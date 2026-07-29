@@ -22,10 +22,12 @@ export function AutomationApiSection() {
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-foreground">Workspace automation</h2>
         <p className="text-muted-foreground">
-          Automation is just a workspace run with no human attached: the same
-          workspace, the same tools, spawned <em>headless</em> on a trigger. A run
-          reaches you through the <span className="text-foreground">Inbox</span> — there
-          is no other output channel. There are two ways a run starts.
+          Automation runs a native agent without an attached interactive
+          Session: the same Workspace and tools, started <em>headless</em> by a
+          trigger. Live progress and structured output appear under{' '}
+          <span className="text-foreground">Runs</span>. A run can also publish a
+          durable, user-facing report to the <span className="text-foreground">Inbox</span>.
+          There are two ways a run starts.
         </p>
       </section>
 
@@ -36,20 +38,21 @@ export function AutomationApiSection() {
           markdown file per issue</strong> under{' '}
           <code className={CODE}>.alice/issues/&lt;id&gt;.md</code> in its own
           checkout (the filename stem is the issue id). Each file is YAML
-          frontmatter plus a markdown body. An issue with a{' '}
+          frontmatter plus one canonical markdown What. The file remains the
+          source of truth whether it is managed from <span className="text-foreground">Issues</span>,{' '}
+          <code className={CODE}>alice-workspace issue</code>, or edited directly.
+          An issue with a{' '}
           <code className={CODE}>when</code> field self-schedules: a launcher
           scanner reads the dir and fires each due issue as a headless run. An
           issue <em>without</em> <code className={CODE}>when</code> is just a
-          tracked work item on the Issue board (the scanner ignores it). There is
-          no central registry and no create API — it is a coding task (the agent
-          edits the files).
+          tracked work item on the Issue board (the scanner ignores it).
         </p>
         <Block>{`.alice/issues/morning-scan.md
 ---
 title: Pre-market movers scan
 status: todo
 priority: high
-assignee: "@workspace"
+assignee: "@new"
 when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: claude
 ---
@@ -71,6 +74,13 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
             <code className={CODE}>done</code>/<code className={CODE}>canceled</code> to silence the timer.
           </li>
           <li>
+            <code className={CODE}>assignee</code> <em>(optional)</em>: scheduled work defaults to{' '}
+            <code className={CODE}>@new</code>, which recruits one Session on the first run and then
+            keeps that concrete owner for later runs. Use <code className={CODE}>@workspace</code>{' '}
+            only when every fire should recruit a newcomer; an exact <code className={CODE}>@resumeId</code>{' '}
+            continues that Session.
+          </li>
+          <li>
             <code className={CODE}>when</code> <em>(optional — present iff scheduled)</em>:{' '}
             <code className={CODE}>{`{kind: every, every: "30m"}`}</code>,{' '}
             <code className={CODE}>{`{kind: cron, cron: "0 9 * * 1-5", timezone: "local"}`}</code>, or{' '}
@@ -82,10 +92,20 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
             for market time. Omission is legacy-compatible machine-local time.
           </li>
           <li>
-            <code className={CODE}>what</code>: a standalone prompt for the headless run — conditions
-            live in the prompt, not the schedule. If omitted, the fire prompt falls back to the title plus the body.
+            <code className={CODE}>agent</code>, <code className={CODE}>model</code>, and{' '}
+            <code className={CODE}>effort</code> optionally select the first or per-run native runtime
+            for <code className={CODE}>@new</code>/<code className={CODE}>@workspace</code>. An exact
+            Session owner already owns that runtime tuple.
           </li>
-          <li>The scanner ticks about once a minute; runs report (or deliberately stay silent) via the Inbox.</li>
+          <li>
+            The markdown below the closing <code className={CODE}>---</code> is the canonical{' '}
+            <strong className="text-foreground">What</strong> and the exact scheduled prompt.
+            Do not add a separate <code className={CODE}>what</code> frontmatter field.
+          </li>
+          <li>
+            The scanner ticks about once a minute. Every attempt appears under Runs; user-facing
+            reports may be published to the Inbox.
+          </li>
         </ul>
       </section>
 
@@ -96,27 +116,31 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
 {
   "prompt": "<the instruction for the run>",
   "agent": "claude",      // optional; uses the saved default agent runtime
+  "resumeId": "resume-…", // optional; continue an existing product conversation
   "timeoutMs": 1800000,   // optional
-  "wait": false           // optional; true = block and return the run's result
+  "wait": false           // optional; true blocks for a fresh run only
 }
 
-  202  { "taskId": "..." }     // accepted, runs in the background (default)
-  429                          // headless concurrency cap reached, retry later`}</Block>
+  202  { "taskId": "...", "resumeId": "...", "status": "running" }
+  429  { "error": "capacity", "message": "..." }`}</Block>
         <p className="text-muted-foreground">
           This is the seam for an external system (a webhook bridge, a cron on
           another host) to drive a workspace. Every run is recorded under{' '}
-          <span className="text-foreground">Runs</span>.
+          <span className="text-foreground">Runs</span>. Keep the returned{' '}
+          <code className={CODE}>resumeId</code> to continue the same accountable
+          conversation in a later asynchronous request.
         </p>
       </section>
 
       <section className="space-y-2">
         <h3 className="font-semibold text-foreground">Reporting back</h3>
         <p className="text-muted-foreground">
-          A headless run has no UI. It surfaces results by pushing to the Inbox
-          (the <code className={CODE}>alice-workspace inbox push</code> CLI, on every
-          workspace's PATH). A run that produces a deliverable but never pushes
-          leaves nothing behind — so a prompt should end by reporting, unless it
-          was a check that deliberately found nothing to say.
+          Every headless run preserves its structured reply and tool activity under{' '}
+          <span className="text-foreground">Runs</span>. For a durable handoff or
+          report, publish to the Inbox with the{' '}
+          <code className={CODE}>alice-workspace inbox push</code> CLI available on
+          every Workspace&apos;s PATH. A no-change check may deliberately exit
+          without creating Inbox noise.
         </p>
       </section>
     </div>
