@@ -763,7 +763,11 @@ export const zh: Resources = {
     },
   },
   dev: {
+    onboarding: '新手引导',
     snapshots: '快照',
+    filterTools: '筛选工具…',
+    selectTool: '请从左侧面板选择一个工具。',
+    toolDetailsLoadError: '工具详情加载失败。',
   },
   simulator: {
     title: '模拟器',

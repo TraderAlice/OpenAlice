@@ -764,7 +764,11 @@ export const ja: Resources = {
     },
   },
   dev: {
+    onboarding: 'オンボーディング',
     snapshots: 'スナップショット',
+    filterTools: 'ツールを絞り込む…',
+    selectTool: '左側のパネルからツールを選択してください。',
+    toolDetailsLoadError: 'ツールの詳細を読み込めませんでした。',
   },
   simulator: {
     title: 'シミュレーター',

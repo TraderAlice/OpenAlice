@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '../components/PageHeader'
 import { Spinner, EmptyState } from '../components/StateViews'
 import { getIntlLocale } from '../lib/intl'
@@ -20,13 +21,13 @@ import { filterAccountTierUTAs } from '../lib/uta-account-filter'
 
 type Tab = Extract<ViewSpec, { kind: 'dev' }>['params']['tab']
 
-const TAB_TITLES: Record<Tab, string> = {
-  tools: 'Tools',
-  onboarding: 'Onboarding',
-  snapshots: 'Snapshots',
-  logs: 'Logs',
-  simulator: 'Simulator',
-}
+const TAB_TITLE_KEYS = {
+  tools: 'common.tools',
+  onboarding: 'dev.onboarding',
+  snapshots: 'dev.snapshots',
+  logs: 'common.logs',
+  simulator: 'simulator.title',
+} as const satisfies Record<Tab, string>
 
 /** Tabs that render content with internal scroll containers — the outer wrapper must NOT add overflow. */
 const SELF_SCROLLING_TABS: ReadonlySet<Tab> = new Set(['tools', 'logs'])
@@ -39,10 +40,11 @@ interface DevPageProps {
 
 export function DevPage({ spec }: DevPageProps) {
   const tab = spec.params.tab
+  const { t } = useTranslation()
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={TAB_TITLES[tab]} />
+      <PageHeader title={t(TAB_TITLE_KEYS[tab])} />
       <div className={`flex-1 min-h-0 ${SELF_SCROLLING_TABS.has(tab) ? 'flex flex-col' : 'overflow-y-auto'}`}>
         {tab === 'tools' && <ToolsTab />}
         {tab === 'onboarding' && <OnboardingDesignPage />}
@@ -268,6 +270,7 @@ function SnapshotRow({ snapshot: s, expanded, onToggle, onDelete }: {
 // ==================== Tools Tab ====================
 
 function ToolsTab() {
+  const { t } = useTranslation()
   const [inventory, setInventory] = useState<ToolInfo[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [detail, setDetail] = useState<ToolDetail | null>(null)
@@ -330,7 +333,8 @@ function ToolsTab() {
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter tools..."
+            placeholder={t('dev.filterTools')}
+            aria-label={t('dev.filterTools')}
             className="w-full px-2.5 py-1.5 bg-background text-foreground border border-border rounded-md text-xs outline-none focus:border-primary"
           />
         </div>
@@ -371,14 +375,14 @@ function ToolsTab() {
       <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            Select a tool from the left panel.
+            {t('dev.selectTool')}
           </div>
         ) : loadingDetail ? (
           <div className="flex justify-center py-10"><Spinner size="sm" /></div>
         ) : detail ? (
           <ToolExecutePanel detail={detail} result={result} onResult={setResult} />
         ) : (
-          <p className="text-sm text-muted-foreground">Failed to load tool details.</p>
+          <p className="text-sm text-muted-foreground">{t('dev.toolDetailsLoadError')}</p>
         )}
       </div>
     </div>
