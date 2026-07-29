@@ -2,7 +2,7 @@ interface ToggleProps {
   checked: boolean
   onChange: (v: boolean) => void
   size?: 'sm' | 'md'
-  ariaLabel?: string
+  ariaLabel: string
   disabled?: boolean
 }
 
