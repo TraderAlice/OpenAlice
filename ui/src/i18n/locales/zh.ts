@@ -880,7 +880,9 @@ export const zh: Resources = {
   },
   automation: {
     runs: '运行',
+    runsDescription: '查看跨工作区的无头 Agent 运行及工作进度。',
     api: 'API',
+    apiDescription: '从外部触发工作区自动化，并查看调度文件格式。',
   },
   tradingModeGate: {
     liteMode: '精简模式',

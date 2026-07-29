@@ -888,7 +888,9 @@ export const zhHant: Resources = {
   },
   automation: {
     runs: '運行',
+    runsDescription: '查看跨工作區的無頭 Agent 運行與工作進度。',
     api: 'API',
+    apiDescription: '從外部觸發工作區自動化，並查看排程檔案格式。',
   },
   tradingModeGate: {
     liteMode: '精簡模式',

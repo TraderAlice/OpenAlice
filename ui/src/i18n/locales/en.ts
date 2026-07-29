@@ -892,7 +892,9 @@ export const en = {
   },
   automation: {
     runs: 'Runs',
+    runsDescription: 'Headless agent runs across workspaces — what the workers are doing.',
     api: 'API',
+    apiDescription: 'Trigger workspace automation from outside, and review the schedule-file format.',
   },
   tradingModeGate: {
     liteMode: 'Lite mode',
