@@ -1338,6 +1338,8 @@ export const zhHant: Resources = {
     deleteEntryAriaLabel: '刪除此收件匣項目',
     deleteConfirmTitle: '刪除這則收件匣訊息？',
     deleteConfirmMessage: '這會從收件匣中永久刪除此更新，但不會刪除 {{workspace}} 中連結的檔案。',
+    deleting: '正在刪除…',
+    deleteFailed: '無法刪除這則收件匣訊息。訊息仍保留，請再試一次。',
   },
   templates: {
     catalogTitle: '工作區模板',

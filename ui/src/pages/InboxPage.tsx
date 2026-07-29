@@ -23,7 +23,7 @@ import { MarkdownContent } from '../components/MarkdownContent'
 import { FileContentView } from '../components/FileContentView'
 import { InboxReplyThread } from '../components/InboxReplyThread'
 import { api } from '../api'
-import { inboxLive, refreshInbox, removeInboxOptimistically } from '../live/inbox'
+import { inboxLive, refreshInbox, removeInboxAfterDelete } from '../live/inbox'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxRead } from '../live/inbox-read'
 import { useIssues } from '../hooks/useIssues'
@@ -60,38 +60,45 @@ export function InboxPage({ visible }: InboxPageProps) {
   const select = useInboxSelection((s) => s.select)
   const markRead = useInboxRead((s) => s.markRead)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
   const pendingDelete = entries.find((e) => e.id === pendingDeleteId) ?? null
 
-  /** Hard-delete an entry. Optimistically removes it, advances selection
-   *  to the next-older entry (or previous if last), fires the DELETE,
-   *  then refreshes to reconcile with the server. */
-  const handleDelete = useCallback(async (id: string) => {
+  /** Hard-delete an entry. The durable DELETE must succeed before the UI
+   *  removes anything: a failed destructive action should keep both the
+   *  entry and its confirmation available for a retry, not briefly mimic
+   *  success until the next Inbox refresh restores the entry. */
+  const handleDelete = useCallback(async (id: string): Promise<boolean> => {
     const idx = entries.findIndex((e) => e.id === id)
-    if (idx < 0) return
+    if (idx < 0) return false
+    setDeleteError(null)
 
     // entries is newest-first; the "next" one is the next older entry.
     // Fall back to the previous (newer) if we deleted the tail.
     const nextId = entries[idx + 1]?.id ?? entries[idx - 1]?.id ?? null
 
-    removeInboxOptimistically(id)
+    try {
+      await api.inbox.delete(id)
+    } catch {
+      setDeleteError(t('inbox.deleteFailed'))
+      refreshInbox()
+      return false
+    }
+
+    removeInboxAfterDelete(id)
     if (nextId) {
       select(nextId)
       markRead(nextId)
     } else {
       select(null)
     }
-
-    try {
-      await api.inbox.delete(id)
-    } catch {
-      // best-effort — refreshInbox below reconciles if the server disagreed.
-    }
     refreshInbox()
-  }, [entries, select, markRead])
+    return true
+  }, [entries, select, markRead, t])
 
   const requestDelete = useCallback((id: string) => {
+    setDeleteError(null)
     setPendingDeleteId(id)
   }, [])
 
@@ -141,16 +148,34 @@ export function InboxPage({ visible }: InboxPageProps) {
       {pendingDelete && (
         <ConfirmDialog
           title={t('inbox.deleteConfirmTitle')}
-          message={t('inbox.deleteConfirmMessage', {
-            workspace: pendingDelete.workspaceLabel ?? pendingDelete.workspaceId,
-          })}
+          message={(
+            <div className="space-y-3">
+              <p>{t('inbox.deleteConfirmMessage', {
+                workspace: pendingDelete.workspaceLabel ?? pendingDelete.workspaceId,
+              })}</p>
+              {deleteError && (
+                <p
+                  role="alert"
+                  className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive"
+                >
+                  {deleteError}
+                </p>
+              )}
+            </div>
+          )}
           confirmLabel={t('common.delete')}
           cancelLabel={t('common.cancel')}
+          workingLabel={t('inbox.deleting')}
           onConfirm={async () => {
-            await handleDelete(pendingDelete.id)
+            const deleted = await handleDelete(pendingDelete.id)
+            if (!deleted) return
+            setDeleteError(null)
             setPendingDeleteId(null)
           }}
-          onClose={() => setPendingDeleteId(null)}
+          onClose={() => {
+            setDeleteError(null)
+            setPendingDeleteId(null)
+          }}
         />
       )}
     </>
