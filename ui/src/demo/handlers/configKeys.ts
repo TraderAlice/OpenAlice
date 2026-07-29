@@ -1,4 +1,12 @@
 import { http, HttpResponse } from 'msw'
+import type { NewsCollectorConfig, NewsCollectorFeed } from '../../api/types'
+import { createDemoNewsConfig } from '../fixtures/newsConfig'
+
+let demoNewsConfig = createDemoNewsConfig()
+
+export function resetDemoNewsConfig(): void {
+  demoNewsConfig = createDemoNewsConfig()
+}
 
 export const demoCredentialPresets = [
   {
@@ -134,6 +142,12 @@ export const demoCredentialPresets = [
   },
 ]
 
+function isValidDuration(value: string): boolean {
+  const match = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(value.trim())
+  if (!match) return false
+  return Number(match[1] ?? 0) > 0 || Number(match[2] ?? 0) > 0 || Number(match[3] ?? 0) > 0
+}
+
 export const configKeysHandlers = [
   http.get('/api/config/api-keys/status', () => HttpResponse.json({})),
   http.put('/api/config/apiKeys', () => new HttpResponse(null, { status: 204 })),
@@ -141,7 +155,28 @@ export const configKeysHandlers = [
   // and useConfigPage adopts the echo, so `{}` here would wipe the page.
   http.put('/api/config/marketData', async ({ request }) => HttpResponse.json(await request.json())),
   http.put('/api/config/trading', async ({ request }) => HttpResponse.json(await request.json())),
-  http.put('/api/config/snapshot', async ({ request }) => HttpResponse.json(await request.json())),
+  http.put('/api/config/snapshot', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+    const every = typeof body.every === 'string' ? body.every.trim() : '15m'
+    if (
+      (Object.prototype.hasOwnProperty.call(body, 'enabled') && typeof body.enabled !== 'boolean')
+      || !isValidDuration(every)
+    ) {
+      return HttpResponse.json({ error: 'Validation failed' }, { status: 400 })
+    }
+    return HttpResponse.json({
+      enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
+      every,
+    })
+  }),
+  http.put('/api/config/news', async ({ request }) => {
+    const body = await request.json().catch(() => null)
+    if (!isNewsCollectorConfig(body)) {
+      return HttpResponse.json({ error: 'invalid_news_config' }, { status: 400 })
+    }
+    demoNewsConfig = structuredClone(body)
+    return HttpResponse.json(demoNewsConfig)
+  }),
 
   http.get('/api/config', () =>
     HttpResponse.json({
@@ -158,6 +193,7 @@ export const configKeysHandlers = [
         providerKeys: {},
         hub: { enabled: true, baseUrl: 'https://traderhub.openalice.ai' },
       },
+      news: demoNewsConfig,
       ports: { web: 47331 },
     }),
   ),
@@ -211,3 +247,42 @@ export const configKeysHandlers = [
     return HttpResponse.json({ agent: typeof body.agent === 'string' ? body.agent : null })
   }),
 ]
+
+function isNewsCollectorConfig(value: unknown): value is NewsCollectorConfig {
+  if (!isRecord(value)) return false
+  return typeof value.enabled === 'boolean'
+    && isPositiveInteger(value.intervalMinutes)
+    && isPositiveInteger(value.maxInMemory)
+    && isPositiveInteger(value.retentionDays)
+    && Array.isArray(value.feeds)
+    && value.feeds.every(isNewsCollectorFeed)
+}
+
+function isNewsCollectorFeed(value: unknown): value is NewsCollectorFeed {
+  if (!isRecord(value)) return false
+  return typeof value.name === 'string'
+    && typeof value.url === 'string'
+    && isUrl(value.url)
+    && typeof value.source === 'string'
+    && (value.categories === undefined
+      || (Array.isArray(value.categories) && value.categories.every((item) => typeof item === 'string')))
+    && (value.description === undefined || typeof value.description === 'string')
+    && (value.enabled === undefined || typeof value.enabled === 'boolean')
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+}
+
+function isUrl(value: string): boolean {
+  try {
+    new URL(value)
+    return true
+  } catch {
+    return false
+  }
+}

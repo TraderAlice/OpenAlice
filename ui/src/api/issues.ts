@@ -71,7 +71,7 @@ export type IssueActivityRecord =
 export type IssueCommentDelivery =
   | { state: 'pending'; targetResumeId: string; taskId: string }
   | { state: 'replied'; targetResumeId: string; taskId: string; replyCommentId: string }
-  | { state: 'failed'; targetResumeId: string; taskId?: string; error: string }
+  | { state: 'failed'; targetResumeId?: string; taskId?: string; error: string }
 
 export interface IssueComment {
   id: string

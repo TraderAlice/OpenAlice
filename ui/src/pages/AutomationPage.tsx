@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { PageHeader } from '../components/PageHeader'
 import type { ViewSpec } from '../tabs/types'
 import { AutomationApiSection } from './AutomationApiSection'
@@ -5,14 +7,12 @@ import { AutomationRunsSection } from './AutomationRunsSection'
 
 type AutomationSection = Extract<ViewSpec, { kind: 'automation' }>['params']['section']
 
-const SECTION_TITLE: Record<AutomationSection, string> = {
-  runs: 'Runs',
-  api: 'API',
-}
-
-const SECTION_DESCRIPTION: Record<AutomationSection, string> = {
-  runs: 'Headless agent runs across workspaces — what the workers are doing.',
-  api: 'Trigger workspace automation from outside, and the schedule-file format.',
+const SECTION_DESCRIPTION_KEY: Record<
+  AutomationSection,
+  'automation.runsDescription' | 'automation.apiDescription'
+> = {
+  runs: 'automation.runsDescription',
+  api: 'automation.apiDescription',
 }
 
 interface AutomationPageProps {
@@ -26,11 +26,15 @@ interface AutomationPageProps {
  * Workspace issues; the retired event-bus surfaces are intentionally absent.
  */
 export function AutomationPage({ spec }: AutomationPageProps) {
+  const { t } = useTranslation()
   const section = spec.params.section
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={SECTION_TITLE[section]} description={SECTION_DESCRIPTION[section]} />
+      <PageHeader
+        title={t(section === 'runs' ? 'automation.runs' : 'automation.api')}
+        description={t(SECTION_DESCRIPTION_KEY[section])}
+      />
       <div
         data-testid="automation-scroll-region"
         className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:px-6 py-5"

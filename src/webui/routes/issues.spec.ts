@@ -311,6 +311,35 @@ describe('POST /api/issues/:wsId/:id/comments', () => {
     }))
   })
 
+  it('asks the creator or reconstructs for a human comment without a fixed owner', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', assignee: '@workspace' })
+    const { app, ask } = build()
+    const r = await req(app, 'POST', '/ws-1/i1/comments', { text: 'how should I read this?' })
+    expect(r.status).toBe(200)
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: {
+        kind: 'issue',
+        workspaceId: 'ws-1',
+        issueId: 'i1',
+        action: 'created',
+      },
+      reconstruct: true,
+      source: { kind: 'human' },
+      subject: expect.objectContaining({
+        kind: 'issue',
+        issueId: 'i1',
+        relation: 'creator',
+        commentId: expect.any(String),
+      }),
+    }))
+    expect(r.body.comments[0].delivery).toEqual({
+      state: 'pending',
+      targetResumeId: 'resume-kind-owl-abc123',
+      taskId: 'run-comment-reply',
+    })
+    expect(r.body.issue.assignee).toBe('@workspace')
+  })
+
   it('notifies the fixed owner and persists pending delivery without blocking the comment', async () => {
     await createIssue(wsDir, {
       id: 'i1',

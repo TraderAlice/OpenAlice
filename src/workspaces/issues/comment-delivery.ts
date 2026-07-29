@@ -1,4 +1,7 @@
-import type { WorkspaceConversationControl } from '../../core/workspace-tool-center.js'
+import type {
+  WorkspaceConversationCaller,
+  WorkspaceConversationControl,
+} from '../../core/workspace-tool-center.js'
 import type { IProvenanceStore } from '../../core/provenance-store.js'
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from '../headless-task-registry.js'
 import { sessionSignature } from '../session-signature.js'
@@ -13,7 +16,7 @@ import { issueAssigneeResumeId, type IssueRecord } from './declaration.js'
 const COMMENT_REPLY_TIMEOUT_MS = 300_000
 
 export type IssueCommentDispatchResult =
-  | { status: 'not_requested'; reason: 'no_fixed_owner' | 'owner_commented' }
+  | { status: 'not_requested'; reason: 'non_human_note' | 'owner_commented' }
   | { status: 'scheduled'; delivery: Extract<IssueCommentDelivery, { state: 'pending' }> }
   | { status: 'failed'; delivery: Extract<IssueCommentDelivery, { state: 'failed' }> }
 
@@ -34,9 +37,14 @@ export function issueCommentReplyPrompt(input: {
 
 /**
  * A fixed Issue owner is a real colleague: comments from somebody else are
- * delivered to that exact product Session. Workspace-owned Issues deliberately
- * stay notes-only because recruiting an arbitrary worker for every comment
- * would invent an owner and blur the Issue's scheduling contract.
+ * delivered to that exact product Session. Human comments on Issues without a
+ * fixed owner use the same provenance-aware fallback as Inbox: continue the
+ * creator when attributable, otherwise recruit a reconstruction worker in the
+ * Issue Workspace. That answering Session is a collaborator, not a new owner;
+ * the Issue assignee and scheduling contract stay unchanged.
+ *
+ * Agent-authored comments on Issues without a fixed owner remain notes. This
+ * avoids turning progress logging into an unsolicited worker fan-out.
  */
 export async function dispatchIssueCommentReply(input: {
   conversation?: WorkspaceConversationControl
@@ -44,43 +52,58 @@ export async function dispatchIssueCommentReply(input: {
   issue: IssueRecord
   comment: IssueComment
   authorResumeId?: string
+  source?: WorkspaceConversationCaller
 }): Promise<IssueCommentDispatchResult> {
   const targetResumeId = issueAssigneeResumeId(input.issue.assignee)
-  if (!targetResumeId) return { status: 'not_requested', reason: 'no_fixed_owner' }
   if (targetResumeId === input.authorResumeId) {
     return { status: 'not_requested', reason: 'owner_commented' }
+  }
+  if (!targetResumeId && input.source?.kind !== 'human') {
+    return { status: 'not_requested', reason: 'non_human_note' }
   }
   if (!input.conversation) {
     return {
       status: 'failed',
       delivery: {
         state: 'failed',
-        targetResumeId,
+        ...(targetResumeId ? { targetResumeId } : {}),
         error: 'Issue conversation delivery is unavailable in this runtime.',
       },
     }
   }
 
   try {
+    const target = targetResumeId
+      ? { kind: 'resume' as const, resumeId: targetResumeId }
+      : {
+          kind: 'issue' as const,
+          workspaceId: input.issueWorkspaceId,
+          issueId: input.issue.id,
+          action: 'created' as const,
+        }
     const result = await input.conversation.ask({
       prompt: issueCommentReplyPrompt(input),
-      target: { kind: 'resume', resumeId: targetResumeId },
+      target,
       timeoutMs: COMMENT_REPLY_TIMEOUT_MS,
+      ...(!targetResumeId ? { reconstruct: true } : {}),
+      ...(input.source ? { source: input.source } : {}),
       subject: {
         kind: 'issue',
         workspaceId: input.issueWorkspaceId,
         issueId: input.issue.id,
-        relation: 'owner',
+        relation: targetResumeId ? 'owner' : 'creator',
         commentId: input.comment.id,
       },
     })
     if (result.status === 'unavailable') {
+      const unavailableTargetResumeId = targetResumeId
+        ?? result.resolution.attributedOrigin?.resumeId
       return {
         status: 'failed',
         delivery: {
           state: 'failed',
-          targetResumeId,
-          error: `Could not reach the Issue owner: ${result.resolution.reason}.`,
+          ...(unavailableTargetResumeId ? { targetResumeId: unavailableTargetResumeId } : {}),
+          error: `Could not reach an Agent for this Issue: ${result.resolution.reason}.`,
         },
       }
     }
@@ -88,7 +111,7 @@ export async function dispatchIssueCommentReply(input: {
       status: 'scheduled',
       delivery: {
         state: 'pending',
-        targetResumeId,
+        targetResumeId: result.resumeId,
         taskId: result.taskId,
       },
     }
@@ -97,7 +120,7 @@ export async function dispatchIssueCommentReply(input: {
       status: 'failed',
       delivery: {
         state: 'failed',
-        targetResumeId,
+        ...(targetResumeId ? { targetResumeId } : {}),
         error: err instanceof Error ? err.message : String(err),
       },
     }
@@ -173,8 +196,8 @@ export async function recordIssueCommentReply(input: {
       taskId: input.task.taskId,
       error: input.error
         ?? (input.status === 'done'
-          ? 'The Issue owner finished without a final reply.'
-          : `The Issue owner run ended as ${input.status}.`),
+          ? 'The Issue reply Agent finished without a final reply.'
+          : `The Issue reply run ended as ${input.status}.`),
     },
   )
   if (!updated.ok) throw new Error(updated.error)

@@ -296,8 +296,12 @@ edits remain explicitly unknown rather than crediting the wrong coworker.
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
 delivered to that exact Session. The final assistant response is recorded as a
 reply comment, linked by `replyTo`; delivery state stays on the source comment.
-Workspace-owned Issues do not recruit a fresh worker for comments. This keeps
-“leave a durable note” separate from “create a new execution owner.”
+For a human comment without a fixed owner, OpenAlice follows the Issue creation
+provenance and uses the universal follow-up rule: continue the attributable
+creator, or recruit a reconstructed Agent in the Issue Workspace when creation
+has no Session origin. This answering Session is a collaborator, not an
+execution owner; `assignee` stays unchanged. Agent-authored comments without a
+fixed owner remain durable notes so progress logging does not fan out workers.
 
 #### Mode A: one responsible Session
 
@@ -507,6 +511,7 @@ The embedded generic entry point is:
 alice-workspace conversation ask --resume-id <resumeId> --prompt '<question>'
 alice-workspace conversation ask --issue-id <issueId> [--ws-id <workspaceId>] --prompt '<question>'
 alice-workspace conversation ask --ws-id <workspaceId> --prompt '<question>'
+alice-workspace conversation ask --ws-id <workspaceId> --prompt '<reconstruction request>' --reconstruct
 alice-workspace conversation await --task-id <taskId>
 alice-workspace conversation collect --task-id <taskA> --task-id <taskB>
 alice-workspace conversation read --task-id <taskId>
@@ -528,11 +533,28 @@ inside the resolver and future business-specific convenience commands; agents
 never serialize them into `conversation ask`. The ask result reports a compact
 `resolution.mode`; read returns runtime status and the latest assistant text by
 default. Full tool/message blocks are diagnostic data behind `--mode detailed`.
-For one peer, `ask --await` is the preferred path. For multiple peers, dispatch
-all asks first so their runs overlap, then server-side collect their task ids in
-one ordered result before synthesizing. A timed-out collect preserves every task;
-callers fall back to a later collect/read snapshot instead of scripting arbitrary
-sleeps.
+
+Provenance resolution and prompt semantics are separate. A fallback worker is
+still labeled `reconstructed` so it cannot impersonate a missing author, but
+OpenAlice delivers the caller's prompt unchanged unless `--reconstruct` was
+explicitly requested. The optional flag adds the reconstruction preamble; it
+does not change whom OpenAlice addresses.
+
+Choose waiting behavior from the work rather than treating every ask as a
+blocking follow-up:
+
+- use `--await` for a bounded consultation whose answer is required in the
+  current turn;
+- omit it for delegation, retain the returned `taskId`/`resumeId`, and retrieve
+  the reply later with `read` or `await`;
+- dispatch multiple independent asks before one ordered `collect`;
+- ask a long-running peer to manage its own local Issue/schedule and `inbox
+  push` the finished report when the human should be notified.
+
+Inbox is human-facing delivery. OpenAlice does not yet inject an unsolicited
+completion message into another Agent's active transcript. A timed-out collect
+preserves every task; callers fall back to a later collect/read snapshot instead
+of scripting arbitrary sleeps.
 
 The first fresh reconstruction appends a `reconstructed` occurrence to the
 artifact. Later questions about that same otherwise-unattributed artifact
@@ -549,6 +571,44 @@ prompts or exposing adapter-native session ids. UI requests return immediately
 after dispatch; the page polls durable task state instead of holding an
 Electron IPC request open for the model turn.
 
+### Independent conversation event log
+
+Every dispatched Workspace conversation also appends a
+`conversation.dispatched` event to
+`<launcherRoot>/state/agent-conversations.jsonl`. Completion appends a matching
+`conversation.completed` event keyed by `taskId`. The stream records:
+
+- authoritative caller Workspace/Session identity when available;
+- target Workspace, product `resumeId`, and Agent runtime;
+- requested target and exact/reconstructed resolution;
+- the original prompt, delivered prompt, and whether explicit reconstruction
+  guidance changed it;
+- terminal status, final assistant text, duration, and compact error.
+
+The file is private launcher state (`0600` where supported), not Workspace Git
+content. It can contain complete prompts and replies and must be treated as
+sensitive local conversation history. Native runtime session ids and raw tool
+blocks never enter it.
+
+`HeadlessTaskRegistry` remains execution truth and structured headless logs
+remain diagnostic truth. The independent event stream is an analysis/audit
+projection for prompt-flow studies and future visualization. A logging failure
+must not block or change message delivery, and the log is not an Agent
+notification mechanism.
+
+The authenticated Dev → Logs → Agent conversations view exposes a read-only
+projection of this stream. It joins dispatch and completion by `taskId`, shows
+newest conversations first, and polls only the newest page. A dispatch without
+a completion event is shown as running. Expanding a row reveals routing
+identities, the original prompt, the final reply, and the delivered prompt only
+when explicit reconstruction guidance changed it.
+
+The browser never receives the launcher log path or an arbitrary file-read
+capability. `/api/agent-conversations` returns bounded typed pages and provides
+no replay, resume, edit, or delete operation. Malformed or partially appended
+JSONL lines are ignored so an interrupted write cannot make the diagnostics
+surface unusable.
+
 ## Phase 2 Feature Design Skeleton
 
 Business convenience wrappers delegate to the same shipped resolver:
@@ -558,7 +618,7 @@ inbox ask <entry>             -> sender Session or reconstructed Workspace Sessi
 issue ask <issue> --creator   -> creation provenance (shipped)
 issue ask <issue> --owner     -> declared Session assignee, or explain Workspace ownership (shipped)
 issue ask <issue> --run-id    -> that run's Session (shipped)
-issue comment <issue>         -> timeline note; fixed owner replies in Activity (shipped)
+issue comment <issue>         -> fixed owner replies; human UI may reconstruct when unowned (shipped)
 report ask <path> [revision]  -> matching writer/update occurrence
 trade ask <order> --decision  -> initiating Session
 trade ask <order> --execution -> UTA/broker evidence, not an AI conversation
@@ -575,7 +635,7 @@ No feature should invent its own meaning of “the agent who made this.”
 | Product Session | `ResumeRegistry`, headless `resumeId`, interactive materialization | Standard origin projection and read-only lookup | Continue exact or create reconstructed Session |
 | Execution | `HeadlessTaskRegistry`, `parentTaskId`, normalized output | Bind every attributable occurrence to the execution and `resumeId` | Poll/stream the peer reply and tool activity |
 | Inbox | Server-stamped run/session origin | Safe exposure and legacy/unknown classification | Ask sender or reconstruct at Workspace |
-| Issue | `{ workspaceId, issueId }`, Activity, Runs, and Inbox reports | Creator/mutation edges, structured comment threads, plus explicit Workspace/Session ownership | Comment to the fixed owner; explicitly ask creator or one selected run |
+| Issue | `{ workspaceId, issueId }`, Activity, Runs, and Inbox reports | Creator/mutation edges, structured comment threads, plus explicit Workspace/Session ownership | Comment to the fixed owner; human comments may reconstruct; explicitly ask creator or one selected run |
 | Report | Workspace path and git repository | Revision-level creation/update attribution | Ask writer of the selected revision |
 | Trade | UTA operation/order authority | Alice Session decision correlation across the UTA boundary | Ask initiator; route execution questions to UTA evidence |
 
@@ -593,8 +653,11 @@ shapes should point back here rather than restating the rules differently.
 | `src/workspaces/session-registry.ts` | Interactive materializations and resume indexes |
 | `src/workspaces/service.ts` | Dispatch, resume, and per-Session concurrency |
 | `src/workspaces/conversation-control.ts` | Provenance resolution plus exact/reconstructed headless dispatch |
+| `src/workspaces/agent-conversation-log.ts` | Private append-only peer-message prompt/reply event stream |
 | `src/tool/conversation.ts` | Embedded business-target ask/read CLI tools |
 | `src/webui/routes/inquiries.ts` | Human Inbox/Issue ask dispatch and durable inquiry projections |
+| `src/webui/routes/agent-conversations.ts` | Authenticated read-only joined conversation pages for Dev Logs |
+| `ui/src/pages/LogsPage.tsx` | Tool-call and Agent-conversation diagnostic views |
 | `src/core/inbox-store.ts` | Immutable notification records and sender provenance |
 | `src/server/inbox-origin.ts` | Server-side run/session attribution |
 | `src/workspaces/issues/declaration.ts` | Workspace-local Issue declaration |

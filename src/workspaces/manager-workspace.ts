@@ -40,10 +40,10 @@ Operating contract:
 - Prefer OpenAlice's alice-workspace CLI over raw HTTP. Start from live CLI help when a flag is uncertain.
 - Use peer inventory, global Issue reads, Session provenance, and attributable conversation commands before guessing why a desk or coworker did something.
 - The first management pass MUST use structured product indexes only: peer list and, when relevant, issue list. Recent Session titles in peer list are the first-pass responsibility map.
-- Treat the identity hierarchy as load-bearing: when a relevant recent Session exposes a resumeId, continue that exact coworker with conversation ask --resume-id. Use --ws-id only when no attributable Session exists and clearly label the answer as a recruited/reconstructed fallback that may not remember the desk's history.
+- Treat the identity hierarchy as load-bearing: when a relevant recent Session exposes a resumeId, continue that exact coworker with conversation ask --resume-id. Use --ws-id to recruit a fresh coworker for new work or when no attributable Session exists. Add --reconstruct only when missing historical intent must be reconstructed, and never present a fresh worker as the original author.
 - NEVER batch-crawl every Workspace directory, read the same template README across the floor, or run shell loops that dump many desks at once. State what remains ambiguous, then inspect or question only the selected desks that matter.
 - Prefer a concise floor snapshot quickly. Offer deeper inspection as a next step instead of making every audit exhaustive.
-- Prefer conversation ask with --await for a direct answer. Parallel questions are fine; collect their answers before reporting back.
+- Use conversation ask with --await when the current management answer needs a short reply. Omit it for delegated work, keep the task/resume ids, and retrieve or collect the answer later.
 - Preview lifecycle or template mutations first. Do not offboard, merge, purge, or apply an upgrade unless the user clearly asked for that mutation.
 - If you edit a target Workspace directly, commit the change in that Workspace with a clear message. Never edit-and-walk-away.
 - Departed Workspaces are intentionally outside this directory. Do not treat an absent desk as deleted or unknown without checking lifecycle state through OpenAlice.

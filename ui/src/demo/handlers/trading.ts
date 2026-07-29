@@ -43,6 +43,27 @@ function utaId(params: { id?: string | readonly string[] }): string {
   return Array.isArray(v) ? v[0] ?? '' : String(v ?? '')
 }
 
+type DemoOrderAction = 'placeOrder' | 'closePosition' | 'cancelOrder'
+
+async function simulateOrderPush(request: Request, action: DemoOrderAction) {
+  const body = await request.json() as { message?: unknown; orderId?: unknown }
+  const message = typeof body.message === 'string' && body.message.trim()
+    ? body.message.trim()
+    : `Demo ${action}`
+  const orderId = action === 'cancelOrder' && typeof body.orderId === 'string'
+    ? body.orderId
+    : `demo-${action}-order`
+
+  return HttpResponse.json({
+    hash: `demo-${action}-commit`,
+    message,
+    operationCount: 1,
+    submitted: [{ action, success: true, orderId, status: 'Simulated' }],
+    rejected: [],
+    simulated: true,
+  })
+}
+
 const demoBrokerPresets = [
   {
     id: 'alpaca', label: 'Alpaca', description: 'US equities with paper-trading support.',
@@ -130,13 +151,16 @@ export const tradingHandlers = [
   http.get('/api/trading/uta/:id/trade-history', ({ params }) =>
     HttpResponse.json({ trades: demoTradeHistoryByUTA[utaId(params)] ?? [] }),
   ),
-  http.get('/api/trading/uta/:id/market-clock', () =>
-    HttpResponse.json({
+  http.get('/api/trading/uta/:id/market-clock', ({ params }) => {
+    if (utaId(params) === DEMO_UTA_CRYPTO) {
+      return HttpResponse.json({ isOpen: true })
+    }
+    return HttpResponse.json({
       isOpen: false,
       nextOpen: new Date(Date.now() + 3600_000).toISOString(),
       nextClose: new Date(Date.now() + 7 * 3600_000).toISOString(),
-    }),
-  ),
+    })
+  }),
 
   http.get('/api/trading/uta/:id/wallet/status', () =>
     HttpResponse.json({ staged: [], pendingMessage: null, head: null, commitCount: 0 }),
@@ -157,23 +181,14 @@ export const tradingHandlers = [
       rejected: [],
     }),
   ),
-  http.post('/api/trading/uta/:id/wallet/place-order', () =>
-    HttpResponse.json(
-      { error: 'Demo mode — orders are read-only.', phase: 'validate' },
-      { status: 400 },
-    ),
+  http.post('/api/trading/uta/:id/wallet/place-order', ({ request }) =>
+    simulateOrderPush(request, 'placeOrder'),
   ),
-  http.post('/api/trading/uta/:id/wallet/close-position', () =>
-    HttpResponse.json(
-      { error: 'Demo mode — orders are read-only.', phase: 'validate' },
-      { status: 400 },
-    ),
+  http.post('/api/trading/uta/:id/wallet/close-position', ({ request }) =>
+    simulateOrderPush(request, 'closePosition'),
   ),
-  http.post('/api/trading/uta/:id/wallet/cancel-order', () =>
-    HttpResponse.json(
-      { error: 'Demo mode — orders are read-only.', phase: 'validate' },
-      { status: 400 },
-    ),
+  http.post('/api/trading/uta/:id/wallet/cancel-order', ({ request }) =>
+    simulateOrderPush(request, 'cancelOrder'),
   ),
 
   http.get('/api/trading/config/broker-presets', () => HttpResponse.json({ presets: demoBrokerPresets })),

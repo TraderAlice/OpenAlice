@@ -14,7 +14,7 @@
  * helper: it carries each vendor's endpoint + model suggestions + request shape.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Preset, type WireShape } from '../api'
 import type {
@@ -26,6 +26,7 @@ import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
 import { SettingsScrollArea, inputClass } from '../components/form'
 import { CredentialModal } from '../components/credentials/CredentialModal'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
   AGENT_LABELS,
   WIRE_SHAPE_GUIDANCE,
@@ -93,24 +94,37 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
 export function AIProviderPage() {
   const { t } = useTranslation()
   const [credentials, setCredentials] = useState<CredentialSummary[] | null>(null)
+  const [credentialsLoadError, setCredentialsLoadError] = useState(false)
   const [presets, setPresets] = useState<Preset[]>([])
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; cred: CredentialSummary } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<CredentialSummary | null>(null)
 
-  const reload = () => api.config.getCredentials().then(({ credentials: c }) => setCredentials(c)).catch(() => setCredentials([]))
+  const reload = useCallback(async () => {
+    setCredentials(null)
+    setCredentialsLoadError(false)
+    try {
+      const { credentials: next } = await api.config.getCredentials()
+      setCredentials(next)
+    } catch {
+      setCredentialsLoadError(true)
+    }
+  }, [])
 
   useEffect(() => {
     void reload()
     api.config.getPresets().then(({ presets: p }) => setPresets(p)).catch(() => {})
-  }, [])
+  }, [reload])
 
   const apiKeyPresets = useMemo(() => presets.filter(isApiKeyPreset), [presets])
 
-  const handleDelete = async (slug: string) => {
+  const handleDelete = async (slug: string): Promise<boolean> => {
     try {
       await api.config.deleteCredential(slug)
       await reload()
+      return true
     } catch (err) {
       alert(err instanceof Error ? err.message : t('aiProvider.deleteFailed'))
+      return false
     }
   }
 
@@ -118,7 +132,21 @@ export function AIProviderPage() {
     return (
       <div className="flex flex-col flex-1 min-h-0">
         <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
-        <PageLoading />
+        {credentialsLoadError ? (
+          <div className="flex flex-1 items-center justify-center px-6 py-12">
+            <div role="alert" className="max-w-md text-center">
+              <h2 className="text-sm font-semibold text-foreground">{t('aiProvider.loadErrorTitle')}</h2>
+              <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                {t('aiProvider.loadErrorDescription')}
+              </p>
+              <button type="button" className="btn-secondary-sm mt-4" onClick={() => void reload()}>
+                {t('common.retry')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <PageLoading />
+        )}
       </div>
     )
   }
@@ -179,7 +207,13 @@ export function AIProviderPage() {
                         {t('common.edit')}
                       </button>
                       <button
-                        onClick={() => handleDelete(cred.slug)}
+                        onClick={() => setPendingDelete(cred)}
+                        title={t('aiProvider.deleteCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
+                        aria-label={t('aiProvider.deleteCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
                         className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-destructive transition-colors"
                       >
                         {t('common.delete')}
@@ -250,6 +284,24 @@ export function AIProviderPage() {
           presets={apiKeyPresets}
           onClose={() => setModal(null)}
           onSaved={async () => { await reload(); setModal(null) }}
+        />
+      )}
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t('aiProvider.deleteConfirmTitle', {
+            credential: credentialLabel(pendingDelete),
+          })}
+          message={t('aiProvider.deleteConfirmMessage', {
+            slug: pendingDelete.slug,
+          })}
+          confirmLabel={t('common.delete')}
+          cancelLabel={t('common.cancel')}
+          onConfirm={async () => {
+            if (await handleDelete(pendingDelete.slug)) {
+              setPendingDelete(null)
+            }
+          }}
+          onClose={() => setPendingDelete(null)}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, Layers } from 'lucide-react'
+import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { inboxLive } from '../live/inbox'
 import { useInboxRead } from '../live/inbox-read'
@@ -31,8 +32,13 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const select = useInboxSelection((s) => s.select)
   const markRead = useInboxRead((s) => s.markRead)
   const mode = useInboxViewMode((s) => s.mode)
+  const { workspaces } = useWorkspaces()
 
   const threads = useMemo(() => groupThreads(entries), [entries])
+  const workspaceLabels = useMemo(
+    () => new Map(workspaces.map((workspace) => [workspace.id, workspace.tag])),
+    [workspaces],
+  )
   const readIds = useMemo(() => {
     const ids: Record<string, true> = {}
     for (const entry of entries) {
@@ -112,6 +118,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
           threads={threads}
           selectedId={selectedId}
           readIds={readIds}
+          workspaceLabels={workspaceLabels}
           onSelect={selectAndRead}
         />
       ) : (
@@ -119,6 +126,7 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
           entries={entries}
           selectedId={selectedId}
           readIds={readIds}
+          workspaceLabels={workspaceLabels}
           onSelect={selectAndRead}
         />
       )}
@@ -180,23 +188,26 @@ function ToggleBtn({
 // ==================== Workspace (clustered) view ====================
 
 function WorkspaceView({
-  threads, selectedId, readIds, onSelect,
+  threads, selectedId, readIds, workspaceLabels, onSelect,
 }: {
   threads: ReturnType<typeof groupThreads>
   selectedId: string | null
   readIds: Record<string, true>
+  workspaceLabels: ReadonlyMap<string, string>
   onSelect: (id: string) => void
 }) {
   return (
     <>
       {threads.map((thread) => {
         const unread = thread.entries.reduce((n, e) => (readIds[e.id] ? n : n + 1), 0)
+        const workspaceLabel =
+          workspaceLabels.get(thread.workspaceId) ?? thread.workspaceLabel ?? thread.workspaceId
         return (
           <div key={thread.workspaceId} className="mb-1.5">
             {/* Cluster header: label · unread badge · latest time */}
             <div className="flex items-center gap-1.5 px-3 mt-1.5 mb-0.5">
               <span className="flex-1 truncate text-[12px] font-medium text-foreground/90">
-                {thread.workspaceLabel ?? thread.workspaceId}
+                {workspaceLabel}
               </span>
               {unread > 0 && (
                 <span className="shrink-0 min-w-[15px] h-[15px] px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold tabular-nums flex items-center justify-center">
@@ -272,11 +283,12 @@ function ClusterRow({
 // ==================== Time (flat chronological) view ====================
 
 function TimeView({
-  entries, selectedId, readIds, onSelect,
+  entries, selectedId, readIds, workspaceLabels, onSelect,
 }: {
   entries: readonly InboxEntry[]
   selectedId: string | null
   readIds: Record<string, true>
+  workspaceLabels: ReadonlyMap<string, string>
   onSelect: (id: string) => void
 }) {
   const { t } = useTranslation()
@@ -296,6 +308,7 @@ function TimeView({
                 entry={entry}
                 active={entry.id === selectedId}
                 unread={!readIds[entry.id]}
+                workspaceLabel={workspaceLabels.get(entry.workspaceId)}
                 onClick={() => onSelect(entry.id)}
               />
             ))}
@@ -309,11 +322,12 @@ function TimeView({
 /** Row in the flat time feed — carries the workspace label (no cluster
  *  header to provide it). */
 function TimeRow({
-  entry, active, unread, onClick,
+  entry, active, unread, workspaceLabel, onClick,
 }: {
   entry: InboxEntry
   active: boolean
   unread: boolean
+  workspaceLabel?: string
   onClick: () => void
 }) {
   return (
@@ -342,7 +356,7 @@ function TimeRow({
           className={`shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
         />
         <span className={`flex-1 truncate text-[12px] ${unread ? 'font-medium text-foreground' : 'text-foreground'}`}>
-          {entry.workspaceLabel ?? entry.workspaceId}
+          {workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId}
         </span>
         <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
           {formatRelativeTime(entry.ts)}

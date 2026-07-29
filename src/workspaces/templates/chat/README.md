@@ -40,8 +40,9 @@ headless workspace run.
 
 Inbox keeps durable report delivery separate from the live terminal. A user or
 peer agent can ask the attributable sender about a report; when only the
-Workspace is known, OpenAlice creates a fresh reconstruction Session and labels
-it honestly instead of pretending it found the original author.
+Workspace is known, OpenAlice creates a fresh Session and labels its provenance
+honestly instead of pretending it found the original author. Reconstruction
+instructions are added only when the caller explicitly requests them.
 
 Things Alice will route here:
 - Research notes, thesis updates, and market snapshots worth re-reading later.

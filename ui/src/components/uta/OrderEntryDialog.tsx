@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Decimal from 'decimal.js'
 import { Field, inputClass } from '../form'
 import { Dialog } from './Dialog'
 import { tradingApi, OrderEntryError } from '../../api/trading'
@@ -142,10 +143,11 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
   const [subAccountId, setSubAccountId] = useState(() => initialWallet(p.subAccounts, p.defaultSubAccountId))
 
   const multiWallet = (p.subAccounts?.length ?? 0) > 1
+  const hasOrderSize = !!quantity.trim() || (orderType === 'MKT' && !!cashQty.trim())
   const canSubmit =
     !!aliceId.trim() &&
     !!message.trim() &&
-    (!!quantity.trim() || !!cashQty.trim()) &&
+    hasOrderSize &&
     (orderType !== 'LMT' || !!lmtPrice.trim()) &&
     (!multiWallet || !!subAccountId) &&
     !p.submitting
@@ -160,8 +162,11 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
         orderType,
         tif,
         message: message.trim(),
-        ...(quantity.trim() && { totalQuantity: quantity.trim() }),
-        ...(cashQty.trim() && { cashQty: cashQty.trim() }),
+        ...(orderType === 'MKT' && cashQty.trim()
+          ? { cashQty: cashQty.trim() }
+          : quantity.trim()
+            ? { totalQuantity: quantity.trim() }
+            : {}),
         ...(orderType === 'LMT' && lmtPrice.trim() && { lmtPrice: lmtPrice.trim() }),
         ...(multiWallet && subAccountId && { subAccountId }),
       }
@@ -197,15 +202,27 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
           <Segmented value={action} options={[{ id: 'BUY' }, { id: 'SELL' }]} onChange={(v) => setAction(v as 'BUY' | 'SELL')} />
         </Field>
         <Field label="Order Type">
-          <Segmented value={orderType} options={[{ id: 'MKT', label: 'Market' }, { id: 'LMT', label: 'Limit' }]} onChange={(v) => setOrderType(v as 'MKT' | 'LMT')} />
+          <Segmented
+            value={orderType}
+            options={[{ id: 'MKT', label: 'Market' }, { id: 'LMT', label: 'Limit' }]}
+            onChange={(v) => {
+              const next = v as 'MKT' | 'LMT'
+              setOrderType(next)
+              if (next !== 'MKT') setCashQty('')
+            }}
+          />
         </Field>
       </div>
 
-      <Field label={`Quantity${cashQty ? ' (or use Cash Qty below)' : ''}`}>
+      <Field label={`Quantity${cashQty ? ' (using Cash Qty below)' : ''}`}>
         <input
           className={`${inputClass} font-mono`}
           value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value
+            setQuantity(next)
+            if (next.trim()) setCashQty('')
+          }}
           placeholder="0.001"
           inputMode="decimal"
         />
@@ -232,16 +249,24 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
       </button>
       {showAdvanced && (
         <div className="space-y-3 border-l border-border pl-3">
-          <Field label="Cash Qty (notional)">
-            <input
-              className={`${inputClass} font-mono`}
-              value={cashQty}
-              onChange={(e) => setCashQty(e.target.value)}
-              placeholder="50"
-              inputMode="decimal"
-            />
-            <p className="text-[11px] text-muted-foreground/60 mt-1">USDT-equivalent notional. Overrides Quantity if both are set.</p>
-          </Field>
+          {orderType === 'MKT' && (
+            <Field label="Cash Qty (notional)">
+              <input
+                className={`${inputClass} font-mono`}
+                value={cashQty}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setCashQty(next)
+                  if (next.trim()) setQuantity('')
+                }}
+                placeholder="50"
+                inputMode="decimal"
+              />
+              <p className="text-[11px] text-muted-foreground/60 mt-1">
+                Market orders only. Entering a cash quantity clears Quantity.
+              </p>
+            </Field>
+          )}
           <Field label="Time in Force">
             <select className={inputClass} value={tif} onChange={(e) => setTif(e.target.value)}>
               <option value="DAY">DAY</option>
@@ -281,13 +306,34 @@ function PlaceForm({ initialAliceId, ...p }: SharedFormProps & { initialAliceId?
 
 // ==================== Close form ====================
 
+function closeQuantityError(qty: string, availableQty: string): string | null {
+  if (!qty.trim()) return null
+
+  const available = new Decimal(availableQty).abs()
+  let requested: Decimal
+  try {
+    requested = new Decimal(qty.trim())
+  } catch {
+    return `Enter a positive quantity no greater than ${available.toString()}.`
+  }
+
+  if (!requested.isFinite() || requested.lte(0)) {
+    return `Enter a positive quantity no greater than ${available.toString()}.`
+  }
+  if (requested.gt(available)) {
+    return `Quantity cannot exceed the current position size (${available.toString()}).`
+  }
+  return null
+}
+
 function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { aliceId: string; initialQty: string; symbol?: string }) {
   const [qty, setQty] = useState(initialQty)
   const [message, setMessage] = useState('')
   const [subAccountId, setSubAccountId] = useState(() => initialWallet(p.subAccounts, p.defaultSubAccountId))
 
   const multiWallet = (p.subAccounts?.length ?? 0) > 1
-  const canSubmit = !!message.trim() && (!multiWallet || !!subAccountId) && !p.submitting
+  const quantityError = closeQuantityError(qty, initialQty)
+  const canSubmit = !!message.trim() && !quantityError && (!multiWallet || !!subAccountId) && !p.submitting
 
   const handleSubmit = async () => {
     p.setError(null)
@@ -330,8 +376,16 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           onChange={(e) => setQty(e.target.value)}
           placeholder="(empty = full position)"
           inputMode="decimal"
+          aria-label="Quantity to close"
+          aria-invalid={quantityError ? 'true' : undefined}
+          aria-describedby="close-position-quantity-help"
         />
-        <p className="text-[11px] text-muted-foreground/60 mt-1">Defaults to current position size. Override for partial close. Empty = close entire position.</p>
+        <p
+          id="close-position-quantity-help"
+          className={`text-[11px] mt-1 ${quantityError ? 'text-destructive' : 'text-muted-foreground/60'}`}
+        >
+          {quantityError ?? `Current position size: ${new Decimal(initialQty).abs().toString()}. Enter less for a partial close, or clear to close all.`}
+        </p>
       </Field>
 
       <Field label="Commit Message — required">
@@ -341,6 +395,7 @@ function CloseForm({ aliceId, initialQty, symbol, ...p }: SharedFormProps & { al
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Why are you closing?"
           autoFocus
+          aria-label="Commit Message — required"
         />
       </Field>
 
@@ -365,13 +420,16 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
   const totalRejected = result.rejected.length
   const totalSubmitted = result.submitted.length
   const fullySubmitted = totalRejected === 0 && totalSubmitted > 0
+  const simulated = result.simulated === true
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full shrink-0 ${fullySubmitted ? 'bg-success' : 'bg-warning'}`} />
         <span className={`text-[13px] font-medium ${fullySubmitted ? 'text-success' : 'text-warning'}`}>
-          {fullySubmitted
+          {simulated
+            ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} simulated`
+            : fullySubmitted
             ? `${totalSubmitted} operation${totalSubmitted > 1 ? 's' : ''} submitted to broker`
             : `${totalSubmitted} submitted, ${totalRejected} rejected`}
         </span>
@@ -389,16 +447,24 @@ function PushResultPanel({ result }: { result: WalletPushResult }) {
       </div>
 
       {result.submitted.length > 0 && (
-        <OpTable title="Submitted" rows={result.submitted} kind="submitted" />
+        <OpTable title={simulated ? 'Simulated' : 'Submitted'} rows={result.submitted} kind="submitted" />
       )}
       {result.rejected.length > 0 && (
         <OpTable title="Rejected" rows={result.rejected} kind="rejected" />
       )}
 
-      <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Status <strong className="text-foreground">Submitted</strong> means the broker accepted the order — fills happen async.
-        Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-foreground">Filled</strong>.
-      </p>
+      {simulated
+        ? (
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Demo simulation only — no order was sent to a broker and portfolio data was not changed.
+          </p>
+        )
+        : (
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Status <strong className="text-foreground">Submitted</strong> means the broker accepted the order — fills happen async.
+            Refresh the positions / orders panels in a moment to see the order transition to <strong className="text-foreground">Filled</strong>.
+          </p>
+        )}
     </div>
   )
 }
@@ -482,4 +548,3 @@ function Segmented({ value, options, onChange }: {
     </div>
   )
 }
-

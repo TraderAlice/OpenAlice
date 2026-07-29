@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -202,5 +202,32 @@ describe('KlinePanel source routing', () => {
       </MemoryRouter>,
     )
     expect(mocks.bars).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('KlinePanel chart controls', () => {
+  it('names each control independently and exposes the selected interval and range', async () => {
+    mocks.bars.mockResolvedValue(response('AAPL', 'yfinance|AAPL'))
+
+    render(
+      <MemoryRouter initialEntries={['/market/equity/AAPL?interval=5m&range=3M']}>
+        <KlinePanel selection={{ symbol: 'AAPL', assetClass: 'equity' }} />
+      </MemoryRouter>,
+    )
+
+    const intervals = screen.getByRole('group', { name: 'Interval' })
+    expect(within(intervals).getByRole('button', { name: '5m' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(intervals).getByRole('button', { name: '1m' }).getAttribute('aria-pressed')).toBe('false')
+
+    const ranges = screen.getByRole('group', { name: 'Range' })
+    expect(within(ranges).getByRole('button', { name: '3M' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(ranges).getByRole('button', { name: '1Y' }).getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.click(within(intervals).getByRole('button', { name: '1h' }))
+
+    await waitFor(() => {
+      expect(within(intervals).getByRole('button', { name: '1h' }).getAttribute('aria-pressed')).toBe('true')
+      expect(mocks.bars).toHaveBeenCalledWith(expect.objectContaining({ interval: '1h' }))
+    })
   })
 })

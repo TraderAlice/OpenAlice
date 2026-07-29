@@ -499,6 +499,12 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
   // Tab title = file basename; path itself shows in the page header.
   title: (spec) => spec.params.path.split('/').filter(Boolean).pop() ?? spec.params.path,
   toUrl: (spec) => {
+    if (spec.params.source === 'tracked') {
+      const query = spec.params.returnTrackedName
+        ? `?entity=${encodeURIComponent(spec.params.returnTrackedName)}`
+        : ''
+      return `/tracked/files/${encodeURIComponent(spec.params.wsId)}/${encodeURIComponent(spec.params.path)}${query}`
+    }
     const base = spec.params.source === 'chat'
       ? `/chat/workspaces/${encodeURIComponent(spec.params.wsId)}`
       : `/workspaces/${encodeURIComponent(spec.params.wsId)}`
@@ -509,6 +515,17 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
   },
   Component: ({ spec }) => spec.params.source === 'chat'
     ? <FileViewerPage spec={spec} />
+    : spec.params.source === 'tracked'
+      ? (
+        <PageSidebarShell
+          storageKey="tracked"
+          titleKey="nav.item.tracked"
+          defaultWidth={232}
+          sidebar={<TrackedSidebar />}
+        >
+          <FileViewerPage spec={spec} />
+        </PageSidebarShell>
+      )
     : (
       <PageSidebarShell
         storageKey="workspaces"

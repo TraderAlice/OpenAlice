@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TrendingUp, Hash, FileText, ListChecks } from 'lucide-react'
+import { TrendingUp, Hash, FileText, ListChecks, CircleAlert } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
 import { api } from '../api'
@@ -27,27 +27,38 @@ export function TrackedPage() {
 
   const [detail, setDetail] = useState<EntityDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState(false)
+  const [detailRequest, setDetailRequest] = useState(0)
   useEffect(() => {
     if (!selectedName) {
       setDetail(null)
       setDetailLoading(false)
+      setDetailError(false)
       return
     }
     let cancelled = false
     setDetail(null)
     setDetailLoading(true)
+    setDetailError(false)
     api.entities
       .get(selectedName)
       .then((d) => {
-        if (!cancelled) { setDetail(d); setDetailLoading(false) }
+        if (!cancelled) {
+          setDetail(d)
+          setDetailLoading(false)
+        }
       })
       .catch(() => {
-        if (!cancelled) { setDetail(null); setDetailLoading(false) }
+        if (!cancelled) {
+          setDetail(null)
+          setDetailLoading(false)
+          setDetailError(true)
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [selectedName])
+  }, [selectedName, detailRequest])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -62,12 +73,42 @@ export function TrackedPage() {
           <EmptyState />
         ) : !selectedName ? (
           <div className="px-6 py-8 text-muted-foreground text-sm">{t('tracked.selectFromSidebar')}</div>
-        ) : detailLoading || !detail ? (
+        ) : detailLoading ? (
           <PageLoading />
+        ) : detailError || !detail ? (
+          <DetailLoadError
+            name={selectedName}
+            onRetry={() => setDetailRequest((request) => request + 1)}
+          />
         ) : (
           <Detail detail={detail} />
         )}
       </div>
+    </div>
+  )
+}
+
+function DetailLoadError({ name, onRetry }: { name: string; onRetry: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="alert"
+      className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center"
+    >
+      <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
+      <h2 className="mt-3 text-[15px] font-medium text-foreground">
+        {t('tracked.detailLoadErrorTitle', { name })}
+      </h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        {t('tracked.detailLoadErrorDescription')}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+      >
+        {t('common.retry')}
+      </button>
     </div>
   )
 }
@@ -134,7 +175,11 @@ function Detail({ detail }: { detail: EntityDetail }) {
       ) : (
         <div className="flex flex-col gap-1">
           {backlinks.map((b, i) => (
-            <BacklinkRow key={`${b.workspaceId}:${b.path}:${i}`} backlink={b} />
+            <BacklinkRow
+              key={`${b.workspaceId}:${b.path}:${i}`}
+              backlink={b}
+              trackedName={entity.name}
+            />
           ))}
         </div>
       )}
@@ -157,7 +202,13 @@ function issueIdFromPath(path: string): string | null {
   return id && !id.includes('/') ? id : null
 }
 
-function BacklinkRow({ backlink }: { backlink: Backlink }) {
+function BacklinkRow({
+  backlink,
+  trackedName,
+}: {
+  backlink: Backlink
+  trackedName: string
+}) {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const issueId = issueIdFromPath(backlink.path)
@@ -172,10 +223,18 @@ function BacklinkRow({ backlink }: { backlink: Backlink }) {
       })
       return
     }
-    // Plain note → the dedicated file viewer (VS Code-style), at its exact path.
+    // Plain note stays owned by Tracked. Preserve the selected entity so both
+    // the page Back action and a copied/deep-linked URL return to the same
+    // entity/backlink context instead of falling into System → Workspaces.
+    setSidebar('tracked')
     openOrFocus({
       kind: 'file-viewer',
-      params: { wsId: backlink.workspaceId, path: backlink.path },
+      params: {
+        wsId: backlink.workspaceId,
+        path: backlink.path,
+        source: 'tracked',
+        returnTrackedName: trackedName,
+      },
     })
   }
   const Icon = issueId ? ListChecks : FileText

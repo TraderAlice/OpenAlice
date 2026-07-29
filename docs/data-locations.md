@@ -26,6 +26,11 @@ homes and unpinned ports. Two writers must never share one home. Default ports
 probe upward independently, while explicitly pinned ports still fail if they
 collide.
 
+Workspace launcher state includes the private
+`workspaces/state/agent-conversations.jsonl` prompt/reply event stream. It moves
+with the complete home, is not part of any Workspace repository, and should be
+treated as sensitive conversation history when backing up or sharing a home.
+
 `AQ_LAUNCHER_ROOT` and `OPENALICE_GLOBAL_DIR` remain advanced split-root
 overrides. A fixed `AQ_LAUNCHER_ROOT` disables desktop home switching because
 changing only the rest of the home would still share Workspace files and

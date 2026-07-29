@@ -3,11 +3,13 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import '../i18n'
 import { FileViewerPage } from './FileViewerPage'
 
 const mocks = vi.hoisted(() => ({
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
+  selectTracked: vi.fn(),
   readWorkspaceFile: vi.fn(),
 }))
 
@@ -27,6 +29,12 @@ vi.mock('../tabs/store', () => ({
 
 vi.mock('../components/workspace/api', () => ({
   readWorkspaceFile: mocks.readWorkspaceFile,
+}))
+
+vi.mock('../live/tracked-selection', () => ({
+  useTrackedSelection: (selector: (state: {
+    select: typeof mocks.selectTracked
+  }) => unknown) => selector({ select: mocks.selectTracked }),
 }))
 
 vi.mock('../components/FileContentView', () => ({
@@ -56,7 +64,9 @@ describe('FileViewerPage back navigation', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    const back = screen.getByRole('button', { name: 'Back to chat-jul20' })
+    expect(back.getAttribute('title')).toBe('Back to chat-jul20')
+    fireEvent.click(back)
 
     expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
@@ -76,12 +86,37 @@ describe('FileViewerPage back navigation', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to chat-jul20' }))
 
     expect(mocks.setSidebar).toHaveBeenCalledWith('workspaces')
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace',
       params: { wsId: 'chat-1' },
+    })
+  })
+
+  it('returns a Tracked backlink artifact to the same entity context', () => {
+    render(
+      <FileViewerPage
+        spec={{
+          kind: 'file-viewer',
+          params: {
+            wsId: 'chat-1',
+            path: 'research/power.md',
+            source: 'tracked',
+            returnTrackedName: 'stock-vst',
+          },
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Tracked' }))
+
+    expect(mocks.selectTracked).toHaveBeenCalledWith('stock-vst')
+    expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'tracked',
+      params: {},
     })
   })
 })

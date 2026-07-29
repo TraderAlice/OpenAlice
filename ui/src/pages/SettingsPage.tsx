@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Moon, RotateCcw, Sun } from 'lucide-react'
-import { api, type AppConfig } from '../api'
+import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
 import { SaveIndicator } from '../components/SaveIndicator'
@@ -357,18 +357,23 @@ function PalettePicker({
 
 // ==================== Language ====================
 
-function LanguageSection() {
+export function LanguageSection() {
   const { t } = useTranslation()
   const locale = useLocale()
   const setLocale = useSetLocale()
   return (
     <ConfigSection title={t('settings.language.title')} description={t('settings.language.description')}>
-      <div className="flex flex-wrap gap-2 py-1">
+      <div
+        className="flex flex-wrap gap-2 py-1"
+        role="group"
+        aria-label={t('settings.language.title')}
+      >
         {(['en', 'zh', 'ja', 'zh-Hant'] as const).map((l) => (
           <button
             key={l}
             type="button"
             onClick={() => setLocale(l)}
+            aria-pressed={locale === l}
             className={`px-3 py-1.5 text-sm rounded border transition-colors ${
               locale === l
                 ? 'border-primary text-primary bg-primary/10'
@@ -653,13 +658,6 @@ function WorkspaceShellSection() {
 
 function SettingsSection() {
   const { t } = useTranslation()
-  const [config, setConfig] = useState<AppConfig | null>(null)
-
-  useEffect(() => {
-    api.config.load().then(setConfig).catch(() => {})
-  }, [])
-
-  if (!config) return <PageLoading />
 
   return (
     <div className="mx-auto w-full max-w-[1100px]">
@@ -769,7 +767,7 @@ interface ToolGroup {
   tools: ToolInfo[]
 }
 
-function ToolsSection() {
+export function ToolsSection() {
   const { t } = useTranslation()
   const groupLabel = (key: string): string => {
     switch (key) {
@@ -789,15 +787,25 @@ function ToolsSection() {
   const [inventory, setInventory] = useState<ToolInfo[]>([])
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    api.tools.load().then((res) => {
+  const loadTools = useCallback(async () => {
+    setLoaded(false)
+    setLoadError(false)
+    try {
+      const res = await api.tools.load()
       setInventory(res.inventory)
       setDisabled(new Set(res.disabled))
       setLoaded(true)
-    }).catch(() => {})
+    } catch {
+      setLoadError(true)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadTools()
+  }, [loadTools])
 
   const groups = useMemo<ToolGroup[]>(() => {
     const map = new Map<string, ToolInfo[]>()
@@ -854,7 +862,16 @@ function ToolsSection() {
   return (
     <div className="mx-auto w-full max-w-[1100px]">
       {!loaded ? (
-        <PageLoading />
+        loadError ? (
+          <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-sm font-medium text-foreground">{t('settings.tools.loadError')}</p>
+            <button type="button" className="btn-secondary-sm mt-4" onClick={() => void loadTools()}>
+              {t('common.retry')}
+            </button>
+          </div>
+        ) : (
+          <PageLoading />
+        )
       ) : groups.length === 0 ? (
         <EmptyState title={t('settings.tools.emptyTitle')} description={t('settings.tools.emptyDescription')} />
       ) : (
@@ -930,6 +947,7 @@ function ToolGroupCard({
           </span>
         </button>
         <Toggle
+          ariaLabel={`${label} tools`}
           size="sm"
           checked={!noneEnabled}
           onChange={(v) => onToggleGroup(group.tools, v)}
@@ -961,6 +979,7 @@ function ToolGroupCard({
                   )}
                 </div>
                 <Toggle
+                  ariaLabel={t.name}
                   size="sm"
                   checked={enabled}
                   onChange={() => onToggleTool(t.name)}
@@ -983,6 +1002,43 @@ const TABS: { key: Tab; labelKey: 'settings.tab.settings' | 'settings.tab.tools'
   { key: 'tools', labelKey: 'settings.tab.tools' },
 ]
 
+export function SettingsTabBar({
+  tab,
+  onSelect,
+}: {
+  tab: Tab
+  onSelect: (tab: Tab) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      className="flex gap-1"
+      role="group"
+      aria-label={t('settings.title')}
+    >
+      {TABS.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => onSelect(item.key)}
+          aria-pressed={tab === item.key}
+          className={`px-3 py-2 text-sm font-medium transition-colors relative ${
+            tab === item.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {t(item.labelKey)}
+          {tab === item.key && (
+            <span
+              aria-hidden
+              className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t"
+            />
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('settings')
@@ -992,22 +1048,7 @@ export function SettingsPage() {
       <PageHeader title={t('settings.title')} />
 
       <div className="px-4 md:px-6 border-b border-border/60">
-        <div className="flex gap-1">
-          {TABS.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setTab(item.key)}
-              className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-                tab === item.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t(item.labelKey)}
-              {tab === item.key && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t" />
-              )}
-            </button>
-          ))}
-        </div>
+        <SettingsTabBar tab={tab} onSelect={setTab} />
       </div>
 
       <SettingsScrollArea className="px-4 py-6 md:px-8">

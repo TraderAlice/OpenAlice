@@ -376,11 +376,11 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
         const fresh = await loadConfig()
         Object.assign(opts.ctx.config, fresh)
       }
-      // trading.json is consumed by the UTA process at boot (order-sync
-      // poller cadence) — bounce UTA via the Guardian flag protocol, same
-      // as broker config edits. Fire-and-forget: progress is visible
-      // through the health badges.
-      if (section === 'trading') {
+      // trading.json and snapshot.json are consumed by the UTA process at
+      // boot (order-sync and snapshot pump cadence) — bounce UTA via the
+      // Guardian flag protocol, same as broker config edits.
+      // Fire-and-forget: progress is visible through the health badges.
+      if (section === 'trading' || section === 'snapshot') {
         triggerUTARestart().catch(() => { /* surfaced via health badges */ })
       }
       // marketData edits are picked up lazily by the provider resolver

@@ -122,6 +122,7 @@ export function PortfolioPage() {
   const [selectedSnapshot, setSelectedSnapshot] = useState<UTASnapshotSummary | null>(null)
   const [snapshotEnabled, setSnapshotEnabled] = useState(true)
   const [snapshotEvery, setSnapshotEvery] = useState('15m')
+  const [snapshotConfigLoaded, setSnapshotConfigLoaded] = useState(false)
   // Aggregate curve (all UTAs, full per-account breakdown) — shared between
   // hero today-PnL delta and per-account sparklines. Distinct from
   // curvePoints which follows the user's chart-account selection.
@@ -131,7 +132,11 @@ export function PortfolioPage() {
   const saveSnapshotConfig = useCallback(async (d: Record<string, unknown>) => {
     await api.config.updateSection('snapshot', d)
   }, [])
-  const { status: snapshotSaveStatus } = useAutoSave({ data: snapshotConfig, save: saveSnapshotConfig })
+  const { status: snapshotSaveStatus } = useAutoSave({
+    data: snapshotConfig,
+    save: saveSnapshotConfig,
+    enabled: snapshotConfigLoaded,
+  })
 
   // Fetch curve data for the user's chart-pane selection (single account
   // or 'all'). Distinct from aggregate-curve — that one is always fetched
@@ -177,6 +182,7 @@ export function PortfolioPage() {
       setSnapshotEnabled(configResult.snapshot.enabled)
       setSnapshotEvery(configResult.snapshot.every)
     }
+    setSnapshotConfigLoaded(true)
 
     // Default to first account on initial load
     const effectiveId = curveAccountId || result.accounts[0]?.id || 'all'
@@ -780,7 +786,16 @@ const INTERVAL_PRESETS = [
   { label: '1h', value: '1h' },
 ]
 
-function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, saveStatus }: {
+export function isValidSnapshotInterval(value: string): boolean {
+  const match = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(value.trim())
+  if (!match) return false
+  const hours = Number(match[1] ?? 0)
+  const minutes = Number(match[2] ?? 0)
+  const seconds = Number(match[3] ?? 0)
+  return hours > 0 || minutes > 0 || seconds > 0
+}
+
+export function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, saveStatus }: {
   enabled: boolean
   every: string
   onEnabledChange: (v: boolean) => void
@@ -789,6 +804,13 @@ function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, save
 }) {
   const isPreset = INTERVAL_PRESETS.some(p => p.value === every)
   const [showCustom, setShowCustom] = useState(!isPreset)
+  const [customEvery, setCustomEvery] = useState(every)
+  const customEveryValid = isValidSnapshotInterval(customEvery)
+
+  useEffect(() => {
+    setCustomEvery(every)
+    if (!isPreset) setShowCustom(true)
+  }, [every, isPreset])
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-secondary/45 px-3 py-2.5 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -818,13 +840,30 @@ function SnapshotSettings({ enabled, every, onEnabledChange, onEveryChange, save
           compact
         />
         {showCustom && (
-          <input
-            aria-label="Custom portfolio snapshot interval"
-            className="w-16 rounded-md border border-border bg-background px-1.5 py-1 text-center text-[12px] text-foreground outline-none focus:border-primary"
-            value={every}
-            onChange={(e) => onEveryChange(e.target.value)}
-            placeholder="e.g. 2h"
-          />
+          <div className="relative">
+            <input
+              aria-label="Custom portfolio snapshot interval"
+              aria-invalid={!customEveryValid}
+              aria-describedby={!customEveryValid ? 'snapshot-interval-error' : undefined}
+              className="w-20 rounded-md border border-border bg-background px-1.5 py-1 text-center text-[12px] text-foreground outline-none focus:border-primary"
+              value={customEvery}
+              onChange={(e) => {
+                const next = e.target.value
+                setCustomEvery(next)
+                if (isValidSnapshotInterval(next)) onEveryChange(next.trim())
+              }}
+              placeholder="e.g. 2h"
+            />
+            {!customEveryValid && (
+              <p
+                id="snapshot-interval-error"
+                role="alert"
+                className="absolute right-0 top-full z-10 mt-1 w-max max-w-64 rounded-md border border-destructive/30 bg-background px-2 py-1 text-[11px] text-destructive shadow-md"
+              >
+                Use a positive duration such as 15m, 1h, or 2h15m.
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -29,12 +29,16 @@ function validId(id: string | undefined): id is string {
   return typeof id === 'string' && /^[a-zA-Z0-9_-]+$/.test(id)
 }
 
-async function promptFromRequest(c: import('hono').Context): Promise<string | null> {
+async function promptFromRequest(
+  c: import('hono').Context,
+): Promise<{ prompt: string; reconstruct: boolean } | null> {
   try {
-    const body = await c.req.json() as { prompt?: unknown }
+    const body = await c.req.json() as { prompt?: unknown; reconstruct?: unknown }
     if (typeof body.prompt !== 'string') return null
     const prompt = body.prompt.trim()
-    return prompt.length > 0 && prompt.length <= MAX_PROMPT_CHARS ? prompt : null
+    return prompt.length > 0 && prompt.length <= MAX_PROMPT_CHARS
+      ? { prompt, reconstruct: body.reconstruct === true }
+      : null
   } catch {
     return null
   }
@@ -89,8 +93,8 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
 
   app.post('/inbox/:id', async (c) => {
     const id = c.req.param('id')
-    const prompt = await promptFromRequest(c)
-    if (!prompt) return c.json({ error: 'invalid_prompt', message: 'prompt must be 1-16000 characters' }, 400)
+    const request = await promptFromRequest(c)
+    if (!request) return c.json({ error: 'invalid_prompt', message: 'prompt must be 1-16000 characters' }, 400)
     const entry = await deps.inboxStore.get(id)
     if (!entry) return c.json({ error: 'not_found' }, 404)
     const origin = resolveInboxOrigin(entry)
@@ -99,9 +103,11 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
       : { kind: 'inbox' as const, inboxEntryId: entry.id, workspaceId: entry.workspaceId }
     try {
       const result = await conversation.ask({
-        prompt,
+        prompt: request.prompt,
         target,
         timeoutMs: DEFAULT_TIMEOUT_MS,
+        source: { kind: 'human' },
+        ...(request.reconstruct ? { reconstruct: true } : {}),
         subject: { kind: 'inbox', entryId: entry.id },
       })
       if (result.status === 'unavailable') {
@@ -125,7 +131,7 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
     const wsId = c.req.param('wsId')
     const id = c.req.param('id')
     if (!validId(wsId) || !validId(id)) return c.json({ error: 'not_found' }, 404)
-    let body: { prompt?: unknown; relation?: unknown; runId?: unknown }
+    let body: { prompt?: unknown; relation?: unknown; runId?: unknown; reconstruct?: unknown }
     try {
       body = await c.req.json() as typeof body
     } catch {
@@ -167,7 +173,14 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
       ...(runId ? { runId } : {}),
     }
     try {
-      const result = await conversation.ask({ prompt, target, timeoutMs: DEFAULT_TIMEOUT_MS, subject })
+      const result = await conversation.ask({
+        prompt,
+        target,
+        timeoutMs: DEFAULT_TIMEOUT_MS,
+        source: { kind: 'human' },
+        ...(body.reconstruct === true ? { reconstruct: true } : {}),
+        subject,
+      })
       if (result.status === 'unavailable') {
         return c.json({ error: 'unavailable', resolution: result.resolution }, 409)
       }

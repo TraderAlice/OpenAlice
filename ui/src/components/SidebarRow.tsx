@@ -45,6 +45,7 @@ export function SidebarRow({ label, active = false, onClick, icon, trail, title,
     <div
       role="button"
       tabIndex={0}
+      aria-current={active ? 'page' : undefined}
       onClick={onClick}
       title={title}
       onKeyDown={(e) => {

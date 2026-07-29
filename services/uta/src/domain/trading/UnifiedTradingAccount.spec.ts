@@ -244,6 +244,7 @@ describe('UTA — operation dispatch', () => {
 
   describe('closePosition', () => {
     it('calls broker.closePosition with contract and qty', async () => {
+      broker.externalDeposit({ nativeKey: 'AAPL', quantity: 10 })
       const spy = vi.spyOn(broker, 'closePosition')
       const contract = makeContract({ symbol: 'AAPL' })
       uta.git.add({ action: 'closePosition', contract, quantity: new Decimal(5) })
@@ -254,6 +255,31 @@ describe('UTA — operation dispatch', () => {
       const [passedContract, qty] = spy.mock.calls[0]
       expect(passedContract.symbol).toBe('AAPL')
       expect(qty!.toNumber()).toBe(5)
+    })
+
+    it('rejects an oversized partial close before calling the broker', async () => {
+      broker.externalDeposit({ nativeKey: 'AAPL', quantity: 10 })
+      const spy = vi.spyOn(broker, 'closePosition')
+      const contract = makeContract({ symbol: 'AAPL' })
+      uta.git.add({ action: 'closePosition', contract, quantity: new Decimal(11) })
+      uta.git.commit('oversized close AAPL')
+      const result = await uta.push()
+
+      expect(spy).not.toHaveBeenCalled()
+      expect(result.submitted).toHaveLength(0)
+      expect(result.rejected).toHaveLength(1)
+      expect(result.rejected[0].error).toMatch(/quantity 11 exceeds the open AAPL position size 10/)
+    })
+
+    it('rejects a stale partial close when the position no longer exists', async () => {
+      const spy = vi.spyOn(broker, 'closePosition')
+      const contract = makeContract({ symbol: 'AAPL' })
+      uta.git.add({ action: 'closePosition', contract, quantity: new Decimal(5) })
+      uta.git.commit('stale close AAPL')
+      const result = await uta.push()
+
+      expect(spy).not.toHaveBeenCalled()
+      expect(result.rejected[0].error).toMatch(/no open position found for AAPL/)
     })
 
     it('passes undefined qty for full close', async () => {
@@ -732,6 +758,15 @@ describe('UTA — stageClosePosition', () => {
     const op = staged[0] as Extract<Operation, { action: 'closePosition' }>
     expect(op.quantity).toBeUndefined()
   })
+
+  it.each(['0', '-1', 'Infinity', 'not-a-number'])(
+    'rejects invalid explicit quantity %s before staging',
+    (qty) => {
+      expect(() => uta.stageClosePosition({ aliceId: 'mock-paper|AAPL', qty }))
+        .toThrow(/qty must be a positive finite number/)
+      expect(uta.status().staged).toHaveLength(0)
+    },
+  )
 })
 
 // ==================== contractFromAliceId ====================

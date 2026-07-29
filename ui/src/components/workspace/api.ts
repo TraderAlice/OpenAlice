@@ -1291,6 +1291,8 @@ export interface WorkspaceCredentialDetection {
   readonly reasoning?: boolean | null;
   readonly reasoningEffort?: ModelReasoningEffort | null;
   readonly reasoningMode?: ModelReasoningMode | null;
+  /** Registered thinking-switch default when the model has no native effort tier. */
+  readonly reasoningDefaultEnabled?: boolean | null;
   readonly interactiveSetupStatus?:
     | 'ready'
     | 'runtime-onboarding-required'

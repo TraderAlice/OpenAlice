@@ -279,6 +279,41 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     });
   });
 
+  it('reports a registered thinking-switch default when the model has no effort tier', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({
+      'longcat-1': {
+        vendor: 'longcat',
+        authType: 'api-key',
+        apiKey: 'longcat-test-key',
+        wires: { 'openai-chat': 'https://api.longcat.chat/openai/v1' },
+      },
+    });
+    const { app } = build({
+      opencodeConfig: {
+        apiKey: 'longcat-test-key',
+        model: 'LongCat-2.0',
+        wireShape: 'openai-chat',
+        reasoning: true,
+      },
+    });
+
+    const result = await get(app, '/ws-1/agent-config/opencode/credential');
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        configured: true,
+        slug: 'longcat-1',
+        model: 'LongCat-2.0',
+        contextWindow: null,
+        wireShape: 'openai-chat',
+        reasoning: true,
+        reasoningMode: 'optional',
+        reasoningDefaultEnabled: true,
+      },
+    });
+  });
+
   it('keeps hand-edited Workspace config visible when no vault key matches', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app } = build({

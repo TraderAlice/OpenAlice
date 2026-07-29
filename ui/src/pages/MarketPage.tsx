@@ -25,7 +25,7 @@ export function MarketPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title="Market" description="Search assets and view price history." />
+      <PageHeader title={t('market.pageTitle')} description={t('market.pageDescription')} />
       <div className="flex-1 flex flex-col gap-6 px-4 md:px-8 py-4 min-h-0 overflow-y-auto">
         <SearchBox />
 
@@ -34,10 +34,10 @@ export function MarketPage() {
           <div className="relative flex flex-col gap-4">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-success">FX desk</p>
-                <h2 className="mt-1 text-[17px] font-semibold text-foreground">From spot to carry and macro — in one pair view.</h2>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-success">{t('market.fxEyebrow')}</p>
+                <h2 className="mt-1 text-[17px] font-semibold text-foreground">{t('market.fxTitle')}</h2>
                 <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
-                  Open a major pair for price risk, rate and inflation divergence, indicative forwards, and a manual exposure scenario. No broker or bank-account connection required.
+                  {t('market.fxDescription')}
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -56,20 +56,20 @@ export function MarketPage() {
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <FxDeskEntry
                 icon={<Globe2 size={15} />}
-                title="Cross-country macro"
-                description="Rates, inflation and growth momentum by currency economy."
+                title={t('market.fxGlobalTitle')}
+                description={t('market.fxGlobalDescription')}
                 onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'global-macro' } })}
               />
               <FxDeskEntry
                 icon={<Activity size={15} />}
-                title="US regime"
-                description="Dollar, Treasury curve, inflation and labor inputs."
+                title={t('market.fxUsTitle')}
+                description={t('market.fxUsDescription')}
                 onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'macro' } })}
               />
               <FxDeskEntry
                 icon={<Landmark size={15} />}
-                title="Fed policy"
-                description="Balance sheet, dealer positioning and FOMC documents."
+                title={t('market.fxFedTitle')}
+                description={t('market.fxFedDescription')}
                 onClick={() => openOrFocus({ kind: 'market-board', params: { board: 'fed' } })}
               />
             </div>

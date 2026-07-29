@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { Gauge, LockKeyhole, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { CircleAlert, Gauge, LockKeyhole, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { api, type AppConfig } from '../api'
@@ -38,28 +38,69 @@ const MODES: TradingMode[] = ['lite', 'readonly', 'pro']
 export function AgentPermissionsPage() {
   const { t } = useTranslation()
   const [config, setConfig] = useState<AppConfig | null>(null)
+  const [loadError, setLoadError] = useState(false)
+
+  const loadConfig = useCallback(async () => {
+    setConfig(null)
+    setLoadError(false)
+    try {
+      setConfig(await api.config.load())
+    } catch {
+      setLoadError(true)
+    }
+  }, [])
 
   useEffect(() => {
     ensureTradingModePolling()
-    api.config.load().then(setConfig).catch(() => {})
-  }, [])
-
-  if (!config) return <PageLoading />
+    void loadConfig()
+  }, [loadConfig])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('settings.agentPermissions.title')} />
-      <SettingsScrollArea>
-        <div className="mx-auto w-full max-w-[980px] px-4 md:px-6">
-          <TradingModeSection />
-          <PermissionSection
-            title={t('settings.agentPermissions.aiPush.title')}
-            description={t('settings.agentPermissions.aiPush.description')}
-          >
-            <AiTradingToggle config={config} setConfig={setConfig} />
-          </PermissionSection>
-        </div>
-      </SettingsScrollArea>
+      {!config ? (
+        loadError ? <PermissionsLoadError onRetry={() => void loadConfig()} /> : <PageLoading />
+      ) : (
+        <SettingsScrollArea>
+          <div className="mx-auto w-full max-w-[980px] px-4 md:px-6">
+            <TradingModeSection />
+            <PermissionSection
+              title={t('settings.agentPermissions.aiPush.title')}
+              description={t('settings.agentPermissions.aiPush.description')}
+            >
+              <AiTradingToggle config={config} setConfig={setConfig} />
+            </PermissionSection>
+          </div>
+        </SettingsScrollArea>
+      )}
+    </div>
+  )
+}
+
+function PermissionsLoadError({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex flex-1 items-center justify-center px-6 py-12">
+      <div
+        role="alert"
+        className="flex max-w-md flex-col items-center rounded-xl border border-destructive/30 bg-destructive/5 px-6 py-7 text-center"
+      >
+        <CircleAlert className="mb-3 text-destructive" size={28} strokeWidth={1.7} aria-hidden />
+        <h2 className="text-sm font-semibold text-foreground">
+          {t('settings.agentPermissions.loadErrorTitle')}
+        </h2>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+          {t('settings.agentPermissions.loadErrorDescription')}
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-5 rounded-md border border-border bg-background px-3.5 py-2 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+        >
+          {t('common.retry')}
+        </button>
+      </div>
     </div>
   )
 }
@@ -190,7 +231,11 @@ function AiTradingToggle({
             {enabled ? t('settings.agent.allowAiTradingOn') : t('settings.agent.allowAiTradingOff')}
           </p>
         </div>
-        <Toggle checked={enabled} onChange={onToggle} />
+        <Toggle
+          ariaLabel={t('settings.agent.allowAiTrading')}
+          checked={enabled}
+          onChange={onToggle}
+        />
       </div>
       {enabled && (
         <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive leading-relaxed">

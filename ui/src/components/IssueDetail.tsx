@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowLeft, Hash, History, Inbox, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
 
@@ -18,13 +18,19 @@ import type {
 } from '../api/issues'
 import type { ModelReasoningEffort } from '../api/types'
 import {
+  detectWorkspaceCredential,
   getAgentReadiness,
   getWorkspaceSessionDirectory,
   type AgentCredentialReadiness,
   type AgentId,
+  type WorkspaceCredentialDetection,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
 import { issuesApi } from '../api/issues'
+import {
+  WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
+  type WorkspaceAgentConfigChangedDetail,
+} from '../lib/workspaceAiEvents'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
@@ -190,6 +196,7 @@ function AgentEditor({
         className={railControl}
         value={selected}
         disabled={disabled}
+        aria-label="Runtime"
         onChange={(e) => {
           const next = e.target.value
           onChange(next ? next : null)
@@ -230,36 +237,92 @@ function AgentEditor({
 
 function ModelEditor({
   value,
+  workspaceModel,
+  loadingWorkspaceDefault,
   disabled,
   onChange,
 }: {
   value?: string
+  workspaceModel: string | null
+  loadingWorkspaceDefault: boolean
   disabled?: boolean
   onChange: (next: string | null) => void
 }) {
+  const [customMode, setCustomMode] = useState(Boolean(value))
   const [draft, setDraft] = useState(value ?? '')
-  useEffect(() => setDraft(value ?? ''), [value])
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    setCustomMode(Boolean(value))
+    setDraft(value ?? '')
+  }, [value])
   const commit = () => {
     const next = draft.trim()
     if (next !== (value ?? '')) onChange(next || null)
+    if (!next) setCustomMode(false)
   }
+  const workspaceLabel = loadingWorkspaceDefault
+    ? 'Default · loading…'
+    : workspaceModel
+      ? `Default · ${workspaceModel}`
+      : 'Default · runtime decides'
+
   return (
-    <input
-      className={railControl}
-      value={draft}
-      disabled={disabled}
-      placeholder="Inherit Workspace"
-      aria-label="Run model"
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          commit()
-          event.currentTarget.blur()
-        }
-      }}
-    />
+    <div className="min-w-0 flex-1">
+      <select
+        className={`${railControl} w-full`}
+        value={customMode ? 'custom' : 'workspace'}
+        disabled={disabled}
+        aria-label="Run model"
+        onChange={(event) => {
+          if (event.target.value === 'workspace') {
+            setCustomMode(false)
+            setDraft('')
+            if (value) onChange(null)
+            return
+          }
+          setCustomMode(true)
+          queueMicrotask(() => inputRef.current?.focus())
+        }}
+      >
+        <option value="workspace">{workspaceLabel}</option>
+        <option value="custom">{value ? `Override · ${value}` : 'Custom model…'}</option>
+      </select>
+      {customMode && (
+        <input
+          ref={inputRef}
+          className={`${railControl} mt-1 w-full`}
+          value={draft}
+          disabled={disabled}
+          placeholder="Exact native model ID"
+          aria-label="Custom run model"
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              commit()
+              event.currentTarget.blur()
+            } else if (event.key === 'Escape' && !value) {
+              setDraft('')
+              setCustomMode(false)
+            }
+          }}
+        />
+      )}
+    </div>
   )
+}
+
+function workspaceEffortLabel(
+  detected: WorkspaceCredentialDetection | null,
+  loading: boolean,
+): string {
+  if (loading) return 'Default · loading…'
+  if (detected?.reasoningEffort) return `Default · ${detected.reasoningEffort}`
+  if (detected?.reasoningMode === 'none') return 'Default · none'
+  if (detected?.reasoningMode === 'required') return 'Default · required'
+  if (detected?.reasoningDefaultEnabled === true) return 'Default · thinking on'
+  if (detected?.reasoningDefaultEnabled === false) return 'Default · thinking off'
+  return 'Default · runtime decides'
 }
 
 function PropertySection({
@@ -281,6 +344,7 @@ function PropertySection({
 }
 
 function PropertiesRail({
+  wsId,
   issue,
   agentOptions,
   issueDefaultAgent,
@@ -295,6 +359,7 @@ function PropertiesRail({
   onRetry,
   onConfigureAgent,
 }: {
+  wsId: string
   issue: IssueDetailIssue
   agentOptions: readonly { id: string; displayName: string; installed?: boolean }[]
   issueDefaultAgent: string | null
@@ -322,6 +387,53 @@ function PropertiesRail({
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
   const effortOptions = runEffortsForAgent(effectiveAgent)
+  const [workspaceDefaults, setWorkspaceDefaults] = useState<{
+    agent: string
+    loading: boolean
+    detected: WorkspaceCredentialDetection | null
+  } | null>(null)
+  const [workspaceDefaultsRevision, setWorkspaceDefaultsRevision] = useState(0)
+
+  useEffect(() => {
+    const handleWorkspaceAgentConfigChanged = (event: Event) => {
+      const detail = (event as CustomEvent<WorkspaceAgentConfigChangedDetail>).detail
+      if (detail?.wsId === wsId && detail.agent === effectiveAgent) {
+        setWorkspaceDefaultsRevision((revision) => revision + 1)
+      }
+    }
+    window.addEventListener(
+      WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
+      handleWorkspaceAgentConfigChanged,
+    )
+    return () => {
+      window.removeEventListener(
+        WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
+        handleWorkspaceAgentConfigChanged,
+      )
+    }
+  }, [effectiveAgent, wsId])
+
+  useEffect(() => {
+    if (!isConfigurableAgent(effectiveAgent)) {
+      setWorkspaceDefaults(null)
+      return
+    }
+    let live = true
+    setWorkspaceDefaults({ agent: effectiveAgent, loading: true, detected: null })
+    void detectWorkspaceCredential(wsId, effectiveAgent)
+      .then((detected) => {
+        if (live) setWorkspaceDefaults({ agent: effectiveAgent, loading: false, detected })
+      })
+      .catch(() => {
+        if (live) setWorkspaceDefaults({ agent: effectiveAgent, loading: false, detected: null })
+      })
+    return () => { live = false }
+  }, [effectiveAgent, workspaceDefaultsRevision, wsId])
+
+  const selectedWorkspaceDefaults = workspaceDefaults?.agent === effectiveAgent
+    ? workspaceDefaults
+    : null
+
   return (
     <aside className="min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
       <PropertySection title="Work item" description="Ownership and schedule are part of this Issue.">
@@ -331,6 +443,7 @@ function PropertiesRail({
             className={railControl}
             value={issue.status}
             disabled={saving}
+            aria-label="Status"
             onChange={(e) => onPatch({ status: e.target.value as IssueStatus })}
           >
             {STATUS_OPTIONS.map((s) => (
@@ -346,6 +459,7 @@ function PropertiesRail({
             className={`${railControl} capitalize`}
             value={issue.priority}
             disabled={saving}
+            aria-label="Priority"
             onChange={(e) => onPatch({ priority: e.target.value as IssuePriority })}
           >
             {PRIORITY_OPTIONS.map((p) => (
@@ -400,6 +514,8 @@ function PropertiesRail({
               <EditRow label="Model">
                 <ModelEditor
                   value={issue.model}
+                  workspaceModel={selectedWorkspaceDefaults?.detected?.model ?? null}
+                  loadingWorkspaceDefault={selectedWorkspaceDefaults?.loading ?? false}
                   disabled={saving}
                   onChange={(model) => onPatch({ model })}
                 />
@@ -416,7 +532,12 @@ function PropertiesRail({
                       : null,
                   })}
                 >
-                  <option value="">Inherit Workspace</option>
+                  <option value="">
+                    {workspaceEffortLabel(
+                      selectedWorkspaceDefaults?.detected ?? null,
+                      selectedWorkspaceDefaults?.loading ?? false,
+                    )}
+                  </option>
                   {effortOptions.map((effort) => (
                     <option key={effort} value={effort}>{effort}</option>
                   ))}
@@ -507,7 +628,7 @@ function CommentComposer({
         rows={3}
         value={text}
         disabled={sending}
-        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Leave a comment…'}
+        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Ask about this Issue…'}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -523,8 +644,8 @@ function CommentComposer({
           {ownerResumeId
             ? <>The assigned Session <span className="font-mono text-foreground/75">@{ownerResumeId}</span> will reply here.</>
             : assignee === '@new'
-              ? 'The first scheduled run will assign a Session; until then this is a timeline note.'
-              : 'No fixed Session owner — this comment is recorded as a timeline note.'}
+              ? 'Until the first run assigns an owner, the creator or a reconstructed Workspace Agent will reply here.'
+              : 'The creator or a reconstructed Workspace Agent will reply here; ownership stays unchanged.'}
         </p>
         <button
           type="button"
@@ -532,7 +653,7 @@ function CommentComposer({
           disabled={sending || text.trim().length === 0}
           className="oa-pressable rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Comment'}
+          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Comment & ask'}
         </button>
       </div>
     </div>
@@ -736,9 +857,9 @@ function mutationSummary(change: { field: string; before?: string; after?: strin
   return `changed ${label} from ${mutationValue(change.field, change.before)} to ${mutationValue(change.field, change.after)}`
 }
 
-function IssueActivity({
+export function IssueActivity({
   activity,
-  onContinue,
+  onOpenSession,
   wsId,
   issueId,
   ownerResumeId,
@@ -746,25 +867,46 @@ function IssueActivity({
   onPosted,
 }: {
   activity: IssueActivityRecord[]
-  onContinue: (record: IssueProvenanceRecord) => Promise<void>
+  onOpenSession: (record: IssueProvenanceRecord) => Promise<void>
   wsId: string
   issueId: string
   ownerResumeId: string | null
   assignee: string
   onPosted: (next: IssueDetailData) => void
 }) {
-  const [continuingId, setContinuingId] = useState<string | null>(null)
-  const [continueError, setContinueError] = useState<string | null>(null)
+  const [openingId, setOpeningId] = useState<string | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
+  const [identityPopoverId, setIdentityPopoverId] = useState<string | null>(null)
+  const identityPopoverRef = useRef<HTMLSpanElement>(null)
 
-  const continueSession = async (record: IssueProvenanceRecord) => {
-    setContinuingId(record.id)
-    setContinueError(null)
+  useEffect(() => {
+    if (!identityPopoverId) return
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!identityPopoverRef.current?.contains(event.target as Node)) {
+        setIdentityPopoverId(null)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIdentityPopoverId(null)
+    }
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [identityPopoverId])
+
+  const openSession = async (record: IssueProvenanceRecord) => {
+    setIdentityPopoverId(null)
+    setOpeningId(record.id)
+    setOpenError(null)
     try {
-      await onContinue(record)
+      await onOpenSession(record)
     } catch (err) {
-      setContinueError(err instanceof Error ? err.message : String(err))
+      setOpenError(err instanceof Error ? err.message : String(err))
     } finally {
-      setContinuingId(null)
+      setOpeningId(null)
     }
   }
 
@@ -805,7 +947,7 @@ function IssueActivity({
                     )}
                     {delivery?.state === 'failed' && (
                       <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-[11px] leading-snug text-warning">
-                        The comment is saved, but the owner could not be reached: {delivery.error}
+                        The comment is saved, but an Agent could not reply: {delivery.error}
                       </p>
                     )}
                   </article>
@@ -828,11 +970,55 @@ function IssueActivity({
                   <History size={10} aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] text-muted-foreground">
-                    <span className="font-medium text-foreground/80">{originLabel}</span>{' '}
+                  <div className="text-[12px] text-muted-foreground">
+                    {isSession ? (
+                      <span
+                        ref={identityPopoverId === record.id ? identityPopoverRef : undefined}
+                        className="relative inline-block"
+                      >
+                        <button
+                          type="button"
+                          aria-label={`Show Session details for ${originLabel}`}
+                          aria-haspopup="dialog"
+                          aria-expanded={identityPopoverId === record.id}
+                          aria-controls={`issue-session-${record.id}`}
+                          onClick={() => setIdentityPopoverId((open) => open === record.id ? null : record.id)}
+                          disabled={openingId !== null}
+                          className="inline rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50"
+                        >
+                          {originLabel}
+                        </button>
+                        {identityPopoverId === record.id && (
+                          <div
+                            id={`issue-session-${record.id}`}
+                            role="dialog"
+                            aria-label={`Session ${origin.resumeId}`}
+                            className="oa-popover-enter absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg"
+                          >
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+                              Session
+                            </p>
+                            <p className="mt-1 text-[12px] font-medium text-foreground">{origin.agent}</p>
+                            <p className="mt-0.5 break-all font-mono text-[10px] leading-relaxed text-muted-foreground">
+                              {origin.resumeId}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => void openSession(record)}
+                              disabled={openingId !== null}
+                              className="oa-pressable mt-3 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
+                            >
+                              {openingId === record.id ? 'Opening…' : 'Open conversation'}
+                            </button>
+                          </div>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-foreground/80">{originLabel}</span>
+                    )}{' '}
                     {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
                     <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
-                  </p>
+                  </div>
                   {record.mutation && (
                     <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-muted-foreground/80">
                       {record.mutation.fields.map((change) => (
@@ -841,22 +1027,12 @@ function IssueActivity({
                     </ul>
                   )}
                 </div>
-                {isSession && (
-                  <button
-                    type="button"
-                    onClick={() => void continueSession(record)}
-                    disabled={continuingId !== null}
-                    className="oa-pressable shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-wait disabled:opacity-50"
-                  >
-                    {continuingId === record.id ? 'Opening…' : 'Continue'}
-                  </button>
-                )}
               </li>
             )
           })}
         </ul>
       )}
-      {continueError && <p className="mt-2 text-xs text-destructive">Could not continue Session: {continueError}</p>}
+      {openError && <p className="mt-2 text-xs text-destructive">Could not open Session: {openError}</p>}
       <CommentComposer
         wsId={wsId}
         id={issueId}
@@ -1088,7 +1264,7 @@ export function IssueDetail({
     [selectInboxEntry, markInboxRead, setSidebar, openOrFocus],
   )
 
-  const continueProvenanceSession = useCallback(
+  const openProvenanceSession = useCallback(
     async (record: IssueProvenanceRecord) => {
       if (record.origin.kind !== 'session') return
       setSidebar('chat')
@@ -1245,7 +1421,7 @@ export function IssueDetail({
           />
           <IssueActivity
             activity={activity}
-            onContinue={continueProvenanceSession}
+            onOpenSession={openProvenanceSession}
             wsId={wsId}
             issueId={id}
             ownerResumeId={stableOwnerResumeId}
@@ -1254,6 +1430,7 @@ export function IssueDetail({
           />
         </main>
         <PropertiesRail
+          wsId={wsId}
           issue={issue}
           agentOptions={agentOptions}
           issueDefaultAgent={issueDefaultAgent}

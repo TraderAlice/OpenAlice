@@ -253,8 +253,20 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         </section>
 
         {(error ?? workspaceManagerError) && (
-          <div className="mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
-            {error ?? workspaceManagerError}
+          <div
+            role="alert"
+            className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-[12px] text-destructive"
+          >
+            <span>{error ?? workspaceManagerError}</span>
+            {!error && workspaceManagerError && (
+              <button
+                type="button"
+                className="shrink-0 rounded-md border border-destructive/30 px-2.5 py-1 font-medium hover:bg-destructive/10"
+                onClick={() => void refreshWorkspaceManager()}
+              >
+                {t('common.retry')}
+              </button>
+            )}
           </div>
         )}
 
