@@ -203,6 +203,24 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceManagerPage runtime selection', () => {
+  it('does not submit when Enter confirms an IME composition candidate', async () => {
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    await screen.findByRole('button', { name: 'Select agent' })
+    const composer = screen.getByRole('textbox')
+    fireEvent.change(composer, { target: { value: '检查工作区' } })
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: true })
+    expect(mocks.quickStartWorkspaceManager).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: false })
+    await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
+      '检查工作区',
+      'codex',
+      undefined,
+    ))
+  })
+
   it('offers a retry when the manager snapshot cannot load', async () => {
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context('codex'),
