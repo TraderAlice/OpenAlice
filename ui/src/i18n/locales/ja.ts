@@ -974,6 +974,17 @@ export const ja: Resources = {
     openSymbol: '{{symbol}} の詳細を開く',
     pageTitle: 'マーケット',
     pageDescription: '銘柄を検索し、価格履歴を確認します。',
+    tradeableTitle: '設定済みブローカーで取引可能',
+    tradeableInfo:
+      'エンドポイント：/api/trading/contracts/search\nブローカー側でヒューリスティックなあいまい検索を行います。分析画面のシンボルは検索条件であり、正規 ID ではありません。\n取引時はブローカーの aliceId（alias:broker:exchange-id）を使用します。',
+    tradeableSearching: 'ブローカーを検索中…',
+    tradeableNoAccounts:
+      '取引口座が設定されていません。<tradingLink>「取引」で追加</tradingLink>すると、一致する取引商品を確認できます。',
+    tradeableNoMatches: '設定済みブローカーに {{symbol}} と一致する取引可能な商品はありません。',
+    tradeableShowFewer: '折りたたむ',
+    tradeableShowMore: 'ほか {{hidden}} 件を表示（全 {{total}} 件）',
+    tradeableOrderTitle: '対応する UTA の注文画面を開く',
+    tradeableOrder: '注文',
     searchPlaceholder: '銘柄を検索…',
     searchInputPlaceholder: '銘柄を検索 — AAPL、ビットコイン、EUR、金…',
     searching: '検索中…',
