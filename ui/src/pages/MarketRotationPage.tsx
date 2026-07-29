@@ -43,6 +43,7 @@ export function MarketRotationPage() {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [requestVersion, setRequestVersion] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -63,7 +64,13 @@ export function MarketRotationPage() {
     load()
     const timer = setInterval(load, REFRESH_MS)
     return () => { alive = false; clearInterval(timer) }
-  }, [])
+  }, [requestVersion])
+
+  const retry = () => {
+    setError(null)
+    setLoading(true)
+    setRequestVersion((version) => version + 1)
+  }
 
   const points = useMemo<Point[]>(() => {
     if (!data) return []
@@ -92,7 +99,19 @@ export function MarketRotationPage() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-6 min-h-0">
         {loading && !data && <CenteredLoading label={t('common.loading')} />}
         {error && (
-          <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive"
+          >
+            <span className="min-w-0 break-words">{error}</span>
+            <button
+              type="button"
+              className="shrink-0 rounded-md border border-destructive/30 px-2.5 py-1 font-medium hover:bg-destructive/10"
+              onClick={retry}
+            >
+              {t('common.retry')}
+            </button>
+          </div>
         )}
 
         {data && (
