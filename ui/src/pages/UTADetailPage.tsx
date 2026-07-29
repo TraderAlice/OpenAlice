@@ -251,39 +251,45 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
             </div>
           )}
 
-          {/* Exchange-style two-column layout: tables get the wide main
-              column, the Account panel rides a sticky sidebar. On narrow
-              screens it collapses to one column with the Account panel
-              first — it's the summary. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start">
-            <div className="lg:order-2 lg:sticky lg:top-4 self-start min-w-0 space-y-3">
-              {subAccounts.length > 1 && (
-                <SubAccountSelector
-                  subAccounts={subAccounts}
-                  selected={selectedSub}
-                  onSelect={(sub) => {
-                    // Drop the previous wallet's numbers immediately so the
-                    // panel shows "Loading account info…" during the (slow,
-                    // multi-round-trip) scoped read instead of briefly painting
-                    // the old scope's net-liquidation under the new pill.
-                    setAccount(null)
-                    setSelectedSub(sub)
-                  }}
-                />
-              )}
-              <AccountPanel account={account} positions={positions} delta24h={delta24h} clock={clock} connecting={health?.connecting ?? false} />
-            </div>
+          {!lastUpdated ? <UTADetailMainSkeleton /> : (
+            <div className="space-y-5">
+              {/* Keep the visual overview together, then give the operational
+                  tables the full content width. The auto-fit grid responds to
+                  this pane's real width after both app sidebars, rather than
+                  guessing from the browser viewport. */}
+              <div
+                className="grid items-stretch gap-4"
+                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 26rem), 1fr))' }}
+              >
+                {curvePoints.length >= 2 && (
+                  <div className="min-w-0">
+                    <EquityCurve
+                      points={curvePoints}
+                      accounts={[{ id, label: displayName }]}
+                      selectedAccountId={id}
+                      onAccountChange={() => { /* single-account mode: switcher hidden */ }}
+                    />
+                  </div>
+                )}
 
-            <div className="lg:order-1 min-w-0 space-y-5">
-              {!lastUpdated ? <UTADetailMainSkeleton /> : <>
-              {curvePoints.length >= 2 && (
-                <EquityCurve
-                  points={curvePoints}
-                  accounts={[{ id, label: displayName }]}
-                  selectedAccountId={id}
-                  onAccountChange={() => { /* single-account mode: switcher hidden */ }}
-                />
-              )}
+                <div className="min-w-0 space-y-3">
+                  {subAccounts.length > 1 && (
+                    <SubAccountSelector
+                      subAccounts={subAccounts}
+                      selected={selectedSub}
+                      onSelect={(sub) => {
+                        // Drop the previous wallet's numbers immediately so the
+                        // panel shows "Loading account info…" during the (slow,
+                        // multi-round-trip) scoped read instead of briefly painting
+                        // the old scope's net-liquidation under the new pill.
+                        setAccount(null)
+                        setSelectedSub(sub)
+                      }}
+                    />
+                  )}
+                  <AccountPanel account={account} positions={positions} delta24h={delta24h} clock={clock} connecting={health?.connecting ?? false} />
+                </div>
+              </div>
 
               <PositionsSection
                 positions={positions}
@@ -296,9 +302,8 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
               />
 
               <OrdersArea utaId={id} openOrders={orders} />
-              </>}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
