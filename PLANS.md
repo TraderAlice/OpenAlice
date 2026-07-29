@@ -21,6 +21,11 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/shell-first-cli-supervisor.md]] — Makes Shell-first OpenAlice a
+  first-class distribution with a Supervisor TUI, persistent Guardian-owned
+  Runtime lifecycle, standalone headless release bundle, atomic upgrade and
+  rollback, and real N-1 plus PTY end-to-end acceptance.
+
 ## Completed
 
 - [[plans/cli-lifecycle-quality.md]] — Aligns the computer-level CLI with the
