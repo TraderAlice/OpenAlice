@@ -42,9 +42,10 @@ Launchers share the same ownership model:
   host. It starts Alice/UTA through Electron's Node mode.
 - `scripts/guardian/prod.mjs` supervises built Runtime services for Docker and
   the source-backed local CLI. Docker defaults to the `docker` launcher;
-  `openalice start` supplies the `cli` launcher, while `openalice server`
-  supplies `cli-server` plus a versioned local status/stop capability. All CLI
-  browser and SSH paths keep Alice on loopback.
+  `openalice start` supplies the compatibility `cli` launcher, while canonical
+  `openalice up|run` and compatibility `openalice server` supply `cli-server`
+  plus a versioned local status/stop capability. All CLI browser and SSH paths
+  keep Alice on loopback.
 - `packages/guardian-runtime/` owns cross-launcher single-writer locks,
   heartbeat metadata, process identity, and controlled takeover.
 

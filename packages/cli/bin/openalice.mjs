@@ -4,6 +4,13 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { installedContentIdentity, readInstallSource } from '../src/install-source.mjs'
+import {
+  formatLifecycleHelp,
+  formatRootHelp,
+  formatShellCompletion,
+  parseLifecycleArgs,
+  runLifecycleCommand,
+} from '../src/lifecycle-command.mjs'
 import { formatLocalStartHelp, parseLocalStartArgs, startLocal } from '../src/local-start.mjs'
 import { connectRemote, formatRemoteHelp, parseRemoteArgs } from '../src/remote.mjs'
 import { formatServerHelp, parseServerArgs, runServerCommand } from '../src/server.mjs'
@@ -14,7 +21,7 @@ import { formatUpdateHelp, maybeNotifyUpdate, runUpdateCommand } from '../src/up
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
   if (command === '--help' || command === '-h' || command === 'help') {
-    process.stdout.write(formatHelp())
+    process.stdout.write(formatRootHelp())
     return 0
   }
   if (command === 'version' && args[0] === '--json') {
@@ -38,6 +45,35 @@ export async function main(argv = process.argv.slice(2)) {
     const options = parseLocalStartArgs(startArgs)
     await maybeNotifyUpdate({ enabled: options.checkUpdates })
     return startLocal(options)
+  }
+  if (['up', 'run', 'down', 'status', 'open'].includes(command)) {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatLifecycleHelp(command))
+      return 0
+    }
+    const options = parseLifecycleArgs(command, args)
+    if ((command === 'up' || command === 'run') && options.checkUpdates && !options.json) {
+      await maybeNotifyUpdate({ enabled: true })
+    }
+    return runLifecycleCommand(command, options)
+  }
+  if (command === 'completion') {
+    if (args.includes('--help') || args.includes('-h') || args.length === 0) {
+      process.stdout.write(`Usage:
+  openalice completion <bash|zsh|fish|powershell>
+
+Prints a completion script to stdout without modifying shell configuration.
+`)
+      return args.length === 0 ? 2 : 0
+    }
+    if (args.length !== 1) {
+      const error = new Error('completion expects exactly one shell name')
+      error.code = 'EUSAGE'
+      error.exitCode = 2
+      throw error
+    }
+    process.stdout.write(formatShellCompletion(args[0]))
+    return 0
   }
   if (command === 'ssh') {
     if (args.includes('--help') || args.includes('-h')) {
@@ -75,35 +111,10 @@ export async function main(argv = process.argv.slice(2)) {
     }
     return runUninstallCommand(args)
   }
-  throw new Error(`Unknown command: ${command}\n\n${formatHelp()}`)
-}
-
-function formatHelp() {
-  return `OpenAlice CLI
-
-Usage:
-  openalice
-  openalice version --json
-  openalice start [path] [options]
-  openalice server <run|start|status|stop> [options]
-  openalice ssh <user@host> [options]
-  openalice remote <user@host> [options]
-  openalice update [--check] [--yes]
-  openalice uninstall [--plan] [--yes]
-
-Commands:
-  version   Print the CLI version; --json also reports its recorded install source
-  start     Start OpenAlice from a source checkout on local loopback (default)
-  server    Run, detach, inspect, or stop a browserless local Runtime
-  ssh       Open a loopback-only SSH tunnel to an already-running OpenAlice
-  remote    Plan, prepare, and connect to an OpenAlice Server over SSH
-  update    Check for or install a newer stable OpenAlice release
-  uninstall Remove the installed CLI and managed Pi while preserving user data
-
-Run "openalice start --help", "openalice server --help",
-"openalice ssh --help", "openalice remote --help",
-"openalice update --help", or "openalice uninstall --help" for details.
-`
+  const error = new Error(`Unknown command: ${command}\n\n${formatRootHelp()}`)
+  error.code = 'EUSAGE'
+  error.exitCode = 2
+  throw error
 }
 
 function readVersion() {
@@ -116,7 +127,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     (code) => { process.exitCode = code },
     (error) => {
       process.stderr.write(`openalice: ${error instanceof Error ? error.message : String(error)}\n`)
-      process.exitCode = 1
+      process.exitCode = Number.isInteger(error?.exitCode) ? error.exitCode : 1
     },
   )
 }

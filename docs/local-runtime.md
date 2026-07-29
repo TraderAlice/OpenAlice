@@ -7,6 +7,7 @@ consent, installed layout, PATH integration, updates, and installer release
 checks belong to [[docs/cli-installer.md]].
 
 Related guides: [[docs/cli-installer.md]],
+[[docs/cli-supervisor.md]],
 [[docs/managed-workspace-runtime.md]],
 [[docs/docker-deployment.md]], [[docs/broker-packs.md]], and
 [[docs/remote-access.md]].
@@ -99,6 +100,11 @@ explicitly requests the existing Guardian recovery flow.
 Useful controls:
 
 ```bash
+openalice up
+openalice status
+openalice open
+openalice down
+openalice run
 openalice start --no-open
 openalice start --rebuild
 openalice start --home /tmp/openalice-test-home --port 41000
@@ -128,17 +134,18 @@ Workspaces, runtime locks, credentials, and optional Broker Packs. See
 Use `--rebuild` after pulling source changes when existing build artifacts may
 be stale. Never use a real user-state root for launcher or recovery tests.
 
-## Server Lifecycle
+## Shell Lifecycle
 
-The browser convenience command and a persistent Server are separate lifetime
-contracts. `openalice start` remains foreground and browser-oriented. The
-installed Server surface is:
+The browser convenience command and a persistent Runtime are separate lifetime
+contracts. `openalice start` remains the compatibility foreground,
+browser-oriented path while the canonical Shell lifecycle is:
 
 ```bash
-openalice server run [app-dir]     # foreground, no browser
-openalice server start [app-dir]   # detached, wait for real readiness
-openalice server status            # read-only, with stable --json output
-openalice server stop              # ask the owning Guardian to stop itself
+openalice run [app-dir]             # foreground, no browser
+openalice up [app-dir]              # detached, wait for real readiness
+openalice status [--json]           # read-only
+openalice open                      # verify and open the existing Web UI
+openalice down [--json]             # ask the owning Guardian to stop itself
 ```
 
 These commands reuse the same checkout preparation, build artifacts,
@@ -148,11 +155,26 @@ launcher or a PID-file kill path. Detached start succeeds only after Guardian
 ownership, the local control endpoint, and Alice HTTP are ready.
 
 The control endpoint is local to the selected home and is not an Alice HTTP
-route. `server stop` sends a versioned structured request to a matching CLI
-Server, then waits for Guardian's normal child shutdown and ownership release.
-It refuses to guess at an unreachable PID or silently stop an Electron-owned
-Runtime. Exact status classes, control fields, recovery rules, and the managed
-SSH composition live in [[docs/remote-access.md]].
+route. `down` sends a versioned structured request to a matching CLI Server,
+then waits for Guardian's normal child shutdown and ownership release. It
+refuses to guess at an unreachable PID or silently stop an Electron-owned
+Runtime. `open` requires both an owner-advertised endpoint and a successful
+OpenAlice auth-status probe. Exact command/JSON presentation belongs to
+[[docs/cli-supervisor.md]]; status classes, control fields, recovery rules, and
+the managed SSH composition live in [[docs/remote-access.md]].
+
+The legacy surface remains available for managed remote and existing scripts:
+
+```bash
+openalice server run [app-dir]
+openalice server start [app-dir]
+openalice server status
+openalice server stop
+```
+
+Both command families operate the same `cli-server` Guardian owner. The legacy
+`server status --json` keeps its raw payload while top-level JSON uses a
+versioned command envelope.
 
 The detached path is still source-backed: a user-owned or remote-managed
 checkout supplies the built Runtime while the installed CLI supplies lifecycle
@@ -179,7 +201,7 @@ Keep bootstrap observable and layered:
    downloadable headless Runtime while retaining the same CLI and localhost
    contract.
 
-The same Server command contract survives that transition. Source-backed and
+The same lifecycle contract survives that transition. Source-backed and
 standalone-bundle Runtime providers differ in preparation, not in ownership,
 status, stop, browser, or SSH behavior.
 

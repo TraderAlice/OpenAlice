@@ -104,6 +104,16 @@ node -e '
 const status = JSON.parse(process.argv[1]);
 if (status.class !== "absent" || status.state !== "absent") process.exit(1);
 ' "$server_status" || fail "installed CLI server status check failed"
+lifecycle_status="$($bin_dir/openalice status --home "$HOME/openalice-lifecycle-smoke" --json)"
+node -e '
+const value = JSON.parse(process.argv[1]);
+if (value.schemaVersion !== 1 || value.command !== "status" || value.ok !== true) process.exit(1);
+if (value.result?.status?.class !== "absent" || value.result?.status?.state !== "absent") process.exit(1);
+' "$lifecycle_status" || fail "installed CLI lifecycle status envelope check failed"
+"$bin_dir/openalice" up --help | grep -Fq "persistent background Runtime" \
+  || fail "installed CLI up help check failed"
+"$bin_dir/openalice" completion bash | grep -Fq "complete -F _openalice_completion openalice" \
+  || fail "installed CLI completion check failed"
 [[ -f "$bin_dir/openalice.cmd" ]] || fail "Windows launcher was not installed"
 [[ -f "$bin_dir/pi.cmd" ]] || fail "Windows managed Pi launcher was not installed"
 [[ ! -e "$HOME/.openalice/.cli-install.lock" ]] || fail "installer lock was not released"
@@ -120,6 +130,10 @@ cmp /fixture/packages/cli/src/install-source.mjs "$v1_release/src/install-source
   || fail "downloaded install-source module differs from the fixture"
 cmp /fixture/packages/cli/src/install-layout.mjs "$v1_release/src/install-layout.mjs" \
   || fail "downloaded install-layout module differs from the fixture"
+cmp /fixture/packages/cli/src/lifecycle-command.mjs "$v1_release/src/lifecycle-command.mjs" \
+  || fail "downloaded lifecycle command module differs from the fixture"
+cmp /fixture/packages/cli/src/lifecycle.mjs "$v1_release/src/lifecycle.mjs" \
+  || fail "downloaded lifecycle core module differs from the fixture"
 cmp /fixture/packages/cli/src/remote.mjs "$v1_release/src/remote.mjs" \
   || fail "downloaded Remote CLI file differs from the fixture"
 cmp /fixture/packages/cli/src/runtime-deps.mjs "$v1_release/src/runtime-deps.mjs" \

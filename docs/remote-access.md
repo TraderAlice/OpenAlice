@@ -7,6 +7,7 @@ path toward an independent Studio frontend.
 
 Start with [[docs/remote-quickstart.md]] for the user-facing setup and daily
 workflow. This owner guide complements [[docs/local-runtime.md]],
+[[docs/cli-supervisor.md]],
 [[docs/docker-deployment.md]], and [[docs/managed-workspace-runtime.md]]. The
 Herdr comparison that informed this design is recorded in
 [[docs/reference/herdr-remote-architecture.md]]. That reference is research;
@@ -18,6 +19,8 @@ The repository now contains the source-backed Stage 0 through Stage 2 path:
 
 - `openalice start` prepares a source checkout, runs Guardian in the
   foreground, and optionally opens the local browser;
+- `openalice up|run|status|open|down` provides the canonical local Shell
+  lifecycle and presentation over the same `cli-server` Guardian owner;
 - `openalice ssh <target>` creates a loopback SSH tunnel to an already-running
   remote OpenAlice Runtime;
 - `openalice server run|start|status|stop` provides a browserless foreground or
@@ -89,8 +92,9 @@ protocol is deferred until the local/server boundary is stable.
    install, update, start, takeover, or stop consent.
 6. Disconnecting a browser, Electron renderer, CLI, or SSH tunnel does not stop
    a detached Server.
-7. `server stop` asks the owning Guardian to terminate its own tree and verifies
-   completion. It does not signal a guessed PID or delete a live lock.
+7. top-level `down` and compatibility `server stop` ask the owning Guardian to
+   terminate its own tree and verify completion. They do not signal a guessed
+   PID or delete a live lock.
 8. `--takeover` remains the only command-line authority to replace another
    recorded Guardian owner.
 9. Remote bootstrap reuses the invoking local CLI's recorded ordinary
@@ -146,15 +150,25 @@ updates, starts, stops, or takes over the remote Runtime.
 ### Server lifecycle
 
 ```bash
+openalice run [app-dir]
+openalice up [app-dir]
+openalice status
+openalice open
+openalice down
+
+# compatibility surface used by managed remote and existing scripts
 openalice server run [app-dir]
 openalice server start [app-dir]
 openalice server status
 openalice server stop
 ```
 
-All server commands accept the same explicit `--home`, `--port`, and source
-checkout selection as local start. `run` and `start` also accept `--rebuild` and
-`--takeover` where the existing start contract does.
+The top-level lifecycle is canonical for direct Shell use. The `server`
+commands remain its compatibility presenter because managed remote must keep
+working across CLI upgrades. Both families operate the same `cli-server`
+Guardian owner and accept the same explicit `--home`, `--port`, and source
+checkout selection as local start. `run`, `up`, and `server start` also accept
+`--rebuild` and `--takeover` where the existing start contract does.
 
 | Command | Lifetime and side effects |
 |---|---|

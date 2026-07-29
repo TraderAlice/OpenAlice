@@ -21,6 +21,11 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
+  Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
+  headless release bundle, atomic update/rollback, and real N-1 plus PTY
+  acceptance through serial increments.
+
 ## Completed
 
 - [[plans/cli-lifecycle-quality.md]] — Aligns the computer-level CLI with the

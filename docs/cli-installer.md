@@ -6,6 +6,7 @@ platform boundaries, verification, and release checks. Update it whenever the
 root `install` script, the distributed CLI file set, or installer smoke changes.
 
 Related guides: [[docs/local-runtime.md]],
+[[docs/cli-supervisor.md]],
 [[docs/managed-workspace-runtime.md]], and
 [[docs/development-workflow.md]]. Optional broker integration delivery belongs
 to [[docs/broker-packs.md]]. External installer research is deliberately
@@ -103,8 +104,10 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
   installer verification, and update handoff.
 - `packages/cli/src/uninstall.mjs` — installer-lock safety, PATH cleanup, and
   the state-preserving CLI-only removal boundary.
+- `packages/cli/src/lifecycle{,-command}.mjs` — canonical top-level Runtime
+  lifecycle, structured presentation, and shell completion.
 - `packages/cli/src/server{,-control}.mjs` — detached lifecycle and the
-  Guardian control client.
+  legacy presenter plus Guardian control client.
 - `packages/cli/src/remote.mjs` — consent-first managed SSH orchestration.
 - `packages/cli/src/runtime-deps.mjs` — source-build tool probe and actionable
   local-start failure.
@@ -625,6 +628,9 @@ with an explicit `y`, and run at least:
 command -v openalice
 openalice --version
 openalice version --json
+openalice status --home /tmp/openalice-unused-home --json
+openalice up --help
+openalice completion zsh
 openalice update --check
 openalice uninstall --plan
 command -v pi
@@ -647,10 +653,13 @@ changes:
 
 1. run `pnpm build:server`;
 2. install from `--source` into a temporary install root;
-3. start the installed CLI with an isolated `--home`, unused port, and
-   `--no-open`;
+3. start the installed CLI with `openalice up`, an isolated `--home`, and an
+   unused port;
 4. verify `/api/auth/status` and the real root page;
-5. stop with `Ctrl+C` and confirm the Runtime exits cleanly.
+5. prove the Runtime survives the starting shell, stop it with
+   `openalice down`, and confirm the Guardian/Alice tree exits cleanly;
+6. repeat with `openalice run`, stop with Ctrl+C, and confirm foreground
+   ownership exits cleanly.
 
 Never use the normal user home or a live broker account for this acceptance.
 Electron smoke is required only when shared dependency topology, managed
