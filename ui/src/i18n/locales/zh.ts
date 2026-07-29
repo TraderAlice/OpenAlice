@@ -763,6 +763,7 @@ export const zh: Resources = {
     title: '模拟器',
   },
   market: {
+    openSymbol: '打开 {{symbol}} 详情',
     searchPlaceholder: '搜索资产…',
     browseSection: '浏览',
     browseMarkets: '浏览市场',

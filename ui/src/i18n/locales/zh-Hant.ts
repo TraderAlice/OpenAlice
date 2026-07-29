@@ -771,6 +771,7 @@ export const zhHant: Resources = {
     title: '模擬器',
   },
   market: {
+    openSymbol: '開啟 {{symbol}} 詳情',
     searchPlaceholder: '搜尋資產…',
     browseSection: '瀏覽',
     browseMarkets: '瀏覽市場',

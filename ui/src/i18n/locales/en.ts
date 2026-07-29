@@ -774,6 +774,7 @@ export const en = {
     title: 'Simulator',
   },
   market: {
+    openSymbol: 'Open {{symbol}} details',
     searchPlaceholder: 'Search assets…',
     browseSection: 'Browse',
     browseMarkets: 'Browse Markets',
