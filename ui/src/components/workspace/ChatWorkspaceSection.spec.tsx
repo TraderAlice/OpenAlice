@@ -103,10 +103,11 @@ function workspaceContext(
 function renderSection(
   workspaces: readonly Workspace[] = [chatWorkspace],
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
+  onNavigate?: () => void,
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
-      <ChatWorkspaceSection />
+      <ChatWorkspaceSection onNavigate={onNavigate} />
     </WorkspacesContext.Provider>,
   )
 }
@@ -120,13 +121,15 @@ afterEach(cleanup)
 
 describe('ChatWorkspaceSection actions', () => {
   it('keeps conversation creation primary and scopes workspace creation to the workspace list', () => {
-    renderSection()
+    const onNavigate = vi.fn()
+    renderSection([chatWorkspace], null, onNavigate)
 
     const newChat = screen.getByRole('button', { name: 'New chat' })
     const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
     const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
     const newSession = screen.getByRole('button', { name: 'New conversation in this workspace' })
+    const configureWorkspace = screen.getByRole('button', { name: 'Configure this workspace' })
 
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
@@ -137,20 +140,26 @@ describe('ChatWorkspaceSection actions', () => {
     expect(newWorkspace.querySelector('.lucide-panels-top-left')).toBeTruthy()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
+    fireEvent.click(configureWorkspace)
+    expect(onNavigate).not.toHaveBeenCalled()
+
     fireEvent.click(newChat)
     expect(openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} })
+    expect(onNavigate).toHaveBeenCalledTimes(1)
 
     fireEvent.click(workspaceButton)
     expect(openOrFocus).toHaveBeenLastCalledWith({
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(2)
 
     fireEvent.click(newSession)
     expect(openOrFocus).toHaveBeenLastCalledWith({
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(3)
   })
 
   it('keeps an explicit workspace action in the empty state', () => {
@@ -162,7 +171,8 @@ describe('ChatWorkspaceSection actions', () => {
 
   it('bounds expanded Workspace history and routes the full catalog to the Session library', () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
-    renderSection([{ ...chatWorkspace, sessions }])
+    const onNavigate = vi.fn()
+    renderSection([{ ...chatWorkspace, sessions }], null, onNavigate)
 
     expect(screen.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(6)
     expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
@@ -172,9 +182,11 @@ describe('ChatWorkspaceSection actions', () => {
       kind: 'workspace',
       params: { wsId: chatWorkspace.id, source: 'chat' },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(1)
   })
 
   it('owns Manager Session navigation and lifecycle actions under the Manager entry', () => {
+    const onNavigate = vi.fn()
     const manager: ManagerWorkspaceSnapshot = {
       id: MANAGER_WORKSPACE_ID,
       tag: 'Workspace Manager',
@@ -211,7 +223,7 @@ describe('ChatWorkspaceSection actions', () => {
       ],
     }
 
-    renderSection([], manager)
+    renderSection([], manager, onNavigate)
 
     const managerButton = screen.getByRole('button', { name: 'Workspace Manager' })
     const managerSection = managerButton.parentElement?.parentElement
@@ -229,19 +241,24 @@ describe('ChatWorkspaceSection actions', () => {
       kind: 'workspace-manager',
       params: { sessionId: 'manager-opencode' },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(1)
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Stop Inspect the floor' }))
     expect(actions.pauseSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-opencode')
+    expect(onNavigate).toHaveBeenCalledTimes(1)
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Resume Coordinate owners' }))
     expect(actions.openWebPiSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
+    expect(onNavigate).toHaveBeenCalledTimes(2)
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
     fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
+    expect(onNavigate).toHaveBeenCalledTimes(2)
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Collapse sessions' }))
     expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
+    expect(onNavigate).toHaveBeenCalledTimes(2)
   })
 })

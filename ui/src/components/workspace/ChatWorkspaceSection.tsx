@@ -50,7 +50,7 @@ function nextChatWorkspaceTag(workspaces: readonly Workspace[]): string {
   return `${CHAT_TEMPLATE}-${suffix}`
 }
 
-export function ChatWorkspaceSection(): ReactElement | null {
+export function ChatWorkspaceSection({ onNavigate = () => undefined }: { onNavigate?: () => void }): ReactElement | null {
   const { t } = useTranslation()
   const ctx = useWorkspaces()
   const focused = useWorkspace((s) => getFocusedTab(s)?.spec)
@@ -76,6 +76,11 @@ export function ChatWorkspaceSection(): ReactElement | null {
   const [pendingDelete, setPendingDelete] = useState<Workspace | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
+  const navigate = (target: Parameters<typeof openOrFocus>[0]): void => {
+    openOrFocus(target)
+    onNavigate()
+  }
+
   const rememberChatWorkspace = (workspaceId: string): void => {
     void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
   }
@@ -94,7 +99,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
       <div className="px-2 pt-2 pb-1">
         <button
           type="button"
-          onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
+          onClick={() => navigate({ kind: 'chat-landing', params: {} })}
           className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2.5 text-left text-[13px] font-medium text-foreground hover:border-primary/45 hover:bg-primary/15"
         >
           <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-primary" />
@@ -107,8 +112,8 @@ export function ChatWorkspaceSection(): ReactElement | null {
         loaded={ctx.workspaceManagerLoaded}
         isFocused={isManagerFocus}
         activeSessionId={isManagerFocus ? focused.params.sessionId ?? null : null}
-        onOpen={() => openOrFocus({ kind: 'workspace-manager', params: {} })}
-        onOpenSession={(sessionId) => openOrFocus({
+        onOpen={() => navigate({ kind: 'workspace-manager', params: {} })}
+        onOpenSession={(sessionId) => navigate({
           kind: 'workspace-manager',
           params: { sessionId },
         })}
@@ -119,6 +124,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
           } else {
             void ctx.resumeSession(MANAGER_WORKSPACE_ID, sessionId)
           }
+          onNavigate()
         }}
         onDeleteSession={(sessionId) => ctx.requestDeleteSession(MANAGER_WORKSPACE_ID, sessionId)}
       />
@@ -149,7 +155,7 @@ export function ChatWorkspaceSection(): ReactElement | null {
           onCreated={(workspace) => {
             ctx.refresh()
             rememberChatWorkspace(workspace.id)
-            openOrFocus({ kind: 'chat-landing', params: { targetWsId: workspace.id } })
+            navigate({ kind: 'chat-landing', params: { targetWsId: workspace.id } })
           }}
           onClose={() => setShowCreate(false)}
         />
@@ -197,24 +203,25 @@ export function ChatWorkspaceSection(): ReactElement | null {
             selection={selection}
             onOpen={() => {
               rememberChatWorkspace(w.id)
-              openOrFocus({ kind: 'chat-landing', params: { targetWsId: w.id } })
+              navigate({ kind: 'chat-landing', params: { targetWsId: w.id } })
             }}
             onOpenSession={(sid) => {
               rememberChatWorkspace(w.id)
-              openOrFocus({ kind: 'workspace', params: { wsId: w.id, sessionId: sid, source: 'chat' } })
+              navigate({ kind: 'workspace', params: { wsId: w.id, sessionId: sid, source: 'chat' } })
             }}
             onPauseSession={(sid) => void ctx.pauseSession(w.id, sid)}
             onResumeSession={(sid) => {
               rememberChatWorkspace(w.id)
               void ctx.resumeSession(w.id, sid, 'chat')
+              onNavigate()
             }}
             onDeleteSession={(sid) => ctx.requestDeleteSession(w.id, sid)}
             onConfigure={() => ctx.openAgentConfig(w.id)}
             onDelete={() => setPendingDelete(w)}
-            onSpawn={() => openOrFocus({ kind: 'chat-landing', params: { targetWsId: w.id } })}
+            onSpawn={() => navigate({ kind: 'chat-landing', params: { targetWsId: w.id } })}
             onBrowseSessions={() => {
               rememberChatWorkspace(w.id)
-              openOrFocus({ kind: 'workspace', params: { wsId: w.id, source: 'chat' } })
+              navigate({ kind: 'workspace', params: { wsId: w.id, source: 'chat' } })
             }}
           />
         ))}

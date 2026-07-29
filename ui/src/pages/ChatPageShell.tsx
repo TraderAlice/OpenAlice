@@ -14,7 +14,9 @@ export function ChatPageShell({ children }: ChatPageShellProps) {
       storageKey="chat"
       title={t('nav.item.chat')}
       defaultWidth={260}
-      sidebar={<ChatChannelListContainer />}
+      sidebar={({ closeMobileDrawer }) => (
+        <ChatChannelListContainer onNavigate={closeMobileDrawer} />
+      )}
     >
       {children}
     </PageSidebarLayout>
