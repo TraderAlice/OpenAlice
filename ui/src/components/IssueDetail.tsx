@@ -736,9 +736,9 @@ function mutationSummary(change: { field: string; before?: string; after?: strin
   return `changed ${label} from ${mutationValue(change.field, change.before)} to ${mutationValue(change.field, change.after)}`
 }
 
-function IssueActivity({
+export function IssueActivity({
   activity,
-  onContinue,
+  onOpenSession,
   wsId,
   issueId,
   ownerResumeId,
@@ -746,25 +746,25 @@ function IssueActivity({
   onPosted,
 }: {
   activity: IssueActivityRecord[]
-  onContinue: (record: IssueProvenanceRecord) => Promise<void>
+  onOpenSession: (record: IssueProvenanceRecord) => Promise<void>
   wsId: string
   issueId: string
   ownerResumeId: string | null
   assignee: string
   onPosted: (next: IssueDetailData) => void
 }) {
-  const [continuingId, setContinuingId] = useState<string | null>(null)
-  const [continueError, setContinueError] = useState<string | null>(null)
+  const [openingId, setOpeningId] = useState<string | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
 
-  const continueSession = async (record: IssueProvenanceRecord) => {
-    setContinuingId(record.id)
-    setContinueError(null)
+  const openSession = async (record: IssueProvenanceRecord) => {
+    setOpeningId(record.id)
+    setOpenError(null)
     try {
-      await onContinue(record)
+      await onOpenSession(record)
     } catch (err) {
-      setContinueError(err instanceof Error ? err.message : String(err))
+      setOpenError(err instanceof Error ? err.message : String(err))
     } finally {
-      setContinuingId(null)
+      setOpeningId(null)
     }
   }
 
@@ -829,7 +829,21 @@ function IssueActivity({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[12px] text-muted-foreground">
-                    <span className="font-medium text-foreground/80">{originLabel}</span>{' '}
+                    {isSession ? (
+                      <button
+                        type="button"
+                        aria-label={`Open conversation with ${originLabel}`}
+                        aria-busy={openingId === record.id}
+                        title="Open this Session conversation"
+                        onClick={() => void openSession(record)}
+                        disabled={openingId !== null}
+                        className="inline rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50"
+                      >
+                        {originLabel}
+                      </button>
+                    ) : (
+                      <span className="font-medium text-foreground/80">{originLabel}</span>
+                    )}{' '}
                     {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
                     <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
                   </p>
@@ -841,22 +855,12 @@ function IssueActivity({
                     </ul>
                   )}
                 </div>
-                {isSession && (
-                  <button
-                    type="button"
-                    onClick={() => void continueSession(record)}
-                    disabled={continuingId !== null}
-                    className="oa-pressable shrink-0 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-wait disabled:opacity-50"
-                  >
-                    {continuingId === record.id ? 'Opening…' : 'Continue'}
-                  </button>
-                )}
               </li>
             )
           })}
         </ul>
       )}
-      {continueError && <p className="mt-2 text-xs text-destructive">Could not continue Session: {continueError}</p>}
+      {openError && <p className="mt-2 text-xs text-destructive">Could not open Session: {openError}</p>}
       <CommentComposer
         wsId={wsId}
         id={issueId}
@@ -1088,7 +1092,7 @@ export function IssueDetail({
     [selectInboxEntry, markInboxRead, setSidebar, openOrFocus],
   )
 
-  const continueProvenanceSession = useCallback(
+  const openProvenanceSession = useCallback(
     async (record: IssueProvenanceRecord) => {
       if (record.origin.kind !== 'session') return
       setSidebar('chat')
@@ -1245,7 +1249,7 @@ export function IssueDetail({
           />
           <IssueActivity
             activity={activity}
-            onContinue={continueProvenanceSession}
+            onOpenSession={openProvenanceSession}
             wsId={wsId}
             issueId={id}
             ownerResumeId={stableOwnerResumeId}
