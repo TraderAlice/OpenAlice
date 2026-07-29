@@ -472,3 +472,7 @@ This plan is complete only when:
   TypeScript, Guardian recovery, real running status/logs/Doctor, installer
   upgrade/uninstall, managed remote SSH, server build, and Electron PTY smoke
   all passed.
+- 2026-07-30: Audited increment 1 PR #853's one failed Windows dev-smoke:
+  Guardian recovery lost a heartbeat write to a transient `owner.json` rename
+  `EPERM`. The failed-job rerun passed Guardian recovery and the complete dev
+  smoke without a runtime-lock change, so no speculative retry was introduced.
