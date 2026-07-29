@@ -771,6 +771,17 @@ export const zhHant: Resources = {
     title: '模擬器',
   },
   market: {
+    tradeableTitle: '已設定券商中的可交易合約',
+    tradeableInfo:
+      '介面：/api/trading/contracts/search\n透過券商端啟發式模糊比對；分析頁標的是查詢條件，並非標準識別碼。\n可交易身分以券商的 aliceId（alias:broker:exchange-id）為準，下單時請使用它。',
+    tradeableSearching: '正在搜尋券商…',
+    tradeableNoAccounts:
+      '尚未設定交易帳戶。<tradingLink>前往「交易」新增</tradingLink>，即可在此查看相符合約。',
+    tradeableNoMatches: '已設定券商中沒有與 {{symbol}} 相符的可交易合約。',
+    tradeableShowFewer: '收合',
+    tradeableShowMore: '再顯示 {{hidden}} 項（共 {{total}} 項）',
+    tradeableOrderTitle: '在對應 UTA 中開啟下單面板',
+    tradeableOrder: '下單',
     searchPlaceholder: '搜尋資產…',
     browseSection: '瀏覽',
     browseMarkets: '瀏覽市場',

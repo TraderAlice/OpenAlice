@@ -763,6 +763,17 @@ export const zh: Resources = {
     title: '模拟器',
   },
   market: {
+    tradeableTitle: '已配置券商中的可交易合约',
+    tradeableInfo:
+      '接口：/api/trading/contracts/search\n通过券商侧启发式模糊匹配；分析页标的是查询条件，并非规范标识。\n可交易身份以券商的 aliceId（alias:broker:exchange-id）为准，下单时请使用它。',
+    tradeableSearching: '正在搜索券商…',
+    tradeableNoAccounts:
+      '尚未配置交易账户。<tradingLink>前往“交易”添加</tradingLink>，即可在此查看匹配合约。',
+    tradeableNoMatches: '已配置券商中没有与 {{symbol}} 匹配的可交易合约。',
+    tradeableShowFewer: '收起',
+    tradeableShowMore: '再显示 {{hidden}} 项（共 {{total}} 项）',
+    tradeableOrderTitle: '在对应 UTA 中打开下单面板',
+    tradeableOrder: '下单',
     searchPlaceholder: '搜索资产…',
     browseSection: '浏览',
     browseMarkets: '浏览市场',

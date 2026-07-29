@@ -774,6 +774,17 @@ export const en = {
     title: 'Simulator',
   },
   market: {
+    tradeableTitle: 'Tradeable on configured brokers',
+    tradeableInfo:
+      'Endpoint: /api/trading/contracts/search\nHeuristic broker-side fuzzy match — the analysis symbol is a query, not the canonical id.\nTradeable identity is the broker’s aliceId (alias:broker:exchange-id). Use it to place orders.',
+    tradeableSearching: 'Searching brokers…',
+    tradeableNoAccounts:
+      'No trading accounts configured. <tradingLink>Add one in Trading</tradingLink> to see matching contracts here.',
+    tradeableNoMatches: 'No tradeable contracts matching {{symbol}} on your configured brokers.',
+    tradeableShowFewer: 'Show fewer',
+    tradeableShowMore: 'Show {{hidden}} more ({{total}} total)',
+    tradeableOrderTitle: 'Open order entry on the UTA',
+    tradeableOrder: 'Order',
     searchPlaceholder: 'Search assets…',
     browseSection: 'Browse',
     browseMarkets: 'Browse Markets',
