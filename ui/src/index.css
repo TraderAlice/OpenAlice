@@ -214,6 +214,11 @@ body {
   to { opacity: 1; }
 }
 
+@keyframes oa-page-sidebar-enter {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
+}
+
 @keyframes oa-disclosure-enter {
   from {
     opacity: 0;
@@ -245,6 +250,15 @@ body {
 }
 
 .oa-dialog-backdrop {
+  animation: oa-backdrop-enter var(--motion-standard) ease-out both;
+}
+
+.oa-page-sidebar-dialog[open] {
+  animation: oa-page-sidebar-enter var(--motion-standard) var(--motion-ease-out) both;
+}
+
+.oa-page-sidebar-dialog::backdrop {
+  background: var(--backdrop);
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
@@ -558,6 +572,8 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-view-enter,
   .oa-dialog-surface,
   .oa-dialog-backdrop,
+  .oa-page-sidebar-dialog[open],
+  .oa-page-sidebar-dialog::backdrop,
   .oa-disclosure-enter,
   .oa-popover-enter {
     animation: none;
