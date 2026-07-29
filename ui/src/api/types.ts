@@ -406,6 +406,8 @@ export interface WalletPushResult {
   operationCount: number
   submitted: Array<{ action: string; success: boolean; orderId?: string; status: string; error?: string }>
   rejected: Array<{ action: string; success: boolean; error?: string; status: string }>
+  /** Demo-only marker: the response exercises the result UI without contacting a broker. */
+  simulated?: boolean
 }
 
 // ==================== Order / Trade History ====================
