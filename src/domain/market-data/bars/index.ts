@@ -2,6 +2,7 @@ export { createBarService } from './bar-service.js'
 export {
   parseBarId,
   formatBarId,
+  isDerivativeBarId,
   type BarRef,
   type OhlcvBar,
   type BarMeta,
