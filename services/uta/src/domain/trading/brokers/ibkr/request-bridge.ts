@@ -506,6 +506,10 @@ export class RequestBridge extends DefaultEWrapper {
     }
 
     // Request-specific errors — reject the corresponding pending Promise
+    // 10167 announces that IBKR is falling back to delayed ticks after
+    // reqMarketDataType(3). Keep that snapshot open for DELAYED_* callbacks.
+    if (errorCode === 10167 && this.snapshots.has(reqId)) return
+
     const brokerError = classifyIbkrError(errorCode, errorString)
 
     // Try reqId-based first, then orderId-based
