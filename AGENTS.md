@@ -84,6 +84,13 @@ Choose delivery authority before implementation:
 | Serial / interactive | Default: the user is actively requesting and steering concrete work | After proportional local verification, open and merge the PR without waiting for pending remote CI; delete the feature branch and return to updated `dev` unless the user says to pause |
 | Parallel / contribution | Explicit `/goal` or direct request to autonomously find and contribute improvements | Leave each PR open for later review, return to `dev`, and continue from a fresh branch |
 
+Before starting the next parallel contribution, label the open PR with
+`workflow:parallel`, exactly one `theme:*`, and exactly one `area:*`. Add
+`review:deep` when the change touches trading writes, persisted configuration,
+credentials, destructive actions, security boundaries, or substantial
+cross-surface structure. Use the controlled taxonomy in
+[[docs/development-workflow.md]] rather than inventing one-off labels.
+
 A later interactive message does not retroactively authorize merging a parallel
 PR queue. Parallel work is already non-blocking because opening a PR does not
 pause the next contribution. In serial work the PR exists to durably integrate

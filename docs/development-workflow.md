@@ -82,13 +82,47 @@ For each coherent contribution:
 1. start from latest `dev` on a fresh feature branch;
 2. implement and verify one reviewable change;
 3. open a PR to `dev`;
-4. do not merge it;
-5. return to `dev` and continue from another fresh branch.
+4. apply the required parallel-contribution labels;
+5. do not merge it;
+6. return to `dev` and continue from another fresh branch.
 
 The open PR queue becomes the later acceptance surface. A subsequent
 interactive request does not retroactively authorize merging that queue.
 Because these PRs are not merged during the contribution loop, their pending CI
 never blocks starting the next independent contribution.
+
+#### Parallel PR labels
+
+Labels are part of the delivery contract, not later backlog cleanup. Before
+starting the next contribution, every parallel PR must have:
+
+- `workflow:parallel`;
+- exactly one primary `theme:*` label describing why the change exists;
+- exactly one primary `area:*` label describing who owns the changed surface;
+- `review:deep` when the change touches trading writes, persisted
+  configuration, credentials, destructive actions, security boundaries, or
+  substantial cross-surface structure.
+
+The controlled themes are:
+
+| Label | Use |
+|---|---|
+| `theme:demo` | Demo fidelity, fixtures, or simulated interactions |
+| `theme:safety` | Correctness, validation, destructive-action, or trading safety |
+| `theme:accessibility` | Keyboard, assistive-technology, or interaction semantics |
+| `theme:reliability` | Failure recovery, retries, loading, or resilience |
+| `theme:localization` | Interface localization or translated product copy |
+
+The controlled areas are `area:app-shell`, `area:collaboration`, `area:demo`,
+`area:devtools`, `area:market-data`, `area:onboarding`, `area:settings`,
+`area:trading`, and `area:workspace`. Choose the primary owner instead of
+applying several areas; if no area fits repeatedly, add one intentionally and
+update this guide in the same governance change.
+
+Labels supplement the PR body; they do not replace the problem evidence,
+verification record, or explicit residual-risk notes. `review:deep` signals
+review depth and never counts as approval. Verify the labels on GitHub before
+returning to `dev`.
 
 ## Routine PR Flow
 
