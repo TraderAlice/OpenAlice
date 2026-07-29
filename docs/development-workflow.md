@@ -72,36 +72,56 @@ diff; it is not a synchronous CI or approval pause. Remote CI is
 one-increment-delayed feedback in this mode: it continues after merge and must
 be checked before the next serial publication.
 
-### Parallel / contribution
+### Autonomous / topic contribution
 
 This mode activates only with `/goal` or a direct request to autonomously find
 and contribute improvements.
 
-For each coherent contribution:
+GitHub's PR list is a community-facing product surface. Do not mirror internal
+agent task decomposition into one PR per finding. Autonomous work is collected
+into a coherent topic that a reviewer can understand as one product outcome:
 
-1. start from latest `dev` on a fresh feature branch;
-2. implement and verify one reviewable change;
-3. open a PR to `dev`;
-4. apply the required parallel-contribution labels;
-5. do not merge it;
-6. return to `dev` and continue from another fresh branch.
+1. define the topic in one sentence and record its acceptance boundary and
+   non-goals;
+2. start from latest `dev` on one topic branch and open a Draft PR after the
+   first verified increment;
+3. keep one integrator responsible for that branch; parallel workers use
+   temporary branches or worktrees and hand off commits rather than racing to
+   push the topic branch;
+4. add related improvements as atomic, independently understandable and
+   revertible commits;
+5. keep the Draft PR body current with included increments, verification, open
+   risks, and remaining topic work;
+6. finish, freeze, and present the topic for acceptance before starting another
+   community-facing topic by default;
+7. do not merge until the maintainer explicitly accepts that topic.
 
-The open PR queue becomes the later acceptance surface. A subsequent
-interactive request does not retroactively authorize merging that queue.
-Because these PRs are not merged during the contribution loop, their pending CI
-never blocks starting the next independent contribution.
+The PR is the topic's acceptance surface; commits remain its debugging and
+review units. A large diff does not require a split when it still serves one
+clear acceptance story. Open another PR only when work has a genuinely
+different product goal, needs an independent rollback/security/release boundary,
+or the maintainer explicitly authorizes concurrent topics. Never create another
+PR merely because one internal task or agent finished.
 
-#### Parallel PR labels
+A later interactive message does not retroactively authorize merging the topic
+PR. Related increments may continue while its latest CI is pending because new
+pushes supersede older runs. A completed failure must be understood and repaired
+before adding more scope.
+
+#### Topic PR labels
 
 Labels are part of the delivery contract, not later backlog cleanup. Before
-starting the next contribution, every parallel PR must have:
+adding a second increment, every autonomous topic PR must have:
 
 - `workflow:parallel`;
 - exactly one primary `theme:*` label describing why the change exists;
-- exactly one primary `area:*` label describing who owns the changed surface;
+- at least one `area:*` label describing who owns the changed surface;
 - `review:deep` when the change touches trading writes, persisted
   configuration, credentials, destructive actions, security boundaries, or
   substantial cross-surface structure.
+
+Prefer one primary area. Add another only when the topic intentionally crosses
+owner boundaries; do not accumulate area labels for incidental file touches.
 
 The controlled themes are:
 
@@ -115,9 +135,8 @@ The controlled themes are:
 
 The controlled areas are `area:app-shell`, `area:collaboration`, `area:demo`,
 `area:devtools`, `area:market-data`, `area:onboarding`, `area:settings`,
-`area:trading`, and `area:workspace`. Choose the primary owner instead of
-applying several areas; if no area fits repeatedly, add one intentionally and
-update this guide in the same governance change.
+`area:trading`, and `area:workspace`. If no area fits repeatedly, add one
+intentionally and update this guide in the same governance change.
 
 Labels supplement the PR body; they do not replace the problem evidence,
 verification record, or explicit residual-risk notes. `review:deep` signals
@@ -148,12 +167,22 @@ The PR body should contain:
 ## Summary
 - what changed and why
 
+## Included increments
+- [ ] atomic outcome represented by one or more named commits
+
 ## Verification
 - exact automated and manual checks run
 
 ## Boundary touch
 - trading, auth, credentials, migrations, runtime, packaging, or none
+
+## Non-goals
+- adjacent work intentionally left out
 ```
+
+The increment checklist and non-goals are required for autonomous topic PRs and
+optional for small serial PRs. Update the checklist as the branch grows; do not
+make reviewers reconstruct the topic from commit titles alone.
 
 Do not append agent-vendor advertising or automatic co-author trailers.
 Credit human reports, designs, or reviews through `CONTRIBUTORS.md` and links to
@@ -175,8 +204,9 @@ delivery lane:
   inspect both that PR's checks and the resulting `dev` push run. A completed
   failure blocks further stacking until it is understood and repaired; pending
   status alone does not block progress.
-- Parallel/contribution PRs remain open for later acceptance. Their CI result
-  informs review but does not grant merge authority.
+- Autonomous topic PRs remain open for later acceptance. Pending runs do not
+  block related commits, but only the latest head is evidence and a completed
+  failure blocks further scope until repaired. CI never grants merge authority.
 - A push to `dev` runs the focused Ubuntu Guardian/full-stack smoke instead of
   repeating the PR's complete build, test, and cross-platform jobs.
 - Installer or distributed-CLI PRs run deterministic clean-container install
