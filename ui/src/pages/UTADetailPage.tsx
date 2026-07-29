@@ -18,6 +18,7 @@ import { Metric, signFromDelta } from '../components/Metric'
 import { fmt, fmtPnl, fmtNum, fmtPctSigned, isUnsetDecimal } from '../lib/format'
 import { secTypeToClass, assetClassLabel, ASSET_CLASS_ORDER, type AssetClass } from '../lib/asset-class'
 import { ContractCell } from '../lib/contract-display'
+import { displayNameForUTA } from '../lib/uta-account-filter'
 
 // ==================== Page ====================
 
@@ -197,11 +198,12 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
   }
 
   const isDisabled = uta.enabled === false
+  const displayName = displayNameForUTA(uta, preset)
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
-        title={preset?.label ?? uta.id}
+        title={displayName}
         live={{ lastUpdated }}
         description={
           <>
@@ -277,7 +279,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
               {curvePoints.length >= 2 && (
                 <EquityCurve
                   points={curvePoints}
-                  accounts={[{ id, label: preset?.label ?? id }]}
+                  accounts={[{ id, label: displayName }]}
                   selectedAccountId={id}
                   onAccountChange={() => { /* single-account mode: switcher hidden */ }}
                 />
