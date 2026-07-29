@@ -580,6 +580,13 @@ export const ja: Resources = {
     yesterday: '昨日',
     collapseSessions: 'セッションを折りたたむ',
     expandSessions: 'セッションを展開',
+    workspaceActions: {
+      collapse: '{{workspace}} のセッションを折りたたむ',
+      expand: '{{workspace}} のセッションを展開',
+      newConversation: '{{workspace}} で新しい会話を開始',
+      configure: '{{workspace}} を設定',
+      offboard: '{{workspace}} を退役',
+    },
     viewAllSessions: '{{count}} 件のセッションをすべて表示',
     deleteWorkspace: 'ワークスペースを退役',
     deleteWorkspaceTitle: 'チャットワークスペースを退役',

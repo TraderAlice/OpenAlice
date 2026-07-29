@@ -591,6 +591,13 @@ export const en = {
     yesterday: 'Yesterday',
     collapseSessions: 'Collapse sessions',
     expandSessions: 'Expand sessions',
+    workspaceActions: {
+      collapse: 'Collapse sessions in {{workspace}}',
+      expand: 'Expand sessions in {{workspace}}',
+      newConversation: 'New conversation in {{workspace}}',
+      configure: 'Configure {{workspace}}',
+      offboard: 'Offboard {{workspace}}',
+    },
     viewAllSessions: 'View all {{count}} sessions',
     deleteWorkspace: 'Offboard workspace',
     deleteWorkspaceTitle: 'Offboard chat workspace',

@@ -126,7 +126,7 @@ describe('ChatWorkspaceSection actions', () => {
     const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
     const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
-    const newSession = screen.getByRole('button', { name: 'New conversation in this workspace' })
+    const newSession = screen.getByRole('button', { name: 'New conversation in chat-jul11' })
 
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
@@ -151,6 +151,43 @@ describe('ChatWorkspaceSection actions', () => {
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })
+  })
+
+  it('keeps named Workspace identity compact and scopes every row action to it', () => {
+    const namedWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-optical',
+      tag: 'chat-jun30',
+      displayName: 'Optical Networking Follow-up',
+      dir: '/tmp/chat-jun30',
+    }
+
+    renderSection([chatWorkspace, namedWorkspace])
+
+    expect(screen.getAllByText('Optical Networking Follow-up')).toHaveLength(1)
+    expect(screen.getByText('chat-jun30')).toBeTruthy()
+    const collapse = screen.getByRole('button', {
+      name: 'Collapse sessions in Optical Networking Follow-up (chat-jun30)',
+    })
+    const newConversation = screen.getByRole('button', {
+      name: 'New conversation in Optical Networking Follow-up (chat-jun30)',
+    })
+    const configure = screen.getByRole('button', {
+      name: 'Configure Optical Networking Follow-up (chat-jun30)',
+    })
+    expect(screen.getByRole('button', {
+      name: 'Offboard Optical Networking Follow-up (chat-jun30)',
+    })).toBeTruthy()
+    expect(collapse.className).toContain('h-7')
+    expect(newConversation.className).toContain('h-7')
+    expect(configure.className).toContain('h-7')
+    expect(configure.parentElement?.className).toContain('opacity-100')
+    expect(configure.parentElement?.className).toContain('sm:opacity-0')
+    expect(configure.parentElement?.className).toContain('sm:focus-within:opacity-100')
+
+    expect(screen.queryByRole('button', { name: 'New conversation in this workspace' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Configure this workspace' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Offboard workspace' })).toBeNull()
   })
 
   it('keeps an explicit workspace action in the empty state', () => {

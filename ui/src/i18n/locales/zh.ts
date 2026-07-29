@@ -579,6 +579,13 @@ export const zh: Resources = {
     yesterday: '昨天',
     collapseSessions: '收起会话',
     expandSessions: '展开会话',
+    workspaceActions: {
+      collapse: '收起 {{workspace}} 的会话',
+      expand: '展开 {{workspace}} 的会话',
+      newConversation: '在 {{workspace}} 中新建对话',
+      configure: '配置 {{workspace}}',
+      offboard: '办理 {{workspace}} 离职',
+    },
     viewAllSessions: '查看全部 {{count}} 个会话',
     deleteWorkspace: '办理工作区离职',
     deleteWorkspaceTitle: '办理对话工作区离职',
