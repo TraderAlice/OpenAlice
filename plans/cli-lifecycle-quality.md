@@ -1,8 +1,8 @@
 # CLI Lifecycle Quality
 
-Status: Active
+Status: Complete
 
-Related issues: None
+Related PR: #847
 
 Owner guides:
 
@@ -44,7 +44,7 @@ Workspace template upgrades are out of scope.
 - [x] Align CLI and root versions and enforce the invariant in tests/release.
 - [x] Extend the distributed payload, installer acceptance, and owner guide.
 - [x] Run required repository, CLI, Docker, and real installer-path checks.
-- [ ] Publish and merge a serial PR into `dev`.
+- [x] Publish the completed serial change through PR #847 targeting `dev`.
 
 ## Verification
 
