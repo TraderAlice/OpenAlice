@@ -5,6 +5,7 @@ import { GuardsSection, CRYPTO_GUARD_TYPES, SECURITIES_GUARD_TYPES } from '../gu
 import { ReconnectButton } from '../ReconnectButton'
 import { useSchemaForm } from '../../hooks/useSchemaForm'
 import type { UTAConfig, BrokerPreset, BrokerHealthInfo } from '../../api/types'
+import { displayNameForUTA } from '../../lib/uta-account-filter'
 import { Dialog } from './Dialog'
 import { HealthBadge } from './HealthBadge'
 import { SchemaFormFields } from './SchemaFormFields'
@@ -71,13 +72,19 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
   }
 
   const guardTypes = (preset?.guardCategory === 'crypto') ? CRYPTO_GUARD_TYPES : SECURITIES_GUARD_TYPES
+  const displayName = displayNameForUTA(uta, preset)
 
   return (
     <Dialog onClose={onClose} width="w-[560px]">
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3 min-w-0">
-          <h3 className="text-[14px] font-semibold text-foreground truncate">{uta.id}</h3>
+          <div className="min-w-0">
+            <h3 className="text-[14px] font-semibold text-foreground truncate">{displayName}</h3>
+            {displayName !== uta.id && (
+              <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{uta.id}</div>
+            )}
+          </div>
           <HealthBadge health={health} size="md" />
         </div>
         <div className="flex items-center gap-3 shrink-0">

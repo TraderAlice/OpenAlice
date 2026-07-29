@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { UTASummary, UTATier } from '../api/types'
-import { displayProviderForUTA, filterAccountTierUTAs, isAccountTierUTA } from './uta-account-filter'
+import { displayNameForUTA, displayProviderForUTA, filterAccountTierUTAs, isAccountTierUTA } from './uta-account-filter'
 
 function summary(id: string, tier: UTATier): UTASummary {
   return {
@@ -41,5 +41,17 @@ describe('UTA account filtering', () => {
     expect(displayProviderForUTA({ id: 'paper', provider: 'alpaca' })).toBe('alpaca')
     expect(displayProviderForUTA({ id: 'binance-readonly' })).toBe('ccxt')
     expect(displayProviderForUTA({ id: 'ibkr-main' })).toBe('ibkr')
+  })
+
+  it('prefers the configured account label for display names', () => {
+    expect(displayNameForUTA(
+      { id: 'alpaca-paper', label: 'Retirement Paper' },
+      { label: 'Alpaca' },
+    )).toBe('Retirement Paper')
+    expect(displayNameForUTA(
+      { id: 'ibkr-main', label: '   ' },
+      { label: 'IBKR' },
+    )).toBe('IBKR')
+    expect(displayNameForUTA({ id: 'custom-broker' })).toBe('custom-broker')
   })
 })
