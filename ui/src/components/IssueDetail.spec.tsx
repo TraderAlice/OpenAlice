@@ -12,7 +12,7 @@ afterEach(() => {
 })
 
 describe('IssueActivity provenance identity', () => {
-  it('opens a Session from its identity instead of rendering a detached Continue action', async () => {
+  it('shows Session details before an explicit Open conversation action', async () => {
     const record: IssueProvenanceRecord = {
       id: 'provenance-reconstructed',
       action: 'reconstructed',
@@ -40,9 +40,22 @@ describe('IssueActivity provenance identity', () => {
 
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
     fireEvent.click(screen.getByRole('button', {
-      name: 'Open conversation with opencode · resume-open-coral-harbor-j76vuu',
+      name: 'Show Session details for opencode · resume-open-coral-harbor-j76vuu',
     }))
+    expect(onOpenSession).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', {
+      name: 'Session resume-open-coral-harbor-j76vuu',
+    })).toBeTruthy()
 
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', {
+      name: 'Session resume-open-coral-harbor-j76vuu',
+    })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Show Session details for opencode · resume-open-coral-harbor-j76vuu',
+    }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
     await waitFor(() => expect(onOpenSession).toHaveBeenCalledWith(expect.objectContaining(record)))
   })
 })

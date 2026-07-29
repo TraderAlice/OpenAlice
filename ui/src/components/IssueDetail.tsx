@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowLeft, Hash, History, Inbox, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
 
@@ -755,8 +755,29 @@ export function IssueActivity({
 }) {
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [openError, setOpenError] = useState<string | null>(null)
+  const [identityPopoverId, setIdentityPopoverId] = useState<string | null>(null)
+  const identityPopoverRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!identityPopoverId) return
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!identityPopoverRef.current?.contains(event.target as Node)) {
+        setIdentityPopoverId(null)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIdentityPopoverId(null)
+    }
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [identityPopoverId])
 
   const openSession = async (record: IssueProvenanceRecord) => {
+    setIdentityPopoverId(null)
     setOpeningId(record.id)
     setOpenError(null)
     try {
@@ -828,25 +849,55 @@ export function IssueActivity({
                   <History size={10} aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] text-muted-foreground">
+                  <div className="text-[12px] text-muted-foreground">
                     {isSession ? (
-                      <button
-                        type="button"
-                        aria-label={`Open conversation with ${originLabel}`}
-                        aria-busy={openingId === record.id}
-                        title="Open this Session conversation"
-                        onClick={() => void openSession(record)}
-                        disabled={openingId !== null}
-                        className="inline rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50"
+                      <span
+                        ref={identityPopoverId === record.id ? identityPopoverRef : undefined}
+                        className="relative inline-block"
                       >
-                        {originLabel}
-                      </button>
+                        <button
+                          type="button"
+                          aria-label={`Show Session details for ${originLabel}`}
+                          aria-haspopup="dialog"
+                          aria-expanded={identityPopoverId === record.id}
+                          aria-controls={`issue-session-${record.id}`}
+                          onClick={() => setIdentityPopoverId((open) => open === record.id ? null : record.id)}
+                          disabled={openingId !== null}
+                          className="inline rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50"
+                        >
+                          {originLabel}
+                        </button>
+                        {identityPopoverId === record.id && (
+                          <div
+                            id={`issue-session-${record.id}`}
+                            role="dialog"
+                            aria-label={`Session ${origin.resumeId}`}
+                            className="oa-popover-enter absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg"
+                          >
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+                              Session
+                            </p>
+                            <p className="mt-1 text-[12px] font-medium text-foreground">{origin.agent}</p>
+                            <p className="mt-0.5 break-all font-mono text-[10px] leading-relaxed text-muted-foreground">
+                              {origin.resumeId}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => void openSession(record)}
+                              disabled={openingId !== null}
+                              className="oa-pressable mt-3 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
+                            >
+                              {openingId === record.id ? 'Opening…' : 'Open conversation'}
+                            </button>
+                          </div>
+                        )}
+                      </span>
                     ) : (
                       <span className="font-medium text-foreground/80">{originLabel}</span>
                     )}{' '}
                     {PROVENANCE_ACTION_LABEL[record.action]} ·{' '}
                     <span title={new Date(record.at).toLocaleString()}>{formatRelativeTime(record.at)}</span>
-                  </p>
+                  </div>
                   {record.mutation && (
                     <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-muted-foreground/80">
                       {record.mutation.fields.map((change) => (
