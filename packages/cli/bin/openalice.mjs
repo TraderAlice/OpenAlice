@@ -12,6 +12,11 @@ import {
   runLifecycleCommand,
 } from '../src/lifecycle-command.mjs'
 import { formatLocalStartHelp, parseLocalStartArgs, startLocal } from '../src/local-start.mjs'
+import {
+  formatObservabilityHelp,
+  parseObservabilityArgs,
+  runObservabilityCommand,
+} from '../src/observability-command.mjs'
 import { connectRemote, formatRemoteHelp, parseRemoteArgs } from '../src/remote.mjs'
 import { formatServerHelp, parseServerArgs, runServerCommand } from '../src/server.mjs'
 import { connectSsh, formatSshHelp, parseSshConnectArgs } from '../src/ssh-connect.mjs'
@@ -56,6 +61,13 @@ export async function main(argv = process.argv.slice(2)) {
       await maybeNotifyUpdate({ enabled: true })
     }
     return runLifecycleCommand(command, options)
+  }
+  if (command === 'logs' || command === 'doctor') {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatObservabilityHelp(command))
+      return 0
+    }
+    return runObservabilityCommand(command, parseObservabilityArgs(command, args))
   }
   if (command === 'completion') {
     if (args.includes('--help') || args.includes('-h') || args.length === 0) {

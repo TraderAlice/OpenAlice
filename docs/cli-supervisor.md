@@ -43,6 +43,8 @@ openalice up [path] [options]
 openalice run [path] [options]
 openalice down [options]
 openalice status [options]
+openalice logs [options]
+openalice doctor [options]
 openalice open [options]
 ```
 
@@ -52,6 +54,8 @@ openalice open [options]
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |
 | `status` | Read normalized status without mutation |
+| `logs` | Read a bounded, redacted tail from safe Runtime log rotations |
+| `doctor` | Run read-only provenance, ownership, readiness, component, provider, update-metadata, and log-layout checks |
 | `open` | Require an advertised Web endpoint and a successful `/api/auth/status` probe before invoking the platform browser opener |
 
 `up` is idempotent for an already healthy matching owner. `down` is idempotent
@@ -132,11 +136,13 @@ Runtime failures after parsing use the same envelope on stderr:
 }
 ```
 
-The nested normalized status retains Guardian protocol, lifecycle class,
-Runtime version when known, selected home, sanitized owner, loopback Web
-endpoint, component state, capabilities, and safe diagnostic detail. It never
-includes lock tokens, credentials, internal ports, or arbitrary environment
-values.
+The nested normalized status retains Guardian transport/control compatibility,
+lifecycle class, product version, provider identity, pending activation,
+bounded uptime, selected home, sanitized owner, loopback Web endpoint,
+component summary/detail, capabilities, and safe diagnostic detail.
+`runtimeVersion` remains as a compatibility alias while `productVersion` is
+the user-facing release identity. Status never includes lock tokens,
+credentials, internal ports, or arbitrary environment values.
 
 Exit behavior is:
 
@@ -163,6 +169,78 @@ An Electron-owned or dev-owned Runtime may be inspected and opened, but
 `down` refuses it. Only a matching `cli-server` that advertises
 `runtime.stop` accepts the stop transaction.
 
+## Control Compatibility
+
+Guardian control uses one local JSON-line request and response per connection.
+The transport envelope remains `protocol: 1`. Compatible additions do not bump
+that number: older clients ignore unknown result fields and newer clients
+default missing additive metadata to control API 1.
+
+Normalized status includes:
+
+```json
+{
+  "protocol": 1,
+  "control": {
+    "apiVersion": 1,
+    "minClientApiVersion": 1,
+    "capabilities": ["runtime.status", "runtime.stop"]
+  }
+}
+```
+
+The CLI must check an advertised capability before requesting an optional
+mutation. A future server whose `minClientApiVersion` is newer than the CLI is
+reported as `incompatible`; the CLI does not guess at stop semantics. A
+breaking framing or response-envelope change requires a transport protocol
+bump. Cross-version fixtures preserve both directions: the current client
+normalizes the legacy protocol-1 result, and a legacy request reads the
+additive current result.
+
+## Logs
+
+`openalice logs` reads only regular `server.log` and `server.log.<rotation>`
+files inside `<home>/logs`. Symlinked directories/files and unrelated names are
+rejected or ignored. Reads are bounded to ten recent rotations, 256 KiB per
+file, 1 MiB total, and 5,000 requested lines. It never follows arbitrary paths.
+
+Before terminal or JSON output, the reader redacts common authorization,
+token, API-key, password, private-key, sealing-key, and first-run admin-token
+forms. Terminal control bytes are escaped. Redaction is a defense-in-depth
+safety net; Runtime logs can still contain private product or trading context
+and should not be published blindly.
+
+The current command is a snapshot tail:
+
+```bash
+openalice logs --lines 200
+openalice logs --lines 200 --json
+```
+
+Follow, pause, component filtering, and TUI log navigation belong to the later
+Logs/TUI increment and must reuse this bounded reader.
+
+## Doctor
+
+`openalice doctor` is read-only. It performs no install, update discovery
+network request, takeover, restart, configuration write, credential read, or
+broker action. It checks:
+
+- CLI product version, install source, and installed content identity;
+- the Node.js minimum;
+- Guardian ownership, control compatibility, and lifecycle state;
+- the advertised loopback Web endpoint with a bounded auth-status probe;
+- Alice, UTA, and Connector state;
+- source-provider version and required built artifacts, or advertised bundle
+  content identity;
+- locally cached stable-update metadata;
+- safe Runtime log discovery.
+
+Human output uses explicit PASS/WARN/FAIL rows. JSON uses the same versioned
+root envelope as lifecycle commands. A completed Doctor run exits `1` when it
+contains failures, `0` for healthy or warning-only results, and `2` for invalid
+syntax.
+
 ## Shell Completion
 
 Completion is generated from the root command registry:
@@ -184,6 +262,11 @@ completion; detailed shell installation remains user-owned.
 - `packages/cli/src/lifecycle.mjs` — presentation-neutral lifecycle.
 - `packages/cli/src/lifecycle-command.mjs` — canonical command parsing and
   presentation.
+- `packages/cli/src/logs.mjs` — bounded log discovery, tailing, control-byte
+  escaping, and credential redaction.
+- `packages/cli/src/doctor.mjs` — read-only structured diagnostic checks.
+- `packages/cli/src/observability-command.mjs` — logs/Doctor parsing and
+  human/JSON presentation.
 - `packages/cli/src/server.mjs` — legacy `server` presenter.
 - `packages/cli/src/server-control.mjs` — local control client and normalized
   status.

@@ -86,6 +86,7 @@ export async function startRuntime(options, dependencies = {}) {
   })
   runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
+  runtimeEnv.OPENALICE_RUNTIME_PROVIDER = 'source'
 
   const logPath = resolve(options.logFile ?? resolve(homeRoot, 'logs', 'server.log'))
   runtimeEnv.OPENALICE_SERVER_LOG = logPath

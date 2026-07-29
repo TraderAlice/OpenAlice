@@ -110,6 +110,18 @@ const value = JSON.parse(process.argv[1]);
 if (value.schemaVersion !== 1 || value.command !== "status" || value.ok !== true) process.exit(1);
 if (value.result?.status?.class !== "absent" || value.result?.status?.state !== "absent") process.exit(1);
 ' "$lifecycle_status" || fail "installed CLI lifecycle status envelope check failed"
+logs_status="$($bin_dir/openalice logs --home "$HOME/openalice-lifecycle-smoke" --json)"
+node -e '
+const value = JSON.parse(process.argv[1]);
+if (value.schemaVersion !== 1 || value.command !== "logs" || value.ok !== true) process.exit(1);
+if (value.result?.logs?.home !== process.argv[2] || value.result?.logs?.entries?.length !== 0) process.exit(1);
+' "$logs_status" "$HOME/openalice-lifecycle-smoke" || fail "installed CLI logs envelope check failed"
+doctor_status="$($bin_dir/openalice doctor --home "$HOME/openalice-lifecycle-smoke" --json)"
+node -e '
+const value = JSON.parse(process.argv[1]);
+if (value.schemaVersion !== 1 || value.command !== "doctor" || value.ok !== true) process.exit(1);
+if (value.result?.doctor?.summary?.failures !== 0 || value.result?.doctor?.runtime?.class !== "absent") process.exit(1);
+' "$doctor_status" || fail "installed CLI Doctor envelope check failed"
 "$bin_dir/openalice" up --help | grep -Fq "persistent background Runtime" \
   || fail "installed CLI up help check failed"
 "$bin_dir/openalice" completion bash | grep -Fq "complete -F _openalice_completion openalice" \
@@ -126,6 +138,12 @@ grep -Fq "OPENALICE_MANAGED_PI_PATH" "$bin_dir/openalice" \
   || fail "OpenAlice launcher does not inject the managed Pi path"
 cmp /fixture/packages/cli/src/local-start.mjs "$v1_release/src/local-start.mjs" \
   || fail "downloaded CLI file differs from the fixture"
+cmp /fixture/packages/cli/src/doctor.mjs "$v1_release/src/doctor.mjs" \
+  || fail "downloaded Doctor module differs from the fixture"
+cmp /fixture/packages/cli/src/logs.mjs "$v1_release/src/logs.mjs" \
+  || fail "downloaded logs module differs from the fixture"
+cmp /fixture/packages/cli/src/observability-command.mjs "$v1_release/src/observability-command.mjs" \
+  || fail "downloaded observability command module differs from the fixture"
 cmp /fixture/packages/cli/src/install-source.mjs "$v1_release/src/install-source.mjs" \
   || fail "downloaded install-source module differs from the fixture"
 cmp /fixture/packages/cli/src/install-layout.mjs "$v1_release/src/install-layout.mjs" \

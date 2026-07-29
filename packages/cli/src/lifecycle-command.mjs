@@ -15,6 +15,8 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'run', description: 'Run a local Runtime in the foreground' },
   { name: 'down', description: 'Stop the persistent local Runtime' },
   { name: 'status', description: 'Inspect the selected local Runtime' },
+  { name: 'logs', description: 'Read a bounded redacted Runtime log tail' },
+  { name: 'doctor', description: 'Run read-only Runtime diagnostics' },
   { name: 'open', description: 'Open the verified local Web UI' },
   { name: 'start', description: 'Compatibility foreground browser launcher' },
   { name: 'server', description: 'Compatibility Server lifecycle commands' },
@@ -36,6 +38,8 @@ const LIFECYCLE_OPTIONS = Object.freeze({
   ],
   down: ['--home', '--wait', '--json'],
   status: ['--home', '--wait', '--json'],
+  logs: ['--home', '--lines', '--json'],
+  doctor: ['--home', '--wait', '--json'],
   open: ['--home', '--wait'],
 })
 
@@ -343,15 +347,35 @@ function formatExistingRuntime(status) {
 
 function formatLifecycleStatus(status) {
   const lines = [`OpenAlice Runtime: ${status.class}`, `Home: ${status.home}`]
-  if (status.runtimeVersion) lines.push(`Version: ${status.runtimeVersion}`)
+  if (status.productVersion || status.runtimeVersion) {
+    lines.push(`Version: ${status.productVersion ?? status.runtimeVersion}`)
+  }
   if (status.owner) lines.push(`Owner: ${status.owner.surface} (pid ${status.owner.pid})`)
   if (status.endpoints?.web) lines.push(`Web: ${status.endpoints.web}`)
+  if (status.provider?.kind) {
+    const identity = status.provider.contentIdentity ? ` (${status.provider.contentIdentity})` : ''
+    lines.push(`Provider: ${status.provider.kind}${identity}`)
+  }
+  if (Number.isInteger(status.uptimeSeconds)) lines.push(`Uptime: ${formatUptime(status.uptimeSeconds)}`)
   for (const name of ['alice', 'uta', 'connector']) {
     if (status.components?.[name]) lines.push(`${displayComponent(name)}: ${status.components[name]}`)
+  }
+  if (status.pendingActivation?.productVersion) {
+    lines.push(`Pending activation: ${status.pendingActivation.productVersion}${status.pendingActivation.restartRequired ? ' (restart required)' : ''}`)
   }
   if (status.owner?.launchRoot) lines.push(`Runtime source: ${status.owner.launchRoot}`)
   if (status.detail) lines.push(`Detail: ${status.detail}`)
   return `${lines.join('\n')}\n`
+}
+
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86_400)
+  const hours = Math.floor((seconds % 86_400) / 3_600)
+  const minutes = Math.floor((seconds % 3_600) / 60)
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m`
+  return `${seconds}s`
 }
 
 function displayComponent(name) {

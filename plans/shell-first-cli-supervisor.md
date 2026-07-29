@@ -249,13 +249,13 @@ and verification before the next dependent branch starts from updated `dev`.
 
 ### 2. Control compatibility and observability
 
-- [ ] Specify transport/API compatibility and capability negotiation.
-- [ ] Add provider, product version, pending activation, component detail, and
+- [x] Specify transport/API compatibility and capability negotiation.
+- [x] Add provider, product version, pending activation, component detail, and
   bounded uptime to normalized status.
-- [ ] Add safe rotated log discovery/tail and redaction.
-- [ ] Add read-only Doctor checks for provenance, Node/runtime requirements,
+- [x] Add safe rotated log discovery/tail and redaction.
+- [x] Add read-only Doctor checks for provenance, Node/runtime requirements,
   ownership, ports, components, update metadata, and source/bundle integrity.
-- [ ] Exercise old-client/new-server and new-client/old-server fixtures.
+- [x] Exercise old-client/new-server and new-client/old-server fixtures.
 
 ### 3. TUI renderer spike and PTY harness
 
@@ -465,3 +465,10 @@ This plan is complete only when:
   clean installer upgrade/uninstall Docker smoke, managed remote SSH smoke, UI
   typecheck, server build, and Electron PTY smoke.
 - 2026-07-30: Published increment 1 as serial PR #853 targeting `dev`.
+- 2026-07-30: Completed increment 2 implementation and local verification:
+  additive control API/capability negotiation, expanded product/provider/status
+  provenance, bounded redacted logs, read-only Doctor, and both cross-version
+  directions. CLI tests passed 126; root Vitest passed 3,629 with 9 skipped;
+  TypeScript, Guardian recovery, real running status/logs/Doctor, installer
+  upgrade/uninstall, managed remote SSH, server build, and Electron PTY smoke
+  all passed.
