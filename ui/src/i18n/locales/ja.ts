@@ -1156,6 +1156,13 @@ export const ja: Resources = {
       operationCount_other: '{{count}} 件の操作',
       cleanDescription: '承認待ちのブローカー書き込みはありません。',
       cleanDetailDescription: '承認待ちのブローカー書き込みはありません。最近プッシュしたコミットはここに表示されます。',
+      verificationUnknown: '承認状態を確認できません',
+      verificationCount: '{{verified}} / {{total}} 口座を確認済み',
+      verificationDescription: '一部の口座を確認できませんでした。最後に確認できた項目は保持されています。キューがクリーンと判断する前に再試行してください。',
+      listUnavailableDescription: '取引口座を読み込めませんでした。最後に確認できた審査状態は保持されています。',
+      failedAccounts: '確認できない口座: {{accounts}}',
+      retry: '再試行',
+      retrying: '再試行中…',
     },
     status: {
       needsApproval: '承認が必要',
