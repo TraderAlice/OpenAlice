@@ -382,8 +382,9 @@ export const issueCommentFactory: WorkspaceToolFactory = {
         'signed by the current product Session when available. It never mutates',
         'the canonical What or changes the next scheduled prompt. If the Issue',
         'has a different fixed @resumeId owner, OpenAlice asks that Session in',
-        'the background and records its final reply in Activity. Workspace-owned',
-        'Issues keep the comment as a durable note and do not recruit a worker.',
+        'the background and records its final reply in Activity. Human comments',
+        'without a fixed owner ask the creator or a reconstructed Workspace Agent.',
+        'Agent-authored comments without a fixed owner remain durable notes.',
       ].join('\n'),
       inputSchema: z.object({
         id: z.string().min(1).describe('The issue id to comment on.'),
@@ -419,7 +420,9 @@ export const issueCommentFactory: WorkspaceToolFactory = {
                   status: 'failed' as const,
                   delivery: {
                     state: 'failed' as const,
-                    targetResumeId: dispatched.delivery.targetResumeId,
+                    ...(dispatched.delivery.targetResumeId
+                      ? { targetResumeId: dispatched.delivery.targetResumeId }
+                      : {}),
                     ...(dispatched.delivery.taskId ? { taskId: dispatched.delivery.taskId } : {}),
                     error: `Comment saved, but delivery state could not be recorded: ${updated.error}`,
                   },

@@ -104,10 +104,13 @@ Comments are also the Issue's normal conversation entry. When `assignee` is an
 exact `@resumeId`, a comment from somebody else is delivered asynchronously to
 that Session and its final reply is appended as another structured comment.
 The source comment records `pending`, `replied`, or `failed`, so a durable note
-never masquerades as a delivered message. A comment on `@workspace`, `@human`,
-or `@unassigned` stays a timeline note: OpenAlice does not invent a new owner
-just because somebody commented. An owner commenting on their own Issue is not
-echoed back to the same Session.
+never masquerades as a delivered message. A human comment without a fixed owner
+uses the same provenance-aware fallback as Inbox: OpenAlice asks the
+attributable creator, or recruits a reconstruction Agent in the Issue
+Workspace when no creator Session exists. The answer is recorded in Activity
+without changing `assignee`; a temporary answerer never becomes the scheduling
+owner. Agent-authored comments without a fixed owner remain timeline notes, and
+an owner commenting on their own Issue is not echoed back to the same Session.
 
 `done` and `canceled` are terminal and stop scheduled firing. There is no
 separate `enabled` flag. A successful one-shot `at` issue is automatically

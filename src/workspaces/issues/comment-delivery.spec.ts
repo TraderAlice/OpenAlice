@@ -46,12 +46,66 @@ function conversation(result: Awaited<ReturnType<WorkspaceConversationControl['a
 }
 
 describe('dispatchIssueCommentReply', () => {
-  it('keeps workspace-owned Issues as notes without recruiting a worker', async () => {
+  it('keeps agent-authored workspace-owned comments as notes', async () => {
     expect(await dispatchIssueCommentReply({
       issueWorkspaceId: 'ws-home',
       issue: issue('@workspace'),
       comment,
-    })).toEqual({ status: 'not_requested', reason: 'no_fixed_owner' })
+      source: { kind: 'workspace', workspaceId: 'ws-home' },
+    })).toEqual({ status: 'not_requested', reason: 'non_human_note' })
+  })
+
+  it('asks the creator or reconstructs for a human comment without a fixed owner', async () => {
+    const control = conversation({
+      status: 'dispatched',
+      taskId: 'run-reconstructed-reply',
+      resumeId: 'resume-reconstructed',
+      workspaceId: 'ws-home',
+      workspace: 'home-desk',
+      agent: 'codex',
+      resolution: {
+        mode: 'reconstructed',
+        workspaceId: 'ws-home',
+        reason: 'missing-origin',
+        origin: {
+          kind: 'session',
+          workspaceId: 'ws-home',
+          resumeId: 'resume-reconstructed',
+          agent: 'codex',
+        },
+      },
+    })
+    expect(await dispatchIssueCommentReply({
+      conversation: control,
+      issueWorkspaceId: 'ws-home',
+      issue: issue('@workspace'),
+      comment,
+      source: { kind: 'human' },
+    })).toEqual({
+      status: 'scheduled',
+      delivery: {
+        state: 'pending',
+        targetResumeId: 'resume-reconstructed',
+        taskId: 'run-reconstructed-reply',
+      },
+    })
+    expect(control.ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: {
+        kind: 'issue',
+        workspaceId: 'ws-home',
+        issueId: 'audit',
+        action: 'created',
+      },
+      reconstruct: true,
+      source: { kind: 'human' },
+      subject: {
+        kind: 'issue',
+        workspaceId: 'ws-home',
+        issueId: 'audit',
+        relation: 'creator',
+        commentId: 'comment-1',
+      },
+    }))
   })
 
   it('does not notify an owner about their own comment', async () => {

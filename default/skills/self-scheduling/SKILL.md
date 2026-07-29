@@ -71,8 +71,9 @@ alice-workspace issue update --id morning-scan --status done
 
 # comment — append markdown to the structured `<id>.comments.json` sidecar. An
 # attributable Session signs with @resumeId. If somebody else comments on an
-# Issue with a fixed @resumeId owner, OpenAlice asks that owner in the background
-# and records the final reply in Activity. @workspace comments remain notes.
+# For a fixed @resumeId owner, OpenAlice asks that owner in the background.
+# Human comments without one ask the creator or a reconstructed Workspace Agent.
+# Agent-authored comments without a fixed owner remain timeline notes.
 alice-workspace issue comment --id morning-scan --text "Brief pushed; SPY gapped +0.4%."
 ```
 

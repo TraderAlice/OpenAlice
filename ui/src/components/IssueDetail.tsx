@@ -507,7 +507,7 @@ function CommentComposer({
         rows={3}
         value={text}
         disabled={sending}
-        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Add a timeline note…'}
+        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Ask about this Issue…'}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -523,8 +523,8 @@ function CommentComposer({
           {ownerResumeId
             ? <>The assigned Session <span className="font-mono text-foreground/75">@{ownerResumeId}</span> will reply here.</>
             : assignee === '@new'
-              ? 'The first scheduled run will assign a Session; until then this is a timeline note.'
-              : 'No fixed Session owner — this comment is recorded as a timeline note.'}
+              ? 'Until the first run assigns an owner, the creator or a reconstructed Workspace Agent will reply here.'
+              : 'The creator or a reconstructed Workspace Agent will reply here; ownership stays unchanged.'}
         </p>
         <button
           type="button"
@@ -532,7 +532,7 @@ function CommentComposer({
           disabled={sending || text.trim().length === 0}
           className="oa-pressable rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Add note'}
+          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Comment & ask'}
         </button>
       </div>
     </div>
@@ -805,7 +805,7 @@ function IssueActivity({
                     )}
                     {delivery?.state === 'failed' && (
                       <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-[11px] leading-snug text-warning">
-                        The comment is saved, but the owner could not be reached: {delivery.error}
+                        The comment is saved, but an Agent could not reply: {delivery.error}
                       </p>
                     )}
                   </article>

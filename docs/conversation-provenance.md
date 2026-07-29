@@ -296,8 +296,12 @@ edits remain explicitly unknown rather than crediting the wrong coworker.
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
 delivered to that exact Session. The final assistant response is recorded as a
 reply comment, linked by `replyTo`; delivery state stays on the source comment.
-Workspace-owned Issues do not recruit a fresh worker for comments. This keeps
-“leave a durable note” separate from “create a new execution owner.”
+For a human comment without a fixed owner, OpenAlice follows the Issue creation
+provenance and uses the universal follow-up rule: continue the attributable
+creator, or recruit a reconstructed Agent in the Issue Workspace when creation
+has no Session origin. This answering Session is a collaborator, not an
+execution owner; `assignee` stays unchanged. Agent-authored comments without a
+fixed owner remain durable notes so progress logging does not fan out workers.
 
 #### Mode A: one responsible Session
 
@@ -614,7 +618,7 @@ inbox ask <entry>             -> sender Session or reconstructed Workspace Sessi
 issue ask <issue> --creator   -> creation provenance (shipped)
 issue ask <issue> --owner     -> declared Session assignee, or explain Workspace ownership (shipped)
 issue ask <issue> --run-id    -> that run's Session (shipped)
-issue comment <issue>         -> timeline note; fixed owner replies in Activity (shipped)
+issue comment <issue>         -> fixed owner replies; human UI may reconstruct when unowned (shipped)
 report ask <path> [revision]  -> matching writer/update occurrence
 trade ask <order> --decision  -> initiating Session
 trade ask <order> --execution -> UTA/broker evidence, not an AI conversation
@@ -631,7 +635,7 @@ No feature should invent its own meaning of “the agent who made this.”
 | Product Session | `ResumeRegistry`, headless `resumeId`, interactive materialization | Standard origin projection and read-only lookup | Continue exact or create reconstructed Session |
 | Execution | `HeadlessTaskRegistry`, `parentTaskId`, normalized output | Bind every attributable occurrence to the execution and `resumeId` | Poll/stream the peer reply and tool activity |
 | Inbox | Server-stamped run/session origin | Safe exposure and legacy/unknown classification | Ask sender or reconstruct at Workspace |
-| Issue | `{ workspaceId, issueId }`, Activity, Runs, and Inbox reports | Creator/mutation edges, structured comment threads, plus explicit Workspace/Session ownership | Comment to the fixed owner; explicitly ask creator or one selected run |
+| Issue | `{ workspaceId, issueId }`, Activity, Runs, and Inbox reports | Creator/mutation edges, structured comment threads, plus explicit Workspace/Session ownership | Comment to the fixed owner; human comments may reconstruct; explicitly ask creator or one selected run |
 | Report | Workspace path and git repository | Revision-level creation/update attribution | Ask writer of the selected revision |
 | Trade | UTA operation/order authority | Alice Session decision correlation across the UTA boundary | Ask initiator; route execution questions to UTA evidence |
 

@@ -276,8 +276,9 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
   // POST /api/issues/:wsId/:id/comments — append a structured markdown comment
   // to `<id>.comments.json`. Author is fixed to 'human' here (the agent path
   // stamps its signed resume id when one is available). A different fixed
-  // Session owner is notified in the background; workspace-owned Issues remain
-  // durable notes and never recruit a random worker. Returns updated detail.
+  // Session owner is notified in the background. Human comments without a
+  // fixed owner follow the same provenance-aware creator/reconstruction path
+  // as Inbox. Returns updated detail.
   app.post('/:wsId/:id/comments', async (c) => {
     const wsId = c.req.param('wsId')
     const id = c.req.param('id')

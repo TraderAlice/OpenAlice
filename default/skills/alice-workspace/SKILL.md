@@ -27,9 +27,10 @@ Choose the verb from the intent, not from whichever object you happen to have:
 `issue comment` is the durable conversation entry for this Workspace's own
 Issue. If the Issue has an exact `@resumeId` assignee, a comment from somebody
 else resumes that owner in the background and records the final reply in the
-Activity timeline. `@workspace`-owned Issues keep comments as notes and do not
-recruit a random worker. Use `issue ask` when interrogating the creator or a
-specific historical run without adding a comment.
+Activity timeline. A human comment without a fixed owner asks the creator or a
+reconstructed Workspace Agent without changing assignee. Agent-authored
+comments without a fixed owner remain notes. Use `issue ask` when interrogating
+the creator or a specific historical run without adding a comment.
 
 **Hand finished work back to the user** — this is the outbound channel. It posts
 to the user's Inbox tab:

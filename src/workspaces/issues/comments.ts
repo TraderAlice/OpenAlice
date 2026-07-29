@@ -23,7 +23,7 @@ export interface IssueComment {
   markdown: string
   /** A reply remains a first-class timeline entry while retaining the thread edge. */
   replyTo?: string
-  /** Delivery is optional because comments on unowned Issues are durable notes only. */
+  /** Delivery is optional for agent-authored notes and owner self-comments. */
   delivery?: IssueCommentDelivery
 }
 
@@ -41,7 +41,7 @@ export type IssueCommentDelivery =
     }
   | {
       state: 'failed'
-      targetResumeId: string
+      targetResumeId?: string
       taskId?: string
       error: string
     }
@@ -60,7 +60,7 @@ const issueCommentDeliverySchema = z.discriminatedUnion('state', [
   }),
   z.object({
     state: z.literal('failed'),
-    targetResumeId: z.string().min(1),
+    targetResumeId: z.string().min(1).optional(),
     taskId: z.string().min(1).optional(),
     error: z.string().min(1),
   }),

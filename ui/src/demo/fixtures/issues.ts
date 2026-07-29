@@ -556,38 +556,36 @@ export function demoIssueAddComment(
   const key = `${wsId}/${id}`
   const comments = demoIssueComments[key] ?? []
   const commentId = `demo-comment-${comments.length + 1}`
-  const ownerResumeId = boardIssue.assignee.startsWith('@resume-') ? boardIssue.assignee.slice(1) : null
+  const ownerResumeId = boardIssue.assignee.startsWith('@resume-')
+    ? boardIssue.assignee.slice(1)
+    : `demo-reconstructed-${id}`
   const taskId = `demo-comment-run-${comments.length + 1}`
   comments.push({
     id: commentId,
     author,
     at: new Date().toISOString(),
     markdown: text,
-    ...(ownerResumeId ? {
-      delivery: { state: 'pending' as const, targetResumeId: ownerResumeId, taskId },
-    } : {}),
+    delivery: { state: 'pending' as const, targetResumeId: ownerResumeId, taskId },
   })
   demoIssueComments[key] = comments
-  if (ownerResumeId) {
-    window.setTimeout(() => {
-      const source = comments.find((comment) => comment.id === commentId)
-      if (!source || source.delivery?.state !== 'pending') return
-      const replyCommentId = `demo-reply-${commentId}`
-      source.delivery = {
-        state: 'replied',
-        targetResumeId: ownerResumeId,
-        taskId,
-        replyCommentId,
-      }
-      comments.push({
-        id: replyCommentId,
-        author: `@${ownerResumeId}`,
-        at: new Date().toISOString(),
-        markdown: 'I saw the comment and will carry this context into the next pass.',
-        replyTo: commentId,
-      })
-    }, 900)
-  }
+  window.setTimeout(() => {
+    const source = comments.find((comment) => comment.id === commentId)
+    if (!source || source.delivery?.state !== 'pending') return
+    const replyCommentId = `demo-reply-${commentId}`
+    source.delivery = {
+      state: 'replied',
+      targetResumeId: ownerResumeId,
+      taskId,
+      replyCommentId,
+    }
+    comments.push({
+      id: replyCommentId,
+      author: `@${ownerResumeId}`,
+      at: new Date().toISOString(),
+      markdown: 'I saw the comment and will carry this context into the next pass.',
+      replyTo: commentId,
+    })
+  }, 900)
   return demoIssueDetail(wsId, id)
 }
 
