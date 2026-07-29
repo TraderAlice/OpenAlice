@@ -288,7 +288,8 @@ Before merging a promotion:
   and the post-merge live dev-channel job to be green, and walk the interactive
   installer locally when its human-facing flow changed;
 - confirm the new release version, notes, and tag intent; the release workflow
-  must see a version whose tag does not already exist;
+  must see a version whose tag does not already exist, and the root and
+  `packages/cli` manifests must carry that same product version;
 - confirm CI and release workflow triggers still match the branch policy.
 
 The release workflow repeats the deterministic installer and managed-remote

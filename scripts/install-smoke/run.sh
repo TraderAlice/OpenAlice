@@ -53,6 +53,7 @@ curl --fail --silent --output /dev/null "$installer_url" || {
 }
 
 export OPENALICE_INSTALL_BASE_URL="http://127.0.0.1:18080/packages/cli/"
+cli_version="$(node -p "require('/fixture/packages/cli/package.json').version")"
 
 default_plan="$(curl -fsSL "$installer_url" | bash -s -- --plan)"
 grep -Fq "Branch         master" <<<"$default_plan" || fail "installer did not default to master"
@@ -86,15 +87,16 @@ install_branch smoke-v1
 
 bin_dir="$HOME/.openalice/bin"
 versions_dir="$HOME/.openalice/cli-versions"
-[[ "$($bin_dir/openalice --version)" == "0.2.0" ]] || fail "installed CLI version check failed"
+[[ "$($bin_dir/openalice --version)" == "$cli_version" ]] || fail "installed CLI version check failed"
 install_source="$($bin_dir/openalice version --json)"
 node -e '
 const value = JSON.parse(process.argv[1]);
-if (value.version !== "0.2.0") process.exit(1);
-if (value.installSource?.cliVersion !== "0.2.0") process.exit(1);
+const expectedVersion = process.argv[2];
+if (value.version !== expectedVersion) process.exit(1);
+if (value.installSource?.cliVersion !== expectedVersion) process.exit(1);
 if (value.installSource?.selector?.kind !== "branch" || value.installSource?.selector?.value !== "smoke-v1") process.exit(1);
 if (value.installSource?.installerUrl !== "http://127.0.0.1:18080/install") process.exit(1);
-' "$install_source" || fail "installed CLI did not preserve its install source"
+' "$install_source" "$cli_version" || fail "installed CLI did not preserve its install source"
 [[ "$($bin_dir/pi --version)" == "0.80.6" ]] || fail "installed managed Pi version check failed"
 "$bin_dir/openalice" --help | grep -Fq "OpenAlice CLI" || fail "installed CLI help check failed"
 server_status="$($bin_dir/openalice server status --home "$HOME/openalice-server-smoke" --json)"
@@ -116,6 +118,8 @@ cmp /fixture/packages/cli/src/local-start.mjs "$v1_release/src/local-start.mjs" 
   || fail "downloaded CLI file differs from the fixture"
 cmp /fixture/packages/cli/src/install-source.mjs "$v1_release/src/install-source.mjs" \
   || fail "downloaded install-source module differs from the fixture"
+cmp /fixture/packages/cli/src/install-layout.mjs "$v1_release/src/install-layout.mjs" \
+  || fail "downloaded install-layout module differs from the fixture"
 cmp /fixture/packages/cli/src/remote.mjs "$v1_release/src/remote.mjs" \
   || fail "downloaded Remote CLI file differs from the fixture"
 cmp /fixture/packages/cli/src/runtime-deps.mjs "$v1_release/src/runtime-deps.mjs" \
@@ -124,6 +128,10 @@ cmp /fixture/packages/cli/src/server.mjs "$v1_release/src/server.mjs" \
   || fail "downloaded Server CLI file differs from the fixture"
 cmp /fixture/packages/cli/src/server-control.mjs "$v1_release/src/server-control.mjs" \
   || fail "downloaded Server control file differs from the fixture"
+cmp /fixture/packages/cli/src/update.mjs "$v1_release/src/update.mjs" \
+  || fail "downloaded update module differs from the fixture"
+cmp /fixture/packages/cli/src/uninstall.mjs "$v1_release/src/uninstall.mjs" \
+  || fail "downloaded uninstall module differs from the fixture"
 
 expected_path_line="export PATH=$HOME/.openalice/bin:\$PATH"
 path_count="$(grep -Fxc "$expected_path_line" "$HOME/.bashrc" || true)"
@@ -151,6 +159,10 @@ path_count="$(grep -Fxc "$expected_path_line" "$HOME/.bashrc" || true)"
 v1_count="$(find "$versions_dir" -mindepth 1 -maxdepth 1 -type d -name 'smoke-v1-*' | wc -l | tr -d ' ')"
 [[ "$v1_count" == "1" ]] || fail "repeat install duplicated an identical CLI release"
 
+update_check="$("$bin_dir/openalice" update --check)"
+grep -Fq "stable release update checks are disabled" <<<"$update_check" \
+  || fail "development-channel CLI did not explain its update policy"
+
 curl -fsSL "$installer_url" | bash -s -- --yes --version smoke-v2
 v2_release="$(find "$versions_dir" -mindepth 1 -maxdepth 1 -type d -name 'smoke-v2-*' -print -quit)"
 [[ -d "$v1_release" ]] || fail "version switch removed the previous CLI"
@@ -159,9 +171,29 @@ version_count="$(find "$versions_dir" -mindepth 1 -maxdepth 1 -type d | wc -l | 
 [[ "$version_count" == "2" ]] || fail "unexpected number of installed CLI versions: $version_count"
 grep -Fq "$v2_release/bin/openalice.mjs" "$bin_dir/openalice" \
   || fail "stable launcher did not switch to the latest install"
-[[ "$($bin_dir/openalice --version)" == "0.2.0" ]] || fail "switched CLI is not runnable"
+[[ "$($bin_dir/openalice --version)" == "$cli_version" ]] || fail "switched CLI is not runnable"
 
 grep -Fq "GET /packages/cli/package.json" "$server_log" \
   || fail "installer did not exercise the HTTP download branch"
+
+mkdir -p "$HOME/.openalice/data" "$HOME/.openalice/workspaces" "$HOME/.openalice/sources"
+printf 'state\n' > "$HOME/.openalice/data/preserved"
+printf 'desk\n' > "$HOME/.openalice/workspaces/preserved"
+printf 'checkout\n' > "$HOME/.openalice/sources/preserved"
+printf 'keys\n' > "$HOME/.openalice/provider-keys.json"
+printf 'seal\n' > "$HOME/.openalice/sealing.key"
+uninstall_plan="$("$bin_dir/openalice" uninstall --plan)"
+grep -Fq "$HOME/.openalice/workspaces" <<<"$uninstall_plan" \
+  || fail "uninstall plan did not name preserved Workspaces"
+"$bin_dir/openalice" uninstall --yes
+[[ ! -e "$bin_dir/openalice" ]] || fail "uninstall left the OpenAlice launcher"
+[[ ! -e "$versions_dir" ]] || fail "uninstall left immutable CLI releases"
+[[ -f "$HOME/.openalice/data/preserved" ]] || fail "uninstall removed application data"
+[[ -f "$HOME/.openalice/workspaces/preserved" ]] || fail "uninstall removed Workspaces"
+[[ -f "$HOME/.openalice/sources/preserved" ]] || fail "uninstall removed source checkouts"
+[[ -f "$HOME/.openalice/provider-keys.json" ]] || fail "uninstall removed provider credentials"
+[[ -f "$HOME/.openalice/sealing.key" ]] || fail "uninstall removed the sealing key"
+[[ "$(grep -Fxc '# >>> OpenAlice CLI >>>' "$HOME/.bashrc" || true)" == "0" ]] \
+  || fail "uninstall left the managed PATH block"
 
 echo "[install-docker-smoke] passed"

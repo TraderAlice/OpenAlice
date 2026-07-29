@@ -38,6 +38,7 @@ describe('OpenAlice local Runtime launcher', () => {
       prepare: true,
       rebuild: true,
       takeover: true,
+      checkUpdates: true,
       waitMs: 15_000,
     })
   })

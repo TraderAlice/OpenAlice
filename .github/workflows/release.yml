@@ -36,6 +36,8 @@ jobs:
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
+          test "$CLI_VERSION" = "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
@@ -362,7 +364,9 @@ jobs:
         run: |
           VERSION="${TAG#v}"
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          CLI_PACKAGE_VERSION=$(node -p "require('./packages/cli/package.json').version")
           test "$PACKAGE_VERSION" = "$VERSION"
+          test "$CLI_PACKAGE_VERSION" = "$VERSION"
           bash -n install
           cp install "dist/r2-upload/OpenAlice-${VERSION}-install"
 
