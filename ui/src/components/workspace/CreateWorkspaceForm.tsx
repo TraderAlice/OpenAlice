@@ -154,7 +154,7 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
         <p className={HINT}>{TAG_HINT}</p>
       </div>
 
-      {create.error && <div className="text-[12px] text-destructive">{create.error}</div>}
+      {create.error && <div role="alert" className="text-[12px] text-destructive">{create.error}</div>}
 
       <div className="flex items-center justify-end gap-2 pt-1">
         {onCancel && (
