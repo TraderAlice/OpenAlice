@@ -220,6 +220,7 @@ export const zhHant: Resources = {
     },
     tools: {
       summary: '{{groups}} 個分組共 {{tools}} 個工具——變更會在下次 AI 請求時生效',
+      loadError: '無法載入工具目錄。',
       emptyTitle: '尚未註冊任何工具。',
       emptyDescription: '引擎啟動後工具會顯示在這裡。',
       group: {

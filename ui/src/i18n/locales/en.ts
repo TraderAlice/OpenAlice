@@ -224,6 +224,7 @@ export const en = {
     },
     tools: {
       summary: '{{tools}} tools in {{groups}} groups — changes apply on next AI request',
+      loadError: 'Could not load the tool catalog.',
       emptyTitle: 'No tools registered.',
       emptyDescription: 'Tools will appear here when the engine starts.',
       group: {
