@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
 import { MobileRailMenuButton } from './components/MobileRailMenuButton'
@@ -68,6 +68,7 @@ function AppShell() {
   // (charts, money/date labels that don't call t()) refresh too.
   useLocale()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const mobileRailMenuButtonRef = useRef<HTMLButtonElement>(null)
   const isDesktop = useIsDesktop() // ≥768 — rail is a static column
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
@@ -95,7 +96,12 @@ function AppShell() {
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">
       {/* Mobile header — visible only below md */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-border/80 bg-secondary shrink-0 md:hidden">
-        <MobileRailMenuButton onOpen={() => setSidebarOpen(true)} />
+        <MobileRailMenuButton
+          ref={mobileRailMenuButtonRef}
+          open={sidebarOpen}
+          controlsId="activity-bar"
+          onOpen={() => setSidebarOpen(true)}
+        />
         <span className="text-sm font-semibold text-foreground">OpenAlice</span>
       </div>
 
@@ -115,8 +121,13 @@ function AppShell() {
           onClose={() => setSidebarOpen(false)}
           desktopStatic={isDesktop}
           railMode={railMode}
+          returnFocusRef={mobileRailMenuButtonRef}
         />
-        <div className="flex-1 min-h-0">
+        <div
+          aria-hidden={!isDesktop && sidebarOpen ? true : undefined}
+          inert={!isDesktop && sidebarOpen ? true : undefined}
+          className="flex-1 min-h-0"
+        >
           {mainContent}
         </div>
         <UrlAdopter />
