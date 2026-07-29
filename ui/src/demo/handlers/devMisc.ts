@@ -1,9 +1,13 @@
 import { http, HttpResponse } from 'msw'
 
+import packageJson from '../../../../package.json'
+
+const currentVersion = packageJson.version
+
 export const devMiscHandlers = [
   http.get('/api/version', () =>
     HttpResponse.json({
-      current: '0.21.0-demo',
+      current: currentVersion,
       latest: null,
       hasUpdate: false,
       releaseUrl: null,
@@ -15,7 +19,7 @@ export const devMiscHandlers = [
 
   http.post('/api/version/check', () =>
     HttpResponse.json({
-      current: '0.21.0-demo',
+      current: currentVersion,
       latest: null,
       hasUpdate: false,
       releaseUrl: null,
