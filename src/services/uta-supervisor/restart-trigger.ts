@@ -5,12 +5,9 @@
  *   1. Atomic-write `data/control/restart-uta.flag` (write to .tmp + rename)
  *      with content = ISO timestamp of the request.
  *   2. Guardian's fs.watch fires (debounced 100ms), Guardian SIGTERMs UTA,
- *      waits exit, respawns with fresh `accounts.json`.
+ *      waits exit, and respawns it with fresh boot-time configuration.
  *   3. Alice polls `${OPENALICE_UTA_URL}/__uta/health` until `startedAt` is
  *      newer than the pre-trigger value, or until timeout.
- *
- * Step 5 wires this into `trading-config.ts` so broker setup saves trigger
- * UTA reload automatically. Step 4 just exposes the helper.
  */
 
 import { writeFile, rename, mkdir } from 'fs/promises'

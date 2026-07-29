@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { setupServer } from 'msw/node'
 
-import { demoCredentialPresets } from './configKeys'
+import { configKeysHandlers, demoCredentialPresets } from './configKeys'
+
+const server = setupServer(...configKeysHandlers)
+const baseUrl = window.location.origin
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
 
 function modelIds(presetId: string): string[] {
   const preset = demoCredentialPresets.find((candidate) => candidate.id === presetId)
@@ -27,5 +35,27 @@ describe('demo credential catalog', () => {
       'claude-haiku-4-5',
       'claude-sonnet-4-6',
     ])
+  })
+})
+
+describe('demo snapshot config', () => {
+  it('mirrors production duration validation and normalization', async () => {
+    const invalid = await fetch(`${baseUrl}/api/config/snapshot`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true, every: 'nonsense' }),
+    })
+
+    expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toEqual({ error: 'Validation failed' })
+
+    const valid = await fetch(`${baseUrl}/api/config/snapshot`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false, every: ' 2h15m ' }),
+    })
+
+    expect(valid.status).toBe(200)
+    expect(await valid.json()).toEqual({ enabled: false, every: '2h15m' })
   })
 })
