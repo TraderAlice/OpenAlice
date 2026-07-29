@@ -54,6 +54,7 @@ export function TemplateDetailPage({ spec }: Props) {
   const [readme, setReadme] = useState<string | null>(null)
   const [readmeMissing, setReadmeMissing] = useState(false)
   const [readmeError, setReadmeError] = useState<string | null>(null)
+  const [readmeAttempt, setReadmeAttempt] = useState(0)
   useEffect(() => {
     let cancelled = false
     setReadme(null)
@@ -72,7 +73,7 @@ export function TemplateDetailPage({ spec }: Props) {
     return () => {
       cancelled = true
     }
-  }, [templateName])
+  }, [templateName, readmeAttempt])
 
   if (!template) {
     return (
@@ -152,7 +153,19 @@ export function TemplateDetailPage({ spec }: Props) {
             <p className="text-[12px] text-muted-foreground italic">{t('templates.noReadme')}</p>
           )}
           {readmeError && (
-            <p className="text-[12px] text-muted-foreground italic">{readmeError}</p>
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 text-[12px] text-destructive"
+            >
+              <span className="min-w-0 break-words">{readmeError}</span>
+              <button
+                type="button"
+                className="shrink-0 rounded-md border border-destructive/30 px-2.5 py-1 font-medium hover:bg-destructive/10"
+                onClick={() => setReadmeAttempt((attempt) => attempt + 1)}
+              >
+                {t('common.retry')}
+              </button>
+            </div>
           )}
           {readmeBody && (
             <MarkdownContent text={readmeBody} className="text-[13px] leading-relaxed" />
