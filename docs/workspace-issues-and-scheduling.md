@@ -56,6 +56,11 @@ The filename stem is the stable issue id. Frontmatter:
     every scheduled fire;
   - an exact `@resumeId` continues one accountable product Session;
   - `@human` or `@unassigned` is valid only for unscheduled work.
+  When omitted, a scheduled Issue defaults to `@new` so its first run establishes
+  one durable owner; an unscheduled board item defaults to `@workspace`.
+  Structured creation by an attributable resumable Session still assigns that
+  creating Session. Use `@workspace` explicitly only when every fire should
+  recruit a newcomer.
 - `when` — optional schedule:
   - `{ kind: at, at: <ISO timestamp> }`
   - `{ kind: every, every: <duration> }`
@@ -78,7 +83,8 @@ exact Session owner, the claim rewrite removes the tuple.
 
 Migration `0018_issue_assignee_ownership` removes the retired parallel
 `execution` field. It maps `resume` to the former `session:<resumeId>` shape and
-fresh/omitted scheduled ownership to the former `workspace` shape.
+fresh/omitted scheduled ownership to the former `workspace` shape. That history
+is preserved as explicit `@workspace`; the new omission default is `@new`.
 Migration `0019_issue_session_signatures` then writes those owners as
 `@resumeId` / `@workspace`, the same visible signature language used in reports.
 
@@ -98,10 +104,13 @@ Comments are also the Issue's normal conversation entry. When `assignee` is an
 exact `@resumeId`, a comment from somebody else is delivered asynchronously to
 that Session and its final reply is appended as another structured comment.
 The source comment records `pending`, `replied`, or `failed`, so a durable note
-never masquerades as a delivered message. A comment on `@workspace`, `@human`,
-or `@unassigned` stays a timeline note: OpenAlice does not invent a new owner
-just because somebody commented. An owner commenting on their own Issue is not
-echoed back to the same Session.
+never masquerades as a delivered message. A human comment without a fixed owner
+uses the same provenance-aware fallback as Inbox: OpenAlice asks the
+attributable creator, or recruits a reconstruction Agent in the Issue
+Workspace when no creator Session exists. The answer is recorded in Activity
+without changing `assignee`; a temporary answerer never becomes the scheduling
+owner. Agent-authored comments without a fixed owner remain timeline notes, and
+an owner commenting on their own Issue is not echoed back to the same Session.
 
 `done` and `canceled` are terminal and stop scheduled firing. There is no
 separate `enabled` flag. A successful one-shot `at` issue is automatically

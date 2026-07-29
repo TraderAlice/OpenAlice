@@ -134,7 +134,11 @@ function Detail({ detail }: { detail: EntityDetail }) {
       ) : (
         <div className="flex flex-col gap-1">
           {backlinks.map((b, i) => (
-            <BacklinkRow key={`${b.workspaceId}:${b.path}:${i}`} backlink={b} />
+            <BacklinkRow
+              key={`${b.workspaceId}:${b.path}:${i}`}
+              backlink={b}
+              trackedName={entity.name}
+            />
           ))}
         </div>
       )}
@@ -157,7 +161,13 @@ function issueIdFromPath(path: string): string | null {
   return id && !id.includes('/') ? id : null
 }
 
-function BacklinkRow({ backlink }: { backlink: Backlink }) {
+function BacklinkRow({
+  backlink,
+  trackedName,
+}: {
+  backlink: Backlink
+  trackedName: string
+}) {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const issueId = issueIdFromPath(backlink.path)
@@ -172,10 +182,18 @@ function BacklinkRow({ backlink }: { backlink: Backlink }) {
       })
       return
     }
-    // Plain note → the dedicated file viewer (VS Code-style), at its exact path.
+    // Plain note stays owned by Tracked. Preserve the selected entity so both
+    // the page Back action and a copied/deep-linked URL return to the same
+    // entity/backlink context instead of falling into System → Workspaces.
+    setSidebar('tracked')
     openOrFocus({
       kind: 'file-viewer',
-      params: { wsId: backlink.workspaceId, path: backlink.path },
+      params: {
+        wsId: backlink.workspaceId,
+        path: backlink.path,
+        source: 'tracked',
+        returnTrackedName: trackedName,
+      },
     })
   }
   const Icon = issueId ? ListChecks : FileText

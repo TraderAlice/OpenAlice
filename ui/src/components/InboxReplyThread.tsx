@@ -57,7 +57,7 @@ export function InboxReplyThread({
           placeholder={t('inbox.replyPlaceholder')}
           onChange={(event) => thread.setPrompt(event.target.value)}
           onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault()
               void thread.submit()
             }

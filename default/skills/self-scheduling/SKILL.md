@@ -71,8 +71,9 @@ alice-workspace issue update --id morning-scan --status done
 
 # comment — append markdown to the structured `<id>.comments.json` sidecar. An
 # attributable Session signs with @resumeId. If somebody else comments on an
-# Issue with a fixed @resumeId owner, OpenAlice asks that owner in the background
-# and records the final reply in Activity. @workspace comments remain notes.
+# For a fixed @resumeId owner, OpenAlice asks that owner in the background.
+# Human comments without one ask the creator or a reconstructed Workspace Agent.
+# Agent-authored comments without a fixed owner remain timeline notes.
 alice-workspace issue comment --id morning-scan --text "Brief pushed; SPY gapped +0.4%."
 ```
 
@@ -161,8 +162,9 @@ plain tracked item; add a `when` and it starts firing.
   - `@human` and `@unassigned` are valid only for unscheduled work.
   CLI `issue create` defaults to `@me` when called by an attributable Session
   (who creates it owns it); `@me` is resolved to a concrete `@resumeId` before
-  writing. Use `@new` when the job needs a new long-lived owner, and
-  `@workspace` explicitly only when every fire should recruit a newcomer.
+  writing. Otherwise omitted scheduled ownership defaults to `@new`, while an
+  unscheduled board item defaults to `@workspace`. Use `@workspace` explicitly
+  only when every fire should recruit a newcomer.
 - **`when`** *(OPTIONAL — present iff the issue self-schedules)* — one of:
   - `{ kind: every, every: "30m" }` — repeat on an interval (`30m`, `2h`,
     `1h30m`). Runs on the next scan, then on the interval.

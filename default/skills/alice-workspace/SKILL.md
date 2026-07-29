@@ -27,9 +27,10 @@ Choose the verb from the intent, not from whichever object you happen to have:
 `issue comment` is the durable conversation entry for this Workspace's own
 Issue. If the Issue has an exact `@resumeId` assignee, a comment from somebody
 else resumes that owner in the background and records the final reply in the
-Activity timeline. `@workspace`-owned Issues keep comments as notes and do not
-recruit a random worker. Use `issue ask` when interrogating the creator or a
-specific historical run without adding a comment.
+Activity timeline. A human comment without a fixed owner asks the creator or a
+reconstructed Workspace Agent without changing assignee. Agent-authored
+comments without a fixed owner remain notes. Use `issue ask` when interrogating
+the creator or a specific historical run without adding a comment.
 
 **Hand finished work back to the user** — this is the outbound channel. It posts
 to the user's Inbox tab:
@@ -206,9 +207,12 @@ human-approved peer-edit path). The full on-disk file model + self-scheduling
 skill. `assignee` is the single ownership and dispatch contract: `@new`
 recruits once and then keeps that first Session, `@workspace` recruits a new
 Session each fire, `@me` resolves to the caller, and an exact `@resumeId` keeps
-one accountable product Session. Commit intentional Issue-file changes as a
-focused Git change; Activity remains an audit fallback, while Git is the exact
-rollback history. Issue/Inbox CLI actions are signed automatically. End standalone reports with `Signed-by: @resumeId`
+one accountable product Session. Omitted scheduled ownership defaults to
+`@new` unless an attributable resumable caller owns it as `@me`; use
+`@workspace` explicitly for fresh-every-fire work. Commit intentional
+Issue-file changes as a focused Git change; Activity remains an audit fallback,
+while Git is the exact rollback history. Issue/Inbox CLI actions are signed
+automatically. End standalone reports with `Signed-by: @resumeId`
 (copy it from `signature show`) so another Agent can return to the author.
 
 **Upgrade this Workspace's managed template assets** — preview first, then

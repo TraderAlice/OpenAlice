@@ -86,6 +86,15 @@ describe('createIssue', () => {
     }
   })
 
+  it('defaults scheduled work to one durable new owner', async () => {
+    const scheduled = await createIssue(dir, {
+      id: 'default-owner',
+      title: 'Default scheduled owner',
+      when: { kind: 'every', every: '30m' },
+    })
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new')
+  })
+
   it('refuses to overwrite an existing issue (conflict)', async () => {
     await createIssue(dir, { id: 'dup', title: 'first' })
     const res = await createIssue(dir, { id: 'dup', title: 'second' })

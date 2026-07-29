@@ -23,6 +23,20 @@ describe('file-viewer URL projection', () => {
       params: { wsId: 'workspace-1', path: 'README.md' },
     })).toBe('/workspaces/workspace-1/view/README.md')
   })
+
+  it('projects Tracked artifacts into a provenance-preserving route', () => {
+    expect(getView('file-viewer').toUrl({
+      kind: 'file-viewer',
+      params: {
+        wsId: 'workspace-1',
+        path: 'research/power note.md',
+        source: 'tracked',
+        returnTrackedName: 'stock-vst',
+      },
+    })).toBe(
+      '/tracked/files/workspace-1/research%2Fpower%20note.md?entity=stock-vst',
+    )
+  })
 })
 
 describe('shared product shells', () => {

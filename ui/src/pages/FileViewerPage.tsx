@@ -16,6 +16,7 @@ import { FileContentView } from '../components/FileContentView'
 import { CenteredLoading } from '../components/StateViews'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
+import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
 
@@ -24,10 +25,11 @@ interface Props {
 }
 
 export function FileViewerPage({ spec }: Props) {
-  const { wsId, path, source, returnSessionId } = spec.params
+  const { wsId, path, source, returnSessionId, returnTrackedName } = spec.params
   const { workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
+  const selectTracked = useTrackedSelection((s) => s.select)
   const tag = workspaces.find((w) => w.id === wsId)?.tag ?? wsId.slice(0, 8)
 
   const [result, setResult] = useState<ReadFileResult | null>(null)
@@ -42,7 +44,13 @@ export function FileViewerPage({ spec }: Props) {
     }
   }, [wsId, path])
 
-  const openWorkspace = () => {
+  const goBack = () => {
+    if (source === 'tracked') {
+      if (returnTrackedName) selectTracked(returnTrackedName)
+      setSidebar('tracked')
+      openOrFocus({ kind: 'tracked', params: {} })
+      return
+    }
     setSidebar(source === 'chat' ? 'chat' : 'workspaces')
     openOrFocus({
       kind: 'workspace',
@@ -59,9 +67,9 @@ export function FileViewerPage({ spec }: Props) {
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-secondary/30 shrink-0">
         <button
           type="button"
-          onClick={openWorkspace}
+          onClick={goBack}
           className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title={`Back to ${tag}`}
+          title={source === 'tracked' ? 'Back to Tracked' : `Back to ${tag}`}
         >
           <ArrowLeft size={14} strokeWidth={1.8} aria-hidden />
           <span className="hidden sm:inline">Back</span>

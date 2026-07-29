@@ -58,6 +58,7 @@ import {
 import { dispatchIssueCommentReply } from '../workspaces/issues/comment-delivery.js'
 import { issueMutation, issueMutationFingerprint } from '../workspaces/issues/change-tracker.js'
 import {
+  NEW_ASSIGNEE,
   WORKSPACE_ASSIGNEE,
   normalizeIssueAssigneeAlias,
   sessionSignature,
@@ -142,19 +143,21 @@ function resolveIssueAssignee(
  * Session that Alice can resume. Shell PTYs also carry an interactive
  * SessionRecord/resumeId for terminal bookkeeping, but they have no native
  * Agent Runtime conversation to continue. Treating those as owners creates an
- * Issue that cannot ever run; an omitted owner therefore falls back to the
- * Workspace, while an explicit `@me` remains a strict validation error.
+ * Issue that cannot ever run; an omitted owner therefore falls back to `@new`
+ * for scheduled work and the Workspace for a plain board item, while an
+ * explicit `@me` remains a strict validation error.
  *
  * Older/test contexts may not expose the identity resolver. Preserve their
  * attributable-session behavior; production always supplies the resolver.
  */
-function defaultIssueAssignee(ctx: WorkspaceToolContext): string {
+function defaultIssueAssignee(ctx: WorkspaceToolContext, scheduled: boolean): string {
+  const fallback = scheduled ? NEW_ASSIGNEE : WORKSPACE_ASSIGNEE
   const origin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
-  if (!origin) return WORKSPACE_ASSIGNEE
+  if (!origin) return fallback
   if (!ctx.resolveSessionIdentity) return '@me'
   return ctx.resolveSessionIdentity(origin.resumeId)?.resumable
     ? '@me'
-    : WORKSPACE_ASSIGNEE
+    : fallback
 }
 
 /** Prefer the signed product Session; fall back only for unattributed shells. */
@@ -379,8 +382,9 @@ export const issueCommentFactory: WorkspaceToolFactory = {
         'signed by the current product Session when available. It never mutates',
         'the canonical What or changes the next scheduled prompt. If the Issue',
         'has a different fixed @resumeId owner, OpenAlice asks that Session in',
-        'the background and records its final reply in Activity. Workspace-owned',
-        'Issues keep the comment as a durable note and do not recruit a worker.',
+        'the background and records its final reply in Activity. Human comments',
+        'without a fixed owner ask the creator or a reconstructed Workspace Agent.',
+        'Agent-authored comments without a fixed owner remain durable notes.',
       ].join('\n'),
       inputSchema: z.object({
         id: z.string().min(1).describe('The issue id to comment on.'),
@@ -416,7 +420,9 @@ export const issueCommentFactory: WorkspaceToolFactory = {
                   status: 'failed' as const,
                   delivery: {
                     state: 'failed' as const,
-                    targetResumeId: dispatched.delivery.targetResumeId,
+                    ...(dispatched.delivery.targetResumeId
+                      ? { targetResumeId: dispatched.delivery.targetResumeId }
+                      : {}),
                     ...(dispatched.delivery.taskId ? { taskId: dispatched.delivery.taskId } : {}),
                     error: `Comment saved, but delivery state could not be recorded: ${updated.error}`,
                   },
@@ -457,6 +463,9 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         'recruits a new Session each fire. `@me` resolves to this',
         'calling Session, while an exact `@resumeId` keeps one accountable',
         'Session (including a deliberately signed Session from another Workspace).',
+        'When ownership is omitted, scheduled work defaults to `@new`; an',
+        'unscheduled board item defaults to `@workspace`. An attributable',
+        'resumable caller still owns the Issue as `@me`.',
         'A scheduled run is unattended: if its result is meant for the human,',
         'What must explicitly tell it to use `alice-workspace inbox push`.',
       ].join('\n'),
@@ -471,7 +480,7 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         priority: z.enum(ISSUE_PRIORITIES).optional().describe('Initial priority (default "none").'),
         assignee: issueAssigneeInputSchema
           .optional()
-          .describe('Initial owner. Omit or use @me for the current Session; @new recruits once and keeps that Session; @workspace recruits a fresh Session each fire.'),
+          .describe('Initial owner. Omitted scheduled work defaults to @new; an attributable resumable caller defaults to @me. @workspace explicitly recruits a fresh Session each fire.'),
         when: issueWhenSchema
           .optional()
           .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron, timezone?:"local"|IANA }. Present iff the issue self-schedules.'),
@@ -484,9 +493,9 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         // Structured creation is attributable: "who creates it owns it". A
-        // human/unattributed caller has no Session to sign with, so its safe
-        // fallback is the Issue's home Workspace recruiting a fresh worker.
-        const defaultAssignee = defaultIssueAssignee(ctx)
+        // human/unattributed caller has no Session to sign with, so scheduled
+        // work recruits once while a plain board item remains Workspace-owned.
+        const defaultAssignee = defaultIssueAssignee(ctx, when !== undefined)
         const resolvedAssignee = resolveIssueAssignee(ctx, assignee ?? defaultAssignee)
         if (!resolvedAssignee.ok) return { ok: false as const, error: resolvedAssignee.error }
         const res = await createIssue(dir.dir, {

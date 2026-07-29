@@ -125,7 +125,7 @@ describe('readWorkspaceIssues', () => {
     }
   })
 
-  it('parses Session ownership and defaults scheduled work to the Workspace', async () => {
+  it('parses Session ownership and defaults scheduled work to one durable new owner', async () => {
     await writeIssue('owned', fm([
       'title: Owned work',
       'when: { kind: every, every: 30m }',
@@ -137,7 +137,7 @@ describe('readWorkspaceIssues', () => {
     if (!result.ok) return
     const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
     expect(issueAssigneeResumeId(byId['owned'].assignee)).toBe('resume-kind-owl-abc123')
-    expect(byId['legacy'].assignee).toBe('@workspace')
+    expect(byId['legacy'].assignee).toBe('@new')
   })
 
   it('rejects every runtime override on an exact Session owner', async () => {

@@ -20,7 +20,8 @@
  *   title: <required, short human title>
  *   status: backlog | todo | in_progress | done | canceled   (optional → 'todo')
  *   priority: urgent | high | medium | low | none             (optional → 'none')
- *   assignee: "@workspace" | "@new" | "@human" | "@unassigned" | "@<resumeId>"  (optional → '@workspace')
+ *   assignee: "@workspace" | "@new" | "@human" | "@unassigned" | "@<resumeId>"
+ *             (optional → scheduled '@new', otherwise '@workspace')
  *   when: { kind: at, at } | { kind: every, every } |
  *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
  *   what: <legacy fire prompt; migrated into the markdown What body>
@@ -117,12 +118,12 @@ export function issueAssigneeClaimsFirstSession(assignee: string): boolean {
  * comes from the filename, What from below the frontmatter (see IssueRecord).
  * Optional fields carry their board defaults so every read yields a complete row.
  */
-export const issueFrontmatterSchema = z.object({
+const issueFrontmatterObjectSchema = z.object({
   /** Short human title — required; an issue without a title has no board row. */
   title: z.string().min(1),
   status: z.enum(ISSUE_STATUSES).default('todo'),
   priority: z.enum(ISSUE_PRIORITIES).default('none'),
-  assignee: issueAssigneeSchema.default(WORKSPACE_ASSIGNEE),
+  assignee: issueAssigneeSchema.optional(),
   /** Present iff the issue self-schedules. Absent ⇒ pure board work item. */
   when: issueWhenSchema.optional(),
   /** Legacy compatibility only. New files keep What in the markdown document
@@ -142,32 +143,39 @@ export const issueFrontmatterSchema = z.object({
   /** Migration 0018 removes the former parallel ownership field. Keeping a
    * `never` key makes stale files fail loudly instead of being silently read. */
   execution: z.never().optional(),
-}).superRefine((value, ctx) => {
-  if (value.when && (value.assignee === HUMAN_ASSIGNEE || value.assignee === UNASSIGNED_ASSIGNEE)) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['assignee'],
-      message: 'scheduled issues must be assigned to @workspace, @new, or an exact @resumeId',
-    })
-  }
-  if (!value.when && value.assignee === NEW_ASSIGNEE) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['assignee'],
-      message: '@new needs a schedule so its first run can claim a Session',
-    })
-  }
-  if (issueAssigneeResumeId(value.assignee)) {
-    for (const field of ['agent', 'model', 'effort'] as const) {
-      if (!value[field]) continue
+})
+
+export const issueFrontmatterSchema = issueFrontmatterObjectSchema
+  .transform((value) => ({
+    ...value,
+    assignee: value.assignee ?? (value.when ? NEW_ASSIGNEE : WORKSPACE_ASSIGNEE),
+  }))
+  .superRefine((value, ctx) => {
+    if (value.when && (value.assignee === HUMAN_ASSIGNEE || value.assignee === UNASSIGNED_ASSIGNEE)) {
       ctx.addIssue({
         code: 'custom',
-        path: [field],
-        message: `session assignee owns its runtime; remove the ${field} override`,
+        path: ['assignee'],
+        message: 'scheduled issues must be assigned to @workspace, @new, or an exact @resumeId',
       })
     }
-  }
-})
+    if (!value.when && value.assignee === NEW_ASSIGNEE) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['assignee'],
+        message: '@new needs a schedule so its first run can claim a Session',
+      })
+    }
+    if (issueAssigneeResumeId(value.assignee)) {
+      for (const field of ['agent', 'model', 'effort'] as const) {
+        if (!value[field]) continue
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `session assignee owns its runtime; remove the ${field} override`,
+        })
+      }
+    }
+  })
 type IssueFrontmatterFile = z.infer<typeof issueFrontmatterSchema>
 export type IssueFrontmatter = Omit<IssueFrontmatterFile, 'what' | 'execution'>
 
