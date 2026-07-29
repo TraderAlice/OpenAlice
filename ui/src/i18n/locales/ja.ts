@@ -81,6 +81,7 @@ export const ja: Resources = {
     detail: {
       workItem: '作業項目',
       workItemDescription: '担当者とスケジュールは、この課題の一部です。',
+      sectionNavigation: '課題セクション',
       status: 'ステータス',
       priority: '優先度',
       assignee: '担当者',

@@ -88,6 +88,7 @@ export const zhHant: Resources = {
     detail: {
       workItem: '工作項目',
       workItemDescription: '負責人與排程都屬於這個議題。',
+      sectionNavigation: '議題區段',
       status: '狀態',
       priority: '優先級',
       assignee: '負責人',

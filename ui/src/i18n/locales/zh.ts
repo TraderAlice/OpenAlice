@@ -80,6 +80,7 @@ export const zh: Resources = {
     detail: {
       workItem: '工作项',
       workItemDescription: '负责人和计划都属于这个议题。',
+      sectionNavigation: '议题分区',
       status: '状态',
       priority: '优先级',
       assignee: '负责人',

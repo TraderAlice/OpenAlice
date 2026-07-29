@@ -489,7 +489,7 @@ function PropertiesRail({
   }, [issue.automationHealth, issue.status, t])
 
   return (
-    <aside className="mt-5 min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0">
+    <aside id="issue-work-item" className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0">
       <PropertySection
         title={t('issues.detail.workItem')}
         description={t('issues.detail.workItemDescription')}
@@ -742,7 +742,7 @@ function WhatEditor({
 }) {
   const { t } = useTranslation()
   return (
-    <section className="mt-4 border-t border-border/60 pt-4">
+    <section id="issue-what" className="mt-4 scroll-mt-20 border-t border-border/60 pt-4">
       <div className="mb-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">
           {t('issues.detail.what')}
@@ -850,7 +850,7 @@ function InboxReportsSection({
   const { t } = useTranslation()
   if (reports.length === 0) return null
   return (
-    <section className="mt-8">
+    <section id="issue-inbox-reports" className="mt-8 scroll-mt-20">
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
         {t('issues.detail.inboxReports')}
       </h3>
@@ -1015,7 +1015,7 @@ export function IssueActivity({
   }
 
   return (
-    <section className="mt-8">
+    <section id="issue-activity" className="mt-8 scroll-mt-20">
       <div className="mb-3 flex items-baseline justify-between gap-3 border-t border-border/60 pt-5">
         <h2 className="text-sm font-semibold text-foreground">{t('issues.detail.activity')}</h2>
         <span className="hidden text-[11px] text-muted-foreground sm:inline">
@@ -1172,7 +1172,7 @@ function RunsSection({
   if (runs.length === 0) return null
   const visible = expanded ? runs : runs.slice(0, 4)
   return (
-    <section className="mt-8 rounded-xl border border-border bg-secondary/45 px-3 py-3 sm:px-4">
+    <section id="issue-runs" className="mt-8 scroll-mt-20 rounded-xl border border-border bg-secondary/45 px-3 py-3 sm:px-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t('issues.detail.runs')}</h2>
@@ -1543,6 +1543,45 @@ export function IssueDetail({
             {issue.when && <CadencePill when={issue.when} />}
           </div>
           <h1 className="text-xl font-semibold text-foreground">{issue.title}</h1>
+          <nav
+            aria-label={t('issues.detail.sectionNavigation')}
+            className="mt-3 flex flex-wrap gap-1 border-y border-border/60 py-2 lg:hidden"
+          >
+            <a
+              href="#issue-work-item"
+              className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {t('issues.detail.workItem')}
+            </a>
+            <a
+              href="#issue-what"
+              className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {t('issues.detail.what')}
+            </a>
+            <a
+              href="#issue-activity"
+              className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {t('issues.detail.activity')}
+            </a>
+            {runs.length > 0 && (
+              <a
+                href="#issue-runs"
+                className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                {t('issues.detail.runs')}
+              </a>
+            )}
+            {inboxReports.length > 0 && (
+              <a
+                href="#issue-inbox-reports"
+                className="oa-pressable rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                {t('issues.detail.inboxReports')}
+              </a>
+            )}
+          </nav>
         </header>
         <PropertiesRail
           wsId={wsId}

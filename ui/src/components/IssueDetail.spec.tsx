@@ -171,22 +171,28 @@ describe('IssueDetail property controls', () => {
   it('places mobile work-item controls before long-form Issue content', () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
-    const workItem = screen.getByText('Work item')
-    const what = screen.getByText('What')
-    const activity = screen.getByText('Activity')
+    const workItem = screen.getByRole('heading', { level: 3, name: 'Work item' })
+    const what = screen.getByRole('heading', { level: 2, name: 'What' })
+    const activity = screen.getByRole('heading', { level: 2, name: 'Activity' })
+    const sectionNavigation = screen.getByRole('navigation', { name: 'Issue sections' })
 
     expect(workItem.compareDocumentPosition(what) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(workItem.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-work-item"]')).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-what"]')).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-activity"]')).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-runs"]')).toBeNull()
+    expect(sectionNavigation.querySelector('a[href="#issue-inbox-reports"]')).toBeNull()
   })
 
   it.each([
-    ['en', 'Work item', 'Status', 'What', 'Activity', 'Schedule is valid and has not run yet.'],
-    ['zh', '工作项', '状态', '任务内容', '动态', '运行计划有效，但尚未执行。'],
-    ['zh-Hant', '工作項目', '狀態', '任務內容', '動態', '執行排程有效，但尚未執行。'],
-    ['ja', '作業項目', 'ステータス', '作業内容', 'アクティビティ', 'スケジュールは有効ですが、まだ実行されていません。'],
+    ['en', 'Work item', 'Status', 'What', 'Activity', 'Issue sections', 'Schedule is valid and has not run yet.'],
+    ['zh', '工作项', '状态', '任务内容', '动态', '议题分区', '运行计划有效，但尚未执行。'],
+    ['zh-Hant', '工作項目', '狀態', '任務內容', '動態', '議題區段', '執行排程有效，但尚未執行。'],
+    ['ja', '作業項目', 'ステータス', '作業内容', 'アクティビティ', '課題セクション', 'スケジュールは有効ですが、まだ実行されていません。'],
   ] as const)(
     'localizes Issue chrome in %s while preserving authored content',
-    async (locale, workItem, status, what, activity, healthMessage) => {
+    async (locale, workItem, status, what, activity, sectionNavigation, healthMessage) => {
       await i18n.changeLanguage(locale)
       scheduledIssue.issue.automationHealth = {
         state: 'not_started',
@@ -195,10 +201,11 @@ describe('IssueDetail property controls', () => {
 
       render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
-      expect(screen.getByText(workItem)).toBeTruthy()
+      expect(screen.getByRole('heading', { level: 3, name: workItem })).toBeTruthy()
       expect(screen.getByRole('combobox', { name: status })).toBeTruthy()
-      expect(screen.getByText(what)).toBeTruthy()
-      expect(screen.getByText(activity)).toBeTruthy()
+      expect(screen.getByRole('heading', { level: 2, name: what })).toBeTruthy()
+      expect(screen.getByRole('heading', { level: 2, name: activity })).toBeTruthy()
+      expect(screen.getByRole('navigation', { name: sectionNavigation })).toBeTruthy()
       expect(screen.getByText(healthMessage)).toBeTruthy()
       expect(screen.getByText('Morning movers scan')).toBeTruthy()
       expect(screen.getByText('Scan the market and publish a brief.')).toBeTruthy()
