@@ -81,6 +81,13 @@ describe('AIProviderPage', () => {
     expect(await screen.findByText('已保存')).toBeTruthy()
   })
 
+  it('names each credential edit action with the credential it changes', async () => {
+    render(<AIProviderPage />)
+
+    expect(await screen.findByRole('button', { name: '编辑 Gemini' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
+  })
+
   it('confirms credential deletion and explains the default cleanup', async () => {
     render(<AIProviderPage />)
 
