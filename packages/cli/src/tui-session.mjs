@@ -12,6 +12,7 @@ export function createTerminalSession(options) {
   }
 
   const renderer = options.renderer ?? new AnsiTerminalRenderer(output)
+  const platform = options.platform ?? process.platform
   const previousRawMode = input.isRaw === true
   const inputWasFlowing = input.readableFlowing === true
   let settled = false
@@ -22,11 +23,20 @@ export function createTerminalSession(options) {
     rejectExit = rejectPromise
   })
 
-  const cleanup = () => {
-    input.off('data', onData)
-    output.off('resize', onResize)
+  const removeSignalListeners = () => {
     signalSource.off('SIGINT', onSigint)
     signalSource.off('SIGTERM', onSigterm)
+  }
+
+  const cleanup = (reason) => {
+    input.off('data', onData)
+    output.off('resize', onResize)
+    if (platform === 'win32' && reason === 'ctrl-c') {
+      const timer = setTimeout(removeSignalListeners, 100)
+      timer.unref?.()
+    } else {
+      removeSignalListeners()
+    }
     let cleanupError = null
     try {
       input.setRawMode(previousRawMode)
@@ -45,7 +55,7 @@ export function createTerminalSession(options) {
   const finish = (reason, error = null) => {
     if (settled) return
     settled = true
-    const cleanupError = cleanup()
+    const cleanupError = cleanup(reason)
     if (error || cleanupError) rejectExit(error ?? cleanupError)
     else resolveExit({ reason })
   }

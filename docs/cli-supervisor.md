@@ -267,7 +267,9 @@ is deliberately small:
 - `AnsiTerminalRenderer` owns alternate-screen entry, row-level diffs, cursor
   visibility, style reset, and alternate-screen exit;
 - `createTerminalSession` owns TTY refusal, raw-mode setup/restoration, resize,
-  Ctrl+C/SIGINT/SIGTERM cleanup, and renderer-error cleanup;
+  Ctrl+C/SIGINT/SIGTERM cleanup, and renderer-error cleanup. On Windows it
+  briefly absorbs a duplicate ConPTY SIGINT after a raw Ctrl+C byte while the
+  caller drains diagnostics, then removes the signal listeners;
 - product actions and polling remain outside the renderer and will call the
   same lifecycle services as non-interactive commands.
 

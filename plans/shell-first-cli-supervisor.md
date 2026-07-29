@@ -506,3 +506,11 @@ This plan is complete only when:
   recovery/dev smoke, root TypeScript/Vitest (3,644 passed, 10 skipped), and
   Electron Guardian takeover/PTY acceptance passed; Windows rerun remains the
   merge gate.
+- 2026-07-30: The next Windows run proved Guardian recovery but exposed two
+  remaining terminal details before the TUI test could pass: node-pty's Win32
+  argv quoting corrupted a Bash command that began with a quote, and ConPTY
+  delivered a delayed SIGINT after the raw Ctrl+C byte. Prefixed the Bash child
+  command without restoring MSYS `exec`, kept the settled Windows signal guard
+  for a bounded 100 ms diagnostic drain, and added a deterministic session
+  regression. Local CLI TUI tests now pass 13 with only the Windows-only Bash
+  journey skipped; the full repository passes 3,645 tests with 10 skipped.

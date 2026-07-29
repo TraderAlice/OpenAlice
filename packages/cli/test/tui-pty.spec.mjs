@@ -39,8 +39,10 @@ describe('Supervisor TUI PTY harness', { timeout: 10_000 }, () => {
     await harness.waitForScreen('RUNNING')
     harness.send('\x03')
 
-    expect((await harness.waitForExit()).exitCode).toBe(0)
-    await expect(harness.readResult()).resolves.toMatchObject({ reason: 'ctrl-c', raw: false })
+    const exit = await harness.waitForExit()
+    const result = await harness.readResult()
+    expect(exit.exitCode, `${JSON.stringify(result)}\n${harness.diagnostics()}`).toBe(0)
+    expect(result).toMatchObject({ reason: 'ctrl-c', raw: false })
   })
 
   it('parses Unicode through xterm, resizes to the narrow view, and honors NO_COLOR', async () => {
