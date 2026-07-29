@@ -5,7 +5,7 @@ import {
   demoWorkspaces,
   demoTemplates,
 } from '../fixtures/workspaces'
-import { demoWorkspaceFiles } from '../fixtures/inbox'
+import { demoWorkspaceFilePaths, demoWorkspaceFiles } from '../fixtures/inbox'
 import {
   createDemoWebPiSnapshot,
   demoWebPiFollowUp,
@@ -105,6 +105,50 @@ function ensureDemoWebPiSession(wsId: string, sessionId: string): WebPiSnapshot 
     startedAt: record.startedAt ?? Date.now(),
     messages: [],
   })
+}
+
+const DEMO_FILE_MTIME = new Date().toISOString()
+
+function demoDirectoryListing(workspaceId: string, requestedPath: string) {
+  const segments = requestedPath.split('/').filter((segment) => segment !== '' && segment !== '.')
+  if (segments.includes('..')) return null
+
+  const path = segments.join('/')
+  const prefix = path ? `${path}/` : ''
+  const entries = new Map<string, {
+    name: string
+    kind: 'file' | 'dir'
+    sizeBytes: number | null
+    mtime: string
+  }>()
+
+  for (const filePath of demoWorkspaceFilePaths[workspaceId] ?? []) {
+    if (!filePath.startsWith(prefix)) continue
+    const remainder = filePath.slice(prefix.length)
+    if (!remainder) continue
+    const slash = remainder.indexOf('/')
+    const name = slash === -1 ? remainder : remainder.slice(0, slash)
+    if (entries.has(name)) continue
+
+    const kind = slash === -1 ? 'file' as const : 'dir' as const
+    entries.set(name, {
+      name,
+      kind,
+      sizeBytes: kind === 'file'
+        ? new TextEncoder().encode(demoWorkspaceFiles[filePath] ?? '').byteLength
+        : null,
+      mtime: DEMO_FILE_MTIME,
+    })
+  }
+
+  return {
+    path,
+    entries: [...entries.values()].sort((a, b) => {
+      if (a.kind === 'dir' && b.kind !== 'dir') return -1
+      if (a.kind !== 'dir' && b.kind === 'dir') return 1
+      return a.name.localeCompare(b.name)
+    }),
+  }
 }
 
 function appendDemoWebPiMessages(
@@ -701,9 +745,17 @@ export const workspacesHandlers = [
   http.get('/api/workspaces/:id/git/status', () =>
     HttpResponse.json({ branch: 'main', clean: true, files: [] }),
   ),
-  http.get('/api/workspaces/:id/files', () =>
-    HttpResponse.json({ path: '/', entries: [] }),
-  ),
+  http.get('/api/workspaces/:id/files', ({ params, request }) => {
+    const path = new URL(request.url).searchParams.get('path') ?? ''
+    const listing = demoDirectoryListing(String(params.id), path)
+    if (!listing) {
+      return HttpResponse.json(
+        { error: 'invalid_path', message: `refused to escape workspace: ${path}` },
+        { status: 400 },
+      )
+    }
+    return HttpResponse.json(listing)
+  }),
   http.get('/api/workspaces/:id/file', ({ request }) => {
     const url = new URL(request.url)
     const path = url.searchParams.get('path') ?? ''

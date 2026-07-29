@@ -1,5 +1,9 @@
 import type { InboxEntry, InboxOrigin } from '../../api/inbox'
-import { DEMO_SESSION_ID, DEMO_WORKSPACE_ID } from './workspaces'
+import {
+  DEMO_CHAT_WORKSPACE_ID,
+  DEMO_SESSION_ID,
+  DEMO_WORKSPACE_ID,
+} from './workspaces'
 
 export const DEMO_REPORT_PATH = 'research-AAPL-q1.md'
 
@@ -239,4 +243,25 @@ Post-mortem on what we let run without us.
   pullback that didn't come. Lesson: on a [[ai-data-center-power]] leader,
   buy the first higher-low, not the deep retrace.
 `,
+}
+
+/** Files visible from each recorded Workspace's Files panel. The content map
+ *  above remains the read endpoint's source of truth; this index supplies the
+ *  owning Workspace needed by the directory-listing endpoint. */
+export const demoWorkspaceFilePaths: Readonly<Record<string, readonly string[]>> = {
+  [DEMO_WORKSPACE_ID]: [
+    DEMO_REPORT_PATH,
+  ],
+  [DEMO_CHAT_WORKSPACE_ID]: [
+    'power_buy_points_2026-06-02.md',
+    'rotation/2026-06-02.md',
+    'rotation/ai-chain-2026-06-02.md',
+    'rotation/missed-rightside-2026-06-02.md',
+  ],
+  'demo-ws-auto-quant': [
+    'reports/movers-2026-06-27.md',
+  ],
+  'demo-ws-macro': [
+    'digests/macro-2026-06-25.md',
+  ],
 }
