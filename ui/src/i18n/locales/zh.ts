@@ -30,6 +30,12 @@ export const zh: Resources = {
     collapseRail: '折叠活动栏',
     expandRail: '展开活动栏',
   },
+  demoBanner: {
+    badge: '演示',
+    compact: '快照数据 · 模拟 AI',
+    description: '你正在查看包含录制数据的 OpenAlice 快照。更改不会保存；WebPi 回复为模拟生成。',
+    install: '安装',
+  },
   settings: {
     title: '设置',
     tab: {
