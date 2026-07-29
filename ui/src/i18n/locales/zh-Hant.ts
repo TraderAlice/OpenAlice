@@ -174,6 +174,8 @@ export const zhHant: Resources = {
     },
     agentPermissions: {
       title: '智慧體權限',
+      loadErrorTitle: '無法載入智慧體權限',
+      loadErrorDescription: 'OpenAlice 無法讀取目前設定。你的權限沒有變更。',
       mode: {
         title: '交易模式',
         description: 'Alice 與工作區智慧體的全域券商能力。',

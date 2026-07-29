@@ -177,6 +177,8 @@ export const en = {
     },
     agentPermissions: {
       title: 'Agent Permissions',
+      loadErrorTitle: 'Couldn’t load Agent Permissions',
+      loadErrorDescription: 'OpenAlice could not read the current configuration. Your permissions have not been changed.',
       mode: {
         title: 'Trading mode',
         description: 'Global broker capability for Alice and workspace agents.',
