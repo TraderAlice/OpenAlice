@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useId, useMemo } from 'react'
 import { Moon, RotateCcw, Sun } from 'lucide-react'
 import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
@@ -925,14 +925,18 @@ function ToolGroupCard({
 }: ToolGroupCardProps) {
   const enabledCount = group.tools.filter((t) => !disabled.has(t.name)).length
   const noneEnabled = enabledCount === 0
+  const toolListId = useId()
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
       {/* Group header */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-secondary">
         <button
+          type="button"
           onClick={onToggleExpanded}
           className="flex items-center gap-2 flex-1 text-left min-w-0"
+          aria-expanded={expanded}
+          aria-controls={toolListId}
         >
           <svg
             width="14" height="14" viewBox="0 0 24 24"
@@ -956,6 +960,9 @@ function ToolGroupCard({
 
       {/* Tool list */}
       <div
+        id={toolListId}
+        aria-hidden={!expanded}
+        inert={!expanded ? true : undefined}
         className={`transition-all duration-150 ${
           expanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
         } overflow-hidden`}

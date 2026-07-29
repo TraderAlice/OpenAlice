@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   probeAgentRuntimeReadiness: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
   getQuickChat: vi.fn(),
+  quickChat: vi.fn(),
   rememberRecentChatWorkspace: vi.fn(),
   rememberQuickChatCredential: vi.fn(),
 }))
@@ -102,7 +103,7 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     openHeadlessRun: vi.fn(async () => undefined),
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
-    quickChat: vi.fn(async () => 'chat-1'),
+    quickChat: mocks.quickChat,
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
     openWebPiSession: vi.fn(async () => undefined),
@@ -181,6 +182,7 @@ beforeEach(async () => {
     lastCredentialByAgent: {},
     recentChatWorkspaceId: 'chat-1',
   })
+  mocks.quickChat.mockResolvedValue('chat-1')
   mocks.rememberRecentChatWorkspace.mockResolvedValue(undefined)
   mocks.rememberQuickChatCredential.mockResolvedValue(undefined)
 })
@@ -200,6 +202,27 @@ describe('ChatLandingPage polling stability', () => {
 
     expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(1)
     expect(mocks.getAgentReadiness).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ChatLandingPage keyboard submission', () => {
+  it('does not submit when Enter confirms an IME composition candidate', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    await screen.findByLabelText('Model gemini-3.1-flash-lite')
+    const composer = screen.getByPlaceholderText('Ask Alice…')
+    fireEvent.change(composer, { target: { value: '你好' } })
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: true })
+    expect(mocks.quickChat).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: false })
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      '你好',
+      'pi',
+      'google-1',
+      'chat-1',
+    ))
   })
 })
 

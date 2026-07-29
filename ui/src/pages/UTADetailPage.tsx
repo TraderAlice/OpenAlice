@@ -205,6 +205,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       <PageHeader
         title={displayName}
         live={{ lastUpdated }}
+        stackActionsOnNarrow
         description={
           <>
             <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
@@ -220,25 +221,32 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           // secondary actions share btn-secondary-sm; Place Order is the
           // single filled-accent primary at the same size. No hand-rolled
           // paddings — mixed sizes were what made this row look drunk.
-          <div className="flex items-center gap-2">
-            <Toggle
-              ariaLabel={`${preset?.label ?? uta.id} enabled`}
-              size="sm"
-              checked={!isDisabled}
-              onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
-            />
-            <div className="w-px h-5 bg-border" />
-            <ReconnectButton accountId={uta.id} />
-            <button onClick={() => setEditing(true)} className="btn-secondary-sm">
-              Edit
-            </button>
-            <button
-              onClick={() => setOrderMode({ kind: 'place' })}
-              disabled={isDisabled}
-              className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-all active:scale-[0.98] cursor-pointer"
-            >
-              + Place Order
-            </button>
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <div className="mr-auto flex items-center gap-2">
+              <Toggle
+                ariaLabel={`${preset?.label ?? uta.id} enabled`}
+                size="sm"
+                checked={!isDisabled}
+                onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
+              />
+              <span className="text-[11px] text-muted-foreground">
+                {isDisabled ? 'Account disabled' : 'Account enabled'}
+              </span>
+            </div>
+            <div className="oa-uta-header-divider h-5 w-px bg-border" />
+            <div className="flex flex-wrap items-center gap-2">
+              <ReconnectButton accountId={uta.id} />
+              <button onClick={() => setEditing(true)} className="btn-secondary-sm">
+                Edit
+              </button>
+              <button
+                onClick={() => setOrderMode({ kind: 'place' })}
+                disabled={isDisabled}
+                className="btn-primary-sm"
+              >
+                + Place Order
+              </button>
+            </div>
           </div>
         }
       />

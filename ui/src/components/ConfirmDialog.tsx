@@ -55,7 +55,11 @@ export function ConfirmDialog({
   const confirmClass = variant === 'danger' ? 'btn-danger' : 'btn-primary'
 
   return (
-    <Dialog onClose={busy ? () => {} : onClose} width="w-[440px]">
+    <Dialog
+      ariaLabel={title}
+      onClose={busy ? () => {} : onClose}
+      width="w-[440px]"
+    >
       <div className="px-5 py-4 border-b border-border">
         <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
       </div>
@@ -65,6 +69,7 @@ export function ConfirmDialog({
       <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
         <button
           type="button"
+          autoFocus
           onClick={onClose}
           disabled={busy}
           className="btn-secondary"

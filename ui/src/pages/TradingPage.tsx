@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useId, useMemo } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { SettingsScrollArea, inputClass } from '../components/form'
 import { Skeleton } from '../components/StateViews'
@@ -65,10 +65,13 @@ async function saveTradingRuntimeConfigPatch(patch: Partial<TradingRuntimeConfig
   return next
 }
 
-function ExternalOrderMonitoringRow() {
+export function ExternalOrderMonitoringRow() {
   const [value, setValue] = useState<string | null>(null)
   const [runtimeConfig, setRuntimeConfig] = useState<TradingRuntimeConfig | null>(null)
   const [msg, setMsg] = useState('')
+  const selectId = useId()
+  const descriptionId = `${selectId}-description`
+  const statusId = `${selectId}-status`
 
   useEffect(() => {
     let cancelled = false
@@ -105,20 +108,31 @@ function ExternalOrderMonitoringRow() {
   if (value === null) return null
 
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3 border border-border rounded-lg">
+    <div className="flex flex-col items-stretch gap-3 rounded-lg border border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <div className="text-[12px] font-medium text-foreground">External order monitoring</div>
-        <div className="text-[11px] text-muted-foreground">
+        <label htmlFor={selectId} className="text-[12px] font-medium text-foreground">
+          External order monitoring
+        </label>
+        <div id={descriptionId} className="text-[11px] text-muted-foreground">
           How often to scan for orders placed outside Alice (exchange app, direct API).
           Known pending orders are tracked every 10s regardless.
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {msg && <span className="text-[11px] text-muted-foreground">{msg}</span>}
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+        <span
+          id={statusId}
+          role="status"
+          aria-atomic="true"
+          className="text-[11px] text-muted-foreground"
+        >
+          {msg}
+        </span>
         <select
+          id={selectId}
+          aria-describedby={`${descriptionId} ${statusId}`}
           value={value}
           onChange={(e) => { void save(e.target.value) }}
-          className={inputClass + ' w-auto'}
+          className={inputClass + ' w-full sm:w-auto'}
         >
           {OBSERVE_CADENCE_OPTIONS.map((v) => (
             <option key={v} value={v}>{v === 'off' ? 'Off' : `Every ${v}`}</option>

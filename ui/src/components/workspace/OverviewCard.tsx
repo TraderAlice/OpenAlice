@@ -24,6 +24,8 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
   shell: Terminal,
 }
 
+const SESSION_PREVIEW_LIMIT = 5
+
 function AgentGlyph({ agent }: { agent: string }) {
   const Icon = AGENT_ICONS[agent]
   if (Icon) return <Icon size={12} strokeWidth={2.25} aria-hidden="true" />
@@ -53,6 +55,8 @@ export function OverviewCard({
   const w = workspace
   const label = workspaceDisplayName(w)
   const hasRunning = w.sessions.some((s) => s.state === 'running')
+  const previewSessions = w.sessions.slice(0, SESSION_PREVIEW_LIMIT)
+  const hiddenSessionCount = w.sessions.length - previewSessions.length
 
   const lastActivityMs = useMemo(() => {
     const sessionTs = w.sessions
@@ -119,14 +123,15 @@ export function OverviewCard({
 
         {/* Sessions */}
         <div className="border-t border-border pt-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-1.5">
-            {t('workspace.sessions')}
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+            <span>{t('workspace.sessions')}</span>
+            <span className="tabular-nums text-muted-foreground/45">{w.sessions.length}</span>
           </div>
           {w.sessions.length === 0 ? (
             <p className="text-[12px] text-muted-foreground/80 italic">{t('workspace.noSessions')}</p>
           ) : (
             <ul className="space-y-0.5 -mx-2">
-              {w.sessions.map((s) => (
+              {previewSessions.map((s) => (
                 <li key={s.id}>
                   <button
                     type="button"
@@ -152,6 +157,22 @@ export function OverviewCard({
                   </button>
                 </li>
               ))}
+              {hiddenSessionCount > 0 && (
+                <li className="mt-1 border-t border-border/60 pt-1">
+                  <button
+                    type="button"
+                    onClick={onOpen}
+                    aria-label={t('workspace.viewAllSessions', { count: w.sessions.length })}
+                    className="oa-nav-row pointer-events-auto flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] font-medium text-primary hover:bg-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    <span>{t('workspace.viewAllSessions', { count: w.sessions.length })}</span>
+                    <span className="ml-auto tabular-nums text-muted-foreground/55">
+                      +{hiddenSessionCount}
+                    </span>
+                    <ChevronRight size={11} className="text-primary/65" aria-hidden />
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </div>

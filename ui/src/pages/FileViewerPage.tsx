@@ -17,6 +17,7 @@ import { FileContentView } from '../components/FileContentView'
 import { CenteredLoading } from '../components/StateViews'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
+import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
 import type { ViewSpec } from '../tabs/types'
@@ -32,10 +33,12 @@ export function FileViewerPage({ spec }: Props) {
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectTracked = useTrackedSelection((s) => s.select)
-  const tag = workspaces.find((w) => w.id === wsId)?.tag ?? wsId.slice(0, 8)
+  const workspace = workspaces.find((w) => w.id === wsId)
+  const workspaceName = workspace ? workspaceDisplayName(workspace) : wsId.slice(0, 8)
+  const workspaceTitle = workspace ? workspaceDisplayTitle(workspace) : workspaceName
   const backLabel = source === 'tracked'
     ? t('fileViewer.backToTracked')
-    : t('fileViewer.backToWorkspace', { workspace: tag })
+    : t('fileViewer.backToWorkspace', { workspace: workspaceName })
 
   const [result, setResult] = useState<ReadFileResult | null>(null)
   useEffect(() => {
@@ -84,7 +87,12 @@ export function FileViewerPage({ spec }: Props) {
         <span className="font-mono text-[12px] text-foreground truncate" title={path}>
           {path}
         </span>
-        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/60">{tag}</span>
+        <span
+          className="ml-auto min-w-0 max-w-[min(35vw,20rem)] truncate text-right text-[11px] text-muted-foreground/70"
+          title={workspaceTitle}
+        >
+          {workspaceName}
+        </span>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="max-w-[820px] mx-auto px-6 py-6">

@@ -44,6 +44,13 @@ export function formatBarId(sourceId: string, nativeSymbol: string): string {
   return `${sourceId}|${nativeSymbol}`
 }
 
+/** Perpetuals, swaps, and dated derivatives carry a settlement/expiry segment
+ *  in the native symbol (`XLE/USDT:USDT`, `BTC/USD:USD-310613`). A plain
+ *  ticker or spot pair has no `:` segment. */
+export function isDerivativeBarId(barId: string): boolean {
+  return (parseBarId(barId)?.nativeSymbol ?? '').includes(':')
+}
+
 // ==================== data shapes ====================
 
 /** OHLCV bar — structurally identical to `analysis/indicator` `OhlcvData`. */

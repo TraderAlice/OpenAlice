@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { HeadlessListSnapshot, HeadlessTaskRecord } from '../api/headless'
@@ -95,5 +96,38 @@ describe('AutomationRunsSection workspace identity', () => {
 
     expect(await screen.findByText(departedId)).toBeTruthy()
     expect(screen.getByTitle(departedId).className).toContain('font-mono')
+  })
+})
+
+describe('AutomationRunsSection run controls', () => {
+  it('gives long task instructions a concise accessible name without hiding the visible prompt', async () => {
+    const omittedTail = 'TAIL_MARKER_THAT_MUST_NOT_BE_READ_FOR_EVERY_RUN'
+    const prompt = `Review the latest market snapshot and summarize material changes. ${'Include supporting detail. '.repeat(12)}${omittedTail}`
+    mocks.snapshot.mockResolvedValue(snapshot([task({ prompt })]))
+
+    render(<AutomationRunsSection />)
+
+    const control = await screen.findByRole('button', { name: /^Run details, running:/ })
+    const accessibleName = control.getAttribute('aria-label')
+    expect(accessibleName).toContain('Review the latest market snapshot')
+    expect(accessibleName).toContain('codex in quant-desk')
+    expect(accessibleName).not.toContain(omittedTail)
+    expect(accessibleName?.length).toBeLessThan(160)
+    expect(screen.getByText(prompt)).toBeTruthy()
+
+    control.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(control.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Task instructions')).toBeTruthy()
+  })
+
+  it('labels an empty stored prompt without exposing a blank control', async () => {
+    mocks.snapshot.mockResolvedValue(snapshot([task({ prompt: '' })]))
+
+    render(<AutomationRunsSection />)
+
+    expect(await screen.findByRole('button', {
+      name: 'Run details, running: Untitled task. codex in quant-desk.',
+    })).toBeTruthy()
   })
 })

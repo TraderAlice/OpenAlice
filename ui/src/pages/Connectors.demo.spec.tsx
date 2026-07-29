@@ -116,7 +116,7 @@ describe('Connector demo routes', () => {
     expect(input.value).toBe('still-here')
   })
 
-  it('removes a configured secret only from the explicit remove action', async () => {
+  it('requires confirmation before removing a configured secret', async () => {
     const snapshot = createDemoConnectorSnapshot()
     snapshot.config.adapters.discord.configuredSecrets = ['botToken']
     mocks.load.mockResolvedValue(snapshot)
@@ -124,6 +124,20 @@ describe('Connector demo routes', () => {
 
     await screen.findByText('Run external notification connectors')
     fireEvent.click(screen.getByRole('button', { name: 'Remove token' }))
+
+    expect(screen.getByRole('heading', { name: 'Remove Discord token?' })).toBeTruthy()
+    expect(screen.getByText(/OpenAlice cannot recover this token after removal/)).toBeTruthy()
+    await new Promise((resolve) => window.setTimeout(resolve, 800))
+    expect(mocks.save).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('heading', { name: 'Remove Discord token?' })).toBeNull()
+    await new Promise((resolve) => window.setTimeout(resolve, 800))
+    expect(mocks.save).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Remove token' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove token' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove token' }).at(-1)!)
 
     await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
     const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig

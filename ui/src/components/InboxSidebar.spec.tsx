@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { InboxEntry } from '../api/inbox'
@@ -94,5 +95,56 @@ describe('InboxSidebar Workspace labels', () => {
     render(<InboxSidebar />)
 
     expect(screen.getByText('old-desk')).toBeTruthy()
+  })
+})
+
+describe('InboxSidebar search', () => {
+  it('filters both views by update content and provenance, then clears cleanly', async () => {
+    const user = userEvent.setup()
+    mocks.entries = [
+      {
+        id: 'inbox-1',
+        ts: Date.now(),
+        workspaceId: 'workspace-1',
+        workspaceLabel: 'old-desk',
+        comments: 'Research is ready.',
+        origin: { kind: 'headless', agent: 'codex', resumeId: 'resume-research' },
+      },
+      {
+        id: 'inbox-2',
+        ts: Date.now() - 1000,
+        workspaceId: 'workspace-2',
+        workspaceLabel: 'macro-desk',
+        comments: 'Macro alert published.',
+        origin: { kind: 'headless', agent: 'opencode', resumeId: 'resume-macro' },
+      },
+    ]
+    mocks.workspaces = [
+      { id: 'workspace-1', tag: 'renamed-desk' },
+      { id: 'workspace-2', tag: 'macro-desk' },
+    ]
+
+    render(<InboxSidebar />)
+
+    const search = screen.getByRole('searchbox', { name: 'Search Inbox…' })
+    await user.type(search, 'opencode')
+
+    expect(screen.getByText('Macro alert published.')).toBeTruthy()
+    expect(screen.queryByText('Research is ready.')).toBeNull()
+    expect(screen.getByText('1 of 2 updates')).toBeTruthy()
+
+    search.blur()
+    fireEvent.keyDown(window, { key: 'j' })
+    expect(mocks.select).toHaveBeenCalledWith('inbox-2')
+    expect(mocks.markRead).toHaveBeenCalledWith('inbox-2')
+
+    await user.clear(search)
+    await user.type(search, 'nothing-here')
+    expect(screen.getByText('No updates match “nothing-here”.')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Clear Inbox search' }))
+    expect(screen.getByText('Research is ready.')).toBeTruthy()
+    expect(screen.getByText('Macro alert published.')).toBeTruthy()
+    expect(screen.queryByText(/updates match/)).toBeNull()
   })
 })

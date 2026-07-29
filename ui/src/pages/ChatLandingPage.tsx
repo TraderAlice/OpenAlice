@@ -221,7 +221,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter submits; Shift+Enter inserts a newline (standard chat-composer feel).
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       void submit()
     }

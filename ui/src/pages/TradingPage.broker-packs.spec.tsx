@@ -9,7 +9,11 @@ vi.mock('../api', () => ({
   api: { trading: { installBrokerPack } },
 }))
 
-import { KeylessDataSourcesRow, MissingBrokerPacksNotice } from './TradingPage'
+import {
+  ExternalOrderMonitoringRow,
+  KeylessDataSourcesRow,
+  MissingBrokerPacksNotice,
+} from './TradingPage'
 
 const missingCcxt: BrokerPackStatus = {
   engine: 'ccxt',
@@ -110,5 +114,39 @@ describe('KeylessDataSourcesRow', () => {
     await waitFor(() => expect(installBrokerPack).toHaveBeenCalledWith('ccxt'))
     expect(onPackInstalled).toHaveBeenCalledWith(expect.objectContaining({ engine: 'ccxt', installed: true }))
     expect(screen.getByText('Installed — choose the feeds you want')).toBeTruthy()
+  })
+})
+
+describe('ExternalOrderMonitoringRow', () => {
+  it('names and describes the cadence picker, then announces a saved change', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') return new Response(null, { status: 204 })
+      return new Response(JSON.stringify({
+        trading: { observeExternalOrdersEvery: '15m', keylessDataSources: [] },
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ExternalOrderMonitoringRow />)
+
+    const select = await screen.findByRole('combobox', { name: 'External order monitoring' })
+    const describedBy = select.getAttribute('aria-describedby')?.split(' ') ?? []
+
+    expect(select.id).not.toBe('')
+    expect(document.querySelector(`label[for="${select.id}"]`)?.textContent).toContain(
+      'External order monitoring',
+    )
+    expect(describedBy.some((id) =>
+      document.getElementById(id)?.textContent?.includes('orders placed outside Alice'),
+    )).toBe(true)
+
+    fireEvent.change(select, { target: { value: '5m' } })
+
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(
+      'Saved — restarting UTA to apply',
+    ))
+    expect(fetchMock).toHaveBeenCalledWith('/api/config/trading', expect.objectContaining({
+      method: 'PUT',
+    }))
   })
 })

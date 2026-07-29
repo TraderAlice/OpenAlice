@@ -13,11 +13,11 @@ import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
  * have moved to the Legacy section of the ActivityBar — they're
  * pre-Workspace artifacts that don't share this surface anymore.
  */
-export function ChatChannelListContainer() {
+export function ChatChannelListContainer({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto min-h-0">
-        <ChatWorkspaceSection />
+        <ChatWorkspaceSection onNavigate={onNavigate} />
       </div>
     </div>
   )

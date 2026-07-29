@@ -98,6 +98,7 @@ export function ActivityBar({
   const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
+  const mobileDrawerClosed = !desktopStatic && !open
 
   return (
     <>
@@ -112,6 +113,9 @@ export function ActivityBar({
       {/* ActivityBar — Linear-style workspace rail. Mobile: slide-in over
        *  page with backdrop. Desktop: static column flush left. */}
       <aside
+        data-testid="activity-bar"
+        aria-hidden={mobileDrawerClosed}
+        inert={mobileDrawerClosed ? true : undefined}
         className={`
           w-[280px] ${compactRail ? 'md:w-[60px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
           bg-muted
@@ -190,6 +194,7 @@ export function ActivityBar({
                           type="button"
                           onClick={handleClick}
                           title={t(item.labelKey)}
+                          aria-current={isActive ? 'page' : undefined}
                           className={`oa-nav-item relative flex items-center rounded-md text-left ${
                             compactRail
                               ? denseRail

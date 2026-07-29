@@ -1002,18 +1002,25 @@
   grid-template-columns: 18px 1fr auto;
   gap: 8px;
   align-items: baseline;
+  width: 100%;
   padding: 3px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 12px;
   cursor: default;
 }
-.files-row.files-dir,
-.files-row.files-symlink {
+button.files-row {
   cursor: pointer;
 }
-.files-row.files-dir:hover,
-.files-row.files-symlink:hover {
+button.files-row:hover {
   background: var(--accent);
+}
+button.files-row:focus-visible {
+  background: var(--accent);
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
 
 .files-icon {

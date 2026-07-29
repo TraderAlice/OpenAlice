@@ -42,6 +42,7 @@ export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSub
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<{ message: string; phase?: string } | null>(null)
   const [result, setResult] = useState<WalletPushResult | null>(null)
+  const dialogTitle = mode.kind === 'place' ? 'Place Order' : 'Close Position'
 
   // Whether the result panel has shown — once it has, parent should
   // refresh on close. We notify via onPushComplete after a successful
@@ -52,8 +53,8 @@ export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSub
   }
 
   return (
-    <Dialog onClose={handleClose} width="w-[560px]">
-      <Header mode={mode} onClose={handleClose} />
+    <Dialog ariaLabel={dialogTitle} onClose={handleClose} width="w-[560px]">
+      <Header title={dialogTitle} onClose={handleClose} />
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {result
@@ -75,12 +76,16 @@ export function OrderEntryDialog({ utaId, mode, onClose, subAccounts, defaultSub
 
 // ==================== Header ====================
 
-function Header({ mode, onClose }: { mode: OrderEntryMode; onClose: () => void }) {
-  const title = mode.kind === 'place' ? 'Place Order' : 'Close Position'
+function Header({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div className="shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
       <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
-      <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 transition-colors">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={`Close ${title}`}
+        className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+      >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
