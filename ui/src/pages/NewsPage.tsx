@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRelativeTime } from '../lib/intl'
 import { api, type NewsArticle } from '../api'
@@ -87,6 +87,12 @@ export function NewsPage() {
   const [sourceFilter, setSourceFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [sources, setSources] = useState<string[]>([])
+  const orderedArticles = useMemo(
+    () => [...articles].sort(
+      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
+    ),
+    [articles],
+  )
 
   const fetchArticles = useCallback(async (lb: string, src: string) => {
     try {
@@ -170,8 +176,11 @@ export function NewsPage() {
               <EmptyState title={t('news.noArticles')} description={t('news.noArticlesDescription')} />
             ) : (
               <div className="divide-y divide-border/50">
-                {[...articles].reverse().map((article, i) => (
-                  <ArticleRow key={`${article.time}-${i}`} article={article} />
+                {orderedArticles.map((article) => (
+                  <ArticleRow
+                    key={`${article.time}-${article.link ?? article.title}`}
+                    article={article}
+                  />
                 ))}
               </div>
             )}
