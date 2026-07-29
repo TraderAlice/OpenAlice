@@ -1447,6 +1447,7 @@ export const en = {
     activeAgo: 'Active {{time}}',
     sessions: 'Sessions',
     noSessions: 'no sessions yet',
+    viewAllSessions: 'View all {{count}} sessions',
     fromTemplate: 'from {{template}} v{{version}}',
     override: 'Workspace override · {{agents}}',
     templateUpgrade: 'Review managed template changes from v{{from}} → v{{to}}.',
