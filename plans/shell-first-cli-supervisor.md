@@ -476,3 +476,4 @@ This plan is complete only when:
   Guardian recovery lost a heartbeat write to a transient `owner.json` rename
   `EPERM`. The failed-job rerun passed Guardian recovery and the complete dev
   smoke without a runtime-lock change, so no speculative retry was introduced.
+- 2026-07-30: Published increment 2 as serial PR #855 targeting `dev`.
