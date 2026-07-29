@@ -41,6 +41,13 @@ export const en = {
     collapseRail: 'Collapse activity bar',
     expandRail: 'Expand activity bar',
   },
+  demoBanner: {
+    badge: 'Demo',
+    compact: 'Snapshot data · Simulated AI',
+    description:
+      'You’re looking at a snapshot of OpenAlice with recorded data. Changes aren’t saved; WebPi replies are simulated.',
+    install: 'Install',
+  },
   settings: {
     title: 'Settings',
     tab: {
