@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bot, CheckCircle2, CircleAlert, Link2, Power, Send, ShieldCheck } from 'lucide-react'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
@@ -13,6 +14,13 @@ import {
 
 const LINK_POLL_MS = 2_500
 
+interface PendingSecretRemoval {
+  connectorId: string
+  connectorLabel: string
+  fieldKey: string
+  fieldLabel: string
+}
+
 export function ConnectorsPage() {
   const [definitions, setDefinitions] = useState<ConnectorDefinition[]>([])
   const [config, setConfig] = useState<PublicConnectorConfig | null>(null)
@@ -21,6 +29,7 @@ export function ConnectorsPage() {
   const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({})
   const [savingSecret, setSavingSecret] = useState<string | null>(null)
   const [secretErrors, setSecretErrors] = useState<Record<string, string>>({})
+  const [pendingSecretRemoval, setPendingSecretRemoval] = useState<PendingSecretRemoval | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
   const [lastProbe, setLastProbe] = useState<{ connectorId: string; probeId: string } | null>(null)
@@ -294,20 +303,11 @@ export function ConnectorsPage() {
                                       type="button"
                                       className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-destructive"
                                       disabled={secretSaving}
-                                      onClick={() => setConfig((current) => {
-                                        if (!current) return current
-                                        const currentAdapter = current.adapters[definition.id]!
-                                        return {
-                                          ...current,
-                                          adapters: {
-                                            ...current.adapters,
-                                            [definition.id]: {
-                                              ...currentAdapter,
-                                              settings: { ...currentAdapter.settings, [field.key]: '' },
-                                              configuredSecrets: currentAdapter.configuredSecrets.filter((key) => key !== field.key),
-                                            },
-                                          },
-                                        }
+                                      onClick={() => setPendingSecretRemoval({
+                                        connectorId: definition.id,
+                                        connectorLabel: definition.label,
+                                        fieldKey: field.key,
+                                        fieldLabel: field.label,
                                       })}
                                     >
                                       Remove token
@@ -370,6 +370,46 @@ export function ConnectorsPage() {
           {loadError && <p className="text-[13px] text-destructive">Failed to load connector settings.</p>}
         </div>
       </SettingsScrollArea>
+
+      {pendingSecretRemoval && (
+        <ConfirmDialog
+          title={`Remove ${pendingSecretRemoval.connectorLabel} token?`}
+          message={(
+            <>
+              OpenAlice will permanently delete the sealed{' '}
+              <strong>{pendingSecretRemoval.fieldLabel}</strong> for{' '}
+              <strong>{pendingSecretRemoval.connectorLabel}</strong>. The connector will stop until
+              you save a replacement. OpenAlice cannot recover this token after removal.
+            </>
+          )}
+          confirmLabel="Remove token"
+          workingLabel="Removing…"
+          onConfirm={() => {
+            setConfig((current) => {
+              if (!current) return current
+              const currentAdapter = current.adapters[pendingSecretRemoval.connectorId] ?? emptyAdapter()
+              return {
+                ...current,
+                adapters: {
+                  ...current.adapters,
+                  [pendingSecretRemoval.connectorId]: {
+                    ...currentAdapter,
+                    settings: {
+                      ...currentAdapter.settings,
+                      [pendingSecretRemoval.fieldKey]: '',
+                    },
+                    configuredSecrets: currentAdapter.configuredSecrets.filter(
+                      (key) => key !== pendingSecretRemoval.fieldKey,
+                    ),
+                  },
+                },
+              }
+            })
+            setPendingSecretRemoval(null)
+          }}
+          onClose={() => setPendingSecretRemoval(null)}
+        />
+      )}
     </div>
   )
 }
