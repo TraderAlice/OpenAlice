@@ -1162,6 +1162,13 @@ export const zhHant: Resources = {
       operationCount_other: '{{count}} 項操作',
       cleanDescription: '沒有等待審批的券商寫入。',
       cleanDetailDescription: '沒有等待審批的券商寫入。最近推送的提交會顯示在這裡。',
+      verificationUnknown: '審批狀態尚未驗證',
+      verificationCount: '已驗證 {{verified}} / {{total}} 個帳戶',
+      verificationDescription: '部分帳戶無法檢查。最近一次已知的審閱項目仍會保留；請重試後再判斷佇列是否乾淨。',
+      listUnavailableDescription: '無法載入交易帳戶。最近一次已知的審閱狀態仍會保留。',
+      failedAccounts: '無法驗證：{{accounts}}',
+      retry: '重試',
+      retrying: '正在重試…',
     },
     status: {
       needsApproval: '需要審批',

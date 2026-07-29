@@ -1154,6 +1154,13 @@ export const zh: Resources = {
       operationCount_other: '{{count}} 项操作',
       cleanDescription: '没有等待审批的券商写入。',
       cleanDetailDescription: '没有等待审批的券商写入。最近推送的提交会显示在这里。',
+      verificationUnknown: '审批状态尚未验证',
+      verificationCount: '已验证 {{verified}} / {{total}} 个账户',
+      verificationDescription: '部分账户无法检查。最近一次已知的审阅项目仍会保留；请重试后再判断队列是否干净。',
+      listUnavailableDescription: '无法加载交易账户。最近一次已知的审阅状态仍会保留。',
+      failedAccounts: '无法验证：{{accounts}}',
+      retry: '重试',
+      retrying: '正在重试…',
     },
     status: {
       needsApproval: '需要审批',

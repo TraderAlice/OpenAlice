@@ -1166,6 +1166,13 @@ export const en = {
       operationCount_other: '{{count}} ops',
       cleanDescription: 'No broker writes are waiting for approval.',
       cleanDetailDescription: 'No broker writes are waiting for approval. Recent pushed commits will appear here.',
+      verificationUnknown: 'Approval status not verified',
+      verificationCount: '{{verified}} / {{total}} accounts verified',
+      verificationDescription: 'Some accounts could not be checked. Last known review items remain visible; retry before treating the queue as clean.',
+      listUnavailableDescription: 'Trading accounts could not be loaded. The last known review state remains visible.',
+      failedAccounts: 'Could not verify: {{accounts}}',
+      retry: 'Retry',
+      retrying: 'Retrying…',
     },
     status: {
       needsApproval: 'Needs approval',
