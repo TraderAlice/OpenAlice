@@ -1443,6 +1443,7 @@ export const ja: Resources = {
     activeAgo: '{{time}}にアクティブ',
     sessions: 'セッション',
     noSessions: 'セッションはまだありません',
+    viewAllSessions: '{{count}} 件のセッションをすべて表示',
     fromTemplate: '{{template}} v{{version}} から作成',
     override: 'ワークスペース上書き設定 · {{agents}}',
     templateUpgrade: 'v{{from}} → v{{to}} のテンプレート資産変更を確認します。',

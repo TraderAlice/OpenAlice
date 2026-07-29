@@ -83,4 +83,37 @@ describe('OverviewCard', () => {
     expect(onOpen).toHaveBeenCalledTimes(1)
     expect(onOpenSession).toHaveBeenCalledWith('session-1')
   })
+
+  it('keeps high-session workspaces compact while preserving recent drill-ins', () => {
+    const onOpen = vi.fn()
+    const onOpenSession = vi.fn()
+    const manySessionWorkspace: Workspace = {
+      ...workspace,
+      sessions: Array.from({ length: 8 }, (_, index) => ({
+        ...workspace.sessions[0]!,
+        id: `session-${index + 1}`,
+        resumeId: `resume-${index + 1}`,
+        name: `x${index + 1}`,
+        state: index === 0 ? 'running' : 'paused',
+        lastActiveAt: `2026-07-28T00:${String(59 - index).padStart(2, '0')}:00.000Z`,
+      })),
+    }
+
+    render(
+      <OverviewCard
+        workspace={manySessionWorkspace}
+        lastCommit={null}
+        onOpen={onOpen}
+        onOpenSession={onOpenSession}
+      />,
+    )
+
+    expect(screen.getAllByRole('button', { name: / (running|paused)$/ })).toHaveLength(5)
+    expect(screen.getByRole('button', { name: 'x5 paused' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'x6 paused' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'View all 8 sessions' }))
+    expect(onOpen).toHaveBeenCalledTimes(1)
+    expect(onOpenSession).not.toHaveBeenCalled()
+  })
 })

@@ -1450,6 +1450,7 @@ export const zhHant: Resources = {
     activeAgo: '活躍於{{time}}',
     sessions: '工作階段',
     noSessions: '還沒有工作階段',
+    viewAllSessions: '檢視全部 {{count}} 個工作階段',
     fromTemplate: '來自 {{template}} v{{version}}',
     override: '工作區覆寫設定 · {{agents}}',
     templateUpgrade: '檢視 v{{from}} → v{{to}} 的範本資產變更。',

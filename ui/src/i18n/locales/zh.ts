@@ -1442,6 +1442,7 @@ export const zh: Resources = {
     activeAgo: '活跃于{{time}}',
     sessions: '会话',
     noSessions: '还没有会话',
+    viewAllSessions: '查看全部 {{count}} 个会话',
     fromTemplate: '来自 {{template}} v{{version}}',
     override: '工作区覆盖配置 · {{agents}}',
     templateUpgrade: '查看 v{{from}} → v{{to}} 的模板资产变更。',
