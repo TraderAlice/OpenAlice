@@ -889,6 +889,8 @@ export const zh: Resources = {
   },
   tracked: {
     nothingTrackedYet: '还没有追踪任何东西。',
+    detailLoadErrorTitle: '无法加载 {{name}}',
+    detailLoadErrorDescription: '这个追踪实体可能已经变更，或 OpenAlice 暂时不可用。',
     backlinksTooltip: '{{count}} 条笔记链接到此',
     assets: '标的',
     topics: '主题',

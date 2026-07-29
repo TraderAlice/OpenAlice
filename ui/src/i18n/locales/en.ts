@@ -900,6 +900,8 @@ export const en = {
   },
   tracked: {
     nothingTrackedYet: 'Nothing tracked yet.',
+    detailLoadErrorTitle: 'Couldn’t load {{name}}',
+    detailLoadErrorDescription: 'The tracked entity may have changed, or OpenAlice may be temporarily unavailable.',
     backlinksTooltip: '{{count}} notes link here',
     assets: 'Assets',
     topics: 'Topics',

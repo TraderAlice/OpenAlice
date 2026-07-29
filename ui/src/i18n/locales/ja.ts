@@ -889,6 +889,8 @@ export const ja: Resources = {
   },
   tracked: {
     nothingTrackedYet: 'まだ何もトラッキングしていません。',
+    detailLoadErrorTitle: '{{name}} を読み込めませんでした',
+    detailLoadErrorDescription: '追跡対象が変更されたか、OpenAlice が一時的に利用できない可能性があります。',
     backlinksTooltip: '{{count}} 件のメモがここにリンク',
     assets: '銘柄',
     topics: 'トピック',

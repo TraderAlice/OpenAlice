@@ -897,6 +897,8 @@ export const zhHant: Resources = {
   },
   tracked: {
     nothingTrackedYet: '尚未追蹤任何項目。',
+    detailLoadErrorTitle: '無法載入 {{name}}',
+    detailLoadErrorDescription: '這個追蹤實體可能已變更，或 OpenAlice 暫時無法使用。',
     backlinksTooltip: '{{count}} 則筆記連結到此',
     assets: '標的',
     topics: '主題',
