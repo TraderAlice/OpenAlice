@@ -906,7 +906,7 @@ function SourceChip({ label }: { label: string }) {
   )
 }
 
-function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
+export function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
   const [expanded, setExpanded] = useState<number | null>(null)
 
   if (orders == null) {
@@ -936,6 +936,7 @@ function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
             <th className="px-3 py-2 font-medium text-right">Limit</th>
             <th className="px-3 py-2 font-medium text-right">Fill</th>
             <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium text-right">Details</th>
           </tr>
         </thead>
         <tbody>
@@ -960,10 +961,25 @@ function OrderHistoryTable({ orders }: { orders: OrderHistoryEntry[] | null }) {
                     {o.source === 'external' && <SourceChip label="External" />}
                   </span>
                 </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    type="button"
+                    aria-expanded={expanded === i}
+                    aria-controls={`order-history-details-${i}`}
+                    aria-label={`${expanded === i ? 'Hide' : 'Show'} details for ${contractPrimary(o.contract)} order`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setExpanded(prev => prev === i ? null : i)
+                    }}
+                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {expanded === i ? 'Hide' : 'Details'}
+                  </button>
+                </td>
               </tr>
               {expanded === i && (
-                <tr className="border-t border-border bg-muted/20">
-                  <td colSpan={8} className="px-3 py-2 text-[11px] text-muted-foreground">
+                <tr id={`order-history-details-${i}`} className="border-t border-border bg-muted/20">
+                  <td colSpan={9} className="px-3 py-2 text-[11px] text-muted-foreground">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       <span className="font-mono">{o.commitHash}</span>
                       <span>{o.message}</span>
