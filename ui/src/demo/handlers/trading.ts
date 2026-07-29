@@ -130,13 +130,16 @@ export const tradingHandlers = [
   http.get('/api/trading/uta/:id/trade-history', ({ params }) =>
     HttpResponse.json({ trades: demoTradeHistoryByUTA[utaId(params)] ?? [] }),
   ),
-  http.get('/api/trading/uta/:id/market-clock', () =>
-    HttpResponse.json({
+  http.get('/api/trading/uta/:id/market-clock', ({ params }) => {
+    if (utaId(params) === DEMO_UTA_CRYPTO) {
+      return HttpResponse.json({ isOpen: true })
+    }
+    return HttpResponse.json({
       isOpen: false,
       nextOpen: new Date(Date.now() + 3600_000).toISOString(),
       nextClose: new Date(Date.now() + 7 * 3600_000).toISOString(),
-    }),
-  ),
+    })
+  }),
 
   http.get('/api/trading/uta/:id/wallet/status', () =>
     HttpResponse.json({ staged: [], pendingMessage: null, head: null, commitCount: 0 }),
