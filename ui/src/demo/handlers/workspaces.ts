@@ -1,5 +1,10 @@
 import { http, HttpResponse } from 'msw'
-import { demoChatWorkspace, demoWorkspaces, demoTemplates } from '../fixtures/workspaces'
+import {
+  DEMO_AUTO_QUANT_WORKSPACE_ID,
+  demoChatWorkspace,
+  demoWorkspaces,
+  demoTemplates,
+} from '../fixtures/workspaces'
 import { demoWorkspaceFiles } from '../fixtures/inbox'
 import {
   createDemoWebPiSnapshot,
@@ -56,7 +61,9 @@ export function resetDemoWorkspaceWebPiState(): void {
     const workspace = demoWorkspaces[index]!
     demoWorkspaces[index] = {
       ...workspace,
-      sessions: workspace.sessions.filter((session) => !session.id.startsWith('demo-quick-chat-')),
+      sessions: workspace.sessions.filter((session) =>
+        !session.id.startsWith('demo-quick-chat-')
+        && !session.id.startsWith('run-demo-resume-')),
     }
   }
 }
@@ -657,7 +664,7 @@ export const workspacesHandlers = [
     const workspace = demoWorkspaces.find((candidate) =>
       candidate.sessions.some((session) => session.resumeId === resumeId),
     ) ?? (resumeId === 'resume-demo-thesis-owner'
-      ? demoWorkspaces.find((candidate) => candidate.id === 'demo-ws-auto-quant')
+      ? demoWorkspaces.find((candidate) => candidate.id === DEMO_AUTO_QUANT_WORKSPACE_ID)
       : undefined)
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
     const session = workspace.sessions.find((candidate) => candidate.resumeId === resumeId)
@@ -672,7 +679,7 @@ export const workspacesHandlers = [
   }),
   http.get('/api/workspaces/:id/resumes', ({ params }) => {
     const wsId = String(params.id)
-    if (wsId === 'demo-ws-auto-quant') {
+    if (wsId === DEMO_AUTO_QUANT_WORKSPACE_ID) {
       return HttpResponse.json({
         workspace: { id: wsId, tag: 'auto-quant' },
         sessions: [{
@@ -707,13 +714,14 @@ export const workspacesHandlers = [
       })),
     })
   }),
-  http.post('/api/workspaces/:id/resumes/:resumeId/session', ({ params }) => {
+  http.post('/api/workspaces/:id/resumes/:resumeId/session', async ({ params, request }) => {
     const wsId = String(params.id)
     const resumeId = String(params.resumeId)
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
     if (!workspace) return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
     const existing = workspace.sessions.find((session) => session.resumeId === resumeId)
     if (existing) return HttpResponse.json({ session: existing, created: false })
+    const body = await request.json().catch(() => ({})) as { title?: unknown }
     const now = new Date().toISOString()
     const session = {
       id: `run-${resumeId}`,
@@ -726,7 +734,9 @@ export const workspacesHandlers = [
       state: 'running' as const,
       pid: 0,
       startedAt: Date.now(),
-      title: 'Compute a quant snapshot of NVDA and push a report to the inbox.',
+      title: typeof body.title === 'string' && body.title.trim()
+        ? body.title.trim()
+        : 'Resumed demo run',
       sourceRunId: 'demo-headless-1',
     }
     ;(workspace.sessions as Array<typeof session>).push(session)

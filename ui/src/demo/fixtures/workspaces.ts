@@ -44,6 +44,8 @@ export const demoWorkspace: Workspace = {
 // history visible.
 export const DEMO_CHAT_WORKSPACE_ID = 'demo-chat-ws'
 export const DEMO_CHAT_SESSION_ID = 'demo-chat-session'
+export const DEMO_AUTO_QUANT_WORKSPACE_ID = 'demo-ws-auto-quant'
+export const DEMO_MACRO_WORKSPACE_ID = 'demo-ws-macro'
 
 // A small spread of agents + states so the sidebar shows the full session
 // styling (per-agent badge colours for claude/codex/opencode/pi, the paused
@@ -119,7 +121,34 @@ export const demoChatWorkspace: Workspace = {
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
 
-export const demoWorkspaces: Workspace[] = [demoWorkspace, demoChatWorkspace]
+const demoIssueWorkspaces: Workspace[] = [
+  {
+    id: DEMO_AUTO_QUANT_WORKSPACE_ID,
+    tag: 'auto-quant',
+    displayName: 'Auto Quant',
+    dir: '/demo/workspaces/auto-quant',
+    createdAt: new Date().toISOString(),
+    agents: ['codex'],
+    sessions: [],
+    agentOverride: { claude: false, codex: false, opencode: false, pi: false },
+  },
+  {
+    id: DEMO_MACRO_WORKSPACE_ID,
+    tag: 'macro-research',
+    displayName: 'Macro Research',
+    dir: '/demo/workspaces/macro-research',
+    createdAt: new Date().toISOString(),
+    agents: ['codex'],
+    sessions: [],
+    agentOverride: { claude: false, codex: false, opencode: false, pi: false },
+  },
+]
+
+export const demoWorkspaces: Workspace[] = [
+  demoWorkspace,
+  demoChatWorkspace,
+  ...demoIssueWorkspaces,
+]
 
 // Templates — names + metadata mirror the real template at
 // src/workspaces/templates/chat/template.json. The name matters: the Chat /
