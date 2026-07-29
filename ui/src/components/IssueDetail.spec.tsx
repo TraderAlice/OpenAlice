@@ -145,6 +145,13 @@ describe('IssueDetail property controls', () => {
   it('names every editable property and resolves inherited runtime defaults', async () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
+    const title = screen.getByRole('heading', { level: 1, name: 'Morning movers scan' })
+    const header = title.closest('header')
+    const identityRow = header?.querySelector('div')
+    expect(header).toBeTruthy()
+    expect(identityRow?.className).toContain('flex-col')
+    expect(identityRow?.className).toContain('sm:flex-row')
+
     expect(screen.getByRole('combobox', { name: 'Status' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
@@ -158,6 +165,17 @@ describe('IssueDetail property controls', () => {
 
     fireEvent.change(model, { target: { value: 'custom' } })
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+  })
+
+  it('places mobile work-item controls before long-form Issue content', () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const workItem = screen.getByText('Work item')
+    const what = screen.getByText('What')
+    const activity = screen.getByText('Activity')
+
+    expect(workItem.compareDocumentPosition(what) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(workItem.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it.each([

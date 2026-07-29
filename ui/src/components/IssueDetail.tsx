@@ -489,7 +489,7 @@ function PropertiesRail({
   }, [issue.automationHealth, issue.status, t])
 
   return (
-    <aside className="min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+    <aside className="mt-5 min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0">
       <PropertySection
         title={t('issues.detail.workItem')}
         description={t('issues.detail.workItemDescription')}
@@ -1299,10 +1299,11 @@ function WikilinkPicker({
 // ==================== Detail view ====================
 
 /**
- * Linear-style issue detail (Phase 2b — interactive). Main column = title +
- * editable canonical What + a Linear-style Activity timeline where comments
- * and changes share one flow. Runs stay in an independent operational section.
- * Right rail = Properties, with status /
+ * Linear-style issue detail (Phase 2b — interactive). The identity header stays
+ * first at every width. On narrow screens, the Properties work-item controls
+ * follow it before the potentially long What and Activity flow; desktop keeps
+ * those controls in the right rail. Runs stay in an independent operational
+ * section. Properties expose status /
  * priority / assignee editable inline (each write PATCHes and applies the
  * server-returned detail — authoritative, refetch-free). The scheduled agent
  * runtime is editable because it is operational routing; schedule cadence and
@@ -1535,29 +1536,14 @@ export function IssueDetail({
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 md:px-6">
       {backToBoard}
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-        <main className="min-w-0 lg:col-start-1 lg:row-start-1">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="font-mono text-[11px] text-muted-foreground/70">{id}</span>
+      <main className="grid min-w-0 gap-x-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <header className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <div className="mb-1 flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <span className="max-w-full break-all font-mono text-[11px] leading-snug text-muted-foreground/70">{id}</span>
             {issue.when && <CadencePill when={issue.when} />}
           </div>
           <h1 className="text-xl font-semibold text-foreground">{issue.title}</h1>
-          <WhatEditor
-            key={`${wsId}:${id}`}
-            value={issue.what}
-            scheduled={Boolean(issue.when)}
-            onSave={(what) => onPatch({ what })}
-          />
-          <IssueActivity
-            activity={activity}
-            onOpenSession={openProvenanceSession}
-            wsId={wsId}
-            issueId={id}
-            ownerResumeId={stableOwnerResumeId}
-            assignee={issue.assignee}
-            onPosted={mutate}
-          />
-        </main>
+        </header>
         <PropertiesRail
           wsId={wsId}
           issue={issue}
@@ -1575,6 +1561,23 @@ export function IssueDetail({
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+          <WhatEditor
+            key={`${wsId}:${id}`}
+            value={issue.what}
+            scheduled={Boolean(issue.when)}
+            onSave={(what) => onPatch({ what })}
+          />
+          <IssueActivity
+            activity={activity}
+            onOpenSession={openProvenanceSession}
+            wsId={wsId}
+            issueId={id}
+            ownerResumeId={stableOwnerResumeId}
+            assignee={issue.assignee}
+            onPosted={mutate}
+          />
+        </div>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-3">
           <RunsSection
             runs={runs}
             onOpen={(run) => {
@@ -1586,7 +1589,7 @@ export function IssueDetail({
           />
           <InboxReportsSection reports={inboxReports} onOpen={gotoInbox} />
         </div>
-      </div>
+      </main>
       {picker && (
         <WikilinkPicker
           resolution={picker}
