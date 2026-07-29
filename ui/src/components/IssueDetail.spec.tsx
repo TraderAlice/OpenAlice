@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
   IssueDetail as IssueDetailData,
   IssueProvenanceRecord,
 } from '../api/issues'
+import { i18n } from '../i18n'
 import { IssueActivity, IssueDetail } from './IssueDetail'
 
 const mocks = vi.hoisted(() => ({
@@ -77,6 +78,11 @@ vi.mock('./workspace/api', () => ({
 vi.mock('./MarkdownWhatEditor', () => ({
   MarkdownWhatEditor: ({ value }: { value: string }) => <div>{value}</div>,
 }))
+
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
+  delete scheduledIssue.issue.automationHealth
+})
 
 afterEach(() => {
   cleanup()
@@ -150,5 +156,44 @@ describe('IssueDetail property controls', () => {
 
     fireEvent.change(model, { target: { value: 'custom' } })
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+  })
+
+  it.each([
+    ['en', 'Work item', 'Status', 'What', 'Activity', 'Schedule is valid and has not run yet.'],
+    ['zh', '工作项', '状态', '任务内容', '动态', '运行计划有效，但尚未执行。'],
+    ['zh-Hant', '工作項目', '狀態', '任務內容', '動態', '執行排程有效，但尚未執行。'],
+    ['ja', '作業項目', 'ステータス', '作業内容', 'アクティビティ', 'スケジュールは有効ですが、まだ実行されていません。'],
+  ] as const)(
+    'localizes Issue chrome in %s while preserving authored content',
+    async (locale, workItem, status, what, activity, healthMessage) => {
+      await i18n.changeLanguage(locale)
+      scheduledIssue.issue.automationHealth = {
+        state: 'not_started',
+        message: 'Schedule is valid and has not run yet.',
+      }
+
+      render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+      expect(screen.getByText(workItem)).toBeTruthy()
+      expect(screen.getByRole('combobox', { name: status })).toBeTruthy()
+      expect(screen.getByText(what)).toBeTruthy()
+      expect(screen.getByText(activity)).toBeTruthy()
+      expect(screen.getByText(healthMessage)).toBeTruthy()
+      expect(screen.getByText('Morning movers scan')).toBeTruthy()
+      expect(screen.getByText('Scan the market and publish a brief.')).toBeTruthy()
+    },
+  )
+
+  it('keeps authoritative runtime diagnostics verbatim in localized chrome', async () => {
+    await i18n.changeLanguage('zh')
+    scheduledIssue.issue.automationHealth = {
+      state: 'failed',
+      message: 'Provider rejected model MODEL_NOT_FOUND.',
+    }
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    expect(screen.getByText('运行状态')).toBeTruthy()
+    expect(screen.getByText('Provider rejected model MODEL_NOT_FOUND.')).toBeTruthy()
   })
 })
