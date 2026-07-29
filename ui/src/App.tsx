@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
+import { MobileRailMenuButton } from './components/MobileRailMenuButton'
 import { TabHost } from './components/TabHost'
 import { DesktopUpdatePrompt } from './components/DesktopUpdatePrompt'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -94,15 +95,7 @@ function AppShell() {
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">
       {/* Mobile header — visible only below md */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border/80 bg-secondary shrink-0 md:hidden">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="text-muted-foreground hover:text-foreground p-1 -ml-1"
-          aria-label="Open menu"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M3 5h14M3 10h14M3 15h14" />
-          </svg>
-        </button>
+        <MobileRailMenuButton onOpen={() => setSidebarOpen(true)} />
         <span className="text-sm font-semibold text-foreground">OpenAlice</span>
       </div>
 
