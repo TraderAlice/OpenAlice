@@ -111,7 +111,7 @@ function listLabelKey(k: MoversList) {
 
 function MoversTable({ rows }: { rows: MoverRow[] }) {
   const { t } = useTranslation()
-  const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const open = useOpenEquity()
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[12px] border-collapse">
@@ -130,11 +130,10 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
             <tr
               key={r.symbol}
               className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer"
-              onClick={() => openOrFocus({ kind: 'market-detail', params: { assetClass: 'equity', symbol: r.symbol } })}
+              onClick={() => open(r.symbol)}
             >
               <td className="py-1.5 pr-3">
-                <span className="font-mono font-semibold text-foreground">{r.symbol}</span>
-                {r.name && <span className="ml-2 text-muted-foreground">{r.name}</span>}
+                <EquityDetailButton symbol={r.symbol} name={r.name} />
               </td>
               <td className="py-1.5 px-3 text-right font-mono text-foreground">{fmtPrice(r.price)}</td>
               <td className={`py-1.5 px-3 text-right font-mono ${signColor(r.percent_change)}`}>{fmtPct(r.percent_change)}</td>
@@ -234,6 +233,34 @@ function useOpenEquity() {
   }
 }
 
+function EquityDetailButton({
+  symbol,
+  name,
+}: {
+  symbol: string | null
+  name?: string | null
+}) {
+  const { t } = useTranslation()
+  const open = useOpenEquity()
+
+  if (!symbol) return <span className="font-mono text-muted-foreground">—</span>
+
+  return (
+    <button
+      type="button"
+      aria-label={t('market.openSymbol', { symbol })}
+      onClick={(event) => {
+        event.stopPropagation()
+        open(symbol)
+      }}
+      className="inline-flex max-w-full items-baseline gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+    >
+      <span className="font-mono font-semibold text-foreground">{symbol}</span>
+      {name && <span className="truncate text-muted-foreground">{name}</span>}
+    </button>
+  )
+}
+
 function EarningsTable({ board }: { board: CalendarBoard }) {
   const { t } = useTranslation()
   const open = useOpenEquity()
@@ -245,8 +272,7 @@ function EarningsTable({ board }: { board: CalendarBoard }) {
         <tr key={`${r.symbol}-${i}`} className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer" onClick={() => open(r.symbol)}>
           <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.report_date}</td>
           <td className="py-1.5 px-3">
-            <span className="font-mono font-semibold text-foreground">{r.symbol}</span>
-            {r.name && <span className="ml-2 text-muted-foreground">{r.name}</span>}
+            <EquityDetailButton symbol={r.symbol} name={r.name} />
           </td>
           <td className="py-1.5 px-3 text-right font-mono text-foreground">{r.eps_previous ?? '—'}</td>
           <td className="py-1.5 pl-3 text-right font-mono text-foreground">{r.eps_consensus ?? '—'}</td>
@@ -262,16 +288,23 @@ function IpoTable({ board }: { board: CalendarBoard }) {
   const rows = [...board.ipos].sort((a, b) => (a.ipo_date ?? '').localeCompare(b.ipo_date ?? ''))
   return (
     <CalTable head={[t('market.colDate'), t('market.colSymbol'), t('market.colExchange')]}>
-      {rows.map((r, i) => (
-        <tr key={`${r.symbol}-${i}`} className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer" onClick={() => open(r.symbol)}>
-          <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.ipo_date ?? '—'}</td>
-          <td className="py-1.5 px-3">
-            <span className="font-mono font-semibold text-foreground">{r.symbol ?? '—'}</span>
-            {typeof r.name === 'string' && r.name && <span className="ml-2 text-muted-foreground">{r.name}</span>}
-          </td>
-          <td className="py-1.5 pl-3 text-muted-foreground">{typeof r.exchange === 'string' ? r.exchange : '—'}</td>
-        </tr>
-      ))}
+      {rows.map((r, i) => {
+        const symbol = typeof r.symbol === 'string' ? r.symbol : null
+        const name = typeof r.name === 'string' ? r.name : null
+        return (
+          <tr
+            key={`${r.symbol}-${i}`}
+            className={`border-b border-border/50 hover:bg-secondary/40 ${symbol ? 'cursor-pointer' : ''}`}
+            onClick={symbol ? () => open(symbol) : undefined}
+          >
+            <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.ipo_date ?? '—'}</td>
+            <td className="py-1.5 px-3">
+              <EquityDetailButton symbol={symbol} name={name} />
+            </td>
+            <td className="py-1.5 pl-3 text-muted-foreground">{typeof r.exchange === 'string' ? r.exchange : '—'}</td>
+          </tr>
+        )
+      })}
     </CalTable>
   )
 }
@@ -286,8 +319,7 @@ function DividendTable({ board }: { board: CalendarBoard }) {
         <tr key={`${r.symbol}-${i}`} className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer" onClick={() => open(r.symbol)}>
           <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.ex_dividend_date}</td>
           <td className="py-1.5 px-3">
-            <span className="font-mono font-semibold text-foreground">{r.symbol}</span>
-            {r.name && <span className="ml-2 text-muted-foreground">{r.name}</span>}
+            <EquityDetailButton symbol={r.symbol} name={r.name} />
           </td>
           <td className="py-1.5 px-3 text-right font-mono text-foreground">{r.amount ?? '—'}</td>
           <td className="py-1.5 pl-3 text-muted-foreground whitespace-nowrap">{r.payment_date ?? '—'}</td>

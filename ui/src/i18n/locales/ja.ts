@@ -770,6 +770,7 @@ export const ja: Resources = {
     title: 'シミュレーター',
   },
   market: {
+    openSymbol: '{{symbol}} の詳細を開く',
     searchPlaceholder: '銘柄を検索…',
     browseSection: '閲覧',
     browseMarkets: 'マーケットを見る',
