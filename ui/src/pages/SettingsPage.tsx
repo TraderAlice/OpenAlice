@@ -357,18 +357,23 @@ function PalettePicker({
 
 // ==================== Language ====================
 
-function LanguageSection() {
+export function LanguageSection() {
   const { t } = useTranslation()
   const locale = useLocale()
   const setLocale = useSetLocale()
   return (
     <ConfigSection title={t('settings.language.title')} description={t('settings.language.description')}>
-      <div className="flex flex-wrap gap-2 py-1">
+      <div
+        className="flex flex-wrap gap-2 py-1"
+        role="group"
+        aria-label={t('settings.language.title')}
+      >
         {(['en', 'zh', 'ja', 'zh-Hant'] as const).map((l) => (
           <button
             key={l}
             type="button"
             onClick={() => setLocale(l)}
+            aria-pressed={locale === l}
             className={`px-3 py-1.5 text-sm rounded border transition-colors ${
               locale === l
                 ? 'border-primary text-primary bg-primary/10'
@@ -983,6 +988,43 @@ const TABS: { key: Tab; labelKey: 'settings.tab.settings' | 'settings.tab.tools'
   { key: 'tools', labelKey: 'settings.tab.tools' },
 ]
 
+export function SettingsTabBar({
+  tab,
+  onSelect,
+}: {
+  tab: Tab
+  onSelect: (tab: Tab) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      className="flex gap-1"
+      role="group"
+      aria-label={t('settings.title')}
+    >
+      {TABS.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => onSelect(item.key)}
+          aria-pressed={tab === item.key}
+          className={`px-3 py-2 text-sm font-medium transition-colors relative ${
+            tab === item.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {t(item.labelKey)}
+          {tab === item.key && (
+            <span
+              aria-hidden
+              className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t"
+            />
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('settings')
@@ -992,22 +1034,7 @@ export function SettingsPage() {
       <PageHeader title={t('settings.title')} />
 
       <div className="px-4 md:px-6 border-b border-border/60">
-        <div className="flex gap-1">
-          {TABS.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setTab(item.key)}
-              className={`px-3 py-2 text-sm font-medium transition-colors relative ${
-                tab === item.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t(item.labelKey)}
-              {tab === item.key && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t" />
-              )}
-            </button>
-          ))}
-        </div>
+        <SettingsTabBar tab={tab} onSelect={setTab} />
       </div>
 
       <SettingsScrollArea className="px-4 py-6 md:px-8">
