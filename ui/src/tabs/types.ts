@@ -14,6 +14,7 @@
  */
 
 export type WorkspaceSource = 'chat'
+export type FileViewerSource = WorkspaceSource | 'tracked'
 
 /** One source of truth for the Dev sidebar and `/dev/:tab` URL contract. */
 export const DEV_TABS = ['tools', 'onboarding', 'snapshots', 'logs', 'simulator'] as const
@@ -55,9 +56,11 @@ export type ViewSpec =
         wsId: string
         path: string
         /** Preserve the product area that opened this Workspace artifact. */
-        source?: WorkspaceSource
+        source?: FileViewerSource
         /** Exact Session materialization to restore when leaving the artifact. */
         returnSessionId?: string
+        /** Tracked entity selection to restore when leaving a backlink artifact. */
+        returnTrackedName?: string
       }
     }
 

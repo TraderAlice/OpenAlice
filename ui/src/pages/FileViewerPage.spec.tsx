@@ -8,6 +8,7 @@ import { FileViewerPage } from './FileViewerPage'
 const mocks = vi.hoisted(() => ({
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
+  selectTracked: vi.fn(),
   readWorkspaceFile: vi.fn(),
 }))
 
@@ -27,6 +28,12 @@ vi.mock('../tabs/store', () => ({
 
 vi.mock('../components/workspace/api', () => ({
   readWorkspaceFile: mocks.readWorkspaceFile,
+}))
+
+vi.mock('../live/tracked-selection', () => ({
+  useTrackedSelection: (selector: (state: {
+    select: typeof mocks.selectTracked
+  }) => unknown) => selector({ select: mocks.selectTracked }),
 }))
 
 vi.mock('../components/FileContentView', () => ({
@@ -82,6 +89,31 @@ describe('FileViewerPage back navigation', () => {
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace',
       params: { wsId: 'chat-1' },
+    })
+  })
+
+  it('returns a Tracked backlink artifact to the same entity context', () => {
+    render(
+      <FileViewerPage
+        spec={{
+          kind: 'file-viewer',
+          params: {
+            wsId: 'chat-1',
+            path: 'research/power.md',
+            source: 'tracked',
+            returnTrackedName: 'stock-vst',
+          },
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(mocks.selectTracked).toHaveBeenCalledWith('stock-vst')
+    expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'tracked',
+      params: {},
     })
   })
 })

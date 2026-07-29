@@ -74,4 +74,25 @@ describe('UrlAdopter file provenance', () => {
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('workspaces')
   })
+
+  it('restores a Tracked file deep link with its entity return context', async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        '/tracked/files/workspace-1/research%2Fpower.md?entity=stock-vst',
+      ]}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'file-viewer',
+      params: {
+        wsId: 'workspace-1',
+        path: 'research/power.md',
+        source: 'tracked',
+        returnTrackedName: 'stock-vst',
+      },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+  })
 })

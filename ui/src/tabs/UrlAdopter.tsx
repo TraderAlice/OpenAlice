@@ -85,6 +85,7 @@ export function UrlAdopter() {
 
         {/* Tracked (entity index) */}
         <Route path="/tracked" element={<AdoptStatic spec={{ kind: 'tracked', params: {} }} />} />
+        <Route path="/tracked/files/:wsId/:path" element={<AdoptTrackedFileViewer />} />
         <Route path="/tracked/issues/:wsId/:id" element={<AdoptTrackedIssueDetail />} />
 
         {/* Workspaces */}
@@ -283,6 +284,26 @@ function AdoptChatFileViewer() {
   )
 }
 
+function AdoptTrackedFileViewer() {
+  const { wsId, path } = useParams<{ wsId: string; path: string }>()
+  const [search] = useSearchParams()
+  if (!wsId || !path) return <Navigate to="/tracked" replace />
+  const returnTrackedName = search.get('entity') ?? undefined
+  return (
+    <AdoptStatic
+      spec={{
+        kind: 'file-viewer',
+        params: {
+          wsId,
+          path,
+          source: 'tracked',
+          ...(returnTrackedName ? { returnTrackedName } : {}),
+        },
+      }}
+    />
+  )
+}
+
 function AdoptDesignProject() {
   const { project } = useParams<{ project: string }>()
   if (!project) return <Navigate to="/dev/tools" replace />
@@ -311,7 +332,12 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'chat-landing':       return 'chat'
     case 'workspace-manager':  return 'chat'
     case 'workspace':          return spec.params.source === 'chat' ? 'chat' : 'workspaces'
-    case 'file-viewer':        return spec.params.source === 'chat' ? 'chat' : 'workspaces'
+    case 'file-viewer':
+      return spec.params.source === 'chat'
+        ? 'chat'
+        : spec.params.source === 'tracked'
+          ? 'tracked'
+          : 'workspaces'
     case 'workspace-list':
     case 'template-catalog':
     case 'template-detail':    return 'workspaces'
