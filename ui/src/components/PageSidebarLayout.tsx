@@ -281,6 +281,8 @@ export function PageSidebarLayout({
       <div
         data-testid="page-sidebar-drawer"
         data-state={drawerOpen ? 'open' : 'closed'}
+        aria-hidden={!drawerOpen}
+        inert={!drawerOpen ? true : undefined}
         className={`absolute inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] transition-transform duration-200 ${
           drawerOpen ? 'translate-x-0' : '-translate-x-full'
         }`}

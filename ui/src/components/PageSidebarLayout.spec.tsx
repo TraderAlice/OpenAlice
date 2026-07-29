@@ -100,12 +100,18 @@ describe('PageSidebarLayout', () => {
 
     const drawer = screen.getByTestId('page-sidebar-drawer')
     expect(drawer.getAttribute('data-state')).toBe('closed')
+    expect(drawer.getAttribute('aria-hidden')).toBe('true')
+    expect(drawer.hasAttribute('inert')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
     expect(drawer.getAttribute('data-state')).toBe('open')
+    expect(drawer.getAttribute('aria-hidden')).toBe('false')
+    expect(drawer.hasAttribute('inert')).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: 'Select message' }))
     expect(drawer.getAttribute('data-state')).toBe('closed')
+    expect(drawer.getAttribute('aria-hidden')).toBe('true')
+    expect(drawer.hasAttribute('inert')).toBe(true)
   })
 
   it('keeps a page navigator in the drawer below its custom desktop breakpoint', () => {
@@ -125,11 +131,17 @@ describe('PageSidebarLayout', () => {
     expect(window.matchMedia).toHaveBeenCalledWith('(min-width: 960px)')
     const drawer = screen.getByTestId('page-sidebar-drawer')
     expect(drawer.getAttribute('data-state')).toBe('closed')
+    expect(drawer.getAttribute('aria-hidden')).toBe('true')
+    expect(drawer.hasAttribute('inert')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }))
     expect(drawer.getAttribute('data-state')).toBe('open')
+    expect(drawer.getAttribute('aria-hidden')).toBe('false')
+    expect(drawer.hasAttribute('inert')).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: 'Select General' }))
     expect(drawer.getAttribute('data-state')).toBe('closed')
+    expect(drawer.getAttribute('aria-hidden')).toBe('true')
+    expect(drawer.hasAttribute('inert')).toBe(true)
   })
 })
