@@ -492,3 +492,6 @@ This plan is complete only when:
   (3,641 tests, 10 skipped); clean installer, installed-CLI Runtime/Web handoff,
   managed remote SSH, distributed-payload equality, and Electron PTY smoke all
   passed. OrbStack was returned to its prior stopped state.
+- 2026-07-30: Published increment 3 as serial PR #857 targeting `dev`; merge
+  waits for its real Windows Git Bash PTY journey because that result completes
+  the renderer-selection evidence rather than serving as generic trailing CI.
