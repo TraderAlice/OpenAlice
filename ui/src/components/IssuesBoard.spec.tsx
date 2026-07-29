@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { IssueListItem, IssueSnapshot } from '../api/issues'
+import { i18n } from '../i18n'
 import { IssuesBoard } from './IssuesBoard'
 
 const mocks = vi.hoisted(() => ({
@@ -52,7 +53,8 @@ function snapshot(issues: IssueListItem[]): IssueSnapshot {
   }
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
   mocks.useIssues.mockReturnValue({
     data: snapshot([]),
     error: null,
@@ -146,5 +148,37 @@ describe('IssuesBoard', () => {
 
     expect(screen.getByText('Assign on first run')).toBeTruthy()
     expect(screen.queryByText('@new')).toBeNull()
+  })
+
+  it('localizes board chrome, schedule health, and accessible metadata', async () => {
+    await i18n.changeLanguage('zh')
+    mocks.useIssues.mockReturnValue({
+      data: snapshot([
+        issue({
+          id: 'weekday-scan',
+          title: '工作日扫描',
+          status: 'in_progress',
+          priority: 'high',
+          assignee: '@new',
+          agent: 'claude',
+          when: { kind: 'cron', cron: '30 8 * * 1-5' },
+          automationHealth: { state: 'running', message: 'Run is active.' },
+        }),
+      ]),
+      error: null,
+      loading: false,
+    })
+
+    render(<IssuesBoard />)
+
+    expect(screen.getByText('进行中')).toBeTruthy()
+    expect(screen.getAllByText('运行中')).toHaveLength(2)
+    expect(screen.getAllByText('每工作日 08:30')).toHaveLength(2)
+    expect(screen.getByText('首次运行时指派')).toBeTruthy()
+    expect(screen.getByText('claude 覆盖')).toBeTruthy()
+    expect(screen.getByLabelText('高优先级')).toBeTruthy()
+    expect(screen.getByLabelText('折叠“进行中”议题')).toBeTruthy()
+    expect(screen.getByTitle('打开 weekday-scan')).toBeTruthy()
+    expect(screen.getByTitle('工作区：market-desk（ws-1）')).toBeTruthy()
   })
 })

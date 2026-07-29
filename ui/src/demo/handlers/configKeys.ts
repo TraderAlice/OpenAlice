@@ -142,6 +142,12 @@ export const demoCredentialPresets = [
   },
 ]
 
+function isValidDuration(value: string): boolean {
+  const match = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(value.trim())
+  if (!match) return false
+  return Number(match[1] ?? 0) > 0 || Number(match[2] ?? 0) > 0 || Number(match[3] ?? 0) > 0
+}
+
 export const configKeysHandlers = [
   http.get('/api/config/api-keys/status', () => HttpResponse.json({})),
   http.put('/api/config/apiKeys', () => new HttpResponse(null, { status: 204 })),
@@ -149,7 +155,20 @@ export const configKeysHandlers = [
   // and useConfigPage adopts the echo, so `{}` here would wipe the page.
   http.put('/api/config/marketData', async ({ request }) => HttpResponse.json(await request.json())),
   http.put('/api/config/trading', async ({ request }) => HttpResponse.json(await request.json())),
-  http.put('/api/config/snapshot', async ({ request }) => HttpResponse.json(await request.json())),
+  http.put('/api/config/snapshot', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+    const every = typeof body.every === 'string' ? body.every.trim() : '15m'
+    if (
+      (Object.prototype.hasOwnProperty.call(body, 'enabled') && typeof body.enabled !== 'boolean')
+      || !isValidDuration(every)
+    ) {
+      return HttpResponse.json({ error: 'Validation failed' }, { status: 400 })
+    }
+    return HttpResponse.json({
+      enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
+      every,
+    })
+  }),
   http.put('/api/config/news', async ({ request }) => {
     const body = await request.json().catch(() => null)
     if (!isNewsCollectorConfig(body)) {

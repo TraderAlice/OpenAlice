@@ -309,6 +309,26 @@ describe('writeConfigSection(trading)', () => {
   })
 })
 
+describe('writeConfigSection(snapshot)', () => {
+  it('normalizes a valid snapshot interval before writing it', async () => {
+    const snapshot = await writeConfigSection('snapshot', {
+      enabled: true,
+      every: ' 2h15m ',
+    }) as { enabled: boolean; every: string }
+
+    expect(snapshot).toEqual({ enabled: true, every: '2h15m' })
+    const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string)
+    expect(written.every).toBe('2h15m')
+  })
+
+  it.each(['nonsense', '0m', ''])('rejects invalid snapshot interval %j without writing', async (every) => {
+    await expect(
+      writeConfigSection('snapshot', { enabled: true, every }),
+    ).rejects.toThrow(/positive duration/)
+    expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+})
+
 // ==================== aiProviderSchema (Zod schema validation) ====================
 
 describe('aiProviderSchema (credential vault)', () => {

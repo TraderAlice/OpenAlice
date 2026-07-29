@@ -1160,6 +1160,7 @@
 
 /* WebPi is deliberately a surface inside the existing terminal slot. */
 .webpi-shell {
+  position: relative;
   width: 100%;
   max-width: 100%;
   height: 100%;
@@ -1325,6 +1326,8 @@
 
 .webpi-error { display: grid; gap: 7px; margin: 20px 0; padding: 13px; border: 1px solid color-mix(in srgb, var(--destructive) 50%, var(--border)); border-radius: 10px; color: var(--destructive); font-size: 12px; }
 .webpi-error button { width: fit-content; color: var(--foreground); text-decoration: underline; }
+.webpi-jump-latest { position: absolute; right: max(18px, calc((100% - 760px) / 2)); bottom: 82px; z-index: 2; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border)); border-radius: 999px; color: var(--foreground); background: color-mix(in srgb, var(--secondary) 92%, transparent); box-shadow: 0 5px 18px color-mix(in srgb, var(--shadow-color) 16%, transparent); font-size: 10px; font-weight: 650; }
+.webpi-jump-latest:hover { border-color: var(--primary); color: var(--primary); }
 .webpi-compaction-status { display: flex; align-items: flex-start; gap: 9px; margin: 0 max(18px, calc((100% - 760px) / 2)) 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border)); border-radius: 10px; color: var(--primary); background: color-mix(in srgb, var(--primary) 7%, var(--secondary)); }
 .webpi-compaction-status > svg { flex: 0 0 auto; margin-top: 2px; }
 .webpi-compaction-status > div { display: grid; gap: 2px; min-width: 0; }
@@ -1354,6 +1357,7 @@
 @container webpi (max-width: 720px) {
   .webpi-messages, .webpi-composer-wrap { padding-left: 12px; padding-right: 12px; }
   .webpi-compaction-status { margin-left: 12px; margin-right: 12px; }
+  .webpi-jump-latest { right: 12px; }
   .webpi-message.is-user { margin-left: 0; }
   .webpi-tool-step > summary { grid-template-columns: 18px minmax(52px, auto) minmax(0, 1fr) 14px; }
   .webpi-step-size { display: none; }

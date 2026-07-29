@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { tradingApi, type ContractSearchHit } from '../../api/trading'
 import type { AssetClass } from '../../api/market'
@@ -22,6 +23,7 @@ interface Props {
 const COLLAPSED_LIMIT = 3
 
 export function TradeableContractsPanel({ symbol, assetClass }: Props) {
+  const { t } = useTranslation()
   const [hits, setHits] = useState<ContractSearchHit[] | null>(null)
   const [utasConfigured, setAccountsConfigured] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,30 +46,25 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
     return () => { cancelled = true }
   }, [symbol, assetClass])
 
-  const info = [
-    'Endpoint: /api/trading/contracts/search',
-    'Heuristic broker-side fuzzy match — symbol on the analysis side is just a query string here, not the canonical id.',
-    'Tradeable identity is the broker\u2019s aliceId (alias:broker:exchange-id). Use it to actually place orders.',
-  ].join('\n')
-
   return (
-    <Card title="Tradeable on configured brokers" info={info}>
-      {loading && <div className="text-[12px] text-muted-foreground">Searching brokers…</div>}
+    <Card title={t('market.tradeableTitle')} info={t('market.tradeableInfo')}>
+      {loading && <div className="text-[12px] text-muted-foreground">{t('market.tradeableSearching')}</div>}
       {error && !loading && <div className="text-[12px] text-destructive">{error}</div>}
 
       {!loading && !error && utasConfigured === 0 && (
         <div className="text-[12px] text-muted-foreground">
-          No trading accounts configured.{' '}
-          <Link to="/trading" className="text-primary hover:underline">
-            Add one in Trading
-          </Link>
-          {' '}to see matching contracts here.
+          <Trans
+            i18nKey="market.tradeableNoAccounts"
+            components={{
+              tradingLink: <Link to="/trading" className="text-primary hover:underline" />,
+            }}
+          />
         </div>
       )}
 
       {!loading && !error && utasConfigured !== 0 && hits && hits.length === 0 && (
         <div className="text-[12px] text-muted-foreground">
-          No tradeable contracts matching <span className="font-mono">{symbol}</span> on your configured brokers.
+          {t('market.tradeableNoMatches', { symbol })}
         </div>
       )}
 
@@ -88,7 +85,9 @@ export function TradeableContractsPanel({ symbol, assetClass }: Props) {
                 onClick={() => setExpanded((v) => !v)}
                 className="mt-2 text-[11px] text-muted-foreground/70 hover:text-primary transition-colors cursor-pointer"
               >
-                {expanded ? `Show fewer` : `Show ${hidden} more (${sorted.length} total)`}
+                {expanded
+                  ? t('market.tradeableShowFewer')
+                  : t('market.tradeableShowMore', { hidden, total: sorted.length })}
               </button>
             )}
           </>
@@ -125,6 +124,7 @@ function byInstrumentFamiliarity(a: ContractSearchHit, b: ContractSearchHit): nu
 }
 
 function ContractRow({ hit }: { hit: ContractSearchHit }) {
+  const { t } = useTranslation()
   const c = hit.contract
   const aliceId = c.aliceId as string | undefined
   // Bridge to the UTA detail page's order entry — clicking jumps the
@@ -159,9 +159,9 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
         <Link
           to={orderHref}
           className="text-[11px] text-primary hover:underline shrink-0"
-          title="Open order entry on the UTA"
+          title={t('market.tradeableOrderTitle')}
         >
-          Order →
+          {t('market.tradeableOrder')} →
         </Link>
       )}
     </li>
