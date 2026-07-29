@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CircleAlert,
   ExternalLink,
+  ListChecks,
   MessageSquareText,
   TerminalSquare,
   Wrench,
@@ -21,7 +22,9 @@ import type {
 import { MarkdownContent } from '../components/MarkdownContent'
 import { Skeleton } from '../components/StateViews'
 import { useWorkspaces } from '../contexts/workspaces-context'
+import { useIssues } from '../hooks/useIssues'
 import { formatRelativeTime } from '../lib/intl'
+import { useWorkspace } from '../tabs/store'
 
 const STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
   running: 'bg-info/15 text-info',
@@ -208,6 +211,81 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
   )
 }
 
+interface IssueRunIdentity {
+  title: string
+  workspaceTag: string
+}
+
+interface IssueRunSource {
+  workspaceId: string
+  issueId: string
+  label: 'Issue' | 'Reply'
+}
+
+function issueIdentityKey(workspaceId: string, issueId: string): string {
+  return `${workspaceId}\u0000${issueId}`
+}
+
+function issueRunSource(task: HeadlessTaskRecord): IssueRunSource | null {
+  if (task.trigger) {
+    return { ...task.trigger, label: 'Issue' }
+  }
+  if (task.inquiry?.subject.kind === 'issue') {
+    return {
+      workspaceId: task.inquiry.subject.workspaceId,
+      issueId: task.inquiry.subject.issueId,
+      label: 'Reply',
+    }
+  }
+  return null
+}
+
+function AutomationRunTitle({
+  task,
+  source,
+  issue,
+}: {
+  task: HeadlessTaskRecord
+  source: IssueRunSource | null
+  issue?: IssueRunIdentity
+}) {
+  if (!source) {
+    return (
+      <span className="block max-h-10 overflow-hidden text-[13px] leading-5 text-foreground">
+        {task.prompt}
+      </span>
+    )
+  }
+
+  const issueTitle = issue?.title ?? source.issueId
+  const issueWorkspace = issue?.workspaceTag ?? source.workspaceId
+  const crossWorkspace = source.workspaceId !== task.wsId
+
+  return (
+    <>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-primary">
+          {source.label}
+        </span>
+        <span
+          className={`truncate text-[13px] font-medium text-foreground${issue ? '' : ' font-mono'}`}
+          title={`Issue: ${issueTitle} · ${issueWorkspace}`}
+        >
+          {issueTitle}
+        </span>
+        {crossWorkspace && (
+          <span className="shrink-0 truncate text-[10px] text-muted-foreground" title={issueWorkspace}>
+            · {issueWorkspace}
+          </span>
+        )}
+      </span>
+      <span className="mt-0.5 block truncate text-[12px] leading-5 text-muted-foreground">
+        {task.prompt}
+      </span>
+    </>
+  )
+}
+
 /** Cross-workspace control plane for concurrent native-agent runs. */
 export function AutomationRunsSection() {
   const [snapshot, setSnapshot] = useState<HeadlessListSnapshot | null>(null)
@@ -215,6 +293,8 @@ export function AutomationRunsSection() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const { openHeadlessRun, workspaces } = useWorkspaces()
+  const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const { data: issueSnapshot } = useIssues()
   const workspaceLabels = useMemo(() => new Map(
     workspaces.map((workspace) => {
       const displayName = workspace.displayName?.trim()
@@ -227,6 +307,18 @@ export function AutomationRunsSection() {
       ] as const
     }),
   ), [workspaces])
+  const issueIdentities = useMemo(() => {
+    const identities = new Map<string, IssueRunIdentity>()
+    for (const workspace of issueSnapshot?.workspaces ?? []) {
+      for (const issue of workspace.issues) {
+        identities.set(
+          issueIdentityKey(workspace.wsId, issue.id),
+          { title: issue.title, workspaceTag: workspace.tag },
+        )
+      }
+    }
+    return identities
+  }, [issueSnapshot])
 
   const toggle = (id: string) => setExpanded((prev) => {
     const next = new Set(prev)
@@ -345,8 +437,15 @@ export function AutomationRunsSection() {
             const isExpanded = expanded.has(task.taskId)
             const openable = task.status !== 'running' && task.resumable
             const workspaceLabel = workspaceLabels.get(task.wsId)
+            const issueSource = issueRunSource(task)
+            const issueIdentity = issueSource
+              ? issueIdentities.get(issueIdentityKey(issueSource.workspaceId, issueSource.issueId))
+              : undefined
             const workspaceName = workspaceLabel?.label ?? task.wsId
-            const runLabel = `Run details, ${task.status}: ${summarizeRunPrompt(task.prompt)}. ${task.agent} in ${workspaceName}.`
+            const runSubject = issueIdentity?.title
+              ?? issueSource?.issueId
+              ?? summarizeRunPrompt(task.prompt)
+            const runLabel = `Run details, ${task.status}: ${runSubject}. ${task.agent} in ${workspaceName}.`
             const toolSummary = task.output?.toolCalls
               ? `${task.output.toolCalls} tool${task.output.toolCalls === 1 ? '' : 's'}`
               : task.output
@@ -370,9 +469,7 @@ export function AutomationRunsSection() {
                   </span>
                   <Bot size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1">
-                    <span className="block max-h-10 overflow-hidden text-[13px] leading-5 text-foreground">
-                      {task.prompt}
-                    </span>
+                    <AutomationRunTitle task={task} source={issueSource} issue={issueIdentity} />
                     <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                       <span>{task.agent}</span>
                       <span
@@ -405,20 +502,40 @@ export function AutomationRunsSection() {
                         {task.error}
                       </div>
                     )}
-                    {openable && (
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10"
-                        title="Resume this run's conversation in an interactive session"
-                        onClick={() => {
-                          void openHeadlessRun(task.wsId, task.resumeId, {
-                            title: task.prompt,
-                          }).catch((e) => setError(e instanceof Error ? e.message : String(e)))
-                        }}
-                      >
-                        <ExternalLink size={12} />
-                        Open as session
-                      </button>
+                    {(issueSource || openable) && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {issueSource && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-primary hover:bg-primary/10"
+                            onClick={() => openOrFocus({
+                              kind: 'issue-detail',
+                              params: {
+                                wsId: issueSource.workspaceId,
+                                id: issueSource.issueId,
+                              },
+                            })}
+                          >
+                            <ListChecks size={12} />
+                            Open Issue
+                          </button>
+                        )}
+                        {openable && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10"
+                            title="Resume this run's conversation in an interactive session"
+                            onClick={() => {
+                              void openHeadlessRun(task.wsId, task.resumeId, {
+                                title: task.prompt,
+                              }).catch((e) => setError(e instanceof Error ? e.message : String(e)))
+                            }}
+                          >
+                            <ExternalLink size={12} />
+                            Open as session
+                          </button>
+                        )}
+                      </div>
                     )}
                     <RunOutput task={task} />
                   </div>
