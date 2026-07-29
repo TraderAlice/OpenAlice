@@ -7,6 +7,26 @@ export type HeadlessLaunchErrorCode =
   | 'executable_not_found'
   | 'spawn_failed'
 
+export type HeadlessInquirySubject =
+  | { kind: 'inbox'; entryId: string }
+  | {
+      kind: 'issue'
+      workspaceId: string
+      issueId: string
+      relation: 'creator' | 'owner' | 'run'
+      runId?: string
+      commentId?: string
+    }
+
+export interface HeadlessTaskInquiry {
+  subject: HeadlessInquirySubject
+  question: string
+  resolution: {
+    mode: 'exact' | 'reconstructed'
+    reason?: string
+  }
+}
+
 export interface HeadlessTaskRecord {
   taskId: string
   /** Stable product conversation identity shared by every resumed turn. */
@@ -17,6 +37,8 @@ export interface HeadlessTaskRecord {
   /** Business source; independent from wsId when a cross-Workspace signed
    * Session executes an Issue owned by another Workspace. */
   trigger?: { kind: 'issue'; workspaceId: string; issueId: string }
+  /** Product object that requested a follow-up run. */
+  inquiry?: HeadlessTaskInquiry
   agent: string
   model?: string
   effort?: ModelReasoningEffort
