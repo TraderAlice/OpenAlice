@@ -144,6 +144,8 @@ browser-oriented path while the canonical Shell lifecycle is:
 openalice run [app-dir]             # foreground, no browser
 openalice up [app-dir]              # detached, wait for real readiness
 openalice status [--json]           # read-only
+openalice logs [--lines N] [--json] # bounded redacted Runtime log tail
+openalice doctor [--json]           # read-only diagnostics
 openalice open                      # verify and open the existing Web UI
 openalice down [--json]             # ask the owning Guardian to stop itself
 ```

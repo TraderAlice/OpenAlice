@@ -51,6 +51,10 @@ const GUARDIAN_STARTED_AT = currentProcessStartedAt()
 const TAKEOVER = takeoverRequested()
 const SERVER_MODE = process.env.OPENALICE_SERVER_MODE?.trim() || 'foreground'
 const GUARDIAN_INSTANCE_ID = randomUUID()
+const RUNTIME_PROVIDER = resolveRuntimeProvider()
+const RUNTIME_CONTENT_IDENTITY = normalizeContentIdentity(
+  process.env.OPENALICE_RUNTIME_CONTENT_IDENTITY,
+)
 if (!process.env.OPENALICE_HOME && process.env.OPENALICE_USER_DATA_HOME) {
   console.warn('[guardian/prod] OPENALICE_USER_DATA_HOME is deprecated — set OPENALICE_HOME instead')
 }
@@ -71,6 +75,29 @@ function truthyEnv(raw) {
   if (raw === undefined || raw === '') return false
   const normalized = String(raw).toLowerCase()
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
+function resolveRuntimeProvider() {
+  const explicit = process.env.OPENALICE_RUNTIME_PROVIDER?.trim()
+  if (['source', 'bundle', 'docker', 'remote'].includes(explicit)) return explicit
+  return LAUNCHER === 'docker' ? 'docker' : 'source'
+}
+
+function normalizeContentIdentity(value) {
+  const normalized = String(value ?? '').trim()
+  return /^[A-Za-z0-9._-]{1,128}$/.test(normalized) ? normalized : null
+}
+
+function pendingActivation() {
+  const productVersion = String(
+    process.env.OPENALICE_PENDING_ACTIVATION_VERSION ?? '',
+  ).trim()
+  if (!/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,127}$/.test(productVersion)) return null
+  return {
+    productVersion,
+    restartRequired: true,
+    reason: 'A staged OpenAlice release is waiting for this Runtime to restart',
+  }
 }
 
 function isLiteModeEnv(env) {
@@ -209,8 +236,15 @@ async function readRuntimeVersion() {
 
 function runtimeStatus() {
   const owner = guardianRuntimeLock?.owner
+  const capabilities = LAUNCHER === 'cli-server' ? ['runtime.stop'] : []
   return {
     protocol: 1,
+    control: {
+      apiVersion: 1,
+      minClientApiVersion: 1,
+      capabilities: ['runtime.status', ...capabilities],
+    },
+    productVersion: RUNTIME_VERSION,
     runtimeVersion: RUNTIME_VERSION,
     state: stopping ? 'stopping' : aliceStatus === 'ready' ? 'running' : 'starting',
     home: resolve(DATA_HOME),
@@ -225,12 +259,40 @@ function runtimeStatus() {
     endpoints: {
       web: `http://${BIND_HOST}:${WEB_PORT}`,
     },
+    provider: {
+      kind: RUNTIME_PROVIDER,
+      ...(RUNTIME_PROVIDER === 'source'
+        ? { root: resolve(process.env.OPENALICE_APP_HOME ?? process.cwd()) }
+        : {}),
+      ...(RUNTIME_CONTENT_IDENTITY
+        ? { contentIdentity: RUNTIME_CONTENT_IDENTITY }
+        : {}),
+    },
+    pendingActivation: pendingActivation(),
+    uptimeSeconds: Math.max(0, Math.floor((Date.now() - GUARDIAN_STARTED_AT) / 1_000)),
     components: {
       alice: aliceStatus,
       uta: utaStatus,
       connector: connectorStatus,
     },
-    capabilities: LAUNCHER === 'cli-server' ? ['runtime.stop'] : [],
+    componentDetail: {
+      alice: {
+        state: aliceStatus,
+        required: true,
+        ...(aliceChild?.pid ? { pid: aliceChild.pid } : {}),
+      },
+      uta: {
+        state: utaStatus,
+        required: false,
+        ...(utaChild?.pid ? { pid: utaChild.pid } : {}),
+      },
+      connector: {
+        state: connectorStatus,
+        required: false,
+        ...(connectorChild?.pid ? { pid: connectorChild.pid } : {}),
+      },
+    },
+    capabilities,
   }
 }
 

@@ -106,6 +106,9 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
   the state-preserving CLI-only removal boundary.
 - `packages/cli/src/lifecycle{,-command}.mjs` — canonical top-level Runtime
   lifecycle, structured presentation, and shell completion.
+- `packages/cli/src/{logs,doctor,observability-command}.mjs` — bounded
+  redacted log tails and read-only diagnostics shipped in the immutable CLI
+  release.
 - `packages/cli/src/server{,-control}.mjs` — detached lifecycle and the
   legacy presenter plus Guardian control client.
 - `packages/cli/src/remote.mjs` — consent-first managed SSH orchestration.
