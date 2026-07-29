@@ -4,6 +4,8 @@ Status: Active
 
 Related issue: None yet
 
+Plan PR: #852
+
 Delivery mode: Parallel / contribution. Every implementation increment targets
 `dev`, remains open for human review, and carries the required parallel labels.
 Dependent increments wait for their prerequisite PRs to merge; independent test,
@@ -329,7 +331,7 @@ intent. A dependent increment does not branch from an unmerged contribution.
   release boundaries, Herdr research, and Electron/package verification.
 - [x] Record product vocabulary, target command grammar, TUI boundary, update
   transaction, delivery increments, and acceptance matrix.
-- [ ] Publish this plan PR to `dev` with `workflow:parallel`,
+- [x] Publish this plan PR to `dev` with `workflow:parallel`,
   `theme:reliability`, `area:app-shell`, and `review:deep`.
 
 ### 1. Presentation-neutral lifecycle core
@@ -627,4 +629,5 @@ This plan is complete only when:
   protocol, source-backed Runtime boundary, installer smoke, Herdr reference,
   and cross-surface verification requirements. Established the Supervisor TUI
   boundary, target command grammar, headless bundle direction, update
-  transaction, ten implementation increments, and acceptance matrix.
+  transaction, ten implementation increments, and acceptance matrix. Published
+  draft PR #852 for human review under the parallel contribution policy.
