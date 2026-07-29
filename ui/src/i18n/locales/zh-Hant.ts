@@ -1229,6 +1229,8 @@ export const zhHant: Resources = {
     cannotReplyWorkspaceGone: '工作區已不存在——無處回覆。',
     deleteEntryTitle: '刪除此則（Delete / Backspace）',
     deleteEntryAriaLabel: '刪除此收件匣項目',
+    deleteConfirmTitle: '刪除這則收件匣訊息？',
+    deleteConfirmMessage: '這會從收件匣中永久刪除此更新，但不會刪除 {{workspace}} 中連結的檔案。',
   },
   templates: {
     catalogTitle: '工作區模板',
