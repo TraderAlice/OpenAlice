@@ -103,4 +103,19 @@ describe('MarketSidebar search keyboard controls', () => {
     expect((search as HTMLInputElement).value).toBe('')
     expect(screen.queryByRole('heading', { name: /Search Results/ })).toBeNull()
   })
+
+  it('keeps the watchlist remove action visible and separate from row navigation', () => {
+    useWatchlist.setState({
+      entries: [{ assetClass: 'equity', symbol: 'AAPL', addedAt: 1 }],
+    })
+    render(<MarketSidebar />)
+
+    const remove = screen.getByRole('button', { name: 'Remove AAPL' })
+    expect(remove.className).not.toContain('opacity-0')
+
+    fireEvent.click(remove)
+
+    expect(useWatchlist.getState().entries).toEqual([])
+    expect(getFocusedTab(useWorkspace.getState())).toBeNull()
+  })
 })
