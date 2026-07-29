@@ -243,7 +243,7 @@ and verification before the next dependent branch starts from updated `dev`.
   registry.
 - [x] Extend the distributed installer payload and clean-install assertions.
 - [x] Add the durable Shell CLI Supervisor owner guide and index routes.
-- [ ] Complete real Guardian/browser, installer, repository, and Electron
+- [x] Complete real Guardian/browser, installer, repository, and Electron
   verification.
 - [ ] Deliver through the first serial PR to `dev`.
 
@@ -459,3 +459,8 @@ This plan is complete only when:
   from current `dev`: added a presentation-neutral lifecycle core, canonical
   top-level commands, versioned JSON, shell completion, compatibility presenter,
   distributed payload coverage, and the Shell CLI Supervisor owner guide.
+- 2026-07-30: Increment 1 verification passed: CLI unit tests (114), root
+  TypeScript and Vitest (3,617 passed, 9 skipped), Guardian runtime and recovery
+  smoke, real isolated background `up/status/down`, foreground PTY Ctrl+C,
+  clean installer upgrade/uninstall Docker smoke, managed remote SSH smoke, UI
+  typecheck, server build, and Electron PTY smoke.
