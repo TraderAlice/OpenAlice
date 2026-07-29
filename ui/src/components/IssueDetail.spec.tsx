@@ -171,7 +171,7 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
   })
 
-  it('places mobile work-item controls before long-form Issue content', () => {
+  it('places mobile work-item controls before long-form Issue content', async () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
     const workItem = screen.getByRole('heading', { level: 3, name: 'Work item' })
@@ -184,8 +184,11 @@ describe('IssueDetail property controls', () => {
     expect(sectionNavigation.className).toContain('sticky')
     expect(sectionNavigation.className).toContain('overflow-x-auto')
     expect(sectionNavigation.className).toContain('flex-nowrap')
-    expect(sectionNavigation.querySelector('a[href="#issue-work-item"]')).toBeTruthy()
-    expect(sectionNavigation.querySelector('a[href="#issue-work-item"]')?.className).toContain('min-h-10')
+    const workItemLink = sectionNavigation.querySelector('a[href="#issue-work-item"]')
+    expect(workItemLink).toBeTruthy()
+    expect(workItemLink?.className).toContain('min-h-10')
+    expect(workItemLink?.getAttribute('aria-current')).toBe('location')
+    expect(workItemLink?.className).toContain('bg-primary-muted')
     expect(sectionNavigation.querySelector('a[href="#issue-what"]')).toBeTruthy()
     expect(sectionNavigation.querySelector('a[href="#issue-activity"]')).toBeTruthy()
     expect(sectionNavigation.querySelector('a[href="#issue-reply"]')?.textContent).toBe('Reply')
@@ -193,6 +196,53 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('button', { name: 'Comment & ask' }).className).toContain('min-h-10')
     expect(sectionNavigation.querySelector('a[href="#issue-runs"]')).toBeNull()
     expect(sectionNavigation.querySelector('a[href="#issue-inbox-reports"]')).toBeNull()
+
+    const rect = (top: number, height = 100): DOMRect => ({
+      x: 0,
+      y: top,
+      top,
+      right: 320,
+      bottom: top + height,
+      left: 0,
+      width: 320,
+      height,
+      toJSON: () => ({}),
+    })
+    Object.defineProperty(sectionNavigation, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(53, 54),
+    })
+    Object.defineProperty(document.getElementById('issue-work-item')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(-900),
+    })
+    Object.defineProperty(document.getElementById('issue-what')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(-300),
+    })
+    Object.defineProperty(document.getElementById('issue-activity')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(100),
+    })
+    Object.defineProperty(document.getElementById('issue-reply')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(600),
+    })
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(sectionNavigation.querySelector('a[href="#issue-activity"]')?.getAttribute('aria-current')).toBe('location')
+      expect(workItemLink?.getAttribute('aria-current')).toBeNull()
+    })
+
+    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(1_000)
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(700)
+    vi.spyOn(window, 'scrollY', 'get').mockReturnValue(300)
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(sectionNavigation.querySelector('a[href="#issue-reply"]')?.getAttribute('aria-current')).toBe('location')
+    })
   })
 
   it.each([

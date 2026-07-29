@@ -42,6 +42,7 @@ import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
 import { AutomationHealthPill, CadencePill, PriorityIndicator } from './IssuesBoard'
+import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
@@ -65,9 +66,6 @@ const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'n
 // settings `inputClass`, trimmed for the narrow rail.
 const railControl =
   'min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0'
-
-const mobileSectionLink =
-  'oa-pressable inline-flex min-h-10 shrink-0 items-center rounded-md px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
 const ALL_RUN_EFFORTS: readonly ModelReasoningEffort[] = [
@@ -1553,33 +1551,10 @@ export function IssueDetail({
           </div>
           <h1 className="text-xl font-semibold text-foreground">{issue.title}</h1>
         </header>
-        <nav
-          aria-label={t('issues.detail.sectionNavigation')}
-          className="scrollbar-hide sticky top-0 z-20 -mx-4 mt-3 flex flex-nowrap gap-1 overflow-x-auto overscroll-x-contain border-y border-border/60 bg-background/95 px-4 py-1.5 shadow-sm backdrop-blur md:-mx-6 md:px-6 lg:hidden"
-        >
-          <a href="#issue-work-item" className={mobileSectionLink}>
-            {t('issues.detail.workItem')}
-          </a>
-          <a href="#issue-what" className={mobileSectionLink}>
-            {t('issues.detail.what')}
-          </a>
-          <a href="#issue-activity" className={mobileSectionLink}>
-            {t('issues.detail.activity')}
-          </a>
-          <a href="#issue-reply" className={mobileSectionLink}>
-            {t('issues.detail.replyNavigation')}
-          </a>
-          {runs.length > 0 && (
-            <a href="#issue-runs" className={mobileSectionLink}>
-              {t('issues.detail.runs')}
-            </a>
-          )}
-          {inboxReports.length > 0 && (
-            <a href="#issue-inbox-reports" className={mobileSectionLink}>
-              {t('issues.detail.inboxReports')}
-            </a>
-          )}
-        </nav>
+        <IssueSectionNavigation
+          hasRuns={runs.length > 0}
+          hasInboxReports={inboxReports.length > 0}
+        />
         <PropertiesRail
           wsId={wsId}
           issue={issue}
