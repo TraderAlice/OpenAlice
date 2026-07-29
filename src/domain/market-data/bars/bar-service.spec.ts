@@ -3,7 +3,7 @@
  * Real-provider accuracy is covered by bars.bbProvider.spec.ts (gated).
  */
 import { describe, it, expect, vi } from 'vitest'
-import { createBarService, parseBarId, formatBarId } from './index.js'
+import { createBarService, parseBarId, formatBarId, isDerivativeBarId } from './index.js'
 import type { BarServiceDeps, UtaBarGateway } from './types.js'
 import type {
   EquityClientLike, CryptoClientLike, CurrencyClientLike, CommodityClientLike,
@@ -55,6 +55,12 @@ describe('barId helpers', () => {
     expect(parseBarId('AAPL')).toBeNull()
     expect(parseBarId('|AAPL')).toBeNull()
     expect(parseBarId('yfinance|')).toBeNull()
+  })
+  it('distinguishes spot/native assets from perpetual and dated derivatives', () => {
+    expect(isDerivativeBarId('alpaca|AAPL')).toBe(false)
+    expect(isDerivativeBarId('binance|BTC/USDT')).toBe(false)
+    expect(isDerivativeBarId('binance|AAPL/USDT:USDT')).toBe(true)
+    expect(isDerivativeBarId('okx|BTC/USD:USD-310613')).toBe(true)
   })
 })
 
@@ -324,6 +330,45 @@ describe('searchBarSources — federated candidates', () => {
     expect(out).toHaveLength(1)
     expect(out[0].symbol).toBe('AAPL')
     expect(out[0].barCapability).toBe('iex')
+  })
+
+  it('ranks the real asset ahead of a fresher same-ticker synthetic derivative', async () => {
+    const utaManager = {
+      has: async () => true,
+      get: async () => undefined,
+      searchContracts: async () => [
+        {
+          source: 'binance-readonly',
+          contract: {
+            aliceId: 'binance-readonly|AAPL/USDT:USDT',
+            symbol: 'AAPL',
+            secType: 'CRYPTO_PERP',
+          },
+          derivativeSecTypes: ['CRYPTO_PERP'],
+          assetClass: 'crypto',
+        },
+        {
+          source: 'alpaca-paper',
+          contract: { aliceId: 'alpaca-paper|AAPL', symbol: 'AAPL', secType: 'STK' },
+          derivativeSecTypes: [],
+          assetClass: 'equity',
+        },
+      ],
+      getBarCapabilities: async () => ({
+        'binance-readonly': 'realtime',
+        'alpaca-paper': 'iex',
+      }),
+    } as never
+
+    const out = await createBarService(makeDeps({ utaManager })).searchBarSources('AAPL')
+
+    expect(out[0]).toMatchObject({
+      barId: 'alpaca-paper|AAPL',
+      assetClass: 'equity',
+      barCapability: 'iex',
+    })
+    expect(out.findIndex((candidate) => candidate.barId === 'binance-readonly|AAPL/USDT:USDT'))
+      .toBeGreaterThan(out.findIndex((candidate) => candidate.barId === 'yfinance|AAPL'))
   })
 
   it('survives one side failing (vendor still returns if UTA throws)', async () => {

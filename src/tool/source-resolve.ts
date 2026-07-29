@@ -12,7 +12,7 @@
  */
 
 import type { BarService, BarCapability } from '@/domain/market-data/bars/index'
-import { parseBarId } from '@/domain/market-data/bars/index'
+import { isDerivativeBarId } from '@/domain/market-data/bars/index'
 import type { AssetClass } from '@/domain/market-data/aggregate-search'
 
 const FRESHNESS_RANK: Record<BarCapability, number> = {
@@ -30,13 +30,6 @@ export interface ResolveResult {
   pickedFrom?: string
 }
 
-/** A perp/swap/dated derivative carries a quote-currency or expiry segment in
- *  its native symbol (`XLE/USDT:USDT`, `BTC/USD:USD-310613`). A plain ticker
- *  ("XLE") or spot pair without the `:` does not. */
-function isDerivative(barId: string): boolean {
-  return (parseBarId(barId)?.nativeSymbol ?? '').includes(':')
-}
-
 export async function resolveBarSource(
   barService: BarService,
   input: { query?: string; barId?: string; asset?: AssetArg },
@@ -51,8 +44,8 @@ export async function resolveBarSource(
     return { error: `No bar source found for "${input.query}". Try searchBars to see candidates, or pass a barId.` }
   }
   const best = [...candidates].sort((a, b) => {
-    const da = Number(isDerivative(a.barId))
-    const db = Number(isDerivative(b.barId))
+    const da = Number(isDerivativeBarId(a.barId))
+    const db = Number(isDerivativeBarId(b.barId))
     if (da !== db) return da - db // non-derivative (the real contract) first
     const fa = a.barCapability ? FRESHNESS_RANK[a.barCapability] : 5
     const fb = b.barCapability ? FRESHNESS_RANK[b.barCapability] : 5

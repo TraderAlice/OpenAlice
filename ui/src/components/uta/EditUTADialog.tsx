@@ -75,7 +75,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
   const displayName = displayNameForUTA(uta, preset)
 
   return (
-    <Dialog onClose={onClose} width="w-[560px]">
+    <Dialog ariaLabel={`Edit ${displayName}`} onClose={onClose} width="w-[560px]">
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3 min-w-0">
@@ -100,7 +100,12 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
               </svg>
             </button>
           )}
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 transition-colors">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={`Close ${displayName} editor`}
+            className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>

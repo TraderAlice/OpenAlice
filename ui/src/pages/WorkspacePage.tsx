@@ -23,6 +23,7 @@ import '@xterm/xterm/css/xterm.css'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
+import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
 import type { ViewSpec } from '../tabs/types'
@@ -88,6 +89,10 @@ export function WorkspacePage({ spec, visible }: Props) {
     )
   }
 
+  const workspaceName = workspaceDisplayName(workspace)
+  const workspaceTitle = workspaceDisplayTitle(workspace)
+  const hasCustomName = workspaceName !== workspace.tag
+
   // Sessions list: pass the full workspace.sessions. WorkspaceView's
   // `runningSlots` is gated on sessionId so the multi-terminal mount
   // only happens when a session is pinned (one session per tab still
@@ -99,8 +104,20 @@ export function WorkspacePage({ spec, visible }: Props) {
        *  launcher component itself is byte-faithful; we add the AI-provider
        *  affordance here. */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-secondary/30 shrink-0">
-        <span className="text-[12px] text-muted-foreground font-medium">{workspace.tag}</span>
-        <div className="flex items-center gap-1">
+        <div
+          className="flex min-w-0 items-baseline gap-2 pr-2"
+          title={workspaceTitle}
+        >
+          <span className="truncate text-[12px] font-medium text-foreground">
+            {workspaceName}
+          </span>
+          {hasCustomName && (
+            <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/70 sm:inline">
+              {workspace.tag}
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           {activeRecord?.agent === 'pi' && activeRecord.state === 'running' && (
             <button
               type="button"
@@ -143,7 +160,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           {...(source ? { source } : {})}
           activeRecord={activeRecord}
           sessions={workspace.sessions}
-          label={workspace.tag}
+          label={workspaceName}
           onSpawnFresh={spawnDefault}
           onResume={(id) => void ctx.resumeSession(wsId, id, source)}
           onOpenWebPi={(id) => void ctx.openWebPiSession(wsId, id, source)}

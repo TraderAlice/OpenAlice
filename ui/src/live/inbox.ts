@@ -13,10 +13,10 @@ reloadOnHotUpdate('live/inbox')
  * Single shared connection via LiveStore refcount; multiple subscribers
  * (sidebar list, detail page, Activity bar unread badge) share one timer.
  *
- * Two side-channel helpers (`refreshInbox` / `removeInboxOptimistically`)
- * are exported alongside for the delete flow: optimistic removal flips
- * the entry out of state immediately so the UI doesn't lag the
- * DELETE round-trip, then a refresh confirms truth from the server.
+ * Two side-channel helpers (`refreshInbox` / `removeInboxAfterDelete`)
+ * are exported alongside for the delete flow: once the server acknowledges
+ * the DELETE, the local removal updates every Inbox surface immediately,
+ * then a refresh reconciles with authoritative server state.
  */
 
 export interface InboxState {
@@ -73,10 +73,9 @@ export function refreshInbox(): void {
   triggerRefresh?.()
 }
 
-/** Optimistically remove an entry from the in-memory list before the
- *  DELETE round-trip completes. Pairs with `refreshInbox()` after the
- *  request lands so server state is the source of truth either way. */
-export function removeInboxOptimistically(id: string): void {
+/** Remove a server-confirmed deletion from the in-memory list immediately.
+ *  Pairs with `refreshInbox()` so server state remains authoritative. */
+export function removeInboxAfterDelete(id: string): void {
   applyState?.((prev) => ({
     ...prev,
     entries: prev.entries.filter((e) => e.id !== id),

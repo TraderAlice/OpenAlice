@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   openAgentConfig: vi.fn(),
   openHeadlessRun: vi.fn(),
+  getWorkspaceSessionDirectory: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -72,7 +73,7 @@ vi.mock('../contexts/workspaces-context', () => ({
 vi.mock('./workspace/api', () => ({
   detectWorkspaceCredential: mocks.detectWorkspaceCredential,
   getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
-  getWorkspaceSessionDirectory: vi.fn().mockResolvedValue({ sessions: [] }),
+  getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
 }))
 
 vi.mock('./MarkdownWhatEditor', () => ({
@@ -82,6 +83,7 @@ vi.mock('./MarkdownWhatEditor', () => ({
 beforeEach(async () => {
   await i18n.changeLanguage('en')
   delete scheduledIssue.issue.automationHealth
+  mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
 })
 
 afterEach(() => {
@@ -195,5 +197,50 @@ describe('IssueDetail property controls', () => {
 
     expect(screen.getByText('运行状态')).toBeTruthy()
     expect(screen.getByText('Provider rejected model MODEL_NOT_FOUND.')).toBeTruthy()
+  })
+
+  it('keeps stable Session identities first in a large assignee picker', async () => {
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [
+        {
+          resumeId: 'resume-recent-worker',
+          agent: 'codex',
+          createdAt: Date.now() - 120_000,
+          updatedAt: Date.now() - 60_000,
+          resumable: true,
+          active: false,
+          latestExecution: {
+            taskId: 'task-1',
+            status: 'done',
+            startedAt: Date.now() - 90_000,
+            assistantPreview: 'Updated a very long financial and industrial rotation report.',
+          },
+        },
+        {
+          resumeId: 'resume-active-owner',
+          agent: 'pi',
+          createdAt: Date.now() - 86_400_000,
+          updatedAt: Date.now() - 3_600_000,
+          resumable: true,
+          active: true,
+          interactive: {
+            name: 'p1',
+            title: 'Current thesis room',
+            state: 'running',
+            lastActiveAt: new Date().toISOString(),
+          },
+        },
+      ],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const assignee = screen.getByRole('combobox', { name: 'Assignee' }) as HTMLSelectElement
+    await waitFor(() => expect(assignee.options).toHaveLength(4))
+    const labels = Array.from(assignee.options, (option) => option.textContent ?? '')
+
+    expect(labels[2]).toBe('@resume-active-owner · pi · active — Current thesis room')
+    expect(labels[3]).toMatch(/^@resume-recent-worker · codex · .+ — Updated a very long financi…$/)
+    expect(labels.some((label) => label.startsWith('Updated a very long'))).toBe(false)
   })
 })
