@@ -1345,6 +1345,8 @@ export const zh: Resources = {
     deleteEntryAriaLabel: '删除此收件箱条目',
     deleteConfirmTitle: '删除这条收件箱消息？',
     deleteConfirmMessage: '这会从收件箱中永久删除此更新，但不会删除 {{workspace}} 中链接的文件。',
+    deleting: '正在删除…',
+    deleteFailed: '无法删除这条收件箱消息。消息仍然保留，请重试。',
   },
   templates: {
     catalogTitle: '工作区模板',

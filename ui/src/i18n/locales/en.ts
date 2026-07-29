@@ -1357,6 +1357,8 @@ export const en = {
     deleteEntryAriaLabel: 'Delete this inbox entry',
     deleteConfirmTitle: 'Delete Inbox entry?',
     deleteConfirmMessage: 'This permanently removes this update from Inbox. Files linked from {{workspace}} are not deleted.',
+    deleting: 'Deleting…',
+    deleteFailed: 'Couldn’t delete this Inbox entry. It is still available. Try again.',
   },
   templates: {
     catalogTitle: 'Workspace templates',

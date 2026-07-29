@@ -1346,6 +1346,8 @@ export const ja: Resources = {
     deleteEntryAriaLabel: 'この受信トレイの項目を削除',
     deleteConfirmTitle: '受信トレイの項目を削除しますか？',
     deleteConfirmMessage: 'この更新を受信トレイから完全に削除します。{{workspace}} でリンクされているファイルは削除されません。',
+    deleting: '削除中…',
+    deleteFailed: '受信トレイの項目を削除できませんでした。項目はそのまま残っています。もう一度お試しください。',
   },
   templates: {
     catalogTitle: 'ワークスペーステンプレート',
