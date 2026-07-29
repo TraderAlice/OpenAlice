@@ -56,6 +56,11 @@ The filename stem is the stable issue id. Frontmatter:
     every scheduled fire;
   - an exact `@resumeId` continues one accountable product Session;
   - `@human` or `@unassigned` is valid only for unscheduled work.
+  When omitted, a scheduled Issue defaults to `@new` so its first run establishes
+  one durable owner; an unscheduled board item defaults to `@workspace`.
+  Structured creation by an attributable resumable Session still assigns that
+  creating Session. Use `@workspace` explicitly only when every fire should
+  recruit a newcomer.
 - `when` — optional schedule:
   - `{ kind: at, at: <ISO timestamp> }`
   - `{ kind: every, every: <duration> }`
@@ -78,7 +83,8 @@ exact Session owner, the claim rewrite removes the tuple.
 
 Migration `0018_issue_assignee_ownership` removes the retired parallel
 `execution` field. It maps `resume` to the former `session:<resumeId>` shape and
-fresh/omitted scheduled ownership to the former `workspace` shape.
+fresh/omitted scheduled ownership to the former `workspace` shape. That history
+is preserved as explicit `@workspace`; the new omission default is `@new`.
 Migration `0019_issue_session_signatures` then writes those owners as
 `@resumeId` / `@workspace`, the same visible signature language used in reports.
 

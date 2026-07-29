@@ -84,7 +84,11 @@ function issueMd(spec: IssueSpec): string {
   if (spec.agent) lines.push(`agent: ${spec.agent}`)
   if (spec.model) lines.push(`model: ${spec.model}`)
   if (spec.effort) lines.push(`effort: ${spec.effort}`)
-  if (spec.assignee) lines.push(`assignee: ${JSON.stringify(spec.assignee)}`)
+  // Scanner tests exercise dispatch policy, not declaration defaults. Keep the
+  // historical fresh-every-fire fixture explicit now that omitted scheduled
+  // ownership means recruit once (`@new`).
+  const assignee = spec.assignee ?? (spec.when ? '@workspace' : undefined)
+  if (assignee) lines.push(`assignee: ${JSON.stringify(assignee)}`)
   if (spec.when) {
     const w = spec.when
     const inner =

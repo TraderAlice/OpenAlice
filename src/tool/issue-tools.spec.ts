@@ -114,14 +114,14 @@ describe('issue_create', () => {
     expect(res.error).toMatch(/already exists/)
   })
 
-  it('defaults scheduled work to Workspace ownership', async () => {
+  it('defaults scheduled work to one durable new owner', async () => {
     const created = await run(issueCreateFactory.build(ctx()), {
       id: 'fresh-owner',
       title: 'Fresh owner',
       when: { kind: 'every', every: '30m' },
     })
     expect(created.ok).toBe(true)
-    expect((await readBack('fresh-owner'))?.assignee).toBe('@workspace')
+    expect((await readBack('fresh-owner'))?.assignee).toBe('@new')
   })
 
   it('accepts @new as an explicit recruit-once ownership policy', async () => {
@@ -178,6 +178,14 @@ describe('issue_create', () => {
     })
     expect(implicit.ok).toBe(true)
     expect((await readBack('shell-created'))?.assignee).toBe('@workspace')
+
+    const scheduled = await run(issueCreateFactory.build(context), {
+      id: 'shell-scheduled',
+      title: 'Shell-created schedule',
+      when: { kind: 'every', every: '30m' },
+    })
+    expect(scheduled.ok).toBe(true)
+    expect((await readBack('shell-scheduled'))?.assignee).toBe('@new')
 
     const explicit = await run(issueCreateFactory.build(context), {
       id: 'shell-owned', title: 'Invalid shell owner', assignee: '@me',

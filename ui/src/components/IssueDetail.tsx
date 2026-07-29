@@ -507,7 +507,7 @@ function CommentComposer({
         rows={3}
         value={text}
         disabled={sending}
-        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Leave a comment…'}
+        placeholder={ownerResumeId ? `Comment to @${ownerResumeId}…` : 'Add a timeline note…'}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -532,7 +532,7 @@ function CommentComposer({
           disabled={sending || text.trim().length === 0}
           className="oa-pressable rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Comment'}
+          {sending ? 'Sending…' : ownerResumeId ? 'Comment & notify' : 'Add note'}
         </button>
       </div>
     </div>

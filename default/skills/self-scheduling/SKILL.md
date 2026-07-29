@@ -161,8 +161,9 @@ plain tracked item; add a `when` and it starts firing.
   - `@human` and `@unassigned` are valid only for unscheduled work.
   CLI `issue create` defaults to `@me` when called by an attributable Session
   (who creates it owns it); `@me` is resolved to a concrete `@resumeId` before
-  writing. Use `@new` when the job needs a new long-lived owner, and
-  `@workspace` explicitly only when every fire should recruit a newcomer.
+  writing. Otherwise omitted scheduled ownership defaults to `@new`, while an
+  unscheduled board item defaults to `@workspace`. Use `@workspace` explicitly
+  only when every fire should recruit a newcomer.
 - **`when`** *(OPTIONAL — present iff the issue self-schedules)* — one of:
   - `{ kind: every, every: "30m" }` — repeat on an interval (`30m`, `2h`,
     `1h30m`). Runs on the next scan, then on the interval.
