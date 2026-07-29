@@ -18,13 +18,19 @@ import type {
 } from '../api/issues'
 import type { ModelReasoningEffort } from '../api/types'
 import {
+  detectWorkspaceCredential,
   getAgentReadiness,
   getWorkspaceSessionDirectory,
   type AgentCredentialReadiness,
   type AgentId,
+  type WorkspaceCredentialDetection,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
 import { issuesApi } from '../api/issues'
+import {
+  WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
+  type WorkspaceAgentConfigChangedDetail,
+} from '../lib/workspaceAiEvents'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
@@ -231,36 +237,92 @@ function AgentEditor({
 
 function ModelEditor({
   value,
+  workspaceModel,
+  loadingWorkspaceDefault,
   disabled,
   onChange,
 }: {
   value?: string
+  workspaceModel: string | null
+  loadingWorkspaceDefault: boolean
   disabled?: boolean
   onChange: (next: string | null) => void
 }) {
+  const [customMode, setCustomMode] = useState(Boolean(value))
   const [draft, setDraft] = useState(value ?? '')
-  useEffect(() => setDraft(value ?? ''), [value])
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    setCustomMode(Boolean(value))
+    setDraft(value ?? '')
+  }, [value])
   const commit = () => {
     const next = draft.trim()
     if (next !== (value ?? '')) onChange(next || null)
+    if (!next) setCustomMode(false)
   }
+  const workspaceLabel = loadingWorkspaceDefault
+    ? 'Default · loading…'
+    : workspaceModel
+      ? `Default · ${workspaceModel}`
+      : 'Default · runtime decides'
+
   return (
-    <input
-      className={railControl}
-      value={draft}
-      disabled={disabled}
-      placeholder="Inherit Workspace"
-      aria-label="Run model"
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          commit()
-          event.currentTarget.blur()
-        }
-      }}
-    />
+    <div className="min-w-0 flex-1">
+      <select
+        className={`${railControl} w-full`}
+        value={customMode ? 'custom' : 'workspace'}
+        disabled={disabled}
+        aria-label="Run model"
+        onChange={(event) => {
+          if (event.target.value === 'workspace') {
+            setCustomMode(false)
+            setDraft('')
+            if (value) onChange(null)
+            return
+          }
+          setCustomMode(true)
+          queueMicrotask(() => inputRef.current?.focus())
+        }}
+      >
+        <option value="workspace">{workspaceLabel}</option>
+        <option value="custom">{value ? `Override · ${value}` : 'Custom model…'}</option>
+      </select>
+      {customMode && (
+        <input
+          ref={inputRef}
+          className={`${railControl} mt-1 w-full`}
+          value={draft}
+          disabled={disabled}
+          placeholder="Exact native model ID"
+          aria-label="Custom run model"
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              commit()
+              event.currentTarget.blur()
+            } else if (event.key === 'Escape' && !value) {
+              setDraft('')
+              setCustomMode(false)
+            }
+          }}
+        />
+      )}
+    </div>
   )
+}
+
+function workspaceEffortLabel(
+  detected: WorkspaceCredentialDetection | null,
+  loading: boolean,
+): string {
+  if (loading) return 'Default · loading…'
+  if (detected?.reasoningEffort) return `Default · ${detected.reasoningEffort}`
+  if (detected?.reasoningMode === 'none') return 'Default · none'
+  if (detected?.reasoningMode === 'required') return 'Default · required'
+  if (detected?.reasoningDefaultEnabled === true) return 'Default · thinking on'
+  if (detected?.reasoningDefaultEnabled === false) return 'Default · thinking off'
+  return 'Default · runtime decides'
 }
 
 function PropertySection({
@@ -282,6 +344,7 @@ function PropertySection({
 }
 
 function PropertiesRail({
+  wsId,
   issue,
   agentOptions,
   issueDefaultAgent,
@@ -296,6 +359,7 @@ function PropertiesRail({
   onRetry,
   onConfigureAgent,
 }: {
+  wsId: string
   issue: IssueDetailIssue
   agentOptions: readonly { id: string; displayName: string; installed?: boolean }[]
   issueDefaultAgent: string | null
@@ -323,6 +387,53 @@ function PropertiesRail({
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
   const effortOptions = runEffortsForAgent(effectiveAgent)
+  const [workspaceDefaults, setWorkspaceDefaults] = useState<{
+    agent: string
+    loading: boolean
+    detected: WorkspaceCredentialDetection | null
+  } | null>(null)
+  const [workspaceDefaultsRevision, setWorkspaceDefaultsRevision] = useState(0)
+
+  useEffect(() => {
+    const handleWorkspaceAgentConfigChanged = (event: Event) => {
+      const detail = (event as CustomEvent<WorkspaceAgentConfigChangedDetail>).detail
+      if (detail?.wsId === wsId && detail.agent === effectiveAgent) {
+        setWorkspaceDefaultsRevision((revision) => revision + 1)
+      }
+    }
+    window.addEventListener(
+      WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
+      handleWorkspaceAgentConfigChanged,
+    )
+    return () => {
+      window.removeEventListener(
+        WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
+        handleWorkspaceAgentConfigChanged,
+      )
+    }
+  }, [effectiveAgent, wsId])
+
+  useEffect(() => {
+    if (!isConfigurableAgent(effectiveAgent)) {
+      setWorkspaceDefaults(null)
+      return
+    }
+    let live = true
+    setWorkspaceDefaults({ agent: effectiveAgent, loading: true, detected: null })
+    void detectWorkspaceCredential(wsId, effectiveAgent)
+      .then((detected) => {
+        if (live) setWorkspaceDefaults({ agent: effectiveAgent, loading: false, detected })
+      })
+      .catch(() => {
+        if (live) setWorkspaceDefaults({ agent: effectiveAgent, loading: false, detected: null })
+      })
+    return () => { live = false }
+  }, [effectiveAgent, workspaceDefaultsRevision, wsId])
+
+  const selectedWorkspaceDefaults = workspaceDefaults?.agent === effectiveAgent
+    ? workspaceDefaults
+    : null
+
   return (
     <aside className="min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
       <PropertySection title="Work item" description="Ownership and schedule are part of this Issue.">
@@ -403,6 +514,8 @@ function PropertiesRail({
               <EditRow label="Model">
                 <ModelEditor
                   value={issue.model}
+                  workspaceModel={selectedWorkspaceDefaults?.detected?.model ?? null}
+                  loadingWorkspaceDefault={selectedWorkspaceDefaults?.loading ?? false}
                   disabled={saving}
                   onChange={(model) => onPatch({ model })}
                 />
@@ -419,7 +532,12 @@ function PropertiesRail({
                       : null,
                   })}
                 >
-                  <option value="">Inherit Workspace</option>
+                  <option value="">
+                    {workspaceEffortLabel(
+                      selectedWorkspaceDefaults?.detected ?? null,
+                      selectedWorkspaceDefaults?.loading ?? false,
+                    )}
+                  </option>
                   {effortOptions.map((effort) => (
                     <option key={effort} value={effort}>{effort}</option>
                   ))}
@@ -1312,6 +1430,7 @@ export function IssueDetail({
           />
         </main>
         <PropertiesRail
+          wsId={wsId}
           issue={issue}
           agentOptions={agentOptions}
           issueDefaultAgent={issueDefaultAgent}

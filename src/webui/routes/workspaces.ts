@@ -622,6 +622,7 @@ export function createWorkspaceRoutes(
     reasoning: boolean | null;
     reasoningEffort: WorkspaceAiCred['reasoningEffort'];
     reasoningMode: ModelReasoningMode | null;
+    reasoningDefaultEnabled: boolean | null;
   } | null> => {
     const adapter = svc.adapters.get(agentId);
     if (!adapter?.readAiConfig) return null;
@@ -635,6 +636,7 @@ export function createWorkspaceRoutes(
           baseUrl: cfg.baseUrl ?? undefined,
           wireShape: cfg.wireShape ?? undefined,
         });
+    const reasoningSemantics = resolveModelSemantics(vendor, cfg.model)?.reasoning;
     return {
       slug,
       model: cfg.model ?? null,
@@ -642,7 +644,8 @@ export function createWorkspaceRoutes(
       wireShape: cfg.wireShape ?? null,
       reasoning: cfg.reasoning ?? null,
       reasoningEffort: cfg.reasoningEffort ?? null,
-      reasoningMode: resolveModelSemantics(vendor, cfg.model)?.reasoning?.mode ?? null,
+      reasoningMode: reasoningSemantics?.mode ?? null,
+      reasoningDefaultEnabled: reasoningSemantics?.defaultEnabled ?? null,
     };
   };
 
@@ -2126,6 +2129,9 @@ export function createWorkspaceRoutes(
         ...(typeof detected?.reasoning === 'boolean' ? { reasoning: detected.reasoning } : {}),
         ...(detected?.reasoningEffort ? { reasoningEffort: detected.reasoningEffort } : {}),
         ...(detected?.reasoningMode ? { reasoningMode: detected.reasoningMode } : {}),
+        ...(typeof detected?.reasoningDefaultEnabled === 'boolean'
+          ? { reasoningDefaultEnabled: detected.reasoningDefaultEnabled }
+          : {}),
         ...(interactiveSetupStatus !== null ? { interactiveSetupStatus } : {}),
       });
     } catch (err) {

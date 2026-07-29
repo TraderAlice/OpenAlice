@@ -1081,6 +1081,8 @@ export const workspacesHandlers = [
       wireShape: configured ? config?.wireShape ?? null : null,
       reasoning: configured ? config?.reasoning ?? null : null,
       reasoningEffort: configured ? config?.reasoningEffort ?? null : null,
+      reasoningMode: null,
+      reasoningDefaultEnabled: null,
     })
   }),
   http.put('/api/workspaces/:id/agent-config/:agent', async ({ params, request }) => {

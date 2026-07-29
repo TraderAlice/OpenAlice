@@ -10,6 +10,15 @@ import type {
 import { IssueActivity, IssueDetail } from './IssueDetail'
 
 const mocks = vi.hoisted(() => ({
+  detectWorkspaceCredential: vi.fn().mockResolvedValue({
+    configured: true,
+    slug: 'longcat-1',
+    model: 'LongCat-2.0',
+    contextWindow: null,
+    wireShape: 'openai-chat',
+    reasoningMode: 'optional',
+    reasoningDefaultEnabled: true,
+  }),
   mutate: vi.fn(),
   openAgentConfig: vi.fn(),
   openHeadlessRun: vi.fn(),
@@ -60,6 +69,7 @@ vi.mock('../contexts/workspaces-context', () => ({
 }))
 
 vi.mock('./workspace/api', () => ({
+  detectWorkspaceCredential: mocks.detectWorkspaceCredential,
   getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
   getWorkspaceSessionDirectory: vi.fn().mockResolvedValue({ sessions: [] }),
 }))
@@ -124,14 +134,21 @@ describe('IssueActivity provenance identity', () => {
 })
 
 describe('IssueDetail property controls', () => {
-  it('names every editable property in the work-item rail', () => {
+  it('names every editable property and resolves inherited runtime defaults', async () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
     expect(screen.getByRole('combobox', { name: 'Status' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
-    expect(screen.getByRole('textbox', { name: 'Run model' })).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Run effort' })).toBeTruthy()
+    const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
+    const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
+    await waitFor(() => {
+      expect(model.selectedOptions[0]?.textContent).toBe('Default · LongCat-2.0')
+      expect(effort.selectedOptions[0]?.textContent).toBe('Default · thinking on')
+    })
+
+    fireEvent.change(model, { target: { value: 'custom' } })
+    expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
   })
 })
