@@ -223,6 +223,8 @@ export const zh: Resources = {
   aiProvider: {
     title: 'AI 提供方',
     description: '管理 Alice 可注入工作区的提供方账户和模型默认值。',
+    loadErrorTitle: '无法加载 AI 凭证',
+    loadErrorDescription: 'OpenAlice 无法读取凭证库。你已保存的凭证没有发生变化。',
     vaultIntro: 'API key 由 Alice 集中保管。新工作区可以写入选定的默认凭证，任何工作区也都能载入已保存凭证。订阅登录仍由 agent CLI 自己管理（claude login / codex login）。',
     credentials: '凭证库',
     addFirst: '添加第一个凭证',

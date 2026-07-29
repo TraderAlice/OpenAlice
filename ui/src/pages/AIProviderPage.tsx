@@ -14,7 +14,7 @@
  * helper: it carries each vendor's endpoint + model suggestions + request shape.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Preset, type WireShape } from '../api'
 import type {
@@ -93,15 +93,25 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
 export function AIProviderPage() {
   const { t } = useTranslation()
   const [credentials, setCredentials] = useState<CredentialSummary[] | null>(null)
+  const [credentialsLoadError, setCredentialsLoadError] = useState(false)
   const [presets, setPresets] = useState<Preset[]>([])
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; cred: CredentialSummary } | null>(null)
 
-  const reload = () => api.config.getCredentials().then(({ credentials: c }) => setCredentials(c)).catch(() => setCredentials([]))
+  const reload = useCallback(async () => {
+    setCredentials(null)
+    setCredentialsLoadError(false)
+    try {
+      const { credentials: next } = await api.config.getCredentials()
+      setCredentials(next)
+    } catch {
+      setCredentialsLoadError(true)
+    }
+  }, [])
 
   useEffect(() => {
     void reload()
     api.config.getPresets().then(({ presets: p }) => setPresets(p)).catch(() => {})
-  }, [])
+  }, [reload])
 
   const apiKeyPresets = useMemo(() => presets.filter(isApiKeyPreset), [presets])
 
@@ -118,7 +128,21 @@ export function AIProviderPage() {
     return (
       <div className="flex flex-col flex-1 min-h-0">
         <PageHeader title={t('aiProvider.title')} description={t('aiProvider.description')} />
-        <PageLoading />
+        {credentialsLoadError ? (
+          <div className="flex flex-1 items-center justify-center px-6 py-12">
+            <div role="alert" className="max-w-md text-center">
+              <h2 className="text-sm font-semibold text-foreground">{t('aiProvider.loadErrorTitle')}</h2>
+              <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                {t('aiProvider.loadErrorDescription')}
+              </p>
+              <button type="button" className="btn-secondary-sm mt-4" onClick={() => void reload()}>
+                {t('common.retry')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <PageLoading />
+        )}
       </div>
     )
   }
