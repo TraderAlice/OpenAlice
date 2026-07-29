@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { TFunction } from 'i18next'
 import {
   AlertTriangle,
   ArrowRight,
@@ -17,6 +18,7 @@ import {
   XCircle,
   type LucideIcon,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { configApi, type CredentialSummary } from '../api/config'
 import { tradingApi, type TradingServiceStatus } from '../api/trading'
@@ -61,13 +63,6 @@ const INITIAL_STATE: OnboardingRuntimeState = {
   appConfig: null,
 }
 
-const STATE_LABEL: Record<Readiness, string> = {
-  ready: 'Ready',
-  attention: 'Needs setup',
-  optional: 'Optional',
-  locked: 'Locked',
-}
-
 const STATE_STYLE: Record<Readiness, string> = {
   ready: 'border-success/25 bg-success/10 text-success',
   attention: 'border-destructive/25 bg-destructive/10 text-destructive',
@@ -76,6 +71,7 @@ const STATE_STYLE: Record<Readiness, string> = {
 }
 
 export function OnboardingDesignPage() {
+  const { t } = useTranslation()
   const { agents } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const [runtime, setRuntime] = useState<OnboardingRuntimeState>(INITIAL_STATE)
@@ -119,7 +115,7 @@ export function OnboardingDesignPage() {
     tradingStatus: runtime.tradingStatus,
     utas: runtime.utas,
     appConfig: runtime.appConfig,
-  }), [agents, runtime])
+  }, t), [agents, runtime, t])
 
   const openTarget = (target?: ViewSpec) => {
     if (!target) return
@@ -130,7 +126,7 @@ export function OnboardingDesignPage() {
     <div className="flex min-h-full flex-col">
       <div className="space-y-5 px-4 py-5 md:px-6">
         {loading ? (
-          <CenteredLoading label="Loading setup state..." />
+          <CenteredLoading label={t('onboardingChecklist.loading')} />
         ) : error ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-[13px] text-destructive">
             {error}
@@ -140,19 +136,22 @@ export function OnboardingDesignPage() {
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
                 <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Setup checklist
+                  {t('onboardingChecklist.eyebrow')}
                 </div>
                 <h1 className="mt-1 text-[24px] font-semibold leading-tight text-foreground">
-                  Bring Alice online one layer at a time.
+                  {t('onboardingChecklist.title')}
                 </h1>
                 <p className="mt-2 max-w-[680px] text-[13px] leading-relaxed text-muted-foreground">
-                  Start with an agent runtime and AI access. Add UTA only when you want broker-aware analysis or trading workflows.
+                  {t('onboardingChecklist.body')}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                 <StatusChip>{model.tradingModeLabel}</StatusChip>
-                <StatusChip>{model.installedAgentCount}/{model.agentCount} runtimes</StatusChip>
-                <StatusChip>{model.utaCount} UTA</StatusChip>
+                <StatusChip>{t('onboardingChecklist.summary.runtimes', {
+                  installed: model.installedAgentCount,
+                  total: model.agentCount,
+                })}</StatusChip>
+                <StatusChip>{t('onboardingChecklist.summary.uta', { count: model.utaCount })}</StatusChip>
               </div>
             </div>
 
@@ -166,9 +165,11 @@ export function OnboardingDesignPage() {
                       <TerminalSquare className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <h2 className="text-[16px] font-semibold text-foreground">Setup path</h2>
+                      <h2 className="text-[16px] font-semibold text-foreground">
+                        {t('onboardingChecklist.path.title')}
+                      </h2>
                       <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                        The first incomplete item is the next useful action.
+                        {t('onboardingChecklist.path.body')}
                       </p>
                     </div>
                   </div>
@@ -192,27 +193,27 @@ export function OnboardingDesignPage() {
                 <CapabilityPanel model={model} />
                 <div className="rounded-lg border border-border bg-secondary/50 px-4 py-4">
                   <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Shortcuts
+                    {t('onboardingChecklist.shortcuts.title')}
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                     <SmallAction
                       icon={<KeyRound className="h-3.5 w-3.5" />}
-                      label="AI Provider"
+                      label={t('onboardingChecklist.shortcuts.aiProvider')}
                       onClick={() => openTarget({ kind: 'settings', params: { category: 'ai-provider' } })}
                     />
                     <SmallAction
                       icon={<Settings className="h-3.5 w-3.5" />}
-                      label="Agent Permissions"
+                      label={t('onboardingChecklist.shortcuts.agentPermissions')}
                       onClick={() => openTarget({ kind: 'settings', params: { category: 'agent-permissions' } })}
                     />
                     <SmallAction
                       icon={<WalletCards className="h-3.5 w-3.5" />}
-                      label="Trading Settings"
+                      label={t('onboardingChecklist.shortcuts.tradingSettings')}
                       onClick={() => openTarget({ kind: 'settings', params: { category: 'trading' } })}
                     />
                     <SmallAction
                       icon={<Bot className="h-3.5 w-3.5" />}
-                      label="Ask Alice"
+                      label={t('onboardingChecklist.shortcuts.askAlice')}
                       onClick={() => openTarget({ kind: 'chat-landing', params: {} })}
                     />
                   </div>
@@ -232,7 +233,7 @@ export function buildOnboardingModel(input: {
   tradingStatus: TradingServiceStatus | null
   utas: UTAConfig[]
   appConfig: AppConfig | null
-}) {
+}, t: TFunction) {
   const agentRuntimes = input.agents.filter((a) => a.kind !== 'utility')
   const installedAgents = agentRuntimes.filter((a) => a.installed !== false)
   const agentCount = agentRuntimes.length
@@ -254,12 +255,18 @@ export function buildOnboardingModel(input: {
   const runtimeNames = installedAgents.map((a) => a.displayName).join(', ')
   const agentStep: StepModel = {
     id: 'agent-runtime',
-    title: hasAgentRuntime ? 'Agent runtime ready' : agentsKnown ? 'Choose an agent runtime' : 'Checking agent runtimes',
+    title: hasAgentRuntime
+      ? t('onboardingChecklist.steps.agent.readyTitle')
+      : agentsKnown
+        ? t('onboardingChecklist.steps.agent.chooseTitle')
+        : t('onboardingChecklist.steps.agent.checkingTitle'),
     body: hasAgentRuntime
-      ? `${runtimeNames} can launch Alice workspaces.`
-      : 'Desktop builds can include a managed runtime; developer installs can also use Codex, Claude Code, opencode, or Pi on PATH.',
+      ? t('onboardingChecklist.steps.agent.readyBody', { runtimes: runtimeNames })
+      : t('onboardingChecklist.steps.agent.missingBody'),
     state: hasAgentRuntime ? 'ready' : 'attention',
-    action: hasAgentRuntime ? 'Open Ask Alice' : 'Open runtime setup',
+    action: hasAgentRuntime
+      ? t('onboardingChecklist.steps.agent.openAlice')
+      : t('onboardingChecklist.steps.agent.openSetup'),
     target: hasAgentRuntime
       ? { kind: 'chat-landing', params: {} }
       : { kind: 'settings', params: { category: 'ai-provider' } },
@@ -268,42 +275,61 @@ export function buildOnboardingModel(input: {
 
   const credentialStep: StepModel = {
     id: 'ai-access',
-    title: hasCredential ? 'AI access configured' : hasLoginRuntime ? 'CLI login can carry AI access' : 'Add AI access',
-    body: hasCredential
-      ? `${credentialCount} vault credential${credentialCount === 1 ? '' : 's'} available for workspace injection.`
+    title: hasCredential
+      ? t('onboardingChecklist.steps.ai.configuredTitle')
       : hasLoginRuntime
-        ? 'Claude Code and Codex can use their own login; vault credentials stay optional.'
-        : 'Pi and opencode need a vault credential before they can call a model.',
+        ? t('onboardingChecklist.steps.ai.cliTitle')
+        : t('onboardingChecklist.steps.ai.addTitle'),
+    body: hasCredential
+      ? t('onboardingChecklist.steps.ai.configuredBody', { count: credentialCount })
+      : hasLoginRuntime
+        ? t('onboardingChecklist.steps.ai.cliBody')
+        : t('onboardingChecklist.steps.ai.addBody'),
     state: hasCredential || hasLoginRuntime ? 'ready' : 'attention',
-    action: 'Open AI Provider',
+    action: t('onboardingChecklist.steps.ai.action'),
     target: { kind: 'settings', params: { category: 'ai-provider' } },
     icon: KeyRound,
   }
 
   const modeStep: StepModel = {
     id: 'trading-mode',
-    title: mode === 'lite' ? 'Lite mode active' : mode === 'readonly' ? 'Readonly mode active' : 'Pro mode active',
+    title: t('onboardingChecklist.steps.mode.activeTitle', {
+      mode: t(`firstRunGuide.mode.${mode}`),
+    }),
     body: mode === 'lite'
-      ? 'UTA is disconnected. Alice can still analyze markets and research without broker state.'
+      ? t('onboardingChecklist.steps.mode.liteBody')
       : mode === 'readonly'
-        ? 'UTA can read accounts and positions. Broker writes stay blocked.'
-        : 'UTA is enabled and per-account permissions decide write behavior.',
+        ? t('onboardingChecklist.steps.mode.readonlyBody')
+        : t('onboardingChecklist.steps.mode.proBody'),
     state: 'ready',
-    action: 'Choose mode',
+    action: t('onboardingChecklist.steps.mode.action'),
     target: { kind: 'settings', params: { category: 'agent-permissions' } },
     icon: ShieldCheck,
   }
 
   const utaStep: StepModel = {
     id: 'uta-accounts',
-    title: hasUTA ? 'UTA configured' : mode === 'lite' ? 'UTA can wait' : 'Connect a UTA',
-    body: hasUTA
-      ? `${utaCount} configured, ${enabledUtaCount} enabled, ${readOnlyUtaCount} read-only, ${vendorCount} data vendor${vendorCount === 1 ? '' : 's'}.`
+    title: hasUTA
+      ? t('onboardingChecklist.steps.uta.configuredTitle')
       : mode === 'lite'
-        ? 'Connect one later for portfolio-aware analysis, broker-backed data, or Trading as Git.'
-        : 'Readonly and Pro modes need at least one broker or exchange account.',
+        ? t('onboardingChecklist.steps.uta.waitTitle')
+        : t('onboardingChecklist.steps.uta.connectTitle'),
+    body: hasUTA
+      ? t('onboardingChecklist.steps.uta.configuredBody', {
+        total: utaCount,
+        enabled: enabledUtaCount,
+        readOnly: readOnlyUtaCount,
+        vendors: vendorCount,
+      })
+      : mode === 'lite'
+        ? t('onboardingChecklist.steps.uta.waitBody')
+        : t('onboardingChecklist.steps.uta.connectBody'),
     state: hasUTA ? 'ready' : mode === 'lite' ? 'optional' : 'attention',
-    action: hasUTA ? 'Open Trading settings' : mode === 'lite' ? 'Add UTA later' : 'Add UTA',
+    action: hasUTA
+      ? t('onboardingChecklist.steps.uta.openSettings')
+      : mode === 'lite'
+        ? t('onboardingChecklist.steps.uta.addLater')
+        : t('onboardingChecklist.steps.uta.add'),
     target: { kind: 'settings', params: { category: 'trading' } },
     icon: WalletCards,
   }
@@ -313,36 +339,50 @@ export function buildOnboardingModel(input: {
   const capabilities: CapabilityModel[] = [
     {
       id: 'ask-alice',
-      label: 'Ask Alice',
-      detail: hasAgentRuntime ? 'Workspace chat can launch.' : 'Needs one available agent runtime.',
+      label: t('onboardingChecklist.capabilities.askAlice.label'),
+      detail: hasAgentRuntime
+        ? t('onboardingChecklist.capabilities.askAlice.ready')
+        : t('onboardingChecklist.capabilities.askAlice.blocked'),
       state: hasAgentRuntime ? 'ready' : 'attention',
       icon: Bot,
     },
     {
       id: 'market-analysis',
-      label: 'Market analysis',
-      detail: 'Available in Lite with OpenAlice market tools.',
+      label: t('onboardingChecklist.capabilities.market.label'),
+      detail: t('onboardingChecklist.capabilities.market.detail'),
       state: 'ready',
       icon: Compass,
     },
     {
       id: 'portfolio',
-      label: 'Portfolio-aware analysis',
-      detail: mode === 'lite' ? 'Locked until Readonly or Pro.' : hasUTA ? 'Broker accounts can be read.' : 'Needs a connected UTA.',
+      label: t('onboardingChecklist.capabilities.portfolio.label'),
+      detail: mode === 'lite'
+        ? t('onboardingChecklist.capabilities.portfolio.lite')
+        : hasUTA
+          ? t('onboardingChecklist.capabilities.portfolio.ready')
+          : t('onboardingChecklist.capabilities.portfolio.needsUta'),
       state: mode === 'lite' ? 'locked' : hasUTA ? 'ready' : 'attention',
       icon: LineChart,
     },
     {
       id: 'trade-pr',
-      label: 'Trading proposals',
-      detail: mode === 'lite' ? 'Locked while UTA is disconnected.' : hasUTA ? 'Agents can stage broker proposals.' : 'Needs a connected UTA.',
+      label: t('onboardingChecklist.capabilities.proposals.label'),
+      detail: mode === 'lite'
+        ? t('onboardingChecklist.capabilities.proposals.lite')
+        : hasUTA
+          ? t('onboardingChecklist.capabilities.proposals.ready')
+          : t('onboardingChecklist.capabilities.proposals.needsUta'),
       state: mode === 'lite' ? 'locked' : hasUTA ? 'ready' : 'attention',
       icon: GitBranch,
     },
     {
       id: 'auto-push',
-      label: 'AI trade push',
-      detail: mode === 'pro' && allowAiTrading ? 'Enabled globally.' : mode === 'pro' ? 'Manual approval remains required.' : 'Only relevant in Pro.',
+      label: t('onboardingChecklist.capabilities.aiPush.label'),
+      detail: mode === 'pro' && allowAiTrading
+        ? t('onboardingChecklist.capabilities.aiPush.enabled')
+        : mode === 'pro'
+          ? t('onboardingChecklist.capabilities.aiPush.manual')
+          : t('onboardingChecklist.capabilities.aiPush.proOnly'),
       state: mode === 'pro' && allowAiTrading ? 'ready' : mode === 'pro' ? 'optional' : 'locked',
       icon: Lock,
     },
@@ -359,7 +399,10 @@ export function buildOnboardingModel(input: {
     agentCount,
     installedAgentCount,
     credentialCount,
-    tradingModeLabel: `${mode[0].toUpperCase()}${mode.slice(1)} · ${modeSource}`,
+    tradingModeLabel: t('onboardingChecklist.summary.mode', {
+      mode: t(`firstRunGuide.mode.${mode}`),
+      source: t(`onboardingChecklist.source.${modeSource}`),
+    }),
     mode,
     modeSource,
     hasUTA,
@@ -369,13 +412,32 @@ export function buildOnboardingModel(input: {
 }
 
 function StatusBand({ model }: { model: ReturnType<typeof buildOnboardingModel> }) {
+  const { t } = useTranslation()
   return (
     <div className="border-y border-border bg-secondary/35">
       <div className="grid grid-cols-2 divide-x divide-y divide-border lg:grid-cols-4 lg:divide-y-0">
-        <StatusMetric label="Setup" value={`${model.readyCount}/${model.steps.length}`} sub="ready checks" />
-        <StatusMetric label="Mode" value={model.tradingModeLabel} sub="global trading capability" />
-        <StatusMetric label="Agent" value={`${model.installedAgentCount}/${model.agentCount}`} sub="available runtimes" />
-        <StatusMetric label="UTA" value={model.hasUTA ? `${model.utaCount} configured` : 'none'} sub="broker connection state" />
+        <StatusMetric
+          label={t('onboardingChecklist.status.setup')}
+          value={`${model.readyCount}/${model.steps.length}`}
+          sub={t('onboardingChecklist.status.readyChecks')}
+        />
+        <StatusMetric
+          label={t('onboardingChecklist.status.mode')}
+          value={model.tradingModeLabel}
+          sub={t('onboardingChecklist.status.tradingCapability')}
+        />
+        <StatusMetric
+          label={t('onboardingChecklist.status.agent')}
+          value={`${model.installedAgentCount}/${model.agentCount}`}
+          sub={t('onboardingChecklist.status.availableRuntimes')}
+        />
+        <StatusMetric
+          label="UTA"
+          value={model.hasUTA
+            ? t('onboardingChecklist.status.configuredUta', { count: model.utaCount })
+            : t('onboardingChecklist.status.none')}
+          sub={t('onboardingChecklist.status.brokerState')}
+        />
       </div>
     </div>
   )
@@ -392,6 +454,7 @@ function StatusMetric({ label, value, sub }: { label: string; value: string; sub
 }
 
 function CapabilityPanel({ model }: { model: ReturnType<typeof buildOnboardingModel> }) {
+  const { t } = useTranslation()
   return (
     <section className="min-w-0 rounded-lg border border-border bg-secondary/50">
       <div className="border-b border-border px-4 py-3">
@@ -400,9 +463,11 @@ function CapabilityPanel({ model }: { model: ReturnType<typeof buildOnboardingMo
             <Compass className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-[16px] font-semibold text-foreground">Capability map</h2>
+            <h2 className="text-[16px] font-semibold text-foreground">
+              {t('onboardingChecklist.capabilities.title')}
+            </h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Shows what is usable in the current mode.
+              {t('onboardingChecklist.capabilities.body')}
             </p>
           </div>
         </div>
@@ -500,14 +565,16 @@ function SmallAction({ icon, label, onClick }: { icon: ReactNode; label: string;
 }
 
 function StateBadge({ state, label }: { state: Readiness; label?: string }) {
+  const { t } = useTranslation()
   return (
     <span className={`inline-flex min-h-5 items-center rounded-full border px-2 text-[10px] font-medium ${STATE_STYLE[state]}`}>
-      {label ?? STATE_LABEL[state]}
+      {label ?? t(`onboardingChecklist.state.${state}`)}
     </span>
   )
 }
 
 function StateDot({ state }: { state: Readiness }) {
+  const { t } = useTranslation()
   const Icon = state === 'ready'
     ? CheckCircle2
     : state === 'attention'
@@ -516,7 +583,10 @@ function StateDot({ state }: { state: Readiness }) {
         ? XCircle
         : Circle
   return (
-    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${STATE_STYLE[state]}`} title={STATE_LABEL[state]}>
+    <span
+      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${STATE_STYLE[state]}`}
+      title={t(`onboardingChecklist.state.${state}`)}
+    >
       <Icon className="h-3.5 w-3.5" />
     </span>
   )
