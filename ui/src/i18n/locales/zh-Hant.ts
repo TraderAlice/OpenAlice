@@ -1217,6 +1217,9 @@ export const zhHant: Resources = {
   },
   tracked: {
     nothingTrackedYet: '尚未追蹤任何項目。',
+    listLoadErrorTitle: '無法載入追蹤清單',
+    listLoadErrorDescription: 'OpenAlice 暫時無法重新整理追蹤的資產與主題。現有內容並未被刪除。',
+    listStale: '即時重新整理失敗——目前顯示上次成功載入的追蹤項目。',
     detailLoadErrorTitle: '無法載入 {{name}}',
     detailLoadErrorDescription: '這個追蹤實體可能已變更，或 OpenAlice 暫時無法使用。',
     backlinksTooltip: '{{count}} 則筆記連結到此',

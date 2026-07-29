@@ -1221,6 +1221,9 @@ export const en = {
   },
   tracked: {
     nothingTrackedYet: 'Nothing tracked yet.',
+    listLoadErrorTitle: 'Couldn’t load Tracked',
+    listLoadErrorDescription: 'OpenAlice could not refresh the tracked assets and topics. Nothing has been removed.',
+    listStale: 'Live refresh failed — showing the last known tracked items.',
     detailLoadErrorTitle: 'Couldn’t load {{name}}',
     detailLoadErrorDescription: 'The tracked entity may have changed, or OpenAlice may be temporarily unavailable.',
     backlinksTooltip: '{{count}} notes link here',

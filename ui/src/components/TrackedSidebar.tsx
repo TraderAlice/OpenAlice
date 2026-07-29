@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TrendingUp, Hash } from 'lucide-react'
+import { TrendingUp, Hash, CircleAlert } from 'lucide-react'
 import { entitiesLive } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
@@ -18,6 +18,7 @@ export function TrackedSidebar() {
   const { t } = useTranslation()
   const entities = entitiesLive.useStore((s) => s.entities)
   const loading = entitiesLive.useStore((s) => s.loading)
+  const listError = entitiesLive.useStore((s) => s.error)
   const selected = useTrackedSelection((s) => s.selectedName)
   const select = useTrackedSelection((s) => s.select)
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
@@ -44,6 +45,15 @@ export function TrackedSidebar() {
     return (
       <div className="flex flex-col h-full overflow-y-auto py-1">
         <SidebarRowsSkeleton rows={6} icon />
+      </div>
+    )
+  }
+
+  if (listError && entities.length === 0) {
+    return (
+      <div className="flex items-start gap-2 px-3 py-4 text-[12px] leading-relaxed text-muted-foreground">
+        <CircleAlert size={14} className="mt-0.5 shrink-0 text-destructive" aria-hidden />
+        <span>{t('tracked.listLoadErrorTitle')}</span>
       </div>
     )
   }

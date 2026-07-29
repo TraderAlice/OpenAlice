@@ -4,7 +4,7 @@ import { TrendingUp, Hash, FileText, ListChecks, CircleAlert } from 'lucide-reac
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
 import { api } from '../api'
-import { entitiesLive } from '../live/entities'
+import { entitiesLive, refreshEntities } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
 import type { EntityDetail, Backlink } from '../api/entities'
@@ -23,6 +23,8 @@ export function TrackedPage() {
   const { t } = useTranslation()
   const entities = entitiesLive.useStore((s) => s.entities)
   const loading = entitiesLive.useStore((s) => s.loading)
+  const listError = entitiesLive.useStore((s) => s.error)
+  const refreshing = entitiesLive.useStore((s) => s.refreshing)
   const selectedName = useTrackedSelection((s) => s.selectedName)
 
   const [detail, setDetail] = useState<EntityDetail | null>(null)
@@ -67,8 +69,13 @@ export function TrackedPage() {
         description={t('tracked.pageDescription', { count: entities.length })}
       />
       <div className="flex-1 overflow-y-auto min-h-0">
+        {listError && entities.length > 0 && (
+          <StaleCollectionNotice refreshing={refreshing} onRetry={refreshEntities} />
+        )}
         {loading && entities.length === 0 ? (
           <TrackedListSkeleton />
+        ) : listError && entities.length === 0 ? (
+          <CollectionLoadError refreshing={refreshing} onRetry={refreshEntities} />
         ) : entities.length === 0 ? (
           <EmptyState />
         ) : !selectedName ? (
@@ -84,6 +91,65 @@ export function TrackedPage() {
           <Detail detail={detail} />
         )}
       </div>
+    </div>
+  )
+}
+
+function CollectionLoadError({
+  refreshing,
+  onRetry,
+}: {
+  refreshing: boolean
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="alert"
+      className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center"
+    >
+      <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
+      <h2 className="mt-3 text-[15px] font-medium text-foreground">
+        {t('tracked.listLoadErrorTitle')}
+      </h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        {t('tracked.listLoadErrorDescription')}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={refreshing}
+        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+      >
+        {refreshing ? t('common.loading') : t('common.retry')}
+      </button>
+    </div>
+  )
+}
+
+function StaleCollectionNotice({
+  refreshing,
+  onRetry,
+}: {
+  refreshing: boolean
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="status"
+      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] text-muted-foreground md:mx-8"
+    >
+      <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
+      <span className="min-w-0 flex-1">{t('tracked.listStale')}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={refreshing}
+        className="oa-pressable shrink-0 rounded px-2 py-1 font-medium text-foreground hover:bg-warning/10 disabled:cursor-wait disabled:opacity-60"
+      >
+        {refreshing ? t('common.loading') : t('common.retry')}
+      </button>
     </div>
   )
 }

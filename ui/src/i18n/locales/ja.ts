@@ -1210,6 +1210,9 @@ export const ja: Resources = {
   },
   tracked: {
     nothingTrackedYet: 'まだ何もトラッキングしていません。',
+    listLoadErrorTitle: '追跡リストを読み込めませんでした',
+    listLoadErrorDescription: 'OpenAlice は追跡中の銘柄とトピックを更新できませんでした。既存の内容は削除されていません。',
+    listStale: 'ライブ更新に失敗しました。最後に取得できた追跡項目を表示しています。',
     detailLoadErrorTitle: '{{name}} を読み込めませんでした',
     detailLoadErrorDescription: '追跡対象が変更されたか、OpenAlice が一時的に利用できない可能性があります。',
     backlinksTooltip: '{{count}} 件のメモがここにリンク',
