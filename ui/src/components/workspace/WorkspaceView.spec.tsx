@@ -7,11 +7,20 @@ import { i18n } from '../../i18n'
 import type { SessionRecord } from './api'
 import { WorkspaceView } from './WorkspaceView'
 
-vi.mock('../../live/use-is-desktop', () => ({ useIsDesktop: () => true }))
-vi.mock('../../live/workspace-side-panels', () => ({
-  useWorkspaceSidePanels: () => ({ files: false, autoHideMobile: true }),
+const viewMocks = vi.hoisted(() => ({
+  isDesktop: true,
+  sidePrefs: {
+    files: false,
+    autoHideMobile: true,
+    mobileFilesOpen: false,
+  },
 }))
-vi.mock('./FilesPanel', () => ({ FilesPanel: () => null }))
+
+vi.mock('../../live/use-is-desktop', () => ({ useIsDesktop: () => viewMocks.isDesktop }))
+vi.mock('../../live/workspace-side-panels', () => ({
+  useWorkspaceSidePanels: () => viewMocks.sidePrefs,
+}))
+vi.mock('./FilesPanel', () => ({ FilesPanel: () => <div data-testid="files-panel" /> }))
 vi.mock('./Terminal', () => ({ TerminalView: () => null }))
 vi.mock('./WebPiView', () => ({ WebPiView: () => null }))
 
@@ -33,6 +42,10 @@ function session(index: number, state: SessionRecord['state']): SessionRecord {
 }
 
 beforeEach(async () => {
+  viewMocks.isDesktop = true
+  viewMocks.sidePrefs.files = false
+  viewMocks.sidePrefs.autoHideMobile = true
+  viewMocks.sidePrefs.mobileFilesOpen = false
   await i18n.changeLanguage('en')
 })
 
@@ -88,5 +101,58 @@ describe('WorkspaceView Session library', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Start a new session' }))
     expect(onSpawnFresh).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('WorkspaceView Files panel', () => {
+  const renderWorkspace = () => render(
+    <WorkspaceView
+      wsId="chat-1"
+      sessionId={null}
+      activeRecord={null}
+      sessions={[]}
+      onSpawnFresh={vi.fn()}
+      onResume={vi.fn()}
+      onOpenWebPi={vi.fn()}
+      onSelectSession={vi.fn()}
+      onSessionLost={vi.fn()}
+    />,
+  )
+
+  it('uses the transient mobile state instead of the persisted desktop preference', () => {
+    viewMocks.isDesktop = false
+    viewMocks.sidePrefs.files = true
+
+    const { container, rerender } = renderWorkspace()
+
+    expect(screen.queryByTestId('files-panel')).toBeNull()
+    expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(true)
+
+    viewMocks.sidePrefs.mobileFilesOpen = true
+    rerender(
+      <WorkspaceView
+        wsId="chat-1"
+        sessionId={null}
+        activeRecord={null}
+        sessions={[]}
+        onSpawnFresh={vi.fn()}
+        onResume={vi.fn()}
+        onOpenWebPi={vi.fn()}
+        onSelectSession={vi.fn()}
+        onSessionLost={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('files-panel')).toBeTruthy()
+    expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(false)
+  })
+
+  it('continues to follow the persisted Files preference on desktop', () => {
+    viewMocks.sidePrefs.files = true
+
+    const { container } = renderWorkspace()
+
+    expect(screen.getByTestId('files-panel')).toBeTruthy()
+    expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(false)
   })
 })
