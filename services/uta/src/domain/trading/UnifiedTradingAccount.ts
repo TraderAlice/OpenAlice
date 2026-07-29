@@ -185,6 +185,9 @@ export class UnifiedTradingAccount {
         case 'modifyOrder':
           return broker.modifyOrder(op.orderId, op.changes)
         case 'closePosition':
+          if (op.quantity != null) {
+            await this._assertCloseQuantityWithinPosition(op.contract, op.quantity)
+          }
           return broker.closePosition(op.contract, op.quantity)
         case 'cancelOrder':
           return broker.cancelOrder(op.orderId, op.orderCancel)
@@ -560,6 +563,38 @@ export class UnifiedTradingAccount {
   }
 
   /**
+   * Re-check an explicit partial-close quantity against the latest broker
+   * position immediately before dispatch. This is deliberately later than
+   * staging: a position can change after the UI or CLI created its proposal.
+   * Broker adapters do not all enforce reduce-only semantics, so allowing an
+   * oversized reverse order here could cross through flat into a new exposure.
+   */
+  private async _assertCloseQuantityWithinPosition(contract: Contract, quantity: Decimal): Promise<void> {
+    if (!quantity.isFinite() || quantity.lte(0)) {
+      throw new Error('closePosition: qty must be a positive finite number.')
+    }
+
+    const nativeKey = this.broker.getNativeKey(contract)
+    const positions = await this._callBroker(() => this.broker.getPositions())
+    const position = positions.find(candidate =>
+      this.broker.getNativeKey(candidate.contract) === nativeKey,
+    )
+    const label = contract.symbol || contract.localSymbol || nativeKey
+
+    if (!position) {
+      throw new Error(`closePosition: no open position found for ${label}. Refresh positions before retrying.`)
+    }
+
+    const available = position.quantity.abs()
+    if (quantity.gt(available)) {
+      throw new Error(
+        `closePosition: quantity ${quantity.toString()} exceeds the open ${label} position size ${available.toString()}. ` +
+        `Use a quantity no greater than ${available.toString()}, or omit qty to close the full position.`,
+      )
+    }
+  }
+
+  /**
    * Per-orderType required-field gate, enforced at stage time so a broken
    * order can never reach staging/commit. Without this, a caller that loses
    * fields on the way in (e.g. a CLI typo like --quantity for --totalQuantity)
@@ -709,13 +744,25 @@ export class UnifiedTradingAccount {
     const contract = this.contractFromAliceId(params.aliceId)
     if (params.symbol) contract.symbol = params.symbol
 
+    let quantity: Decimal | undefined
+    if (params.qty != null) {
+      try {
+        quantity = new Decimal(String(params.qty))
+      } catch {
+        throw new Error('closePosition: qty must be a positive finite number.')
+      }
+      if (!quantity.isFinite() || quantity.lte(0)) {
+        throw new Error('closePosition: qty must be a positive finite number.')
+      }
+    }
+
     const subAccountId = this._resolveWriteSubAccount(contract, params.subAccountId)
     if (subAccountId) this._stagedSubAccountIds.push(subAccountId)
 
     return this.git.add({
       action: 'closePosition',
       contract,
-      quantity: params.qty != null ? new Decimal(String(params.qty)) : undefined,
+      quantity,
     })
   }
 
