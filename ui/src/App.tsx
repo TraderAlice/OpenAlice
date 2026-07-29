@@ -94,7 +94,7 @@ function AppShell() {
   const mainContent = (
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">
       {/* Mobile header — visible only below md */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/80 bg-secondary shrink-0 md:hidden">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-border/80 bg-secondary shrink-0 md:hidden">
         <MobileRailMenuButton onOpen={() => setSidebarOpen(true)} />
         <span className="text-sm font-semibold text-foreground">OpenAlice</span>
       </div>

@@ -17,7 +17,11 @@ describe('MobileRailMenuButton', () => {
     const onOpen = vi.fn()
     render(<MobileRailMenuButton onOpen={onOpen} />)
 
-    fireEvent.click(screen.getByRole('button', { name: '展开活动栏' }))
+    const button = screen.getByRole('button', { name: '展开活动栏' })
+    expect(button.className).toContain('h-10')
+    expect(button.className).toContain('w-10')
+
+    fireEvent.click(button)
 
     expect(onOpen).toHaveBeenCalledOnce()
   })

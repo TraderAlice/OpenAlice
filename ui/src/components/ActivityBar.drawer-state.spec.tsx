@@ -85,4 +85,21 @@ describe('ActivityBar mobile drawer state', () => {
     expect(activityBar.getAttribute('aria-hidden')).toBe('false')
     expect(activityBar.hasAttribute('inert')).toBe(false)
   })
+
+  it('keeps mobile drawer actions tappable without changing desktop density', () => {
+    render(<ActivityBar open onClose={vi.fn()} desktopStatic={false} />)
+
+    const primaryAction = screen.getByRole('button', { name: 'Ask Alice' })
+    const sectionToggle = screen.getByRole('button', { name: 'Beta' })
+    const sectionInfo = screen.getByRole('button', { name: 'nav.about' })
+
+    expect(primaryAction.className).toContain('min-h-10')
+    expect(primaryAction.className).toContain('md:min-h-[34px]')
+    expect(sectionToggle.className).toContain('min-h-10')
+    expect(sectionToggle.className).toContain('md:min-h-7')
+    expect(sectionInfo.className).toContain('min-h-10')
+    expect(sectionInfo.className).toContain('min-w-10')
+    expect(sectionInfo.className).toContain('md:min-h-7')
+    expect(sectionInfo.className).toContain('md:min-w-7')
+  })
 })

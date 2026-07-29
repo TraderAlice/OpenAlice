@@ -202,7 +202,7 @@ export function ActivityBar({
                                 : 'md:h-9 md:w-11 md:min-h-9 md:justify-center md:gap-0 md:px-0 md:py-0'
                               : denseRail
                                 ? `min-h-[28px] ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-1 text-[12px]`
-                                : `min-h-[34px] ${narrowRail ? 'gap-2 px-2.5' : 'gap-3 px-3'} py-1.5 text-[13px]`
+                                : `min-h-10 md:min-h-[34px] ${narrowRail ? 'gap-2 px-2.5' : 'gap-3 px-3'} py-1.5 text-[13px]`
                           } ${
                             isActive
                               ? 'bg-primary-muted text-foreground'
@@ -311,7 +311,7 @@ function SectionHeader({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex min-h-7 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-10 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground md:min-h-7"
           aria-expanded={!isCollapsed}
           aria-controls={controlsId}
           title={label}
@@ -330,7 +330,7 @@ function SectionHeader({
           <button
             type="button"
             onClick={() => setHintOpen((o) => !o)}
-            className={`flex min-h-7 min-w-7 items-center justify-center p-0.5 transition-colors ${
+            className={`flex min-h-10 min-w-10 items-center justify-center p-0.5 transition-colors md:min-h-7 md:min-w-7 ${
               hintOpen ? 'text-muted-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground'
             }`}
             aria-label={t('nav.about', { label })}

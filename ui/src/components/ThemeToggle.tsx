@@ -35,7 +35,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
       onClick={cycle}
       title={t('theme.switchTo', { mode: t(`theme.mode.${NEXT[theme]}`) })}
       aria-label={t('theme.switchTo', { mode: t(`theme.mode.${NEXT[theme]}`) })}
-      className={`relative flex ${compact ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground`}
+      className={`relative flex ${compact ? 'h-10 w-10 md:h-[26px] md:w-[26px]' : 'h-10 w-10 md:h-9 md:w-9'} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground`}
     >
       <Icon size={compact ? 14 : 17} strokeWidth={1.75} aria-hidden />
       {theme === 'auto' && (

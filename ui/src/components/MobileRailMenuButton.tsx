@@ -6,7 +6,7 @@ export function MobileRailMenuButton({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="text-muted-foreground hover:text-foreground p-1 -ml-1"
+      className="oa-icon-action -ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       aria-label={t('nav.expandRail')}
     >
       <svg
