@@ -41,6 +41,10 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     }))
     expect(rootManifest.engines.node).toBe('>=22.19.0')
     expect(cliManifest.engines.node).toBe('>=22.19.0')
+    expect(cliManifest.version).toBe(rootManifest.version)
+    for (const file of cliManifest.files) {
+      expect(installer).toContain(`  "${file}"`)
+    }
     expect(sha256(packageBytes)).toBe('ee080db64c3732daea5547bd6d9809465ffa236ef6099051e64a16753e48b795')
     expect(sha256(lockBytes)).toBe('0f409bf498507f93bfbde3dc6f2b4c83bc58bdea2e2f5eabf3053cc2a81568d4')
   })
@@ -129,15 +133,15 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     await expect(access(join(installRoot, 'bin', 'pi.cmd'))).resolves.toBeUndefined()
 
     const result = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['--version'])
-    expect(result.stdout.trim()).toBe('0.2.0')
+    expect(result.stdout.trim()).toBe('0.87.0-beta')
     const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
     expect(JSON.parse(versionInfo.stdout)).toEqual({
-      version: '0.2.0',
+      version: '0.87.0-beta',
       contentIdentity: releases[0].slice(-16),
       installSource: {
         schemaVersion: 1,
         repository: 'TraderAlice/OpenAlice',
-        cliVersion: '0.2.0',
+        cliVersion: '0.87.0-beta',
         selector: { kind: 'version', value: 'test/ref' },
         installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/test/ref/install',
       },
@@ -165,6 +169,26 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     expect(result.stdout).toContain('Install plan')
     expect(result.stdout).toContain('Plan complete')
     await expect(access(installRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects a payload that does not match the update manifest version', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'openalice-install-expected-version-'))
+    temporaryPaths.push(home)
+    await expect(execFileAsync('bash', [join(repositoryRoot, 'install'),
+      '--source', repositoryRoot,
+      '--install-dir', join(home, '.openalice'),
+      '--no-modify-path',
+      '--yes',
+    ], {
+      env: {
+        ...installerEnv(home),
+        OPENALICE_EXPECTED_CLI_VERSION: '999.0.0',
+      },
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining('instead of expected release 999.0.0'),
+    })
+    await expect(access(join(home, '.openalice', 'bin', 'openalice')))
+      .rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('requires explicit approval when no interactive terminal is available', async () => {

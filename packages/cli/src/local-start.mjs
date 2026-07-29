@@ -35,6 +35,7 @@ export function parseLocalStartArgs(argv) {
     prepare: true,
     rebuild: false,
     takeover: false,
+    checkUpdates: true,
     waitMs: 120_000,
   }
 
@@ -55,6 +56,10 @@ export function parseLocalStartArgs(argv) {
     }
     if (arg === '--takeover') {
       options.takeover = true
+      continue
+    }
+    if (arg === '--no-update-check') {
+      options.checkUpdates = false
       continue
     }
     if (arg === '--app-dir') {
@@ -302,6 +307,7 @@ Options:
   --rebuild          Reinstall dependencies and rebuild server artifacts
   --skip-prepare     Fail instead of installing/building missing artifacts
   --takeover         Replace the recorded local Guardian owner tree
+  --no-update-check  Skip the bounded stable-release update check
   --wait <seconds>   Readiness timeout, 1-600 (default: 120)
   --no-open          Print the URL without opening a browser
   -h, --help         Show this help

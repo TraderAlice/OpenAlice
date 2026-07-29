@@ -34,6 +34,7 @@ const STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
 }
 
 const RUNS_PAGE_SIZE = 25
+const RUN_PROMPT_SUMMARY_LENGTH = 96
 
 function fmtDuration(ms?: number): string {
   if (ms == null) return '—'
@@ -50,6 +51,15 @@ function formatValue(value: unknown): string {
   } catch {
     return String(value)
   }
+}
+
+function summarizeRunPrompt(prompt: string): string {
+  const normalized = prompt.replace(/\s+/g, ' ').trim()
+  if (!normalized) return 'Untitled task'
+
+  const characters = Array.from(normalized)
+  if (characters.length <= RUN_PROMPT_SUMMARY_LENGTH) return normalized
+  return `${characters.slice(0, RUN_PROMPT_SUMMARY_LENGTH - 1).join('').trimEnd()}…`
 }
 
 function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'tool' }> }) {
@@ -431,6 +441,11 @@ export function AutomationRunsSection() {
             const issueIdentity = issueSource
               ? issueIdentities.get(issueIdentityKey(issueSource.workspaceId, issueSource.issueId))
               : undefined
+            const workspaceName = workspaceLabel?.label ?? task.wsId
+            const runSubject = issueIdentity?.title
+              ?? issueSource?.issueId
+              ?? summarizeRunPrompt(task.prompt)
+            const runLabel = `Run details, ${task.status}: ${runSubject}. ${task.agent} in ${workspaceName}.`
             const toolSummary = task.output?.toolCalls
               ? `${task.output.toolCalls} tool${task.output.toolCalls === 1 ? '' : 's'}`
               : task.output
@@ -447,6 +462,7 @@ export function AutomationRunsSection() {
                   onClick={() => toggle(task.taskId)}
                   className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-muted/35"
                   aria-expanded={isExpanded}
+                  aria-label={runLabel}
                 >
                   <span className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_STYLE[task.status]}`}>
                     {task.status}

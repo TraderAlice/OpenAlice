@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
@@ -35,7 +36,7 @@ beforeEach(async () => {
         title: 'Newest update',
         content: 'Newest content',
         source: 'Bloomberg',
-        link: null,
+        link: 'https://example.com/newest',
         categories: null,
       },
       {
@@ -67,5 +68,28 @@ describe('NewsPage ordering', () => {
 
     expect(newest.compareDocumentPosition(middle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(middle.compareDocumentPosition(oldest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
+describe('NewsPage article disclosures', () => {
+  it('uses a native disclosure button that expands with the keyboard', async () => {
+    const user = userEvent.setup()
+    render(<NewsPage />)
+
+    const disclosure = await screen.findByRole('button', { name: 'Newest update' })
+    expect(disclosure.tagName).toBe('BUTTON')
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('link', { name: 'Open original' })).toBeNull()
+
+    disclosure.focus()
+    await user.keyboard('{Enter}')
+
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('link', { name: 'Open original' }).getAttribute('href'))
+      .toBe('https://example.com/newest')
+
+    await user.keyboard(' ')
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('link', { name: 'Open original' })).toBeNull()
   })
 })

@@ -120,18 +120,23 @@ function AssigneeEditor({
   disabled?: boolean
   onChange: (next: string) => void
 }) {
-  const sessionChoices = sessions.filter(
-    (session) => session.resumeId && session.agent !== 'shell' && session.resumable,
-  )
+  const sessionChoices = sessions
+    .filter((session) => session.resumeId && session.agent !== 'shell' && session.resumable)
+    .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
   const selectedResumeId = value.startsWith('@resume-') ? value.slice(1) : null
   const hasSelected = !selectedResumeId || sessionChoices.some((session) => session.resumeId === selectedResumeId)
   const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
-    const raw = session.interactive?.title
+    const rawContext = session.interactive?.title
       || session.interactive?.name
       || session.latestExecution?.assistantPreview
-      || session.resumeId
-    const label = raw.length > 38 ? `${raw.slice(0, 37)}…` : raw
-    return `${label} · ${session.agent}`
+    const normalizedContext = rawContext?.replace(/\s+/g, ' ').trim()
+    const context = normalizedContext && normalizedContext !== session.resumeId
+      ? normalizedContext.length > 28
+        ? `${normalizedContext.slice(0, 27)}…`
+        : normalizedContext
+      : null
+    const activity = session.active ? 'active' : formatRelativeTime(session.updatedAt)
+    return `@${session.resumeId} · ${session.agent} · ${activity}${context ? ` — ${context}` : ''}`
   }
 
   return (
@@ -153,7 +158,7 @@ function AssigneeEditor({
           </option>
         ))}
         {!hasSelected && selectedResumeId && (
-          <option value={value}>Signed Session · {selectedResumeId}</option>
+          <option value={value}>Signed Session · @{selectedResumeId}</option>
         )}
       </optgroup>
     </select>

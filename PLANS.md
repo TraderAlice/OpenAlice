@@ -23,6 +23,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/cli-lifecycle-quality.md]] — Aligns the computer-level CLI with the
+  OpenAlice product version and adds bounded update discovery, installer-backed
+  updates, and state-preserving CLI uninstall. Delivered in PR #847.
 - [[plans/agent-conversation-log-ui.md]] — Adds a read-only, paginated Agent
   collaboration view to Dev Logs without exposing launcher file paths or
   introducing a new dispatch surface. Delivered in PR #742.

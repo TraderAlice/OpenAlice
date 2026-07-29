@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { readFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { PassThrough } from 'node:stream'
 
@@ -24,10 +25,13 @@ import {
   runSshCommand,
 } from './remote.mjs'
 
+const CLI_VERSION = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+).version
 const masterInstallSource = {
   schemaVersion: 1,
   repository: 'TraderAlice/OpenAlice',
-  cliVersion: '0.2.0',
+  cliVersion: CLI_VERSION,
   selector: { kind: 'branch', value: 'master' },
   installerUrl: 'https://openalice.ai/install',
 }
@@ -327,9 +331,9 @@ describe('OpenAlice managed remote connector', () => {
       expect(command).toContain("--home '/data/openalice'")
       return [
         'cli=/home/alice/.openalice/bin/openalice',
-        'version=0.2.0',
+        `version=${CLI_VERSION}`,
         'identity=' + JSON.stringify({
-          version: '0.2.0',
+          version: CLI_VERSION,
           installSource: masterInstallSource,
           contentIdentity: '1234567890abcdef',
         }),
@@ -346,7 +350,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(runRemote).toHaveBeenCalledOnce()
     expect(remote).toEqual(expect.objectContaining({
       cliPath: '/home/alice/.openalice/bin/openalice',
-      cliVersion: '0.2.0',
+      cliVersion: CLI_VERSION,
       cliContentIdentity: '1234567890abcdef',
       cliCompatible: true,
       status: expect.objectContaining({ class: 'running' }),
@@ -711,7 +715,7 @@ function compatibleRemote(statusOverrides = {}) {
     sourceArtifactsReady: null,
     runtimeBuildToolsMissing: [],
     cliPath: '/home/alice/.openalice/bin/openalice',
-    cliVersion: '0.2.0',
+    cliVersion: CLI_VERSION,
     installSource: masterInstallSource,
     cliCompatible: true,
     status: {

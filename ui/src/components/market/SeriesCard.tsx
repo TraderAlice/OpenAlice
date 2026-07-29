@@ -25,7 +25,15 @@ export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; 
         </div>
         <div className="h-9 w-24 shrink-0">
           {!empty && (
-            <LineChart width={96} height={36} data={card.points} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <LineChart
+              width={96}
+              height={36}
+              data={card.points}
+              margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
+              accessibilityLayer={false}
+              role="img"
+              aria-label={describeSeriesTrend(card, label)}
+            >
               <YAxis hide domain={['dataMin', 'dataMax']} />
               <Line type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
             </LineChart>
@@ -35,6 +43,16 @@ export function SeriesCard({ card, label, emptyText }: { card: MacroSeriesCard; 
       {empty && <span className="text-[11px] text-muted-foreground">{emptyText}</span>}
     </div>
   )
+}
+
+export function describeSeriesTrend(card: MacroSeriesCard, label: string): string {
+  const first = card.points[0]
+  const last = card.points[card.points.length - 1]
+  if (!first || !last) return label
+  if (first === last) {
+    return `${label}: ${fmtSeriesValue(card, last.value)} (${last.date})`
+  }
+  return `${label}: ${fmtSeriesValue(card, first.value)} → ${fmtSeriesValue(card, last.value)} (${first.date} – ${last.date})`
 }
 
 export function fmtSeriesValue(card: MacroSeriesCard, v: number | null): string {

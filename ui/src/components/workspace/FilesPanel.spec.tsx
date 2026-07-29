@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FilesPanel } from './FilesPanel'
@@ -28,6 +29,16 @@ beforeEach(() => {
       kind: 'file',
       sizeBytes: 128,
       mtime: '2026-07-20T00:00:00.000Z',
+    }, {
+      name: 'notes',
+      kind: 'dir',
+      sizeBytes: null,
+      mtime: '2026-07-19T00:00:00.000Z',
+    }, {
+      name: 'workspace.sock',
+      kind: 'other',
+      sizeBytes: null,
+      mtime: '2026-07-18T00:00:00.000Z',
     }],
   })
 })
@@ -68,5 +79,29 @@ describe('FilesPanel navigation provenance', () => {
       kind: 'file-viewer',
       params: { wsId: 'workspace-1', path: 'research.md' },
     })
+  })
+
+  it('makes files and folders native keyboard controls while leaving other entries static', async () => {
+    const user = userEvent.setup()
+    render(<FilesPanel wsId="workspace-1" sessionId={null} />)
+
+    const file = await screen.findByRole('button', { name: /research\.md/ })
+    const folder = screen.getByRole('button', { name: /notes/ })
+    expect(file.tagName).toBe('BUTTON')
+    expect(file.tabIndex).toBe(0)
+    expect(folder.tagName).toBe('BUTTON')
+    expect(folder.tabIndex).toBe(0)
+    expect(screen.getByText('workspace.sock').closest('button')).toBeNull()
+
+    file.focus()
+    await user.keyboard('{Enter}')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'file-viewer',
+      params: { wsId: 'workspace-1', path: 'research.md' },
+    })
+
+    folder.focus()
+    await user.keyboard(' ')
+    await waitFor(() => expect(mocks.listFiles).toHaveBeenCalledWith('workspace-1', 'notes'))
   })
 })

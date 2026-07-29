@@ -666,6 +666,7 @@ fi
 FILES=(
   "package.json"
   "bin/openalice.mjs"
+  "src/install-layout.mjs"
   "src/install-source.mjs"
   "src/local-start.mjs"
   "src/remote.mjs"
@@ -674,6 +675,8 @@ FILES=(
   "src/server.mjs"
   "src/server-control.mjs"
   "src/ssh-connect.mjs"
+  "src/uninstall.mjs"
+  "src/update.mjs"
 )
 
 step 3 "Downloading OpenAlice and managed Pi"
@@ -729,6 +732,7 @@ ok "Managed Pi $PI_VERSION is ready"
 step 5 "Verifying the OpenAlice CLI"
 chmod +x "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/bin/openalice.mjs"
+node --check "$STAGING/src/install-layout.mjs"
 node --check "$STAGING/src/install-source.mjs"
 node --check "$STAGING/src/local-start.mjs"
 node --check "$STAGING/src/remote.mjs"
@@ -737,12 +741,18 @@ node --check "$STAGING/src/runtime-client.mjs"
 node --check "$STAGING/src/server.mjs"
 node --check "$STAGING/src/server-control.mjs"
 node --check "$STAGING/src/ssh-connect.mjs"
+node --check "$STAGING/src/uninstall.mjs"
+node --check "$STAGING/src/update.mjs"
 
 CLI_VERSION="$(node -e '
   const manifest = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
   if (manifest.name !== "@traderalice/openalice-cli" || typeof manifest.version !== "string") process.exit(1);
   process.stdout.write(manifest.version);
 ' "$STAGING/package.json")" || die "The downloaded package manifest is not an OpenAlice CLI package"
+if [[ -n "${OPENALICE_EXPECTED_CLI_VERSION:-}" \
+  && "$CLI_VERSION" != "$OPENALICE_EXPECTED_CLI_VERSION" ]]; then
+  die "The downloaded CLI reported $CLI_VERSION instead of expected release $OPENALICE_EXPECTED_CLI_VERSION"
+fi
 STAGED_VERSION="$(node "$STAGING/bin/openalice.mjs" --version)"
 [[ "$STAGED_VERSION" == "$CLI_VERSION" ]] || die "The downloaded CLI did not report its package version"
 node -e '

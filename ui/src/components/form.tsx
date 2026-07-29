@@ -97,16 +97,31 @@ export function ConfigSection({ title, description, children }: ConfigSectionPro
 interface FieldProps {
   label: string
   description?: string
+  controlId?: string
+  descriptionId?: string
   children: ReactNode
 }
 
-export function Field({ label, description, children }: FieldProps) {
+export function Field({
+  label,
+  description,
+  controlId,
+  descriptionId,
+  children,
+}: FieldProps) {
   return (
     <div className="mb-3.5 last:mb-0">
-      <label className="block text-[13px] text-foreground mb-1.5 font-medium">{label}</label>
+      <label
+        htmlFor={controlId}
+        className="block text-[13px] text-foreground mb-1.5 font-medium"
+      >
+        {label}
+      </label>
       {children}
       {description && (
-        <p className="text-[12px] text-muted-foreground/60 mt-1">{description}</p>
+        <p id={descriptionId} className="text-[12px] text-muted-foreground/60 mt-1">
+          {description}
+        </p>
       )}
     </div>
   )

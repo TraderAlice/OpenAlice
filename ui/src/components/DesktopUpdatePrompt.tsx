@@ -70,7 +70,11 @@ export function DesktopUpdatePrompt() {
   }
 
   return (
-    <Dialog onClose={busy ? () => {} : () => setStatus(null)} width="w-[480px]">
+    <Dialog
+      ariaLabel="OpenAlice update ready"
+      onClose={busy ? () => {} : () => setStatus(null)}
+      width="w-[480px]"
+    >
       <div className="px-5 py-4 border-b border-border flex items-center gap-3">
         <div className="h-9 w-9 rounded-lg border border-primary/30 bg-primary-muted/30 text-primary flex items-center justify-center shrink-0">
           <Download size={18} strokeWidth={1.8} />

@@ -25,40 +25,51 @@ function ArticleRow({ article }: { article: NewsArticle }) {
     : article.content
 
   return (
-    <div
-      className="px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-      onClick={() => setExpanded(!expanded)}
-    >
-      {/* Header row */}
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-medium text-foreground leading-snug">{article.title}</p>
-          <div className="flex items-center gap-2 mt-1">
-            {article.source && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
-                {article.source}
-              </span>
-            )}
-            <span className="text-[11px] text-muted-foreground">{formatRelativeTime(article.time)}</span>
-            {article.categories && (
-              <span className="text-[11px] text-muted-foreground/50 truncate">{article.categories}</span>
-            )}
+    <article>
+      <button
+        type="button"
+        aria-label={article.title}
+        aria-expanded={expanded}
+        onClick={() => setExpanded((current) => !current)}
+        className="w-full px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+      >
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium text-foreground leading-snug">{article.title}</p>
+            <div className="flex items-center gap-2 mt-1">
+              {article.source && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
+                  {article.source}
+                </span>
+              )}
+              <span className="text-[11px] text-muted-foreground">{formatRelativeTime(article.time)}</span>
+              {article.categories && (
+                <span className="text-[11px] text-muted-foreground/50 truncate">{article.categories}</span>
+              )}
+            </div>
           </div>
+          <span
+            className="text-muted-foreground text-xs shrink-0 mt-0.5"
+            aria-hidden
+          >
+            {expanded ? '▾' : '▸'}
+          </span>
         </div>
-        <span className="text-muted-foreground text-xs shrink-0 mt-0.5">{expanded ? '▾' : '▸'}</span>
-      </div>
 
-      {/* Preview / Expanded */}
-      {expanded ? (
-        <div className="mt-2 space-y-2">
+        {!expanded && article.content && (
+          <p className="mt-1 text-[12px] text-muted-foreground/50 truncate">{contentPreview}</p>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-3 space-y-2">
           <p className="text-[12px] text-muted-foreground/80 leading-relaxed whitespace-pre-wrap">{article.content}</p>
           {article.link && (
             <a
               href={article.link}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline"
+              className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {t('news.openOriginal')}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,12 +80,8 @@ function ArticleRow({ article }: { article: NewsArticle }) {
             </a>
           )}
         </div>
-      ) : (
-        article.content && (
-          <p className="mt-1 text-[12px] text-muted-foreground/50 truncate">{contentPreview}</p>
-        )
       )}
-    </div>
+    </article>
   )
 }
 

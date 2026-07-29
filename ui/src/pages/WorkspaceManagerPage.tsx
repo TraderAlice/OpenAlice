@@ -117,7 +117,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
       void submit()
     }

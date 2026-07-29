@@ -8,6 +8,8 @@ import { formatLocalStartHelp, parseLocalStartArgs, startLocal } from '../src/lo
 import { connectRemote, formatRemoteHelp, parseRemoteArgs } from '../src/remote.mjs'
 import { formatServerHelp, parseServerArgs, runServerCommand } from '../src/server.mjs'
 import { connectSsh, formatSshHelp, parseSshConnectArgs } from '../src/ssh-connect.mjs'
+import { formatUninstallHelp, runUninstallCommand } from '../src/uninstall.mjs'
+import { formatUpdateHelp, maybeNotifyUpdate, runUpdateCommand } from '../src/update.mjs'
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
@@ -33,7 +35,9 @@ export async function main(argv = process.argv.slice(2)) {
       process.stdout.write(formatLocalStartHelp())
       return 0
     }
-    return startLocal(parseLocalStartArgs(startArgs))
+    const options = parseLocalStartArgs(startArgs)
+    await maybeNotifyUpdate({ enabled: options.checkUpdates })
+    return startLocal(options)
   }
   if (command === 'ssh') {
     if (args.includes('--help') || args.includes('-h')) {
@@ -57,6 +61,20 @@ export async function main(argv = process.argv.slice(2)) {
     }
     return connectRemote(parseRemoteArgs(args))
   }
+  if (command === 'update') {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatUpdateHelp())
+      return 0
+    }
+    return runUpdateCommand(args)
+  }
+  if (command === 'uninstall') {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatUninstallHelp())
+      return 0
+    }
+    return runUninstallCommand(args)
+  }
   throw new Error(`Unknown command: ${command}\n\n${formatHelp()}`)
 }
 
@@ -70,6 +88,8 @@ Usage:
   openalice server <run|start|status|stop> [options]
   openalice ssh <user@host> [options]
   openalice remote <user@host> [options]
+  openalice update [--check] [--yes]
+  openalice uninstall [--plan] [--yes]
 
 Commands:
   version   Print the CLI version; --json also reports its recorded install source
@@ -77,9 +97,12 @@ Commands:
   server    Run, detach, inspect, or stop a browserless local Runtime
   ssh       Open a loopback-only SSH tunnel to an already-running OpenAlice
   remote    Plan, prepare, and connect to an OpenAlice Server over SSH
+  update    Check for or install a newer stable OpenAlice release
+  uninstall Remove the installed CLI and managed Pi while preserving user data
 
 Run "openalice start --help", "openalice server --help",
-"openalice ssh --help", or "openalice remote --help" for details.
+"openalice ssh --help", "openalice remote --help",
+"openalice update --help", or "openalice uninstall --help" for details.
 `
 }
 
