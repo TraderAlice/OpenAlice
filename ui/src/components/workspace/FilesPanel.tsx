@@ -119,17 +119,30 @@ export function FilesPanel(props: FilesPanelProps): ReactElement {
         {listing?.entries.length === 0 && !error && (
           <li className="panel-empty">empty</li>
         )}
-        {listing?.entries.map((e) => (
-          <li
-            key={e.name}
-            className={`files-row files-${e.kind}`}
-            onClick={() => enter(e)}
-          >
-            <span className="files-icon">{iconFor(e)}</span>
-            <span className="files-name">{e.name}</span>
-            <span className="files-meta">{formatMeta(e)}</span>
-          </li>
-        ))}
+        {listing?.entries.map((e) => {
+          const row = (
+            <>
+              <span className="files-icon">{iconFor(e)}</span>
+              <span className="files-name">{e.name}</span>
+              <span className="files-meta">{formatMeta(e)}</span>
+            </>
+          );
+          return (
+            <li key={e.name}>
+              {e.kind === 'other' ? (
+                <div className={`files-row files-${e.kind}`}>{row}</div>
+              ) : (
+                <button
+                  type="button"
+                  className={`files-row files-${e.kind}`}
+                  onClick={() => enter(e)}
+                >
+                  {row}
+                </button>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
