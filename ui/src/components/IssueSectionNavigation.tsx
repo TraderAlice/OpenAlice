@@ -53,7 +53,7 @@ export function IssueSectionNavigation({
     let frame = 0
     const updateActiveSection = () => {
       frame = 0
-      const threshold = nav.getBoundingClientRect().bottom + 16
+      const threshold = nav.getBoundingClientRect().bottom + 32
       let nextId: IssueSectionId = sections[0].id
       let foundRenderedSection = false
       const atBottom = scrollContainer instanceof HTMLElement
@@ -120,7 +120,21 @@ export function IssueSectionNavigation({
             key={id}
             href={`#${id}`}
             aria-current={active ? 'location' : undefined}
-            onClick={() => setActiveId(id)}
+            onClick={(event) => {
+              if (
+                event.button !== 0
+                || event.metaKey
+                || event.ctrlKey
+                || event.shiftKey
+                || event.altKey
+              ) return
+              const target = document.getElementById(id)
+              if (!target) return
+              event.preventDefault()
+              setActiveId(id)
+              window.history.replaceState(window.history.state, '', `#${id}`)
+              target.scrollIntoView({ block: 'start' })
+            }}
             className={`${mobileSectionLink} ${
               active
                 ? 'bg-primary-muted text-foreground'

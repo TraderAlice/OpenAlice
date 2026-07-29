@@ -189,7 +189,8 @@ describe('IssueDetail property controls', () => {
     expect(workItemLink?.className).toContain('min-h-10')
     expect(workItemLink?.getAttribute('aria-current')).toBe('location')
     expect(workItemLink?.className).toContain('bg-primary-muted')
-    expect(sectionNavigation.querySelector('a[href="#issue-what"]')).toBeTruthy()
+    const whatLink = sectionNavigation.querySelector('a[href="#issue-what"]') as HTMLAnchorElement
+    expect(whatLink).toBeTruthy()
     expect(sectionNavigation.querySelector('a[href="#issue-activity"]')).toBeTruthy()
     expect(sectionNavigation.querySelector('a[href="#issue-reply"]')?.textContent).toBe('Reply')
     expect(document.querySelector('#issue-reply textarea')).toBeTruthy()
@@ -222,7 +223,7 @@ describe('IssueDetail property controls', () => {
     })
     Object.defineProperty(document.getElementById('issue-activity')!, 'getBoundingClientRect', {
       configurable: true,
-      value: () => rect(100),
+      value: () => rect(132),
     })
     Object.defineProperty(document.getElementById('issue-reply')!, 'getBoundingClientRect', {
       configurable: true,
@@ -243,6 +244,19 @@ describe('IssueDetail property controls', () => {
     await waitFor(() => {
       expect(sectionNavigation.querySelector('a[href="#issue-reply"]')?.getAttribute('aria-current')).toBe('location')
     })
+
+    const whatSection = document.getElementById('issue-what')!
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(whatSection, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    fireEvent.click(whatLink)
+
+    expect(replaceState).toHaveBeenCalledWith(window.history.state, '', '#issue-what')
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
+    expect(whatLink.getAttribute('aria-current')).toBe('location')
   })
 
   it.each([
