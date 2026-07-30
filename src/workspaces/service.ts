@@ -307,7 +307,12 @@ export function launchEnvironmentDisclosure(
 }
 import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
-import { SessionRegistry, type SessionRecord } from './session-registry.js';
+import {
+  SessionRegistry,
+  sessionPreferredTitle,
+  type SessionRecord,
+} from './session-registry.js';
+import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
 import { TemplateUpgradeManager } from './template-upgrade.js';
@@ -395,6 +400,8 @@ export interface WorkspaceService {
       approveProject?: boolean;
     },
   ): Promise<WebPiSnapshot>;
+  /** Best-effort background reconciliation of native runtime Session titles. */
+  refreshSessionTitles?(meta: WorkspaceMeta): Promise<void>;
   publicMeta(w: WorkspaceMeta): Promise<unknown>;
   /**
    * Probe the host PATH for each registered adapter's CLI binary. Keyed by
@@ -760,6 +767,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   adapters.register(opencodeAdapter);
   adapters.register(piAdapter);
   adapters.register(shellAdapter);
+  const sessionTitleResolver = new NativeSessionTitleResolver({
+    sessionRegistry,
+    resumeRegistry,
+    adapters,
+    logger: launcherLogger.child({ scope: 'session-title' }),
+  });
+  const refreshSessionTitles = (meta: WorkspaceMeta): Promise<void> =>
+    sessionTitleResolver.refreshWorkspace(meta);
   const managerWorkspace = createManagerWorkspaceMeta(
     config.launcherRoot,
     adapters.list().filter(isAgentRuntime).map((adapter) => adapter.id),
@@ -2021,6 +2036,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const ws = registry.get(wsId);
     if (!ws) return null;
     await sessionRegistry.ensureLoaded(wsId);
+    void refreshSessionTitles(ws);
     return buildWorkspaceSessionDirectory({
       workspace: { id: ws.id, tag: ws.tag },
       identities: resumeRegistry.list({ wsId, limit }),
@@ -2318,6 +2334,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const metadata = await readWorkspaceMetadata(w.dir);
     const harnessSource = await readHarnessSource(w.dir);
     await sessionRegistry.ensureLoaded(w.id).catch(() => undefined);
+    void refreshSessionTitles(w);
     const sessions = sessionRegistry.listFor(w.id).map((r) => {
       const terminal = pool.get(r.id);
       const browser = webPi.get(r.id);
@@ -2333,7 +2350,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         resumeId: r.resumeId,
         pid: terminal?.pid ?? browser?.pid ?? null,
         startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-        title: r.title ?? null,
+        title: sessionPreferredTitle(r) ?? null,
         sourceRunId: r.sourceRunId ?? null,
       };
     });
@@ -2410,6 +2427,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resolveDefaultAgentId,
     resolveAdapter,
     startWebPiSession,
+    refreshSessionTitles,
     publicMeta,
     detectAgents,
     getAgentRuntimeReadiness: getAgentRuntimeReadinessMethod,

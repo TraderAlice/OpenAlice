@@ -334,6 +334,13 @@ export interface CliAdapter {
 
   /** Subprocess discovery (capabilities.transcriptDiscovery === 'subprocess'). */
   listOnDisk?(cwd: string): Promise<readonly OnDiskSession[]>;
+
+  /**
+   * Read the runtime's current human-facing title for one native Session.
+   * This is best-effort presentation metadata: callers keep the launch prompt
+   * as a fallback when the runtime has not named the Session yet.
+   */
+  readSessionTitle?(cwd: string, sessionId: string): Promise<string | null>;
 }
 
 /** Execute the common pre-use lifecycle without coupling callers to an

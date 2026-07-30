@@ -652,7 +652,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const { t } = useTranslation();
   const s = props.session;
   const isPaused = s.state === 'paused';
-  // Title: the captured first message (seeded sessions), else the sticky name.
+  // The server resolves native title → launch prompt → sticky name.
   const display = s.title?.trim() || s.name;
   const resumeLabel = t('workspace.resumeSession', { title: display });
   const stopLabel = t('workspace.stopSession', { title: display });

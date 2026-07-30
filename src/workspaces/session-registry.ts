@@ -38,12 +38,16 @@ export interface SessionRecord {
   resumeHint?: { kind: 'agent-session-id'; value: string };
   scrollbackFile?: string;
   /**
-   * The user's first message, captured when the session is seeded (quick-chat).
-   * Surfaced as a human-readable title in the chat sidebar instead of the sticky
-   * `c1` name. Only present for seeded sessions; absent ones fall back to `name`.
-   * Stored capped — we don't need the whole prompt for a one-line title.
+   * Preferred title discovered from the native runtime. This intentionally
+   * stays separate from `fallbackTitle`: a runtime-generated or user-renamed
+   * title must win over the prompt OpenAlice happened to use at launch.
    */
   readonly title?: string;
+  /**
+   * OpenAlice's launch-time title candidate, normally the first user message.
+   * Used only until the native runtime exposes a better title.
+   */
+  readonly fallbackTitle?: string;
   /**
    * The headless run this launcher-owned Session was materialized from.
    * Optional in the v2 registry because ordinary interactive Sessions have no
@@ -56,11 +60,29 @@ export interface SessionRecord {
 }
 
 interface FileShape {
-  readonly version: 2;
+  readonly version: 3;
   readonly records: SessionRecord[];
 }
 
 const SESSION_FILE_RE = /^[A-Za-z0-9_-]+\.json$/;
+export const MAX_SESSION_TITLE = 200;
+
+/** Native title → launch-time prompt. */
+export function sessionPreferredTitle(
+  record: Pick<SessionRecord, 'title' | 'fallbackTitle'>,
+): string | undefined {
+  return record.title?.trim() || record.fallbackTitle?.trim() || undefined;
+}
+
+/** Preferred title → sticky launcher name. */
+export function sessionDisplayTitle(record: Pick<SessionRecord, 'title' | 'fallbackTitle' | 'name'>): string {
+  return sessionPreferredTitle(record) || record.name;
+}
+
+export function normalizeSessionTitle(value: string | null | undefined): string | undefined {
+  const title = value?.trim();
+  return title ? title.slice(0, MAX_SESSION_TITLE) : undefined;
+}
 
 /**
  * Per-workspace persistent registry of SessionRecords. Each workspace gets
@@ -273,7 +295,7 @@ export class SessionRegistry {
     const records = this.byWs.get(wsId);
     if (!records) return;
     const payload: FileShape = {
-      version: 2,
+      version: 3,
       records: Array.from(records.values()),
     };
     const path = join(this.dir, `${wsId}.json`);
@@ -293,7 +315,7 @@ function validateFile(value: unknown): SessionRecord[] {
     throw new Error('sessions.json: root must be an object');
   }
   const v = value as Record<string, unknown>;
-  if (v['version'] !== 1 && v['version'] !== 2) {
+  if (v['version'] !== 1 && v['version'] !== 2 && v['version'] !== 3) {
     throw new Error(`sessions.json: unsupported version ${String(v['version'])}`);
   }
   if (!Array.isArray(v['records'])) {
@@ -329,10 +351,14 @@ function validateFile(value: unknown): SessionRecord[] {
       ...(r['surface'] === 'terminal' || r['surface'] === 'webpi'
         ? { surface: r['surface'] }
         : {}),
-      // Carry the session title (the captured first message) across reloads —
-      // it's written to disk by `flush`, so it must be read back here too, or
-      // every server restart / registry reload reverts the row to the `c1` name.
-      ...(typeof r['title'] === 'string' ? { title: r['title'] } : {}),
+      // Before v3 `title` meant "the launch prompt". Treat it as a fallback so
+      // a native runtime title discovered after upgrade can replace it.
+      ...(v['version'] === 3 && typeof r['title'] === 'string' ? { title: r['title'] } : {}),
+      ...(typeof r['fallbackTitle'] === 'string'
+        ? { fallbackTitle: r['fallbackTitle'] }
+        : v['version'] !== 3 && typeof r['title'] === 'string'
+          ? { fallbackTitle: r['title'] }
+          : {}),
       ...(typeof r['sourceRunId'] === 'string' ? { sourceRunId: r['sourceRunId'] } : {}),
     };
     const hint = r['resumeHint'];

@@ -24,7 +24,11 @@ import { listDir, PathTraversal, readWorkspaceFile } from '../../workspaces/file
 import { gitLog, gitStatus } from '../../workspaces/git-service.js';
 import { logger as launcherLogger } from '../../workspaces/logger.js';
 import { readWorkspaceMetadata, workspaceMetadataSchema, writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
-import type { SessionRecord } from '../../workspaces/session-registry.js';
+import {
+  normalizeSessionTitle,
+  sessionPreferredTitle,
+  type SessionRecord,
+} from '../../workspaces/session-registry.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import {
@@ -148,9 +152,6 @@ function redactLaunchCommand(argv: readonly string[]): readonly string[] {
   return out;
 }
 
-/** Max stored length of a session title (the seed message); the row truncates further. */
-const MAX_SESSION_TITLE = 200;
-
 /** The 201 body both `/:id/sessions/spawn` and `/quick-chat` return. */
 interface SpawnedSessionBody {
   readonly sessionId: string;
@@ -160,7 +161,7 @@ interface SpawnedSessionBody {
   readonly agent: string;
   readonly resumeId: string;
   readonly startedAt: number;
-  /** The seed message, when the session was seeded — its sidebar title. */
+  /** Native Session title, falling back to the launch-time prompt. */
   readonly title: string | null;
 }
 
@@ -339,8 +340,7 @@ export function createWorkspaceRoutes(
     });
     const recordName = svc.sessionRegistry.nextName(id, adapter.id, prefix);
     const nowIso = new Date().toISOString();
-    const titleSource = opts.title?.trim() || initialPrompt;
-    const title = titleSource ? titleSource.slice(0, MAX_SESSION_TITLE) : undefined;
+    const fallbackTitle = normalizeSessionTitle(opts.title) ?? normalizeSessionTitle(initialPrompt);
     const claimedResume = opts.resumeId
       ? (svc.claimResume?.(opts.resumeId) ?? true)
       : false;
@@ -372,7 +372,7 @@ export function createWorkspaceRoutes(
       lastActiveAt: nowIso,
       state: 'running',
       surface: 'terminal',
-      ...(title !== undefined ? { title } : {}),
+      ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(resume && resume !== 'last'
         ? { resumeHint: { kind: 'agent-session-id' as const, value: resume.sessionId } }
@@ -414,7 +414,7 @@ export function createWorkspaceRoutes(
           agent: adapter.id,
           resumeId: identity.resumeId,
           startedAt: session.startedAt,
-          title: title ?? null,
+          title: sessionPreferredTitle(record) ?? null,
         },
       };
     } catch (err) {
@@ -443,7 +443,7 @@ export function createWorkspaceRoutes(
       resumeId: record.resumeId,
       pid: terminal?.pid ?? browser?.pid ?? null,
       startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-      title: record.title ?? null,
+      title: sessionPreferredTitle(record) ?? null,
       sourceRunId: record.sourceRunId ?? null,
     };
   };
@@ -537,6 +537,7 @@ export function createWorkspaceRoutes(
   const publicManager = async () => {
     const meta = svc.managerWorkspace;
     await svc.sessionRegistry.ensureLoaded(meta.id);
+    void svc.refreshSessionTitles?.(meta);
     return {
       id: meta.id,
       tag: meta.tag,
@@ -1702,7 +1703,7 @@ export function createWorkspaceRoutes(
           pid: session.pid,
           agent: adapter.id,
           startedAt: session.startedAt,
-          title: record.title ?? null,
+          title: sessionPreferredTitle(record) ?? null,
         });
       } catch (err) {
         launcherLogger.error('workspace.session_resume_failed', { id, token, err });

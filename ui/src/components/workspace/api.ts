@@ -642,7 +642,7 @@ export interface SessionRecord {
   readonly surface?: 'terminal' | 'webpi';
   readonly pid: number | null;
   readonly startedAt: number | null;
-  /** First message (seeded sessions) — the sidebar title; null → fall back to `name`. */
+  /** Resolved native/fallback sidebar title; null for an unseeded, unnamed Session. */
   readonly title: string | null;
   /** Headless run this stable Alice Session was materialized from. */
   readonly sourceRunId?: string | null;
