@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
+import { useTranslation } from 'react-i18next'
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
 
@@ -25,6 +26,7 @@ const SAVED_LABEL_MS = 1_200
  * are only applied when there are no local edits waiting to be saved.
  */
 export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
+  const { t } = useTranslation()
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const mountedRef = useRef(true)
   const latestRef = useRef(value)
@@ -76,7 +78,8 @@ export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
     },
     editorProps: {
       attributes: {
-        'aria-label': 'Issue What',
+        'aria-label': t('issues.detail.whatEditorLabel'),
+        'data-placeholder': t('issues.detail.whatEditorPlaceholder'),
         spellcheck: 'true',
       },
     },
@@ -142,6 +145,20 @@ export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
   useEffect(() => {
     if (!editor) return
 
+    editor.setOptions({
+      editorProps: {
+        attributes: {
+          'aria-label': t('issues.detail.whatEditorLabel'),
+          'data-placeholder': t('issues.detail.whatEditorPlaceholder'),
+          spellcheck: 'true',
+        },
+      },
+    })
+  }, [editor, t])
+
+  useEffect(() => {
+    if (!editor) return
+
     const incoming = value.trim()
     const hasLocalEdits = latestRef.current.trim() !== savedRef.current.trim()
     if (saveInFlightRef.current || hasLocalEdits || incoming === savedRef.current.trim()) return
@@ -153,18 +170,32 @@ export function MarkdownWhatEditor({ value, onSave }: MarkdownWhatEditorProps) {
   }, [editor, value])
 
   const status =
-    saveState === 'saving' ? 'Saving…'
-      : saveState === 'saved' ? 'Saved'
-        : saveState === 'error' ? 'Couldn’t save · will retry after the next edit'
+    saveState === 'saving' ? t('issues.detail.whatSaving')
+      : saveState === 'saved' ? t('issues.detail.whatSaved')
+        : saveState === 'error' ? t('issues.detail.whatSaveError')
           : ''
 
   return (
     <div>
-      <div className="what-editor-shell rounded-lg border border-transparent transition-colors hover:border-border/40 focus-within:border-border/70 focus-within:bg-secondary/20">
-        <EditorContent editor={editor} className="markdown-content what-editor-content" />
+      <div
+        aria-live="polite"
+        className="pointer-events-none sticky top-[6.75rem] z-10 flex min-h-5 justify-end lg:top-2"
+      >
+        <span
+          className={`rounded-full border bg-background/95 px-2 py-0.5 text-[11px] shadow-sm backdrop-blur transition-opacity ${
+            saveState === 'error'
+              ? 'border-destructive/30 text-destructive'
+              : 'border-border/70 text-muted-foreground'
+          } ${status ? 'opacity-100' : 'opacity-0'}`}
+        >
+          {status || '\u00a0'}
+        </span>
       </div>
-      <div aria-live="polite" className={`mt-1 min-h-4 text-right text-[11px] transition-opacity ${saveState === 'error' ? 'text-destructive' : 'text-muted-foreground/60'} ${status ? 'opacity-100' : 'opacity-0'}`}>
-        {status || '\u00a0'}
+      <div
+        className="what-editor-shell cursor-text rounded-lg border border-transparent transition-colors active:border-border/50 focus-within:border-border/70 focus-within:bg-secondary/20 sm:hover:border-border/40"
+        onClick={() => editor?.view.focus()}
+      >
+        <EditorContent editor={editor} className="markdown-content what-editor-content" />
       </div>
     </div>
   )

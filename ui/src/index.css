@@ -809,7 +809,7 @@ html[lang="ja"] .oa-onboarding-title {
 }
 .what-editor-content .ProseMirror p.is-editor-empty:first-child::before {
   color: var(--muted-foreground);
-  content: 'Describe what this Issue should accomplish…';
+  content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;

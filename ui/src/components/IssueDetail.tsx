@@ -42,6 +42,7 @@ import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
 import { AutomationHealthPill, CadencePill, PriorityIndicator } from './IssuesBoard'
+import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
@@ -64,7 +65,7 @@ const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'n
 // Shared compact control styling for the rail's selects / inline input — the
 // settings `inputClass`, trimmed for the narrow rail.
 const railControl =
-  'min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50'
+  'min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
 const ALL_RUN_EFFORTS: readonly ModelReasoningEffort[] = [
@@ -92,9 +93,9 @@ function fmtDuration(ms?: number): string {
 
 function PropRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2">
+    <div className="flex items-start justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:gap-1">
       <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="min-w-0 text-right text-[13px] text-foreground">{children}</div>
+      <div className="min-w-0 text-right text-[13px] text-foreground max-[359px]:w-full max-[359px]:text-left">{children}</div>
     </div>
   )
 }
@@ -102,9 +103,9 @@ function PropRow({ label, children }: { label: string; children: ReactNode }) {
 /** Editable row: label on the left, an interactive control filling the right. */
 function EditRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2">
+    <div className="flex items-center justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:items-stretch max-[359px]:gap-1">
       <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">{children}</div>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 max-[359px]:w-full max-[359px]:justify-start">{children}</div>
     </div>
   )
 }
@@ -246,7 +247,7 @@ function AgentEditor({
         aria-label={canConfigure
           ? t('issues.detail.configureRuntime', { runtime: effectiveAgent })
           : t('issues.detail.noConfigurableRuntime')}
-        className="shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        className="min-h-10 min-w-10 shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0"
       >
         <Settings size={14} aria-hidden />
       </button>
@@ -489,7 +490,7 @@ function PropertiesRail({
   }, [issue.automationHealth, issue.status, t])
 
   return (
-    <aside className="min-w-0 w-full shrink-0 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+    <aside id="issue-work-item" className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0">
       <PropertySection
         title={t('issues.detail.workItem')}
         description={t('issues.detail.workItemDescription')}
@@ -604,15 +605,15 @@ function PropertiesRail({
             </>
           )}
           {agentNeedsCredential && (
-            <p className="py-2 text-right text-[11px] leading-snug text-warning">
+            <p className="py-2 text-right text-[11px] leading-snug text-warning max-[359px]:text-left">
               {t('issues.detail.aiCredentialMissing')}
             </p>
           )}
           {issue.automationHealth && (
             <PropRow label={t('issues.detail.health')}>
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1 max-[359px]:items-start">
                 <AutomationHealthPill health={issue.automationHealth} />
-                <span className="max-w-44 text-[11px] leading-snug text-muted-foreground">
+                <span className="max-w-44 text-[11px] leading-snug text-muted-foreground max-[359px]:max-w-none">
                   {automationHealthMessage}
                 </span>
                 {canRetry && (
@@ -620,7 +621,7 @@ function PropertiesRail({
                     type="button"
                     disabled={retrying}
                     onClick={onRetry}
-                    className="oa-pressable mt-1 inline-flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50"
+                    className="oa-pressable mt-1 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
                   >
                     <RotateCcw size={12} aria-hidden />
                     {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
@@ -686,7 +687,10 @@ function CommentComposer({
   }, [text, sending, wsId, id, onPosted])
 
   return (
-    <div className="rounded-xl border border-border bg-background px-3 py-3 shadow-sm transition-colors focus-within:border-primary/45">
+    <div
+      id="issue-reply"
+      className="scroll-mt-20 rounded-xl border border-border bg-background px-3 py-3 shadow-sm transition-colors focus-within:border-primary/45"
+    >
       <textarea
         rows={3}
         value={text}
@@ -716,7 +720,7 @@ function CommentComposer({
           type="button"
           onClick={() => void submit()}
           disabled={sending || text.trim().length === 0}
-          className="oa-pressable rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="oa-pressable min-h-10 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0"
         >
           {sending
             ? t('issues.detail.sending')
@@ -742,7 +746,7 @@ function WhatEditor({
 }) {
   const { t } = useTranslation()
   return (
-    <section className="mt-4 border-t border-border/60 pt-4">
+    <section id="issue-what" className="mt-4 scroll-mt-20 border-t border-border/60 pt-4">
       <div className="mb-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">
           {t('issues.detail.what')}
@@ -751,6 +755,9 @@ function WhatEditor({
           {scheduled
             ? t('issues.detail.whatScheduledDescription')
             : t('issues.detail.whatDescription')}
+        </p>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          {t('issues.detail.whatEditHint')}
         </p>
       </div>
       <MarkdownWhatEditor value={value} onSave={onSave} />
@@ -787,7 +794,7 @@ function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRe
           title={run.resumable
             ? t('issues.detail.openRunSessionTitle')
             : t('issues.detail.noResumableSessionTitle')}
-          className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-10 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0"
         >
           {t('issues.detail.openConversation')}
         </button>
@@ -850,7 +857,7 @@ function InboxReportsSection({
   const { t } = useTranslation()
   if (reports.length === 0) return null
   return (
-    <section className="mt-8">
+    <section id="issue-inbox-reports" className="mt-8 scroll-mt-20">
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
         {t('issues.detail.inboxReports')}
       </h3>
@@ -1015,7 +1022,7 @@ export function IssueActivity({
   }
 
   return (
-    <section className="mt-8">
+    <section id="issue-activity" className="mt-8 scroll-mt-20">
       <div className="mb-3 flex items-baseline justify-between gap-3 border-t border-border/60 pt-5">
         <h2 className="text-sm font-semibold text-foreground">{t('issues.detail.activity')}</h2>
         <span className="hidden text-[11px] text-muted-foreground sm:inline">
@@ -1094,7 +1101,7 @@ export function IssueActivity({
                           aria-controls={`issue-session-${record.id}`}
                           onClick={() => setIdentityPopoverId((open) => open === record.id ? null : record.id)}
                           disabled={openingId !== null}
-                          className="inline rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50"
+                          className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
                         >
                           {originLabel}
                         </button>
@@ -1116,7 +1123,7 @@ export function IssueActivity({
                               type="button"
                               onClick={() => void openSession(record)}
                               disabled={openingId !== null}
-                              className="oa-pressable mt-3 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
+                              className="oa-pressable mt-3 min-h-10 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
                             >
                               {openingId === record.id
                                 ? t('issues.detail.opening')
@@ -1172,7 +1179,7 @@ function RunsSection({
   if (runs.length === 0) return null
   const visible = expanded ? runs : runs.slice(0, 4)
   return (
-    <section className="mt-8 rounded-xl border border-border bg-secondary/45 px-3 py-3 sm:px-4">
+    <section id="issue-runs" className="mt-8 scroll-mt-20 rounded-xl border border-border bg-secondary/45 px-3 py-3 sm:px-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t('issues.detail.runs')}</h2>
@@ -1189,7 +1196,7 @@ function RunsSection({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="oa-pressable mt-3 w-full rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="oa-pressable mt-3 min-h-10 w-full rounded-md px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:min-h-0"
         >
           {expanded
             ? t('issues.detail.showRecentRuns')
@@ -1299,10 +1306,11 @@ function WikilinkPicker({
 // ==================== Detail view ====================
 
 /**
- * Linear-style issue detail (Phase 2b — interactive). Main column = title +
- * editable canonical What + a Linear-style Activity timeline where comments
- * and changes share one flow. Runs stay in an independent operational section.
- * Right rail = Properties, with status /
+ * Linear-style issue detail (Phase 2b — interactive). The identity header stays
+ * first at every width. On narrow screens, the Properties work-item controls
+ * follow it before the potentially long What and Activity flow; desktop keeps
+ * those controls in the right rail. Runs stay in an independent operational
+ * section. Properties expose status /
  * priority / assignee editable inline (each write PATCHes and applies the
  * server-returned detail — authoritative, refetch-free). The scheduled agent
  * runtime is editable because it is operational routing; schedule cadence and
@@ -1480,7 +1488,7 @@ export function IssueDetail({
         setSidebar('issue')
         openOrFocus({ kind: 'issue', params: {} })
       }}
-      className="mb-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      className="mb-2 inline-flex min-h-10 items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground sm:mb-4 sm:min-h-0"
     >
       <ArrowLeft size={13} /> {backLabel ?? t('nav.item.issue')}
     </button>
@@ -1535,29 +1543,18 @@ export function IssueDetail({
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 md:px-6">
       {backToBoard}
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-        <main className="min-w-0 lg:col-start-1 lg:row-start-1">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="font-mono text-[11px] text-muted-foreground/70">{id}</span>
+      <main className="grid min-w-0 gap-x-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <header className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <div className="mb-1 flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <span className="max-w-full break-all font-mono text-[11px] leading-snug text-muted-foreground/70">{id}</span>
             {issue.when && <CadencePill when={issue.when} />}
           </div>
           <h1 className="text-xl font-semibold text-foreground">{issue.title}</h1>
-          <WhatEditor
-            key={`${wsId}:${id}`}
-            value={issue.what}
-            scheduled={Boolean(issue.when)}
-            onSave={(what) => onPatch({ what })}
-          />
-          <IssueActivity
-            activity={activity}
-            onOpenSession={openProvenanceSession}
-            wsId={wsId}
-            issueId={id}
-            ownerResumeId={stableOwnerResumeId}
-            assignee={issue.assignee}
-            onPosted={mutate}
-          />
-        </main>
+        </header>
+        <IssueSectionNavigation
+          hasRuns={runs.length > 0}
+          hasInboxReports={inboxReports.length > 0}
+        />
         <PropertiesRail
           wsId={wsId}
           issue={issue}
@@ -1575,6 +1572,23 @@ export function IssueDetail({
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+          <WhatEditor
+            key={`${wsId}:${id}`}
+            value={issue.what}
+            scheduled={Boolean(issue.when)}
+            onSave={(what) => onPatch({ what })}
+          />
+          <IssueActivity
+            activity={activity}
+            onOpenSession={openProvenanceSession}
+            wsId={wsId}
+            issueId={id}
+            ownerResumeId={stableOwnerResumeId}
+            assignee={issue.assignee}
+            onPosted={mutate}
+          />
+        </div>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-3">
           <RunsSection
             runs={runs}
             onOpen={(run) => {
@@ -1586,7 +1600,7 @@ export function IssueDetail({
           />
           <InboxReportsSection reports={inboxReports} onOpen={gotoInbox} />
         </div>
-      </div>
+      </main>
       {picker && (
         <WikilinkPicker
           resolution={picker}
