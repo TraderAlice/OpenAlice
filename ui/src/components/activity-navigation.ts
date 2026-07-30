@@ -48,9 +48,9 @@ export const NAV_SECTIONS: NavSection[] = [
     sectionLabel: '',
     items: [
       { page: 'chat',       labelKey: 'nav.item.chat',       icon: MessageSquare, defaultTab: { kind: 'chat-landing', params: {} } },
-      { page: 'auto-quant', labelKey: 'nav.item.autoQuant',  icon: Microscope, defaultTab: { kind: 'auto-quant-landing', params: {} } },
       { page: 'inbox',      labelKey: 'nav.item.inbox',      icon: Inbox, defaultTab: { kind: 'inbox', params: {} } },
       { page: 'issue',      labelKey: 'nav.item.issue',      icon: ListChecks, defaultTab: { kind: 'issue', params: {} } },
+      { page: 'auto-quant', labelKey: 'nav.item.autoQuant',  icon: Microscope, defaultTab: { kind: 'auto-quant-landing', params: {} } },
       { page: 'tracked',    labelKey: 'nav.item.tracked',    icon: Telescope, defaultTab: { kind: 'tracked', params: {} } },
       { page: 'market',     labelKey: 'nav.item.market',     icon: BarChart3, defaultTab: { kind: 'market-list', params: {} } },
       { page: 'news',       labelKey: 'nav.item.news',       icon: Newspaper, defaultTab: { kind: 'news', params: {} } },

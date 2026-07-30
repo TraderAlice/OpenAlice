@@ -18,7 +18,7 @@ export const en = {
       inbox: 'Inbox',
       tracked: 'Tracked',
       chat: 'Ask Alice',
-      autoQuant: 'AutoQuant',
+      autoQuant: 'Quant',
       workspaces: 'Workspaces',
       market: 'Market',
       news: 'News',

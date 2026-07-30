@@ -7,7 +7,7 @@ export const zh: Resources = {
       inbox: '收件箱',
       tracked: '追踪',
       chat: '问 Alice',
-      autoQuant: 'AutoQuant',
+      autoQuant: 'Quant',
       workspaces: '工作区',
       market: '市场',
       news: '新闻',
