@@ -1095,6 +1095,28 @@ button.files-row:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.terminal-title-separator {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+}
+
+.terminal-session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+
+.terminal-header-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
 .terminal-header-action {
   height: 24px;
   padding: 0 8px;
@@ -1109,6 +1131,39 @@ button.files-row:focus-visible {
 .terminal-header-action:hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+/* A pinned terminal is the Workspace page's primary canvas, not a card inside
+ * another card. Its titlebar absorbs the Workspace actions and its shell runs
+ * edge-to-edge; the remaining borders describe actual pane splits. */
+.workspace-page-shell.is-terminal-canvas .workspace-view {
+  gap: 0;
+}
+
+.workspace-page-shell.is-terminal-canvas .workspace-side > .panel {
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+}
+
+.terminal-shell.is-canvas {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.terminal-shell.is-canvas .terminal-header {
+  padding-block: 6px;
+  background: var(--secondary);
+}
+
+@container (max-width: 680px) {
+  .terminal-shell.is-canvas .terminal-meta {
+    display: none;
+  }
+
+  .terminal-shell.is-canvas .terminal-session-title {
+    flex: 1 1 auto;
+  }
 }
 
 .status-dot {
