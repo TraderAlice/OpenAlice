@@ -92,7 +92,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG CLAUDE_CODE_VERSION=2.1.202
 ARG CODEX_VERSION=0.144.1
 ARG OPENCODE_VERSION=1.17.18
-ARG PI_VERSION=0.80.6
+ARG PI_VERSION=0.83.0
 RUN npm install -g \
         "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
         "@openai/codex@${CODEX_VERSION}" \

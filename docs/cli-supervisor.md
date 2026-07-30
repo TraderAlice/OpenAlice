@@ -70,20 +70,23 @@ options documented in [[docs/local-runtime.md]]. `up` is browserless by default;
 
 ## Default and Compatibility Surface
 
-During the migration toward the Supervisor TUI:
-
-- bare `openalice` and `openalice start` retain the existing foreground,
-  browser-oriented source launcher;
+- bare `openalice` enters the local Supervisor TUI;
+- `openalice tui` is the explicit equivalent for tests and scripts;
+- `openalice start` retains the existing foreground, browser-oriented source
+  launcher;
 - `openalice server run|start|status|stop` remains available for managed remote
   and existing scripts;
 - new code uses `run|up|status|down`;
-- `server status --json` retains its legacy raw status payload;
-- the future change that makes bare `openalice` enter the TUI requires its own
-  PTY acceptance and compatibility decision.
+- `server status --json` retains its legacy raw status payload.
 
 The top-level commands and the `server` compatibility surface launch the same
 `cli-server` Guardian owner. They are presenters over one lifecycle rather than
 separate daemons.
+
+The first TypeScript TUI shell is deliberately read-only: it reports the
+selected Runtime and detaches with `q`, `Esc`, or `Ctrl+C`. Unfinished controls
+remain inside the application shell and do not change the default entry back to
+the compatibility launcher.
 
 ## Presentation-neutral Core
 
@@ -258,7 +261,13 @@ completion; detailed shell installation remains user-owned.
 
 ## Load-bearing Files
 
-- `packages/cli/bin/openalice.mjs` — root dispatch and process exit mapping.
+- `packages/cli/bin/openalice.ts` and `packages/cli/src/main.ts` — TypeScript
+  application entry and default-TUI/explicit-command dispatch.
+- `packages/cli/src/supervisor-tui.ts` — `pi-tui` Supervisor application shell.
+- `packages/cli/src/pi-tui-loader.ts` — workspace and installed managed-Pi TUI
+  resolution.
+- `packages/cli/bin/openalice.mjs` — transitional presenter for existing
+  non-interactive commands while their source moves to TypeScript.
 - `packages/cli/src/lifecycle.mjs` — presentation-neutral lifecycle.
 - `packages/cli/src/lifecycle-command.mjs` — canonical command parsing and
   presentation.

@@ -97,7 +97,7 @@ if (value.installSource?.cliVersion !== expectedVersion) process.exit(1);
 if (value.installSource?.selector?.kind !== "branch" || value.installSource?.selector?.value !== "smoke-v1") process.exit(1);
 if (value.installSource?.installerUrl !== "http://127.0.0.1:18080/install") process.exit(1);
 ' "$install_source" "$cli_version" || fail "installed CLI did not preserve its install source"
-[[ "$($bin_dir/pi --version)" == "0.80.6" ]] || fail "installed managed Pi version check failed"
+[[ "$($bin_dir/pi --version)" == "0.83.0" ]] || fail "installed managed Pi version check failed"
 "$bin_dir/openalice" --help | grep -Fq "OpenAlice CLI" || fail "installed CLI help check failed"
 server_status="$($bin_dir/openalice server status --home "$HOME/openalice-server-smoke" --json)"
 node -e '
@@ -130,7 +130,7 @@ if (value.result?.doctor?.summary?.failures !== 0 || value.result?.doctor?.runti
 [[ -f "$bin_dir/pi.cmd" ]] || fail "Windows managed Pi launcher was not installed"
 [[ ! -e "$HOME/.openalice/.cli-install.lock" ]] || fail "installer lock was not released"
 v1_release="$(find "$versions_dir" -mindepth 1 -maxdepth 1 -type d -name 'smoke-v1-*' -print -quit)"
-[[ -n "$v1_release" && -f "$v1_release/bin/openalice.mjs" ]] || fail "content-addressed CLI release was not installed"
+[[ -n "$v1_release" && -f "$v1_release/bin/openalice.ts" ]] || fail "content-addressed CLI release was not installed"
 [[ -f "$v1_release/install-source.json" ]] || fail "content-addressed CLI release omitted install source metadata"
 [[ -f "$v1_release/managed/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js" ]] \
   || fail "content-addressed managed Pi runtime was not installed"
@@ -201,7 +201,7 @@ v2_release="$(find "$versions_dir" -mindepth 1 -maxdepth 1 -type d -name 'smoke-
 [[ -n "$v2_release" && -d "$v2_release" ]] || fail "version switch did not install the new CLI"
 version_count="$(find "$versions_dir" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 [[ "$version_count" == "2" ]] || fail "unexpected number of installed CLI versions: $version_count"
-grep -Fq "$v2_release/bin/openalice.mjs" "$bin_dir/openalice" \
+grep -Fq "$v2_release/bin/openalice.ts" "$bin_dir/openalice" \
   || fail "stable launcher did not switch to the latest install"
 [[ "$($bin_dir/openalice --version)" == "$cli_version" ]] || fail "switched CLI is not runnable"
 

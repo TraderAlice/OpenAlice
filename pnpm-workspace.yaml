@@ -14,6 +14,9 @@ allowBuilds:
   node-pty: true
   protobufjs: false
 
+minimumReleaseAgeExclude:
+  - '@earendil-works/pi-tui@0.83.0'
+
 overrides:
   '@alpacahq/alpaca-trade-api>axios': ^0.32.0
   '@alpacahq/alpaca-trade-api>eslint': '-'

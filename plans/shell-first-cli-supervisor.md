@@ -356,12 +356,13 @@ and verification before the next dependent branch starts from updated `dev`.
 
 ### 4. Supervisor TUI application
 
-- [ ] Make bare `openalice` enter the TUI; retain `openalice tui` as an explicit
+- [x] Make bare `openalice` enter the TUI; retain `openalice tui` as an explicit
   alias useful for tests and scripts.
-- [ ] Render a stable application chrome from the first increment: product and
-  channel header, selected instance, lifecycle summary, navigation, action bar,
-  help, and update indicator.
-- [ ] Show unfinished product panels as unavailable within the TUI instead of
+- [x] Render the initial stable application chrome: product and channel header,
+  selected home, lifecycle summary, detach action bar, and unavailable-state
+  guidance.
+- [ ] Add navigation, help, update indicator, and selectable detail panels.
+- [x] Show unfinished product panels as unavailable within the TUI instead of
   preserving a temporary non-TUI default command.
 - [ ] Implement stopped, starting, running, degraded, incompatible, stopping,
   and update-available states.
@@ -588,3 +589,13 @@ This plan is complete only when:
   semantics reference, and Guardian plus the OpenAlice installer as the final
   ownership and update authority. Recorded the comparison in
   [[docs/reference/pi-herdr-cli-architecture.md]].
+- 2026-07-30: Started the replacement implementation from merged PR #868.
+  Added the native TypeScript CLI entry and first `pi-tui` Supervisor shell,
+  made bare `openalice` enter it, retained `openalice tui` and every explicit
+  command, and bumped the managed Pi/TUI release assets together to `0.83.0`.
+  CLI tests passed 132 including a real bare-command PTY detach/restoration
+  journey, root TypeScript passed, and root Vitest passed 3,637 with 9 skipped.
+  A real isolated source install verified the official Pi manifest/lock hashes,
+  installed both launchers, ran the installed TUI through a PTY, and restored
+  the terminal on detach. Docker installer smoke remained unrun because the
+  local Docker/OrbStack socket was absent.
