@@ -54,7 +54,11 @@ describe('InboxReplyThread', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Reply to this update…' }), {
       target: { value: 'Which data did you use?' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
+    const reply = screen.getByRole('button', { name: 'Reply' })
+    expect(reply.className).toContain('h-10')
+    expect(reply.className).toContain('w-10')
+    expect(reply.className).toContain('sm:h-8')
+    fireEvent.click(reply)
 
     await waitFor(() => expect(ask).toHaveBeenCalledWith('Which data did you use?'))
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2))
