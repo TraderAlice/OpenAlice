@@ -120,6 +120,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     wsId={props.wsId}
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
+                    chrome="integrated"
                     {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
                     onSessionLost={props.onSessionLost}
                   />

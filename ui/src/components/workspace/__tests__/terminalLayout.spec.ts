@@ -42,4 +42,12 @@ describe('terminal responsive layout contract', () => {
     expect(declarationsFor('.terminal-title')).toContain('text-overflow: ellipsis')
     expect(declarationsFor('.terminal-meta')).toContain('text-overflow: ellipsis')
   })
+
+  it('lets Workspace pages integrate the terminal without nested card chrome', () => {
+    const integrated = declarationsFor('.terminal-shell.is-integrated')
+    expect(integrated).toContain('border: 0')
+    expect(integrated).toContain('border-radius: 0')
+    expect(integrated).toContain('box-shadow: none')
+    expect(declarationsFor('.terminal-shell.has-header')).toContain('grid-template-rows: auto 1fr')
+  })
 })

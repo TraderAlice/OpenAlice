@@ -94,6 +94,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   const workspaceName = workspaceDisplayName(workspace)
   const workspaceTitle = workspaceDisplayTitle(workspace)
   const hasCustomName = workspaceName !== workspace.tag
+  const sessionTitle = activeRecord?.title?.trim() || activeRecord?.name || null
 
   // Sessions list: pass the full workspace.sessions. WorkspaceView's
   // `runningSlots` is gated on sessionId so the multi-terminal mount
@@ -102,24 +103,58 @@ export function WorkspacePage({ spec, visible }: Props) {
   // state needs the full list to render resume/continue cards.
   return (
     <div className="workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {/* OpenAlice-side header bar above the launcher's WorkspaceView. The
-       *  launcher component itself is byte-faithful; we add the AI-provider
-       *  affordance here. */}
+      {/* One owning header for Workspace identity, active Session identity,
+       *  runtime state, and page actions. A normally connected terminal
+       *  deliberately contributes no second title card below it. */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-secondary/30 shrink-0">
-        <div
-          className="flex min-w-0 items-baseline gap-2 pr-2"
-          title={workspaceTitle}
-        >
-          <span className="truncate text-[12px] font-medium text-foreground">
-            {workspaceName}
-          </span>
-          {hasCustomName && (
-            <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/70 sm:inline">
-              {workspace.tag}
+        <div className="flex min-w-0 items-center gap-2 pr-2">
+          <div
+            className="flex min-w-0 items-baseline gap-2"
+            title={workspaceTitle}
+          >
+            <span className={`truncate text-[12px] font-medium ${
+              sessionTitle ? 'text-muted-foreground' : 'text-foreground'
+            }`}>
+              {workspaceName}
             </span>
+            {hasCustomName && (
+              <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/60 lg:inline">
+                {workspace.tag}
+              </span>
+            )}
+          </div>
+          {sessionTitle && activeRecord && (
+            <>
+              <span aria-hidden="true" className="shrink-0 text-[11px] text-muted-foreground/35">/</span>
+              <span
+                className="min-w-0 truncate text-[12px] font-semibold text-foreground"
+                title={sessionTitle}
+              >
+                {sessionTitle}
+              </span>
+              {sessionTitle !== activeRecord.name && (
+                <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/60 sm:inline">
+                  {activeRecord.name}
+                </span>
+              )}
+            </>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {activeRecord && (
+            <span
+              className="mr-1 hidden items-center gap-1.5 text-[10px] text-muted-foreground md:inline-flex"
+              title={`${activeRecord.state}${activeRecord.pid !== null ? ` · pid ${activeRecord.pid}` : ''}`}
+            >
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 rounded-full ${
+                  activeRecord.state === 'running' ? 'bg-success' : 'bg-muted-foreground/50'
+                }`}
+              />
+              {activeRecord.pid !== null ? `pid ${activeRecord.pid}` : t('workspace.paused')}
+            </span>
+          )}
           {activeRecord?.agent === 'pi' && activeRecord.state === 'running' && (
             <button
               type="button"

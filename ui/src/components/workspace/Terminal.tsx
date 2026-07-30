@@ -173,8 +173,13 @@ export interface TerminalViewProps {
   readonly wsId: string;
   /** Stable session record id. Required; emits `?session=<id>` on the WS. */
   readonly sessionId: string;
-  /** Human-facing label shown in the terminal header. Falls back to wsId. */
+  /** Human-facing label shown by framed terminal chrome. Falls back to wsId. */
   readonly label?: string;
+  /**
+   * `integrated` lets the owning page carry normal Workspace / Session
+   * identity. Terminal chrome then appears only for transport exceptions.
+   */
+  readonly chrome?: 'framed' | 'integrated';
   /** WebSocket URL base. Defaults to `${ws/wss}://${location.host}/pty`. */
   readonly wsUrl?: string;
   /** OpenTUI currently corrupts to an all-black canvas in xterm's WebGL addon. */
@@ -648,36 +653,45 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     };
   }, [wsId, sessionId, wsUrl, props.renderer]);
 
+  const integrated = props.chrome === 'integrated';
+  const hasTransportException =
+    status !== 'connected' || childExited || scrollbackTruncated || exitInfo !== null;
+  const showHeader = !integrated || hasTransportException;
+
   return (
-    <div className="terminal-shell">
-      <header className="terminal-header">
-        <StatusDot status={status} />
-        <span className="terminal-title">{props.label ?? wsId}</span>
-        <span className="terminal-meta">
-          {pid !== null ? `pid ${pid}` : ''}
-          {childExited ? ' · child exited' : ''}
-          {scrollbackTruncated ? ' · scrollback truncated' : ''}
-          {exitInfo
-            ? ` · session ended code=${exitInfo.code}${
-                exitInfo.signal !== null ? ` signal=${exitInfo.signal}` : ''
-              }`
-            : ''}
-        </span>
-        {status === 'locked' && (
-          <button
-            type="button"
-            className="terminal-header-action"
-            onClick={() => {
-              takeoverNextAttachRef.current = true;
-              setStatus('connecting');
-              connectRef.current?.();
-            }}
-            title="take over this session"
-          >
-            take over
-          </button>
-        )}
-      </header>
+    <div
+      className={`terminal-shell${integrated ? ' is-integrated' : ''}${showHeader ? ' has-header' : ''}`}
+    >
+      {showHeader && (
+        <header className="terminal-header">
+          <StatusDot status={status} />
+          <span className="terminal-title">{integrated ? status : (props.label ?? wsId)}</span>
+          <span className="terminal-meta">
+            {pid !== null ? `pid ${pid}` : ''}
+            {childExited ? ' · child exited' : ''}
+            {scrollbackTruncated ? ' · scrollback truncated' : ''}
+            {exitInfo
+              ? ` · session ended code=${exitInfo.code}${
+                  exitInfo.signal !== null ? ` signal=${exitInfo.signal}` : ''
+                }`
+              : ''}
+          </span>
+          {status === 'locked' && (
+            <button
+              type="button"
+              className="terminal-header-action"
+              onClick={() => {
+                takeoverNextAttachRef.current = true;
+                setStatus('connecting');
+                connectRef.current?.();
+              }}
+              title="take over this session"
+            >
+              take over
+            </button>
+          )}
+        </header>
+      )}
       {/* FitAddon reads the computed size of xterm's direct parent. Keep that
           parent padding-free: putting the visual inset on `.terminal-host`
           makes FitAddon count the padding as usable columns, so the xterm

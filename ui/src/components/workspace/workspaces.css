@@ -1048,7 +1048,7 @@ button.files-row:focus-visible {
 
 .terminal-shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: 1fr;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -1059,6 +1059,17 @@ button.files-row:focus-visible {
   overflow: hidden;
   background: var(--secondary);
   box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow-color) 35%, transparent);
+}
+
+.terminal-shell.has-header {
+  grid-template-rows: auto 1fr;
+}
+
+.terminal-shell.is-integrated {
+  border: 0;
+  border-radius: 0;
+  background: var(--background);
+  box-shadow: none;
 }
 
 .terminal-header {
@@ -1073,6 +1084,19 @@ button.files-row:focus-visible {
   font-size: 12px;
   color: var(--muted-foreground);
   user-select: none;
+}
+
+.terminal-shell.is-integrated .terminal-header {
+  min-height: 30px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--secondary) 72%, transparent);
+  font-size: 11px;
+}
+
+.terminal-shell.is-integrated .status-dot {
+  width: 6px;
+  height: 6px;
+  box-shadow: none;
 }
 
 .terminal-title {

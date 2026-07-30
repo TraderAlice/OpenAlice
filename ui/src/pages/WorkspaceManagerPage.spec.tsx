@@ -67,7 +67,9 @@ vi.mock('../api/config', () => ({
 }))
 
 vi.mock('../components/workspace/Terminal', () => ({
-  TerminalView: () => <div data-testid="terminal-view" />,
+  TerminalView: ({ chrome }: { chrome?: string }) => (
+    <div data-testid="terminal-view" data-chrome={chrome} />
+  ),
 }))
 
 vi.mock('../components/workspace/WebPiView', () => ({
@@ -486,6 +488,31 @@ describe('WorkspaceManagerPage runtime selection', () => {
       session.id,
     )
     expect(mocks.openWebPiSession).not.toHaveBeenCalled()
+  })
+
+  it('integrates a running Manager terminal into the owning page header', () => {
+    const session: SessionRecord = {
+      id: 'manager-codex-running',
+      resumeId: 'manager-codex-running-resume',
+      wsId: 'workspace-manager',
+      agent: 'codex',
+      name: 'x1',
+      createdAt: '2026-07-16T00:00:00.000Z',
+      lastActiveAt: '2026-07-16T00:00:00.000Z',
+      state: 'running',
+      surface: 'terminal',
+      pid: 42,
+      startedAt: 1,
+      title: 'Inspect the floor',
+    }
+    mocks.useWorkspaces.mockImplementation(() => context('codex', managerSnapshot([session])))
+
+    render(<WorkspaceManagerPage spec={{
+      kind: 'workspace-manager',
+      params: { sessionId: session.id },
+    }} />)
+
+    expect(screen.getByTestId('terminal-view').getAttribute('data-chrome')).toBe('integrated')
   })
 
   it('reopens a paused Pi Manager Session in its saved WebPi surface', () => {

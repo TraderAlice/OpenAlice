@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import '../i18n'
-import type { Workspace } from '../components/workspace/api'
+import type { SessionRecord, Workspace } from '../components/workspace/api'
 import { WorkspacePage } from './WorkspacePage'
 
 const mocks = vi.hoisted(() => ({
@@ -59,6 +59,21 @@ function workspace(overrides: Partial<Workspace> = {}): Workspace {
   }
 }
 
+const runningSession: SessionRecord = {
+  id: 'codex-calm-glass-harbor',
+  resumeId: 'resume-1',
+  wsId: 'chat-1',
+  agent: 'codex',
+  name: 'x1',
+  createdAt: '2026-06-30T00:00:00.000Z',
+  lastActiveAt: '2026-06-30T00:05:00.000Z',
+  state: 'running',
+  surface: 'terminal',
+  pid: 49949,
+  startedAt: 1,
+  title: 'Cross-market rotation',
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.workspaces = [workspace({ displayName: 'Optical Networking Follow-up' })]
@@ -96,5 +111,28 @@ describe('WorkspacePage identity', () => {
 
     expect(screen.getByTitle('chat-jun30').textContent).toBe('chat-jun30')
     expect(screen.getByTestId('workspace-view').getAttribute('data-label')).toBe('chat-jun30')
+  })
+
+  it('combines Workspace and Session identity in the owning page header', () => {
+    mocks.workspaces = [workspace({
+      displayName: 'AutoQuant',
+      sessions: [runningSession],
+    })]
+
+    render(
+      <WorkspacePage
+        spec={{
+          kind: 'workspace',
+          params: { wsId: 'chat-1', sessionId: runningSession.id, source: 'auto-quant' },
+        }}
+        visible
+      />,
+    )
+
+    expect(screen.getByText('AutoQuant').parentElement?.getAttribute('title'))
+      .toBe('AutoQuant\nchat-jun30')
+    expect(screen.getByTitle('Cross-market rotation').textContent).toBe('Cross-market rotation')
+    expect(screen.getByText('x1')).toBeTruthy()
+    expect(screen.getByTitle('running · pid 49949').textContent).toContain('pid 49949')
   })
 })

@@ -9,6 +9,7 @@ import { WorkspaceView } from './WorkspaceView'
 
 const viewMocks = vi.hoisted(() => ({
   isDesktop: true,
+  terminalProps: vi.fn(),
   sidePrefs: {
     files: false,
     autoHideMobile: true,
@@ -21,7 +22,12 @@ vi.mock('../../live/workspace-side-panels', () => ({
   useWorkspaceSidePanels: () => viewMocks.sidePrefs,
 }))
 vi.mock('./FilesPanel', () => ({ FilesPanel: () => <div data-testid="files-panel" /> }))
-vi.mock('./Terminal', () => ({ TerminalView: () => null }))
+vi.mock('./Terminal', () => ({
+  TerminalView: (props: unknown) => {
+    viewMocks.terminalProps(props)
+    return <div data-testid="terminal-view" />
+  },
+}))
 vi.mock('./WebPiView', () => ({ WebPiView: () => null }))
 
 function session(index: number, state: SessionRecord['state']): SessionRecord {
@@ -42,6 +48,7 @@ function session(index: number, state: SessionRecord['state']): SessionRecord {
 }
 
 beforeEach(async () => {
+  viewMocks.terminalProps.mockClear()
   viewMocks.isDesktop = true
   viewMocks.sidePrefs.files = false
   viewMocks.sidePrefs.autoHideMobile = true
@@ -50,6 +57,32 @@ beforeEach(async () => {
 })
 
 afterEach(cleanup)
+
+describe('WorkspaceView terminal chrome', () => {
+  it('lets the owning page carry normal Workspace and Session identity', () => {
+    const active = session(2, 'running')
+    render(
+      <WorkspaceView
+        wsId="chat-1"
+        sessionId={active.id}
+        activeRecord={active}
+        sessions={[active]}
+        label="Research desk"
+        onSpawnFresh={vi.fn()}
+        onResume={vi.fn()}
+        onOpenWebPi={vi.fn()}
+        onSelectSession={vi.fn()}
+        onSessionLost={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('terminal-view')).toBeTruthy()
+    expect(viewMocks.terminalProps).toHaveBeenCalledWith(expect.objectContaining({
+      chrome: 'integrated',
+      label: 'Research desk · p2',
+    }))
+  })
+})
 
 describe('WorkspaceView Session library', () => {
   it('keeps a large Workspace searchable and routes running and paused rows correctly', () => {

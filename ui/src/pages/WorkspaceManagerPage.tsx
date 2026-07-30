@@ -181,6 +181,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
               sessionId={sessionId}
               renderer={session.agent === 'opencode' ? 'dom' : 'auto'}
               label={`${t('workspaceManager.title')} · ${session.name}`}
+              chrome="integrated"
               onSessionLost={() => void refreshWorkspaceManager()}
             />
           )}
