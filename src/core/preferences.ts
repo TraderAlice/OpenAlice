@@ -19,15 +19,27 @@ const quickChatPreferencesSchema = z.object({
   recentChatWorkspaceId: z.string().nullable().default(null),
 })
 
+const autoQuantPreferencesSchema = z.object({
+  /**
+   * The durable desk behind the AutoQuant Harness. AutoQuant is considered
+   * initialized only while this points at an active `auto-quant-v2` Workspace.
+   */
+  defaultWorkspaceId: z.string().nullable().default(null),
+})
+
 const preferencesSchema = z.object({
   version: z.literal(1).default(1),
   quickChat: quickChatPreferencesSchema.default({
     lastCredentialByAgent: {},
     recentChatWorkspaceId: null,
   }),
+  autoQuant: autoQuantPreferencesSchema.default({
+    defaultWorkspaceId: null,
+  }),
 })
 
 export type QuickChatPreferences = z.infer<typeof quickChatPreferencesSchema>
+export type AutoQuantPreferences = z.infer<typeof autoQuantPreferencesSchema>
 export type Preferences = z.infer<typeof preferencesSchema>
 
 function emptyPreferences(): Preferences {
@@ -53,6 +65,11 @@ export async function readQuickChatPreferences(path = preferencesPath()): Promis
     lastCredentialByAgent: { ...preferences.quickChat.lastCredentialByAgent },
     recentChatWorkspaceId: preferences.quickChat.recentChatWorkspaceId,
   }
+}
+
+export async function readAutoQuantPreferences(path = preferencesPath()): Promise<AutoQuantPreferences> {
+  const preferences = await readPreferences(path)
+  return { defaultWorkspaceId: preferences.autoQuant.defaultWorkspaceId }
 }
 
 // Alice is single-writer at the process level, but two UI requests can still
@@ -119,6 +136,26 @@ export async function rememberRecentChatWorkspace(
     })
     await writePreferences(updated, path)
     return copyQuickChatPreferences(updated.quickChat)
+  })
+  mutationQueue = operation
+  return operation
+}
+
+export async function rememberAutoQuantDefaultWorkspace(
+  workspaceId: string | null,
+  path = preferencesPath(),
+): Promise<AutoQuantPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      autoQuant: {
+        ...preferences.autoQuant,
+        defaultWorkspaceId: workspaceId,
+      },
+    })
+    await writePreferences(updated, path)
+    return { defaultWorkspaceId: updated.autoQuant.defaultWorkspaceId }
   })
   mutationQueue = operation
   return operation

@@ -43,6 +43,7 @@ function build(opts: {
   workspaces?: any[];
   sessionsByWorkspace?: Record<string, any[]>;
   recentChatWorkspaceId?: string | null;
+  autoQuantDefaultWorkspaceId?: string | null;
   claudeConfig?: WorkspaceAiCred | null;
   claudeInteractiveSetupStatus?: 'ready' | 'runtime-onboarding-required' | 'workspace-trust-required' | 'unknown';
   opencodeConfig?: WorkspaceAiCred | null;
@@ -80,7 +81,12 @@ function build(opts: {
     startedAt: 1,
   }));
   const setTerminalViewAttributes = vi.fn(() => true);
-  const creator = { create: vi.fn(async () => ({ ok: true as const, workspace: META })) };
+  const creator = {
+    create: vi.fn(async (tag: string, template: string) => ({
+      ok: true as const,
+      workspace: { ...META, tag, template },
+    })),
+  };
   const registry = {
     list: () => opts.workspaces ?? [],
     get: (id: string) => (opts.workspaces ?? []).find((w) => w.id === id) ?? (id === META.id ? META : undefined),
@@ -130,7 +136,7 @@ function build(opts: {
     sessionRegistry,
     resumeRegistry,
     pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
-    publicMeta: vi.fn(async () => META),
+    publicMeta: vi.fn(async (workspace: any) => workspace),
     config: { launcherRepoRoot: '/repo' },
     getAgentRuntimeReadiness: vi.fn(() => ({
       agents: opts.opencodeRuntimeSource
@@ -156,14 +162,29 @@ function build(opts: {
     lastCredentialByAgent: {},
     recentChatWorkspaceId: workspaceId,
   }));
+  const rememberAutoQuantDefaultWorkspace = vi.fn(async (workspaceId: string | null) => ({
+    defaultWorkspaceId: workspaceId,
+  }));
   const app = createWorkspaceRoutes(svc, {
     readQuickChatPreferences: vi.fn(async () => ({
       lastCredentialByAgent: {},
       recentChatWorkspaceId: opts.recentChatWorkspaceId ?? null,
     })),
     rememberRecentChatWorkspace,
+    readAutoQuantPreferences: vi.fn(async () => ({
+      defaultWorkspaceId: opts.autoQuantDefaultWorkspaceId ?? null,
+    })),
+    rememberAutoQuantDefaultWorkspace,
   });
-  return { app, opencode, spawn, creator, rememberRecentChatWorkspace, setTerminalViewAttributes };
+  return {
+    app,
+    opencode,
+    spawn,
+    creator,
+    rememberRecentChatWorkspace,
+    rememberAutoQuantDefaultWorkspace,
+    setTerminalViewAttributes,
+  };
 }
 
 async function quickChat(app: any, body: unknown) {
@@ -606,23 +627,103 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
   });
 
-  it('creates a pinned AutoQuant V2 workspace without changing Chat preferences', async () => {
+  it('requires AutoQuant initialization instead of creating a Workspace from the composer', async () => {
     const { app, creator, rememberRecentChatWorkspace } = build();
     const r = await quickChat(app, {
       prompt: 'research momentum',
       agent: 'claude',
       template: 'auto-quant-v2',
-      sourceVersion: 'v0.8.27',
     });
 
-    expect(r.status).toBe(201);
-    expect(creator.create).toHaveBeenCalledWith(
-      'auto-quant',
-      'auto-quant-v2',
-      undefined,
-      'v0.8.27',
-    );
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('auto_quant_not_initialized');
+    expect(creator.create).not.toHaveBeenCalled();
     expect(rememberRecentChatWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('initializes the first AutoQuant Workspace and stores it as the default', async () => {
+    const { app, creator, rememberAutoQuantDefaultWorkspace } = build();
+    const response = await app.request('/auto-quant/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'auto-quant', template: 'auto-quant-v2' });
+    expect(creator.create).toHaveBeenCalledWith('auto-quant', 'auto-quant-v2');
+    expect(rememberAutoQuantDefaultWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('requires explicit selection when an AutoQuant Workspace already exists', async () => {
+    const existing = {
+      id: 'aq-existing',
+      dir: '/aq',
+      agents: ['claude'],
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator } = build({ workspaces: [existing] });
+
+    const response = await app.request('/auto-quant/initialize', { method: 'POST' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: 'auto_quant_workspace_selection_required',
+    });
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('uses the explicitly selected AutoQuant default for targetless research', async () => {
+    const existing = {
+      id: 'aq-existing',
+      dir: '/aq',
+      agents: ['claude'],
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, spawn } = build({
+      workspaces: [existing],
+      autoQuantDefaultWorkspaceId: existing.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+    });
+    expect(r.status).toBe(201);
+    expect((spawn.mock.calls[0] as any[])[0]).toBe(existing.id);
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('does not let an explicit target bypass the AutoQuant default pointer', async () => {
+    const defaultWorkspace = {
+      id: 'aq-default',
+      dir: '/aq-default',
+      agents: ['claude'],
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const otherWorkspace = {
+      ...defaultWorkspace,
+      id: 'aq-other',
+      dir: '/aq-other',
+      tag: 'auto-quant-2',
+    };
+    const { app, spawn } = build({
+      workspaces: [defaultWorkspace, otherWorkspace],
+      autoQuantDefaultWorkspaceId: defaultWorkspace.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+      targetWsId: otherWorkspace.id,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('auto_quant_workspace_not_default');
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   // targetWsId — the chat sidebar's per-workspace "+": spawn INTO the given

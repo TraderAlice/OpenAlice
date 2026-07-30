@@ -795,6 +795,51 @@ export interface QuickChatResult {
   readonly session: SpawnedSession;
 }
 
+export interface AutoQuantDefaultWorkspaceStatus {
+  readonly defaultWorkspaceId: string | null
+  readonly configuredWorkspaceId: string | null
+  readonly ready: boolean
+}
+
+export async function getAutoQuantDefaultWorkspace(): Promise<AutoQuantDefaultWorkspaceStatus> {
+  const res = await fetch('/api/workspaces/auto-quant/default-workspace')
+  const body = (await res.json().catch(() => null)) as
+    | (AutoQuantDefaultWorkspaceStatus & { message?: string })
+    | null
+  if (!res.ok || !body) {
+    throw new Error(body?.message ?? `AutoQuant preference load failed: ${res.status}`)
+  }
+  return body
+}
+
+export async function setAutoQuantDefaultWorkspace(
+  workspaceId: string,
+): Promise<{ defaultWorkspaceId: string; ready: true }> {
+  const res = await fetch('/api/workspaces/auto-quant/default-workspace', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ workspaceId }),
+  })
+  const body = (await res.json().catch(() => null)) as
+    | { defaultWorkspaceId?: string; ready?: boolean; message?: string; error?: string }
+    | null
+  if (!res.ok || body?.ready !== true || typeof body.defaultWorkspaceId !== 'string') {
+    throw new Error(body?.message ?? body?.error ?? `AutoQuant preference save failed: ${res.status}`)
+  }
+  return { defaultWorkspaceId: body.defaultWorkspaceId, ready: true }
+}
+
+export async function initializeAutoQuantWorkspace(): Promise<Workspace> {
+  const res = await fetch('/api/workspaces/auto-quant/initialize', { method: 'POST' })
+  const body = (await res.json().catch(() => null)) as
+    | { workspace?: Workspace; message?: string; error?: string }
+    | null
+  if (!res.ok || !body?.workspace) {
+    throw new Error(body?.message ?? body?.error ?? `AutoQuant initialization failed: ${res.status}`)
+  }
+  return body.workspace
+}
+
 export const MANAGER_WORKSPACE_ID = 'workspace-manager'
 
 export interface ManagerWorkspaceSnapshot {
@@ -857,14 +902,12 @@ export async function quickChat(
   credentialSlug?: string,
   targetWsId?: string,
   template?: 'chat' | 'auto-quant-v2',
-  sourceVersion?: string,
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;
   if (template !== undefined) body['template'] = template;
-  if (sourceVersion !== undefined) body['sourceVersion'] = sourceVersion;
   const res = await fetch('/api/workspaces/quick-chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

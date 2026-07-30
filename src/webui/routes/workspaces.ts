@@ -51,11 +51,17 @@ import {
 } from '../../workspaces/agent-credential-readiness.js';
 import { validateTerminalViewAttributes } from '../../workspaces/terminal-view-attributes.js';
 import {
+  readAutoQuantPreferences,
   readQuickChatPreferences,
+  rememberAutoQuantDefaultWorkspace,
   rememberRecentChatWorkspace,
+  type AutoQuantPreferences,
   type QuickChatPreferences,
 } from '../../core/preferences.js';
-import { CHAT_WORKSPACE_TEMPLATE } from '../../workspaces/chat-workspace-resolver.js';
+import {
+  AUTO_QUANT_WORKSPACE_TEMPLATE,
+  CHAT_WORKSPACE_TEMPLATE,
+} from '../../workspaces/chat-workspace-resolver.js';
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import {
@@ -85,11 +91,16 @@ const resumeInFlight = new Map<string, Promise<unknown>>();
 interface QuickChatWorkspacePreferenceDeps {
   readQuickChatPreferences(): Promise<QuickChatPreferences>;
   rememberRecentChatWorkspace(workspaceId: string | null): Promise<QuickChatPreferences>;
+  readAutoQuantPreferences?(): Promise<AutoQuantPreferences>;
+  rememberAutoQuantDefaultWorkspace?(workspaceId: string | null): Promise<AutoQuantPreferences>;
 }
 
 const defaultQuickChatWorkspacePreferenceDeps: QuickChatWorkspacePreferenceDeps = {
   readQuickChatPreferences: () => readQuickChatPreferences(),
   rememberRecentChatWorkspace: (workspaceId) => rememberRecentChatWorkspace(workspaceId),
+  readAutoQuantPreferences: () => readAutoQuantPreferences(),
+  rememberAutoQuantDefaultWorkspace: (workspaceId) =>
+    rememberAutoQuantDefaultWorkspace(workspaceId),
 };
 
 /**
@@ -183,6 +194,18 @@ export function createWorkspaceRoutes(
 ): Hono {
   const app = new Hono();
   const headlessSessionInFlight = new Map<string, Promise<OpenHeadlessSessionResult>>();
+  const readAutoQuantPreference = () =>
+    (quickChatPreferences.readAutoQuantPreferences ?? readAutoQuantPreferences)();
+  const rememberAutoQuantWorkspace = (workspaceId: string | null) =>
+    (quickChatPreferences.rememberAutoQuantDefaultWorkspace
+      ?? rememberAutoQuantDefaultWorkspace)(workspaceId);
+  const resolveAutoQuantDefaultWorkspace = async (): Promise<WorkspaceMeta | undefined> => {
+    const preference = await readAutoQuantPreference();
+    const workspace = preference.defaultWorkspaceId
+      ? svc.registry.get(preference.defaultWorkspaceId)
+      : undefined;
+    return workspace?.template === AUTO_QUANT_WORKSPACE_TEMPLATE ? workspace : undefined;
+  };
 
   // Renderer truth for hidden/headless terminal color queries. App-global,
   // matching Orca's terminal-view-attribute bridge rather than a spawn env.
@@ -820,6 +843,81 @@ export function createWorkspaceRoutes(
     }
   });
 
+  app.get('/auto-quant/default-workspace', async (c) => {
+    try {
+      const preference = await readAutoQuantPreference();
+      const configured = preference.defaultWorkspaceId;
+      const workspace = configured ? svc.registry.get(configured) : undefined;
+      const valid = workspace?.template === AUTO_QUANT_WORKSPACE_TEMPLATE;
+      return c.json({
+        defaultWorkspaceId: valid ? workspace.id : null,
+        configuredWorkspaceId: configured,
+        ready: valid,
+      });
+    } catch (err) {
+      launcherLogger.warn('auto_quant.preference_read_failed', { err });
+      return c.json({ error: 'preferences_read_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.put('/auto-quant/default-workspace', async (c) => {
+    const body = await safeJson(c).catch(() => null);
+    const workspaceId = body && typeof body === 'object'
+      ? (body as Record<string, unknown>)['workspaceId']
+      : undefined;
+    if (typeof workspaceId !== 'string' || !validId(workspaceId)) {
+      return c.json({ error: 'invalid_workspace_id' }, 400);
+    }
+    const workspace = svc.registry.get(workspaceId);
+    if (!workspace) return c.json({ error: 'workspace_not_found' }, 404);
+    if (workspace.template !== AUTO_QUANT_WORKSPACE_TEMPLATE) {
+      return c.json({ error: 'workspace_template_mismatch' }, 400);
+    }
+    try {
+      await rememberAutoQuantWorkspace(workspace.id);
+      return c.json({ defaultWorkspaceId: workspace.id, ready: true });
+    } catch (err) {
+      launcherLogger.warn('auto_quant.preference_write_failed', { id: workspace.id, err });
+      return c.json({ error: 'preferences_write_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/auto-quant/initialize', async (c) => {
+    try {
+      const preference = await readAutoQuantPreference();
+      const configured = preference.defaultWorkspaceId
+        ? svc.registry.get(preference.defaultWorkspaceId)
+        : undefined;
+      if (configured?.template === AUTO_QUANT_WORKSPACE_TEMPLATE) {
+        return c.json({ workspace: await svc.publicMeta(configured) });
+      }
+      if (svc.registry.list().some((workspace) =>
+        workspace.template === AUTO_QUANT_WORKSPACE_TEMPLATE)) {
+        return c.json({
+          error: 'auto_quant_workspace_selection_required',
+          message: 'select an existing AutoQuant Workspace before continuing',
+        }, 409);
+      }
+
+      const result = await svc.resolveOrCreateAutoQuantWorkspace();
+      if (!result.ok) {
+        const status =
+          result.code === 'tag_in_use' ? 409
+          : result.code === 'unknown_template' ? 400
+          : result.code === 'unknown_source_version' ? 400
+          : result.code === 'invalid_tag' ? 400
+          : result.code === 'unknown_agent' ? 400
+          : 500;
+        return c.json({ error: result.code, message: result.message }, status as 400 | 409 | 500);
+      }
+      await rememberAutoQuantWorkspace(result.workspace.id);
+      return c.json({ workspace: await svc.publicMeta(result.workspace) }, 201);
+    } catch (err) {
+      launcherLogger.error('auto_quant.initialize_failed', { err });
+      return c.json({ error: 'auto_quant_initialize_failed', message: (err as Error).message }, 500);
+    }
+  });
+
   app.post('/', async (c) => {
     const body = await safeJson(c);
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -1278,14 +1376,13 @@ export function createWorkspaceRoutes(
   // Conversational harness launch — the "type a message → you're in" front
   // door shared by Ask Alice and AutoQuant. The harness chooses only the
   // Workspace template; the native Coding Agent remains the worker.
-  // Body: { prompt, agent?, targetWsId?, template?, sourceVersion? }
+  // Body: { prompt, agent?, targetWsId?, template? }
   app.post('/quick-chat', async (c) => {
     let prompt: string;
     let agentId: string | undefined;
     let credentialSlug: string | undefined;
     let targetWsId: string | undefined;
     let templateName = 'chat';
-    let sourceVersion: string | undefined;
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -1310,10 +1407,6 @@ export function createWorkspaceRoutes(
         }
         templateName = rawTemplate;
       }
-      const rawSourceVersion = fields['sourceVersion'];
-      if (typeof rawSourceVersion === 'string' && rawSourceVersion.length > 0) {
-        sourceVersion = rawSourceVersion;
-      }
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
@@ -1330,11 +1423,35 @@ export function createWorkspaceRoutes(
       if (templateName === 'auto-quant-v2' && found.template !== templateName) {
         return c.json({ error: 'workspace_template_mismatch' }, 400);
       }
+      if (templateName === 'auto-quant-v2') {
+        const defaultWorkspace = await resolveAutoQuantDefaultWorkspace().catch((err) => {
+          launcherLogger.warn('auto_quant.preference_read_failed', { err });
+          return undefined;
+        });
+        if (!defaultWorkspace) {
+          return c.json({ error: 'auto_quant_not_initialized' }, 409);
+        }
+        if (defaultWorkspace.id !== found.id) {
+          return c.json({ error: 'auto_quant_workspace_not_default' }, 400);
+        }
+      }
       meta = found;
       if (templateName === 'chat') await rememberRecentChat(meta);
     } else {
       const target = templateName === 'auto-quant-v2'
-        ? await svc.resolveOrCreateAutoQuantWorkspace(undefined, sourceVersion)
+        ? await (async () => {
+            const workspace = await resolveAutoQuantDefaultWorkspace().catch((err) => {
+              launcherLogger.warn('auto_quant.preference_read_failed', { err });
+              return undefined;
+            });
+            return workspace
+              ? { ok: true as const, workspace }
+              : {
+                  ok: false as const,
+                  code: 'auto_quant_not_initialized' as const,
+                  message: 'AutoQuant needs a default Workspace before research can start',
+                };
+          })()
         : await (async () => {
             const preference = await quickChatPreferences.readQuickChatPreferences().catch((err) => {
               launcherLogger.warn('quick_chat.preference_read_failed', { err });
@@ -1349,6 +1466,7 @@ export function createWorkspaceRoutes(
           : target.code === 'unknown_source_version' ? 400
           : target.code === 'invalid_tag' ? 400
           : target.code === 'unknown_agent' ? 400
+          : target.code === 'auto_quant_not_initialized' ? 409
           : 500;
         launcherLogger.error('quick_chat.create_failed', {
           code: target.code,

@@ -38,11 +38,13 @@ import {
   deleteSession as apiDeleteSession,
   type AgentId,
   getIssueDefaultAgent,
+  getAutoQuantDefaultWorkspace,
   getWorkspaceManager,
   getWorkspaceDefaultAgent,
   listAgents,
   listTemplates,
   listWorkspaces,
+  initializeAutoQuantWorkspace as apiInitializeAutoQuantWorkspace,
   openWebPiSession as apiOpenWebPiSession,
   openResumeSession,
   pauseSession as apiPauseSession,
@@ -50,6 +52,7 @@ import {
   quickStartWorkspaceManager as apiQuickStartWorkspaceManager,
   resumeSession as apiResumeSession,
   setIssueDefaultAgent as apiSetIssueDefaultAgent,
+  setAutoQuantDefaultWorkspace as apiSetAutoQuantDefaultWorkspace,
   setWorkspaceDefaultAgent as apiSetWorkspaceDefaultAgent,
   spawnSession,
   updateWorkspaceMetadata,
@@ -72,6 +75,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
   const [templatesLoaded, setTemplatesLoaded] = useState(false)
+  const [autoQuantDefaultWorkspaceId, setAutoQuantDefaultWorkspaceId] = useState<string | null>(null)
+  const [autoQuantPreferenceLoaded, setAutoQuantPreferenceLoaded] = useState(false)
+  const [autoQuantPreferenceError, setAutoQuantPreferenceError] = useState<string | null>(null)
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [defaultAgent, setDefaultAgentState] = useState<string | null>(null)
   const [issueDefaultAgent, setIssueDefaultAgentState] = useState<string | null>(null)
@@ -158,6 +164,16 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     void listAgents().then(setAgents).catch(() => setAgents([]))
     void getWorkspaceDefaultAgent().then(setDefaultAgentState).catch(() => setDefaultAgentState(null))
     void getIssueDefaultAgent().then(setIssueDefaultAgentState).catch(() => setIssueDefaultAgentState(null))
+    void getAutoQuantDefaultWorkspace()
+      .then((status) => {
+        setAutoQuantDefaultWorkspaceId(status.defaultWorkspaceId)
+        setAutoQuantPreferenceError(null)
+      })
+      .catch((error) => {
+        setAutoQuantDefaultWorkspaceId(null)
+        setAutoQuantPreferenceError((error as Error).message)
+      })
+      .finally(() => setAutoQuantPreferenceLoaded(true))
   }, [])
 
   // Reconcile tabs against the workspaces list. If a workspace or session
@@ -303,6 +319,24 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setIssueDefaultAgentState(saved)
   }, [])
 
+  const initializeAutoQuant = useCallback(async (): Promise<Workspace> => {
+    const workspace = await apiInitializeAutoQuantWorkspace()
+    setWorkspaces((current) => [
+      workspace,
+      ...current.filter((candidate) => candidate.id !== workspace.id),
+    ])
+    setAutoQuantDefaultWorkspaceId(workspace.id)
+    setAutoQuantPreferenceError(null)
+    void refresh()
+    return workspace
+  }, [refresh])
+
+  const setAutoQuantDefaultWorkspace = useCallback(async (workspaceId: string): Promise<void> => {
+    const saved = await apiSetAutoQuantDefaultWorkspace(workspaceId)
+    setAutoQuantDefaultWorkspaceId(saved.defaultWorkspaceId)
+    setAutoQuantPreferenceError(null)
+  }, [])
+
   const quickChat = useCallback(
     async (
       prompt: string,
@@ -310,7 +344,6 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       credentialSlug?: string,
       targetWsId?: string,
       template?: 'chat' | 'auto-quant-v2',
-      sourceVersion?: string,
     ): Promise<string> => {
       await ensureTerminalAppearancePublished()
       const { workspace, session } = await apiQuickChat(
@@ -319,7 +352,6 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         credentialSlug,
         targetWsId,
         template,
-        sourceVersion,
       )
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
@@ -567,6 +599,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         workspaceManagerError,
         hasLoaded,
         templatesLoaded,
+        autoQuantDefaultWorkspaceId,
+        autoQuantPreferenceLoaded,
+        autoQuantPreferenceError,
         refresh,
         refreshWorkspaceManager,
         quickStartWorkspaceManager,
@@ -574,6 +609,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         openHeadlessRun,
         setDefaultAgent,
         setIssueDefaultAgent,
+        initializeAutoQuant,
+        setAutoQuantDefaultWorkspace,
         quickChat,
         pauseSession,
         resumeSession,

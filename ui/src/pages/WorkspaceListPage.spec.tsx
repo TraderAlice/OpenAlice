@@ -50,6 +50,9 @@ function context(): WorkspacesContextValue {
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    autoQuantDefaultWorkspaceId: null,
+    autoQuantPreferenceLoaded: true,
+    autoQuantPreferenceError: null,
     refresh: vi.fn(),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => {
@@ -59,6 +62,8 @@ function context(): WorkspacesContextValue {
     openHeadlessRun: vi.fn(async () => undefined),
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
+    initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: vi.fn(async () => ''),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
