@@ -11,10 +11,9 @@ import { useWorkspaceSidePanels } from '../../live/workspace-side-panels'
  * leaving a narrow always-on column. Lives next to "Settings" in
  * WorkspacePage's header; replaces the old Layout popover.
  *
- * Desktop state is user-level + persisted (fold it once, it stays folded).
- * Auto-hidden mobile layouts use an explicit, transient overlay state so the
- * control never claims a hidden panel is open and never changes the user's
- * desktop preference.
+ * Desktop state is runtime-only so a new UI load starts collapsed. Auto-hidden
+ * mobile layouts use a separate transient overlay state so the control never
+ * claims a hidden panel is open.
  */
 export function WorkspaceFilesToggle(): ReactElement {
   const { t } = useTranslation()
