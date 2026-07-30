@@ -27,6 +27,7 @@ export const zh: Resources = {
     unread: '{{count}} 条未读',
     pendingPush: '{{count}} 笔待推送',
     about: '关于{{label}}',
+    primaryNavigation: '主导航',
     collapseRail: '折叠活动栏',
     expandRail: '展开活动栏',
   },
