@@ -97,4 +97,39 @@ describe('WorkspacePage identity', () => {
     expect(screen.getByTitle('chat-jun30').textContent).toBe('chat-jun30')
     expect(screen.getByTestId('workspace-view').getAttribute('data-label')).toBe('chat-jun30')
   })
+
+  it('presents the active Session as part of the page identity without replacing the Workspace', () => {
+    mocks.workspaces = [workspace({
+      displayName: 'AutoQuant',
+      sessions: [{
+        id: 'opencode-fresh-cloud',
+        resumeId: 'resume-1',
+        wsId: 'chat-1',
+        agent: 'opencode',
+        name: 'x1',
+        title: 'Research semiconductor momentum',
+        state: 'running',
+        surface: 'terminal',
+        createdAt: '2026-07-31T00:00:00.000Z',
+        lastActiveAt: '2026-07-31T00:00:00.000Z',
+        pid: 49949,
+        startedAt: 1,
+      }],
+    })]
+
+    render(
+      <WorkspacePage
+        spec={{
+          kind: 'workspace',
+          params: { wsId: 'chat-1', sessionId: 'opencode-fresh-cloud' },
+        }}
+        visible
+      />,
+    )
+
+    expect(screen.getByText('AutoQuant')).toBeTruthy()
+    expect(screen.getByText('Research semiconductor momentum')).toBeTruthy()
+    expect(screen.getByText('AutoQuant').parentElement?.getAttribute('title'))
+      .toBe('AutoQuant\nchat-jun30\nResearch semiconductor momentum')
+  })
 })

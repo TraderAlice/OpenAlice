@@ -80,7 +80,12 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
   const usesMobileOverlay = !isDesktop && sidePrefs.autoHideMobile;
   const showFiles = usesMobileOverlay ? sidePrefs.mobileFilesOpen : sidePrefs.files;
   const showAside = showFiles;
-  const viewClass = `workspace-view${showAside ? '' : ' has-no-side'}`;
+  const hasRunningSession = runningSlots.length > 0;
+  const viewClass = [
+    'workspace-view',
+    showAside ? '' : 'has-no-side',
+    hasRunningSession ? 'has-running-session' : '',
+  ].filter(Boolean).join(' ');
 
   return (
     <div className={viewClass}>
@@ -112,7 +117,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                   <WebPiView
                     wsId={props.wsId}
                     sessionId={s.id}
-                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    label={`${s.agent} · ${s.name}`}
                     onSessionLost={props.onSessionLost}
                   />
                 ) : (
@@ -120,7 +125,8 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     wsId={props.wsId}
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
-                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    label={`${s.agent} · ${s.name}`}
+                    chrome="workspace"
                     onSessionLost={props.onSessionLost}
                   />
                 )}

@@ -21,8 +21,16 @@ vi.mock('../../live/workspace-side-panels', () => ({
   useWorkspaceSidePanels: () => viewMocks.sidePrefs,
 }))
 vi.mock('./FilesPanel', () => ({ FilesPanel: () => <div data-testid="files-panel" /> }))
-vi.mock('./Terminal', () => ({ TerminalView: () => null }))
-vi.mock('./WebPiView', () => ({ WebPiView: () => null }))
+vi.mock('./Terminal', () => ({
+  TerminalView: (props: { label?: string; chrome?: string }) => (
+    <div data-testid="terminal-view" data-label={props.label} data-chrome={props.chrome} />
+  ),
+}))
+vi.mock('./WebPiView', () => ({
+  WebPiView: (props: { label?: string }) => (
+    <div data-testid="webpi-view" data-label={props.label} />
+  ),
+}))
 
 function session(index: number, state: SessionRecord['state']): SessionRecord {
   return {
@@ -154,5 +162,52 @@ describe('WorkspaceView Files panel', () => {
 
     expect(screen.getByTestId('files-panel')).toBeTruthy()
     expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(false)
+  })
+})
+
+describe('WorkspaceView running surface hierarchy', () => {
+  const renderRunning = (record: SessionRecord) => render(
+    <WorkspaceView
+      wsId="auto-quant"
+      sessionId={record.id}
+      activeRecord={record}
+      sessions={[record]}
+      label="AutoQuant"
+      onSpawnFresh={vi.fn()}
+      onResume={vi.fn()}
+      onOpenWebPi={vi.fn()}
+      onSelectSession={vi.fn()}
+      onSessionLost={vi.fn()}
+    />,
+  )
+
+  it('uses the runtime and Session handle without repeating the Workspace name', () => {
+    const record = {
+      ...session(1, 'running'),
+      wsId: 'auto-quant',
+      agent: 'opencode',
+      name: 'x1',
+    }
+
+    const { container } = renderRunning(record)
+
+    const terminal = screen.getByTestId('terminal-view')
+    expect(terminal.getAttribute('data-label')).toBe('opencode · x1')
+    expect(terminal.getAttribute('data-chrome')).toBe('workspace')
+    expect(container.querySelector('.workspace-view')?.classList.contains('has-running-session')).toBe(true)
+  })
+
+  it('keeps WebPi identity at the Session level too', () => {
+    const record = {
+      ...session(2, 'running'),
+      wsId: 'auto-quant',
+      agent: 'pi',
+      name: 'x2',
+      surface: 'webpi' as const,
+    }
+
+    renderRunning(record)
+
+    expect(screen.getByTestId('webpi-view').getAttribute('data-label')).toBe('pi · x2')
   })
 })

@@ -175,6 +175,12 @@ export interface TerminalViewProps {
   readonly sessionId: string;
   /** Human-facing label shown in the terminal header. Falls back to wsId. */
   readonly label?: string;
+  /**
+   * Workspace surfaces already own the surrounding identity and layout. This
+   * variant keeps the terminal flush with that shell instead of drawing a
+   * second card inside it.
+   */
+  readonly chrome?: 'panel' | 'workspace';
   /** WebSocket URL base. Defaults to `${ws/wss}://${location.host}/pty`. */
   readonly wsUrl?: string;
   /** OpenTUI currently corrupts to an all-black canvas in xterm's WebGL addon. */
@@ -649,7 +655,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   }, [wsId, sessionId, wsUrl, props.renderer]);
 
   return (
-    <div className="terminal-shell">
+    <div className={`terminal-shell${props.chrome === 'workspace' ? ' is-workspace' : ''}`}>
       <header className="terminal-header">
         <StatusDot status={status} />
         <span className="terminal-title">{props.label ?? wsId}</span>
@@ -702,7 +708,7 @@ function StatusDot({ status }: { status: Status }): ReactElement {
   return (
     <span
       className="status-dot"
-      style={{ background: colors[status] }}
+      style={{ background: colors[status], color: colors[status] }}
       title={status}
       aria-label={status}
     />

@@ -339,10 +339,30 @@
   }
 }
 
+@container (max-width: 520px) {
+  .workspace-page-shell .workspace-side {
+    width: 100%;
+  }
+}
+
 /* Both side panels hidden (or auto-hidden on mobile) — collapse the
  * 360px aside column so the terminal pane fills the whole width. */
 .workspace-view.has-no-side {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-view.has-running-session {
+  gap: 0;
+}
+
+.workspace-view.has-running-session .workspace-side {
+  gap: 0;
+  border-left: 1px solid var(--border);
+}
+
+.workspace-view.has-running-session .workspace-side > .panel {
+  border: 0;
+  border-radius: 0;
 }
 
 .workspace-terminal {
@@ -1061,14 +1081,21 @@ button.files-row:focus-visible {
   box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow-color) 35%, transparent);
 }
 
+.terminal-shell.is-workspace {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .terminal-header {
   display: flex;
   align-items: center;
   min-width: 0;
   overflow: hidden;
   gap: 10px;
-  padding: 8px 12px;
-  background: linear-gradient(180deg, var(--muted), var(--secondary));
+  min-height: 34px;
+  padding: 6px 12px;
+  background: var(--secondary);
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   color: var(--muted-foreground);
@@ -1081,8 +1108,8 @@ button.files-row:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--foreground);
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  font-weight: 550;
+  letter-spacing: 0.1px;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
@@ -1115,8 +1142,9 @@ button.files-row:focus-visible {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  box-shadow: 0 0 6px currentColor;
+  border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
   display: inline-block;
+  flex: 0 0 auto;
 }
 
 .terminal-body {

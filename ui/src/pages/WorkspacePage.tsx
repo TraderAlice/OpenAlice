@@ -94,6 +94,8 @@ export function WorkspacePage({ spec, visible }: Props) {
   const workspaceName = workspaceDisplayName(workspace)
   const workspaceTitle = workspaceDisplayTitle(workspace)
   const hasCustomName = workspaceName !== workspace.tag
+  const activeSessionTitle = activeRecord?.title?.trim() || activeRecord?.name || null
+  const embedsRunningSurface = activeRecord?.state === 'running'
 
   // Sessions list: pass the full workspace.sessions. WorkspaceView's
   // `runningSlots` is gated on sessionId so the multi-terminal mount
@@ -102,21 +104,29 @@ export function WorkspacePage({ spec, visible }: Props) {
   // state needs the full list to render resume/continue cards.
   return (
     <div className="workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {/* OpenAlice-side header bar above the launcher's WorkspaceView. The
-       *  launcher component itself is byte-faithful; we add the AI-provider
-       *  affordance here. */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-secondary/30 shrink-0">
+      {/* One page-owned identity bar. Session surfaces below it only report
+       * runtime state; they must not repeat the Workspace name as another
+       * nested title. */}
+      <div className="flex min-h-10 shrink-0 items-center justify-between border-b border-border bg-secondary/30 px-3 py-1.5">
         <div
-          className="flex min-w-0 items-baseline gap-2 pr-2"
-          title={workspaceTitle}
+          className="flex min-w-0 items-center gap-2 pr-2"
+          title={activeSessionTitle ? `${workspaceTitle}\n${activeSessionTitle}` : workspaceTitle}
         >
-          <span className="truncate text-[12px] font-medium text-foreground">
+          <span className="shrink-0 truncate text-[12px] font-semibold text-foreground">
             {workspaceName}
           </span>
           {hasCustomName && (
-            <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/70 sm:inline">
+            <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/60 md:inline">
               {workspace.tag}
             </span>
+          )}
+          {activeSessionTitle && (
+            <>
+              <span className="shrink-0 text-[11px] text-muted-foreground/45" aria-hidden="true">/</span>
+              <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                {activeSessionTitle}
+              </span>
+            </>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -155,7 +165,11 @@ export function WorkspacePage({ spec, visible }: Props) {
         </div>
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3">
+      <div
+        className={`flex min-h-0 min-w-0 flex-1 flex-col ${
+          embedsRunningSurface ? '' : 'p-3'
+        }`}
+      >
         <WorkspaceView
           wsId={wsId}
           sessionId={sessionId}

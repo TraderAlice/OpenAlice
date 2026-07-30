@@ -42,4 +42,19 @@ describe('terminal responsive layout contract', () => {
     expect(declarationsFor('.terminal-title')).toContain('text-overflow: ellipsis')
     expect(declarationsFor('.terminal-meta')).toContain('text-overflow: ellipsis')
   })
+
+  it('flattens the terminal when the Workspace already owns the page shell', () => {
+    const workspaceChrome = declarationsFor('.terminal-shell.is-workspace')
+
+    expect(workspaceChrome).toContain('border: 0')
+    expect(workspaceChrome).toContain('border-radius: 0')
+    expect(workspaceChrome).toContain('box-shadow: none')
+    expect(declarationsFor('.workspace-view.has-running-session')).toContain('gap: 0')
+  })
+
+  it('lets the Files overlay own the full Workspace width on a phone', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 520px\)[\s\S]*?\.workspace-page-shell \.workspace-side\s*\{[\s\S]*?width: 100%/,
+    )
+  })
 })
