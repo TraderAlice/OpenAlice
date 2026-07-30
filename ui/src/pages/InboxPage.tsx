@@ -321,9 +321,9 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     <div className="mx-auto max-w-[920px] px-4 py-6 md:px-8 md:py-8">
       {/* Provenance is identity, not a third way to open the same Session. */}
       <header className="mb-6 border-b border-border/70 pb-4">
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
               <span
                 className={`text-[14px] font-semibold ${
                   wsAlive ? 'text-foreground' : 'text-muted-foreground/70 line-through'
@@ -334,14 +334,16 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
               </span>
               {senderLabel && (
                 <span
-                  className="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground/75"
+                  className="inline-flex min-w-0 items-start gap-1.5 text-[11px] text-muted-foreground/75 sm:items-center"
                   title={t('inbox.senderIdentityTitle', { sender: senderLabel })}
                 >
                   <ChevronRight size={11} className="shrink-0 text-muted-foreground/35" aria-hidden />
                   {origin?.kind === 'interactive'
                     ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
                     : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
-                  <span className="max-w-[380px] truncate">{t('inbox.fromSender', { sender: senderLabel })}</span>
+                  <span className="min-w-0 break-all sm:max-w-[380px] sm:truncate">
+                    {t('inbox.fromSender', { sender: senderLabel })}
+                  </span>
                 </span>
               )}
               {issueId && (
@@ -349,10 +351,12 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                   type="button"
                   onClick={openIssue}
                   title={t('inbox.fromIssueTitle', { issue: issueId })}
-                  className="oa-pressable inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground/75 hover:bg-primary/10 hover:text-primary"
+                  className="oa-pressable inline-flex min-h-10 w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-left text-[11px] text-muted-foreground/75 hover:bg-primary/10 hover:text-primary sm:min-h-0 sm:w-auto sm:py-0.5"
                 >
                   <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
-                  <span className="max-w-[220px] truncate">{t('inbox.fromIssue', { issue: issueTitle ?? issueId })}</span>
+                  <span className="min-w-0 break-words sm:max-w-[220px] sm:truncate">
+                    {t('inbox.fromIssue', { issue: issueTitle ?? issueId })}
+                  </span>
                 </button>
               )}
             </div>
@@ -362,13 +366,13 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
               {formatRelativeTime(entry.ts)}
             </div>
           </div>
-          <div className="-mr-1 flex shrink-0 items-center gap-1">
+          <div className="flex w-full items-center gap-2 sm:-mr-1 sm:w-auto sm:shrink-0 sm:gap-1">
             {wsAlive && (
               <button
                 type="button"
                 onClick={() => void continueOrigin()}
                 disabled={continuing}
-                className="oa-pressable inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5"
+                className="oa-pressable inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 sm:h-8 sm:flex-none sm:px-2.5"
                 title={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
                 aria-label={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
               >
@@ -390,7 +394,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
             <button
               type="button"
               onClick={onDelete}
-              className="oa-pressable inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground/45 hover:bg-destructive/10 hover:text-destructive"
+              className="oa-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground/55 hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:border-transparent sm:bg-transparent"
               title={t('inbox.deleteEntryTitle')}
               aria-label={t('inbox.deleteEntryAriaLabel')}
             >

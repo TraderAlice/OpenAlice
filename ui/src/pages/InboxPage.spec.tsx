@@ -156,3 +156,47 @@ describe('InboxPage deletion', () => {
     await waitFor(() => expect(screen.queryByText('Delete Inbox entry?')).toBeNull())
   })
 })
+
+describe('InboxPage responsive detail header', () => {
+  it('keeps long provenance readable and mobile actions touch-sized', async () => {
+    const entry = {
+      id: 'inbox-mobile-header',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: 'A durable research update.',
+      origin: {
+        kind: 'headless' as const,
+        agent: 'pi',
+        runId: 'run-mobile-header',
+        resumeId: 'resume-plain-linen-river-2218b6',
+        issueId: 'daily-us-market-close-with-a-long-name',
+      },
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({
+      entries: [entry],
+      hasMore: false,
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    const sender = await screen.findByText('from pi · @resume-plain-linen-river-2218b6')
+    expect(sender.className).toContain('break-all')
+    expect(sender.className).toContain('sm:truncate')
+
+    const issue = screen.getByRole('button', {
+      name: 'from daily-us-market-close-with-a-long-name',
+    })
+    expect(issue.className).toContain('min-h-10')
+    expect(issue.className).toContain('sm:min-h-0')
+
+    const openConversation = screen.getByRole('button', { name: 'Open conversation' })
+    expect(openConversation.className).toContain('h-10')
+    expect(openConversation.className).toContain('sm:h-8')
+
+    const deleteEntry = screen.getByRole('button', { name: 'Delete this inbox entry' })
+    expect(deleteEntry.className).toContain('h-10')
+    expect(deleteEntry.className).toContain('w-10')
+  })
+})
