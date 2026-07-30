@@ -145,7 +145,9 @@ export async function startRuntime(options, dependencies = {}) {
       waitForRuntimeReady(homeRoot, options.waitMs, {
         ...dependencies,
         readStatus,
-        allowOwnerTransition: options.takeover,
+        allowOwnerTransition: true,
+        allowForeignOwnerTransition: options.takeover,
+        expectedOwnerPid: runtime.pid,
         signal: readinessAbort.signal,
       }),
       earlyFailure,
@@ -239,8 +241,20 @@ async function waitForRuntimeReady(homeRoot, timeoutMs, dependencies) {
       timeoutMs: Math.min(1_000, Math.max(100, deadline - Date.now())),
     }, dependencies)
     if (
+      Number.isInteger(dependencies.expectedOwnerPid)
+      && Number.isInteger(lastStatus.owner?.pid)
+      && lastStatus.owner.pid !== dependencies.expectedOwnerPid
+      && !dependencies.allowForeignOwnerTransition
+    ) {
+      throw lifecycleError('EOWNED', formatOwnershipRefusal(lastStatus))
+    }
+    if (
       lastStatus.class === 'running'
       && lastStatus.owner?.surface === 'cli-server'
+      && (
+        !Number.isInteger(dependencies.expectedOwnerPid)
+        || lastStatus.owner.pid === dependencies.expectedOwnerPid
+      )
       && isLoopbackWebUrl(lastStatus.endpoints?.web)
     ) {
       return lastStatus

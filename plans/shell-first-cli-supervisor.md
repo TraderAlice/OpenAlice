@@ -402,6 +402,9 @@ starting the Runtime.
   flags once into `ResolvedLaunchContext`, retaining field-level provenance.
 - [ ] Add `openalice config check` plus TUI diagnostics; invalid live reload
   retains the last valid configuration.
+- [x] Add a selected-instance TUI settings overlay for complete home, Web port,
+  and update-check inheritance, with active-Runtime guards and visible
+  environment/CLI locks.
 - [x] Give OpenAlice-managed Pi an instance-local `PI_CODING_AGENT_DIR` and
   session root without changing a user-installed Pi launched externally.
 - [x] Update the managed Workspace runtime owner guide and tests for the new
@@ -414,11 +417,14 @@ starting the Runtime.
 - [ ] Test concurrent homes, ports, sockets, logs, foreign/stale owners,
   Electron ownership, and remote instances.
 
-The first persisted-configuration increment activates a versioned atomic
-`<Supervisor root>/config.json` and lets the TUI validate, remember, and
-immediately use the selected instance's source checkout. General config
-editing, `config check`, last-known-good live reload, and named-instance
-management remain unchecked above.
+The first persisted-configuration increments activate a versioned atomic
+`<Supervisor root>/config.json` and let the TUI validate, remember, and
+immediately use the selected instance's source checkout, complete home, Web
+port, and update policy. Returning a field to inheritance removes only that
+instance key. Environment and CLI provenance visibly lock lower-priority
+editing, while an active Runtime prevents its home or port from changing
+underneath it. Machine-default editing, `config check`, last-known-good live
+reload, and named-instance management remain unchecked above.
 
 The clean-host follow-up reuses the managed-remote install-source identity for
 local startup. A stopped installed Supervisor now confirms `m Managed`, clones
@@ -676,3 +682,17 @@ This plan is complete only when:
   instance/home/port selection. Persisted configuration schemas, registry
   loading, and full root-parser conversion remain in the configuration
   increment.
+- 2026-07-30: Added a Pi-style selected-instance settings overlay to the bare
+  Supervisor TUI. Humans can set or inherit complete home, Web port, and update
+  checks without launch flags; active Runtime mutations are guarded, and
+  environment/CLI overrides render their resolved values as locked. Atomic
+  persistence now removes explicit fields when they return to inheritance.
+  Real PTY journeys cover a saved/reloaded port and a `--port` lock.
+- 2026-07-30: The installed-CLI dogfood journey exposed two lifecycle gaps
+  masked by isolated unit fixtures. The built Guardian now probes unconfigured
+  internal ports, allowing a CLI Runtime on another complete home to coexist
+  with the desktop process occupying 47332. Status fallback now observes both
+  Guardian and Alice runtime locks, and spawned-start readiness accepts only
+  its expected Guardian PID. The same isolated installed CLI then completed
+  start, authenticated Web/root probes, stop/restart ownership handoff,
+  reconnect, and final stop while the desktop app remained active.

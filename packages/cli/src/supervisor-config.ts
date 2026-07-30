@@ -60,6 +60,19 @@ export interface PersistInstanceConfigOptions {
   ) => Promise<void>
 }
 
+export async function readInstanceLaunchConfig(
+  context: ResolvedLaunchContext,
+  options: Pick<PersistInstanceConfigOptions, 'readConfig'> = {},
+): Promise<InstanceLaunchConfig> {
+  const config = await (
+    options.readConfig ?? readSupervisorConfig
+  )(context.supervisorRoot)
+  return {
+    ...config.instances?.[context.instance],
+    name: context.instance,
+  }
+}
+
 export async function resolveStoredLaunchContext(
   flags: TuiLaunchFlags = {},
   options: StoredLaunchContextOptions = {},
@@ -104,6 +117,16 @@ export async function persistInstanceLaunchConfig(
     ...existing,
     ...patch,
     name: context.instance,
+  }
+  for (const key of [
+    'home',
+    'port',
+    'appDir',
+    'updateChecks',
+  ] as const) {
+    if (Object.hasOwn(patch, key) && patch[key] === undefined) {
+      delete instance[key]
+    }
   }
   const next: SupervisorConfigDocument = {
     ...current,
