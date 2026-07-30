@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useId, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRelativeTime } from '../lib/intl'
 import { api, type NewsArticle } from '../api'
@@ -17,34 +17,95 @@ const LOOKBACK_OPTIONS = [
 
 // ==================== Article Row ====================
 
+interface ArticleGroup {
+  key: string
+  label: string
+  articles: NewsArticle[]
+}
+
+function localDayKey(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+function articleDayLabel(date: Date): string {
+  const today = new Date()
+  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const dayDistance = Math.round((targetDay - todayStart) / 86_400_000)
+  if (dayDistance >= -1 && dayDistance <= 1) {
+    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(dayDistance, 'day')
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }),
+  }).format(date)
+}
+
+function groupArticlesByDay(articles: NewsArticle[]): ArticleGroup[] {
+  const groups = new Map<string, ArticleGroup>()
+  for (const article of articles) {
+    const date = new Date(article.time)
+    const valid = !Number.isNaN(date.getTime())
+    const key = valid ? localDayKey(date) : article.time
+    const group = groups.get(key) ?? {
+      key,
+      label: valid ? articleDayLabel(date) : article.time,
+      articles: [],
+    }
+    group.articles.push(article)
+    groups.set(key, group)
+  }
+  return [...groups.values()]
+}
+
 function ArticleRow({ article }: { article: NewsArticle }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
-  const contentPreview = article.content.length > 160
-    ? article.content.slice(0, 160) + '...'
-    : article.content
+  const disclosureId = useId().replace(/:/g, '')
+  const titleId = `news-title-${disclosureId}`
+  const panelId = `news-details-${disclosureId}`
+  const hasPreview = article.content.trim().length > 0
+  const categories = article.categories?.replaceAll(',', ' · ')
 
   return (
-    <article>
+    <article data-density={hasPreview ? 'preview' : 'compact'}>
       <button
         type="button"
         aria-label={article.title}
         aria-expanded={expanded}
+        aria-controls={panelId}
         onClick={() => setExpanded((current) => !current)}
-        className="group w-full px-4 py-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-5"
+        className={`group w-full px-1 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-2 ${
+          hasPreview ? 'py-3 sm:py-3.5' : 'py-2.5'
+        }`}
       >
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium leading-snug text-foreground">{article.title}</p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p
+              id={titleId}
+              className="line-clamp-2 text-sm font-medium leading-snug text-foreground sm:line-clamp-1"
+            >
+              {article.title}
+            </p>
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
               {article.source && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
+                <span className="shrink-0 font-semibold text-foreground/70">
                   {article.source}
                 </span>
               )}
-              <span className="text-[11px] text-muted-foreground">{formatRelativeTime(article.time)}</span>
-              {article.categories && (
-                <span className="text-[11px] text-muted-foreground/50 truncate">{article.categories}</span>
+              {article.source && <span className="text-muted-foreground/40" aria-hidden>·</span>}
+              <span className="shrink-0 tabular-nums">{formatRelativeTime(article.time)}</span>
+              {categories && (
+                <>
+                  <span className="hidden text-muted-foreground/40 sm:inline" aria-hidden>·</span>
+                  <span className="hidden truncate text-muted-foreground/75 sm:inline">{categories}</span>
+                </>
               )}
             </div>
           </div>
@@ -58,16 +119,23 @@ function ArticleRow({ article }: { article: NewsArticle }) {
           </span>
         </div>
 
-        {!expanded && article.content && (
-          <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground/75 md:line-clamp-1">
-            {contentPreview}
+        {!expanded && hasPreview && (
+          <p className="mt-2 line-clamp-2 max-w-[88ch] text-[13px] leading-relaxed text-muted-foreground/80 md:line-clamp-1">
+            {article.content}
           </p>
         )}
       </button>
 
       {expanded && (
-        <div className="space-y-3 border-t border-border/40 px-4 pb-4 pt-3 sm:px-5">
-          <p className="max-w-[72ch] whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{article.content}</p>
+        <div
+          id={panelId}
+          role="region"
+          aria-labelledby={titleId}
+          className="ml-1 space-y-3 border-l-2 border-primary/25 px-3 pb-4 pt-2 sm:ml-2 sm:px-4"
+        >
+          {hasPreview && (
+            <p className="max-w-[72ch] whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{article.content}</p>
+          )}
           {article.link && (
             <a
               href={article.link}
@@ -104,6 +172,7 @@ export function NewsPage() {
     ),
     [articles],
   )
+  const articleGroups = useMemo(() => groupArticlesByDay(orderedArticles), [orderedArticles])
 
   const fetchArticles = useCallback(async (lb: string, src: string) => {
     try {
@@ -145,12 +214,12 @@ export function NewsPage() {
       <div className="flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6 md:py-5">
         <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col gap-3">
           {/* Controls */}
-          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+          <div className="grid shrink-0 grid-cols-2 items-center gap-2 sm:flex sm:gap-3">
             <select
               aria-label={t('news.lookbackLabel')}
               value={lookback}
               onChange={(e) => setLookback(e.target.value)}
-              className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+              className="min-h-10 min-w-0 w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:w-auto"
             >
               {LOOKBACK_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
@@ -161,7 +230,7 @@ export function NewsPage() {
               aria-label={t('news.sourceLabel')}
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="min-h-10 max-w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+              className="min-h-10 min-w-0 w-full max-w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:w-auto"
             >
               <option value="">{t('news.allSources')}</option>
               {sources.map((s) => (
@@ -169,20 +238,21 @@ export function NewsPage() {
               ))}
             </select>
 
-            <span aria-live="polite" className="ml-auto inline-flex min-h-10 items-center text-xs tabular-nums text-muted-foreground">
+            <span aria-live="polite" className="col-span-2 inline-flex min-h-6 items-center justify-end text-xs tabular-nums text-muted-foreground sm:ml-auto sm:min-h-10">
               {t('news.articleCount', { count: articles.length })}
             </span>
           </div>
 
           {/* Article list */}
           <div
+            data-testid="news-feed"
             aria-busy={loading}
-            className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+            className="min-h-0 flex-1 overflow-y-auto"
           >
             {loading && articles.length === 0 ? (
-              <div className="divide-y divide-border/50">
+              <div className="divide-y divide-border/50 border-y border-border/70">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="px-4 py-3">
+                  <div key={i} className="px-1 py-3 sm:px-2">
                     <Skeleton className="h-3.5 w-3/4" />
                     <Skeleton className="h-2.5 w-1/3 mt-2" />
                   </div>
@@ -191,12 +261,26 @@ export function NewsPage() {
             ) : articles.length === 0 ? (
               <EmptyState title={t('news.noArticles')} description={t('news.noArticlesDescription')} />
             ) : (
-              <div className="divide-y divide-border/50">
-                {orderedArticles.map((article) => (
-                  <ArticleRow
-                    key={`${article.time}-${article.link ?? article.title}`}
-                    article={article}
-                  />
+              <div className={articleGroups.length > 1 ? 'space-y-5 pb-1' : ''}>
+                {articleGroups.map((group) => (
+                  <section key={group.key} data-news-day={group.key}>
+                    {articleGroups.length > 1 && (
+                      <div className="flex min-h-9 items-center justify-between gap-3 px-1 pb-1 text-xs sm:px-2">
+                        <h3 className="font-semibold text-foreground/80">{group.label}</h3>
+                        <span className="tabular-nums text-muted-foreground">
+                          {t('news.articleCount', { count: group.articles.length })}
+                        </span>
+                      </div>
+                    )}
+                    <div className="divide-y divide-border/55 border-y border-border/70">
+                      {group.articles.map((article) => (
+                        <ArticleRow
+                          key={`${article.time}-${article.link ?? article.title}`}
+                          article={article}
+                        />
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             )}
