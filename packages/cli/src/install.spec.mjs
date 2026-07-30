@@ -145,6 +145,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
         selector: { kind: 'version', value: 'test/ref' },
         installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/test/ref/install',
       },
+      managedRuntime: null,
     })
     await expect(access(join(installRoot, 'cli-versions', releases[0], 'install-source.json'))).resolves.toBeUndefined()
     const pi = await execFileAsync(join(installRoot, 'bin', 'pi'), ['--version'])

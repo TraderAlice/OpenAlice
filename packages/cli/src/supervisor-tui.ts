@@ -381,6 +381,7 @@ export async function runSupervisorTui(
           prepare: true,
           rebuild: false,
           checkUpdates: context.updateChecks,
+          runtimeProvider: context.runtimeProvider,
           port: runtimeStartPort(context),
           homeRoot,
           appDir: context.appDir ?? screen.snapshot.runtime?.provider?.root,
@@ -403,6 +404,7 @@ export async function runSupervisorTui(
           prepare: true,
           rebuild: false,
           checkUpdates: context.updateChecks,
+          runtimeProvider: context.runtimeProvider,
           port: runtimeStartPort(context),
           homeRoot,
           appDir,
@@ -1428,10 +1430,13 @@ export class SupervisorScreen implements Component {
         }
         if (this.snapshot.context) {
           lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
-          lines.push(`Source: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
+          const runtimeLabel = this.snapshot.context.runtimeProvider.kind === 'bundle'
+            ? 'Runtime'
+            : 'Source'
+          lines.push(`${runtimeLabel}: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
         }
       }
-      lines.push('', ...renderGuidance(runtime))
+      lines.push('', ...renderGuidance(runtime, this.snapshot.context))
     }
 
     if (this.snapshot.confirmation) {
@@ -1448,7 +1453,7 @@ export class SupervisorScreen implements Component {
     }
     lines.push(
       '',
-      ...actionBar(runtime, width),
+      ...actionBar(runtime, this.snapshot.context, width),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
     return lines.map((line) => truncate(line, width))
@@ -1513,9 +1518,15 @@ function renderTabs(selected: SupervisorPanel, narrow: boolean): string {
     .join('  ')
 }
 
-function renderGuidance(runtime: RuntimeSummary | null): string[] {
+function renderGuidance(
+  runtime: RuntimeSummary | null,
+  context?: ResolvedLaunchContext,
+): string[] {
   if (!runtime) return ['Runtime status is unavailable. Doctor may explain why.']
   if (runtime.class === 'absent') {
+    if (context?.runtimeProvider.kind === 'bundle') {
+      return ['OpenAlice is stopped. Press s to start the installed Runtime.']
+    }
     return ['OpenAlice is stopped. Press s to start, m for managed source, or c for an existing checkout.']
   }
   if (runtime.class === 'incompatible') {
@@ -1563,8 +1574,8 @@ function renderHelp(): string[] {
     'u  Check for product update       ?  Toggle this help',
     'i  Select or create an instance',
     'p  Configure selected instance settings',
-    'm  Prepare installer-managed source and start',
-    'c  Choose and remember this instance\'s source checkout',
+    'm  Advanced: prepare installer-managed source and start',
+    'c  Advanced: choose and remember a source checkout',
     'Tab / arrows  Change panel        q / Esc  Detach only',
     '',
     'The Supervisor manages Runtime state. Workspaces, trading, and chat stay in the Web UI.',
@@ -1597,9 +1608,15 @@ function renderConfirmation(
   ]
 }
 
-function actionBar(runtime: RuntimeSummary | null, width: number): string[] {
+function actionBar(
+  runtime: RuntimeSummary | null,
+  context: ResolvedLaunchContext | undefined,
+  width: number,
+): string[] {
   const primary = runtime?.class === 'absent'
-    ? 's Start · i Instances · p Settings · m Managed · c Source'
+    ? context?.runtimeProvider.kind === 'bundle'
+      ? 's Start · i Instances · p Settings'
+      : 's Start · i Instances · p Settings · m Managed · c Source'
     : 'o Open · i Instances · p Settings · r Restart · x Stop'
   const secondary = 'd Doctor · l Logs · u Update · ? Help'
   const actions = `${primary} · ${secondary}`

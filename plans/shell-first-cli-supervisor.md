@@ -444,25 +444,57 @@ running Guardian, and TUI stop returned the home to absent.
 
 ### 7. Standalone headless Runtime artifact
 
-- [ ] Inventory server/UI/Guardian outputs, production dependencies, native
+- [x] Inventory server/UI/Guardian outputs, production dependencies, native
   modules, Broker Pack boundary, and managed Pi injection.
 - [ ] Produce deterministic platform/architecture archives.
 - [ ] Define authenticated manifest, version, compatibility, Node requirement,
   file hashes, and content identity.
-- [ ] Install immutable Runtime versions and validate without a checkout.
-- [ ] Add providers for bundle, source-development, Docker, Electron, and
+- [x] Install immutable Runtime versions and validate without a checkout.
+- [x] Add providers for bundle, source-development, Docker, Electron, and
   managed remote.
 - [ ] Prove clean-host Alice, optional components, Web, Workspace PTY, and Pi.
-- [ ] Re-run unsigned Electron package acceptance for shared build changes.
+- [x] Re-run unsigned Electron package acceptance for shared build changes.
 
 ### 8. Installer integration and source-development split
 
-- [ ] Add the Runtime bytes and size to installer plan/consent.
-- [ ] Make normal `up` select the bundle independent of cwd.
+- [x] Add the Runtime identity/platform to installer plan/consent.
+- [x] Make normal `up` select the bundle independent of cwd.
 - [ ] Move checkout preparation/rebuild to explicit development provider.
-- [ ] Make managed remote reuse the release artifact and trust chain.
-- [ ] Distinguish installer-owned Runtime releases from preserved data and
+- [x] Make managed remote reuse the release artifact and trust chain.
+- [x] Distinguish installer-owned Runtime releases from preserved data and
   sources during uninstall.
+
+The first bundle increment on 2026-07-30 produced a 107 MiB darwin-arm64
+archive from three production dependency closures. Content-aware hard-link
+deduplication removed 500 MiB from the expanded tree before compression. The
+34,613-entry manifest verifies product version, Node floor, platform,
+architecture, modes, hashes, symlinks, required Guardian/Alice/UI/UTA/Connector
+layout, and content identity. A release matrix now builds darwin/linux on arm64
+and x64, installs each archive outside the checkout, boots it, runs Doctor, and
+stops it before publication.
+
+The installer places CLI, Pi, and Runtime beneath the same immutable
+`cli-versions/<ref>-<content-id>` directory and atomically switches one launcher
+that exports both managed providers. Stable versioned installers download
+release metadata plus the matching archive, verify both archive SHA-256 and
+the internal manifest, and bind CLI and Runtime to one OpenAlice version.
+Local development can pass `--runtime-archive` and `--runtime-sha256`.
+
+Dogfood installed the candidate into a fresh temporary root, launched
+`openalice up` from `/tmp` with no checkout, reached Alice at loopback, passed
+Doctor with zero failures, opened the bare `pi-tui` Supervisor against the
+surviving Runtime, detached without stopping it, and stopped it cleanly.
+Guardian reported `provider=bundle`, product/runtime `0.87.0-beta`, and content
+`d4a8e69b270f3cd1`. The OrbStack Linux arm64 SSH fixture then installed the
+matching bundle through the ordinary remote installer, launched and tunneled
+without a checkout or build tools, survived disconnect, repaired managed Pi,
+reconnected, and stopped through Guardian. Remaining work in this increment is
+reproducibility/authenticity hardening. The unsigned packaged-Electron Workspace
+acceptance passed its real Electron PTY, Shell, managed Pi response, scheduled
+Issue, and cleanup checks. The interactive clean-container installer playground
+also passed manual review of consent, plan copy, command/version JSON,
+completion, update policy, uninstall preservation, managed Pi, PATH, and
+source-tool planning.
 
 ### 9. Atomic Runtime update, activation, and rollback
 
@@ -608,6 +640,10 @@ This plan is complete only when:
   smoke, real isolated background `up/status/down`, foreground PTY Ctrl+C,
   clean installer upgrade/uninstall Docker smoke, managed remote SSH smoke, UI
   typecheck, server build, and Electron PTY smoke.
+- 2026-07-30: Built the first standalone headless Runtime increment. A clean
+  macOS install booted outside any checkout and the OrbStack Linux arm64 SSH
+  fixture installed, started, tunneled, repaired, reconnected, and stopped the
+  release bundle without creating a managed source checkout.
 - 2026-07-30: Published increment 1 as serial PR #853 targeting `dev`.
 - 2026-07-30: Completed increment 2 implementation and local verification:
   additive control API/capability negotiation, expanded product/provider/status

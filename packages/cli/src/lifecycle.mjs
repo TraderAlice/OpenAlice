@@ -67,8 +67,14 @@ export async function startRuntime(options, dependencies = {}) {
     throw lifecycleError('EOWNED', formatOwnershipRefusal(status))
   }
 
+  const requestedAppDir = options.appDir
+    ?? env['OPENALICE_APP_HOME']?.trim()
+    ?? env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
+    ?? dependencies.cwd
+    ?? process.cwd()
   const resolveRoot = dependencies.resolveRoot ?? findOpenAliceRoot
-  const appDir = await resolveRoot(options.appDir ?? dependencies.cwd ?? process.cwd())
+  const appDir = await resolveRoot(requestedAppDir)
+  const runtimeProvider = resolveRuntimeProvider(options.runtimeProvider, appDir, env)
   const prepareSource = dependencies.prepareSource ?? prepareSourceCheckout
   emit({ type: 'preparing', appDir, homeRoot })
   await prepareSource(appDir, options, {
@@ -86,7 +92,11 @@ export async function startRuntime(options, dependencies = {}) {
   })
   runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
-  runtimeEnv.OPENALICE_RUNTIME_PROVIDER = 'source'
+  runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
+  delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
+  if (runtimeProvider.contentIdentity) {
+    runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY = runtimeProvider.contentIdentity
+  }
 
   const logPath = resolve(options.logFile ?? resolve(homeRoot, 'logs', 'server.log'))
   runtimeEnv.OPENALICE_SERVER_LOG = logPath
@@ -187,6 +197,39 @@ export async function startRuntime(options, dependencies = {}) {
     }
     throw error
   }
+}
+
+function resolveRuntimeProvider(explicit, appDir, env) {
+  if (explicit?.kind === 'bundle') {
+    return {
+      kind: 'bundle',
+      contentIdentity: requireRuntimeContentIdentity(explicit.contentIdentity),
+    }
+  }
+  if (explicit?.kind === 'source') {
+    return { kind: 'source', contentIdentity: null }
+  }
+  const managedPath = env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
+  if (managedPath && resolve(managedPath) === resolve(appDir)) {
+    return {
+      kind: 'bundle',
+      contentIdentity: requireRuntimeContentIdentity(
+        env['OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY'],
+      ),
+    }
+  }
+  return { kind: 'source', contentIdentity: null }
+}
+
+function requireRuntimeContentIdentity(value) {
+  const identity = String(value ?? '').trim()
+  if (!/^[a-f0-9]{16}$/.test(identity)) {
+    throw lifecycleError(
+      'ERUNTIMEIDENTITY',
+      'The installed OpenAlice Runtime is missing its valid 16-character content identity. Reinstall or update OpenAlice.',
+    )
+  }
+  return identity
 }
 
 export async function stopRuntime(options = {}, dependencies = {}) {

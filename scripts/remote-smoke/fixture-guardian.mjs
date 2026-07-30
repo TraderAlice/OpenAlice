@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 
 import { startGuardianControlServer } from './control-server.mjs'
@@ -8,6 +9,9 @@ const port = Number(process.env.OPENALICE_WEB_PORT ?? 47331)
 const surface = process.env.OPENALICE_LAUNCHER ?? 'cli-server'
 const startedAt = new Date().toISOString()
 const instanceId = randomUUID()
+const productVersion = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+).version
 let stopping = false
 let control
 
@@ -31,7 +35,8 @@ control = await startGuardianControlServer({
   allowStop: surface === 'cli-server',
   getStatus: () => ({
     protocol: 1,
-    runtimeVersion: '0.0.0-remote-smoke',
+    productVersion,
+    runtimeVersion: productVersion,
     state: stopping ? 'stopping' : 'running',
     home,
     owner: {
@@ -43,6 +48,11 @@ control = await startGuardianControlServer({
       mode: process.env.OPENALICE_SERVER_MODE ?? 'detached',
     },
     endpoints: { web: `http://127.0.0.1:${port}` },
+    provider: {
+      kind: process.env.OPENALICE_RUNTIME_PROVIDER ?? 'source',
+      root: process.cwd(),
+      contentIdentity: process.env.OPENALICE_RUNTIME_CONTENT_IDENTITY ?? null,
+    },
     components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
     capabilities: surface === 'cli-server' ? ['runtime.stop'] : [],
   }),

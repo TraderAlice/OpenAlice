@@ -19,6 +19,7 @@ import {
   buildRemoteSshArgs,
   connectRemote,
   createRemotePlan,
+  formatRemotePlan,
   parseRemoteArgs,
   probeRemoteHost,
   readRememberedRemotePort,
@@ -224,6 +225,40 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.serverAppDir).toBe(remote.managedAppDir)
     expect(plan.cloneSource).toBe(true)
     expect(plan.mutations).toContain('clone OpenAlice source (branch master)')
+  })
+
+  it('starts an installed Runtime bundle without cloning source or build tools', () => {
+    const remote = {
+      ...compatibleRemote({
+        class: 'absent',
+        state: 'absent',
+        owner: null,
+        endpoints: {},
+      }),
+      managedRuntime: {
+        path: '/home/alice/.openalice/cli-versions/release/managed/runtime',
+        contentIdentity: '0123456789abcdef',
+        productVersion: CLI_VERSION,
+        platform: 'linux',
+        arch: 'x64',
+        compatible: true,
+      },
+      managedAppDir: '/home/alice/.openalice/sources/branch-master/OpenAlice',
+      sourceCheckoutState: 'absent',
+      sourceCheckoutPresent: false,
+      sourceArtifactsReady: false,
+      runtimeBuildToolsMissing: ['git', 'python3', 'make', 'cxx'],
+    }
+
+    const plan = createRemotePlan(parseRemoteArgs(['host']), remote)
+
+    expect(plan.sourceMode).toBe('installed-bundle')
+    expect(plan.bundledRuntime).toBe(true)
+    expect(plan.serverAppDir).toBe(remote.managedRuntime.path)
+    expect(plan.cloneSource).toBe(false)
+    expect(plan.installRuntimeDeps).toBe(false)
+    expect(plan.mutations).toEqual(['start remote OpenAlice Server'])
+    expect(formatRemotePlan(plan)).toContain('Not needed (installed Runtime)')
   })
 
   it('refuses to overwrite an occupied non-OpenAlice source path', () => {

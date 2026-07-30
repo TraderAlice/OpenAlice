@@ -63,17 +63,18 @@ when no owner exists. Ordinary start never signals another owner. `--takeover`
 delegates replacement to Guardian's established discover, TERM, grace, KILL,
 wait, then acquire ordering.
 
-The current Runtime provider remains source-backed. `up` and `run` therefore
-accept the checkout, preparation, rebuild, home, port, wait, and takeover
-options documented in [[docs/local-runtime.md]]. `up` is browserless by default;
-`--open` performs a separate verified browser open after readiness.
+Stable installs use the verified bundle provider. `up` and `run` remain
+browserless lifecycle commands and accept home, port, wait, and takeover
+options; `--app-dir` is an advanced source override with the preparation and
+rebuild options documented in [[docs/local-runtime.md]]. `--open` performs a
+separate verified browser open after readiness.
 
 ## Default and Compatibility Surface
 
 - bare `openalice` enters the local Supervisor TUI;
 - `openalice tui` is the explicit equivalent for tests and scripts;
-- `openalice start` retains the existing foreground, browser-oriented source
-  launcher;
+- `openalice start` retains the existing foreground, browser-oriented
+  compatibility launcher and also selects the installed bundle by default;
 - `openalice server run|start|status|stop` remains available for managed remote
   and existing scripts;
 - new code uses `run|up|status|down`;
@@ -98,9 +99,9 @@ explicit commands:
   stopping another instance, or creates a separate named complete home;
 - `p` opens selected-instance settings for complete home, Web port, update
   checks, and resolved source/config provenance;
-- `m` confirms, prepares, remembers, and starts an installer-managed source
+- `m` is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
-- `c` chooses and remembers the selected instance's source checkout;
+- `c` is an advanced control that chooses and remembers the selected instance's source checkout;
 - `?`, Tab, and the horizontal arrows expose help and detail panels.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
@@ -108,14 +109,12 @@ otherwise foreign owners. Its stop/restart confirmation states that active Web
 and agent sessions will disconnect. Detaching never implies stopping. Update
 discovery runs in the background and cannot block lifecycle controls.
 
-The current Runtime provider is still source-backed. TUI start discovers an
-OpenAlice checkout from the current directory, reuses a configured or
-owner-advertised source root, opens the `c` path editor when discovery fails,
-or explicitly prepares an installer-owned checkout through `m`. The managed
-path is `<install root>/sources/<install-source identity>/OpenAlice`; a branch
-install clones that branch and a version install checks out its immutable ref.
-Unfinished controls remain inside the application shell and do not change the
-default entry back to the compatibility launcher.
+The installed Runtime is the default provider below stored configuration and
+above cwd discovery. TUI start therefore works from any directory and shows a
+small ordinary action bar. A configured instance source,
+`OPENALICE_APP_HOME`, or `--app-dir` overrides the bundle; `m` and `c` remain
+advanced source controls. The managed source path is
+`<install root>/sources/<install-source identity>/OpenAlice`.
 
 ## TUI Launch Context
 
@@ -131,8 +130,9 @@ raw mode. Bare `openalice` and `openalice tui` accept:
 --update-check
 ```
 
-Resolution order is defaults, machine Supervisor configuration, selected
-instance configuration, environment, then explicit CLI flags. The immutable
+Resolution order is defaults, installed Runtime, machine Supervisor
+configuration, selected instance configuration, environment, then explicit CLI
+flags. The immutable
 resolver retains field provenance for every layer. Before terminal raw mode,
 the Supervisor reads a versioned machine-local document at
 `<Supervisor root>/config.json`. It contains machine defaults and an instance
@@ -181,7 +181,10 @@ increments.
 `OPENALICE_APP_HOME`, and `OPENALICE_NO_UPDATE_CHECK` are the corresponding
 environment overrides. `OPENALICE_SUPERVISOR_HOME` may relocate the
 machine-wide Supervisor root, which remains outside every selectable complete
-home.
+home. Installer launchers supply the lower-priority internal pair
+`OPENALICE_MANAGED_RUNTIME_PATH` and
+`OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY`; ordinary users do not need to set
+them.
 
 Only an installer-owned Runtime carrying `OPENALICE_MANAGED_PI_PATH` receives
 instance-private `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`
