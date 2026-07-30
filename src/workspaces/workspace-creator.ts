@@ -247,8 +247,10 @@ export class WorkspaceCreator {
     }
 
     // Launcher-owned context injection (MCP / persona / skills, gated by the
-    // template manifest), then the initial commit. The launcher — not the
-    // bootstrap script — owns what lands in the workspace's first commit.
+    // template manifest), then the launcher commit. The launcher — not the
+    // bootstrap script — owns what lands in that commit. Snapshot templates
+    // make it the root commit; source-backed templates may append it to their
+    // retained upstream history.
     try {
       await injectWorkspaceContext({ template, wsId: id, dir });
     } catch (err) {
@@ -438,11 +440,12 @@ function insufficientStorageResult(availableBytes: number | null = null): Create
 }
 
 /**
- * The launcher's initial commit — uniform across templates (the "Harness rule":
- * every workspace is a fresh-git repo with a clean initial commit, no inherited
- * history, no pushable remote). Replaces the old per-template `commit_initial`
- * bash helper, byte-identical in message + author. The bootstrap script has
- * already run `git init` and set excludes; we just stage and commit.
+ * The launcher's workspace commit, uniform across templates. Snapshot templates
+ * initialize a fresh repository, while source-backed templates may retain an
+ * upstream repository and append this commit to it. Replaces the old
+ * per-template `commit_initial` bash helper, byte-identical in message + author.
+ * The bootstrap script has already prepared Git and its excludes; we just stage
+ * and commit.
  */
 export async function commitInitial(dir: string, message: string): Promise<void> {
   await runGit(dir, ['add', '.']);

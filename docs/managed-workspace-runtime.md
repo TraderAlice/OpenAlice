@@ -447,10 +447,11 @@ POSIX shell exists.
 
 A source-backed Harness receives only repository, release, and exact commit
 values approved by its template catalog. AutoQuant V2 verifies that tuple,
-copies the exact tree, removes upstream history/remotes, starts a fresh local
-research branch, and writes `.alice/harness-source.json`. Bootstrap does not
-install Python or quantitative dependencies; the native Coding Agent owns
-environment setup and later research commits inside the Workspace.
+copies the repository, keeps its upstream ancestry and canonical `origin`,
+starts a local research branch at the approved commit, and writes
+`.alice/harness-source.json`. Bootstrap does not install Python or quantitative
+dependencies; the native Coding Agent owns environment setup, later research
+commits, and explicit fetch/merge upgrades inside the Workspace.
 
 OpenAlice copies Workspace skills into two canonical project paths:
 
