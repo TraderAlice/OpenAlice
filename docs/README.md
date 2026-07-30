@@ -47,6 +47,9 @@ Reference notes under `docs/reference/` are non-authoritative research
 material. The [installer script note](reference/install-script/README.md)
 records Claude Code and Codex upstream links and design lessons without
 vendoring third-party code. The
+[Pi and Herdr CLI architecture note](reference/pi-herdr-cli-architecture.md)
+pins the TypeScript TUI, startup, configuration, persistent Runtime, command,
+and running-update comparison behind the Shell CLI plan. The
 [Herdr remote Runtime note](reference/herdr-remote-architecture.md) records a
 pinned public-source architecture comparison behind the authoritative remote
 guide, also without vendoring third-party code.

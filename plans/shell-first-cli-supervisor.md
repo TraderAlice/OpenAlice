@@ -13,6 +13,12 @@ Superseded planning PR: #852 was opened under the earlier parallel direction.
 It is not retroactively merged; the first serial implementation PR carries the
 updated canonical plan and supersedes it.
 
+Superseded renderer PR: #857 proved the real PTY, Git Bash, terminal cleanup,
+and Windows Guardian seams, but its handwritten `.mjs` renderer is not the
+product architecture. Its platform and harness fixes are salvaged selectively;
+the renderer/session implementation is replaced by the TypeScript `pi-tui`
+application shell.
+
 Owner guides:
 
 - [[docs/cli-supervisor.md]]
@@ -25,6 +31,7 @@ Owner guides:
 
 Research:
 
+- [[docs/reference/pi-herdr-cli-architecture.md]]
 - [[docs/reference/herdr-remote-architecture.md]]
 
 Predecessor:
@@ -121,8 +128,14 @@ openalice completion <bash|zsh|fish|powershell>
 - source development moves to explicit `openalice dev` or
   `openalice run --source <path>` before stable installation stops depending on
   a checkout.
-- bare `openalice` changes to the TUI only after the PTY harness proves terminal
-  restoration and the compatibility transition is documented.
+- bare `openalice` is the product TUI entry from its first shipped CLI-app
+  increment. An unfinished panel is shown as unavailable inside that shell; it
+  is not a reason to preserve a second default entry model.
+- every explicit subcommand bypasses the TUI and uses the same typed
+  application services. Non-interactive commands are the automation API, not
+  a separate implementation.
+- `openalice run` remains the explicit foreground escape hatch for development,
+  containers, service managers, and diagnosis.
 
 ### TUI information architecture
 
@@ -157,18 +170,63 @@ parses human logs as lifecycle truth.
 
 ### Technical shape
 
-- Keep lifecycle actions in a presentation-neutral CLI core.
-- Keep command/TUI rendering as clients of that core.
-- Bundle the initial JavaScript TUI inside the immutable CLI release; do not
-  require a global npm install.
-- Select the renderer through a bounded spike comparing a maintained bundled
-  Node library and a small repository-owned renderer. Measure alternate screen,
-  resize, raw-mode restoration, bundle size, idle CPU, flicker, Unicode width,
-  and Git Bash behavior before choosing.
+- Build the CLI application in strict TypeScript and emit immutable ESM
+  artifacts for installation. Source readability and refactoring safety take
+  priority over maintaining a handwritten `.mjs` implementation.
+- Use `@earendil-works/pi-tui` as the terminal substrate. It already supplies
+  the TypeScript component model, differential rendering, overlays, Unicode
+  width, IME-aware input, terminal lifecycle, and Windows terminal support that
+  OpenAlice would otherwise have to reproduce.
+- Keep lifecycle, configuration, update planning, and diagnostics in a
+  presentation-neutral application core. Command presenters and the TUI are
+  two clients of the same services and schemas.
+- Follow Pi's startup shape: parse and dispatch explicit commands first,
+  resolve the complete launch context, build resources and application state,
+  enter the TUI, then perform optional network checks asynchronously.
+- Follow Herdr's process shape: detect the selected persistent Runtime, attach
+  when compatible, start it when policy allows, and keep the TUI as a
+  replaceable client of Guardian-owned facts.
 - Use an explicit reducer/state machine; render is a pure projection and effects
   call the same services as non-interactive commands.
 - Poll low-frequency status initially. Add streaming only when measured UX or
   remote efficiency requires it.
+- Bundle the dependency closure and any required native assets inside each
+  immutable CLI release; users never need a separate global TUI dependency.
+- Retain the real-PTY/xterm harness as the terminal acceptance boundary. Do not
+  retain the repository-owned ANSI renderer as product architecture.
+
+### Launch context and configuration
+
+Configuration resolves exactly once with observable provenance:
+
+```text
+defaults
+  < machine-wide Supervisor config
+  < selected instance config
+  < environment variables
+  < explicit CLI flags
+```
+
+- The resolver produces one immutable `ResolvedLaunchContext`. Guardian and
+  every child receive the resolved environment and do not independently
+  reinterpret configuration.
+- Every resolved field retains `value`, `source`, and whether it is locked by
+  an explicit override so the TUI and Doctor can explain launch behavior.
+- Machine-wide Supervisor configuration and the instance registry live outside
+  any selectable `OPENALICE_HOME`; the selector must not store the pointer that
+  selects itself.
+- `--home` is an explicit one-run instance-home override. `OPENALICE_HOME`
+  remains the highest-priority environment override for the complete
+  OpenAlice data root.
+- OpenAlice-managed Pi receives a per-instance `PI_CODING_AGENT_DIR` and
+  session root under the resolved home. This isolates settings, trust,
+  resources, and sessions between OpenAlice instances.
+- A user-installed Pi launched outside the managed OpenAlice path keeps Pi's
+  native global configuration. OpenAlice does not globally rewrite the user's
+  own Pi environment.
+- Configuration parse errors retain the last known valid running
+  configuration, appear in the TUI and Doctor, and are checked without
+  mutating state by `openalice config check`.
 
 ### Control compatibility
 
@@ -216,6 +274,22 @@ The update transaction is:
 Package-manager-owned installations show the correct manager command rather
 than self-update.
 
+Update discovery and update application are separate states:
+
+- after the TUI is usable, a bounded asynchronous check may advertise a newer
+  OpenAlice release and cache release notes; network failure is non-fatal;
+- `openalice update --check` and the TUI update panel expose the same result;
+- applying an update always uses the OpenAlice release transaction above, not
+  Pi's npm update transport or Herdr's single-binary replacement;
+- status reports installed CLI version, running Runtime version, protocol
+  compatibility, and `restartNeeded`/pending activation independently;
+- an update first enumerates every running instance and active-work impact;
+  compatible old Runtimes may remain attached to the old immutable release,
+  while incompatible activation requires explicit restart consent;
+- test-only manifest URLs, fake available versions, and transaction fault
+  points are supported through dependency injection into the application core,
+  never undocumented production environment switches.
+
 ## Non-goals
 
 - Terminal chat, trading, settings, Workspace management, or Agent TUIs.
@@ -257,26 +331,45 @@ and verification before the next dependent branch starts from updated `dev`.
   ownership, ports, components, update metadata, and source/bundle integrity.
 - [x] Exercise old-client/new-server and new-client/old-server fixtures.
 
-### 3. TUI renderer spike and PTY harness
+### 3. TypeScript CLI application shell and PTY harness
 
-- [ ] Build two bounded renderer candidates against the same fake control model.
-- [ ] Measure package size, startup, idle CPU, resize, flicker, Unicode,
-  no-color, restoration, and Git Bash behavior.
-- [ ] Select one renderer and remove the rejected spike.
-- [ ] Build a PTY harness with isolated HOME, deterministic control fixtures,
-  real input/resize, `@xterm/headless` parsing, transcripts, and timeouts.
-- [ ] Test normal exit, Ctrl+C, SIGTERM, renderer failure, and disconnect.
+- [x] Prototype a repository-owned renderer and real PTY harness in PR #857;
+  use the result as test evidence rather than the final architecture.
+- [x] Audit Pi `v0.83.0`, Herdr `v0.7.5`, current OpenAlice CLI/Guardian
+  boundaries, configuration precedence, and licenses.
+- [x] Select strict TypeScript plus `@earendil-works/pi-tui`; reject both a Rust
+  rewrite and a handwritten `.mjs` product renderer.
+- [ ] Convert `packages/cli` to TypeScript source with a deterministic build
+  output and installer-owned dependency closure.
+- [ ] Define one root command parser that dispatches explicit commands before
+  interactive startup.
+- [ ] Add `ResolvedLaunchContext`, typed application services, and dependency
+  injection for filesystem, process, control, browser, terminal, clock, and
+  update operations.
+- [ ] Port the PTY harness with isolated HOME and `OPENALICE_HOME`,
+  deterministic control fixtures, real input/resize, `@xterm/headless`
+  parsing, transcripts, and timeouts.
+- [ ] Test normal exit, Ctrl+C, SIGTERM, renderer failure, disconnect, resize,
+  Unicode, no-color, and Git Bash.
+- [ ] Salvage the independent Windows Guardian atomic-owner replacement fix
+  from #857 and close that superseded PR.
 
-### 4. Supervisor TUI MVP
+### 4. Supervisor TUI application
 
-- [ ] Add explicit `openalice tui`.
+- [ ] Make bare `openalice` enter the TUI; retain `openalice tui` as an explicit
+  alias useful for tests and scripts.
+- [ ] Render a stable application chrome from the first increment: product and
+  channel header, selected instance, lifecycle summary, navigation, action bar,
+  help, and update indicator.
+- [ ] Show unfinished product panels as unavailable within the TUI instead of
+  preserving a temporary non-TUI default command.
 - [ ] Implement stopped, starting, running, degraded, incompatible, stopping,
   and update-available states.
 - [ ] Add start, open, stop, restart, detach, help, and read-only detail.
 - [ ] Add component/instance panels and narrow fallback.
 - [ ] Keep the TUI open and reconnect across a self-owned restart.
-- [ ] Change bare `openalice` only after source-backed macOS/Linux PTY and real
-  browser acceptance.
+- [ ] Complete source-backed macOS/Linux PTY and real browser acceptance before
+  merging the bare-command behavior.
 
 ### 5. Logs, Doctor, and update UX
 
@@ -288,10 +381,20 @@ and verification before the next dependent branch starts from updated `dev`.
 - [ ] Add PTY journeys for failed start, disconnect, logs, incompatible control,
   update refusal, and reconnect.
 
-### 6. Instance model
+### 6. Configuration and instance model
 
+- [ ] Define machine-wide Supervisor and selected-instance schemas outside
+  `OPENALICE_HOME`.
+- [ ] Resolve defaults, machine config, instance config, environment, and CLI
+  flags once into `ResolvedLaunchContext`, retaining field-level provenance.
+- [ ] Add `openalice config check` plus TUI diagnostics; invalid live reload
+  retains the last valid configuration.
+- [ ] Give OpenAlice-managed Pi an instance-local `PI_CODING_AGENT_DIR` and
+  session root without changing a user-installed Pi launched externally.
+- [ ] Update the managed Workspace runtime owner guide and tests for the new
+  managed-Pi isolation boundary.
 - [ ] Define a versioned atomic CLI-owned registry mapping names to complete
-  homes.
+  homes; never store the registry inside a selected home.
 - [ ] Preserve implicit `default` without moving existing data.
 - [ ] Add `--instance`, list, TUI selection, and collision checks.
 - [ ] Make deletion remove registry ownership only by default.
@@ -422,7 +525,7 @@ non-trading and uses no real credentials or broker accounts.
 
 | Risk | Mitigation |
 |---|---|
-| Default command surprises foreground users | Explicit TUI command first; compatibility period |
+| Default command surprises foreground users | Document bare TUI semantics and preserve explicit `run`, commands, and the `tui` alias |
 | TUI leaves terminal broken | Central restoration guard plus PTY failure/signal tests |
 | TUI becomes a second product | Supervisor boundary and Web handoff |
 | Protocol strands old Runtime | Capabilities and cross-version fixtures |
@@ -477,3 +580,11 @@ This plan is complete only when:
   `EPERM`. The failed-job rerun passed Guardian recovery and the complete dev
   smoke without a runtime-lock change, so no speculative retry was introduced.
 - 2026-07-30: Published increment 2 as serial PR #855 targeting `dev`.
+- 2026-07-30: Rejected the handwritten `.mjs` renderer direction from PR #857
+  after the user selected a complete TUI application shell from day one.
+  Audited Pi `v0.83.0` and Herdr `v0.7.5` side by side. Selected strict
+  TypeScript plus `@earendil-works/pi-tui`; assigned Pi as the startup,
+  settings, and TUI reference, Herdr as the persistent Runtime and command
+  semantics reference, and Guardian plus the OpenAlice installer as the final
+  ownership and update authority. Recorded the comparison in
+  [[docs/reference/pi-herdr-cli-architecture.md]].
