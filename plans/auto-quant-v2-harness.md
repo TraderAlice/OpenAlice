@@ -19,9 +19,9 @@ quantitative assignment and open a native coding-Agent Session.
 
 - Replace the unused Classic creation template with a new `auto-quant-v2`
   template; existing Classic Workspace checkouts remain untouched.
-- Default new AutoQuant desks to V2 `v0.8.30` at commit
-  `cba95f8718e8396a3147a9cc5f5275cd44feae5f`; retain `v0.8.27` in the
-  approved catalog for reproducible explicit creation.
+- Default new AutoQuant desks to V2 `v0.8.31` at commit
+  `426d815b18450172fbcf4c6b6af77c6ae05a4967`; retain `v0.8.30` and
+  `v0.8.27` in the approved catalog for reproducible explicit creation.
 - Add a generic template-source catalog and create-time version selection.
 - Materialize the exact upstream tree into OpenAlice's fresh local Git Harness
   and commit a source receipt without installing Python dependencies.
@@ -69,8 +69,8 @@ quantitative assignment and open a native coding-Agent Session.
       selection.
 - [x] Replace the Workspace-oriented AutoQuant sidebar with the default desk's
       bounded Session history and a low-frequency Workspace control.
-- [x] Default new initialization to the immutable AutoQuant V2 `v0.8.30`
-      release while retaining the older approved catalog entry.
+- [x] Default new initialization to the immutable AutoQuant V2 `v0.8.31`
+      release while retaining the older approved catalog entries.
 - [x] Re-run full repository, demo, browser/dev, and packaged Electron
       verification for the revised entry path.
 
@@ -87,5 +87,5 @@ quantitative assignment and open a native coding-Agent Session.
 The plan completes when AutoQuant renders no research controls before a valid
 default desk exists, initialization or explicit selection establishes that
 pointer, every new assignment becomes a Session in the selected desk, and a
-fresh desk records the pinned V2 `v0.8.30` source without any Classic migration
+fresh desk records the pinned V2 `v0.8.31` source without any Classic migration
 or AutoQuant-specific orchestration service.
