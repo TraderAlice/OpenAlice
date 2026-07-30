@@ -43,7 +43,8 @@ describe('Supervisor TUI screen', () => {
 
     expect(lines).toContain('OpenAlice  0.87.0-beta  dev')
     expect(lines).toContain('Runtime state: absent')
-    expect(lines).toContain('s Start · m Managed · c Source · d Doctor · l Logs · u Update · ? Help')
+    expect(lines).toContain('s Start · p Settings · m Managed · c Source')
+    expect(lines).toContain('d Doctor · l Logs · u Update · ? Help')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
   })
 
@@ -131,6 +132,29 @@ describe('Supervisor TUI screen', () => {
     running.update({ runtime: { class: 'absent' } })
     expect(running.handleKey('c', matchesKey)).toBe(true)
     expect(configureRequests).toBe(1)
+  })
+
+  it('opens instance settings while stopped or running', () => {
+    let settingsRequests = 0
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'development',
+      runtime: { class: 'absent' },
+    }, {
+      onSettings: () => {
+        settingsRequests += 1
+      },
+    })
+
+    expect(screen.handleKey('p', matchesKey)).toBe(true)
+    screen.update({
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+      },
+    })
+    expect(screen.handleKey('p', matchesKey)).toBe(true)
+    expect(settingsRequests).toBe(2)
   })
 
   it('confirms managed source preparation before dispatch', () => {

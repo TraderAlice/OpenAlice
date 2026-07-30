@@ -265,29 +265,55 @@ function emptyRuntimeStatus(homeRoot, statusClass, state, detail) {
 }
 
 async function inspectGuardianOwner(homeRoot, options = {}) {
-  let owner
-  try {
-    owner = JSON.parse(await readFile(resolve(homeRoot, 'state', 'guardian.lock', 'owner.json'), 'utf8'))
-  } catch (error) {
-    if (error?.code === 'ENOENT') return null
-    return { active: true, publicOwner: null, detail: 'Guardian owner metadata is unreadable' }
-  }
-  if (!Number.isInteger(owner?.pid) || typeof owner?.launcher !== 'string') {
-    return { active: true, publicOwner: null, detail: 'Guardian owner metadata is invalid' }
-  }
+  const ownerPaths = [
+    resolve(homeRoot, 'state', 'guardian.lock', 'owner.json'),
+    resolve(homeRoot, 'state', 'runtime.lock', 'owner.json'),
+    resolve(homeRoot, 'workspaces', 'state', 'runtime.lock', 'owner.json'),
+  ]
   const localHostname = options.hostname ?? hostname()
-  const sameHost = typeof owner.hostname !== 'string' || owner.hostname === localHostname
   const isAlive = options.isProcessAlive ?? isProcessAlive
-  const active = !sameHost || isAlive(owner.pid)
-  return {
-    active,
-    publicOwner: {
-      surface: owner.launcher.startsWith('guardian-') ? owner.launcher.slice('guardian-'.length) : owner.launcher,
+  let staleOwner = null
+  for (const ownerPath of ownerPaths) {
+    let owner
+    try {
+      owner = JSON.parse(await readFile(ownerPath, 'utf8'))
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue
+      return {
+        active: true,
+        publicOwner: null,
+        detail: `Runtime owner metadata is unreadable at ${ownerPath}`,
+      }
+    }
+    if (!Number.isInteger(owner?.pid) || typeof owner?.launcher !== 'string') {
+      return {
+        active: true,
+        publicOwner: null,
+        detail: `Runtime owner metadata is invalid at ${ownerPath}`,
+      }
+    }
+    const sameHost = typeof owner.hostname !== 'string'
+      || owner.hostname === localHostname
+    const active = !sameHost || isAlive(owner.pid)
+    const publicOwner = {
+      surface: owner.launcher.startsWith('guardian-')
+        ? owner.launcher.slice('guardian-'.length)
+        : owner.launcher,
       pid: owner.pid,
-      startedAt: typeof owner.acquiredAt === 'string' ? owner.acquiredAt : null,
-    },
-    ...(!active ? { detail: 'A stale Guardian owner record is present; the next start may recover it' } : {}),
+      startedAt: typeof owner.acquiredAt === 'string'
+        ? owner.acquiredAt
+        : null,
+    }
+    if (active) return { active: true, publicOwner }
+    staleOwner = publicOwner
   }
+  return staleOwner
+    ? {
+        active: false,
+        publicOwner: staleOwner,
+        detail: 'A stale Runtime owner record is present; the next start may recover it',
+      }
+    : null
 }
 
 function sanitizeControlOwner(owner) {

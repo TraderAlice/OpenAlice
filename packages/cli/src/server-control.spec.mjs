@@ -221,6 +221,34 @@ describe('OpenAlice Guardian control protocol', () => {
     expect(stale.class).toBe('absent')
     expect(stale.detail).toContain('stale')
   })
+
+  it('keeps shutdown non-absent while an Alice runtime lock is still active', async () => {
+    const home = await makeTempDir()
+    const lock = join(home, 'state', 'runtime.lock')
+    await mkdir(lock, { recursive: true })
+    await writeFile(join(lock, 'owner.json'), JSON.stringify({
+      pid: process.pid,
+      hostname: 'fixture-host',
+      launcher: 'cli-server',
+      acquiredAt: '2026-07-15T00:00:00.000Z',
+      token: 'do-not-expose',
+    }))
+
+    const status = await readRuntimeStatus({ homeRoot: home }, {
+      hostname: 'fixture-host',
+      isProcessAlive: () => true,
+    })
+
+    expect(status).toEqual(expect.objectContaining({
+      class: 'owned_elsewhere',
+      state: 'running',
+      owner: expect.objectContaining({
+        surface: 'cli-server',
+        pid: process.pid,
+      }),
+    }))
+    expect(JSON.stringify(status)).not.toContain('do-not-expose')
+  })
 })
 
 function runtimeStatus(home, overrides = {}) {

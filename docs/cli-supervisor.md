@@ -94,6 +94,8 @@ explicit commands:
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
 - `u` performs an advisory product-update check;
+- `p` opens selected-instance settings for complete home, Web port, update
+  checks, and resolved source/config provenance;
 - `m` confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
 - `c` chooses and remembers the selected instance's source checkout;
@@ -134,12 +136,21 @@ the Supervisor reads a versioned machine-local document at
 `<Supervisor root>/config.json`. It contains machine defaults and an instance
 map outside every selectable complete home.
 
+The `p` settings overlay atomically edits the selected instance's complete
+home, Web port, and update-check policy. A blank Home or port and the
+`Inherit` update value remove the instance override, exposing the resolved
+machine/default value immediately. Home and port remain read-only while the
+selected Runtime is active. Any value supplied by an environment variable or
+explicit CLI flag is shown with its resolved value and a locked provenance
+message; the TUI never writes a lower-priority value that appears to override
+it.
+
 The `c` editor validates an OpenAlice checkout, atomically saves it as the
 selected instance's `appDir`, and starts the Runtime. If
 `OPENALICE_APP_HOME` or `--app-dir` supplied the source, the TUI reports that
-higher-priority override instead of overwriting it. General configuration
-editing, `openalice config check`, live reload with last-known-good retention,
-and named-instance management remain later increments.
+higher-priority override instead of overwriting it. Machine-default editing,
+`openalice config check`, live reload with last-known-good retention, and
+named-instance management remain later increments.
 
 `OPENALICE_INSTANCE`, `OPENALICE_HOME`, `OPENALICE_WEB_PORT`,
 `OPENALICE_APP_HOME`, and `OPENALICE_NO_UPDATE_CHECK` are the corresponding
@@ -158,6 +169,14 @@ Consequently a Runtime started through the TUI and one started by
 `openalice up` receive the same managed-Pi environment. The transitional
 presenters still own their existing command-specific port, source, timeout,
 and output parsing until the root parser conversion is complete.
+
+The selected Web port is explicit for the source-backed built Guardian.
+Unconfigured MCP/local-tool, UTA, and Connector ports retain their independent
+probe-upward behavior, so another complete home or the desktop app can occupy
+the historical internal defaults without breaking this CLI Runtime. Explicit
+internal environment or `data/config/ports.json` values still fail visibly on
+collision. Stop and restart wait for Guardian plus Alice ownership evidence to
+clear, not merely for the control socket to disappear.
 
 ## Presentation-neutral Core
 

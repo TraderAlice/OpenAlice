@@ -93,6 +93,41 @@ describe('OpenAlice Runtime lifecycle core', () => {
     })
   })
 
+  it('allows its spawned Guardian ownership transition but rejects a racing owner', async () => {
+    const child = new FakeChild()
+    child.pid = 321
+    const racingStatus = {
+      ...runningStatus(),
+      class: 'owned_elsewhere',
+      state: 'starting',
+      owner: {
+        ...runningStatus().owner,
+        pid: 999,
+      },
+      endpoints: {},
+    }
+    const readStatus = vi.fn()
+      .mockResolvedValueOnce(absentStatus())
+      .mockResolvedValue(racingStatus)
+
+    await expect(startRuntime(startOptions(), {
+      detached: true,
+      env: {},
+      nodeBinary: '/test/node',
+      resolveRoot: async (path) => path,
+      prepareSource: async () => ({ prepared: false }),
+      spawnProcess: () => child,
+      openFile: async () => ({ fd: 9, close: async () => undefined }),
+      mkdirImpl: async () => undefined,
+      readStatus,
+      sleep: async () => undefined,
+    })).rejects.toMatchObject({
+      code: 'EOWNED',
+      message: expect.stringContaining('pid 999'),
+    })
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+  })
+
   it('preserves Guardian takeover authority instead of signaling the old owner itself', async () => {
     const child = new FakeChild()
     const previousOwner = {
@@ -231,6 +266,7 @@ function absentStatus() {
 }
 
 class FakeChild extends EventEmitter {
+  pid = 123
   exitCode = null
   signalCode = null
   kill = vi.fn()

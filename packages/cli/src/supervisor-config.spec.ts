@@ -105,6 +105,32 @@ describe('Supervisor configuration', () => {
     })
   })
 
+  it('removes an instance override when a setting returns to inheritance', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-inherit-'))
+    temporaryPaths.push(root)
+    const context = await resolveStoredLaunchContext({}, {
+      homeDir: join(root, 'user'),
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+
+    await persistInstanceLaunchConfig(context, {
+      port: 49_001,
+      updateChecks: false,
+    })
+    await persistInstanceLaunchConfig(context, {
+      port: undefined,
+    })
+
+    const saved = JSON.parse(
+      await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'),
+    )
+    expect(saved.instances.default).toEqual({
+      name: 'default',
+      updateChecks: false,
+    })
+  })
+
   it('rejects corrupt, unknown, and mismatched configuration fields', () => {
     expect(() => parseSupervisorConfig({
       schemaVersion: 2,
