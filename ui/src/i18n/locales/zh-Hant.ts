@@ -598,7 +598,7 @@ export const zhHant: Resources = {
       description: '顯示下一個新 Session 中 OpenAlice 實際交給 PTY 的啟動計畫。讀取時不會執行 Hook、寫入設定或啟動程序。',
       loading: '正在解析啟動計畫…',
       loadError: '無法讀取啟動計畫',
-      noRuntimes: '此工作區沒有可預覽的 Runtime。',
+      noRuntimes: '目前沒有已註冊、可供預覽的 Agent Runtime。',
       runtimeReady: '已找到 Runtime',
       runtimeMissing: '找不到 Runtime',
       runtimeMissingHelp: '目前搜尋路徑中找不到此 Runtime。系統仍會嘗試啟動，但可能因找不到執行檔而失敗。',

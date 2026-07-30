@@ -1353,7 +1353,7 @@ export function WorkspaceAIConfigModal({
             {section === 'launch' && (
               <WorkspaceLaunchConfigurationPanel
                 wsId={wsId}
-                agents={workspace?.agents ?? []}
+                agents={agents.map((agent) => agent.id)}
                 initialAgent={initialAgent}
               />
             )}

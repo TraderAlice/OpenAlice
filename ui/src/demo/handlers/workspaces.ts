@@ -463,7 +463,6 @@ export const workspacesHandlers = [
         ? { spawnedFromVersion: template.version, currentVersion: template.version }
         : {}),
       upgradeAvailable: null,
-      agents: ['claude', 'codex', 'opencode', 'pi'],
       sessions: [],
       agentOverride: { claude: false, codex: false, opencode: false, pi: false },
     }
@@ -941,7 +940,7 @@ export const workspacesHandlers = [
     const prompt = typeof body?.prompt === 'string' && body.prompt.trim()
       ? body.prompt.trim()
       : 'Show me how this Workspace is doing.'
-    const agent = typeof body?.agent === 'string' && ws.agents.includes(body.agent)
+    const agent = typeof body?.agent === 'string'
       ? body.agent
       : 'pi'
     const startedAt = Date.now()
@@ -968,7 +967,6 @@ export const workspacesHandlers = [
     }
     const updatedWorkspace = {
       ...ws,
-      agents: ws.agents.includes(agent) ? ws.agents : [...ws.agents, agent],
       sessions: [...ws.sessions, record],
     }
     const workspaceIndex = demoWorkspaces.findIndex((workspace) => workspace.id === ws.id)

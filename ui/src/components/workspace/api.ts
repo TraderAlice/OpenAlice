@@ -39,8 +39,6 @@ export interface Workspace {
     readonly version: string;
     readonly commit: string;
   };
-  /** Adapter ids enabled for this workspace. Default runtime lives in user config. */
-  readonly agents: readonly string[];
   /**
    * Single ordered list of all session records (running + paused) the
    * launcher tracks for this workspace. Source of truth for sidebar + main
@@ -70,7 +68,6 @@ export interface CreateError {
     | 'bootstrap_failed'
     | 'unknown_template'
     | 'unknown_source_version'
-    | 'unknown_agent'
     | 'no_templates_configured';
   readonly message?: string;
   readonly stderr?: string;
@@ -323,19 +320,13 @@ export async function listWorkspaces(): Promise<Workspace[]> {
   return body.workspaces;
 }
 
-/**
- * Create a workspace. `agents` is optional and normally omitted — the backend
- * owns the "every registered adapter, template-headed" policy (see
- * `WorkspaceCreator.create`). Pass an explicit set only to pin a subset.
- */
+/** Create a Workspace from a template, optionally pinned to a source version. */
 export async function createWorkspace(
   tag: string,
   template: string,
-  agents?: readonly string[],
   sourceVersion?: string,
 ): Promise<CreateResult> {
   const body: Record<string, unknown> = { tag, template };
-  if (agents && agents.length > 0) body['agents'] = agents;
   if (sourceVersion !== undefined) body['sourceVersion'] = sourceVersion;
   const res = await fetch('/api/workspaces', {
     method: 'POST',
@@ -1300,8 +1291,7 @@ export type AgentCredentialSource =
   | 'workspace-config'
   | 'launcher-vault'
   | 'missing'
-  | 'unknown-agent'
-  | 'disabled-agent';
+  | 'unknown-agent';
 
 export interface AgentCredentialReadiness {
   readonly agent: string;

@@ -69,7 +69,7 @@ are reachable. Resolve the peer's absolute dir by its `workspaceId`, then use yo
 own file tools:
 
 ```bash
-# active office-floor inventory (ids, templates, agents, live workload counts)
+# active office-floor inventory (ids, templates, live workload counts)
 alice-workspace peer list
 # --id is the `workspaceId` from an inbox_read entry (a uuid), e.g.:
 alice-workspace peer path --id 550e8400-e29b-41d4-a716-446655440000

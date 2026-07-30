@@ -50,7 +50,6 @@ const liveWorkspace: Workspace = {
   dir: '/tmp/quant-desk',
   createdAt: '2026-07-29T00:00:00.000Z',
   template: 'chat',
-  agents: ['codex'],
   sessions: [],
 }
 

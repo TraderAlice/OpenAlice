@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -26,12 +26,45 @@ describe('WorkspaceRegistry persistence failures', () => {
       tag: 'diskfull',
       dir: join(root, 'chat-failed-row'),
       createdAt: '2026-07-15T00:00:00.000Z',
-      agents: ['pi'],
     })).rejects.toMatchObject({ code: 'ENOSPC' })
 
     expect(registry.hasId('chat-failed-row')).toBe(false)
     expect(registry.hasTag('diskfull')).toBe(false)
     expect(registry.list()).toEqual([])
+  })
+})
+
+describe('WorkspaceRegistry legacy adapter metadata', () => {
+  it('ignores legacy agents and never persists them again', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-registry-agents-'))
+    temporaryPaths.push(root)
+    const path = join(root, 'workspaces.json')
+    await writeFile(path, JSON.stringify({
+      version: 1,
+      workspaces: [{
+        id: 'chat-old',
+        tag: 'chat-old',
+        dir: join(root, 'chat-old'),
+        createdAt: '2026-07-01T00:00:00.000Z',
+        agents: ['claude'],
+      }],
+    }))
+
+    const registry = await WorkspaceRegistry.load(path, logger())
+    expect(registry.get('chat-old')).toEqual({
+      id: 'chat-old',
+      tag: 'chat-old',
+      dir: join(root, 'chat-old'),
+      createdAt: '2026-07-01T00:00:00.000Z',
+    })
+
+    await registry.add({
+      id: 'chat-new',
+      tag: 'chat-new',
+      dir: join(root, 'chat-new'),
+      createdAt: '2026-07-31T00:00:00.000Z',
+    })
+    expect(await readFile(path, 'utf8')).not.toContain('"agents"')
   })
 })
 

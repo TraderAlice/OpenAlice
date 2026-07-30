@@ -24,7 +24,6 @@ const workspace: Workspace = {
   tag: 'chat',
   dir: '/tmp/chat',
   createdAt: '2026-07-15T00:00:00.000Z',
-  agents: ['pi', 'shell'],
   sessions: [],
 }
 

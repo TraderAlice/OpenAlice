@@ -241,7 +241,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       const created = await json(await fetch('/api/workspaces', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ tag, template: 'chat', agents: ['shell', 'pi'] }),
+        body: JSON.stringify({ tag, template: 'chat' }),
       }))
       workspaceId = created.workspace.id
       checks.workspaceCreated = true

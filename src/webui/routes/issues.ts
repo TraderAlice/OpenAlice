@@ -201,8 +201,8 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       } else {
         const agent = raw.trim()
         const adapter = svc.adapters.get(agent)
-        if (!adapter || !isAgentRuntime(adapter) || !meta.agents.includes(agent)) {
-          return c.json({ error: 'invalid_agent', message: `unknown or disabled agent runtime: ${agent}` }, 400)
+        if (!adapter || !isAgentRuntime(adapter)) {
+          return c.json({ error: 'invalid_agent', message: `unknown agent runtime: ${agent}` }, 400)
         }
         patch.agent = agent
       }

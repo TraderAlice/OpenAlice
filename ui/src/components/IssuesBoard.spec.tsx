@@ -25,7 +25,7 @@ vi.mock('../contexts/workspaces-context', () => ({
     ],
     defaultAgent: 'pi',
     issueDefaultAgent: null,
-    workspaces: [{ id: 'ws-1', agents: ['pi', 'claude'] }],
+    workspaces: [{ id: 'ws-1' }],
   }),
 }))
 

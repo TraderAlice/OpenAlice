@@ -49,8 +49,8 @@ export function IssueSettingsPage() {
               descriptionId={runtimeDescriptionId}
               description={
                 workspaceDefault
-                  ? `Unset uses the workspace session default (${workspaceDefault.displayName}), then the workspace's first enabled runtime.`
-                  : "Unset uses the workspace's first enabled runtime."
+                  ? `Unset uses the installation session default (${workspaceDefault.displayName}), then the first registered runtime.`
+                  : 'Unset uses the first registered runtime.'
               }
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

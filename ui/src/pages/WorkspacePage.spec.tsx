@@ -54,7 +54,6 @@ function workspace(overrides: Partial<Workspace> = {}): Workspace {
     tag: 'chat-jun30',
     dir: '/tmp/chat-jun30',
     createdAt: '2026-06-30T00:00:00.000Z',
-    agents: ['codex'],
     sessions: [],
     ...overrides,
   }

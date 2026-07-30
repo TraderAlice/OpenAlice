@@ -271,24 +271,19 @@ function positiveNumber(value: number | null | undefined): number | null {
  * `setup_git_excludes` keeps out of git —
  * but only post-commit are we certain the key never lands in the initial commit.
  *
- * Every miss (agent not enabled, no adapter, credential slug absent) is a loud
+ * Every miss (no adapter, credential slug absent) is a loud
  * `warn` + skip, never a hard failure — a workspace that boots without a seeded
  * provider is still usable (the user configures it manually). Best-effort.
  */
 export async function injectWorkspaceCredentials(opts: {
   readonly dir: string
-  readonly agents: readonly string[]
   readonly agentCredentials: Readonly<Record<string, AgentCredentialDecl>>
   readonly adapterRegistry: AdapterRegistry
   readonly credentials: Record<string, Credential>
   readonly logger: Logger
 }): Promise<void> {
-  const { dir, agents, agentCredentials, adapterRegistry, credentials, logger } = opts
+  const { dir, agentCredentials, adapterRegistry, credentials, logger } = opts
   for (const [agentId, decl] of Object.entries(agentCredentials)) {
-    if (!agents.includes(agentId)) {
-      logger.warn('workspace.cred_inject_skip_disabled', { agentId })
-      continue
-    }
     const adapter = adapterRegistry.get(agentId)
     if (!adapter?.writeAiConfig) {
       logger.warn('workspace.cred_inject_skip_no_adapter', { agentId })

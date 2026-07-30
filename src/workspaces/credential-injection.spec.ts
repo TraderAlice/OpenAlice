@@ -305,7 +305,7 @@ describe('injectWorkspaceCredentials', () => {
     'anthropic-1': anthropicKey,
   }
 
-  it('writes AI config for each declared+enabled agent, mapping the credential', async () => {
+  it('writes AI config for each declared and registered agent, mapping the credential', async () => {
     const calls: WriteCall[] = []
     const reg = new AdapterRegistry()
     reg.register(stubAdapter('claude', calls))
@@ -314,7 +314,6 @@ describe('injectWorkspaceCredentials', () => {
 
     await injectWorkspaceCredentials({
       dir: '/ws',
-      agents: ['claude', 'codex'],
       agentCredentials: {
         claude: { credentialSlug: 'anthropic-1', model: 'claude-opus-4-8' },
         codex: { credentialSlug: 'openai-1', model: 'gpt-5.5' },
@@ -339,7 +338,6 @@ describe('injectWorkspaceCredentials', () => {
 
     await injectWorkspaceCredentials({
       dir: '/ws',
-      agents: ['opencode'],
       agentCredentials: { opencode: { credentialSlug: 'openai-1' } },
       adapterRegistry: reg,
       credentials: {
@@ -360,7 +358,6 @@ describe('injectWorkspaceCredentials', () => {
 
     await injectWorkspaceCredentials({
       dir: '/ws',
-      agents: ['pi'],
       agentCredentials: {
         pi: {
           credentialSlug: 'custom-1',
@@ -377,7 +374,7 @@ describe('injectWorkspaceCredentials', () => {
     expect(calls[0]?.cred.reasoning).toBeUndefined()
   })
 
-  it('skips (loud warn) an agent declared but not enabled on the workspace', async () => {
+  it('skips (loud warn) an agent with no registered adapter', async () => {
     const calls: WriteCall[] = []
     const reg = new AdapterRegistry()
     reg.register(stubAdapter('claude', calls))
@@ -385,7 +382,6 @@ describe('injectWorkspaceCredentials', () => {
 
     await injectWorkspaceCredentials({
       dir: '/ws',
-      agents: ['claude'], // codex NOT enabled
       agentCredentials: { codex: { credentialSlug: 'openai-1', model: 'gpt-5.5' } },
       adapterRegistry: reg,
       credentials,
@@ -393,7 +389,7 @@ describe('injectWorkspaceCredentials', () => {
     })
 
     expect(calls).toHaveLength(0)
-    expect(warns).toContain('workspace.cred_inject_skip_disabled')
+    expect(warns).toContain('workspace.cred_inject_skip_no_adapter')
   })
 
   it('skips (loud warn) when the credential has no wire the agent speaks', async () => {
@@ -404,7 +400,6 @@ describe('injectWorkspaceCredentials', () => {
 
     await injectWorkspaceCredentials({
       dir: '/ws',
-      agents: ['codex'],
       // chatOnlyGateway has only openai-chat; codex is Responses-only.
       agentCredentials: { codex: { credentialSlug: 'chat-only', model: 'gpt-5.5' } },
       adapterRegistry: reg,
@@ -424,7 +419,6 @@ describe('injectWorkspaceCredentials', () => {
 
     await injectWorkspaceCredentials({
       dir: '/ws',
-      agents: ['claude'],
       agentCredentials: { claude: { credentialSlug: 'does-not-exist' } },
       adapterRegistry: reg,
       credentials,

@@ -35,7 +35,6 @@ export interface WorkspaceCatalogRecord {
   readonly tag: string
   readonly activeDir: string
   readonly createdAt: string
-  readonly agents: readonly string[]
   readonly template?: string
   readonly spawnedFromVersion?: string
   lifecycle: WorkspaceLifecycleState
@@ -65,7 +64,6 @@ export function catalogRecordToMeta(record: WorkspaceCatalogRecord): WorkspaceMe
     tag: record.tag,
     dir: record.activeDir,
     createdAt: record.createdAt,
-    agents: record.agents,
     ...(record.template ? { template: record.template } : {}),
     ...(record.spawnedFromVersion ? { spawnedFromVersion: record.spawnedFromVersion } : {}),
   }
@@ -77,7 +75,6 @@ function recordFromMeta(meta: WorkspaceMeta, now: string): WorkspaceCatalogRecor
     tag: meta.tag,
     activeDir: meta.dir,
     createdAt: meta.createdAt,
-    agents: [...meta.agents],
     ...(meta.template ? { template: meta.template } : {}),
     ...(meta.spawnedFromVersion ? { spawnedFromVersion: meta.spawnedFromVersion } : {}),
     lifecycle: 'active',
@@ -159,7 +156,7 @@ export class WorkspaceCatalog {
     return [...this.records.values()]
       .filter((record) => !wanted || wanted.has(record.lifecycle))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map((record) => ({ ...record, agents: [...record.agents] }))
+      .map((record) => ({ ...record }))
   }
 
   async recordCreated(meta: WorkspaceMeta): Promise<void> {
@@ -276,13 +273,42 @@ function validateRecord(value: unknown): WorkspaceCatalogRecord | null {
     typeof record['tag'] !== 'string' ||
     typeof record['activeDir'] !== 'string' ||
     typeof record['createdAt'] !== 'string' ||
-    !Array.isArray(record['agents']) ||
-    !record['agents'].every((agent) => typeof agent === 'string') ||
     typeof record['updatedAt'] !== 'string' ||
     (record['absorbedIntoWorkspaceId'] !== undefined && typeof record['absorbedIntoWorkspaceId'] !== 'string') ||
     (record['absorbedAt'] !== undefined && typeof record['absorbedAt'] !== 'string') ||
     (record['absorbCommit'] !== undefined && typeof record['absorbCommit'] !== 'string') ||
     !['active', 'offboarding', 'departed', 'restoring', 'purging', 'purged'].includes(String(lifecycle))
   ) return null
-  return value as WorkspaceCatalogRecord
+  const sanitized: WorkspaceCatalogRecord = {
+    id: record['id'],
+    tag: record['tag'],
+    activeDir: record['activeDir'],
+    createdAt: record['createdAt'],
+    ...(typeof record['template'] === 'string' ? { template: record['template'] } : {}),
+    ...(typeof record['spawnedFromVersion'] === 'string'
+      ? { spawnedFromVersion: record['spawnedFromVersion'] }
+      : {}),
+    lifecycle: lifecycle as WorkspaceLifecycleState,
+    updatedAt: record['updatedAt'],
+  }
+  const optionalStrings = [
+    'departedDir',
+    'departedAt',
+    'restoredAt',
+    'purgedAt',
+    'reason',
+    'absorbedIntoWorkspaceId',
+    'absorbedAt',
+    'absorbCommit',
+  ] as const
+  for (const key of optionalStrings) {
+    if (typeof record[key] === 'string') sanitized[key] = record[key]
+  }
+  if (record['handoff'] && typeof record['handoff'] === 'object') {
+    sanitized.handoff = record['handoff'] as WorkspaceHandoffSnapshot
+  }
+  if (typeof record['legacyImported'] === 'boolean') {
+    sanitized.legacyImported = record['legacyImported']
+  }
+  return sanitized
 }

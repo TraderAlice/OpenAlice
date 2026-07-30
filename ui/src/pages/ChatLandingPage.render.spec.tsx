@@ -76,6 +76,12 @@ const piAgent: AgentInfo = {
   },
 }
 
+const opencodeAgent: AgentInfo = {
+  ...piAgent,
+  id: 'opencode',
+  displayName: 'opencode',
+}
+
 function chatWorkspace(): Workspace {
   return {
     id: 'chat-1',
@@ -83,7 +89,6 @@ function chatWorkspace(): Workspace {
     dir: '/tmp/chat-jul16',
     createdAt: '2026-07-16T00:00:00.000Z',
     template: 'chat',
-    agents: ['pi'],
     sessions: [],
   }
 }
@@ -92,7 +97,7 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
   return {
     workspaces,
     templates: [],
-    agents: [piAgent],
+    agents: [piAgent, opencodeAgent],
     defaultAgent: 'pi',
     issueDefaultAgent: null,
     listError: null,
@@ -212,6 +217,17 @@ describe('ChatLandingPage polling stability', () => {
 
     expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(1)
     expect(mocks.getAgentReadiness).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ChatLandingPage adapter inventory', () => {
+  it('offers installation-level runtimes regardless of Workspace age', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Select agent' }))
+
+    expect(screen.getByRole('menuitem', { name: /Pi/ })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /opencode/ })).toBeTruthy()
   })
 })
 
