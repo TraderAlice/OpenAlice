@@ -253,7 +253,10 @@ function HarnessLandingPage({
   }
 
   return (
-    <div className="relative h-full w-full overflow-auto bg-background flex flex-col items-center justify-center px-4 py-6 md:px-6 md:py-10">
+    <div
+      data-testid="harness-landing-scroll"
+      className="relative flex h-full w-full flex-col items-center justify-start overflow-x-hidden overflow-y-auto overscroll-contain bg-background px-4 py-4 md:px-6 md:py-10"
+    >
       {/* Ask-Alice backdrop — full-bleed, responsive-only layers (gradient wash
           + faint grid). The #302 mock's %-positioned circle / diagonal bars were
           dropped: they drift on portrait and read as pixel-placed art, not a
@@ -264,7 +267,10 @@ function HarnessLandingPage({
         <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,var(--foreground)_1px,transparent_1px),linear-gradient(to_bottom,var(--foreground)_1px,transparent_1px)] [background-size:96px_96px]" />
       </div>
 
-      <div className="relative z-10 w-full max-w-2xl flex flex-col gap-4 md:gap-5">
+      <div
+        data-testid="harness-landing-stack"
+        className="relative z-10 my-auto flex w-full max-w-2xl flex-col gap-3 md:gap-5"
+      >
         <div className="text-center space-y-1.5">
           {targetWs && mode === 'chat' ? (
             <>
@@ -310,9 +316,12 @@ function HarnessLandingPage({
             placeholder={t(`${copyKey}.placeholder`)}
             rows={3}
             autoFocus
-            className="w-full max-h-[40vh] min-h-[92px] resize-none bg-transparent px-2 py-1.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70 md:min-h-[72px]"
+            className="min-h-[72px] max-h-[40vh] w-full resize-none bg-transparent px-2 py-1.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70"
           />
-          <div className="flex flex-col gap-2 px-1 pt-1 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            data-testid="harness-landing-controls"
+            className="flex items-end justify-between gap-2 px-1 pt-1"
+          >
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               {/* Workspace target — recent by default, explicit when selected.
                   Visible but non-blocking: users can see where the new Session
@@ -373,7 +382,7 @@ function HarnessLandingPage({
                 onConfigureProvider={goConfigureProvider}
               />
             </div>
-            <div className="flex items-center justify-end gap-1.5">
+            <div className="flex shrink-0 items-center justify-end gap-1.5">
               <button
                 type="button"
                 disabled

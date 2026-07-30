@@ -220,6 +220,26 @@ describe('ChatLandingPage polling stability', () => {
   })
 })
 
+describe('ChatLandingPage compact-height layout', () => {
+  it('pins overflow to the reachable top edge while centering content when room allows', () => {
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    const scrollArea = screen.getByTestId('harness-landing-scroll')
+    const stack = screen.getByTestId('harness-landing-stack')
+    const controls = screen.getByTestId('harness-landing-controls')
+    const composer = screen.getByPlaceholderText('Ask Alice…')
+
+    expect(scrollArea.className).toContain('justify-start')
+    expect(scrollArea.className).toContain('overflow-x-hidden')
+    expect(scrollArea.className).toContain('overflow-y-auto')
+    expect(stack.className).toContain('my-auto')
+    expect(composer.className).toContain('min-h-[72px]')
+    expect(controls.className).toContain('items-end')
+    expect(controls.className).not.toContain('flex-col')
+    expect(controls.lastElementChild?.className).toContain('shrink-0')
+  })
+})
+
 describe('ChatLandingPage adapter inventory', () => {
   it('offers installation-level runtimes regardless of Workspace age', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
