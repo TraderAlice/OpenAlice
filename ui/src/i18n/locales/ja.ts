@@ -284,6 +284,8 @@ export const ja: Resources = {
       followsSystem: 'システムに追従',
       themePair: 'テーマの組み合わせ',
       themePairDescription: '自動モードはこの 2 つを切り替えます。編集するスロットを選んでください。',
+      customizePalettes: 'パレットをカスタマイズ',
+      hidePaletteEditor: 'パレット編集を閉じる',
       resetPair: '組み合わせをリセット',
       activeSlot: '使用中',
       editingSlot: '編集中',
