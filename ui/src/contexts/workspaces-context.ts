@@ -27,6 +27,10 @@ export interface WorkspacesContextValue {
   readonly hasLoaded: boolean
   /** True once the templates fetch has settled (success OR failure). */
   readonly templatesLoaded: boolean
+  /** Explicit durable desk pointer that defines AutoQuant readiness. */
+  readonly autoQuantDefaultWorkspaceId: string | null
+  readonly autoQuantPreferenceLoaded: boolean
+  readonly autoQuantPreferenceError: string | null
   refresh(): void
   refreshWorkspaceManager(): Promise<void>
   quickStartWorkspaceManager(
@@ -42,13 +46,14 @@ export interface WorkspacesContextValue {
   ): Promise<void>
   setDefaultAgent(agent: string | null): Promise<void>
   setIssueDefaultAgent(agent: string | null): Promise<void>
+  initializeAutoQuant(): Promise<Workspace>
+  setAutoQuantDefaultWorkspace(workspaceId: string): Promise<void>
   quickChat(
     prompt: string,
     agent?: string,
     credentialSlug?: string,
     targetWsId?: string,
     template?: 'chat' | 'auto-quant-v2',
-    sourceVersion?: string,
   ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>

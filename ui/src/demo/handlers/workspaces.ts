@@ -41,6 +41,7 @@ const demoManagerSession = {
 let demoManagerMessages: unknown[] = []
 let demoQuickChatSequence = 0
 let demoWorkspaceCreateSequence = 0
+let demoAutoQuantDefaultWorkspaceId: string | null = DEMO_AUTO_QUANT_WORKSPACE_ID
 const demoCreatedWorkspaceIds = new Set<string>()
 const DEMO_WORKSPACE_TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
 
@@ -51,6 +52,7 @@ export function resetDemoWorkspaceCreateState(): void {
   }
   demoCreatedWorkspaceIds.clear()
   demoWorkspaceCreateSequence = 0
+  demoAutoQuantDefaultWorkspaceId = DEMO_AUTO_QUANT_WORKSPACE_ID
 }
 
 function webPiKey(wsId: string, sessionId: string): string {
@@ -317,6 +319,40 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
 })
 
 export const workspacesHandlers = [
+  http.get('/api/workspaces/auto-quant/default-workspace', () => {
+    const workspace = demoAutoQuantDefaultWorkspaceId
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === demoAutoQuantDefaultWorkspaceId
+          && candidate.template === 'auto-quant-v2')
+      : undefined
+    return HttpResponse.json({
+      defaultWorkspaceId: workspace?.id ?? null,
+      configuredWorkspaceId: demoAutoQuantDefaultWorkspaceId,
+      ready: workspace !== undefined,
+    })
+  }),
+  http.put('/api/workspaces/auto-quant/default-workspace', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as { workspaceId?: unknown } | null
+    const workspace = typeof body?.workspaceId === 'string'
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === body.workspaceId
+          && candidate.template === 'auto-quant-v2')
+      : undefined
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoQuantDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ defaultWorkspaceId: workspace.id, ready: true })
+  }),
+  http.post('/api/workspaces/auto-quant/initialize', () => {
+    const workspace = demoWorkspaces.find((candidate) =>
+      candidate.template === 'auto-quant-v2')
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoQuantDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ workspace })
+  }),
   http.put('/api/workspaces/terminal-view-attributes', () =>
     HttpResponse.json({ ok: true, changed: true })),
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),

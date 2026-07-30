@@ -90,17 +90,33 @@ describe('resolveCreateAgents — single home of the agent policy', () => {
 describe('resolveTemplateSource', () => {
   const template = {
     name: 'auto-quant-v2',
+    bootstrapScript: '',
+    filesDir: '',
+    templateDir: '',
+    version: '1.0.0',
+    defaultAgents: ['codex'],
+    injectTools: true,
+    injectPersona: false,
+    bundledSkills: [],
     source: {
       repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      defaultVersion: 'v0.8.27',
+      defaultVersion: 'v0.8.30',
       versions: [
+        { version: 'v0.8.30', commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f' },
         { version: 'v0.8.27', commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3' },
       ],
     },
-  } as TemplateMeta;
+  } satisfies TemplateMeta;
 
   it('uses the catalog default when the caller omits a version', () => {
     expect(resolveTemplateSource(template)).toEqual({
+      version: 'v0.8.30',
+      commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f',
+    });
+  });
+
+  it('keeps an older approved release selectable explicitly', () => {
+    expect(resolveTemplateSource(template, 'v0.8.27')).toEqual({
       version: 'v0.8.27',
       commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',
     });

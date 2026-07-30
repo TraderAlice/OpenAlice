@@ -130,6 +130,19 @@ Do not reintroduce date-based automatic Chat Workspaces. A date is not a
 context boundary, and new daily repositories strand files, issues, git history,
 and agent configuration in yesterday's Workspace.
 
+AutoQuant uses the same durable Workspace boundary with a stricter entry rule:
+
+- `autoQuant.defaultWorkspaceId` in `data/preferences.json` is the readiness
+  pointer for the AutoQuant Harness.
+- A missing or stale pointer shows initialization or explicit selection; the
+  research composer never guesses the latest desk and never creates one as a
+  side effect of sending.
+- Once initialized, daily navigation is Session-first. Workspace creation,
+  configuration, and default switching remain low-frequency controls.
+- AutoQuant's Coding Agent owns Projects, Studies, experiments, dependencies,
+  artifacts, and local Git history inside that desk; Alice does not reproduce
+  those lifecycles.
+
 Load-bearing paths:
 
 - `src/workspaces/service.ts` — Workspace lifecycle and composition.

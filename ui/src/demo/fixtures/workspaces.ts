@@ -133,8 +133,8 @@ const demoIssueWorkspaces: Workspace[] = [
       schemaVersion: 1,
       template: 'auto-quant-v2',
       repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      version: 'v0.8.27',
-      commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',
+      version: 'v0.8.30',
+      commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f',
     },
     agents: ['codex'],
     sessions: [],
@@ -182,8 +182,12 @@ export const autoQuantTemplate: TemplateInfo = {
   hasReadme: true,
   source: {
     repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-    defaultVersion: 'v0.8.27',
+    defaultVersion: 'v0.8.30',
     versions: [
+      {
+        version: 'v0.8.30',
+        commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f',
+      },
       {
         version: 'v0.8.27',
         commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',

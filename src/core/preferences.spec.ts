@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
+  readAutoQuantPreferences,
   readPreferences,
   readQuickChatPreferences,
+  rememberAutoQuantDefaultWorkspace,
   rememberQuickChatCredential,
   rememberRecentChatWorkspace,
 } from './preferences.js'
@@ -28,6 +30,7 @@ describe('preferences', () => {
     expect(await readPreferences(path)).toEqual({
       version: 1,
       quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null },
+      autoQuant: { defaultWorkspaceId: null },
     })
 
     await writeFile(path, '{not-json', 'utf-8')
@@ -79,6 +82,20 @@ describe('preferences', () => {
     expect(await readQuickChatPreferences(path)).toEqual({
       lastCredentialByAgent: { pi: 'meituan-1' },
       recentChatWorkspaceId: null,
+    })
+  })
+
+  it('stores the AutoQuant default independently from Chat preferences', async () => {
+    const path = await preferenceFile()
+    await rememberRecentChatWorkspace('chat-calm-river', path)
+    await rememberAutoQuantDefaultWorkspace('aq-main', path)
+
+    expect(await readAutoQuantPreferences(path)).toEqual({
+      defaultWorkspaceId: 'aq-main',
+    })
+    expect(await readQuickChatPreferences(path)).toEqual({
+      lastCredentialByAgent: {},
+      recentChatWorkspaceId: 'chat-calm-river',
     })
   })
 })

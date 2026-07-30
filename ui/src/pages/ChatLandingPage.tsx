@@ -30,6 +30,7 @@ import {
   useAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
 import { isWorkspaceAiAgent } from '../lib/agentRuntime'
+import { AutoQuantSetupPage } from './AutoQuantSetupPage'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
 export {
@@ -91,7 +92,6 @@ function HarnessLandingPage({
     quickChat,
     agents,
     workspaces,
-    templates,
     defaultAgent,
     setDefaultAgent,
     openAgentConfig,
@@ -100,17 +100,6 @@ function HarnessLandingPage({
   const templateName = mode === 'auto-quant' ? 'auto-quant-v2' : 'chat'
   const landingKind = mode === 'auto-quant' ? 'auto-quant-landing' : 'chat-landing'
   const copyKey = mode === 'auto-quant' ? 'autoQuantLanding' : 'chatLanding'
-  const sourceTemplate = templates.find((template) => template.name === templateName)
-  const [sourceVersion, setSourceVersion] = useState<string | undefined>(
-    sourceTemplate?.source?.defaultVersion,
-  )
-
-  useEffect(() => {
-    if (sourceVersion === undefined && sourceTemplate?.source?.defaultVersion) {
-      setSourceVersion(sourceTemplate.source.defaultVersion)
-    }
-  }, [sourceTemplate?.source?.defaultVersion, sourceVersion])
-
   // Targeted launch: the chat sidebar's Workspace row and per-workspace "+"
   // route here with a targetWsId — "Ask Alice, but spawn the session in THIS
   // workspace" rather than the recent Chat workspace. Same composer; the send
@@ -123,12 +112,14 @@ function HarnessLandingPage({
   const workspaceBoxRef = useRef<HTMLDivElement>(null)
   const activeWorkspaceOptionRef = useRef<HTMLButtonElement>(null)
   const selectedHarnessWorkspace = useMemo(
-    () => resolveChatWorkspaceTarget(
-      workspaces,
-      targetWsId ?? selectedWorkspaceId,
-      mode === 'chat' ? launchPreferences.recentChatWorkspaceId : null,
-      templateName,
-    ),
+    () => mode === 'auto-quant'
+      ? targetWs ?? null
+      : resolveChatWorkspaceTarget(
+          workspaces,
+          targetWsId ?? selectedWorkspaceId,
+          launchPreferences.recentChatWorkspaceId,
+          templateName,
+        ),
     [workspaces, templateName, targetWsId, selectedWorkspaceId, mode, launchPreferences.recentChatWorkspaceId],
   )
   const workspaceTarget = targetWs ?? selectedHarnessWorkspace
@@ -235,7 +226,6 @@ function HarnessLandingPage({
         launchConfig.launchCredentialSlug,
         effectiveTargetWorkspaceId,
         templateName,
-        workspaceTarget ? undefined : sourceVersion,
       )
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')
@@ -279,7 +269,7 @@ function HarnessLandingPage({
 
       <div className="relative z-10 w-full max-w-2xl flex flex-col gap-4 md:gap-5">
         <div className="text-center space-y-1.5">
-          {targetWs ? (
+          {targetWs && mode === 'chat' ? (
             <>
               <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                 {t(`${copyKey}.targetHeading`)}
@@ -310,7 +300,7 @@ function HarnessLandingPage({
 
         <div
           className={`rounded-xl px-3 pb-2 pt-3 shadow-[0_18px_50px_-40px_var(--foreground)] transition-[border-color,box-shadow] md:rounded-2xl ${
-            targetWs
+            targetWs && mode === 'chat'
               ? 'bg-primary/[0.04] border border-primary/45 ring-1 ring-primary/15 focus-within:border-primary/70'
               : 'border border-border/80 bg-secondary/70 focus-within:border-primary/60 focus-within:shadow-[0_20px_55px_-38px_var(--primary)]'
           }`}
@@ -330,7 +320,7 @@ function HarnessLandingPage({
               {/* Workspace target — recent by default, explicit when selected.
                   Visible but non-blocking: users can see where the new Session
                   will live without answering a chooser on every send. */}
-              <div ref={workspaceBoxRef} className="relative">
+              {mode === 'chat' && <div ref={workspaceBoxRef} className="relative">
                 <button
                   type="button"
                   onClick={() => setWorkspaceMenuOpen((open) => !open)}
@@ -378,24 +368,7 @@ function HarnessLandingPage({
                     })}
                   </div>
                 )}
-              </div>
-
-              {mode === 'auto-quant' && !workspaceTarget && sourceTemplate?.source && (
-                <label className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
-                  <span>{t('autoQuantLanding.version')}</span>
-                  <select
-                    value={sourceVersion ?? sourceTemplate.source.defaultVersion}
-                    onChange={(event) => setSourceVersion(event.target.value)}
-                    className="max-w-24 bg-transparent font-mono text-foreground outline-none"
-                  >
-                    {sourceTemplate.source.versions.map((version) => (
-                      <option key={version.version} value={version.version}>
-                        {version.version}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              </div>}
 
               <AgentLaunchSelectors
                 ref={launchSelectorsRef}
@@ -528,5 +501,10 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 }
 
 export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
-  return <HarnessLandingPage spec={spec} mode="auto-quant" />
+  const ctx = useWorkspaces()
+  const workspace = ctx.workspaces.find((candidate) =>
+    candidate.id === ctx.autoQuantDefaultWorkspaceId
+    && candidate.template === 'auto-quant-v2')
+  if (!workspace) return <AutoQuantSetupPage />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id } }} mode="auto-quant" />
 }
