@@ -1,9 +1,11 @@
 import {
+  cp,
   mkdir,
   mkdtemp,
   readFile,
   realpath,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -14,6 +16,7 @@ import * as pty from 'node-pty'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const cliEntry = join(dirname(fileURLToPath(import.meta.url)), '../bin/openalice.ts')
+const cliPackageRoot = dirname(dirname(cliEntry))
 const temporaryPaths: string[] = []
 
 afterEach(async () => {
@@ -171,6 +174,84 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('Configure Runtime source')
     expect(transcript).toContain('Could not use that checkout')
     expect(transcript).toContain('Source configuration cancelled.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
+
+  it('uses installed provenance to offer managed Runtime setup from Enter', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-installed-enter-'))
+    temporaryPaths.push(isolatedHome)
+    const installRoot = join(isolatedHome, 'install')
+    const releaseRoot = join(
+      installRoot,
+      'cli-versions',
+      'dev-fixture-1234567890abcdef',
+    )
+    await mkdir(releaseRoot, { recursive: true })
+    await Promise.all([
+      cp(join(cliPackageRoot, 'bin'), join(releaseRoot, 'bin'), { recursive: true }),
+      cp(join(cliPackageRoot, 'src'), join(releaseRoot, 'src'), { recursive: true }),
+      cp(join(cliPackageRoot, 'package.json'), join(releaseRoot, 'package.json')),
+      symlink(join(cliPackageRoot, 'node_modules'), join(releaseRoot, 'node_modules')),
+      writeFile(join(releaseRoot, 'install-source.json'), JSON.stringify({
+        schemaVersion: 1,
+        repository: 'TraderAlice/OpenAlice',
+        cliVersion: '0.87.0-beta',
+        selector: { kind: 'branch', value: 'dev' },
+        installerUrl: 'https://openalice.ai/install',
+      })),
+    ])
+    const installedEntry = join(releaseRoot, 'bin', 'openalice.ts')
+    const unrelatedCwd = join(isolatedHome, 'empty')
+    await mkdir(unrelatedCwd)
+    const child = pty.spawn(process.execPath, [installedEntry], {
+      cols: 100,
+      rows: 28,
+      cwd: unrelatedCwd,
+      env: {
+        ...process.env,
+        HOME: join(isolatedHome, 'home'),
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let requestedStart = false
+      let cancelledPlan = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Installed Supervisor first start timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!requestedStart && output.includes('Enter prepares anything missing')) {
+          requestedStart = true
+          child.write('\r')
+        } else if (
+          !cancelledPlan
+          && output.includes('installer-managed OpenAlice source branch dev')
+        ) {
+          cancelledPlan = true
+          child.write('n')
+        } else if (!detached && output.includes('Action cancelled.')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Installed Supervisor first start exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('OpenAlice  0.87.0-beta  branch dev')
+    expect(transcript).toContain('installer-managed OpenAlice source branch dev')
+    expect(transcript).not.toContain('Configure Runtime source')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })

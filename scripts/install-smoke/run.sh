@@ -15,6 +15,7 @@ fi
 server_log="$(mktemp)"
 refusal_log="$(mktemp)"
 runtime_deps_log="$(mktemp)"
+tui_log="$(mktemp)"
 runtime_fixture_bin="$(mktemp -d)"
 cp /fixture/fake-package-manager.sh "$runtime_fixture_bin/fake-package-manager"
 chmod +x "$runtime_fixture_bin/fake-package-manager"
@@ -31,7 +32,7 @@ cleanup() {
   kill "$server_pid" >/dev/null 2>&1 || true
   wait "$server_pid" >/dev/null 2>&1 || true
   rm -rf "$runtime_fixture_bin"
-  rm -f "$server_log" "$refusal_log" "$runtime_deps_log"
+  rm -f "$server_log" "$refusal_log" "$runtime_deps_log" "$tui_log"
 }
 trap cleanup EXIT
 
@@ -83,7 +84,14 @@ install_branch_with_runtime_deps() {
 
 mkdir -p "$HOME/.openalice/.cli-install.lock"
 printf '99999999\n' > "$HOME/.openalice/.cli-install.lock/pid"
-install_branch smoke-v1
+first_install_output="$(install_branch smoke-v1)"
+printf '%s\n' "$first_install_output"
+grep -Fq "Press Enter inside the Supervisor to prepare, start, and open OpenAlice." \
+  <<<"$first_install_output" \
+  || fail "source-only install did not explain the parameter-free first start"
+grep -Fq "Use c only if you want to select an existing checkout instead." \
+  <<<"$first_install_output" \
+  || fail "source-only install did not keep manual checkout selection secondary"
 
 bin_dir="$HOME/.openalice/bin"
 versions_dir="$HOME/.openalice/cli-versions"
@@ -99,6 +107,21 @@ if (value.installSource?.installerUrl !== "http://127.0.0.1:18080/install") proc
 ' "$install_source" "$cli_version" || fail "installed CLI did not preserve its install source"
 [[ "$($bin_dir/pi --version)" == "0.83.0" ]] || fail "installed managed Pi version check failed"
 "$bin_dir/openalice" --help | grep -Fq "OpenAlice CLI" || fail "installed CLI help check failed"
+{
+  sleep 0.2
+  printf '\r'
+  sleep 0.2
+  printf 'n'
+  sleep 0.2
+  printf 'q'
+} | script -qec "$bin_dir/openalice" "$tui_log" >/dev/null
+grep -Fq "installer-managed OpenAlice source branch smoke-v1" "$tui_log" \
+  || fail "installed bare TUI did not derive managed Runtime setup from install provenance"
+grep -Fq "Action cancelled." "$tui_log" \
+  || fail "installed bare TUI did not return from the managed Runtime confirmation"
+if grep -Fq "Configure Runtime source" "$tui_log"; then
+  fail "installed bare TUI fell back to the manual checkout path"
+fi
 server_status="$($bin_dir/openalice server status --home "$HOME/openalice-server-smoke" --json)"
 node -e '
 const status = JSON.parse(process.argv[1]);

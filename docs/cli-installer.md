@@ -220,10 +220,11 @@ TUI. For automation,
 `--yes --with-runtime-deps` is the explicit pair that approves the displayed
 Linux package command as well as the CLI transaction.
 
-When no local checkout is discoverable after installation, bare `openalice`
-opens the Supervisor and offers two explicit stopped-state paths: `m` prepares
-an installer-managed checkout aligned to the CLI's branch or version under the
-install root, while `c` selects an existing checkout. Managed preparation never
+When no local checkout is discoverable after a source-only installation, bare
+`openalice` opens the Supervisor and Enter inspects the installed branch or
+version, shows the managed Runtime preparation plan, and continues through
+start plus browser open after consent. `m` opens the same managed-source plan
+explicitly, while `c` selects an existing checkout. Managed preparation never
 overwrites an occupied invalid path. Its first Start can install repository
 dependencies and build the source Runtime; the installer therefore discloses
 and optionally prepares the required native build tools before consent.
@@ -613,6 +614,8 @@ It verifies:
 - installed content identity in `openalice version --json`, so same-version
   remote payload drift is detectable;
 - runnable OpenAlice/Pi shell and CMD launchers plus managed-Pi env injection;
+- an installed bare Supervisor launched through a pseudo-TTY, including
+  install-provenance managed Runtime planning, cancellation, and detach;
 - idempotent managed PATH configuration;
 - identical-release reuse;
 - ref switching without deleting the prior release;
@@ -658,8 +661,11 @@ pnpm test:install:docker --interactive
 The playground first offers the Runtime-tool choice, stops again at the real
 combined plan, and then leaves the tester in the clean container. Its fake
 offline package manager records the exact command while still exercising the
-non-root plus `sudo` branch. Review both choices, copy, and spacing, approve
-with an explicit `y`, and run at least:
+non-root plus `sudo` branch. The fixture supplies a minimal offline `pi-tui`
+adapter so the automated Docker lane can execute the installed TUI state
+machine; the repository's real-PTY suite remains the renderer/terminal
+acceptance boundary. Review both choices, copy, and spacing, approve with an
+explicit `y`, and run at least:
 
 ```bash
 command -v openalice

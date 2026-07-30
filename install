@@ -1166,6 +1166,6 @@ if [[ -z "$RUNTIME_CONTENT_IDENTITY" && -n "$checkout" ]]; then
 elif [[ -z "$RUNTIME_CONTENT_IDENTITY" && "$INSTALL_CONTEXT" != "remote" ]]; then
   printf '\n%bNext: open the OpenAlice Supervisor%b\n' "$BOLD" "$RESET"
   printf '  %s\n\n' "$BIN_DIR/openalice"
-  printf 'Press %bm%b inside the Supervisor to prepare the managed Runtime source,\n' "$BOLD" "$RESET"
-  printf 'or %bc%b to select an existing OpenAlice checkout.\n\n' "$BOLD" "$RESET"
+  printf 'Press %bEnter%b inside the Supervisor to prepare, start, and open OpenAlice.\n' "$BOLD" "$RESET"
+  printf 'Use %bc%b only if you want to select an existing checkout instead.\n\n' "$BOLD" "$RESET"
 fi
