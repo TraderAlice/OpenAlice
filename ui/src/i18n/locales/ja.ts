@@ -7,7 +7,7 @@ export const ja: Resources = {
       inbox: '受信トレイ',
       tracked: 'トラッキング',
       chat: 'Alice に質問',
-      autoQuant: 'AutoQuant',
+      autoQuant: 'Quant',
       workspaces: 'ワークスペース',
       market: 'マーケット',
       news: 'ニュース',
