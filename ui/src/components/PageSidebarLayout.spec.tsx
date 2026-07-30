@@ -99,19 +99,84 @@ describe('PageSidebarLayout', () => {
     )
 
     const drawer = screen.getByTestId('page-sidebar-drawer')
+    const opener = screen.getByRole('button', { name: 'Open Inbox' })
     expect(drawer.getAttribute('data-state')).toBe('closed')
     expect(drawer.getAttribute('aria-hidden')).toBe('true')
     expect(drawer.hasAttribute('inert')).toBe(true)
+    expect(opener.getAttribute('aria-expanded')).toBe('false')
+    expect(opener.getAttribute('aria-controls')).toBe(drawer.id)
+    expect(opener.getAttribute('aria-haspopup')).toBe('dialog')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
+    fireEvent.click(opener)
     expect(drawer.getAttribute('data-state')).toBe('open')
     expect(drawer.getAttribute('aria-hidden')).toBe('false')
     expect(drawer.hasAttribute('inert')).toBe(false)
+    expect(drawer.getAttribute('role')).toBe('dialog')
+    expect(drawer.getAttribute('aria-label')).toBe('Inbox')
+    expect(drawer.getAttribute('aria-modal')).toBe('true')
+    expect(opener.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close Inbox' }))
+    expect(screen.getByText('Inbox message').closest('[inert]')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Select message' }))
     expect(drawer.getAttribute('data-state')).toBe('closed')
     expect(drawer.getAttribute('aria-hidden')).toBe('true')
     expect(drawer.hasAttribute('inert')).toBe(true)
+    expect(drawer.hasAttribute('aria-modal')).toBe(false)
+    expect(opener.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(opener)
+    expect(screen.getByText('Inbox message').closest('[inert]')).toBeNull()
+  })
+
+  it('contains phone drawer focus and closes on Escape', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })))
+
+    render(
+      <PageSidebarLayout
+        storageKey="tracked"
+        title="Tracked"
+        sidebar={(
+          <>
+            <button type="button">First item</button>
+            <button type="button" aria-current="page">Current item</button>
+            <button type="button">Last item</button>
+          </>
+        )}
+      >
+        <button type="button">Background action</button>
+      </PageSidebarLayout>,
+    )
+
+    const opener = screen.getByRole('button', { name: 'Open Tracked' })
+    fireEvent.click(opener)
+
+    const close = screen.getByRole('button', { name: 'Close Tracked' })
+    const current = screen.getByRole('button', { name: 'Current item' })
+    const last = screen.getByRole('button', { name: 'Last item' })
+    expect(document.activeElement).toBe(current)
+
+    last.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(close)
+
+    close.focus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    const drawer = screen.getByTestId('page-sidebar-drawer')
+    expect(drawer.getAttribute('data-state')).toBe('closed')
+    expect(document.activeElement).toBe(opener)
+    expect(drawer.className).toContain('oa-page-sidebar-dialog')
   })
 
   it('keeps a page navigator in the drawer below its custom desktop breakpoint', () => {

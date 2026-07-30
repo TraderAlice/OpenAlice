@@ -53,6 +53,8 @@ describe('AboutOpenAliceSection', () => {
     expect(await screen.findByText('v0.82.0-beta')).toBeTruthy()
     expect(screen.getByText('You’re up to date.')).toBeTruthy()
     expect(screen.getByText('Browser / server')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Check for updates' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'View releases' }).className).toContain('min-h-10')
 
     fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }))
 

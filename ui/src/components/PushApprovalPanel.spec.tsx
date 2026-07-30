@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
@@ -182,5 +182,48 @@ describe('PushApprovalPanel localization', () => {
     expect(screen.getByRole('button', { name: '确认推送' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '取消' })).toBeTruthy()
     expect(mocks.walletPush).not.toHaveBeenCalled()
+  })
+
+  it('uses a queue-to-detail drill-in on narrow layouts while preserving the desktop split view', async () => {
+    mocks.walletStatus.mockResolvedValue({
+      staged: [{
+        action: 'placeOrder',
+        contract: { symbol: 'AAPL' },
+        order: {
+          action: 'BUY',
+          orderType: 'LMT',
+          totalQuantity: '2',
+          lmtPrice: '210',
+        },
+      }],
+      pendingMessage: '调整 AAPL 仓位',
+      head: 'abc123456789',
+      commitCount: 1,
+    })
+
+    render(<PushApprovalPanel />)
+
+    const queue = await screen.findByTestId('trading-review-queue')
+    const detail = screen.getByTestId('trading-review-detail')
+    expect(queue.className).toContain('flex')
+    expect(queue.className).toContain('md:flex')
+    expect(detail.className).toContain('hidden')
+    expect(detail.className).toContain('md:block')
+
+    const queueRow = await screen.findByRole('button', { name: /调整 AAPL 仓位/ })
+    fireEvent.click(queueRow)
+
+    expect(queue.className).toContain('hidden')
+    expect(detail.className).toContain('block')
+    expect(detail.className).toContain('overflow-x-hidden')
+
+    const back = screen.getByRole('button', { name: '返回队列' })
+    expect(back.className).toContain('min-h-10')
+    await waitFor(() => expect(document.activeElement).toBe(back))
+    fireEvent.click(back)
+
+    expect(queue.className).toContain('flex')
+    expect(detail.className).toContain('hidden')
+    await waitFor(() => expect(document.activeElement).toBe(queueRow))
   })
 })

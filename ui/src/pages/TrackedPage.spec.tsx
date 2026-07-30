@@ -92,6 +92,10 @@ describe('TrackedPage artifact navigation', () => {
     const backlink = await screen.findByRole('button', {
       name: /research\/power\.md/,
     })
+    expect(backlink.className).toContain('min-h-10')
+    expect(within(backlink).getByText('research/power.md').className).toContain('break-all')
+    expect(within(backlink).getAllByText('power')).toHaveLength(2)
+    expect(screen.getByRole('heading', { name: 'stock-vst' }).className).toContain('break-words')
     fireEvent.click(backlink)
 
     await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({

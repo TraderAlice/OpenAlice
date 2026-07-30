@@ -46,16 +46,24 @@ describe('Settings tool-group disclosures', () => {
     const panel = panelId ? document.getElementById(panelId) : null
 
     expect(disclosure.getAttribute('aria-expanded')).toBe('false')
+    expect(disclosure.className).toContain('min-h-10')
+    expect(disclosure.className).toContain('-my-2.5')
     expect(panel?.getAttribute('aria-hidden')).toBe('true')
     expect(panel?.hasAttribute('inert')).toBe(true)
     expect(screen.queryByRole('switch', { name: 'calculate' })).toBeNull()
+
+    const groupToggle = screen.getByRole('switch', { name: 'Thinking Kit tools' })
+    expect(groupToggle.className).toContain('size-10')
+    fireEvent.click(groupToggle)
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false')
+    expect(groupToggle.getAttribute('aria-checked')).toBe('false')
 
     fireEvent.click(disclosure)
 
     expect(disclosure.getAttribute('aria-expanded')).toBe('true')
     expect(panel?.getAttribute('aria-hidden')).toBe('false')
     expect(panel?.hasAttribute('inert')).toBe(false)
-    expect(screen.getByRole('switch', { name: 'calculate' })).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'calculate' }).className).toContain('size-10')
 
     fireEvent.click(disclosure)
 

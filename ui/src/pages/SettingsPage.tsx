@@ -93,7 +93,7 @@ export function AppearanceSection() {
                 if (mode !== 'auto') chooseSlot(mode)
               }}
               aria-pressed={theme === mode}
-              className={`oa-pressable rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+              className={`oa-pressable min-h-10 rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors sm:min-h-0 ${
                 theme === mode
                   ? 'border-primary bg-primary-muted text-primary'
                   : 'border-border bg-background text-muted-foreground hover:text-foreground'
@@ -137,7 +137,7 @@ export function AppearanceSection() {
             type="button"
             onClick={resetPair}
             disabled={isDefaultPair}
-            className="oa-pressable inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-45"
+            className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-45 sm:min-h-8"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             {t('settings.appearance.resetPair')}
@@ -182,7 +182,7 @@ export function AppearanceSection() {
                   type="button"
                   onClick={() => setPaletteFilter(filter)}
                   aria-pressed={paletteFilter === filter}
-                  className={`rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  className={`min-h-10 rounded px-2.5 py-1 text-[11px] font-medium transition-colors sm:min-h-0 ${
                     paletteFilter === filter
                       ? 'bg-primary-muted text-primary'
                       : 'text-muted-foreground hover:text-foreground'
@@ -374,7 +374,7 @@ export function LanguageSection() {
             type="button"
             onClick={() => setLocale(l)}
             aria-pressed={locale === l}
-            className={`px-3 py-1.5 text-sm rounded border transition-colors ${
+            className={`min-h-10 rounded border px-3 py-1.5 text-sm transition-colors sm:min-h-0 ${
               locale === l
                 ? 'border-primary text-primary bg-primary/10'
                 : 'border-border text-muted-foreground hover:text-foreground'
@@ -484,7 +484,7 @@ export function DataHomeSection() {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="btn-secondary-sm"
+          className="btn-secondary-sm min-h-10 sm:min-h-0"
           disabled={!status || busy}
           onClick={() => void bridge.openCurrent()
             .then((message) => { if (message) setError(t('settings.dataHome.openError')) })
@@ -495,7 +495,7 @@ export function DataHomeSection() {
         <button
           data-testid="data-home-choose"
           type="button"
-          className="btn-primary-sm"
+          className="btn-primary-sm min-h-10 sm:min-h-0"
           disabled={!status || busy || restarting || status.selectionLocked}
           onClick={() => void runAction(() => bridge.chooseAndRestart())}
         >
@@ -531,7 +531,7 @@ export function DataHomeSection() {
                 </span>
                 <button
                   type="button"
-                  className="btn-secondary-sm shrink-0"
+                  className="btn-secondary-sm min-h-10 shrink-0 sm:min-h-0"
                   disabled={busy || restarting || status?.selectionLocked}
                   onClick={() => void runAction(() => bridge.useRecentAndRestart(path))}
                 >
@@ -642,7 +642,7 @@ function WorkspaceShellSection() {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="btn-primary-sm"
+          className="btn-primary-sm min-h-10 sm:min-h-0"
           disabled={saving || (mode === 'custom' && customPath.trim().length === 0)}
           onClick={() => void save()}
         >
@@ -735,7 +735,7 @@ function PersonaEditor() {
         <button
           onClick={handleSave}
           disabled={saving || !dirty}
-          className="btn-primary-sm"
+          className="btn-primary-sm min-h-10 sm:min-h-0"
         >
           {saving ? t('settings.persona.saving') : t('settings.persona.save')}
         </button>
@@ -865,7 +865,7 @@ export function ToolsSection() {
         loadError ? (
           <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-sm font-medium text-foreground">{t('settings.tools.loadError')}</p>
-            <button type="button" className="btn-secondary-sm mt-4" onClick={() => void loadTools()}>
+            <button type="button" className="btn-secondary-sm mt-4 min-h-10 sm:min-h-0" onClick={() => void loadTools()}>
               {t('common.retry')}
             </button>
           </div>
@@ -934,7 +934,7 @@ function ToolGroupCard({
         <button
           type="button"
           onClick={onToggleExpanded}
-          className="flex items-center gap-2 flex-1 text-left min-w-0"
+          className="-my-2.5 flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-secondary"
           aria-expanded={expanded}
           aria-controls={toolListId}
         >
@@ -1029,7 +1029,7 @@ export function SettingsTabBar({
           type="button"
           onClick={() => onSelect(item.key)}
           aria-pressed={tab === item.key}
-          className={`px-3 py-2 text-sm font-medium transition-colors relative ${
+          className={`relative min-h-10 px-3 py-2 text-sm font-medium transition-colors sm:min-h-0 ${
             tab === item.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
           }`}
         >

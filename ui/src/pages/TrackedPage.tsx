@@ -222,10 +222,12 @@ function Detail({ detail }: { detail: EntityDetail }) {
   const Icon = entity.type === 'asset' ? TrendingUp : Hash
   return (
     <div className="max-w-[820px] mx-auto py-6 px-4 md:px-8">
-      <div className="flex items-center gap-2.5 mb-2">
+      <div className="mb-2 flex items-start gap-2.5 sm:items-center">
         <Icon size={20} strokeWidth={1.75} className="shrink-0 text-muted-foreground" aria-hidden />
-        <h2 className="text-[20px] font-semibold font-mono text-foreground">{entity.name}</h2>
-        <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide">
+        <h2 className="min-w-0 break-words font-mono text-[18px] font-semibold leading-snug text-foreground sm:text-[20px]">
+          {entity.name}
+        </h2>
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
           {entity.type}
         </span>
       </div>
@@ -310,16 +312,25 @@ function BacklinkRow({
       type="button"
       onClick={open}
       title={issueId ? `Open issue ${issueId}` : `Open ${backlink.path}`}
-      className="group flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-muted/30 hover:bg-muted hover:border-primary/40 transition-colors text-left"
+      className="group flex min-h-10 items-start gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-muted sm:items-center sm:py-2"
     >
       <Icon
         size={14}
         strokeWidth={1.75}
-        className="shrink-0 text-muted-foreground/70 group-hover:text-primary transition-colors"
+        className="mt-0.5 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary sm:mt-0"
         aria-hidden
       />
-      <span className="flex-1 min-w-0 truncate font-mono text-[12px] text-foreground">{label}</span>
-      <span className="shrink-0 text-[11px] text-muted-foreground/60">{backlink.workspaceTag}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block break-all font-mono text-[12px] leading-5 text-foreground sm:truncate sm:leading-normal">
+          {label}
+        </span>
+        <span className="mt-0.5 block break-all text-[11px] text-muted-foreground/60 sm:hidden">
+          {backlink.workspaceTag}
+        </span>
+      </span>
+      <span className="hidden max-w-[35%] shrink-0 truncate text-[11px] text-muted-foreground/60 sm:block">
+        {backlink.workspaceTag}
+      </span>
     </button>
   )
 }

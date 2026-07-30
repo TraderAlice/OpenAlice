@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LineChart, Line, YAxis, XAxis, Tooltip } from 'recharts'
+import { Search } from 'lucide-react'
 import { useReferenceBoard } from '../components/market/useReferenceBoard'
 import { BoardMeta } from '../components/market/BoardMeta'
 import { PageHeader } from '../components/PageHeader'
@@ -10,6 +11,7 @@ import { MeasuredChartFrame } from '../components/MeasuredChartFrame'
 import {
   referenceApi,
   type MoversBoard, type MoverRow, type ReferenceMeta, type CalendarBoard,
+  type EarningsEvent, type IpoEvent, type DividendEvent,
   type MacroBoard, type MacroSeriesCard, type TermStructureBoard, type TermCurve,
   type GlobalMacroBoard, type GlobalMacroCell, type ShippingBoard, type ShippingCurve,
   type FedBoard,
@@ -156,11 +158,39 @@ function MoversTable({ rows }: { rows: MoverRow[] }) {
 // ==================== Calendar ====================
 
 type CalendarList = 'earnings' | 'ipos' | 'dividends'
+const CALENDAR_PAGE_SIZE = 50
 
 function CalendarBoardView() {
   const { t } = useTranslation()
   const { data, updatedAt, loading, slow, error, retry } = useReferenceBoard<CalendarBoard>(referenceApi.calendar, 30 * 60 * 1000)
   const [list, setList] = useState<CalendarList>('earnings')
+  const [query, setQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(CALENDAR_PAGE_SIZE)
+  const sortedRows = useMemo(() => ({
+    earnings: data ? [...data.earnings].sort((a, b) => a.report_date.localeCompare(b.report_date)) : [],
+    ipos: data ? [...data.ipos].sort((a, b) => (a.ipo_date ?? '').localeCompare(b.ipo_date ?? '')) : [],
+    dividends: data ? [...data.dividends].sort((a, b) => a.ex_dividend_date.localeCompare(b.ex_dividend_date)) : [],
+  }), [data])
+  const filteredRows = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase()
+    if (!normalized) return sortedRows
+    const includesQuery = (...parts: unknown[]) =>
+      parts.some((part) => String(part ?? '').toLocaleLowerCase().includes(normalized))
+    return {
+      earnings: sortedRows.earnings.filter((row) =>
+        includesQuery(row.report_date, row.symbol, row.name)),
+      ipos: sortedRows.ipos.filter((row) =>
+        includesQuery(row.ipo_date, row.symbol, row.name, row.exchange)),
+      dividends: sortedRows.dividends.filter((row) =>
+        includesQuery(row.ex_dividend_date, row.payment_date, row.symbol, row.name)),
+    }
+  }, [query, sortedRows])
+  const activeRows = filteredRows[list]
+  const activeVisibleCount = Math.min(visibleCount, activeRows.length)
+
+  useEffect(() => {
+    setVisibleCount(CALENDAR_PAGE_SIZE)
+  }, [list, query])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -175,19 +205,28 @@ function CalendarBoardView() {
         live={{ lastUpdated: updatedAt }}
       />
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col gap-4 min-h-0">
-        <div className="flex items-center gap-1">
+        <div
+          className="grid grid-cols-3 gap-1 rounded-lg bg-secondary/50 p-1"
+          role="group"
+          aria-label={t('market.boardCalendar')}
+        >
           {(['earnings', 'ipos', 'dividends'] as const).map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => setList(k)}
-              className={`px-3 py-1 rounded-md text-[12px] font-medium transition-colors ${
+              aria-pressed={list === k}
+              aria-label={`${t(calendarLabelKey(k))} (${data?.[k].length ?? 0})`}
+              className={`oa-pressable flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md px-2 py-1 text-[12px] font-medium transition-colors sm:flex-row sm:gap-1.5 ${
                 list === k
-                  ? 'bg-muted text-foreground'
+                  ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}
             >
-              {t(calendarLabelKey(k))} ({data?.[k].length ?? 0})
+              <span className="truncate">{t(calendarLabelKey(k))}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {data?.[k].length ?? 0}
+              </span>
             </button>
           ))}
         </div>
@@ -211,12 +250,60 @@ function CalendarBoardView() {
         {data?.errors?.[list] && (
           <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{data.errors[list]}</div>
         )}
-        {data && data[list].length === 0 && !loading && !data.errors?.[list] && (
+
+        {data && data[list].length > 0 && !data.errors?.[list] && (
+          <div className="space-y-2">
+            <label htmlFor="market-calendar-search" className="sr-only">
+              {t('market.calendarSearch')}
+            </label>
+            <div className="relative">
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60"
+              />
+              <input
+                id="market-calendar-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t('market.calendarSearchPlaceholder')}
+                className="min-h-11 w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/60"
+              />
+            </div>
+            {activeRows.length > 0 && (
+              <div className="text-[11px] text-muted-foreground">
+                {t('market.calendarShowing', {
+                  visible: activeVisibleCount,
+                  total: activeRows.length,
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {data && activeRows.length === 0 && !loading && !data.errors?.[list] && (
           <div className="text-[13px] text-muted-foreground">{t('market.noMatches')}</div>
         )}
-        {data && list === 'earnings' && data.earnings.length > 0 && <EarningsTable board={data} />}
-        {data && list === 'ipos' && data.ipos.length > 0 && <IpoTable board={data} />}
-        {data && list === 'dividends' && data.dividends.length > 0 && <DividendTable board={data} />}
+        {data && list === 'earnings' && filteredRows.earnings.length > 0 && (
+          <EarningsTable rows={filteredRows.earnings.slice(0, visibleCount)} />
+        )}
+        {data && list === 'ipos' && filteredRows.ipos.length > 0 && (
+          <IpoTable rows={filteredRows.ipos.slice(0, visibleCount)} />
+        )}
+        {data && list === 'dividends' && filteredRows.dividends.length > 0 && (
+          <DividendTable rows={filteredRows.dividends.slice(0, visibleCount)} />
+        )}
+        {activeVisibleCount < activeRows.length && (
+          <button
+            type="button"
+            onClick={() => setVisibleCount((count) => count + CALENDAR_PAGE_SIZE)}
+            className="oa-pressable min-h-11 w-full rounded-lg border border-border bg-secondary/50 px-4 py-2 text-[12px] font-medium text-foreground hover:border-primary/40 hover:bg-secondary"
+          >
+            {t('market.calendarShowMore', {
+              count: Math.min(CALENDAR_PAGE_SIZE, activeRows.length - activeVisibleCount),
+            })}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -266,77 +353,109 @@ function EquityDetailButton({
   )
 }
 
-function EarningsTable({ board }: { board: CalendarBoard }) {
+function EarningsTable({ rows }: { rows: EarningsEvent[] }) {
   const { t } = useTranslation()
   const open = useOpenEquity()
-  // Sorted by date so the board reads as an agenda.
-  const rows = [...board.earnings].sort((a, b) => a.report_date.localeCompare(b.report_date))
   return (
-    <CalTable head={[t('market.colDate'), t('market.colSymbol'), t('market.colEpsPrev'), t('market.colEpsEst')]} rightCols={[2, 3]}>
-      {rows.map((r, i) => (
-        <tr key={`${r.symbol}-${i}`} className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer" onClick={() => open(r.symbol)}>
-          <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.report_date}</td>
-          <td className="py-1.5 px-3">
-            <EquityDetailButton symbol={r.symbol} name={r.name} />
-          </td>
-          <td className="py-1.5 px-3 text-right font-mono text-foreground">{r.eps_previous ?? '—'}</td>
-          <td className="py-1.5 pl-3 text-right font-mono text-foreground">{r.eps_consensus ?? '—'}</td>
-        </tr>
-      ))}
-    </CalTable>
-  )
-}
-
-function IpoTable({ board }: { board: CalendarBoard }) {
-  const { t } = useTranslation()
-  const open = useOpenEquity()
-  const rows = [...board.ipos].sort((a, b) => (a.ipo_date ?? '').localeCompare(b.ipo_date ?? ''))
-  return (
-    <CalTable head={[t('market.colDate'), t('market.colSymbol'), t('market.colExchange')]}>
-      {rows.map((r, i) => {
-        const symbol = typeof r.symbol === 'string' ? r.symbol : null
-        const name = typeof r.name === 'string' ? r.name : null
-        return (
-          <tr
-            key={`${r.symbol}-${i}`}
-            className={`border-b border-border/50 hover:bg-secondary/40 ${symbol ? 'cursor-pointer' : ''}`}
-            onClick={symbol ? () => open(symbol) : undefined}
-          >
-            <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.ipo_date ?? '—'}</td>
+    <>
+      <CalendarMobileList
+        rows={rows}
+        date={(row) => row.report_date}
+        symbol={(row) => row.symbol}
+        name={(row) => row.name}
+        metrics={(row) => [
+          { label: t('market.colEpsPrev'), value: row.eps_previous ?? '—' },
+          { label: t('market.colEpsEst'), value: row.eps_consensus ?? '—' },
+        ]}
+      />
+      <CalTable head={[t('market.colDate'), t('market.colSymbol'), t('market.colEpsPrev'), t('market.colEpsEst')]} rightCols={[2, 3]}>
+        {rows.map((r, i) => (
+          <tr key={`${r.symbol}-${i}`} className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer" onClick={() => open(r.symbol)}>
+            <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.report_date}</td>
             <td className="py-1.5 px-3">
-              <EquityDetailButton symbol={symbol} name={name} />
+              <EquityDetailButton symbol={r.symbol} name={r.name} />
             </td>
-            <td className="py-1.5 pl-3 text-muted-foreground">{typeof r.exchange === 'string' ? r.exchange : '—'}</td>
+            <td className="py-1.5 px-3 text-right font-mono text-foreground">{r.eps_previous ?? '—'}</td>
+            <td className="py-1.5 pl-3 text-right font-mono text-foreground">{r.eps_consensus ?? '—'}</td>
           </tr>
-        )
-      })}
-    </CalTable>
+        ))}
+      </CalTable>
+    </>
   )
 }
 
-function DividendTable({ board }: { board: CalendarBoard }) {
+function IpoTable({ rows }: { rows: IpoEvent[] }) {
   const { t } = useTranslation()
   const open = useOpenEquity()
-  const rows = [...board.dividends].sort((a, b) => a.ex_dividend_date.localeCompare(b.ex_dividend_date))
   return (
-    <CalTable head={[t('market.colExDate'), t('market.colSymbol'), t('market.colDivAmount'), t('market.colPayDate')]} rightCols={[2]}>
-      {rows.map((r, i) => (
-        <tr key={`${r.symbol}-${i}`} className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer" onClick={() => open(r.symbol)}>
-          <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.ex_dividend_date}</td>
-          <td className="py-1.5 px-3">
-            <EquityDetailButton symbol={r.symbol} name={r.name} />
-          </td>
-          <td className="py-1.5 px-3 text-right font-mono text-foreground">{r.amount ?? '—'}</td>
-          <td className="py-1.5 pl-3 text-muted-foreground whitespace-nowrap">{r.payment_date ?? '—'}</td>
-        </tr>
-      ))}
-    </CalTable>
+    <>
+      <CalendarMobileList
+        rows={rows}
+        date={(row) => row.ipo_date ?? '—'}
+        symbol={(row) => typeof row.symbol === 'string' ? row.symbol : null}
+        name={(row) => typeof row.name === 'string' ? row.name : null}
+        metrics={(row) => [{
+          label: t('market.colExchange'),
+          value: typeof row.exchange === 'string' ? row.exchange : '—',
+        }]}
+      />
+      <CalTable head={[t('market.colDate'), t('market.colSymbol'), t('market.colExchange')]}>
+        {rows.map((r, i) => {
+          const symbol = typeof r.symbol === 'string' ? r.symbol : null
+          const name = typeof r.name === 'string' ? r.name : null
+          return (
+            <tr
+              key={`${r.symbol}-${i}`}
+              className={`border-b border-border/50 hover:bg-secondary/40 ${symbol ? 'cursor-pointer' : ''}`}
+              onClick={symbol ? () => open(symbol) : undefined}
+            >
+              <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.ipo_date ?? '—'}</td>
+              <td className="py-1.5 px-3">
+                <EquityDetailButton symbol={symbol} name={name} />
+              </td>
+              <td className="py-1.5 pl-3 text-muted-foreground">{typeof r.exchange === 'string' ? r.exchange : '—'}</td>
+            </tr>
+          )
+        })}
+      </CalTable>
+    </>
+  )
+}
+
+function DividendTable({ rows }: { rows: DividendEvent[] }) {
+  const { t } = useTranslation()
+  const open = useOpenEquity()
+  return (
+    <>
+      <CalendarMobileList
+        rows={rows}
+        date={(row) => row.ex_dividend_date}
+        symbol={(row) => row.symbol}
+        name={(row) => row.name}
+        metrics={(row) => [
+          { label: t('market.colDivAmount'), value: row.amount ?? '—' },
+          { label: t('market.colPayDate'), value: row.payment_date ?? '—' },
+        ]}
+      />
+      <CalTable head={[t('market.colExDate'), t('market.colSymbol'), t('market.colDivAmount'), t('market.colPayDate')]} rightCols={[2]}>
+        {rows.map((r, i) => (
+          <tr key={`${r.symbol}-${i}`} className="border-b border-border/50 hover:bg-secondary/40 cursor-pointer" onClick={() => open(r.symbol)}>
+            <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{r.ex_dividend_date}</td>
+            <td className="py-1.5 px-3">
+              <EquityDetailButton symbol={r.symbol} name={r.name} />
+            </td>
+            <td className="py-1.5 px-3 text-right font-mono text-foreground">{r.amount ?? '—'}</td>
+            <td className="py-1.5 pl-3 text-muted-foreground whitespace-nowrap">{r.payment_date ?? '—'}</td>
+          </tr>
+        ))}
+      </CalTable>
+    </>
   )
 }
 
 function CalTable({ head, rightCols = [], children }: { head: string[]; rightCols?: number[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    <div data-testid="calendar-desktop" className="hidden overflow-x-auto md:block">
       <table className="w-full text-[12px] border-collapse">
         <thead>
           <tr className="text-muted-foreground/70 text-left border-b border-border">
@@ -347,6 +466,93 @@ function CalTable({ head, rightCols = [], children }: { head: string[]; rightCol
         </thead>
         <tbody>{children}</tbody>
       </table>
+    </div>
+  )
+}
+
+function CalendarMobileList<T>({
+  rows,
+  date,
+  symbol,
+  name,
+  metrics,
+}: {
+  rows: T[]
+  date: (row: T) => string
+  symbol: (row: T) => string | null
+  name: (row: T) => string | null
+  metrics: (row: T) => Array<{ label: string; value: ReactNode }>
+}) {
+  const { t } = useTranslation()
+  const open = useOpenEquity()
+  const groups = useMemo(() => {
+    const next: Array<{ date: string; rows: Array<{ row: T; index: number }> }> = []
+    rows.forEach((row, index) => {
+      const rowDate = date(row)
+      const current = next.at(-1)
+      if (current?.date === rowDate) current.rows.push({ row, index })
+      else next.push({ date: rowDate, rows: [{ row, index }] })
+    })
+    return next
+  }, [date, rows])
+
+  return (
+    <div data-testid="calendar-mobile" className="space-y-4 md:hidden">
+      {groups.map((group) => (
+        <section key={group.date} className="space-y-1.5">
+          <div className="border-b border-border/70 pb-1 text-[11px] font-medium text-muted-foreground">
+            {group.date}
+          </div>
+          <div className="overflow-hidden rounded-lg border border-border/70 bg-secondary/25">
+            {group.rows.map(({ row, index }) => {
+              const rowSymbol = symbol(row)
+              const rowName = name(row)
+              const content = (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-[13px] font-semibold text-foreground">
+                      {rowSymbol ?? '—'}
+                    </div>
+                    {rowName && (
+                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        {rowName}
+                      </div>
+                    )}
+                  </div>
+                  <dl className="grid shrink-0 grid-cols-2 gap-x-3 text-right">
+                    {metrics(row).map((metric) => (
+                      <div key={metric.label}>
+                        <dt className="text-[9px] uppercase tracking-wide text-muted-foreground/70">
+                          {metric.label}
+                        </dt>
+                        <dd className="mt-0.5 whitespace-nowrap font-mono text-[11px] text-foreground">
+                          {metric.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              )
+              const className = 'oa-pressable flex min-h-14 w-full min-w-0 items-center gap-3 border-b border-border/50 px-3 py-2 text-left last:border-b-0'
+              return rowSymbol ? (
+                <button
+                  key={`${rowSymbol}-${index}`}
+                  type="button"
+                  aria-label={t('market.openSymbol', { symbol: rowSymbol })}
+                  onClick={() => open(rowSymbol)}
+                  className={`${className} hover:bg-secondary/60`}
+                >
+                  {content}
+                </button>
+              ) : (
+                <div key={`unknown-${index}`} className={className}>
+                  {content}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

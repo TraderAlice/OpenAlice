@@ -1,5 +1,9 @@
 import { parseLocalStartArgs } from './local-start.mjs'
 import {
+  buildManagedPiEnv,
+  resolveLaunchContext,
+} from './launch-context.ts'
+import {
   inspectRuntime,
   lifecycleError,
   openRuntime,
@@ -30,18 +34,18 @@ export const ROOT_COMMANDS = Object.freeze([
 
 const LIFECYCLE_OPTIONS = Object.freeze({
   up: [
-    '--app-dir', '--home', '--port', '--log', '--wait', '--rebuild',
+    '--instance', '--app-dir', '--home', '--port', '--log', '--wait', '--rebuild',
     '--skip-prepare', '--takeover', '--open', '--no-open', '--no-update-check', '--json',
   ],
   run: [
-    '--app-dir', '--home', '--port', '--wait', '--rebuild',
+    '--instance', '--app-dir', '--home', '--port', '--wait', '--rebuild',
     '--skip-prepare', '--takeover', '--no-update-check',
   ],
-  down: ['--home', '--wait', '--json'],
-  status: ['--home', '--wait', '--json'],
-  logs: ['--home', '--lines', '--json'],
-  doctor: ['--home', '--wait', '--json'],
-  open: ['--home', '--wait'],
+  down: ['--instance', '--home', '--wait', '--json'],
+  status: ['--instance', '--home', '--wait', '--json'],
+  logs: ['--instance', '--home', '--lines', '--json'],
+  doctor: ['--instance', '--home', '--wait', '--json'],
+  open: ['--instance', '--home', '--wait'],
 })
 
 export function parseLifecycleArgs(action, argv) {
@@ -51,6 +55,7 @@ export function parseLifecycleArgs(action, argv) {
   }
 
   const options = {
+    instance: null,
     homeRoot: null,
     json: false,
     waitMs: action === 'down' ? 15_000 : 2_000,
@@ -67,6 +72,10 @@ export function parseLifecycleArgs(action, argv) {
       options.homeRoot = requireValue(argv, ++index, arg)
       continue
     }
+    if (arg === '--instance') {
+      options.instance = requireValue(argv, ++index, arg)
+      continue
+    }
     if (arg === '--wait') {
       options.waitMs = parseWait(requireValue(argv, ++index, arg))
       continue
@@ -80,10 +89,28 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
   const stdout = dependencies.stdout ?? process.stdout
   const stderr = dependencies.stderr ?? process.stderr
   try {
+    const context = await (
+      dependencies.resolveContext
+      ?? ((flags) => resolveLaunchContext({
+        flags,
+        env: dependencies.env,
+      }))
+    )({
+      instance: options.instance ?? undefined,
+      home: options.homeRoot ?? undefined,
+    })
+    const resolvedOptions = {
+      ...options,
+      homeRoot: context.home,
+    }
+    const runtimeDependencies = {
+      ...dependencies,
+      env: buildManagedPiEnv(context, dependencies.env ?? process.env),
+    }
     if (action === 'up' || action === 'run') {
       const humanOutput = !options.json
-      const result = await (dependencies.startRuntime ?? startRuntime)(options, {
-        ...dependencies,
+      const result = await (dependencies.startRuntime ?? startRuntime)(resolvedOptions, {
+        ...runtimeDependencies,
         detached: action === 'up',
         progressOutput: humanOutput ? stdout : undefined,
         emit: humanOutput
@@ -97,7 +124,7 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
         opened = await (dependencies.openRuntime ?? openRuntime)({
           homeRoot: result.homeRoot,
           waitMs: options.waitMs,
-        }, dependencies)
+        }, runtimeDependencies)
       }
       if (options.json) {
         writeJson(stdout, successEnvelope(action, {
@@ -112,14 +139,20 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
     }
 
     if (action === 'status') {
-      const status = await (dependencies.inspectRuntime ?? inspectRuntime)(options, dependencies)
+      const status = await (dependencies.inspectRuntime ?? inspectRuntime)(
+        resolvedOptions,
+        runtimeDependencies,
+      )
       if (options.json) writeJson(stdout, successEnvelope(action, { status }))
       else stdout.write(formatLifecycleStatus(status))
       return 0
     }
 
     if (action === 'down') {
-      const result = await (dependencies.stopRuntime ?? stopRuntime)(options, dependencies)
+      const result = await (dependencies.stopRuntime ?? stopRuntime)(
+        resolvedOptions,
+        runtimeDependencies,
+      )
       if (options.json) writeJson(stdout, successEnvelope(action, result))
       else if (result.stopped) stdout.write(`OpenAlice Runtime stopped (${result.status.home})\n`)
       else stdout.write(`OpenAlice Runtime is not running (${result.status.home})\n`)
@@ -127,7 +160,10 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
     }
 
     if (action === 'open') {
-      const result = await (dependencies.openRuntime ?? openRuntime)(options, dependencies)
+      const result = await (dependencies.openRuntime ?? openRuntime)(
+        resolvedOptions,
+        runtimeDependencies,
+      )
       stdout.write(`Opened OpenAlice Web UI: ${result.url}\n`)
       return 0
     }
@@ -152,6 +188,7 @@ for Guardian control and Alice HTTP readiness, then returns. The Runtime
 survives this shell.
 
 Options:
+  --instance <name>  Select a named complete-home instance
   --app-dir <path>   OpenAlice checkout (default: current directory or parent)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --port <port>      Local Web port (default: 47331)
@@ -174,6 +211,7 @@ Runs a source-backed OpenAlice Runtime in the foreground without opening a
 browser. Ctrl+C stops the self-owned Guardian process tree.
 
 Options:
+  --instance <name>  Select a named complete-home instance
   --app-dir <path>   OpenAlice checkout (default: current directory or parent)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --port <port>      Local Web port (default: 47331)
@@ -283,6 +321,7 @@ ${fishCompletionOptions()}
 }
 
 function parseStartArgs(action, argv) {
+  let instance = null
   let json = false
   let openRequested = false
   let noOpenRequested = false
@@ -290,6 +329,11 @@ function parseStartArgs(action, argv) {
   const startArgv = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
+    if (arg === '--instance') {
+      if (instance !== null) throw usageError('--instance may only be provided once')
+      instance = requireValue(argv, ++index, arg)
+      continue
+    }
     if (arg === '--json') {
       if (action === 'run') throw usageError('openalice run does not support --json')
       json = true
@@ -318,6 +362,7 @@ function parseStartArgs(action, argv) {
   }
   return {
     ...parsed,
+    instance,
     openBrowser: action === 'up' && openRequested,
     json,
     logFile,
@@ -435,6 +480,7 @@ function formatControlHelp(action, description, defaultWaitSeconds, json) {
 ${description}
 
 Options:
+  --instance <name>  Select a named complete-home instance
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --wait <seconds>   Control timeout, 1-600 (default: ${defaultWaitSeconds})
 ${json ? '  --json             Print a versioned machine-readable result\n' : ''}  -h, --help         Show this help

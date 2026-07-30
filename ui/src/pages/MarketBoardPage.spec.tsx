@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -45,7 +45,9 @@ vi.mock('../components/market/useReferenceBoard', () => ({
     data: mocks.boardData,
     updatedAt: null,
     loading: false,
+    slow: false,
     error: null,
+    retry: vi.fn(),
   }),
 }))
 
@@ -180,5 +182,56 @@ describe('MarketBoardPage', () => {
     expect(formatTermAxisLabel('26-08-30', 640)).toBe('26-08-30')
     expect(formatTermAxisPrice(118_240.5, 320)).toBe('118.2K')
     expect(formatTermAxisPrice(118_240.5, 640)).toBe('118,240.5')
+  })
+
+  it('keeps a large Calendar scan-first, searchable, and bounded on mobile', async () => {
+    const user = userEvent.setup()
+    await i18n.changeLanguage('en')
+    mocks.boardData = {
+      meta: {},
+      window: { start: '2026-08-04', end: '2026-08-13' },
+      earnings: Array.from({ length: 120 }, (_, index) => ({
+        report_date: index < 60 ? '2026-08-04' : '2026-08-05',
+        symbol: `E${String(index).padStart(3, '0')}`,
+        name: `Earnings company ${index}`,
+        eps_previous: index / 10,
+        eps_consensus: index / 8,
+      })),
+      ipos: [
+        { ipo_date: '2026-08-06', symbol: 'NEW1', name: 'New One', exchange: 'NASDAQ' },
+        { ipo_date: '2026-08-07', symbol: 'NEW2', name: 'New Two', exchange: 'NYSE' },
+      ],
+      dividends: [],
+    }
+
+    render(
+      <MarketBoardPage
+        spec={{ kind: 'market-board', params: { board: 'calendar' } }}
+        visible
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Earnings (120)' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('Showing 50 of 120 events')).toBeTruthy()
+    expect(within(screen.getByTestId('calendar-mobile')).getAllByRole('button')).toHaveLength(50)
+    expect(within(screen.getByTestId('calendar-desktop')).getAllByRole('row')).toHaveLength(51)
+
+    await user.click(screen.getByRole('button', { name: 'Show 50 more events' }))
+    expect(within(screen.getByTestId('calendar-mobile')).getAllByRole('button')).toHaveLength(100)
+
+    const search = screen.getByRole('searchbox', { name: 'Search calendar events' })
+    await user.type(search, 'E119')
+    expect(screen.getByText('Showing 1 of 1 events')).toBeTruthy()
+    const result = within(screen.getByTestId('calendar-mobile')).getByRole('button', { name: 'Open E119 details' })
+    await user.click(result)
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'market-detail',
+      params: { assetClass: 'equity', symbol: 'E119' },
+    })
+
+    await user.clear(search)
+    await user.click(screen.getByRole('button', { name: 'IPOs (2)' }))
+    await waitFor(() => expect(screen.getByText('Showing 2 of 2 events')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'IPOs (2)' }).getAttribute('aria-pressed')).toBe('true')
   })
 })

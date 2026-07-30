@@ -154,7 +154,7 @@ const trackedIssueDetailModule: ViewModule<'tracked-issue-detail'> = {
       storageKey="tracked"
       titleKey="nav.item.tracked"
       defaultWidth={232}
-      sidebar={<TrackedSidebar />}
+      sidebar={({ closeMobileDrawer }) => <TrackedSidebar onNavigate={closeMobileDrawer} />}
     >
       <TrackedIssueDetailPage spec={spec} />
     </PageSidebarShell>
@@ -381,7 +381,7 @@ const trackedModule: ViewModule<'tracked'> = {
       storageKey="tracked"
       titleKey="nav.item.tracked"
       defaultWidth={232}
-      sidebar={<TrackedSidebar />}
+      sidebar={({ closeMobileDrawer }) => <TrackedSidebar onNavigate={closeMobileDrawer} />}
     >
       <TrackedPage />
     </PageSidebarShell>
@@ -521,7 +521,7 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
           storageKey="tracked"
           titleKey="nav.item.tracked"
           defaultWidth={232}
-          sidebar={<TrackedSidebar />}
+          sidebar={({ closeMobileDrawer }) => <TrackedSidebar onNavigate={closeMobileDrawer} />}
         >
           <FileViewerPage spec={spec} />
         </PageSidebarShell>

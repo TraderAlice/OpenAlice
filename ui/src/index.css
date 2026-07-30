@@ -214,6 +214,11 @@ body {
   to { opacity: 1; }
 }
 
+@keyframes oa-page-sidebar-enter {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
+}
+
 @keyframes oa-disclosure-enter {
   from {
     opacity: 0;
@@ -246,6 +251,33 @@ body {
 
 .oa-dialog-backdrop {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
+}
+
+.oa-page-sidebar-dialog[open] {
+  animation: oa-page-sidebar-enter var(--motion-standard) var(--motion-ease-out) both;
+}
+
+.oa-page-sidebar-dialog::backdrop {
+  background: var(--backdrop);
+  animation: oa-backdrop-enter var(--motion-standard) ease-out both;
+}
+
+/* Page-owned navigators become touch surfaces inside the phone drawer.
+   A 40px height floor removes the old 18–28px rows; icon controls keep 36px
+   of horizontal room so adjacent workspace names remain distinguishable. */
+.oa-page-sidebar-dialog :is(button, [role="button"]) {
+  min-height: 2.5rem;
+}
+
+.oa-page-sidebar-dialog button:has(svg) {
+  min-width: 2.25rem;
+}
+
+.oa-page-sidebar-dialog :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select
+) {
+  min-height: 2.5rem;
 }
 
 .oa-disclosure-enter {
@@ -558,6 +590,8 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-view-enter,
   .oa-dialog-surface,
   .oa-dialog-backdrop,
+  .oa-page-sidebar-dialog[open],
+  .oa-page-sidebar-dialog::backdrop,
   .oa-disclosure-enter,
   .oa-popover-enter {
     animation: none;
@@ -809,7 +843,7 @@ html[lang="ja"] .oa-onboarding-title {
 }
 .what-editor-content .ProseMirror p.is-editor-empty:first-child::before {
   color: var(--muted-foreground);
-  content: 'Describe what this Issue should accomplish…';
+  content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;

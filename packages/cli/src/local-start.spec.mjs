@@ -152,6 +152,24 @@ describe('OpenAlice local Runtime launcher', () => {
     expect(runtimeEnv).not.toHaveProperty('OPENALICE_TAKEOVER')
   })
 
+  it('isolates managed Pi for every local Guardian launch path', () => {
+    const runtimeEnv = buildLocalRuntimeEnv({
+      OPENALICE_MANAGED_PI_PATH: '/managed/pi/cli.js',
+      PI_CODING_AGENT_DIR: '/native/pi',
+    }, {
+      appDir: '/tmp/OpenAlice',
+      homeRoot: '/tmp/alice-home',
+      nodeBinary: '/test/node',
+      port: 41_000,
+      takeover: false,
+    })
+
+    expect(runtimeEnv).toEqual(expect.objectContaining({
+      PI_CODING_AGENT_DIR: '/tmp/alice-home/runtime/pi',
+      PI_CODING_AGENT_SESSION_DIR: '/tmp/alice-home/runtime/pi/sessions',
+    }))
+  })
+
   it('starts the built Guardian on loopback and preserves explicit takeover', async () => {
     const child = new FakeChild()
     const spawnProcess = vi.fn(() => child)
