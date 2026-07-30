@@ -277,7 +277,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
     for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'completion']) {
       expect(help).toContain(command)
     }
-    expect(formatLifecycleHelp('up')).toContain('persistent background Runtime')
+    expect(formatLifecycleHelp('up')).toContain('installed OpenAlice Runtime in the background')
     expect(formatLifecycleHelp('run')).toContain('foreground')
     expect(formatShellCompletion('bash')).toContain('complete -F _openalice_completion openalice')
     expect(formatShellCompletion('zsh')).toContain('#compdef openalice')

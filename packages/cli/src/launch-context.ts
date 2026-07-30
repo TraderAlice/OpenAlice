@@ -6,6 +6,7 @@ const DEFAULT_PORT = 47_331
 
 export type LaunchValueSource =
   | 'default'
+  | 'installed-runtime'
   | 'machine-config'
   | 'instance-config'
   | 'environment'
@@ -42,6 +43,10 @@ export interface ResolvedLaunchContext {
   home: string
   port: number
   appDir: string | null
+  runtimeProvider: {
+    kind: 'source' | 'bundle'
+    contentIdentity: string | null
+  }
   updateChecks: boolean
   supervisorRoot: string
   managedPi: {
@@ -131,6 +136,13 @@ export function resolveLaunchContext(
   )
   const appDir = resolveField<string | null>(
     candidate(null, 'default', 'current working directory discovery'),
+    nullablePathCandidate(
+      env['OPENALICE_MANAGED_RUNTIME_PATH'],
+      'installed-runtime',
+      'installed OpenAlice Runtime',
+      cwd,
+      homeDir,
+    ),
     nullablePathCandidate(machine.defaults?.appDir, 'machine-config', 'machine.defaults.appDir', cwd, homeDir),
     nullablePathCandidate(instanceConfig.appDir, 'instance-config', `instance.${instance.value}.appDir`, cwd, homeDir),
     nullablePathCandidate(env['OPENALICE_APP_HOME'], 'environment', 'OPENALICE_APP_HOME', cwd, homeDir),
@@ -151,11 +163,23 @@ export function resolveLaunchContext(
   )
 
   const managedPiRoot = join(home.value, 'runtime', 'pi')
+  const runtimeProvider = appDir.provenance.source === 'installed-runtime'
+    ? {
+        kind: 'bundle' as const,
+        contentIdentity: parseRuntimeContentIdentity(
+          env['OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY'],
+        ),
+      }
+    : {
+        kind: 'source' as const,
+        contentIdentity: null,
+      }
   return deepFreeze({
     instance: instance.value,
     home: home.value,
     port: port.value,
     appDir: appDir.value,
+    runtimeProvider,
     updateChecks: updateChecks.value,
     supervisorRoot: supervisorRoot.value,
     managedPi: {
@@ -375,6 +399,17 @@ function parseBoolean(value: string, label: string): boolean {
   if (value === '1' || value === 'true') return true
   if (value === '0' || value === 'false') return false
   throw launchContextError('EBOOLEAN', `${label} must be one of 1, 0, true, or false.`)
+}
+
+function parseRuntimeContentIdentity(value: string | undefined): string {
+  const identity = value?.trim()
+  if (!identity || !/^[a-f0-9]{16}$/.test(identity)) {
+    throw launchContextError(
+      'ERUNTIMEIDENTITY',
+      'OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY must be the 16-character lowercase identity paired with OPENALICE_MANAGED_RUNTIME_PATH.',
+    )
+  }
+  return identity
 }
 
 function requireValue(argv: string[], index: number, flag: string): string {

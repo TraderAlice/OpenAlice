@@ -133,6 +133,7 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
             checkUpdates: _updateChecksSpecified
               ? options.checkUpdates
               : context.updateChecks,
+            runtimeProvider: context.runtimeProvider,
           }
         : {}),
     }
@@ -216,13 +217,13 @@ export function formatLifecycleHelp(action) {
     return `Usage:
   openalice up [path] [options]
 
-Starts a persistent background Runtime from an OpenAlice source checkout, waits
-for Guardian control and Alice HTTP readiness, then returns. The Runtime
-survives this shell.
+Starts the installed OpenAlice Runtime in the background, waits for Guardian
+control and Alice HTTP readiness, then returns. The Runtime survives this shell.
+A source checkout is used only when selected by configuration or --app-dir.
 
 Options:
   --instance <name>  Select a named complete-home instance
-  --app-dir <path>   OpenAlice checkout (default: current directory or parent)
+  --app-dir <path>   Advanced: override the installed Runtime with a source checkout
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --port <port>      Pin the local Web port (default: automatic from 47331)
   --log <path>       Runtime log (default: <home>/logs/server.log)
@@ -240,12 +241,12 @@ Options:
     return `Usage:
   openalice run [path] [options]
 
-Runs a source-backed OpenAlice Runtime in the foreground without opening a
+Runs the installed OpenAlice Runtime in the foreground without opening a
 browser. Ctrl+C stops the self-owned Guardian process tree.
 
 Options:
   --instance <name>  Select a named complete-home instance
-  --app-dir <path>   OpenAlice checkout (default: current directory or parent)
+  --app-dir <path>   Advanced: override the installed Runtime with a source checkout
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --port <port>      Pin the local Web port (default: automatic from 47331)
   --rebuild          Reinstall dependencies and rebuild server artifacts

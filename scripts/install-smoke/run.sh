@@ -122,7 +122,7 @@ const value = JSON.parse(process.argv[1]);
 if (value.schemaVersion !== 1 || value.command !== "doctor" || value.ok !== true) process.exit(1);
 if (value.result?.doctor?.summary?.failures !== 0 || value.result?.doctor?.runtime?.class !== "absent") process.exit(1);
 ' "$doctor_status" || fail "installed CLI Doctor envelope check failed"
-"$bin_dir/openalice" up --help | grep -Fq "persistent background Runtime" \
+"$bin_dir/openalice" up --help | grep -Fq "installed OpenAlice Runtime" \
   || fail "installed CLI up help check failed"
 "$bin_dir/openalice" completion bash | grep -Fq "complete -F _openalice_completion openalice" \
   || fail "installed CLI completion check failed"
@@ -152,6 +152,8 @@ cmp /fixture/packages/cli/src/supervisor-config.ts "$v1_release/src/supervisor-c
   || fail "downloaded Supervisor configuration module differs from the fixture"
 cmp /fixture/packages/cli/src/managed-source.ts "$v1_release/src/managed-source.ts" \
   || fail "downloaded managed source module differs from the fixture"
+cmp /fixture/packages/cli/src/runtime-bundle.mjs "$v1_release/src/runtime-bundle.mjs" \
+  || fail "downloaded Runtime bundle module differs from the fixture"
 cmp /fixture/packages/cli/src/lifecycle-command.mjs "$v1_release/src/lifecycle-command.mjs" \
   || fail "downloaded lifecycle command module differs from the fixture"
 cmp /fixture/packages/cli/src/lifecycle.mjs "$v1_release/src/lifecycle.mjs" \

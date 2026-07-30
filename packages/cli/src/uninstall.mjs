@@ -54,7 +54,7 @@ export async function runUninstallCommand(argv, dependencies = {}) {
     profiles,
     processKill: dependencies.processKill,
   })
-  stdout.write('\nOpenAlice CLI and managed Pi were removed.\n')
+  stdout.write('\nOpenAlice CLI, managed Pi, and installed Runtime were removed.\n')
   stdout.write(`Preserved application data and user work under ${layout.installRoot}.\n`)
   if (result.profilesChanged.length > 0) {
     stdout.write(`Removed managed PATH configuration from: ${result.profilesChanged.join(', ')}\n`)
@@ -141,9 +141,10 @@ export function formatUninstallHelp() {
   openalice uninstall --plan
   openalice uninstall [--yes]
 
-Removes the installed OpenAlice CLI, managed Pi, immutable CLI releases, and
-matching managed PATH blocks. It preserves OpenAlice data, Workspaces, source
-checkouts, credentials, keys, and the shared install root.
+Removes the installed OpenAlice CLI, managed Pi, installed Runtime, immutable
+release directories, and matching managed PATH blocks. It preserves OpenAlice
+data, Workspaces, source checkouts, credentials, keys, and the shared install
+root.
 
 Options:
   --plan     Show exact ownership boundaries without changing files
