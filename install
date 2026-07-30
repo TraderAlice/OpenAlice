@@ -667,6 +667,7 @@ FILES=(
   "package.json"
   "bin/openalice.ts"
   "bin/openalice.mjs"
+  "src/launch-context.ts"
   "src/main.ts"
   "src/pi-tui-loader.ts"
   "src/supervisor-tui.ts"

@@ -1,9 +1,14 @@
 import { diagnoseRuntime } from './doctor.mjs'
+import {
+  buildManagedPiEnv,
+  resolveLaunchContext,
+} from './launch-context.ts'
 import { readRuntimeLogs } from './logs.mjs'
 
 export function parseObservabilityArgs(action, argv) {
   if (!['logs', 'doctor'].includes(action)) throw usageError(`Unknown observability command: ${String(action)}`)
   const options = {
+    instance: null,
     homeRoot: null,
     json: false,
     waitMs: 2_000,
@@ -18,6 +23,10 @@ export function parseObservabilityArgs(action, argv) {
     }
     if (arg === '--home') {
       options.homeRoot = requireValue(argv, ++index, arg)
+      continue
+    }
+    if (arg === '--instance') {
+      options.instance = requireValue(argv, ++index, arg)
       continue
     }
     if (arg === '--wait' && action === 'doctor') {
@@ -37,14 +46,38 @@ export async function runObservabilityCommand(action, options, dependencies = {}
   const stdout = dependencies.stdout ?? process.stdout
   const stderr = dependencies.stderr ?? process.stderr
   try {
+    const context = await (
+      dependencies.resolveContext
+      ?? ((flags) => resolveLaunchContext({
+        flags,
+        env: dependencies.env,
+      }))
+    )({
+      instance: options.instance ?? undefined,
+      home: options.homeRoot ?? undefined,
+    })
+    const resolvedOptions = {
+      ...options,
+      homeRoot: context.home,
+    }
+    const runtimeDependencies = {
+      ...dependencies,
+      env: buildManagedPiEnv(context, dependencies.env ?? process.env),
+    }
     if (action === 'logs') {
-      const logs = await (dependencies.readLogs ?? readRuntimeLogs)(options, dependencies)
+      const logs = await (dependencies.readLogs ?? readRuntimeLogs)(
+        resolvedOptions,
+        runtimeDependencies,
+      )
       if (options.json) writeJson(stdout, successEnvelope(action, { logs }))
       else stdout.write(formatRuntimeLogs(logs))
       return 0
     }
     if (action === 'doctor') {
-      const doctor = await (dependencies.diagnose ?? diagnoseRuntime)(options, dependencies)
+      const doctor = await (dependencies.diagnose ?? diagnoseRuntime)(
+        resolvedOptions,
+        runtimeDependencies,
+      )
       if (options.json) writeJson(stdout, successEnvelope(action, { doctor }))
       else stdout.write(formatDoctor(doctor))
       return doctor.summary.failures > 0 ? 1 : 0
@@ -68,6 +101,7 @@ Prints a bounded, redacted tail of the selected Runtime log. Only regular
 server.log rotation files inside the selected OpenAlice home are read.
 
 Options:
+  --instance <name>  Select a named complete-home instance
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --lines <count>    Last 1-5000 lines (default: 200)
   --json             Print a versioned machine-readable result
@@ -83,6 +117,7 @@ compatibility, Web readiness, components, provider artifacts, update metadata,
 and safe log discovery.
 
 Options:
+  --instance <name>  Select a named complete-home instance
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --wait <seconds>   Control timeout, 1-600 (default: 2)
   --json             Print a versioned machine-readable result

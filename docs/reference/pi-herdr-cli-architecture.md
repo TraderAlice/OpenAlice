@@ -29,6 +29,43 @@ normal dependency with its notices preserved. Herdr declares
 AGPL-3.0-or-later with a commercial option. OpenAlice uses Herdr as a behavioral
 and interface reference; this note does not vendor Herdr source.
 
+## Pi 0.80.3 to 0.83.0 compatibility audit
+
+OpenAlice moved its managed Pi and direct `pi-tui` dependency from the original
+`0.80.3` design baseline to `0.83.0`. The upstream range contains 371 commits
+and three published breaking-change groups:
+
+| Pi release | Upstream break | OpenAlice exposure | Outcome |
+|---|---|---|---|
+| `0.80.7` | Replaced `compat.sendSessionIdHeader` with `compat.sessionAffinityFormat` for OpenAI Responses models | OpenAlice neither emits nor owns Pi `models.json` compatibility fields | No migration required |
+| `0.80.8` | Replaced SDK `authStorage`/`modelRegistry` construction with async `modelRuntime`; removed `AuthStorage` exports and changed registry APIs | OpenAlice launches Pi as a native CLI and does not embed the Pi agent SDK | No migration required |
+| `0.83.0` | Removed deprecated bundled TypeBox aliases such as `Type.Base`, `Type.Promise`, `Type.Options`, and `Value.Mutate` | OpenAlice has no Pi extension using those aliases and its Supervisor imports only `pi-tui` | No migration required |
+
+The exact `pi-tui` surface used by the Supervisor was compared at both tags.
+`TUI.addChild()`, `start()`, `stop()`, `addInputListener()`, and
+`requestRender()`; `ProcessTerminal.start()` and `stop()`; and `matchesKey()`
+plus `KeyId` retain compatible signatures. `TUI` only gained an optional third
+`logDirectory` constructor argument, which the OpenAlice Supervisor now uses to
+keep its own diagnostics below the machine-wide Supervisor root. Both
+coding-agent releases require Node `>=22.19.0`, so the runtime floor did not
+move.
+
+The upgrade is therefore the new OpenAlice baseline rather than a compatibility
+fork. The release integration exposed two OpenAlice-owned drifts, both repaired:
+the installer/desktop vendor hashes now identify the `0.83.0` release assets,
+and the packaged-toolchain smoke derives its expected Pi version from the
+packaged manifest instead of a stale literal. Real source, installed-CLI, PTY,
+installer/uninstaller, and packaged-Electron paths have all launched Pi
+`0.83.0`.
+
+The range also contains changes that directly benefit the chosen architecture:
+`0.81.0` repairs terminal shutdown cursor restoration, and `0.82.0` makes TUI
+debug/crash logs honor a custom agent directory. The latter supports the
+instance-private `PI_CODING_AGENT_DIR` used only when OpenAlice launches its
+pinned managed Pi. Source-development and external Pi keep the user's native
+agent directory. Future Pi extensions must still be checked for removed TypeBox
+aliases before each Pi upgrade.
+
 ## Executive decision
 
 OpenAlice does not choose between a TUI-first application and a scriptable CLI.

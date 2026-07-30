@@ -8,13 +8,15 @@ import {
 
 describe('observability command presenter', () => {
   it('parses bounded logs and Doctor options', () => {
-    expect(parseObservabilityArgs('logs', ['--home', '/tmp/alice', '--lines', '50', '--json'])).toEqual({
+    expect(parseObservabilityArgs('logs', ['--instance', 'research', '--home', '/tmp/alice', '--lines', '50', '--json'])).toEqual({
+      instance: 'research',
       homeRoot: '/tmp/alice',
       json: true,
       waitMs: 2_000,
       lines: 50,
     })
     expect(parseObservabilityArgs('doctor', ['--wait', '3', '--json'])).toEqual({
+      instance: null,
       homeRoot: null,
       json: true,
       waitMs: 3_000,
@@ -65,6 +67,33 @@ describe('observability command presenter', () => {
     expect(exitCode).toBe(1)
     expect(stdout.value).toContain('[FAIL] Web is unavailable')
     expect(formatObservabilityHelp('doctor')).toContain('read-only checks')
+  })
+
+  it('uses the same selected home for logs and Doctor', async () => {
+    const readLogs = vi.fn(async () => ({
+      home: '/tmp/research',
+      component: 'runtime',
+      lineLimit: 200,
+      truncated: false,
+      files: [],
+      entries: [],
+    }))
+    await runObservabilityCommand(
+      'logs',
+      parseObservabilityArgs('logs', [
+        '--instance', 'research',
+        '--home', '/tmp/research',
+      ]),
+      { readLogs, stdout: sink() },
+    )
+
+    expect(readLogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instance: 'research',
+        homeRoot: '/tmp/research',
+      }),
+      expect.any(Object),
+    )
   })
 })
 

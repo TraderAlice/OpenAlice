@@ -107,6 +107,46 @@ selected Runtime) until the standalone headless Runtime artifact ships.
 Unfinished controls remain inside the application shell and do not change the
 default entry back to the compatibility launcher.
 
+## TUI Launch Context
+
+The TypeScript entry resolves launch-affecting values before starting terminal
+raw mode. Bare `openalice` and `openalice tui` accept:
+
+```text
+--instance <name>
+--home <path>
+--port <port>
+--app-dir <path>
+--no-update-check
+--update-check
+```
+
+Resolution order is defaults, machine Supervisor configuration, selected
+instance configuration, environment, then explicit CLI flags. The current
+increment implements the immutable resolver, field provenance, environment and
+flag layers, plus typed seams for the two configuration layers. Persisted
+machine configuration and the instance registry are not active yet; a named
+instance therefore needs an explicit complete home through configuration
+injection, `OPENALICE_HOME`, or `--home`.
+
+`OPENALICE_INSTANCE`, `OPENALICE_HOME`, `OPENALICE_WEB_PORT`,
+`OPENALICE_APP_HOME`, and `OPENALICE_NO_UPDATE_CHECK` are the corresponding
+environment overrides. `OPENALICE_SUPERVISOR_HOME` may relocate the
+machine-wide Supervisor root, which remains outside every selectable complete
+home.
+
+Only an installer-owned Runtime carrying `OPENALICE_MANAGED_PI_PATH` receives
+instance-private `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`
+values. Source development and an external Pi retain their native user
+configuration and session roots.
+
+The same resolver selects homes for `up`, `run`, `down`, `status`, `open`,
+`logs`, and `doctor`; those commands also accept `--instance <name>`.
+Consequently a Runtime started through the TUI and one started by
+`openalice up` receive the same managed-Pi environment. The transitional
+presenters still own their existing command-specific port, source, timeout,
+and output parsing until the root parser conversion is complete.
+
 ## Presentation-neutral Core
 
 `packages/cli/src/lifecycle.mjs` owns:
@@ -282,6 +322,8 @@ completion; detailed shell installation remains user-owned.
 
 - `packages/cli/bin/openalice.ts` and `packages/cli/src/main.ts` — TypeScript
   application entry and default-TUI/explicit-command dispatch.
+- `packages/cli/src/launch-context.ts` — immutable launch precedence,
+  provenance, instance roots, and managed-Pi environment projection.
 - `packages/cli/src/supervisor-tui.ts` — `pi-tui` Supervisor application shell.
 - `packages/cli/src/pi-tui-loader.ts` — workspace and installed managed-Pi TUI
   resolution.
