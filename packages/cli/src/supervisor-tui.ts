@@ -17,8 +17,16 @@ import {
   type ResolvedLaunchContext,
   type TuiLaunchFlags,
 } from './launch-context.ts'
+import { resolveInstalledLayout } from './install-layout.mjs'
+import { readInstallSource } from './install-source.mjs'
 import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
+import {
+  inspectManagedSource,
+  prepareManagedSource,
+  type ManagedSourcePlan,
+  type ManagedSourceResult,
+} from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
 import {
   persistInstanceLaunchConfig,
@@ -100,10 +108,11 @@ export interface SupervisorSnapshot {
   panel?: SupervisorPanel
   busy?: string
   notice?: string
-  confirmation?: 'stop' | 'restart'
+  confirmation?: 'stop' | 'restart' | 'managed-source'
   logs?: RuntimeLogs | null
   doctor?: DoctorReport | null
   update?: UpdateResult | null
+  managedSource?: ManagedSourcePlan | null
 }
 
 export interface SupervisorTuiDependencies {
@@ -126,12 +135,15 @@ export interface SupervisorTuiDependencies {
     context: ResolvedLaunchContext,
     appDir: string,
   ) => Promise<ResolvedLaunchContext>
+  prepareManagedSource?: () => Promise<ManagedSourceResult>
+  inspectManagedSource?: () => Promise<ManagedSourcePlan>
   machineConfig?: MachineSupervisorConfig | null
   instanceConfig?: InstanceLaunchConfig | null
   loadTui?: typeof loadPiTui
   version?: string
   channel?: string
   pollIntervalMs?: number
+  resolveChannel?: () => Promise<string>
 }
 
 interface SupervisorServices {
@@ -182,6 +194,8 @@ export async function runSupervisorTui(
   }
 
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
+  const channel = dependencies.channel
+    ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
   const terminal = new piTui.ProcessTerminal()
   const ui = new piTui.TUI(
     terminal,
@@ -194,7 +208,7 @@ export async function runSupervisorTui(
   let closeSourcePrompt: (() => void) | null = null
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
-    channel: dependencies.channel ?? 'development',
+    channel,
     runtime,
     context,
     diagnostic,
@@ -204,6 +218,12 @@ export async function runSupervisorTui(
     },
     onConfigureSource: () => {
       openSourcePrompt()
+    },
+    onRequestManagedSource: () => {
+      void requestManagedSource()
+    },
+    onPrepareManagedSource: () => {
+      void prepareManagedSourceAndStart()
     },
     requestRender: () => ui.requestRender(),
   })
@@ -219,6 +239,10 @@ export async function runSupervisorTui(
       env: dependencies.env,
     })
   })
+  const prepareManaged = dependencies.prepareManagedSource
+    ?? (() => prepareManagedSource())
+  const inspectManaged = dependencies.inspectManagedSource
+    ?? (() => inspectManagedSource())
 
   async function refreshRuntime(): Promise<void> {
     if (!active || actionRunning) return
@@ -313,6 +337,75 @@ export async function runSupervisorTui(
         if (actionFailure) screen.update({ diagnostic: actionFailure })
       }
     }
+  }
+
+  async function requestManagedSource(): Promise<void> {
+    if (actionRunning) return
+    const source = context.provenance.appDir.source
+    if (source === 'environment' || source === 'cli-flag') {
+      screen.update({
+        notice: `Source is locked by ${context.provenance.appDir.detail}; change that override and reopen the Supervisor.`,
+      })
+      return
+    }
+    actionRunning = true
+    screen.update({
+      busy: 'Inspecting managed source',
+      notice: undefined,
+      diagnostic: undefined,
+    })
+    try {
+      const managedSource = await inspectManaged()
+      if (!active) return
+      screen.update({
+        managedSource,
+        confirmation: 'managed-source',
+      })
+    } catch (error: unknown) {
+      if (!active) return
+      screen.update({
+        diagnostic: `Managed source is unavailable: ${safeError(error)}`,
+      })
+    } finally {
+      actionRunning = false
+      if (active) screen.update({ busy: undefined })
+    }
+  }
+
+  async function prepareManagedSourceAndStart(): Promise<void> {
+    if (!active || actionRunning) return
+    actionRunning = true
+    let prepared = false
+    let actionFailure: string | undefined
+    screen.update({
+      busy: 'Preparing managed source',
+      confirmation: undefined,
+      notice: undefined,
+      diagnostic: undefined,
+    })
+    try {
+      const result = await prepareManaged()
+      const nextContext = await configureSource(context, result.appDir)
+      context = nextContext
+      services = createServices(dependencies, context)
+      prepared = true
+      screen.update({
+        context,
+        notice: result.created
+          ? `Prepared and saved managed source ${result.appDir}.`
+          : `Reused and saved managed source ${result.appDir}.`,
+      })
+    } catch (error: unknown) {
+      actionFailure = `Preparing managed source failed: ${safeError(error)}`
+    } finally {
+      actionRunning = false
+      if (active) {
+        screen.update({ busy: undefined })
+        await refreshRuntime()
+        if (actionFailure) screen.update({ diagnostic: actionFailure })
+      }
+    }
+    if (prepared && active) await performAction('start')
   }
 
   function openSourcePrompt(reason?: string): void {
@@ -471,10 +564,33 @@ export async function runSupervisorTui(
   })
 }
 
+export async function resolveSupervisorChannel(
+  options: {
+    moduleUrl?: string
+    resolveLayout?: (moduleUrl?: string) => unknown
+    readSource?: () => Promise<{
+      selector?: { kind?: string; value?: string }
+    }>
+  } = {},
+): Promise<string> {
+  const moduleUrl = options.moduleUrl ?? import.meta.url
+  const layout = (
+    options.resolveLayout ?? resolveInstalledLayout
+  )(moduleUrl)
+  if (!layout) return 'development'
+  const source = await (options.readSource ?? readInstallSource)()
+  if (source.selector?.kind === 'version') return 'stable'
+  return source.selector?.value
+    ? `branch ${source.selector.value}`
+    : 'installed'
+}
+
 export class SupervisorScreen implements Component {
   snapshot: SupervisorSnapshot
   private readonly onAction?: (action: SupervisorAction) => void
   private readonly onConfigureSource?: () => void
+  private readonly onRequestManagedSource?: () => void
+  private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
 
   constructor(
@@ -482,12 +598,16 @@ export class SupervisorScreen implements Component {
     callbacks: {
       onAction?: (action: SupervisorAction) => void
       onConfigureSource?: () => void
+      onRequestManagedSource?: () => void
+      onPrepareManagedSource?: () => void
       requestRender?: () => void
     } = {},
   ) {
     this.snapshot = { panel: 'overview', ...snapshot }
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
+    this.onRequestManagedSource = callbacks.onRequestManagedSource
+    this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
   }
 
@@ -507,7 +627,11 @@ export class SupervisorScreen implements Component {
     if (this.snapshot.busy) return false
     if (this.snapshot.confirmation) {
       if (matchesKey(data, 'y') || matchesKey(data, 'enter')) {
-        this.onAction?.(this.snapshot.confirmation)
+        if (this.snapshot.confirmation === 'managed-source') {
+          this.onPrepareManagedSource?.()
+        } else {
+          this.onAction?.(this.snapshot.confirmation)
+        }
         return true
       }
       if (matchesKey(data, 'n')) {
@@ -527,6 +651,16 @@ export class SupervisorScreen implements Component {
     if (matchesKey(data, 'c')) {
       if (this.snapshot.runtime?.class === 'absent') {
         this.onConfigureSource?.()
+      } else {
+        this.update({
+          notice: 'Stop the selected Runtime before changing its source checkout.',
+        })
+      }
+      return true
+    }
+    if (matchesKey(data, 'm')) {
+      if (this.snapshot.runtime?.class === 'absent') {
+        this.onRequestManagedSource?.()
       } else {
         this.update({
           notice: 'Stop the selected Runtime before changing its source checkout.',
@@ -611,7 +745,11 @@ export class SupervisorScreen implements Component {
     }
 
     if (this.snapshot.confirmation) {
-      lines.push('', ...renderConfirmation(this.snapshot.confirmation, runtime))
+      lines.push('', ...renderConfirmation(
+        this.snapshot.confirmation,
+        runtime,
+        this.snapshot.managedSource,
+      ))
     }
     if (this.snapshot.busy) lines.push('', `Working: ${this.snapshot.busy}…`)
     if (this.snapshot.notice) lines.push('', `Notice: ${sanitize(this.snapshot.notice)}`)
@@ -688,7 +826,7 @@ function renderTabs(selected: SupervisorPanel, narrow: boolean): string {
 function renderGuidance(runtime: RuntimeSummary | null): string[] {
   if (!runtime) return ['Runtime status is unavailable. Doctor may explain why.']
   if (runtime.class === 'absent') {
-    return ['OpenAlice is stopped. Press s to start, or c to choose its source checkout.']
+    return ['OpenAlice is stopped. Press s to start, m for managed source, or c for an existing checkout.']
   }
   if (runtime.class === 'incompatible') {
     return ['The running Guardian is incompatible. Read Doctor before changing it.']
@@ -733,6 +871,7 @@ function renderHelp(): string[] {
     'x  Stop (confirmation required)   r  Restart (confirmation required)',
     'l  Bounded redacted logs          d  Read-only Doctor',
     'u  Check for product update       ?  Toggle this help',
+    'm  Prepare installer-managed source and start',
     'c  Choose and remember this instance\'s source checkout',
     'Tab / arrows  Change panel        q / Esc  Detach only',
     '',
@@ -741,9 +880,21 @@ function renderHelp(): string[] {
 }
 
 function renderConfirmation(
-  action: 'stop' | 'restart',
+  action: 'stop' | 'restart' | 'managed-source',
   runtime: RuntimeSummary | null,
+  managedSource?: ManagedSourcePlan | null,
 ): string[] {
+  if (action === 'managed-source') {
+    const selector = managedSource
+      ? `${managedSource.selector.kind} ${managedSource.selector.value}`
+      : 'the branch/version paired with this CLI'
+    return [
+      `Prepare and use installer-managed OpenAlice source ${selector}?`,
+      `Destination: ${managedSource?.appDir ?? 'the OpenAlice install root'}`,
+      'First start may install dependencies and build the Runtime.',
+      'Press y / Enter to continue, n / Esc to cancel.',
+    ]
+  }
   const effect = action === 'stop'
     ? 'This stops the Guardian-owned Runtime and disconnects active Web/agent sessions.'
     : 'This stops and starts the Guardian-owned Runtime; active Web/agent sessions reconnect or end.'
@@ -756,7 +907,7 @@ function renderConfirmation(
 
 function actionBar(runtime: RuntimeSummary | null, narrow: boolean): string {
   const actions = runtime?.class === 'absent'
-    ? 's Start · c Source · d Doctor · l Logs · u Update · ? Help'
+    ? 's Start · m Managed · c Source · d Doctor · l Logs · u Update · ? Help'
     : 'o Open · r Restart · x Stop · d Doctor · l Logs · u Update · ? Help'
   return narrow ? actions.replaceAll(' · ', '  ') : actions
 }

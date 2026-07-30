@@ -94,6 +94,8 @@ explicit commands:
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
 - `u` performs an advisory product-update check;
+- `m` confirms, prepares, remembers, and starts an installer-managed source
+  aligned to the installed CLI branch/version;
 - `c` chooses and remembers the selected instance's source checkout;
 - `?`, Tab, and the horizontal arrows expose help and detail panels.
 
@@ -104,9 +106,12 @@ discovery runs in the background and cannot block lifecycle controls.
 
 The current Runtime provider is still source-backed. TUI start discovers an
 OpenAlice checkout from the current directory, reuses a configured or
-owner-advertised source root, or opens the `c` path editor when discovery
-fails. Unfinished controls remain inside the application shell and do not
-change the default entry back to the compatibility launcher.
+owner-advertised source root, opens the `c` path editor when discovery fails,
+or explicitly prepares an installer-owned checkout through `m`. The managed
+path is `<install root>/sources/<install-source identity>/OpenAlice`; a branch
+install clones that branch and a version install checks out its immutable ref.
+Unfinished controls remain inside the application shell and do not change the
+default entry back to the compatibility launcher.
 
 ## TUI Launch Context
 
@@ -333,6 +338,8 @@ completion; detailed shell installation remains user-owned.
   provenance, instance roots, and managed-Pi environment projection.
 - `packages/cli/src/supervisor-config.ts` — versioned machine/instance
   configuration parsing, atomic persistence, and stored-context resolution.
+- `packages/cli/src/managed-source.ts` — local managed checkout identity,
+  validation, collision safety, and atomic preparation.
 - `packages/cli/src/supervisor-tui.ts` — `pi-tui` Supervisor application shell.
 - `packages/cli/src/pi-tui-loader.ts` — workspace and installed managed-Pi TUI
   resolution.

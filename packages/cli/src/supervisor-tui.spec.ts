@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  resolveSupervisorChannel,
   type SupervisorAction,
   SupervisorScreen,
 } from './supervisor-tui.ts'
@@ -8,6 +9,24 @@ import {
 const matchesKey = (data: string, key: string) => data === key
 
 describe('Supervisor TUI screen', () => {
+  it('labels source-run, branch, and version channels from install provenance', async () => {
+    await expect(resolveSupervisorChannel({
+      resolveLayout: () => null,
+    })).resolves.toBe('development')
+    await expect(resolveSupervisorChannel({
+      resolveLayout: () => ({}),
+      readSource: async () => ({
+        selector: { kind: 'branch', value: 'dev' },
+      }),
+    })).resolves.toBe('branch dev')
+    await expect(resolveSupervisorChannel({
+      resolveLayout: () => ({}),
+      readSource: async () => ({
+        selector: { kind: 'version', value: 'v0.87.0' },
+      }),
+    })).resolves.toBe('stable')
+  })
+
   it('renders stable stopped-state application chrome', () => {
     const screen = new SupervisorScreen({
       version: '0.87.0-beta',
@@ -24,7 +43,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(lines).toContain('OpenAlice  0.87.0-beta  dev')
     expect(lines).toContain('Runtime state: absent')
-    expect(lines).toContain('s Start · c Source · d Doctor · l Logs · u Update · ? Help')
+    expect(lines).toContain('s Start · m Managed · c Source · d Doctor · l Logs · u Update · ? Help')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
   })
 
@@ -112,6 +131,31 @@ describe('Supervisor TUI screen', () => {
     running.update({ runtime: { class: 'absent' } })
     expect(running.handleKey('c', matchesKey)).toBe(true)
     expect(configureRequests).toBe(1)
+  })
+
+  it('confirms managed source preparation before dispatch', () => {
+    let prepareRequests = 0
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'development',
+      runtime: { class: 'absent' },
+    }, {
+      onRequestManagedSource: () => {
+        screen.update({ confirmation: 'managed-source' })
+      },
+      onPrepareManagedSource: () => {
+        prepareRequests += 1
+      },
+    })
+
+    expect(screen.handleKey('m', matchesKey)).toBe(true)
+    expect(screen.snapshot.confirmation).toBe('managed-source')
+    expect(screen.render(100).join('\n')).toContain(
+      'branch/version paired with this CLI',
+    )
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(prepareRequests).toBe(1)
   })
 
   it('navigates detail panels and requests their read-only data', () => {
