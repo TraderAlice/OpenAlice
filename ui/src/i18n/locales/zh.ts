@@ -1423,6 +1423,9 @@ export const zh: Resources = {
     articleCount_other: '{{count}} 篇文章',
     noArticles: '无文章',
     noArticlesDescription: '该时间范围内没有找到新闻。',
+    loadErrorTitle: '无法加载新闻',
+    loadErrorDescription: 'OpenAlice 暂时无法刷新新闻流。请检查与 OpenAlice 后端的连接，然后重试。',
+    stale: '实时刷新失败——当前显示这些筛选条件下上次成功加载的新闻。',
     openOriginal: '查看原文',
   },
   tracked: {
