@@ -10,16 +10,18 @@
 ## Outcome
 
 OpenAlice exposes AutoQuant as a first-class Agent Harness beside Ask Alice.
-Entering the surface lets the user send a quantitative assignment into an
-existing AutoQuant V2 desk or create one at an explicitly pinned upstream
-release, then opens the native coding-Agent Session in that Workspace.
+Entering the surface resolves one explicit default AutoQuant V2 desk. A fresh
+install initializes that durable Workspace once; an install with existing
+AutoQuant desks asks the user to select one. Only then can the user send a
+quantitative assignment and open a native coding-Agent Session.
 
 ## Scope
 
 - Replace the unused Classic creation template with a new `auto-quant-v2`
   template; existing Classic Workspace checkouts remain untouched.
-- Pin the first supported source to AutoQuant V2 `v0.8.27` at commit
-  `4bf9eb45763776ab5fc2e02829b804594fc377a3`.
+- Default new AutoQuant desks to V2 `v0.8.30` at commit
+  `cba95f8718e8396a3147a9cc5f5275cd44feae5f`; retain `v0.8.27` in the
+  approved catalog for reproducible explicit creation.
 - Add a generic template-source catalog and create-time version selection.
 - Materialize the exact upstream tree into OpenAlice's fresh local Git Harness
   and commit a source receipt without installing Python dependencies.
@@ -44,6 +46,12 @@ release, then opens the native coding-Agent Session in that Workspace.
 - AutoQuant Workspaces are durable desks. Generic managed-context template
   upgrades remain disabled; future Harness upgrades require an explicit
   AutoQuant-aware workflow.
+- AutoQuant readiness is exactly one validated preference pointer to an active
+  `auto-quant-v2` Workspace. The research composer never creates or guesses a
+  desk.
+- Initialization creates the first desk only when none exists. Existing desks
+  require explicit selection; switching defaults stays behind the low-frequency
+  Workspace control.
 
 ## Work
 
@@ -56,6 +64,15 @@ release, then opens the native coding-Agent Session in that Workspace.
       navigation.
 - [x] Add backend, bootstrap, UI, demo, and navigation coverage.
 - [x] Walk browser/dev and packaged Electron Workspace paths.
+- [x] Add the persisted default-Workspace pointer and idempotent migration.
+- [x] Gate AutoQuant research behind initialization or explicit existing-desk
+      selection.
+- [x] Replace the Workspace-oriented AutoQuant sidebar with the default desk's
+      bounded Session history and a low-frequency Workspace control.
+- [x] Default new initialization to the immutable AutoQuant V2 `v0.8.30`
+      release while retaining the older approved catalog entry.
+- [x] Re-run full repository, demo, browser/dev, and packaged Electron
+      verification for the revised entry path.
 
 ## Verification
 
@@ -67,7 +84,8 @@ release, then opens the native coding-Agent Session in that Workspace.
 
 ## Completion
 
-The plan completes when a user can open AutoQuant, create a pinned V2 desk,
-launch a native Agent with a quantitative assignment, inspect the exact source
-receipt, and return to that desk's Session without any Classic migration or
-AutoQuant-specific orchestration service.
+The plan completes when AutoQuant renders no research controls before a valid
+default desk exists, initialization or explicit selection establishes that
+pointer, every new assignment becomes a Session in the selected desk, and a
+fresh desk records the pinned V2 `v0.8.30` source without any Classic migration
+or AutoQuant-specific orchestration service.

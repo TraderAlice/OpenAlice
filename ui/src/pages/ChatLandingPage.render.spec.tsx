@@ -96,6 +96,9 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    autoQuantDefaultWorkspaceId: null,
+    autoQuantPreferenceLoaded: true,
+    autoQuantPreferenceError: null,
     refresh: vi.fn(),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
@@ -103,6 +106,8 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     openHeadlessRun: vi.fn(async () => undefined),
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
+    initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: mocks.quickChat,
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
@@ -223,7 +228,6 @@ describe('ChatLandingPage keyboard submission', () => {
       'google-1',
       'chat-1',
       'chat',
-      undefined,
     ))
   })
 })

@@ -1,3 +1,5 @@
+import { join, resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -45,14 +47,14 @@ describe('ResolvedLaunchContext', () => {
 
     expect(context).toMatchObject({
       instance: 'desk',
-      home: '/repo/flag-home',
+      home: resolve('/repo', 'flag-home'),
       port: 44_000,
-      appDir: '/repo/flag-app',
+      appDir: resolve('/repo', 'flag-app'),
       updateChecks: true,
-      supervisorRoot: '/Users/alice/Library/Application Support/OpenAlice/Supervisor',
+      supervisorRoot: join('/Users/alice', 'Library', 'Application Support', 'OpenAlice', 'Supervisor'),
       managedPi: {
-        codingAgentDir: '/repo/flag-home/runtime/pi',
-        sessionDir: '/repo/flag-home/runtime/pi/sessions',
+        codingAgentDir: join(resolve('/repo', 'flag-home'), 'runtime', 'pi'),
+        sessionDir: join(resolve('/repo', 'flag-home'), 'runtime', 'pi', 'sessions'),
       },
       provenance: {
         instance: { source: 'cli-flag', detail: '--instance' },
@@ -90,10 +92,10 @@ describe('ResolvedLaunchContext', () => {
       },
     })
 
-    expect(context.home).toBe('/home/alice/env-home')
+    expect(context.home).toBe(resolve('/home/alice', 'env-home'))
     expect(context.port).toBe(43_000)
     expect(context.updateChecks).toBe(false)
-    expect(context.supervisorRoot).toBe('/xdg/openalice')
+    expect(context.supervisorRoot).toBe(join(resolve('/xdg'), 'openalice'))
     expect(context.provenance.home.detail).toBe('OPENALICE_HOME')
   })
 
@@ -132,8 +134,8 @@ describe('ResolvedLaunchContext', () => {
     expect(base.PI_CODING_AGENT_DIR).toBe('/native/pi')
     expect(managed).toMatchObject({
       PATH: '/bin',
-      PI_CODING_AGENT_DIR: '/home/alice/.openalice/runtime/pi',
-      PI_CODING_AGENT_SESSION_DIR: '/home/alice/.openalice/runtime/pi/sessions',
+      PI_CODING_AGENT_DIR: join('/home/alice', '.openalice', 'runtime', 'pi'),
+      PI_CODING_AGENT_SESSION_DIR: join('/home/alice', '.openalice', 'runtime', 'pi', 'sessions'),
     })
   })
 
