@@ -65,6 +65,40 @@ describe('TradeableContractsPanel', () => {
     expect(screen.getByRole('button', { name: '收起' })).toBeTruthy()
   })
 
+  it('keeps canonical contract identity and the order action legible on narrow rows', async () => {
+    mocks.searchContracts.mockResolvedValue({
+      utasConfigured: 1,
+      results: [hit('AAPL', 'alpaca-paper|AAPL')],
+    })
+
+    render(
+      <MemoryRouter>
+        <TradeableContractsPanel symbol="AAPL" assetClass="equity" />
+      </MemoryRouter>,
+    )
+
+    const symbol = await screen.findByText('AAPL')
+    const row = symbol.closest('li')
+    expect(row?.className).toContain('grid-cols-[minmax(0,1fr)_auto]')
+    expect(row?.className).toContain('sm:flex')
+
+    const description = screen.getByText('AAPL equity · NASDAQ · USD')
+    expect(description.className).toContain('col-span-2')
+    expect(description.className).toContain('sm:flex-1')
+
+    const canonicalId = screen.getByText('alpaca-paper|AAPL')
+    expect(canonicalId.className).toContain('min-w-0')
+    expect(canonicalId.getAttribute('title')).toBe('alpaca-paper|AAPL')
+
+    const account = screen.getByText('alpaca-paper')
+    expect(account.className).toContain('hidden sm:inline')
+
+    const order = screen.getByRole('link', { name: '下单 →' })
+    expect(order.className).toContain('min-h-8')
+    expect(order.className).toContain('sm:min-h-0')
+    expect(order.getAttribute('href')).toBe('/uta/alpaca-paper?aliceId=alpaca-paper%7CAAPL')
+  })
+
   it('localizes the no-match state with the requested symbol', async () => {
     mocks.searchContracts.mockResolvedValue({ utasConfigured: 1, results: [] })
 

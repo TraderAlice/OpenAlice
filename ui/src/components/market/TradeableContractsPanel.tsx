@@ -133,32 +133,42 @@ function ContractRow({ hit }: { hit: ContractSearchHit }) {
   const orderHref = aliceId
     ? `/uta/${encodeURIComponent(hit.source)}?aliceId=${encodeURIComponent(aliceId)}`
     : null
+  const description = [c.description || c.localSymbol, c.primaryExchange ?? c.exchange, c.currency]
+    .filter(Boolean)
+    .join(' · ')
   return (
-    <li className="px-3 py-2 flex items-baseline gap-3 text-[12px] hover:bg-muted/40 transition-colors">
-      <span className="font-mono font-semibold text-foreground">{c.symbol ?? '—'}</span>
-      {c.secType && (
-        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-          {c.secType}
-        </span>
-      )}
-      <span className="text-muted-foreground/70 truncate flex-1">
-        {[c.description || c.localSymbol, c.primaryExchange ?? c.exchange, c.currency]
-          .filter(Boolean)
-          .join(' · ')}
+    <li className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-3 py-2 text-[12px] transition-colors hover:bg-muted/40 sm:flex sm:items-baseline sm:gap-3">
+      <span className="flex min-w-0 items-center gap-2 sm:contents">
+        <span className="truncate font-mono font-semibold text-foreground">{c.symbol ?? '—'}</span>
+        {c.secType && (
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {c.secType}
+          </span>
+        )}
       </span>
-      <span className="text-[10px] text-muted-foreground/60 shrink-0">{hit.source}</span>
-      {aliceId && (
-        <code
-          className="text-[10px] font-mono text-muted-foreground truncate max-w-[260px]"
-          title={aliceId}
-        >
-          {aliceId}
-        </code>
-      )}
+
+      <span className="col-span-2 min-w-0 truncate text-muted-foreground/70 sm:flex-1">
+        {description}
+      </span>
+
+      <span className="col-span-2 flex min-w-0 items-center gap-2">
+        <span className={`${aliceId ? 'hidden sm:inline' : ''} shrink-0 text-[10px] text-muted-foreground/60`}>
+          {hit.source}
+        </span>
+        {aliceId && (
+          <code
+            className="min-w-0 max-w-full truncate font-mono text-[10px] text-muted-foreground sm:max-w-[260px]"
+            title={aliceId}
+          >
+            {aliceId}
+          </code>
+        )}
+      </span>
+
       {orderHref && (
         <Link
           to={orderHref}
-          className="text-[11px] text-primary hover:underline shrink-0"
+          className="row-start-1 col-start-2 inline-flex min-h-8 shrink-0 items-center rounded-md px-2 text-[11px] text-primary hover:bg-primary/10 sm:min-h-0 sm:rounded-none sm:px-0 sm:hover:bg-transparent sm:hover:underline"
           title={t('market.tradeableOrderTitle')}
         >
           {t('market.tradeableOrder')} →
