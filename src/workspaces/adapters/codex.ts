@@ -129,6 +129,11 @@ export const codexAdapter: CliAdapter = {
     // resumeHint. Then `codex resume <id>` (composeCommand) resumes by id.
     transcriptDiscovery: 'subprocess',
     headless: true,
+    aiProvider: {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['openai-responses'],
+      defaultWire: 'openai-responses',
+    },
   },
 
   /**

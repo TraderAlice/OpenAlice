@@ -739,6 +739,7 @@ export function FirstRunGuide() {
         <CredentialModal
           mode="add"
           presets={apiKeyPresets}
+          agents={agents}
           initialPresetId={ONBOARDING_TEST_MODE && MOCK_CREDENTIAL_TEST ? ONBOARDING_TEST_PRESET_ID : undefined}
           initialApiKey={ONBOARDING_TEST_MODE && MOCK_CREDENTIAL_TEST ? ONBOARDING_TEST_API_KEY : undefined}
           onClose={() => setShowCredentialForm(false)}

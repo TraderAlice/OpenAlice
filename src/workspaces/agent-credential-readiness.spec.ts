@@ -47,6 +47,15 @@ function adapter(id: string, cfg: WorkspaceAiCred | null = null) {
       resumeLast: true,
       resumeById: true,
       transcriptDiscovery: 'none',
+      aiProvider: {
+        credentialSource: id === 'opencode' || id === 'pi'
+          ? 'workspace-required'
+          : 'runtime-or-workspace',
+        wirePreference: id === 'claude' ? ['anthropic'] : ['openai-chat'],
+        ...(id === 'opencode' || id === 'pi'
+          ? { modelRegistration: { contextWindow: true, reasoning: true } }
+          : {}),
+      },
     },
     composeCommand: () => [id],
     readAiConfig: vi.fn(async () => cfg),

@@ -16,7 +16,7 @@ import {
   type SavedCredential,
   type WorkspaceCredentialDetection,
 } from '../components/workspace/api'
-import { isLoginlessAgent, resolveAgentRuntime, type LoginlessAgentId } from '../lib/agentRuntime'
+import { requiresWorkspaceCredential, resolveAgentRuntime } from '../lib/agentRuntime'
 import {
   WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
   WORKSPACE_DEFAULTS_CHANGED_EVENT,
@@ -202,7 +202,7 @@ export interface AgentLaunchPreferencesState {
   readonly lastCredentialByAgent: Readonly<Record<string, string>>
   readonly recentChatWorkspaceId: string | null
   readonly loaded: boolean
-  rememberCredential(agent: LoginlessAgentId, credentialSlug: string | null): Promise<void>
+  rememberCredential(agent: string, credentialSlug: string | null): Promise<void>
   adoptRecentChatWorkspace(workspaceId: string | null): void
 }
 
@@ -241,7 +241,7 @@ export function useAgentLaunchPreferences(): AgentLaunchPreferencesState {
   }, [])
 
   const rememberCredential = useCallback(async (
-    agent: LoginlessAgentId,
+    agent: string,
     credentialSlug: string | null,
   ): Promise<void> => {
     setPreferences((current) => ({
@@ -352,7 +352,7 @@ export function useAgentLaunchConfig({
     selectedRuntimeReadiness.source === 'managed-runtime' ||
     selectedRuntimeReadiness.source === 'global-login'
   )
-  const needsCredential = isLoginlessAgent(effectiveAgent)
+  const needsCredential = requiresWorkspaceCredential(selectedAgent)
   const credentials = credentialList?.agent === effectiveAgent
     ? credentialList.credentials
     : null
@@ -505,10 +505,10 @@ export function useAgentLaunchConfig({
   }, [setDefaultAgent])
 
   const selectCredential = useCallback((credentialSlug: string) => {
-    if (!isLoginlessAgent(effectiveAgent)) return
+    if (!needsCredential || effectiveAgent === null) return
     setPickedCredential({ agent: effectiveAgent, workspaceId, slug: credentialSlug })
     void preferences.rememberCredential(effectiveAgent, credentialSlug)
-  }, [effectiveAgent, preferences, workspaceId])
+  }, [effectiveAgent, needsCredential, preferences, workspaceId])
 
   const resetCredentialSelection = useCallback(() => setPickedCredential(null), [])
 

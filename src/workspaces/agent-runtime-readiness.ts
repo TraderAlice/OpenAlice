@@ -159,7 +159,7 @@ export function failedRuntimeReadinessRow(opts: {
     source: opts.source ?? 'unknown',
     checkedAt: new Date().toISOString(),
     durationMs: opts.result.durationMs,
-    repairTarget: repairTargetForStatus(status, opts.adapter.id),
+    repairTarget: repairTargetForStatus(status, opts.adapter),
     message: summarizeRuntimeReadinessFailure(opts.result, status),
   };
 }
@@ -187,10 +187,12 @@ export function runtimeProbeSucceeded(result: HeadlessTaskResult): boolean {
 
 function repairTargetForStatus(
   status: AgentRuntimeReadinessStatus,
-  agentId: string,
+  adapter: CliAdapter,
 ): AgentRuntimeRepairTarget {
   if (status === 'auth_required') {
-    return agentId === 'claude' || agentId === 'codex' ? 'cli-login' : 'ai-provider';
+    return adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace'
+      ? 'cli-login'
+      : 'ai-provider';
   }
   if (status === 'provider_required') return 'ai-provider';
   if (status === 'not_installed') return 'runtime-install';

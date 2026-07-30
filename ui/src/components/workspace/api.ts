@@ -423,6 +423,22 @@ export interface AgentCapabilities {
   readonly transcriptDiscovery: 'fs-watch' | 'subprocess' | 'none';
   readonly assignsSessionId?: boolean;
   readonly headless?: boolean;
+  readonly aiProvider?: AgentProviderCapabilities;
+}
+
+export interface AgentProviderCapabilities {
+  readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
+  readonly wirePreference: readonly WireShape[];
+  readonly defaultWire?: WireShape;
+  readonly vendorPolicies?: Readonly<Record<string, {
+    readonly wirePreference: readonly WireShape[];
+    readonly legacyRequestedWireFallbacks?: Readonly<Partial<Record<WireShape, WireShape>>>;
+  }>>;
+  readonly modelRegistration?: {
+    readonly contextWindow?: boolean;
+    readonly reasoning?: boolean;
+    readonly effortVariants?: boolean;
+  };
 }
 
 export interface AgentInfo {

@@ -21,12 +21,14 @@ import {
   type AgentConfig,
   type AgentConfigBundle,
   type AgentId,
+  type AgentInfo,
+  type AgentProviderCapabilities,
   type SavedCredential,
 } from './api'
 import { api, type ModelReasoningEffort, type Preset, type WireShape } from '../../api'
 import {
-  AGENT_WIRE_PREFERENCE,
   WIRE_SHAPE_GUIDANCE,
+  agentWirePreference,
   agentWireShapes,
   anthropicAuthModeForBaseUrl,
   baseUrlToVendor,
@@ -154,12 +156,15 @@ export interface FormState {
   authMode: 'x-api-key' | 'bearer'
 }
 
-/** The wire shape each agent defaults to when nothing else specifies one. */
-const DEFAULT_WIRE_BY_TAB: Record<Tab, WireShape> = {
-  claude: 'anthropic',
-  codex: 'openai-responses', // codex is Responses-only (hard-rejects chat)
-  opencode: 'openai-chat',
-  pi: 'openai-chat',
+function providerCapabilities(
+  agents: readonly AgentInfo[],
+  agent: string,
+): AgentProviderCapabilities | undefined {
+  return agents.find((candidate) => candidate.id === agent)?.capabilities.aiProvider
+}
+
+function defaultWire(capabilities: AgentProviderCapabilities | undefined): WireShape {
+  return capabilities?.defaultWire ?? capabilities?.wirePreference[0] ?? 'anthropic'
 }
 
 const EMPTY_FORM: FormState = {
@@ -184,8 +189,11 @@ function formatContextWindow(value: number): string {
   return String(value)
 }
 
-export function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
-  if (!cfg) return { ...EMPTY_FORM, wireShape: DEFAULT_WIRE_BY_TAB[tab] }
+export function configToForm(
+  cfg: AgentConfig | null,
+  capabilities?: AgentProviderCapabilities,
+): FormState {
+  if (!cfg) return { ...EMPTY_FORM, wireShape: defaultWire(capabilities) }
   return {
     baseUrl: cfg.baseUrl ?? '',
     apiKey: cfg.apiKey ?? '',
@@ -193,13 +201,17 @@ export function configToForm(cfg: AgentConfig | null, tab: Tab): FormState {
     contextWindow: normalizeContextWindow(cfg.contextWindow),
     reasoning: typeof cfg.reasoning === 'boolean' ? cfg.reasoning : null,
     reasoningEffort: cfg.reasoningEffort ?? null,
-    wireShape: cfg.wireShape ?? DEFAULT_WIRE_BY_TAB[tab],
+    wireShape: cfg.wireShape ?? defaultWire(capabilities),
     wireApi: 'responses',
     authMode: cfg.authMode === 'bearer' ? 'bearer' : 'x-api-key',
   }
 }
 
-export function formToConfig(form: FormState, agent: AgentId): AgentConfig {
+export function formToConfig(
+  form: FormState,
+  agent: AgentId,
+  capabilities?: AgentProviderCapabilities,
+): AgentConfig {
   const cfg: AgentConfig = {
     baseUrl: form.baseUrl.trim() || null,
     apiKey: form.apiKey.trim() || null,
@@ -207,11 +219,16 @@ export function formToConfig(form: FormState, agent: AgentId): AgentConfig {
     wireShape: form.wireShape,
     ...(form.reasoningEffort ? { reasoningEffort: form.reasoningEffort } : {}),
   }
-  if (agent === 'opencode' || agent === 'pi') {
+  const registration = capabilities?.modelRegistration
+  if (registration?.contextWindow || registration?.reasoning) {
     return {
       ...cfg,
-      ...(form.contextWindow !== null ? { contextWindow: form.contextWindow } : {}),
-      ...(typeof form.reasoning === 'boolean' ? { reasoning: form.reasoning } : {}),
+      ...(registration.contextWindow && form.contextWindow !== null
+        ? { contextWindow: form.contextWindow }
+        : {}),
+      ...(registration.reasoning && typeof form.reasoning === 'boolean'
+        ? { reasoning: form.reasoning }
+        : {}),
       ...(form.wireShape === 'anthropic' ? { authMode: form.authMode } : {}),
     }
   }
@@ -221,7 +238,6 @@ export function formToConfig(form: FormState, agent: AgentId): AgentConfig {
   if (agent === 'claude') {
     return { ...cfg, authMode: form.authMode }
   }
-  // opencode / pi: baseUrl/apiKey/model + wireShape.
   return cfg
 }
 
@@ -248,19 +264,19 @@ function testKey(form: FormState): string {
 export function connectionFieldsChanged(
   saved: AgentConfig | null,
   form: FormState,
-  tab: Tab,
+  capabilities?: AgentProviderCapabilities,
 ): boolean {
   // Codex and Claude Code can inherit their native login while a project file
   // selects only model/effort. With no OpenAlice-managed endpoint or key there
   // is no credential-bearing HTTP connection for this modal to probe.
   if (
-    (tab === 'codex' || tab === 'claude') &&
+    capabilities?.credentialSource === 'runtime-or-workspace' &&
     !form.baseUrl.trim() &&
     !form.apiKey.trim()
   ) {
     return false
   }
-  return testKey(configToForm(saved, tab)) !== testKey(form)
+  return testKey(configToForm(saved, capabilities)) !== testKey(form)
 }
 
 export function WorkspaceAIConfigModal({
@@ -276,7 +292,12 @@ export function WorkspaceAIConfigModal({
   const onCloseRef = useRef(onClose)
   const dialogTitleId = useId()
   const dialogDescriptionId = useId()
-  const { workspaces, refresh, saveWorkspaceMetadata } = useWorkspaces()
+  const {
+    workspaces,
+    agents = [],
+    refresh,
+    saveWorkspaceMetadata,
+  } = useWorkspaces()
   const workspace = workspaces.find((w) => w.id === wsId) ?? null
   const workspaceLabel = workspace?.displayName?.trim() || workspace?.tag || wsId
   const [section, setSection] = useState<Section>(initialSection)
@@ -385,18 +406,20 @@ export function WorkspaceAIConfigModal({
       .then(([creds, b]) => {
         setCredentials(creds)
         setBundle(b)
-        setClaudeForm(configToForm(b.claude, 'claude'))
-        setCodexForm(configToForm(b.codex, 'codex'))
-        setOpencodeForm(configToForm(b.opencode, 'opencode'))
-        setPiForm(configToForm(b.pi, 'pi'))
+        setClaudeForm(configToForm(b.claude, providerCapabilities(agents, 'claude')))
+        setCodexForm(configToForm(b.codex, providerCapabilities(agents, 'codex')))
+        setOpencodeForm(configToForm(b.opencode, providerCapabilities(agents, 'opencode')))
+        setPiForm(configToForm(b.pi, providerCapabilities(agents, 'pi')))
       })
       .catch((err: Error) => setError(err.message))
     // Presets drive the model-id suggestions (anti-typo) — load once.
     void api.config.getPresets().then(({ presets: p }) => setPresets(p)).catch(() => {})
-  }, [wsId])
+  }, [agents, wsId])
 
   const form = { claude: claudeForm, codex: codexForm, opencode: opencodeForm, pi: piForm }[tab]
   const setForm = { claude: setClaudeForm, codex: setCodexForm, opencode: setOpencodeForm, pi: setPiForm }[tab]
+  const tabProviderCapabilities = providerCapabilities(agents, tab)
+  const modelRegistration = tabProviderCapabilities?.modelRegistration
   const formCredentialByKey = useMemo(() => credentials.find((credential) => (
     !!credential.apiKey && credential.apiKey === form.apiKey.trim()
   )) ?? null, [credentials, form.apiKey])
@@ -405,20 +428,21 @@ export function WorkspaceAIConfigModal({
     return selected?.vendor ?? formCredentialByKey?.vendor ?? null
   }, [credentials, formCredentialByKey, pickedCredential])
   const formWireOptions = useMemo(() => {
-    if (tab !== 'opencode' && tab !== 'pi') return []
-    return formCredentialByKey?.vendor === 'minimax'
-      ? agentWireShapes(formCredentialByKey.wires, tab, formCredentialByKey.vendor)
-      : AGENT_WIRE_PREFERENCE[tab] ?? []
-  }, [formCredentialByKey, tab])
+    return formCredentialByKey?.vendor &&
+      tabProviderCapabilities?.vendorPolicies?.[formCredentialByKey.vendor]
+      ? agentWireShapes(formCredentialByKey.wires, agents, tab, formCredentialByKey.vendor)
+      : agentWirePreference(agents, tab)
+  }, [agents, formCredentialByKey, tab, tabProviderCapabilities])
 
   useEffect(() => {
     if (
-      (tab !== 'opencode' && tab !== 'pi') ||
-      formCredentialByKey?.vendor !== 'minimax'
+      !formCredentialByKey ||
+      !tabProviderCapabilities?.vendorPolicies?.[formCredentialByKey.vendor]
     ) return
     if (formWireOptions.includes(form.wireShape)) return
     const repaired = pickAgentWire(
       formCredentialByKey.wires,
+      agents,
       tab,
       form.wireShape,
       formCredentialByKey.vendor,
@@ -432,7 +456,7 @@ export function WorkspaceAIConfigModal({
         ? { authMode: anthropicAuthModeForBaseUrl(repaired.baseUrl) }
         : {}),
     })
-  }, [form, formCredentialByKey, formWireOptions, setForm, tab])
+  }, [agents, form, formCredentialByKey, formWireOptions, setForm, tab, tabProviderCapabilities])
   // Model-id suggestions for the current field: infer the provider vendor from
   // the matched vault credential first, then its entered baseUrl (api.z.ai →
   // glm, …), with the tab as fallback. Official endpoints may intentionally be
@@ -468,25 +492,25 @@ export function WorkspaceAIConfigModal({
   const dirty = useMemo(() => {
     if (!bundle) return false
     const saved = bundle[tab]
-    const savedForm = configToForm(saved, tab)
+    const savedForm = configToForm(saved, tabProviderCapabilities)
     return (
       savedForm.baseUrl !== form.baseUrl ||
       savedForm.apiKey !== form.apiKey ||
       savedForm.model !== form.model ||
       savedForm.wireShape !== form.wireShape ||
-      ((tab === 'opencode' || tab === 'pi') && savedForm.contextWindow !== form.contextWindow) ||
-      ((tab === 'opencode' || tab === 'pi') && savedForm.reasoning !== form.reasoning) ||
+      (modelRegistration?.contextWindow === true && savedForm.contextWindow !== form.contextWindow) ||
+      (modelRegistration?.reasoning === true && savedForm.reasoning !== form.reasoning) ||
       savedForm.reasoningEffort !== form.reasoningEffort ||
       (form.wireShape === 'anthropic' && savedForm.authMode !== form.authMode)
     )
-  }, [bundle, form, tab])
+  }, [bundle, form, modelRegistration, tab, tabProviderCapabilities])
   const enteredApiKey = form.apiKey.trim()
   const offerSaveCred = !!enteredApiKey &&
     !credentials.some((credential) => credential.apiKey === enteredApiKey) &&
     dismissedCredentialKey !== enteredApiKey
   const connectionDirty = useMemo(
-    () => !!bundle && connectionFieldsChanged(bundle[tab], form, tab),
-    [bundle, form, tab],
+    () => !!bundle && connectionFieldsChanged(bundle[tab], form, tabProviderCapabilities),
+    [bundle, form, tab, tabProviderCapabilities],
   )
   // The primary footer button morphs Test → Save off this: an unsaved change
   // to connection fields has to clear the probe before it can be saved. Local
@@ -498,7 +522,7 @@ export function WorkspaceAIConfigModal({
     if (!cred) return
     // Pick the wire this tab's agent speaks from the credential's capabilities.
     // (The picker only lists compatible credentials, so this is non-null.)
-    const picked = pickAgentWire(cred.wires, tab, pickedWireShape || undefined, cred.vendor)
+    const picked = pickAgentWire(cred.wires, agents, tab, pickedWireShape || undefined, cred.vendor)
     if (!picked) return
     // Prefer the model this credential last used. A newly-created credential
     // falls back to the catalog's explicit default, not list order: catalogs
@@ -524,7 +548,7 @@ export function WorkspaceAIConfigModal({
     setError(null)
     setSaving(true)
     try {
-      await saveAgentConfig(wsId, tab, formToConfig(form, tab))
+      await saveAgentConfig(wsId, tab, formToConfig(form, tab, tabProviderCapabilities))
       notifyConfigChanged()
       onAiSaved?.({
         agent: tab,
@@ -568,7 +592,7 @@ export function WorkspaceAIConfigModal({
       await saveAgentConfig(wsId, tab, { baseUrl: null, apiKey: null, model: null })
       const fresh = await getAgentConfig(wsId)
       setBundle(fresh)
-      setForm({ ...EMPTY_FORM, wireShape: DEFAULT_WIRE_BY_TAB[tab] })
+      setForm({ ...EMPTY_FORM, wireShape: defaultWire(tabProviderCapabilities) })
       notifyConfigChanged()
       setSavedFlash(true)
       setTimeout(() => setSavedFlash(false), 1800)
@@ -865,10 +889,11 @@ export function WorkspaceAIConfigModal({
               // Only credentials that declare a wire THIS agent speaks. Codex is
               // Responses-only, so most credentials won't list here — the funnel
               // toward pi/opencode is by design.
-              const compatible = credentials.filter((c) => pickAgentWire(c.wires, tab, undefined, c.vendor))
+              const compatible = credentials.filter((c) =>
+                pickAgentWire(c.wires, agents, tab, undefined, c.vendor))
               const selectedCredential = compatible.find((c) => c.slug === pickedCredential)
               const selectedWireOptions = selectedCredential
-                ? agentWireShapes(selectedCredential.wires, tab, selectedCredential.vendor)
+                ? agentWireShapes(selectedCredential.wires, agents, tab, selectedCredential.vendor)
                 : []
               return (
                 <>
@@ -880,7 +905,9 @@ export function WorkspaceAIConfigModal({
                         const slug = e.target.value
                         const cred = compatible.find((candidate) => candidate.slug === slug)
                         setPickedCredential(slug)
-                        setPickedWireShape(cred ? (agentWireShapes(cred.wires, tab, cred.vendor)[0] ?? '') : '')
+                        setPickedWireShape(
+                          cred ? (agentWireShapes(cred.wires, agents, tab, cred.vendor)[0] ?? '') : '',
+                        )
                       }}
                       className={inputClass + ' flex-1'}
                       disabled={compatible.length === 0}
@@ -891,7 +918,7 @@ export function WorkspaceAIConfigModal({
                           : t('workspaceSettings.ai.selectCredential')}
                       </option>
                       {compatible.map((cred) => {
-                        const shapes = agentWireShapes(cred.wires, tab, cred.vendor)
+                        const shapes = agentWireShapes(cred.wires, agents, tab, cred.vendor)
                         return (
                           <option key={cred.slug} value={cred.slug}>
                             {(cred.label?.trim() || cred.slug)}{shapes.length > 1 ? ` · ${t('workspaceSettings.ai.protocolCount', { count: shapes.length })}` : ''}
@@ -930,7 +957,7 @@ export function WorkspaceAIConfigModal({
           </div>
 
           {/* Manual fields */}
-          {(tab === 'opencode' || tab === 'pi') && (
+          {(tabProviderCapabilities?.wirePreference.length ?? 0) > 1 && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.apiProtocol')}</label>
               <select
@@ -1115,7 +1142,7 @@ export function WorkspaceAIConfigModal({
                 </div>
               )}
 
-            {(tab === 'opencode' || tab === 'pi') && !selectedModelSemantics?.reasoning && (
+            {modelRegistration?.reasoning === true && !selectedModelSemantics?.reasoning && (
               <details className="mt-2 rounded-md border border-border bg-secondary/40 px-3 py-2">
                 <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
                   {t('aiProvider.advancedReasoning')}
@@ -1143,7 +1170,7 @@ export function WorkspaceAIConfigModal({
 
           </div>
 
-          {(tab === 'opencode' || tab === 'pi') && (
+          {modelRegistration?.contextWindow === true && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.ai.contextWindow')}</label>
               <select

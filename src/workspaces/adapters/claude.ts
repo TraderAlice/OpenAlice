@@ -188,6 +188,11 @@ export const claudeAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'fs-watch',
     headless: true,
+    aiProvider: {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['anthropic'],
+      defaultWire: 'anthropic',
+    },
   },
 
   readInteractiveSetupStatus: readClaudeInteractiveSetupStatus,

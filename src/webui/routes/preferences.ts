@@ -13,11 +13,11 @@ import {
   saveWindowsWorkspaceShellPreference,
   type WindowsWorkspaceShellStatus,
 } from '../../core/windows-workspace-shell.js'
-
-const LOGINLESS_AGENTS = ['opencode', 'pi'] as const
+import type { AdapterRegistry } from '../../workspaces/cli-adapter.js'
+import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js'
 
 const quickChatPreferenceUpdateSchema = z.object({
-  agent: z.enum(LOGINLESS_AGENTS),
+  agent: z.string().trim().min(1).max(128),
   credentialSlug: z.string().trim().min(1).max(128).nullable(),
 })
 
@@ -50,7 +50,10 @@ const defaultDeps: PreferenceRouteDeps = {
   saveWorkspaceShellPreference: (input) => saveWindowsWorkspaceShellPreference(input),
 }
 
-export function createPreferencesRoutes(deps: PreferenceRouteDeps = defaultDeps) {
+export function createPreferencesRoutes(
+  deps: PreferenceRouteDeps = defaultDeps,
+  adapterRegistry: AdapterRegistry = createBuiltinAdapterRegistry(),
+) {
   const app = new Hono()
 
   app.get('/quick-chat', async (c) => {
@@ -64,6 +67,10 @@ export function createPreferencesRoutes(deps: PreferenceRouteDeps = defaultDeps)
   app.put('/quick-chat', async (c) => {
     const parsed = quickChatPreferenceUpdateSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) {
+      return c.json({ error: 'invalid_quick_chat_preference' }, 400)
+    }
+    const adapter = adapterRegistry.get(parsed.data.agent)
+    if (adapter?.capabilities.aiProvider?.credentialSource !== 'workspace-required') {
       return c.json({ error: 'invalid_quick_chat_preference' }, 400)
     }
     try {

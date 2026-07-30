@@ -91,6 +91,21 @@ const runtimeAgents: AgentInfo[] = [
     resumeLast: true,
     resumeById: true,
     transcriptDiscovery: 'none',
+    ...(id !== 'shell' ? {
+      aiProvider: {
+        credentialSource: id === 'opencode' || id === 'pi'
+          ? 'workspace-required' as const
+          : 'runtime-or-workspace' as const,
+        wirePreference: id === 'claude'
+          ? ['anthropic' as const]
+          : id === 'codex'
+            ? ['openai-responses' as const]
+            : ['google-generative-ai' as const, 'openai-chat' as const, 'anthropic' as const, 'openai-responses' as const],
+        ...(id === 'opencode' || id === 'pi'
+          ? { modelRegistration: { contextWindow: true, reasoning: true } }
+          : {}),
+      },
+    } : {}),
   },
 }))
 

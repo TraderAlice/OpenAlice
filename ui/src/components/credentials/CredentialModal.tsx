@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { api, type Preset, type WireShape } from '../../api'
 import type { CredentialSummary } from '../../api/config'
+import type { AgentInfo } from '../workspace/api'
 import { Field, inputClass } from '../form'
 import {
   VENDOR_BY_PRESET,
@@ -46,10 +47,11 @@ function agentNames(ids: readonly string[]): string {
   return ids.map((id) => AGENT_LABELS[id] ?? id).join(', ')
 }
 
-export function CredentialModal({ mode, cred, presets, initialPresetId, initialApiKey, onClose, onSaved }: {
+export function CredentialModal({ mode, cred, presets, agents, initialPresetId, initialApiKey, onClose, onSaved }: {
   mode: 'add' | 'edit'
   cred?: CredentialSummary
   presets: Preset[]
+  agents: readonly AgentInfo[]
   initialPresetId?: string
   initialApiKey?: string
   onClose: () => void
@@ -102,7 +104,7 @@ export function CredentialModal({ mode, cred, presets, initialPresetId, initialA
   const primaryShape = shapes[0]
   const primaryUrl = primaryShape ? (wires[primaryShape] ?? '') : ''
   const compatibilityWires = isCustom ? { [customShape]: customUrl.trim() } : wires
-  const compatibleAgents = compatibleAgentIds(compatibilityWires)
+  const compatibleAgents = compatibleAgentIds(compatibilityWires, agents)
 
   const pickPreset = (next: Preset) => {
     setPreset(next)
@@ -253,7 +255,9 @@ export function CredentialModal({ mode, cred, presets, initialPresetId, initialA
                       <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/75">
                         {item.category === 'custom'
                           ? t('aiProvider.credentialModal.chooseMode')
-                          : t('aiProvider.credentialModal.worksWith', { agents: agentNames(presetCompatibleAgentIds(item)) })}
+                          : t('aiProvider.credentialModal.worksWith', {
+                              agents: agentNames(presetCompatibleAgentIds(item, agents)),
+                            })}
                       </span>
                     </span>
                     {item.category === 'custom' && (
@@ -301,7 +305,9 @@ export function CredentialModal({ mode, cred, presets, initialPresetId, initialA
                     <select className={inputClass} value={customShape} onChange={(event) => { setCustomShape(event.target.value as WireShape); gate.reset() }}>
                       {SHAPE_ORDER.map((shape) => (
                         <option key={shape} value={shape}>
-                          {WIRE_SHAPE_GUIDANCE[shape]} — {agentNames(compatibleAgentIds({ [shape]: '' }))}
+                          {WIRE_SHAPE_GUIDANCE[shape]} — {
+                            agentNames(compatibleAgentIds({ [shape]: '' }, agents))
+                          }
                         </option>
                       ))}
                     </select>

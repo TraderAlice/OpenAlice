@@ -25,15 +25,12 @@ import {
   rememberRecentChatWorkspace,
 } from '@/core/preferences.js';
 
-import { claudeAdapter } from './adapters/claude.js';
-import { codexAdapter } from './adapters/codex.js';
-import { opencodeAdapter } from './adapters/opencode.js';
+import { createBuiltinAdapterRegistry } from './adapters/index.js';
 import { piAdapter } from './adapters/pi.js';
-import { shellAdapter } from './adapters/shell.js';
 import {
-  AdapterRegistry,
   isAgentRuntime,
   prepareAgentRuntimeWorkspace,
+  type AdapterRegistry,
   type CliAdapter,
   type HeadlessRunOverrides,
 } from './cli-adapter.js';
@@ -761,12 +758,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     });
   }
 
-  const adapters = new AdapterRegistry();
-  adapters.register(claudeAdapter, { default: true });
-  adapters.register(codexAdapter);
-  adapters.register(opencodeAdapter);
-  adapters.register(piAdapter);
-  adapters.register(shellAdapter);
+  const adapters = createBuiltinAdapterRegistry();
   const sessionTitleResolver = new NativeSessionTitleResolver({
     sessionRegistry,
     resumeRegistry,
@@ -984,7 +976,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     availability?: AgentAvailability,
   ): AgentRuntimeReadinessSource => {
-    if (adapter.id === 'claude' || adapter.id === 'codex') return 'global-login';
+    if (adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace') {
+      return 'global-login';
+    }
     const binaryPath = availability?.path ?? '';
     if (
       adapter.id === 'pi' &&
@@ -1051,13 +1045,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   ): Promise<boolean> => {
     if (!adapter.writeAiConfig) return false;
     const credentials = await readCredentials();
-    const [, credential] = compatibleCredentials(credentials, adapter.id)[0] ?? [];
+    const [, credential] = compatibleCredentials(credentials, adapter)[0] ?? [];
     if (!credential) return false;
 
     const model = resolveInjectionModel(credential);
     const workspaceCredential = credentialToWorkspaceAiCred(
       credential,
-      adapter.id,
+      adapter,
       model ? { model } : {},
     );
     if (!workspaceCredential) return false;

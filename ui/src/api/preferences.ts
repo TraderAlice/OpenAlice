@@ -23,7 +23,7 @@ export const preferencesApi = {
   },
 
   rememberQuickChatCredential(
-    agent: 'opencode' | 'pi',
+    agent: string,
     credentialSlug: string | null,
   ): Promise<QuickChatPreferences> {
     return fetchJson('/api/preferences/quick-chat', {

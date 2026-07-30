@@ -2158,11 +2158,14 @@ export function createWorkspaceRoutes(
       // mode; the dropdown receives only presentation/injection metadata, while
       // the unfiltered Workspace modal keeps the key-bearing response.
       const agent = c.req.query('agent');
-      const entries = agent ? compatibleCredentials(credentials, agent) : Object.entries(credentials);
+      const adapter = agent ? svc.adapters.get(agent) : undefined;
+      const entries = agent
+        ? adapter ? compatibleCredentials(credentials, adapter) : []
+        : Object.entries(credentials);
       const list = entries.map(([slug, cred]) => {
         const resolvedModel = resolveInjectionModel(cred);
-        const projected = agent && resolvedModel
-          ? credentialToWorkspaceAiCred(cred, agent, { model: resolvedModel })
+        const projected = adapter && resolvedModel
+          ? credentialToWorkspaceAiCred(cred, adapter, { model: resolvedModel })
           : null;
         const reasoningMode = resolveModelSemantics(cred.vendor, resolvedModel)?.reasoning?.mode;
         return {
@@ -2232,13 +2235,14 @@ export function createWorkspaceRoutes(
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
-      const [claude, codex, opencode, pi] = await Promise.all([
-        svc.adapters.get('claude')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('codex')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('opencode')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('pi')?.readAiConfig?.(meta.dir) ?? null,
-      ]);
-      return c.json({ claude, codex, opencode, pi });
+      const configurable = svc.adapters.list().filter(
+        (adapter) => adapter.capabilities.aiProvider && adapter.readAiConfig,
+      );
+      const entries = await Promise.all(configurable.map(async (adapter) => [
+        adapter.id,
+        await adapter.readAiConfig!(meta.dir),
+      ] as const));
+      return c.json(Object.fromEntries(entries));
     } catch (err) {
       if (err instanceof PathTraversal) return c.json({ error: 'invalid_path' }, 400);
       launcherLogger.warn('agent_config.read_failed', { id, err });
@@ -2331,7 +2335,8 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    if (agent !== 'claude' && agent !== 'codex' && agent !== 'opencode' && agent !== 'pi') {
+    const adapter = svc.adapters.get(agent);
+    if (!adapter?.capabilities.aiProvider || !adapter.writeAiConfig) {
       return c.json({ error: 'unknown_agent' }, 400);
     }
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
@@ -2340,8 +2345,6 @@ export function createWorkspaceRoutes(
     const body = (await safeJson(c)) as WorkspaceAiCred | null;
     const cfg = body && typeof body === 'object' ? body : {};
     try {
-      const adapter = svc.adapters.get(agent);
-      if (!adapter?.writeAiConfig) return c.json({ error: 'unknown_agent' }, 400);
       const credentials = cfg.apiKey ? await readCredentials() : {};
       const slug = matchCredentialByApiKey(credentials, cfg.apiKey);
       const vendor = slug
@@ -2351,7 +2354,11 @@ export function createWorkspaceRoutes(
             baseUrl: cfg.baseUrl ?? undefined,
             wireShape: cfg.wireShape ?? undefined,
           });
-      const projected = applyRegisteredModelSemantics(cfg, agent, vendor);
+      const projected = applyRegisteredModelSemantics(
+        cfg,
+        adapter.capabilities.aiProvider,
+        vendor,
+      );
       await adapter.writeAiConfig(meta.dir, projected);
       // Remember an explicit model choice on the originating vault credential
       // (matched by apiKey) so quick-chat can reuse it without re-prompting.
@@ -2379,7 +2386,7 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ ok: false, error: 'invalid_id' }, 400);
-    if (agent !== 'claude' && agent !== 'codex' && agent !== 'opencode' && agent !== 'pi') {
+    if (!svc.adapters.get(agent)?.capabilities.aiProvider) {
       return c.json({ ok: false, error: 'unknown_agent' }, 400);
     }
 
