@@ -268,8 +268,9 @@ is deliberately small:
   visibility, style reset, and alternate-screen exit;
 - `createTerminalSession` owns TTY refusal, raw-mode setup/restoration, resize,
   Ctrl+C/SIGINT/SIGTERM cleanup, and renderer-error cleanup. On Windows it
-  briefly absorbs a duplicate ConPTY SIGINT after a raw Ctrl+C byte while the
-  caller drains diagnostics, then removes the signal listeners;
+  absorbs a duplicate ConPTY SIGINT for a bounded one-second window after a raw
+  Ctrl+C byte while the caller drains diagnostics. The unreferenced guard never
+  delays a normal CLI exit;
 - product actions and polling remain outside the renderer and will call the
   same lifecycle services as non-interactive commands.
 

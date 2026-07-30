@@ -509,8 +509,11 @@ This plan is complete only when:
 - 2026-07-30: The next Windows run proved Guardian recovery but exposed two
   remaining terminal details before the TUI test could pass: node-pty's Win32
   argv quoting corrupted a Bash command that began with a quote, and ConPTY
-  delivered a delayed SIGINT after the raw Ctrl+C byte. Prefixed the Bash child
-  command without restoring MSYS `exec`, kept the settled Windows signal guard
-  for a bounded 100 ms diagnostic drain, and added a deterministic session
-  regression. Local CLI TUI tests now pass 13 with only the Windows-only Bash
+  delivered a delayed SIGINT after the raw Ctrl+C byte. The first bounded guard
+  proved too short on the hosted runner, and retaining an outer Bash process
+  let the shell exit while the fixture result was still being written. Extended
+  the unreferenced guard to one second and restored MSYS `exec` behind a command
+  prefix that survives Win32 argv quoting, so Git Bash hands ConPTY ownership
+  directly to Node. The deterministic session regression now covers the full
+  guard boundary. Local CLI TUI tests pass 13 with only the Windows-only Bash
   journey skipped; the full repository passes 3,645 tests with 10 skipped.

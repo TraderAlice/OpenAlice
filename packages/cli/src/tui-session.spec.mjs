@@ -39,7 +39,9 @@ describe('terminal session cleanup', () => {
     expect(signalSource.listenerCount('SIGINT')).toBe(1)
 
     expect(() => signalSource.emit('SIGINT')).not.toThrow()
-    await vi.advanceTimersByTimeAsync(100)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(signalSource.listenerCount('SIGINT')).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
     expect(signalSource.listenerCount('SIGINT')).toBe(0)
     expect(signalSource.listenerCount('SIGTERM')).toBe(0)
   })

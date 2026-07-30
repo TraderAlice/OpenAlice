@@ -1,5 +1,7 @@
 import { AnsiTerminalRenderer } from './tui-renderer.mjs'
 
+const WINDOWS_CTRL_C_SIGNAL_GUARD_MS = 1_000
+
 export function createTerminalSession(options) {
   const input = options.input ?? process.stdin
   const output = options.output ?? process.stdout
@@ -32,7 +34,7 @@ export function createTerminalSession(options) {
     input.off('data', onData)
     output.off('resize', onResize)
     if (platform === 'win32' && reason === 'ctrl-c') {
-      const timer = setTimeout(removeSignalListeners, 100)
+      const timer = setTimeout(removeSignalListeners, WINDOWS_CTRL_C_SIGNAL_GUARD_MS)
       timer.unref?.()
     } else {
       removeSignalListeners()

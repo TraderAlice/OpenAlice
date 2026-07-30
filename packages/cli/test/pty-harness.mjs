@@ -165,7 +165,7 @@ async function resolveLaunch(options, fixture) {
       '--noprofile',
       '--norc',
       '-c',
-      'command "$(cygpath -u "$OPENALICE_NODE")" "$(cygpath -u "$OPENALICE_TUI_FIXTURE")"',
+      'exec "$(cygpath -u "$OPENALICE_NODE")" "$(cygpath -u "$OPENALICE_TUI_FIXTURE")"',
     ],
     environment: {
       OPENALICE_NODE: process.execPath,
