@@ -333,6 +333,15 @@ and verification before the next dependent branch starts from updated `dev`.
 
 ### 10. Release gates and operational hardening
 
+- [ ] Add a hermetic local stable-channel A to B updater E2E: build two
+  distinct product versions, serve the versioned installer and manifest over a
+  local HTTP fixture, install A, observe the bounded/cached start notice, run
+  `openalice update --yes`, and prove the visible launcher selects B while A
+  and user state remain intact.
+- [ ] Inject manifest, checksum, expected-version, download, staging,
+  pre-switch, and post-switch failures into that journey; every pre-activation
+  failure must leave A runnable and every recoverable activation failure must
+  diagnose or restore a usable release.
 - [ ] Add real previous stable to candidate N-1 to N.
 - [ ] Add post-merge live dev Runtime install/upgrade acceptance.
 - [ ] Cover supported macOS/Linux architectures.
@@ -417,6 +426,12 @@ leaked children or terminal restoration failure.
 Runtime update acceptance uses real N-1 assets, transaction fault injection,
 and data hashes before and after each success/failure. Routine acceptance is
 non-trading and uses no real credentials or broker accounts.
+
+The local updater fixture is the fast trust-chain seam between unit tests and a
+published release: it uses distinct A/B product versions and the real
+`openalice update` command, not merely two installer selectors containing the
+same package version. Public dev-channel and release-candidate checks remain
+separate network acceptance after the hermetic journey passes.
 
 ## Risks and Kill Switches
 
@@ -521,6 +536,18 @@ This plan is complete only when:
   resize, reconnect, and Git Bash journeys could all restore the alternate
   screen yet leave the ESM fixture waiting on a terminal stream callback;
   ConPTY then reported exit 1 and sometimes observed a partial result file.
-  The PTY child now commits its structured evidence and final marker
-  synchronously before publishing an explicit exit code. This is fixture
+  The PTY child now commits its structured evidence synchronously and attempts
+  its final marker before publishing an explicit exit code. This is fixture
   process ownership, not a relaxation of the renderer/session assertions.
+- 2026-07-30: Windows then made the remaining boundary explicit: after the
+  renderer successfully restored the alternate screen, ConPTY could close its
+  output side and reject the fixture's extra human marker with `EPIPE`.
+  Structured result evidence remains synchronous and authoritative; the marker
+  now treats only broken-pipe/end-of-file as an expected best-effort drain.
+  Renderer restoration is still asserted from the real terminal byte stream.
+- 2026-07-30: Audited the local install, uninstall, and update seams before the
+  next increment. Source installation, conservative CLI-only uninstall, atomic
+  release switching, update discovery, checksum/version guards, and installer
+  selector switching are covered independently. Added the missing hermetic
+  stable-channel A-to-B journey as an explicit release-gate increment so a
+  same-version installer smoke cannot stand in for a real product upgrade.

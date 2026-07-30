@@ -360,9 +360,11 @@ pnpm test:cli-tui
 
 The Windows cross-platform suite must exercise the Git Bash journey before a
 renderer selection or terminal-lifecycle change is considered complete.
-The child fixture commits its result and final terminal marker synchronously
-before an explicit exit code; an unresolved stream callback must not be
-mistaken for a renderer or cleanup failure by ConPTY.
+The child fixture commits its structured result synchronously before an
+explicit exit code. Its final human marker is best-effort because Windows
+ConPTY may close the output side immediately after alternate-screen
+restoration; that expected `EPIPE` must not be mistaken for a renderer or
+cleanup failure.
 
 For launcher ownership or takeover changes:
 

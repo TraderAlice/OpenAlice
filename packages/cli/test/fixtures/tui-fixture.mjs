@@ -85,5 +85,13 @@ function writeTerminal(stream, text) {
   // every Windows ConPTY implementation. Commit the fixture's evidence before
   // publishing an explicit child exit code so node-pty never observes a half
   // written result or an unsettled-module failure.
-  writeSync(stream.fd, text)
+  try {
+    writeSync(stream.fd, text)
+  } catch (error) {
+    // Windows ConPTY may close its output side as soon as the alternate screen
+    // is restored. The renderer bytes and result file are already committed;
+    // a best-effort human marker must not turn a successful session into an
+    // operational failure.
+    if (error?.code !== 'EPIPE' && error?.code !== 'EOF') throw error
+  }
 }
