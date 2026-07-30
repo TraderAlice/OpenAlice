@@ -28,6 +28,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/retire-workspace-adapter-pins.md]] — Retires the legacy per-Workspace
+  adapter allowlist so runtime availability comes from the live installation
+  registry and future default-enabled choices can live in global preferences.
 - [[plans/auto-quant-v2-harness.md]] — Adds AutoQuant V2 as a first-class
   version-pinned Harness, then refines it into an explicitly initialized
   default desk with Session-first daily UI and pinned `v0.8.31` source.

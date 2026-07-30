@@ -133,9 +133,6 @@ function HarnessLandingPage({
   // The selectable agent runtimes = the agent CLIs (the bare shell has no agent
   // loop, so it can't be seeded with a first message).
   const cliAgents = agents.filter((a) => a.kind !== 'utility')
-  const targetCliAgents = workspaceTarget
-    ? cliAgents.filter((a) => workspaceTarget.agents.includes(a.id))
-    : cliAgents
 
   const [value, setValue] = useState('')
   const [launching, setLaunching] = useState(false)
@@ -144,7 +141,7 @@ function HarnessLandingPage({
   const launchSelectorsRef = useRef<AgentLaunchSelectorsHandle>(null)
   const credentialWorkspace = workspaceTarget
   const launchConfig = useAgentLaunchConfig({
-    agents: targetCliAgents,
+    agents: cliAgents,
     defaultAgent,
     setDefaultAgent,
     preferences: launchPreferences,

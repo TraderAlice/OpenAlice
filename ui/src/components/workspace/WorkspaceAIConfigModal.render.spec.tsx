@@ -56,7 +56,6 @@ beforeEach(async () => {
       dir: '/tmp/chat-1',
       createdAt: '2026-07-18T00:00:00.000Z',
       template: 'chat',
-      agents: ['pi'],
       sessions: [],
     }],
     agents: [

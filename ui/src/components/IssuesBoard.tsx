@@ -263,7 +263,7 @@ function agentName(id: string, agents: readonly { id: string; displayName: strin
 
 function resolveAgentRuntime(
   issue: IssueListItem,
-  workspace: { agents: readonly string[] } | null,
+  workspace: object | null,
   agents: readonly { id: string; displayName: string; kind?: 'agent' | 'utility' }[],
   issueDefaultAgent: string | null,
   defaultAgent: string | null,
@@ -273,10 +273,9 @@ function resolveAgentRuntime(
       ? { id: issue.agent, displayName: agentName(issue.agent, agents), source: 'override', distinctOverride: true }
       : undefined
   }
-  const runtimeIds = workspace.agents.filter((id) => {
-    const agent = agents.find((a) => a.id === id)
-    return agent ? agent.kind !== 'utility' : id !== 'shell'
-  })
+  const runtimeIds = agents
+    .filter((agent) => agent.kind !== 'utility')
+    .map((agent) => agent.id)
   const issueDefaultId = issueDefaultAgent && runtimeIds.includes(issueDefaultAgent) ? issueDefaultAgent : null
   const workspaceDefaultId = defaultAgent && runtimeIds.includes(defaultAgent) ? defaultAgent : null
   const effectiveDefaultId = issueDefaultId ?? workspaceDefaultId ?? runtimeIds[0] ?? null

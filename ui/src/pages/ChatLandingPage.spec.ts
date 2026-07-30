@@ -50,7 +50,6 @@ function workspace(
     dir: `/tmp/${id}`,
     createdAt,
     template,
-    agents: ['pi'],
     sessions: lastActiveAt
       ? [{
           id: `${id}-session`,

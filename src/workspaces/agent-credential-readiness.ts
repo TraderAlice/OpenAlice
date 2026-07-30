@@ -19,7 +19,6 @@ export type AgentCredentialSource =
   | 'launcher-vault'
   | 'missing'
   | 'unknown-agent'
-  | 'disabled-agent'
 
 export interface AgentCredentialReadiness {
   readonly agent: string
@@ -115,20 +114,6 @@ export async function getAgentCredentialReadiness(opts: {
       compatibleCredentialSlugs: [],
       injectableCredentialSlugs: [],
       message: `unknown agent runtime: ${agentId}`,
-    }
-  }
-  if (!meta.agents.includes(agentId)) {
-    return {
-      agent: agentId,
-      ready: false,
-      requiresCredential: requiresWorkspaceCredential(adapter),
-      source: 'disabled-agent',
-      hasWorkspaceConfig: false,
-      hasUsableWorkspaceConfig: false,
-      detectedCredentialSlug: null,
-      compatibleCredentialSlugs: [],
-      injectableCredentialSlugs: [],
-      message: `agent "${agentId}" is not enabled on this workspace`,
     }
   }
   if (!requiresWorkspaceCredential(adapter)) {

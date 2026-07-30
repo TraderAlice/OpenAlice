@@ -1333,7 +1333,7 @@ export function IssueDetail({
 }: IssueDetailProps) {
   const { t } = useTranslation()
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
-  const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, openHeadlessRun, workspaces } = useWorkspaces()
+  const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, openHeadlessRun } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectInboxEntry = useInboxSelection((s) => s.select)
@@ -1437,11 +1437,8 @@ export function IssueDetail({
     [gotoEntity, gotoIssue],
   )
 
-  const workspace = workspaces.find((w) => w.id === wsId) ?? null
   const agentOptions = agents.filter(
-    (agent) =>
-      agent.kind !== 'utility' &&
-      (workspace ? workspace.agents.includes(agent.id) : true),
+    (agent) => agent.kind !== 'utility',
   )
 
   const onPatch = useCallback(

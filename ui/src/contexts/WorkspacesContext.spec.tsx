@@ -84,7 +84,6 @@ function workspace(): Workspace {
     dir: '/tmp/research-desk',
     createdAt: '2026-07-16T00:00:00.000Z',
     template: 'auto-quant',
-    agents: ['pi'],
     sessions: [],
   }
 }

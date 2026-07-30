@@ -590,7 +590,7 @@ export const zh: Resources = {
       description: '展示下一次新建 Session 时，OpenAlice 实际会交给 PTY 的启动计划。这里不会运行 Hook、写入配置或拉起进程。',
       loading: '正在解析启动计划…',
       loadError: '无法读取启动计划',
-      noRuntimes: '此工作区没有启用可预览的 Runtime。',
+      noRuntimes: '当前没有已注册、可供预览的 Agent Runtime。',
       runtimeReady: '已找到 Runtime',
       runtimeMissing: '未找到 Runtime',
       runtimeMissingHelp: '当前路径中没有找到这个 Runtime。启动仍会尝试，但进程很可能以 executable not found 失败。',

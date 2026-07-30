@@ -437,7 +437,6 @@ try {
     body: JSON.stringify({
       tag: `docker-smoke-${suffix}`,
       template: 'chat',
-      agents: ['shell', ...(aiCredential ? [aiAgent] : [])],
     }),
   }, 201)
   const workspaceId = created?.workspace?.id

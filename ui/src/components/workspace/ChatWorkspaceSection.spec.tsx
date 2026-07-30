@@ -45,7 +45,6 @@ const chatWorkspace: Workspace = {
   dir: '/tmp/chat-jul11',
   createdAt: '2026-07-11T00:00:00.000Z',
   template: 'chat',
-  agents: ['pi'],
   sessions: [],
 }
 

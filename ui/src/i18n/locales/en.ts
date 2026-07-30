@@ -602,7 +602,7 @@ export const en = {
       description: 'Shows the plan OpenAlice will hand to the PTY for the next fresh Session. Reading it does not run hooks, write configuration, or start a process.',
       loading: 'Resolving the launch plan…',
       loadError: 'Could not load the launch plan',
-      noRuntimes: 'This Workspace has no enabled runtime to preview.',
+      noRuntimes: 'No agent runtime is registered to preview.',
       runtimeReady: 'Runtime found',
       runtimeMissing: 'Runtime missing',
       runtimeMissingHelp: 'This runtime was not found on the current search path. Launch will still be attempted, but the process will likely fail with executable not found.',

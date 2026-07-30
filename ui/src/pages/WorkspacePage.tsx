@@ -48,7 +48,6 @@ export function WorkspacePage({ spec, visible }: Props) {
     : null
   const defaultAgentEnabled =
     ctx.defaultAgent !== null &&
-    workspace?.agents.includes(ctx.defaultAgent) === true &&
     ctx.agents.some((a) => a.id === ctx.defaultAgent && a.kind !== 'utility')
 
   const spawnDefault = (): void => {

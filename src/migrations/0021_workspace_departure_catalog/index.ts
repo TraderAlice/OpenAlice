@@ -5,6 +5,10 @@ import { dirname, join, resolve } from 'node:path'
 import type { WorkspaceCatalogRecord } from '../../workspaces/workspace-catalog.js'
 import type { Migration } from '../types.js'
 
+type LegacyWorkspaceCatalogRecord = WorkspaceCatalogRecord & {
+  agents?: string[]
+}
+
 interface RegistryMeta {
   id: string
   tag: string
@@ -55,7 +59,7 @@ async function readRequiredRegistry(path: string): Promise<RegistryMeta[] | null
   return metas
 }
 
-async function readExistingCatalog(path: string): Promise<WorkspaceCatalogRecord[]> {
+async function readExistingCatalog(path: string): Promise<LegacyWorkspaceCatalogRecord[]> {
   let text: string
   try { text = await readFile(path, 'utf8') }
   catch (err) {
@@ -70,12 +74,13 @@ async function readExistingCatalog(path: string): Promise<WorkspaceCatalogRecord
     (parsed as { version?: unknown }).version !== 1 ||
     !Array.isArray((parsed as { workspaces?: unknown }).workspaces)
   ) throw new Error('cannot migrate Workspace lifecycle: workspace-catalog.json has an unsupported shape')
-  const records = (parsed as { workspaces: WorkspaceCatalogRecord[] }).workspaces
+  const records = (parsed as { workspaces: LegacyWorkspaceCatalogRecord[] }).workspaces
   for (const record of records) {
     if (
       !record || typeof record.id !== 'string' || typeof record.tag !== 'string' ||
       typeof record.activeDir !== 'string' || typeof record.createdAt !== 'string' ||
-      typeof record.updatedAt !== 'string' || !Array.isArray(record.agents) ||
+      typeof record.updatedAt !== 'string' ||
+      (record.agents !== undefined && !Array.isArray(record.agents)) ||
       !['active', 'offboarding', 'departed', 'restoring', 'purging', 'purged'].includes(record.lifecycle)
     ) throw new Error('cannot migrate Workspace lifecycle: invalid catalog row')
   }
@@ -110,7 +115,7 @@ function inferredTemplate(id: string): string | undefined {
   return undefined
 }
 
-function activeRecord(meta: RegistryMeta, now: string): WorkspaceCatalogRecord {
+function activeRecord(meta: RegistryMeta, now: string): LegacyWorkspaceCatalogRecord {
   return {
     id: meta.id,
     tag: meta.tag,
@@ -130,7 +135,7 @@ async function legacyRecord(
   activeDir: string,
   departedDir: string,
   now: string,
-): Promise<WorkspaceCatalogRecord> {
+): Promise<LegacyWorkspaceCatalogRecord> {
   const info = await stat(departedDir).catch(() => null)
   const createdAt = info && Number.isFinite(info.birthtimeMs) && info.birthtimeMs > 0
     ? info.birthtime.toISOString()
@@ -170,7 +175,7 @@ export async function migrateWorkspaceDepartureCatalog(
   const activeMetas = registryMetas ?? []
   const activeById = new Map(activeMetas.map((meta) => [meta.id, meta]))
   const catalogPath = join(root, 'state', 'workspace-catalog.json')
-  const records = new Map<string, WorkspaceCatalogRecord>()
+  const records = new Map<string, LegacyWorkspaceCatalogRecord>()
   for (const value of await readExistingCatalog(catalogPath)) {
     if (!value || typeof value.id !== 'string') {
       throw new Error('cannot migrate Workspace lifecycle: invalid catalog row')
@@ -238,5 +243,11 @@ export const migration: Migration = {
   affects: ['workspaces/workspaces.json', 'workspaces/workspaces/*', 'workspaces/departed-workspaces/*', 'workspaces/state/workspace-catalog.json'],
   summary: 'Move unregistered Workspace directories into a durable departed catalog without deleting them.',
   rationale: 'The active Workspace root is a manager-visible office floor; departed desks must leave that namespace while retaining handoff and restore history.',
-  up: async () => { await migrateWorkspaceDepartureCatalog() },
+  up: async (ctx) => {
+    const userDataHome = resolve(ctx.configDir(), '..', '..')
+    const launcherRoot = resolve(
+      process.env['AQ_LAUNCHER_ROOT'] ?? join(userDataHome, 'workspaces'),
+    )
+    await migrateWorkspaceDepartureCatalog(launcherRoot)
+  },
 }

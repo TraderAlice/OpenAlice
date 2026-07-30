@@ -28,7 +28,6 @@ const meta: WorkspaceMeta = {
   dir: '/tmp/ws-1',
   createdAt: '2026-07-04T00:00:00.000Z',
   template: 'chat',
-  agents: ['claude', 'opencode', 'pi'],
 };
 
 const openaiKey: Credential = {

@@ -334,11 +334,11 @@ PTY pool, then shows:
 - only launcher-controlled environment contributions, grouped by terminal,
   Workspace, toolchain, and adapter ownership.
 
-The Shell utility is always present in this surface even when it is not listed
-as a Workspace agent runtime. Its plan uses the same launcher-built base
-environment and cwd as coding agents, so the injected `alice*` and `traderhub`
-CLI path and local tool transport remain visible. Shell does not receive an AI
-provider credential or another runtime's adapter-specific environment.
+The Shell utility is always present in this surface alongside the registered
+agent runtimes. Its plan uses the same launcher-built base environment and cwd
+as coding agents, so the injected `alice*` and `traderhub` CLI path and local
+tool transport remain visible. Shell does not receive an AI provider credential
+or another runtime's adapter-specific environment.
 
 Reading a launch plan never runs `prepareWorkspace`, writes native runtime
 configuration, or starts a process. The response omits inherited host

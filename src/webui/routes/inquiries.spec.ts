@@ -22,7 +22,7 @@ function build(opts: { assignee?: string } = {}) {
   ) => ({ taskId: 'run-new', resumeId: _resumeId ?? 'resume-new' }))
   const list = vi.fn((_filters: unknown) => [] as HeadlessTaskRecord[])
   const svc = {
-    registry: { get: (id: string) => id === 'ws-1' ? { id, tag: 'Research', dir: '/tmp/ws-1', agents: ['pi'] } : undefined },
+    registry: { get: (id: string) => id === 'ws-1' ? { id, tag: 'Research', dir: '/tmp/ws-1' } : undefined },
     resumeRegistry: {
       get: (id: string) => id === 'resume-author' || id === 'resume-owner' || id === 'resume-run'
         ? { resumeId: id, wsId: 'ws-1', agent: 'pi', agentSessionId: `native-${id}` }

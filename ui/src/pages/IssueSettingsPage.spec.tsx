@@ -37,7 +37,7 @@ describe('IssueSettingsPage', () => {
 
     expect(select.id).not.toBe('')
     expect(document.querySelector(`label[for="${select.id}"]`)?.textContent).toBe('Agent runtime')
-    expect(description?.textContent).toContain('workspace session default (opencode)')
+    expect(description?.textContent).toContain('installation session default (opencode)')
     expect(screen.queryByRole('option', { name: 'Shell' })).toBeNull()
   })
 })

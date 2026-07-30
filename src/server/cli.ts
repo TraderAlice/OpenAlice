@@ -110,7 +110,6 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
               id: meta.id,
               tag: meta.tag,
               ...(meta.template ? { template: meta.template } : {}),
-              agents: meta.agents,
               createdAt: meta.createdAt,
               sessions: {
                 total: sessions.length,

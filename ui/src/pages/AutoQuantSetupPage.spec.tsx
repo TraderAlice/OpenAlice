@@ -53,7 +53,6 @@ const existingWorkspace: Workspace = {
   dir: '/tmp/aq-existing',
   createdAt: '2026-07-30T00:00:00.000Z',
   template: 'auto-quant-v2',
-  agents: ['codex'],
   sessions: [],
   harnessSource: {
     schemaVersion: 1,

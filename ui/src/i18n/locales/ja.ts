@@ -591,7 +591,7 @@ export const ja: Resources = {
       description: '次の新規 Session で OpenAlice が PTY に渡す起動プランを表示します。読み取り時にフックの実行、設定の書き込み、プロセスの起動は行いません。',
       loading: '起動プランを解決しています…',
       loadError: '起動プランを読み込めませんでした',
-      noRuntimes: 'このワークスペースにはプレビュー可能な Runtime がありません。',
+      noRuntimes: 'プレビューできる Agent Runtime が登録されていません。',
       runtimeReady: 'Runtime を検出',
       runtimeMissing: 'Runtime が見つかりません',
       runtimeMissingHelp: '現在の検索パスに Runtime がありません。起動は試行されますが、実行ファイルが見つからず失敗する可能性があります。',

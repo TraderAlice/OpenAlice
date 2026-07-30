@@ -335,11 +335,8 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
   const [spawnMenuOpen, setSpawnMenuOpen] = useState(false);
   const spawnControlsRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLUListElement | null>(null);
-  const enabledAgents = w.agents
-    .map((id) => props.agents.find((a) => a.id === id))
-    .filter((a): a is AgentInfo => !!a);
-  const runtimeAgents = enabledAgents.filter((a) => a.kind !== 'utility');
-  const utilityAgents = enabledAgents.filter((a) => a.kind === 'utility');
+  const runtimeAgents = props.agents.filter((a) => a.kind !== 'utility');
+  const utilityAgents = props.agents.filter((a) => a.kind === 'utility');
   const defaultAgentEnabled =
     props.defaultAgent !== null &&
     runtimeAgents.some((a) => a.id === props.defaultAgent);
@@ -428,7 +425,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             <Pencil size={12} strokeWidth={2} />
           </button>
         )}
-        {enabledAgents.length > 0 && (
+        {props.agents.length > 0 && (
           <div ref={spawnControlsRef} className="relative flex shrink-0 items-center">
             <button
               type="button"

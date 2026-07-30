@@ -37,7 +37,6 @@ describe('demo Workspace creation handler', () => {
       spawnedFromVersion: '0.2.0',
       currentVersion: '0.2.0',
       upgradeAvailable: null,
-      agents: ['claude', 'codex', 'opencode', 'pi'],
       sessions: [],
     })
 

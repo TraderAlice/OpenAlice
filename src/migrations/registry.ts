@@ -41,6 +41,7 @@ import { migration as migration_0026_agent_conversation_log } from './0026_agent
 import { migration as migration_0027_repair_snapshot_interval } from './0027_repair_snapshot_interval/index.js'
 import { migration as migration_0028_auto_quant_default_workspace } from './0028_auto_quant_default_workspace/index.js'
 import { migration as migration_0029_session_native_titles } from './0029_session_native_titles/index.js'
+import { migration as migration_0030_retire_workspace_agent_pins } from './0030_retire_workspace_agent_pins/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -65,4 +66,5 @@ export const REGISTRY: Migration[] = [
   migration_0027_repair_snapshot_interval,
   migration_0028_auto_quant_default_workspace,
   migration_0029_session_native_titles,
+  migration_0030_retire_workspace_agent_pins,
 ]
