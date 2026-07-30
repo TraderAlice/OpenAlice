@@ -1,4 +1,11 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -172,12 +179,15 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-settings-'))
     temporaryPaths.push(isolatedHome)
     const supervisorHome = join(isolatedHome, 'supervisor')
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
     const child = pty.spawn(process.execPath, [cliEntry], {
       cols: 110,
       rows: 30,
       cwd: dirname(cliEntry),
       env: {
-        ...process.env,
+        ...childEnv,
         HOME: isolatedHome,
         OPENALICE_HOME: join(isolatedHome, 'state'),
         OPENALICE_SUPERVISOR_HOME: supervisorHome,
@@ -237,6 +247,186 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   })
 
+  it('creates, selects, remembers, and switches named instances inside the TUI', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instances-'))
+    temporaryPaths.push(isolatedHome)
+    const supervisorHome = join(isolatedHome, 'supervisor')
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 110,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: supervisorHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let openedInstances = false
+      let requestedCreate = false
+      let submittedName = false
+      let acceptedHome = false
+      let reopenedInstances = false
+      let selectedDefault = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor instances TUI timed out:\n${output}`))
+      }, 12_000)
+      child.onData((data) => {
+        output += data
+        if (!openedInstances && output.includes('i Instances')) {
+          openedInstances = true
+          child.write('i')
+        } else if (!requestedCreate && output.includes('+ Create instance')) {
+          requestedCreate = true
+          child.write('\u001b[B\r')
+        } else if (
+          !submittedName
+          && output.includes('Instance name')
+        ) {
+          submittedName = true
+          child.write('research\r')
+        } else if (
+          !acceptedHome
+          && output.includes('Create instance · research')
+          && output.includes('Complete home')
+        ) {
+          acceptedHome = true
+          child.write('\r')
+        } else if (
+          !reopenedInstances
+          && output.includes('Created and selected instance research.')
+          && output.includes('Instance: research')
+        ) {
+          reopenedInstances = true
+          child.write('i')
+        } else if (
+          reopenedInstances
+          && !selectedDefault
+          && output.includes('research · current · default')
+        ) {
+          selectedDefault = true
+          child.write('\u001b[A\r')
+        } else if (
+          !detached
+          && output.includes('Selected instance default; future bare starts use it.')
+          && output.includes('Instance: default')
+        ) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor instances TUI exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const config = JSON.parse(
+      await readFile(join(supervisorHome, 'config.json'), 'utf8'),
+    )
+    expect(config.defaultInstance).toBeUndefined()
+    expect(config.instances.research).toEqual({
+      name: 'research',
+      home: await realpath(join(isolatedHome, '.openalice-research')),
+    })
+    expect(transcript).toContain('OpenAlice instances')
+    expect(transcript).toContain('Created and selected instance research.')
+    expect(transcript).toContain('Selected instance default; future bare starts use it.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  }, 15_000)
+
+  it('recovers in the instance picker when the remembered complete home is missing', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instance-recovery-'))
+    temporaryPaths.push(isolatedHome)
+    const supervisorHome = join(isolatedHome, 'supervisor')
+    await mkdir(supervisorHome, { recursive: true })
+    await writeFile(join(supervisorHome, 'config.json'), `${JSON.stringify({
+      schemaVersion: 1,
+      defaultInstance: 'missing',
+      instances: {
+        missing: {
+          name: 'missing',
+          home: join(isolatedHome, 'disconnected-home'),
+        },
+      },
+    }, null, 2)}\n`)
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 120,
+      rows: 32,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: supervisorHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let openedInstances = false
+      let repairedDefault = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor instance recovery timed out:\n${output}`))
+      }, 10_000)
+      child.onData((data) => {
+        output += data
+        if (
+          !openedInstances
+          && output.includes('Using "default"; press i Instances to recover.')
+          && output.includes('Instance: default')
+        ) {
+          openedInstances = true
+          child.write('i')
+        } else if (
+          openedInstances
+          && !repairedDefault
+          && output.includes('default · current')
+          && output.includes('+ Create instance')
+        ) {
+          repairedDefault = true
+          child.write('\r')
+        } else if (
+          !detached
+          && output.includes('Selected instance default; future bare starts use it.')
+        ) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor instance recovery exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const config = JSON.parse(
+      await readFile(join(supervisorHome, 'config.json'), 'utf8'),
+    )
+    expect(config.defaultInstance).toBeUndefined()
+    expect(config.instances.missing.home).toBe(join(isolatedHome, 'disconnected-home'))
+    expect(transcript).toContain('Instance "missing" is missing.')
+    expect(transcript).toContain('Using "default"; press i Instances to recover.')
+    expect(transcript).toContain('+ Create instance')
+    expect(transcript).toContain('Selected instance default; future bare starts use it.')
+  }, 15_000)
+
   it('shows higher-priority CLI overrides as locked settings', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-settings-lock-'))
     temporaryPaths.push(isolatedHome)
@@ -293,6 +483,67 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('44000 · locked')
     expect(transcript).toContain('Locked by --port.')
     expect(transcript).not.toContain('Set Web port')
+  })
+
+  it('shows CLI-selected instances as read-only instead of pretending to switch them', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instance-lock-'))
+    temporaryPaths.push(isolatedHome)
+    const instanceHome = join(isolatedHome, 'research-home')
+    const child = pty.spawn(process.execPath, [
+      cliEntry,
+      '--instance', 'research',
+      '--home', instanceHome,
+    ], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let openedInstances = false
+      let closedInstances = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor instance-lock TUI timed out:\n${output}`))
+      }, 10_000)
+      child.onData((data) => {
+        output += data
+        if (!openedInstances && output.includes('i Instances')) {
+          openedInstances = true
+          child.write('i')
+        } else if (
+          !closedInstances
+          && output.includes('Instance selection is read-only.')
+          && output.includes('research · current')
+        ) {
+          closedInstances = true
+          child.write('\u001b')
+        } else if (
+          !detached
+          && output.includes('Instance selection closed.')
+        ) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor instance-lock TUI exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Locked by --instance.')
+    expect(transcript).toContain('research · current')
+    expect(transcript).not.toContain('+ Create instance')
   })
 
   it('explains when managed source is unavailable from a source-run CLI', async () => {

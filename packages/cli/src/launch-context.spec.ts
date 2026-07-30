@@ -104,6 +104,15 @@ describe('ResolvedLaunchContext', () => {
       homeDir: '/home/alice',
       env: { OPENALICE_INSTANCE: 'research' },
     })).toThrow(/needs an explicit complete home/)
+    expect(() => resolveLaunchContext({
+      homeDir: '/home/alice',
+      machineConfig: {
+        defaultInstance: 'research',
+        defaults: { home: '/shared-machine-home' },
+      },
+      instanceConfig: { name: 'research' },
+      env: {},
+    })).toThrow(/needs an explicit complete home/)
   })
 
   it('rejects malformed instance, port, and boolean environment values', () => {

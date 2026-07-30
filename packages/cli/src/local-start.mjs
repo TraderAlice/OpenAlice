@@ -197,10 +197,14 @@ export function buildLocalRuntimeEnv(env, options) {
     OPENALICE_HOME: options.homeRoot,
     OPENALICE_APP_HOME: options.appDir,
     OPENALICE_BIND_HOST: LOOPBACK,
-    OPENALICE_WEB_PORT: String(options.port),
     OPENALICE_WEB_TRANSPORT: 'http',
     OPENALICE_LAUNCHER: 'cli',
     OPENALICE_NODE_BINARY: options.nodeBinary,
+  }
+  if (options.port === undefined || options.port === null) {
+    delete runtimeEnv.OPENALICE_WEB_PORT
+  } else {
+    runtimeEnv.OPENALICE_WEB_PORT = String(options.port)
   }
   delete runtimeEnv.OPENALICE_DISABLE_AUTH
   delete runtimeEnv.OPENALICE_TAKEOVER

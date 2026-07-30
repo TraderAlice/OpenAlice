@@ -1,8 +1,13 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  dirname,
+  join,
+} from 'node:path'
 import type {
   Component,
   KeyId,
+  SelectItem,
+  SelectListTheme,
   SettingItem,
   SettingsListTheme,
 } from '@earendil-works/pi-tui'
@@ -35,9 +40,16 @@ import {
 } from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
 import {
+  createSupervisorInstance,
   persistInstanceLaunchConfig,
+  persistSelectedSupervisorInstance,
   readInstanceLaunchConfig,
+  readSupervisorInstanceRegistry,
+  isStoredHomeUnavailableError,
+  resolveAvailableStoredLaunchContext,
   resolveStoredLaunchContext,
+  validateSupervisorInstanceName,
+  type SupervisorInstanceRegistry,
 } from './supervisor-config.ts'
 import {
   checkForUpdate,
@@ -148,6 +160,18 @@ export interface SupervisorTuiDependencies {
   loadInstanceConfig?: (
     context: ResolvedLaunchContext,
   ) => Promise<InstanceLaunchConfig>
+  loadInstanceRegistry?: (
+    context: ResolvedLaunchContext,
+  ) => Promise<SupervisorInstanceRegistry>
+  selectInstance?: (
+    context: ResolvedLaunchContext,
+    name: string,
+  ) => Promise<ResolvedLaunchContext>
+  createInstance?: (
+    context: ResolvedLaunchContext,
+    name: string,
+    home: string,
+  ) => Promise<ResolvedLaunchContext>
   prepareManagedSource?: () => Promise<ManagedSourceResult>
   inspectManagedSource?: () => Promise<ManagedSourcePlan>
   machineConfig?: MachineSupervisorConfig | null
@@ -183,9 +207,8 @@ export async function runSupervisorTui(
     )
   }
 
-  let context = await (
-    dependencies.resolveContext
-    ?? ((flags) => {
+  const resolveContext = dependencies.resolveContext
+    ?? ((flags: TuiLaunchFlags) => {
       if (dependencies.machineConfig || dependencies.instanceConfig) {
         return resolveLaunchContext({
           flags,
@@ -196,7 +219,31 @@ export async function runSupervisorTui(
       }
       return resolveStoredLaunchContext(flags, { env: dependencies.env })
     })
-  )(launchFlags)
+  let context: ResolvedLaunchContext
+  let startupNotice: string | undefined
+  try {
+    context = await resolveContext(launchFlags)
+  } catch (error: unknown) {
+    const env = dependencies.env ?? process.env
+    const explicitSelection = launchFlags.instance !== undefined
+      || launchFlags.home !== undefined
+      || env['OPENALICE_INSTANCE'] !== undefined
+      || env['OPENALICE_HOME'] !== undefined
+    const customResolution = dependencies.resolveContext !== undefined
+      || dependencies.machineConfig !== undefined
+      || dependencies.instanceConfig !== undefined
+    if (
+      explicitSelection
+      || customResolution
+      || !isStoredHomeUnavailableError(error)
+    ) {
+      throw error
+    }
+    context = await resolveAvailableStoredLaunchContext({
+      env: dependencies.env,
+    })
+    startupNotice = storedHomeRecoveryNotice(error, context.instance)
+  }
   let services = createServices(dependencies, context)
   let runtime: RuntimeSummary | null = null
   let diagnostic: string | undefined
@@ -219,14 +266,17 @@ export async function runSupervisorTui(
   let actionRunning = false
   let sourcePromptActive = false
   let settingsActive = false
+  let instancesActive = false
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
+  let closeInstances: (() => void) | null = null
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
     runtime,
     context,
     diagnostic,
+    notice: startupNotice,
   }, {
     onAction: (action) => {
       void requestAction(action)
@@ -236,6 +286,9 @@ export async function runSupervisorTui(
     },
     onSettings: () => {
       void openSettings()
+    },
+    onInstances: () => {
+      void openInstances()
     },
     onRequestManagedSource: () => {
       void requestManagedSource()
@@ -259,6 +312,27 @@ export async function runSupervisorTui(
   })
   const loadInstanceConfig = dependencies.loadInstanceConfig
     ?? readInstanceLaunchConfig
+  const loadInstanceRegistry = dependencies.loadInstanceRegistry
+    ?? readSupervisorInstanceRegistry
+  const selectInstance = dependencies.selectInstance ?? (async (
+    currentContext,
+    name,
+  ) => {
+    await persistSelectedSupervisorInstance(currentContext, name)
+    return resolveStoredLaunchContext(launchFlags, {
+      env: dependencies.env,
+    })
+  })
+  const createInstance = dependencies.createInstance ?? (async (
+    currentContext,
+    name,
+    home,
+  ) => {
+    await createSupervisorInstance(currentContext, name, home)
+    return resolveStoredLaunchContext(launchFlags, {
+      env: dependencies.env,
+    })
+  })
   const prepareManaged = dependencies.prepareManagedSource
     ?? (() => prepareManagedSource())
   const inspectManaged = dependencies.inspectManagedSource
@@ -307,7 +381,7 @@ export async function runSupervisorTui(
           prepare: true,
           rebuild: false,
           checkUpdates: context.updateChecks,
-          port: context.port,
+          port: runtimeStartPort(context),
           homeRoot,
           appDir: context.appDir ?? screen.snapshot.runtime?.provider?.root,
           waitMs: 120_000,
@@ -329,7 +403,7 @@ export async function runSupervisorTui(
           prepare: true,
           rebuild: false,
           checkUpdates: context.updateChecks,
-          port: context.port,
+          port: runtimeStartPort(context),
           homeRoot,
           appDir,
           waitMs: 120_000,
@@ -431,7 +505,12 @@ export async function runSupervisorTui(
   }
 
   function openSourcePrompt(reason?: string): void {
-    if (sourcePromptActive || settingsActive || actionRunning) return
+    if (
+      sourcePromptActive
+      || settingsActive
+      || instancesActive
+      || actionRunning
+    ) return
     const source = context.provenance.appDir.source
     if (source === 'environment' || source === 'cli-flag') {
       screen.update({
@@ -519,7 +598,12 @@ export async function runSupervisorTui(
   }
 
   async function openSettings(): Promise<void> {
-    if (settingsActive || sourcePromptActive || actionRunning) return
+    if (
+      settingsActive
+      || sourcePromptActive
+      || instancesActive
+      || actionRunning
+    ) return
     actionRunning = true
     screen.update({
       busy: 'Loading instance settings',
@@ -563,9 +647,10 @@ export async function runSupervisorTui(
       initialValue: string,
       validate: (value: string) => string | undefined,
       done: (selectedValue?: string) => void,
+      initialDetail = 'Leave blank to inherit from the next lower-priority layer.',
     ): Component => {
       const input = new (class extends piTui.Input {
-        detail = 'Leave blank to inherit from the next lower-priority layer.'
+        detail = initialDetail
 
         setDetail(next: string): void {
           this.detail = next
@@ -620,7 +705,11 @@ export async function runSupervisorTui(
         description: homeLocked
           ?? (
             runtimeStopped
-              ? 'Complete state root for this instance. Blank removes the instance override.'
+              ? (
+                  context.instance === 'default'
+                    ? 'Complete state root for this instance. Blank removes the instance override.'
+                    : 'Complete state root for this named instance. Named instances require a separate explicit home.'
+                )
               : 'Stop the selected Runtime before changing its complete home.'
           ),
       }
@@ -628,8 +717,15 @@ export async function runSupervisorTui(
         homeItem.submenu = (_currentValue, done) => inputSubmenu(
           'Set complete home',
           stored.home ?? '',
-          () => undefined,
+          (value) => (
+            context.instance !== 'default' && value === ''
+              ? 'Named instances require an explicit complete home.'
+              : undefined
+          ),
           done,
+          context.instance === 'default'
+            ? 'Leave blank to inherit from the next lower-priority layer.'
+            : 'Named instances require a separate explicit complete home.',
         )
       }
       const portItem: SettingItem = {
@@ -637,7 +733,7 @@ export async function runSupervisorTui(
         label: 'Web port',
         currentValue: portLocked
           ? `${context.port} · locked`
-          : inheritedSettingValue(stored.port, context.port),
+          : portSettingValue(stored.port, context),
         description: portLocked
           ?? (
             runtimeStopped
@@ -799,6 +895,281 @@ export async function runSupervisorTui(
     overlay.focus()
   }
 
+  async function openInstances(): Promise<void> {
+    if (
+      instancesActive
+      || sourcePromptActive
+      || settingsActive
+      || actionRunning
+    ) return
+    actionRunning = true
+    screen.update({
+      busy: 'Loading instances',
+      notice: undefined,
+      diagnostic: undefined,
+    })
+    let registry: SupervisorInstanceRegistry
+    try {
+      registry = await loadInstanceRegistry(context)
+    } catch (error: unknown) {
+      screen.update({
+        diagnostic: `Could not load instances: ${safeError(error)}`,
+      })
+      return
+    } finally {
+      actionRunning = false
+      if (active) screen.update({ busy: undefined })
+    }
+    if (!active) return
+
+    instancesActive = true
+    let changing = false
+    let message = 'Selecting an instance also makes it the next bare-start default.'
+    const lock = instanceSelectionOverrideLock(context)
+    if (lock) message = lock
+    const createValue = '__create_instance__'
+    const visibleInstances = registry.instances.some(
+      (entry) => entry.name === context.instance,
+    )
+      ? registry.instances
+      : [
+          ...registry.instances,
+          {
+            name: context.instance,
+            home: context.home,
+            port: context.port,
+            portAutomatic: context.provenance.port.source === 'default',
+            isDefault: false,
+          },
+        ]
+    const items: SelectItem[] = visibleInstances.map((entry) => ({
+      value: entry.name,
+      label: [
+        entry.name,
+        entry.name === context.instance ? 'current' : undefined,
+        entry.isDefault ? 'default' : undefined,
+      ].filter(Boolean).join(' · '),
+      description: `${entry.home} · Web ${entry.portAutomatic ? `auto from ${entry.port}` : entry.port}`,
+    }))
+    if (!lock) {
+      items.push({
+        value: createValue,
+        label: '+ Create instance…',
+        description: 'Register a separate complete home and select it.',
+      })
+    }
+
+    const theme: SelectListTheme = {
+      selectedPrefix: (text) => text,
+      selectedText: (text) => text,
+      description: (text) => text,
+      scrollInfo: (text) => text,
+      noMatch: (text) => text,
+    }
+    const list = new piTui.SelectList(items, 8, theme, {
+      minPrimaryColumnWidth: 20,
+      maxPrimaryColumnWidth: 32,
+    })
+    const selectedIndex = items.findIndex(
+      (item) => item.value === context.instance,
+    )
+    list.setSelectedIndex(Math.max(0, selectedIndex))
+    let component: Component = list
+
+    const setMessage = (next: string) => {
+      message = next
+      ui.requestRender()
+    }
+    const close = (notice = 'Instance selection closed.') => {
+      if (!instancesActive) return
+      instancesActive = false
+      closeInstances = null
+      overlay.hide()
+      ui.setShowHardwareCursor(false)
+      screen.update({ notice })
+    }
+    const showList = () => {
+      ui.setShowHardwareCursor(false)
+      component = list
+      setMessage(lock ?? 'Selecting an instance also makes it the next bare-start default.')
+    }
+    const activateContext = async (
+      operation: () => Promise<ResolvedLaunchContext>,
+      notice: (next: ResolvedLaunchContext) => string,
+    ) => {
+      if (changing) return
+      changing = true
+      actionRunning = true
+      setMessage('Switching instance…')
+      try {
+        const next = await operation()
+        context = next
+        services = createServices(dependencies, context)
+        screen.update({
+          context,
+          runtime: null,
+          diagnostic: undefined,
+        })
+        close(notice(next))
+      } catch (error: unknown) {
+        setMessage(`Could not switch instance: ${safeError(error)}`)
+      } finally {
+        actionRunning = false
+        changing = false
+        await refreshRuntime()
+      }
+    }
+    const showCreateHomeInput = (name: string) => {
+      const defaultHome = registry.instances.find(
+        (entry) => entry.name === 'default',
+      )?.home ?? context.home
+      const suggestedHome = join(
+        dirname(defaultHome),
+        `.openalice-${name}`,
+      )
+      const input = new (class extends piTui.Input {
+        detail = 'Use a separate complete home. An empty directory is prepared when registered.'
+
+        setDetail(next: string): void {
+          this.detail = next
+          this.invalidate()
+          ui.requestRender()
+        }
+
+        override render(width: number): string[] {
+          return [
+            `Create instance · ${name}`,
+            '',
+            'Complete home',
+            ...super.render(width),
+            '',
+            sanitize(this.detail),
+            '',
+            'Enter  Create and select · Esc  Back',
+          ]
+        }
+      })()
+      input.setValue(suggestedHome)
+      input.focused = true
+      ui.setShowHardwareCursor(true)
+      input.onEscape = () => {
+        input.focused = false
+        showList()
+      }
+      input.onSubmit = (value) => {
+        const home = value.trim()
+        if (!home) {
+          input.setDetail('Enter a complete home for this instance.')
+          return
+        }
+        void activateContext(
+          () => createInstance(context, name, home),
+          (next) => `Created and selected instance ${next.instance}.`,
+        )
+      }
+      component = input
+      setMessage('The new instance owns only its registry entry; its data is never copied or deleted.')
+    }
+    const showCreateNameInput = () => {
+      const input = new (class extends piTui.Input {
+        detail = 'Use a short lowercase name such as research or paper.'
+
+        setDetail(next: string): void {
+          this.detail = next
+          this.invalidate()
+          ui.requestRender()
+        }
+
+        override render(width: number): string[] {
+          return [
+            'Create instance',
+            '',
+            'Instance name',
+            ...super.render(width),
+            '',
+            sanitize(this.detail),
+            '',
+            'Enter  Continue · Esc  Back',
+          ]
+        }
+      })()
+      input.focused = true
+      ui.setShowHardwareCursor(true)
+      input.onEscape = () => {
+        input.focused = false
+        showList()
+      }
+      input.onSubmit = (value) => {
+        const name = value.trim()
+        const validation = validateSupervisorInstanceName(name)
+        if (validation) {
+          input.setDetail(validation)
+          return
+        }
+        if (registry.instances.some((entry) => entry.name === name)) {
+          input.setDetail(`Instance "${name}" is already registered.`)
+          return
+        }
+        input.focused = false
+        showCreateHomeInput(name)
+      }
+      component = input
+      setMessage('Create a named instance without leaving the Supervisor.')
+    }
+
+    list.onCancel = () => close()
+    list.onSelect = (item) => {
+      if (item.value === createValue) {
+        showCreateNameInput()
+        return
+      }
+      if (lock) {
+        setMessage(lock)
+        return
+      }
+      if (
+        item.value === context.instance
+        && item.value === registry.defaultInstance
+      ) {
+        close(`Instance ${context.instance} is already selected.`)
+        return
+      }
+      void activateContext(
+        () => selectInstance(context, item.value),
+        (next) => `Selected instance ${next.instance}; future bare starts use it.`,
+      )
+    }
+
+    const panel = new (class implements Component {
+      render(width: number): string[] {
+        return [
+          'OpenAlice instances',
+          '─'.repeat(Math.max(1, width)),
+          '',
+          ...component.render(width),
+          '',
+          sanitize(message),
+        ]
+      }
+
+      handleInput(data: string): void {
+        if (!changing) component.handleInput?.(data)
+      }
+
+      invalidate(): void {
+        component.invalidate()
+      }
+    })()
+    const overlay = ui.showOverlay(panel, {
+      width: '92%',
+      maxHeight: '90%',
+      anchor: 'center',
+      margin: 1,
+    })
+    closeInstances = () => close()
+    overlay.focus()
+  }
+
   async function discoverUpdateInBackground(): Promise<void> {
     if (!context.updateChecks) return
     try {
@@ -829,6 +1200,7 @@ export async function runSupervisorTui(
       clearInterval(poll)
       closeSourcePrompt?.()
       closeSettings?.()
+      closeInstances?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -837,7 +1209,7 @@ export async function runSupervisorTui(
     }
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
-      if (sourcePromptActive || settingsActive) {
+      if (sourcePromptActive || settingsActive || instancesActive) {
         if (piTui.matchesKey(data, 'ctrl+c')) {
           finish()
           return { consume: true }
@@ -894,6 +1266,7 @@ export class SupervisorScreen implements Component {
   private readonly onAction?: (action: SupervisorAction) => void
   private readonly onConfigureSource?: () => void
   private readonly onSettings?: () => void
+  private readonly onInstances?: () => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
@@ -904,6 +1277,7 @@ export class SupervisorScreen implements Component {
       onAction?: (action: SupervisorAction) => void
       onConfigureSource?: () => void
       onSettings?: () => void
+      onInstances?: () => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
       requestRender?: () => void
@@ -913,6 +1287,7 @@ export class SupervisorScreen implements Component {
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
     this.onSettings = callbacks.onSettings
+    this.onInstances = callbacks.onInstances
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
@@ -967,6 +1342,10 @@ export class SupervisorScreen implements Component {
     }
     if (matchesKey(data, 'p')) {
       this.onSettings?.()
+      return true
+    }
+    if (matchesKey(data, 'i')) {
+      this.onInstances?.()
       return true
     }
     if (matchesKey(data, 'm')) {
@@ -1048,7 +1427,7 @@ export class SupervisorScreen implements Component {
           lines.push(`Uptime: ${formatDuration(runtime?.uptimeSeconds ?? 0)}`)
         }
         if (this.snapshot.context) {
-          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatProvenance(this.snapshot.context.provenance.port)}`)
+          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
           lines.push(`Source: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
         }
       }
@@ -1182,6 +1561,7 @@ function renderHelp(): string[] {
     'x  Stop (confirmation required)   r  Restart (confirmation required)',
     'l  Bounded redacted logs          d  Read-only Doctor',
     'u  Check for product update       ?  Toggle this help',
+    'i  Select or create an instance',
     'p  Configure selected instance settings',
     'm  Prepare installer-managed source and start',
     'c  Choose and remember this instance\'s source checkout',
@@ -1219,8 +1599,8 @@ function renderConfirmation(
 
 function actionBar(runtime: RuntimeSummary | null, width: number): string[] {
   const primary = runtime?.class === 'absent'
-    ? 's Start · p Settings · m Managed · c Source'
-    : 'o Open · p Settings · r Restart · x Stop'
+    ? 's Start · i Instances · p Settings · m Managed · c Source'
+    : 'o Open · i Instances · p Settings · r Restart · x Stop'
   const secondary = 'd Doctor · l Logs · u Update · ? Help'
   const actions = `${primary} · ${secondary}`
   if (actions.length <= width) return [actions]
@@ -1269,6 +1649,14 @@ function formatUpdateNotice(update: UpdateResult): string {
   return update.message ?? 'Automatic update is unavailable for this install channel.'
 }
 
+function runtimeStartPort(
+  context: ResolvedLaunchContext,
+): number | undefined {
+  return context.provenance.port.source === 'default'
+    ? undefined
+    : context.port
+}
+
 function formatOwner(runtime: RuntimeSummary | null): string {
   if (!runtime?.owner) return 'none'
   const pid = runtime.owner.pid === undefined ? '' : ` pid ${runtime.owner.pid}`
@@ -1293,6 +1681,12 @@ function formatDuration(seconds: number): string {
 
 function formatProvenance(value: { source: string; detail: string }): string {
   return value.source === 'default' ? '(default)' : `(${value.detail})`
+}
+
+function formatPortResolution(context: ResolvedLaunchContext): string {
+  return context.provenance.port.source === 'default'
+    ? `(automatic from ${context.port})`
+    : formatProvenance(context.provenance.port)
 }
 
 type EditableSettingField = 'home' | 'port' | 'updateChecks'
@@ -1322,6 +1716,18 @@ function settingOverrideLock(
   return `Locked by ${provenance.detail}. Change that higher-priority override and reopen the Supervisor.`
 }
 
+function instanceSelectionOverrideLock(
+  context: ResolvedLaunchContext,
+): string | undefined {
+  const instanceLock = settingOverrideLock(context.provenance.instance)
+  if (instanceLock) return `Instance selection is read-only. ${instanceLock}`
+  const homeLock = settingOverrideLock(context.provenance.home)
+  if (homeLock) {
+    return `Instance selection is read-only while this session's complete home is fixed. ${homeLock}`
+  }
+  return undefined
+}
+
 function inheritedSettingValue(
   stored: string | number | undefined,
   resolved: string | number,
@@ -1329,6 +1735,16 @@ function inheritedSettingValue(
   return stored === undefined
     ? `${INHERIT_SETTING} → ${resolved}`
     : String(stored)
+}
+
+function portSettingValue(
+  stored: number | undefined,
+  context: ResolvedLaunchContext,
+): string {
+  if (stored !== undefined) return String(stored)
+  return context.provenance.port.source === 'default'
+    ? `${INHERIT_SETTING} → automatic from ${context.port}`
+    : `${INHERIT_SETTING} → ${context.port}`
 }
 
 function booleanSettingValue(stored: boolean | undefined): string {
@@ -1349,7 +1765,7 @@ function settingItemValue(
   if (id === 'port') {
     return settingOverrideLock(context.provenance.port)
       ? `${context.port} · locked`
-      : inheritedSettingValue(stored.port, context.port)
+      : portSettingValue(stored.port, context)
   }
   if (id === 'updateChecks') {
     return settingOverrideLock(context.provenance.updateChecks)
@@ -1373,6 +1789,20 @@ function validatePortSetting(value: string): string | undefined {
 
 function safeError(error: unknown): string {
   return sanitize(error instanceof Error ? error.message : String(error))
+}
+
+function storedHomeRecoveryNotice(
+  error: unknown,
+  fallbackInstance: string,
+): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const match = message.match(/for instance "([^"]+)" (is missing|is unavailable or not writable)/)
+  const unavailable = match
+    ? `Instance "${match[1]}" ${match[2]}.`
+    : 'The remembered instance home is unavailable.'
+  return sanitize(
+    `${unavailable} Using "${fallbackInstance}"; press i Instances to recover.`,
+  )
 }
 
 function sanitize(value: string): string {

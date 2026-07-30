@@ -152,6 +152,20 @@ describe('OpenAlice local Runtime launcher', () => {
     expect(runtimeEnv).not.toHaveProperty('OPENALICE_TAKEOVER')
   })
 
+  it('leaves the Web port unpinned when the Supervisor selected an automatic port', () => {
+    const runtimeEnv = buildLocalRuntimeEnv({
+      OPENALICE_WEB_PORT: '41000',
+    }, {
+      appDir: '/tmp/OpenAlice',
+      homeRoot: '/tmp/alice-home',
+      nodeBinary: '/test/node',
+      port: undefined,
+      takeover: false,
+    })
+
+    expect(runtimeEnv).not.toHaveProperty('OPENALICE_WEB_PORT')
+  })
+
   it('isolates managed Pi for every local Guardian launch path', () => {
     const runtimeEnv = buildLocalRuntimeEnv({
       OPENALICE_MANAGED_PI_PATH: '/managed/pi/cli.js',

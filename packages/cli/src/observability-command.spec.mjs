@@ -97,6 +97,46 @@ describe('observability command presenter', () => {
       expect.any(Object),
     )
   })
+
+  it('loads a TUI-registered named home for logs and Doctor', async () => {
+    const readLogs = vi.fn(async () => ({
+      home: '/srv/openalice-research',
+      component: 'runtime',
+      lineLimit: 200,
+      truncated: false,
+      files: [],
+      entries: [],
+    }))
+    await runObservabilityCommand(
+      'logs',
+      parseObservabilityArgs('logs', ['--instance', 'research']),
+      {
+        env: {},
+        homeDir: '/home/alice',
+        platform: 'linux',
+        readSupervisorConfig: async () => ({
+          schemaVersion: 1,
+          instances: {
+            research: {
+              name: 'research',
+              home: '/srv/openalice-research',
+            },
+          },
+        }),
+        checkStoredHome: async () => {},
+        readLogs,
+        stdout: sink(),
+      },
+    )
+
+    expect(readLogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instance: 'research',
+        homeRoot: '/srv/openalice-research',
+      }),
+      expect.any(Object),
+    )
+  })
 })
 
 function sink() {

@@ -1,8 +1,8 @@
 import { parseLocalStartArgs } from './local-start.mjs'
 import {
   buildManagedPiEnv,
-  resolveLaunchContext,
 } from './launch-context.ts'
+import { resolveStoredLaunchContext } from './supervisor-config.ts'
 import {
   inspectRuntime,
   lifecycleError,
@@ -89,19 +89,52 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
   const stdout = dependencies.stdout ?? process.stdout
   const stderr = dependencies.stderr ?? process.stderr
   try {
+    const startAction = action === 'up' || action === 'run'
     const context = await (
       dependencies.resolveContext
-      ?? ((flags) => resolveLaunchContext({
-        flags,
+      ?? ((flags) => resolveStoredLaunchContext(flags, {
         env: dependencies.env,
+        cwd: dependencies.cwd,
+        homeDir: dependencies.homeDir,
+        platform: dependencies.platform,
+        readConfig: dependencies.readSupervisorConfig,
+        checkStoredHome: dependencies.checkStoredHome,
       }))
     )({
       instance: options.instance ?? undefined,
       home: options.homeRoot ?? undefined,
+      ...(startAction && options._appDirSpecified
+        ? { appDir: options.appDir ?? undefined }
+        : {}),
+      ...(startAction && options._portSpecified
+        ? { port: options.port }
+        : {}),
+      ...(startAction && options._updateChecksSpecified
+        ? { updateChecks: options.checkUpdates }
+        : {}),
     })
+    const {
+      _appDirSpecified,
+      _portSpecified,
+      _updateChecksSpecified,
+      ...publicOptions
+    } = options
     const resolvedOptions = {
-      ...options,
+      ...publicOptions,
       homeRoot: context.home,
+      ...(startAction
+        ? {
+            appDir: _appDirSpecified
+              ? options.appDir
+              : context.appDir,
+            port: _portSpecified
+              ? options.port
+              : runtimeStartPort(context),
+            checkUpdates: _updateChecksSpecified
+              ? options.checkUpdates
+              : context.updateChecks,
+          }
+        : {}),
     }
     const runtimeDependencies = {
       ...dependencies,
@@ -191,7 +224,7 @@ Options:
   --instance <name>  Select a named complete-home instance
   --app-dir <path>   OpenAlice checkout (default: current directory or parent)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
-  --port <port>      Local Web port (default: 47331)
+  --port <port>      Pin the local Web port (default: automatic from 47331)
   --log <path>       Runtime log (default: <home>/logs/server.log)
   --rebuild          Reinstall dependencies and rebuild server artifacts
   --skip-prepare     Fail instead of installing/building missing artifacts
@@ -214,7 +247,7 @@ Options:
   --instance <name>  Select a named complete-home instance
   --app-dir <path>   OpenAlice checkout (default: current directory or parent)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
-  --port <port>      Local Web port (default: 47331)
+  --port <port>      Pin the local Web port (default: automatic from 47331)
   --rebuild          Reinstall dependencies and rebuild server artifacts
   --skip-prepare     Fail instead of installing/building missing artifacts
   --takeover         Replace the recorded Guardian owner tree
@@ -326,6 +359,8 @@ function parseStartArgs(action, argv) {
   let openRequested = false
   let noOpenRequested = false
   let logFile = null
+  let portSpecified = false
+  let updateChecksSpecified = false
   const startArgv = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -345,6 +380,8 @@ function parseStartArgs(action, argv) {
       continue
     }
     if (arg === '--no-open') noOpenRequested = true
+    if (arg === '--port') portSpecified = true
+    if (arg === '--no-update-check') updateChecksSpecified = true
     if (arg === '--log') {
       if (action === 'run') throw usageError('openalice run does not support --log')
       if (logFile !== null) throw usageError('--log may only be provided once')
@@ -362,11 +399,20 @@ function parseStartArgs(action, argv) {
   }
   return {
     ...parsed,
+    _appDirSpecified: parsed.appDir !== null,
+    _portSpecified: portSpecified,
+    _updateChecksSpecified: updateChecksSpecified,
     instance,
     openBrowser: action === 'up' && openRequested,
     json,
     logFile,
   }
+}
+
+function runtimeStartPort(context) {
+  return context.provenance.port.source === 'default'
+    ? undefined
+    : context.port
 }
 
 function formatStartedRuntime(result) {
