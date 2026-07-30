@@ -186,8 +186,22 @@ export function OverviewCard({
         </div>
 
         {/* Footer — only rendered when there's something to show */}
-        {(overrideAgents.length > 0 || lastCommit || (w.template && w.spawnedFromVersion)) && (
+        {(overrideAgents.length > 0 || lastCommit || w.harnessSource || (w.template && w.spawnedFromVersion)) && (
           <div className="border-t border-border pt-3 space-y-1.5">
+            {w.harnessSource && (
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />
+                <span
+                  className="truncate"
+                  title={`${w.harnessSource.version} · ${w.harnessSource.commit}`}
+                >
+                  {t('workspace.fromHarnessSource', {
+                    version: w.harnessSource.version,
+                    commit: w.harnessSource.commit.slice(0, 12),
+                  })}
+                </span>
+              </div>
+            )}
             {w.template && w.spawnedFromVersion && (
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />

@@ -304,9 +304,23 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const quickChat = useCallback(
-    async (prompt: string, agent?: string, credentialSlug?: string, targetWsId?: string): Promise<string> => {
+    async (
+      prompt: string,
+      agent?: string,
+      credentialSlug?: string,
+      targetWsId?: string,
+      template?: 'chat' | 'auto-quant-v2',
+      sourceVersion?: string,
+    ): Promise<string> => {
       await ensureTerminalAppearancePublished()
-      const { workspace, session } = await apiQuickChat(prompt, agent, credentialSlug, targetWsId)
+      const { workspace, session } = await apiQuickChat(
+        prompt,
+        agent,
+        credentialSlug,
+        targetWsId,
+        template,
+        sourceVersion,
+      )
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
         id: session.sessionId,
@@ -341,7 +355,11 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       })
       openOrFocus({
         kind: 'workspace',
-        params: { wsId: workspace.id, sessionId: session.sessionId, source: 'chat' },
+        params: {
+          wsId: workspace.id,
+          sessionId: session.sessionId,
+          source: workspace.template === 'auto-quant-v2' ? 'auto-quant' : 'chat',
+        },
       })
       void refresh()
       return workspace.id

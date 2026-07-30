@@ -13,7 +13,7 @@
  * a data-model change.
  */
 
-export type WorkspaceSource = 'chat'
+export type WorkspaceSource = 'chat' | 'auto-quant'
 export type FileViewerSource = WorkspaceSource | 'tracked'
 
 /** One source of truth for the Dev sidebar and `/dev/:tab` URL contract. */
@@ -49,6 +49,7 @@ export type ViewSpec =
   | { kind: 'inbox';               params: Record<string, never> }
   | { kind: 'tracked';             params: Record<string, never> }
   | { kind: 'chat-landing';        params: { targetWsId?: string } }
+  | { kind: 'auto-quant-landing';  params: { targetWsId?: string } }
   | { kind: 'workspace-manager';   params: { sessionId?: string } }
   | {
       kind: 'file-viewer'
@@ -73,6 +74,7 @@ export type ViewKind = ViewSpec['kind']
  */
 export type ActivitySection =
   | 'chat'
+  | 'auto-quant'
   | 'inbox'
   | 'tracked'
   | 'workspaces'

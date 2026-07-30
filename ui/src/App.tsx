@@ -16,7 +16,7 @@ import { useLocale } from './i18n/useLocale'
  * Each maps to one or more tab kinds via tabs/registry.ts (defaultSpecForActivity).
  */
 export type Page =
-  | 'chat' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
+  | 'chat' | 'auto-quant' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
   | 'issue'
   | 'trading-as-git'
   | 'connectors'

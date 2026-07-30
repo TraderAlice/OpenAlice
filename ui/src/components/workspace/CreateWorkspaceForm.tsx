@@ -65,11 +65,20 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
 
   const effectiveTemplate = presetTemplate ?? selected
   const selectedMeta = templates.find((t) => t.name === effectiveTemplate)
+  const [sourceVersion, setSourceVersion] = useState('')
+  const effectiveSourceVersion = selectedMeta?.source
+    ? sourceVersion || selectedMeta.source.defaultVersion
+    : undefined
 
   const create = useCreateWorkspace({
     template: effectiveTemplate,
+    sourceVersion: effectiveSourceVersion,
     onCreated: props.onCreated,
   })
+
+  useEffect(() => {
+    setSourceVersion(selectedMeta?.source?.defaultVersion ?? '')
+  }, [effectiveTemplate, selectedMeta?.source?.defaultVersion])
 
   // Tag auto-derivation: `<template>-<date>[-n]`, recomputed when the
   // template changes — until the user types into the field, which makes
@@ -153,6 +162,34 @@ export function CreateWorkspaceForm(props: CreateWorkspaceFormProps): ReactEleme
         />
         <p className={HINT}>{TAG_HINT}</p>
       </div>
+
+      {selectedMeta?.source && (
+        <div className="space-y-1.5">
+          <label htmlFor="cw-source-version" className={LABEL}>
+            {t('createWorkspace.sourceVersionLabel')}
+          </label>
+          <select
+            id="cw-source-version"
+            value={effectiveSourceVersion}
+            onChange={(e) => setSourceVersion(e.target.value)}
+            disabled={create.creating}
+            className={FIELD}
+          >
+            {selectedMeta.source.versions.map((entry) => (
+              <option key={entry.version} value={entry.version}>
+                {entry.version}
+              </option>
+            ))}
+          </select>
+          <p className={HINT}>
+            {t('createWorkspace.sourceVersionHint', {
+              commit: selectedMeta.source.versions
+                .find((entry) => entry.version === effectiveSourceVersion)
+                ?.commit.slice(0, 12) ?? '',
+            })}
+          </p>
+        </div>
+      )}
 
       {create.error && <div role="alert" className="text-[12px] text-destructive">{create.error}</div>}
 

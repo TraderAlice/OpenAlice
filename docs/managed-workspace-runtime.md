@@ -445,6 +445,13 @@ Do not add new Bash bootstraps for built-in templates. `bootstrap.sh` remains
 a compatibility fallback for third-party templates and only works where a
 POSIX shell exists.
 
+A source-backed Harness receives only repository, release, and exact commit
+values approved by its template catalog. AutoQuant V2 verifies that tuple,
+copies the exact tree, removes upstream history/remotes, starts a fresh local
+research branch, and writes `.alice/harness-source.json`. Bootstrap does not
+install Python or quantitative dependencies; the native Coding Agent owns
+environment setup and later research commits inside the Workspace.
+
 OpenAlice copies Workspace skills into two canonical project paths:
 
 - `.claude/skills/` for Claude Code;

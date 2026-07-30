@@ -54,8 +54,9 @@ export function resolveChatWorkspaceTarget(
   workspaces: readonly Workspace[],
   explicitWorkspaceId: string | null,
   recentWorkspaceId: string | null,
+  templateName = 'chat',
 ): Workspace | null {
-  const chats = workspaces.filter((workspace) => workspace.template === 'chat')
+  const chats = workspaces.filter((workspace) => workspace.template === templateName)
   const explicit = explicitWorkspaceId
     ? chats.find((workspace) => workspace.id === explicitWorkspaceId)
     : undefined
@@ -76,10 +77,39 @@ export function resolveChatWorkspaceTarget(
  * way — the bottom row shows the workspace type (Chat) and a small runtime
  * picker for agent CLIs. Shell is not an agent runtime and is excluded here.
  */
-export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+type HarnessLandingMode = 'chat' | 'auto-quant'
+
+function HarnessLandingPage({
+  spec,
+  mode,
+}: {
+  spec: { params: { targetWsId?: string } }
+  mode: HarnessLandingMode
+}) {
   const { t } = useTranslation()
-  const { quickChat, agents, workspaces, defaultAgent, setDefaultAgent, openAgentConfig } = useWorkspaces()
+  const {
+    quickChat,
+    agents,
+    workspaces,
+    templates,
+    defaultAgent,
+    setDefaultAgent,
+    openAgentConfig,
+  } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const templateName = mode === 'auto-quant' ? 'auto-quant-v2' : 'chat'
+  const landingKind = mode === 'auto-quant' ? 'auto-quant-landing' : 'chat-landing'
+  const copyKey = mode === 'auto-quant' ? 'autoQuantLanding' : 'chatLanding'
+  const sourceTemplate = templates.find((template) => template.name === templateName)
+  const [sourceVersion, setSourceVersion] = useState<string | undefined>(
+    sourceTemplate?.source?.defaultVersion,
+  )
+
+  useEffect(() => {
+    if (sourceVersion === undefined && sourceTemplate?.source?.defaultVersion) {
+      setSourceVersion(sourceTemplate.source.defaultVersion)
+    }
+  }, [sourceTemplate?.source?.defaultVersion, sourceVersion])
 
   // Targeted launch: the chat sidebar's Workspace row and per-workspace "+"
   // route here with a targetWsId — "Ask Alice, but spawn the session in THIS
@@ -92,20 +122,21 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const workspaceBoxRef = useRef<HTMLDivElement>(null)
   const activeWorkspaceOptionRef = useRef<HTMLButtonElement>(null)
-  const selectedChatWorkspace = useMemo(
+  const selectedHarnessWorkspace = useMemo(
     () => resolveChatWorkspaceTarget(
       workspaces,
       targetWsId ?? selectedWorkspaceId,
-      launchPreferences.recentChatWorkspaceId,
+      mode === 'chat' ? launchPreferences.recentChatWorkspaceId : null,
+      templateName,
     ),
-    [workspaces, targetWsId, selectedWorkspaceId, launchPreferences.recentChatWorkspaceId],
+    [workspaces, templateName, targetWsId, selectedWorkspaceId, mode, launchPreferences.recentChatWorkspaceId],
   )
-  const workspaceTarget = targetWs ?? selectedChatWorkspace
+  const workspaceTarget = targetWs ?? selectedHarnessWorkspace
   const chatWorkspaceOptions = useMemo(
     () => workspaces
-      .filter((workspace) => workspace.template === 'chat')
+      .filter((workspace) => workspace.template === templateName)
       .sort((a, b) => workspaceActivityMs(b) - workspaceActivityMs(a)),
-    [workspaces],
+    [workspaces, templateName],
   )
 
   // The selectable agent runtimes = the agent CLIs (the bare shell has no agent
@@ -203,8 +234,10 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
         effectiveAgent,
         launchConfig.launchCredentialSlug,
         effectiveTargetWorkspaceId,
+        templateName,
+        workspaceTarget ? undefined : sourceVersion,
       )
-      launchPreferences.adoptRecentChatWorkspace(workspaceId)
+      if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')
     } catch (err) {
       // Backend says no compatible credential — bounce to the provider settings.
@@ -249,7 +282,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
           {targetWs ? (
             <>
               <h1 className="text-xl md:text-2xl font-semibold text-foreground">
-                {t('chatLanding.targetHeading')}
+                {t(`${copyKey}.targetHeading`)}
               </h1>
               <div className="flex items-center justify-center gap-2 pt-1">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 pl-2.5 pr-1.5 py-1 text-[12.5px] font-medium text-primary">
@@ -257,9 +290,9 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   {targetWs.tag}
                   <button
                     type="button"
-                    onClick={() => openOrFocus({ kind: 'chat-landing', params: {} })}
-                    aria-label={t('chatLanding.clearTarget')}
-                    title={t('chatLanding.clearTarget')}
+                    onClick={() => openOrFocus({ kind: landingKind, params: {} })}
+                    aria-label={t(`${copyKey}.clearTarget`)}
+                    title={t(`${copyKey}.clearTarget`)}
                     className="oa-icon-action ml-0.5 rounded-full p-0.5 text-primary/70 hover:text-primary hover:bg-primary/20 transition-colors"
                   >
                     <X className="w-3 h-3" />
@@ -269,8 +302,8 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             </>
           ) : (
             <>
-              <h1 className="text-[19px] md:text-2xl font-semibold text-foreground leading-tight">{t('chatLanding.heading')}</h1>
-              <p className="text-[13px] md:text-sm text-muted-foreground leading-relaxed">{t('chatLanding.subheading')}</p>
+              <h1 className="text-[19px] md:text-2xl font-semibold text-foreground leading-tight">{t(`${copyKey}.heading`)}</h1>
+              <p className="text-[13px] md:text-sm text-muted-foreground leading-relaxed">{t(`${copyKey}.subheading`)}</p>
             </>
           )}
         </div>
@@ -287,7 +320,7 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={t('chatLanding.placeholder')}
+            placeholder={t(`${copyKey}.placeholder`)}
             rows={3}
             autoFocus
             className="w-full max-h-[40vh] min-h-[92px] resize-none bg-transparent px-2 py-1.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70 md:min-h-[72px]"
@@ -304,14 +337,14 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   disabled={chatWorkspaceOptions.length === 0 || targetWs !== undefined}
                   aria-haspopup="menu"
                   aria-expanded={workspaceMenuOpen}
-                  aria-label={t('chatLanding.selectWorkspace')}
+                  aria-label={t(`${copyKey}.selectWorkspace`)}
                   className="oa-pressable inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default"
                 >
                   <MessageSquare className="w-3 h-3 shrink-0" />
                   <span className="truncate">
                     {workspaceTarget
                       ? workspaceDisplayTitle(workspaceTarget)
-                      : t('chatLanding.newWorkspaceTarget')}
+                      : t(`${copyKey}.newWorkspaceTarget`)}
                   </span>
                   {chatWorkspaceOptions.length > 0 && targetWs === undefined && (
                     <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
@@ -346,6 +379,23 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
                   </div>
                 )}
               </div>
+
+              {mode === 'auto-quant' && !workspaceTarget && sourceTemplate?.source && (
+                <label className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
+                  <span>{t('autoQuantLanding.version')}</span>
+                  <select
+                    value={sourceVersion ?? sourceTemplate.source.defaultVersion}
+                    onChange={(event) => setSourceVersion(event.target.value)}
+                    className="max-w-24 bg-transparent font-mono text-foreground outline-none"
+                  >
+                    {sourceTemplate.source.versions.map((version) => (
+                      <option key={version.version} value={version.version}>
+                        {version.version}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <AgentLaunchSelectors
                 ref={launchSelectorsRef}
@@ -450,8 +500,8 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
 
         <div className="relative -mx-4 md:mx-0">
           <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto px-4 pb-1 pr-14 md:flex-wrap md:overflow-visible md:px-1 md:pr-1 md:pb-0">
-            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t('chatLanding.examplesLabel')}</span>
-            {[t('chatLanding.ex1'), t('chatLanding.ex2'), t('chatLanding.ex3')].map((ex) => (
+            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t(`${copyKey}.examplesLabel`)}</span>
+            {[t(`${copyKey}.ex1`), t(`${copyKey}.ex2`), t(`${copyKey}.ex3`)].map((ex) => (
               <button
                 key={ex}
                 type="button"
@@ -471,4 +521,12 @@ export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: strin
       </div>
     </div>
   )
+}
+
+export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+  return <HarnessLandingPage spec={spec} mode="chat" />
+}
+
+export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+  return <HarnessLandingPage spec={spec} mode="auto-quant" />
 }

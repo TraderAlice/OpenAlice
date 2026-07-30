@@ -61,7 +61,10 @@ export function WorkspacePage({ spec, visible }: Props) {
     // default runtime is configured, take the remaining empty-state/shortcut
     // entry points to the targeted composer, which owns runtime + credential
     // selection.
-    openOrFocus({ kind: 'chat-landing', params: { targetWsId: wsId } })
+    openOrFocus({
+      kind: source === 'auto-quant' ? 'auto-quant-landing' : 'chat-landing',
+      params: { targetWsId: wsId },
+    })
   }
 
   // Cmd+T / Ctrl+T: spawn fresh session in this workspace; only when this

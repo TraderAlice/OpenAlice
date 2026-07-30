@@ -42,7 +42,14 @@ export interface WorkspacesContextValue {
   ): Promise<void>
   setDefaultAgent(agent: string | null): Promise<void>
   setIssueDefaultAgent(agent: string | null): Promise<void>
-  quickChat(prompt: string, agent?: string, credentialSlug?: string, targetWsId?: string): Promise<string>
+  quickChat(
+    prompt: string,
+    agent?: string,
+    credentialSlug?: string,
+    targetWsId?: string,
+    template?: 'chat' | 'auto-quant-v2',
+    sourceVersion?: string,
+  ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   openWebPiSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>

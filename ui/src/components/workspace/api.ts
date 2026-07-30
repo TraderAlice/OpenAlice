@@ -31,6 +31,14 @@ export interface Workspace {
    * Opens the reviewed three-way Template Upgrade flow.
    */
   readonly upgradeAvailable?: { from: string; to: string } | null;
+  /** Exact external Harness source selected when this Workspace was created. */
+  readonly harnessSource?: {
+    readonly schemaVersion: 1;
+    readonly template: string;
+    readonly repository: string;
+    readonly version: string;
+    readonly commit: string;
+  };
   /** Adapter ids enabled for this workspace. Default runtime lives in user config. */
   readonly agents: readonly string[];
   /**
@@ -61,6 +69,7 @@ export interface CreateError {
     | 'insufficient_storage'
     | 'bootstrap_failed'
     | 'unknown_template'
+    | 'unknown_source_version'
     | 'unknown_agent'
     | 'no_templates_configured';
   readonly message?: string;
@@ -323,11 +332,15 @@ export async function createWorkspace(
   tag: string,
   template: string,
   agents?: readonly string[],
+  sourceVersion?: string,
 ): Promise<CreateResult> {
+  const body: Record<string, unknown> = { tag, template };
+  if (agents && agents.length > 0) body['agents'] = agents;
+  if (sourceVersion !== undefined) body['sourceVersion'] = sourceVersion;
   const res = await fetch('/api/workspaces', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(agents && agents.length > 0 ? { tag, template, agents } : { tag, template }),
+    body: JSON.stringify(body),
   });
   if (res.ok) {
     const body = (await res.json()) as { workspace: Workspace };
@@ -358,6 +371,14 @@ export interface TemplateInfo {
   readonly version: string;
   /** True if the template ships a README.md (showcase detail page can load it). */
   readonly hasReadme: boolean;
+  readonly source?: {
+    readonly repository: string;
+    readonly defaultVersion: string;
+    readonly versions: readonly {
+      readonly version: string;
+      readonly commit: string;
+    }[];
+  };
 }
 
 export async function listTemplates(): Promise<TemplateInfo[]> {
@@ -835,11 +856,15 @@ export async function quickChat(
   agent?: string,
   credentialSlug?: string,
   targetWsId?: string,
+  template?: 'chat' | 'auto-quant-v2',
+  sourceVersion?: string,
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;
+  if (template !== undefined) body['template'] = template;
+  if (sourceVersion !== undefined) body['sourceVersion'] = sourceVersion;
   const res = await fetch('/api/workspaces/quick-chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

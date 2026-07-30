@@ -129,8 +129,11 @@ import {
   resolveInjectionModel,
 } from './credential-injection.js';
 import {
+  AUTO_QUANT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
+  TemplateWorkspaceResolver,
   type ChatWorkspaceResolution,
+  type TemplateWorkspaceResolution,
 } from './chat-workspace-resolver.js';
 
 /** Resolve only the operational facts automation health needs. Product APIs do
@@ -323,6 +326,7 @@ import {
 } from './workspace-runtime-activity.js';
 import { WebPiSessionHost, type WebPiSnapshot } from './webpi-session-host.js';
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
+import { readHarnessSource } from './harness-source.js';
 import {
   createManagerWorkspaceMeta,
 } from './manager-workspace.js';
@@ -373,6 +377,11 @@ export interface WorkspaceService {
   workspaceRuntimeActivity(workspaceId: string): WorkspaceRuntimeActivity;
   /** Resolve the preferred/recent durable Chat Workspace, creating one starter when absent. */
   resolveOrCreateChatWorkspace(preferredWorkspaceId?: string | null): Promise<ChatWorkspaceResolution>;
+  /** Resolve the latest durable AutoQuant desk, creating a pinned starter when absent. */
+  resolveOrCreateAutoQuantWorkspace(
+    preferredWorkspaceId?: string | null,
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution>;
   /** Resolve the configured Workspace runtime, then fall back to its first enabled runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
@@ -779,6 +788,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     sessionRegistry,
     creator,
   });
+  const autoQuantWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry, sessionRegistry, creator },
+    AUTO_QUANT_WORKSPACE_TEMPLATE,
+    'auto-quant',
+  );
 
   const transcriptWatcher = new TranscriptWatcher(
     launcherLogger.child({ scope: 'transcript-watch' }),
@@ -970,6 +984,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     preferredWorkspaceId?: string | null,
   ): Promise<ChatWorkspaceResolution> =>
     chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId);
+  const resolveOrCreateAutoQuantWorkspaceMethod = (
+    preferredWorkspaceId?: string | null,
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution> =>
+    autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
 
   let runtimeReadinessWorkspaceInFlight: Promise<WorkspaceMeta> | null = null;
 
@@ -2297,6 +2316,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   const publicMeta = async (w: WorkspaceMeta): Promise<unknown> => {
     const metadata = await readWorkspaceMetadata(w.dir);
+    const harnessSource = await readHarnessSource(w.dir);
     await sessionRegistry.ensureLoaded(w.id).catch(() => undefined);
     const sessions = sessionRegistry.listFor(w.id).map((r) => {
       const terminal = pool.get(r.id);
@@ -2348,6 +2368,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...w,
       ...(metadata.ok ? metadata.metadata : {}),
       ...(!metadata.ok && metadata.reason === 'invalid' ? { metadataError: metadata.error } : {}),
+      ...(harnessSource ? { harnessSource } : {}),
       sessions,
       agentOverride,
       ...(currentVersion !== undefined ? { currentVersion } : {}),
@@ -2385,6 +2406,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     transcriptWatcher,
     workspaceRuntimeActivity: workspaceRuntimeActivityMethod,
     resolveOrCreateChatWorkspace: resolveOrCreateChatWorkspaceMethod,
+    resolveOrCreateAutoQuantWorkspace: resolveOrCreateAutoQuantWorkspaceMethod,
     resolveDefaultAgentId,
     resolveAdapter,
     startWebPiSession,

@@ -70,7 +70,7 @@ src/                           Alice process
 │   │                          schedules, CLI shims, file/git operations
 │   ├── adapters/              claude / codex / opencode / pi / shell
 │   ├── cli/                   alice, alice-uta, alice-workspace, traderhub
-│   └── templates/             built-in chat and auto-quant templates
+│   └── templates/             built-in Chat and pinned AutoQuant V2 Harnesses
 ├── services/
 │   ├── auth/                  admin token and web session services
 │   ├── uta-client/            Alice-side UTA SDK adapters
@@ -174,6 +174,9 @@ trade-decision attribution — follow [[docs/conversation-provenance.md]].
 Built-in templates use cross-platform `bootstrap.mjs` files and route git
 through `src/workspaces/templates/_common.mjs`. Do not add new Bash bootstraps
 for built-in templates. `bootstrap.sh` remains only as a third-party fallback.
+Source-backed Harnesses declare an explicit repository and version-to-commit
+catalog in `template.json`; creation records the chosen immutable source in
+`.alice/harness-source.json`.
 
 Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
@@ -264,7 +267,7 @@ sealing, and Broker Packs must remain coherent.
 │   ├── departed-workspaces/   retained offboarded repositories
 │   ├── state/                 lifecycle catalog, Sessions, scrollback, tasks,
 │   │                          provenance, Agent conversation log, compatibility lock
-│   └── auto-quant-mirror/     shared Auto-Quant source mirror
+│   └── auto-quant-v2-mirror/  shared AutoQuant V2 source mirror
 ├── state/
 │   ├── guardian.lock          launcher ownership
 │   └── runtime.lock           shared writer ownership

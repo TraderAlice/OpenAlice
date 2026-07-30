@@ -16,7 +16,12 @@ import { injectWorkspaceContext } from './context-injector.js';
 import { injectWorkspaceCredentials } from './credential-injection.js';
 import type { Logger } from './logger.js';
 import { generatePetnameId } from './petname-id.js';
-import type { AgentCredentialDecl, TemplateRegistry } from './template-registry.js';
+import type {
+  AgentCredentialDecl,
+  TemplateMeta,
+  TemplateRegistry,
+  TemplateSourceVersion,
+} from './template-registry.js';
 import { initializeWorkspaceTemplateState } from './template-upgrade.js';
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
 
@@ -56,6 +61,7 @@ export type CreateResult =
         | 'bootstrap_failed'
         | 'injection_failed'
         | 'unknown_template'
+        | 'unknown_source_version'
         | 'unknown_agent';
       readonly message: string;
       readonly stderr?: string;
@@ -94,6 +100,15 @@ export function resolveCreateAgents(
   ];
 }
 
+export function resolveTemplateSource(
+  template: TemplateMeta,
+  requestedVersion?: string,
+): TemplateSourceVersion | undefined {
+  if (!template.source) return undefined;
+  const version = requestedVersion ?? template.source.defaultVersion;
+  return template.source.versions.find((candidate) => candidate.version === version);
+}
+
 /**
  * Creates a workspace by invoking the template's bootstrap script.
  *
@@ -110,6 +125,7 @@ export class WorkspaceCreator {
     tag: string,
     templateName: string,
     agentsRequested?: readonly string[],
+    sourceVersion?: string,
   ): Promise<CreateResult> {
     if (!TAG_RE.test(tag)) {
       return {
@@ -127,6 +143,19 @@ export class WorkspaceCreator {
         ok: false,
         code: 'unknown_template',
         message: `unknown template: ${templateName}`,
+      };
+    }
+    const templateSource = resolveTemplateSource(template, sourceVersion);
+    if (
+      (template.source && !templateSource)
+      || (!template.source && sourceVersion !== undefined)
+    ) {
+      return {
+        ok: false,
+        code: 'unknown_source_version',
+        message: template.source
+          ? `unsupported ${templateName} source version: ${sourceVersion ?? ''}`
+          : `template ${templateName} does not accept a source version`,
       };
     }
 
@@ -160,7 +189,14 @@ export class WorkspaceCreator {
         existsSync(join(this.opts.workspacesRoot, candidate)),
     });
     const dir = join(this.opts.workspacesRoot, id);
-    const log = this.opts.logger.child({ tag, id, dir, template: templateName, agents });
+    const log = this.opts.logger.child({
+      tag,
+      id,
+      dir,
+      template: templateName,
+      agents,
+      ...(templateSource ? { sourceVersion: templateSource.version } : {}),
+    });
 
     log.info('bootstrap.start', { script: template.bootstrapScript });
 
@@ -172,6 +208,11 @@ export class WorkspaceCreator {
         AQ_TEMPLATE_FILES_DIR: template.filesDir,
         AQ_TEMPLATE_ROOT: template.templateDir,
         AQ_LAUNCHER_REPO_ROOT: this.opts.bootstrapEnv.launcherRepoRoot,
+        ...(template.source && templateSource ? {
+          OPENALICE_TEMPLATE_SOURCE_REPOSITORY: template.source.repository,
+          OPENALICE_TEMPLATE_SOURCE_VERSION: templateSource.version,
+          OPENALICE_TEMPLATE_SOURCE_COMMIT: templateSource.commit,
+        } : {}),
         // AQ_LAUNCHER_ROOT is intentionally NOT set here. bootstrap.sh's
         // ${AQ_LAUNCHER_ROOT:-$HOME/.openalice/workspaces} default matches
         // config.ts's default; a user-exported value flows in via

@@ -12,6 +12,10 @@ contract, discoverable skills, and the live CLI surface.
 Alice persona and written to both `CLAUDE.md` and `AGENTS.md` by
 `src/workspaces/context-injector.ts`.
 
+Templates may opt out of this persona layer with `injectPersona: false`.
+AutoQuant V2 does so to preserve the upstream `AGENTS.md`; OpenAlice adds only
+discoverable collaboration/data/trading skills alongside it.
+
 This layer may define only durable behavior:
 
 - how to distinguish chat, durable work, Inbox delivery, and trading;

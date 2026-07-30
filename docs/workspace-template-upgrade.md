@@ -15,9 +15,10 @@ without erasing the work already done here.” It is not a second bootstrap and
 never replaces the complete Workspace directory.
 
 Only a template that explicitly declares
-`"upgradeStrategy": "managed-context"` participates. Chat opts in. Auto-Quant
-and third-party templates remain outside this generic path until they declare a
-safe, template-specific asset boundary.
+`"upgradeStrategy": "managed-context"` participates. Chat opts in. AutoQuant
+V2 source pins and third-party templates remain outside this generic path.
+Choosing an AutoQuant version is a creation-time Harness decision; a future
+upgrade must define an AutoQuant-aware workflow rather than replay bootstrap.
 
 The current managed set is intentionally narrow:
 
