@@ -1,3 +1,5 @@
+import { join, resolve } from 'node:path'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -139,12 +141,12 @@ describe('OpenAlice top-level lifecycle commands', () => {
     expect(startRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         instance: 'research',
-        homeRoot: '/tmp/research-home',
+        homeRoot: resolve('/tmp/research-home'),
       }),
       expect.objectContaining({
         env: expect.objectContaining({
-          PI_CODING_AGENT_DIR: '/tmp/research-home/runtime/pi',
-          PI_CODING_AGENT_SESSION_DIR: '/tmp/research-home/runtime/pi/sessions',
+          PI_CODING_AGENT_DIR: join(resolve('/tmp/research-home'), 'runtime', 'pi'),
+          PI_CODING_AGENT_SESSION_DIR: join(resolve('/tmp/research-home'), 'runtime', 'pi', 'sessions'),
         }),
       }),
     )
@@ -161,7 +163,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
     })).resolves.toBe(0)
 
     expect(inspectRuntime).toHaveBeenCalledWith(
-      expect.objectContaining({ homeRoot: '/tmp/source-home' }),
+      expect.objectContaining({ homeRoot: resolve('/tmp/source-home') }),
       expect.objectContaining({
         env: expect.objectContaining({ PI_CODING_AGENT_DIR: '/native/pi' }),
       }),
