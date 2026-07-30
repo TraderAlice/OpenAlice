@@ -380,6 +380,12 @@
   }
 }
 
+@container (max-width: 520px) {
+  .workspace-page-shell .workspace-side {
+    width: 100%;
+  }
+}
+
 /* Both side panels hidden (or auto-hidden on mobile) — collapse the
  * 360px aside column so the terminal pane fills the whole width. */
 .workspace-view.has-no-side {

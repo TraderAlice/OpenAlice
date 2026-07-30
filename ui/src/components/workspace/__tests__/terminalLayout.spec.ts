@@ -53,4 +53,10 @@ describe('terminal responsive layout contract', () => {
     expect(embedded).toContain('box-shadow: none')
     expect(body).toContain('flex: 1 1 auto')
   })
+
+  it('lets the Files overlay own the full Workspace width on a phone', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 520px\)[\s\S]*?\.workspace-page-shell \.workspace-side\s*\{[\s\S]*?width: 100%/,
+    )
+  })
 })
