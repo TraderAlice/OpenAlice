@@ -14,7 +14,7 @@ import type { EntityListItem } from '../api/entities'
  * notes link to it. Selection lives in `useTrackedSelection` so it survives
  * remounts and is read by TrackedPage in the editor area.
  */
-export function TrackedSidebar() {
+export function TrackedSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation()
   const entities = entitiesLive.useStore((s) => s.entities)
   const loading = entitiesLive.useStore((s) => s.loading)
@@ -80,6 +80,7 @@ export function TrackedSidebar() {
         select(entity.name)
         setSidebar('tracked')
         openOrFocus({ kind: 'tracked', params: {} })
+        onNavigate?.()
       }}
     />
   )
