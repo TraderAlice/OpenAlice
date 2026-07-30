@@ -22,6 +22,7 @@ import {
   ChatWorkspaceResolver,
   TemplateWorkspaceResolver,
 } from '../../workspaces/chat-workspace-resolver.js';
+import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -50,6 +51,7 @@ function build(opts: {
   opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
   runtimeWorkspace?: any;
 } = {}) {
+  const builtinAdapters = createBuiltinAdapterRegistry();
   const META = {
     id: 'ws-1',
     dir: '/w',
@@ -61,16 +63,23 @@ function build(opts: {
   const opencode = {
     id: 'opencode',
     namePrefix: 'o',
+    capabilities: builtinAdapters.get('opencode')!.capabilities,
     writeAiConfig: vi.fn(async () => {}),
     readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
   const claude = {
     id: 'claude',
     namePrefix: 'c',
+    capabilities: builtinAdapters.get('claude')!.capabilities,
     readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
     readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
   };
-  const shell = { id: 'shell', kind: 'utility', namePrefix: 'sh' };
+  const shell = {
+    id: 'shell',
+    kind: 'utility',
+    namePrefix: 'sh',
+    capabilities: builtinAdapters.get('shell')!.capabilities,
+  };
   const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn((_wsId: string, ctx: any) => ({
     recordId: ctx.recordId,

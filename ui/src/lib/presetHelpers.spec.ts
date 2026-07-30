@@ -10,11 +10,40 @@ import {
   savedCredentialModel,
 } from './presetHelpers'
 import type { Preset } from '../api'
+import type { AgentInfo } from '../components/workspace/api'
 
 const multiWire = {
   anthropic: 'https://provider.example/anthropic',
   'openai-chat': 'https://provider.example/v1',
 } as const
+
+const agents: AgentInfo[] = [
+  {
+    id: 'codex',
+    displayName: 'Codex',
+    capabilities: {
+      parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess',
+      aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'] },
+    },
+  },
+  ...['opencode', 'pi'].map((id): AgentInfo => ({
+    id,
+    displayName: id,
+    capabilities: {
+      parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess',
+      aiProvider: {
+        credentialSource: 'workspace-required',
+        wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+        vendorPolicies: {
+          minimax: {
+            wirePreference: ['anthropic'],
+            legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+          },
+        },
+      },
+    },
+  })),
+]
 
 const modelPreset: Preset = {
   id: 'test',
@@ -50,35 +79,35 @@ const modelPreset: Preset = {
 
 describe('agent wire selection', () => {
   it('lists every compatible Pi/opencode protocol in runtime preference order', () => {
-    expect(agentWireShapes(multiWire, 'pi')).toEqual(['openai-chat', 'anthropic'])
-    expect(agentWireShapes(multiWire, 'opencode')).toEqual(['openai-chat', 'anthropic'])
+    expect(agentWireShapes(multiWire, agents, 'pi')).toEqual(['openai-chat', 'anthropic'])
+    expect(agentWireShapes(multiWire, agents, 'opencode')).toEqual(['openai-chat', 'anthropic'])
   })
 
   it('only exposes MiniMax Anthropic to coding CLIs without changing generic providers', () => {
-    expect(agentWireShapes(multiWire, 'pi', 'minimax')).toEqual(['anthropic'])
-    expect(agentWireShapes(multiWire, 'opencode', 'minimax')).toEqual(['anthropic'])
-    expect(pickAgentWire(multiWire, 'opencode', undefined, 'minimax')?.shape).toBe('anthropic')
+    expect(agentWireShapes(multiWire, agents, 'pi', 'minimax')).toEqual(['anthropic'])
+    expect(agentWireShapes(multiWire, agents, 'opencode', 'minimax')).toEqual(['anthropic'])
+    expect(pickAgentWire(multiWire, agents, 'opencode', undefined, 'minimax')?.shape).toBe('anthropic')
   })
 
   it('derives the native endpoint for an old official MiniMax OpenAI-only credential', () => {
     const oldCredential = { 'openai-chat': 'https://api.minimaxi.com/v1' } as const
-    expect(agentWireShapes(oldCredential, 'pi', 'minimax')).toEqual(['anthropic'])
-    expect(pickAgentWire(oldCredential, 'pi', 'openai-chat', 'minimax')).toEqual({
+    expect(agentWireShapes(oldCredential, agents, 'pi', 'minimax')).toEqual(['anthropic'])
+    expect(pickAgentWire(oldCredential, agents, 'pi', 'openai-chat', 'minimax')).toEqual({
       shape: 'anthropic',
       baseUrl: 'https://api.minimaxi.com/anthropic',
     })
   })
 
   it('repairs an old MiniMax OpenAI default and rejects other incompatible protocols', () => {
-    expect(pickAgentWire(multiWire, 'pi', 'anthropic')).toEqual({
+    expect(pickAgentWire(multiWire, agents, 'pi', 'anthropic')).toEqual({
       shape: 'anthropic',
       baseUrl: 'https://provider.example/anthropic',
     })
-    expect(pickAgentWire(multiWire, 'pi', 'openai-chat', 'minimax')).toEqual({
+    expect(pickAgentWire(multiWire, agents, 'pi', 'openai-chat', 'minimax')).toEqual({
       shape: 'anthropic',
       baseUrl: 'https://provider.example/anthropic',
     })
-    expect(pickAgentWire(multiWire, 'codex', 'anthropic')).toBeNull()
+    expect(pickAgentWire(multiWire, agents, 'codex', 'anthropic')).toBeNull()
   })
 })
 

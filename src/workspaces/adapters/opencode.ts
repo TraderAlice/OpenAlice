@@ -326,6 +326,22 @@ export const opencodeAdapter: CliAdapter = {
     // `opencode --session <id>` (composeCommand) resumes by id.
     transcriptDiscovery: 'subprocess',
     headless: true,
+    aiProvider: {
+      credentialSource: 'workspace-required',
+      wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+      defaultWire: 'openai-chat',
+      vendorPolicies: {
+        minimax: {
+          wirePreference: ['anthropic'],
+          legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+        },
+      },
+      modelRegistration: {
+        contextWindow: true,
+        reasoning: true,
+        effortVariants: true,
+      },
+    },
   },
 
   lifecycle: {

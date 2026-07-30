@@ -59,6 +59,82 @@ beforeEach(async () => {
       agents: ['pi'],
       sessions: [],
     }],
+    agents: [
+      {
+        id: 'claude',
+        displayName: 'Claude Code',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: false,
+          resumeById: true,
+          transcriptDiscovery: 'fs-watch',
+          aiProvider: {
+            credentialSource: 'runtime-or-workspace',
+            wirePreference: ['anthropic'],
+          },
+        },
+      },
+      {
+        id: 'codex',
+        displayName: 'Codex',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'subprocess',
+          aiProvider: {
+            credentialSource: 'runtime-or-workspace',
+            wirePreference: ['openai-responses'],
+          },
+        },
+      },
+      {
+        id: 'opencode',
+        displayName: 'opencode',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'subprocess',
+          aiProvider: {
+            credentialSource: 'workspace-required',
+            wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+            vendorPolicies: {
+              minimax: {
+                wirePreference: ['anthropic'],
+                legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+              },
+            },
+            modelRegistration: {
+              contextWindow: true,
+              reasoning: true,
+              effortVariants: true,
+            },
+          },
+        },
+      },
+      {
+        id: 'pi',
+        displayName: 'Pi',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'none',
+          aiProvider: {
+            credentialSource: 'workspace-required',
+            wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+            vendorPolicies: {
+              minimax: {
+                wirePreference: ['anthropic'],
+                legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+              },
+            },
+            modelRegistration: { contextWindow: true, reasoning: true },
+          },
+        },
+      },
+    ],
     refresh: vi.fn(),
     saveWorkspaceMetadata: vi.fn(),
   })

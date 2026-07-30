@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
-  credentialToWorkspaceAiCred,
+  credentialToWorkspaceAiCred as projectCredentialToWorkspace,
   injectWorkspaceCredentials,
-  compatibleCredentials,
+  compatibleCredentials as listCompatibleCredentials,
   matchCredentialByApiKey,
   resolveInjectionModel,
 } from './credential-injection.js'
 import { AdapterRegistry, type CliAdapter, type WorkspaceAiCred } from './cli-adapter.js'
+import { createBuiltinAdapterRegistry } from './adapters/index.js'
 import type { Credential } from '@/core/config.js'
 import type { Logger } from './logger.js'
 
@@ -27,7 +28,65 @@ const longcatKey: Credential = {
   wires: { 'openai-chat': 'https://api.longcat.chat/openai' },
 }
 
+const builtinAdapters = createBuiltinAdapterRegistry()
+
+function builtinAdapter(agentId: string): CliAdapter {
+  const adapter = builtinAdapters.get(agentId)
+  if (!adapter) throw new Error(`missing test adapter: ${agentId}`)
+  return adapter
+}
+
+function credentialToWorkspaceAiCred(
+  credential: Parameters<typeof projectCredentialToWorkspace>[0],
+  agentId: string,
+  overrides?: Parameters<typeof projectCredentialToWorkspace>[2],
+): ReturnType<typeof projectCredentialToWorkspace> {
+  return projectCredentialToWorkspace(credential, builtinAdapter(agentId), overrides)
+}
+
+function compatibleCredentials(
+  credentials: Parameters<typeof listCompatibleCredentials>[0],
+  agentId: string,
+): ReturnType<typeof listCompatibleCredentials> {
+  return listCompatibleCredentials(credentials, builtinAdapter(agentId))
+}
+
 describe('credentialToWorkspaceAiCred', () => {
+  it('supports a newly registered adapter entirely from its capability declaration', () => {
+    const futureAdapter: CliAdapter = {
+      id: 'future',
+      displayName: 'Future Runtime',
+      capabilities: {
+        parallelPerCwd: true,
+        resumeLast: false,
+        resumeById: false,
+        transcriptDiscovery: 'none',
+        aiProvider: {
+          credentialSource: 'workspace-required',
+          wirePreference: ['google-generative-ai'],
+          modelRegistration: {
+            contextWindow: true,
+            reasoning: true,
+            effortVariants: true,
+          },
+        },
+      },
+      composeCommand: (base) => base,
+    }
+
+    expect(projectCredentialToWorkspace(googleKey, futureAdapter, {
+      model: 'gemini-3.1-flash-lite',
+    })).toMatchObject({
+      apiKey: 'AQ.google',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      wireShape: 'google-generative-ai',
+      contextWindow: 1_048_576,
+      reasoning: true,
+      reasoningEffort: 'minimal',
+    })
+    expect(projectCredentialToWorkspace(openaiKey, futureAdapter)).toBeNull()
+  })
+
   it('picks the agent\'s wire (claude → anthropic) + apiKey; model from overrides', () => {
     const cred = credentialToWorkspaceAiCred(minimaxIntl, 'claude', { model: 'MiniMax-M3' })!
     expect(cred.apiKey).toBe('mm-key')
@@ -207,10 +266,17 @@ describe('credentialToWorkspaceAiCred', () => {
 interface WriteCall { id: string; dir: string; cred: WorkspaceAiCred }
 
 function stubAdapter(id: string, calls: WriteCall[], writeable = true): CliAdapter {
+  const aiProvider = builtinAdapters.get(id)?.capabilities.aiProvider
   const adapter: CliAdapter = {
     id,
     displayName: id,
-    capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: false, transcriptDiscovery: 'none' },
+    capabilities: {
+      parallelPerCwd: true,
+      resumeLast: false,
+      resumeById: false,
+      transcriptDiscovery: 'none',
+      ...(aiProvider ? { aiProvider } : {}),
+    },
     composeCommand: (base) => base,
   }
   if (writeable) {

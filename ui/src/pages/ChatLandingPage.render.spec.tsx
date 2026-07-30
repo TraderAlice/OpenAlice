@@ -68,6 +68,11 @@ const piAgent: AgentInfo = {
     resumeLast: true,
     resumeById: true,
     transcriptDiscovery: 'fs-watch',
+    aiProvider: {
+      credentialSource: 'workspace-required',
+      wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+      modelRegistration: { contextWindow: true, reasoning: true },
+    },
   },
 }
 
