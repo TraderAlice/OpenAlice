@@ -272,16 +272,19 @@ export const tradingApi = {
   // ==================== Contract search ====================
 
   /**
-   * Heuristic broker-side search across all configured UTAs. Used by the
-   * Market workbench to surface tradeable contracts matching a data-vendor
-   * symbol — the bridge is intentionally fuzzy / display-only.
+   * Heuristic broker-side search across configured UTAs, optionally narrowed
+   * to one account. The Market workbench searches broadly to bridge a
+   * data-vendor symbol; manual order entry scopes to its open UTA so identical
+   * symbols cannot surface a different account's canonical aliceId.
    */
   async searchContracts(
     pattern: string,
     assetClass?: 'equity' | 'crypto' | 'currency' | 'commodity',
+    source?: string,
   ): Promise<ContractSearchResponse> {
     const qs = new URLSearchParams({ pattern })
     if (assetClass) qs.set('assetClass', assetClass)
+    if (source) qs.set('source', source)
     return fetchJson(`/api/trading/contracts/search?${qs}`)
   },
 

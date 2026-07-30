@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -43,7 +45,7 @@ function setupPlaceOrder() {
     />,
   )
 
-  fireEvent.change(screen.getByPlaceholderText('okx-test|BTC/USDT'), {
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Contract' }), {
     target: { value: 'demo-paper|AAPL' },
   })
   fireEvent.change(screen.getByPlaceholderText('Why are you placing this order?'), {
@@ -64,6 +66,93 @@ function setupClosePosition() {
 }
 
 describe('OrderEntryDialog sizing', () => {
+  it('searches only the open account and submits the selected canonical contract', async () => {
+    const placeOrder = vi.spyOn(tradingApi, 'placeOrder').mockResolvedValue(pushResult)
+    const searchContracts = vi.spyOn(tradingApi, 'searchContracts').mockResolvedValue({
+      count: 2,
+      results: [
+        {
+          source: 'demo-paper',
+          contract: {
+            aliceId: 'demo-paper|AAPL',
+            symbol: 'AAPL',
+            secType: 'STK',
+            description: 'Apple Inc.',
+            primaryExchange: 'NASDAQ',
+            currency: 'USD',
+          },
+          derivativeSecTypes: [],
+        },
+        {
+          source: 'other-account',
+          contract: {
+            aliceId: 'other-account|AAPL',
+            symbol: 'AAPL',
+            secType: 'STK',
+            description: 'Wrong account',
+          },
+          derivativeSecTypes: [],
+        },
+      ],
+    })
+
+    render(
+      <OrderEntryDialog
+        utaId="demo-paper"
+        mode={{ kind: 'place' }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Contract' }), {
+      target: { value: 'AAPL' },
+    })
+
+    await waitFor(() => expect(searchContracts).toHaveBeenCalledWith('AAPL', undefined, 'demo-paper'))
+    expect(screen.queryByText('Wrong account')).toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: /AAPL.*Apple Inc.*NASDAQ.*USD/i }))
+    expect(screen.getByText('demo-paper|AAPL')).toBeTruthy()
+
+    fireEvent.change(screen.getByPlaceholderText('0.001'), { target: { value: '2' } })
+    fireEvent.change(screen.getByPlaceholderText('Why are you placing this order?'), {
+      target: { value: 'Order sizing test' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Place Order' }))
+
+    await waitFor(() => expect(placeOrder).toHaveBeenCalledWith('demo-paper', expect.objectContaining({
+      aliceId: 'demo-paper|AAPL',
+      totalQuantity: '2',
+    })))
+  })
+
+  it('preserves a Market deep link aliceId without requiring another search', async () => {
+    const placeOrder = vi.spyOn(tradingApi, 'placeOrder').mockResolvedValue(pushResult)
+    const searchContracts = vi.spyOn(tradingApi, 'searchContracts')
+
+    render(
+      <OrderEntryDialog
+        utaId="demo-paper"
+        mode={{ kind: 'place', aliceId: 'demo-paper|AAPL' }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect((screen.getByRole('searchbox', { name: 'Contract' }) as HTMLInputElement).value).toBe('AAPL')
+    expect(screen.getByText('demo-paper|AAPL')).toBeTruthy()
+    expect(searchContracts).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByPlaceholderText('0.001'), { target: { value: '1' } })
+    fireEvent.change(screen.getByPlaceholderText('Why are you placing this order?'), {
+      target: { value: 'Market workbench follow-up' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Place Order' }))
+
+    await waitFor(() => expect(placeOrder).toHaveBeenCalledWith('demo-paper', expect.objectContaining({
+      aliceId: 'demo-paper|AAPL',
+      totalQuantity: '1',
+    })))
+  })
+
   it('clears Quantity when Cash Qty becomes authoritative', async () => {
     const placeOrder = setupPlaceOrder()
     const quantity = screen.getByPlaceholderText('0.001') as HTMLInputElement
