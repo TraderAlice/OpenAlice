@@ -657,32 +657,47 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
     .filter((p) => p.price != null)
     .map((p) => ({ ...p, label: p.expiration.slice(2) }))
   return (
-    <div className="border border-border rounded-md bg-secondary/40 px-4 py-3 flex flex-col gap-2">
-      <div className="flex items-baseline gap-3">
-        <span className="text-[15px] font-semibold font-mono text-foreground">{curve.symbol}</span>
+    <div className="border border-border rounded-md bg-secondary/40 px-3 sm:px-4 py-3 flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="shrink-0 text-[15px] font-semibold font-mono text-foreground">{curve.symbol}</span>
         {curve.spot != null && (
-          <span className="text-[12px] text-muted-foreground">{t('market.termSpotPerp')} <span className="font-mono text-foreground">{curve.spot.toLocaleString('en-US')}</span></span>
+          <span className="whitespace-nowrap text-[12px] text-muted-foreground">{t('market.termSpotPerp')} <span className="font-mono text-foreground">{curve.spot.toLocaleString('en-US')}</span></span>
         )}
-        {regime && <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{regime}</span>}
+        {regime && <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground/70">{regime}</span>}
       </div>
       <MeasuredChartFrame className="h-40">
-        {({ width, height }) => (
-          <LineChart width={width} height={height} data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" />
-            <YAxis domain={['dataMin', 'dataMax']} tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} stroke="var(--chart-axis)" width={70}
-              tickFormatter={(v: number) => v.toLocaleString('en-US')} />
-            <Tooltip
-              formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
-              labelFormatter={(l) => `20${l}`}
-              contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', fontSize: 11 }}
-            />
-            <Line type="monotone" dataKey="price" stroke="var(--primary)" strokeWidth={1.5} dot={{ r: 2.5 }} isAnimationActive={false} />
-          </LineChart>
-        )}
+        {({ width, height }) => {
+          const compact = width < 420
+          return (
+            <LineChart width={width} height={height} data={chartData} margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: 0 }}>
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
+                stroke="var(--chart-axis)"
+                interval="preserveStartEnd"
+                minTickGap={compact ? 18 : 28}
+                tickFormatter={(label: string) => formatTermAxisLabel(label, width)}
+              />
+              <YAxis
+                domain={['dataMin', 'dataMax']}
+                tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
+                stroke="var(--chart-axis)"
+                width={compact ? 48 : 70}
+                tickFormatter={(value: number) => formatTermAxisPrice(value, width)}
+              />
+              <Tooltip
+                formatter={(v) => [Number(v).toLocaleString('en-US'), '']}
+                labelFormatter={(l) => `20${l}`}
+                contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', fontSize: 11 }}
+              />
+              <Line type="monotone" dataKey="price" stroke="var(--primary)" strokeWidth={1.5} dot={{ r: 2.5 }} isAnimationActive={false} />
+            </LineChart>
+          )
+        }}
       </MeasuredChartFrame>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
         {curve.points.map((p) => (
-          <span key={p.expiration} className="text-[11px] px-1.5 py-0.5 rounded bg-muted/60 font-mono" title={`${p.daysToExpiry ?? '—'}d`}>
+          <span key={p.expiration} className="flex items-center justify-between gap-2 whitespace-nowrap text-[11px] px-1.5 py-0.5 rounded bg-muted/60 font-mono" title={`${p.daysToExpiry ?? '—'}d`}>
             {p.expiration.slice(2)}{' '}
             <span className={p.annualizedBasis == null ? 'text-muted-foreground' : p.annualizedBasis >= 0 ? 'text-success' : 'text-destructive'}>
               {p.annualizedBasis == null ? '—' : `${p.annualizedBasis >= 0 ? '+' : ''}${p.annualizedBasis.toFixed(1)}%`}
@@ -690,11 +705,23 @@ function TermCurveCard({ curve }: { curve: TermCurve }) {
           </span>
         ))}
         {curve.points.length > 0 && (
-          <span className="text-[10px] text-muted-foreground/60 self-center ml-1">{t('market.termBasisNote')}</span>
+          <span className="col-span-2 text-[10px] text-muted-foreground/60 self-center sm:ml-1">{t('market.termBasisNote')}</span>
         )}
       </div>
     </div>
   )
+}
+
+export function formatTermAxisLabel(label: string, chartWidth: number) {
+  return chartWidth < 420 ? label.slice(-5) : label
+}
+
+export function formatTermAxisPrice(value: number, chartWidth: number) {
+  if (chartWidth >= 420) return value.toLocaleString('en-US')
+  return Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
 }
 
 // ==================== Global macro ====================
@@ -808,12 +835,14 @@ function ChokepointCard({ curve }: { curve: ShippingCurve }) {
     .filter((p) => p.tons != null)
     .map((p) => ({ ...p, mt: (p.tons as number) / 1e6, label: p.date.slice(5) }))
   return (
-    <div className="border border-border rounded-md bg-secondary/40 px-4 py-3 flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] font-semibold text-foreground">{curve.name}</span>
+    <div className="border border-border rounded-md bg-secondary/40 px-3 sm:px-4 py-3 flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+        <span className="text-[13px] font-semibold text-foreground sm:shrink-0">{curve.name}</span>
         {curve.latest && (
-          <span className="text-[11px] text-muted-foreground">
-            {curve.latest.date} · {curve.latest.vessels ?? '—'} {t('market.shippingVessels')} · {curve.latest.tons != null ? (curve.latest.tons / 1e6).toFixed(2) + 'M t' : '—'}
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground sm:justify-end">
+            <span className="whitespace-nowrap">{curve.latest.date}</span>
+            <span className="whitespace-nowrap">{curve.latest.vessels ?? '—'} {t('market.shippingVessels')}</span>
+            <span className="whitespace-nowrap">{curve.latest.tons != null ? (curve.latest.tons / 1e6).toFixed(2) + 'M t' : '—'}</span>
           </span>
         )}
       </div>
