@@ -26,6 +26,7 @@ describe('Settings selection controls', () => {
     expect(group).toBeTruthy()
     expect(screen.getByRole('button', { name: '中文' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'English' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'English' }).className).toContain('min-h-10')
 
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
 
@@ -40,6 +41,7 @@ describe('Settings selection controls', () => {
 
     expect(screen.getByRole('button', { name: '设置' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: '工具' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: '设置' }).className).toContain('min-h-10')
 
     fireEvent.click(screen.getByRole('button', { name: '工具' }))
     expect(onSelect).toHaveBeenCalledWith('tools')
