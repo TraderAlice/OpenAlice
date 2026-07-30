@@ -917,6 +917,11 @@ step 4 "Installing the managed Pi runtime"
 PI_RELATIVE_ENTRY="managed/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
 PI_STAGED_ENTRY="$STAGING/$PI_RELATIVE_ENTRY"
 [[ -f "$PI_STAGED_ENTRY" ]] || die "npm completed without the managed Pi CLI"
+node -e '
+  const { createRequire } = require("node:module");
+  createRequire(process.argv[1]).resolve("@earendil-works/pi-tui");
+' "$PI_STAGED_ENTRY" \
+  || die "npm completed without the managed Pi TUI dependency"
 PI_STAGED_VERSION="$(node "$PI_STAGED_ENTRY" --version)"
 [[ "$PI_STAGED_VERSION" == "$PI_VERSION" ]] || die "Managed Pi reported $PI_STAGED_VERSION instead of $PI_VERSION"
 ok "Managed Pi $PI_VERSION is ready"
@@ -997,9 +1002,17 @@ mkdir -p "$BIN_DIR" "$VERSIONS_DIR"
 DESTINATION="$VERSIONS_DIR/${SAFE_VERSION}-${CONTENT_ID}"
 if [[ -e "$DESTINATION" ]]; then
   destination_pi_version="$(node "$DESTINATION/$PI_RELATIVE_ENTRY" --version 2>/dev/null || true)"
+  destination_pi_tui_ready=0
+  if node -e '
+    const { createRequire } = require("node:module");
+    createRequire(process.argv[1]).resolve("@earendil-works/pi-tui");
+  ' "$DESTINATION/$PI_RELATIVE_ENTRY" >/dev/null 2>&1; then
+    destination_pi_tui_ready=1
+  fi
   if [[ -d "$DESTINATION" \
     && "$(content_id "$DESTINATION" "${CONTENT_FILES[@]}" 2>/dev/null || true)" == "$CONTENT_ID" \
     && "$destination_pi_version" == "$PI_VERSION" \
+    && "$destination_pi_tui_ready" -eq 1 \
     && ( -z "$RUNTIME_CONTENT_IDENTITY" \
       || "$(node "$DESTINATION/src/runtime-bundle.mjs" verify \
         "$DESTINATION/managed/runtime" \
