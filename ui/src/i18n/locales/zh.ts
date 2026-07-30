@@ -1740,5 +1740,14 @@ export const zh: Resources = {
     noTokenHeading: '未配置管理员令牌',
     loginFailed: '登录失败',
     reconnecting: '正在重新连接 OpenAlice…',
+    backendUnavailableEyebrow: '核心服务离线',
+    backendUnavailableHeading: 'OpenAlice 已失去后端连接',
+    backendUnavailableDescription:
+      '这不是某个页面的数据错误。工作区、自动化和交易操作都依赖 OpenAlice 后端，因此在服务恢复响应前，整个应用会暂时停用。',
+    backendUnavailableImpact:
+      '请保持此窗口打开。连接恢复后，你会自动回到当前页面。',
+    backendUnavailableHelp:
+      '请检查承载此页面的 OpenAlice 运行时，然后重试。如果是从终端启动的，请确认 pnpm dev 或 openalice up 仍在运行。',
+    retryNow: '立即重试',
   },
 }

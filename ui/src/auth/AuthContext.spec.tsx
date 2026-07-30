@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import '../i18n'
+
 const mocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
 }))
@@ -9,8 +11,9 @@ vi.mock('./api', () => ({
   getStatus: mocks.getStatus,
 }))
 
-import { AuthProvider, useAuth } from './AuthContext'
+import { AuthProvider, BACKEND_HEALTH_POLL_MS, useAuth } from './AuthContext'
 import { AuthGate } from './AuthGate'
+import { BACKEND_PROBE_REQUESTED_EVENT } from './backendConnectivity'
 
 function WorkspaceHarness() {
   const { refresh } = useAuth()
@@ -49,7 +52,8 @@ describe('AuthProvider backend recovery', () => {
     )
     await flushEffects()
 
-    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Retry now' })).toBe(document.activeElement)
     expect(screen.queryByText('workspace-app')).toBeNull()
     expect(document.querySelector('input[type="password"]')).toBeNull()
 
@@ -80,7 +84,8 @@ describe('AuthProvider backend recovery', () => {
     await flushEffects()
 
     expect(screen.getByText('workspace-app')).toBeTruthy()
-    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    expect(screen.getByText('workspace-app').closest('[inert]')).toBeTruthy()
     expect(document.querySelector('input[type="password"]')).toBeNull()
 
     await act(async () => {
@@ -89,6 +94,60 @@ describe('AuthProvider backend recovery', () => {
 
     expect(screen.getByText('workspace-app')).toBeTruthy()
     expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('detects a quiet backend shutdown with the core heartbeat', async () => {
+    vi.useFakeTimers()
+    mocks.getStatus
+      .mockResolvedValueOnce({ authed: true, tokenConfigured: true })
+      .mockRejectedValueOnce(new Error('backend stopped'))
+      .mockResolvedValueOnce({ authed: true, tokenConfigured: true })
+
+    render(
+      <AuthProvider>
+        <AuthGate><WorkspaceHarness /></AuthGate>
+      </AuthProvider>,
+    )
+    await flushEffects()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(BACKEND_HEALTH_POLL_MS)
+    })
+
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    expect(mocks.getStatus).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250)
+    })
+
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.getByText('workspace-app')).toBeTruthy()
+  })
+
+  it('debounces simultaneous page failures into one independent core probe', async () => {
+    vi.useFakeTimers()
+    mocks.getStatus
+      .mockResolvedValueOnce({ authed: true, tokenConfigured: true })
+      .mockRejectedValueOnce(new Error('backend stopped'))
+
+    render(
+      <AuthProvider>
+        <AuthGate><WorkspaceHarness /></AuthGate>
+      </AuthProvider>,
+    )
+    await flushEffects()
+
+    act(() => {
+      window.dispatchEvent(new Event(BACKEND_PROBE_REQUESTED_EVENT))
+      window.dispatchEvent(new Event(BACKEND_PROBE_REQUESTED_EVENT))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(mocks.getStatus).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
   })
 
   it('still shows login for an explicit unauthenticated response', async () => {
