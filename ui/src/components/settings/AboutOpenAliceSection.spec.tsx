@@ -57,6 +57,7 @@ describe('AboutOpenAliceSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }))
 
     await waitFor(() => expect(mocks.checkVersion).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.queryByText('Checking for updates…')).toBeNull())
     expect(screen.getByText('You’re up to date.')).toBeTruthy()
   })
 

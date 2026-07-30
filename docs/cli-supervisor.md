@@ -83,10 +83,29 @@ The top-level commands and the `server` compatibility surface launch the same
 `cli-server` Guardian owner. They are presenters over one lifecycle rather than
 separate daemons.
 
-The first TypeScript TUI shell is deliberately read-only: it reports the
-selected Runtime and detaches with `q`, `Esc`, or `Ctrl+C`. Unfinished controls
-remain inside the application shell and do not change the default entry back to
-the compatibility launcher.
+The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
+`Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
+explicit commands:
+
+- `s` starts the persistent Runtime when stopped;
+- `o` opens an advertised, verified Web endpoint;
+- `x` stops and `r` restarts only a `cli-server` owner, after an impact
+  confirmation;
+- `l` reads the bounded, redacted log tail;
+- `d` runs read-only Doctor checks;
+- `u` performs an advisory product-update check;
+- `?`, Tab, and the horizontal arrows expose help and detail panels.
+
+The TUI refuses to stop or restart Electron, development, incompatible, or
+otherwise foreign owners. Its stop/restart confirmation states that active Web
+and agent sessions will disconnect. Detaching never implies stopping. Update
+discovery runs in the background and cannot block lifecycle controls.
+
+The current Runtime provider is still source-backed. TUI start therefore needs
+to run from an OpenAlice checkout (or reuse a source root advertised by the
+selected Runtime) until the standalone headless Runtime artifact ships.
+Unfinished controls remain inside the application shell and do not change the
+default entry back to the compatibility launcher.
 
 ## Presentation-neutral Core
 

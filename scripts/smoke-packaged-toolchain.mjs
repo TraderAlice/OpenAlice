@@ -34,7 +34,7 @@ export function buildPackagedToolchainSmokePlan(packageResult) {
     command: electron,
     args: [piCli, '--version'],
     env: { ELECTRON_RUN_AS_NODE: '1' },
-    expectStdout: /\b0\.80\.6\b/,
+    expectStdout: exactLinePattern(packageResult.manifest.pi.version),
   })
 
   const searchTools = packageResult.manifest.searchTools?.[packageResult.platformArch]
@@ -216,6 +216,11 @@ const run = async (args) => {
   }
 
   return { ok: errors.length === 0, errors, commands }
+}
+
+function exactLinePattern(value) {
+  const escaped = String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^${escaped}\\s*$`)
 }
 
 export function packagedElectronExecutable(appRoot, platform) {

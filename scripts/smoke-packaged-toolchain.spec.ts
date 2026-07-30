@@ -28,6 +28,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
         platformArch: 'darwin-arm64',
         manifest: {
           pi: {
+            version: '0.83.0',
             cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
           },
           searchTools: {
@@ -50,6 +51,8 @@ describe('buildPackagedToolchainSmokePlan', () => {
         'managed Pi resolves packaged fd/rg without download',
         'workspace CLI payload through packaged Electron Node',
       ])
+      expect(plan.commands[1].expectStdout.test('0.83.0\n')).toBe(true)
+      expect(plan.commands[1].expectStdout.test('0x83x0\n')).toBe(false)
       expect(packagedElectronExecutable(appRoot, 'darwin')?.replaceAll('\\', '/'))
         .toContain('OpenAlice.app/Contents/MacOS/OpenAlice')
     } finally {
@@ -70,6 +73,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
         platformArch: 'win32-x64',
         manifest: {
           pi: {
+            version: '0.83.0',
             cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
           },
           searchTools: {
@@ -132,6 +136,7 @@ describe('buildPackagedToolchainSmokePlan', () => {
       platformArch: null,
       manifest: {
         pi: {
+          version: '0.83.0',
           cli: 'vendor/pi/node_modules/@earendil-works/pi-coding-agent/dist/cli.js',
         },
       },

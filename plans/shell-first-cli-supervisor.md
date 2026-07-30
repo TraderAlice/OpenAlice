@@ -361,14 +361,14 @@ and verification before the next dependent branch starts from updated `dev`.
 - [x] Render the initial stable application chrome: product and channel header,
   selected home, lifecycle summary, detach action bar, and unavailable-state
   guidance.
-- [ ] Add navigation, help, update indicator, and selectable detail panels.
+- [x] Add navigation, help, update indicator, and selectable detail panels.
 - [x] Show unfinished product panels as unavailable within the TUI instead of
   preserving a temporary non-TUI default command.
-- [ ] Implement stopped, starting, running, degraded, incompatible, stopping,
+- [x] Implement stopped, starting, running, degraded, incompatible, stopping,
   and update-available states.
-- [ ] Add start, open, stop, restart, detach, help, and read-only detail.
+- [x] Add start, open, stop, restart, detach, help, and read-only detail.
 - [ ] Add component/instance panels and narrow fallback.
-- [ ] Keep the TUI open and reconnect across a self-owned restart.
+- [x] Keep the TUI open and reconnect across a self-owned restart.
 - [ ] Complete source-backed macOS/Linux PTY and real browser acceptance before
   merging the bare-command behavior.
 
@@ -599,3 +599,26 @@ This plan is complete only when:
   installed both launchers, ran the installed TUI through a PTY, and restored
   the terminal on detach. Docker installer smoke remained unrun because the
   local Docker/OrbStack socket was absent.
+- 2026-07-30: Repaired the managed Pi `0.83.0` desktop-vendoring hashes in
+  serial PR #872 after both macOS package jobs exposed the stale `0.80.6`
+  digests. The real forced vendor transaction downloaded and verified both Pi
+  release assets, completed `npm ci`, and assembled the macOS managed runtime.
+  The next package step then exposed a second `0.80.6` expectation in the
+  packaged-toolchain smoke; the Supervisor-controls increment replaced that
+  hardcoded version with an exact pattern derived from the packaged manifest.
+- 2026-07-30: Connected the `pi-tui` application shell to the existing
+  lifecycle, logs, Doctor, and update services. Added polled lifecycle and
+  update-available states, keyboard navigation, bounded detail panels,
+  CLI-owner-only start/open/stop/restart controls, and explicit mutation impact
+  confirmation. A real isolated terminal journey started Guardian and Alice,
+  observed ready components and Web endpoint, stopped the Runtime through its
+  control socket, remained inside the TUI across both transitions, and restored
+  the terminal on detach.
+- 2026-07-30: Verified the interactive Supervisor increment with 135 CLI
+  tests, root TypeScript, UI TypeScript, the 3,642-test root Vitest suite, and
+  the CLI package build. An isolated local installer transaction loaded the TUI
+  from managed Pi, rendered installed-provenance Doctor results, then
+  `uninstall --yes` removed CLI/Pi while preserving a sentinel data directory.
+  The Docker installer playground remained unavailable because this host still
+  had no reachable Docker/OrbStack daemon; the equivalent local transaction and
+  real PTY lifecycle journeys passed.
