@@ -1,6 +1,6 @@
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from './headless-task-registry.js'
 import type { ResumeIdentityRecord } from './resume-registry.js'
-import type { SessionRecord } from './session-registry.js'
+import { sessionPreferredTitle, type SessionRecord } from './session-registry.js'
 
 export interface WorkspaceSessionDirectoryEntry {
   resumeId: string
@@ -48,6 +48,7 @@ export function buildWorkspaceSessionDirectory(input: {
     sessions: input.identities.map((identity) => {
       const execution = input.latestExecutionFor(identity.resumeId)
       const interactive = input.interactiveFor(identity.resumeId)
+      const interactiveTitle = interactive ? sessionPreferredTitle(interactive) : undefined
       return {
         resumeId: identity.resumeId,
         agent: identity.agent,
@@ -76,7 +77,7 @@ export function buildWorkspaceSessionDirectory(input: {
           ? {
               interactive: {
                 name: interactive.name,
-                ...(interactive.title ? { title: interactive.title } : {}),
+                ...(interactiveTitle ? { title: interactiveTitle } : {}),
                 state: interactive.state,
                 lastActiveAt: interactive.lastActiveAt,
               },

@@ -18,6 +18,7 @@ import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { registerCliRoutes } from './cli.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
+import { sessionDisplayTitle } from '../workspaces/session-registry.js'
 
 /**
  * MCP Plugin — exposes OpenAlice tools via Streamable HTTP, plus the CLI gateway.
@@ -112,6 +113,7 @@ export class McpPlugin implements Plugin {
         ...(svc ? {
           workspaceInventory: async () => Promise.all(svc.registry.list().map(async (meta) => {
             await svc.sessionRegistry.ensureLoaded(meta.id)
+            void svc.refreshSessionTitles?.(meta)
             const sessions = svc.sessionRegistry.listFor(meta.id)
             const activity = svc.workspaceRuntimeActivity(meta.id)
             return {
@@ -130,7 +132,7 @@ export class McpPlugin implements Plugin {
                   .map((session) => ({
                     resumeId: session.resumeId,
                     agent: session.agent,
-                    title: session.title?.trim() || session.name,
+                    title: sessionDisplayTitle(session),
                     state: session.state,
                     lastActiveAt: session.lastActiveAt,
                   })),

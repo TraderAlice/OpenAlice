@@ -758,7 +758,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(Array.from(records.values())[0]).toMatchObject({
       sourceRunId: 'run-1',
       resumeId: 'resume-run-1',
-      title: 'Investigate the earnings anomaly',
+      fallbackTitle: 'Investigate the earnings anomaly',
       resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
     });
   });

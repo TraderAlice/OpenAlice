@@ -107,6 +107,11 @@ Session totals, live interactive counts, live headless counts, and a bounded
 set of recent attributable Session titles and resume identities. Those titles
 are the first-pass responsibility map; the manager must not replace the index
 with a batch crawl of every desk. Departed desks intentionally do not appear.
+Session titles follow one product-wide order: the native runtime's generated or
+user-renamed title, then OpenAlice's launch-time prompt as a fallback, then the
+sticky launcher name such as `c1` or `x1`. Runtime-specific title discovery
+belongs to each CLI adapter; SessionRegistry owns only that shared precedence
+and the durable cached projection.
 Drill into one selected desk with:
 
 ```bash
