@@ -369,8 +369,20 @@ and verification before the next dependent branch starts from updated `dev`.
 - [x] Add start, open, stop, restart, detach, help, and read-only detail.
 - [ ] Add component/instance panels and narrow fallback.
 - [x] Keep the TUI open and reconnect across a self-owned restart.
-- [ ] Complete source-backed macOS/Linux PTY and real browser acceptance before
+- [x] Complete source-backed macOS/Linux PTY and real browser acceptance before
   merging the bare-command behavior.
+
+Dogfood follow-up on 2026-07-30 installed the CLI and managed Pi into an
+isolated root, launched bare `openalice` through a real macOS PTY, started a
+detached source Runtime, exercised Logs/Doctor/Help, verified
+`/api/auth/status` plus the rendered Ask Alice route in a real browser,
+detached the TUI, and reattached to the surviving Guardian. Repeating the
+journey from an unrelated directory exposed and fixed the missing-source setup
+and disappearing-action-diagnostic paths. The same increment then passed the
+clean-container installer, managed SSH install/start/tunnel/reconnect/repair
+smoke, and Electron PTY smoke; an interactive installer walk confirmed its
+default-no post-install handoff opens the Supervisor without implicitly
+starting the Runtime.
 
 ### 5. Logs, Doctor, and update UX
 
@@ -384,7 +396,7 @@ and verification before the next dependent branch starts from updated `dev`.
 
 ### 6. Configuration and instance model
 
-- [ ] Define machine-wide Supervisor and selected-instance schemas outside
+- [x] Define machine-wide Supervisor and selected-instance schemas outside
   `OPENALICE_HOME`.
 - [ ] Resolve defaults, machine config, instance config, environment, and CLI
   flags once into `ResolvedLaunchContext`, retaining field-level provenance.
@@ -401,6 +413,12 @@ and verification before the next dependent branch starts from updated `dev`.
 - [ ] Make deletion remove registry ownership only by default.
 - [ ] Test concurrent homes, ports, sockets, logs, foreign/stale owners,
   Electron ownership, and remote instances.
+
+The first persisted-configuration increment activates a versioned atomic
+`<Supervisor root>/config.json` and lets the TUI validate, remember, and
+immediately use the selected instance's source checkout. General config
+editing, `config check`, last-known-good live reload, and named-instance
+management remain unchecked above.
 
 ### 7. Standalone headless Runtime artifact
 

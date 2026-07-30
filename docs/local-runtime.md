@@ -88,9 +88,11 @@ adapter workspaces for development, but `build:server` excludes those wrappers
 from UTA Core and no live SDK is evaluated at startup.
 
 When an interactive install is run from inside an OpenAlice checkout, the
-installer presents a separate, default-no `Start OpenAlice now?` prompt after
-the CLI is complete. Installation consent never implies service-start consent,
-and `--yes` remains installation-only for automation.
+installer presents a separate, default-no `Open the OpenAlice Supervisor now?`
+prompt after the CLI is complete. The Supervisor opens inside the checkout but
+does not start the Runtime until the user chooses Start inside the TUI.
+Installation consent never implies service-start consent, and `--yes` remains
+installation-only for automation.
 
 `openalice run` and compatibility `openalice start` stay in the foreground and
 own the Guardian lifetime; `Ctrl+C` stops their self-owned local Runtime. The

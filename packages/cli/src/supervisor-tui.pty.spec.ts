@@ -111,4 +111,60 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
+
+  it('opens an in-TUI source prompt when startup has no checkout', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-source-prompt-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 100,
+      rows: 28,
+      cwd: isolatedHome,
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let requestedStart = false
+      let submittedInvalidPath = false
+      let cancelledPrompt = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor source prompt timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!requestedStart && output.includes('c Source')) {
+          requestedStart = true
+          child.write('s')
+        } else if (!submittedInvalidPath && output.includes('Configure Runtime source')) {
+          submittedInvalidPath = true
+          child.write('\u0005\u0015/definitely/not/openalice\r')
+        } else if (!cancelledPrompt && output.includes('Could not use that checkout')) {
+          cancelledPrompt = true
+          child.write('\u001b')
+        } else if (!detached && output.includes('Source configuration cancelled.')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor source prompt exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Configure Runtime source')
+    expect(transcript).toContain('Could not use that checkout')
+    expect(transcript).toContain('Source configuration cancelled.')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
 })

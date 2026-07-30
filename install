@@ -670,6 +670,7 @@ FILES=(
   "src/launch-context.ts"
   "src/main.ts"
   "src/pi-tui-loader.ts"
+  "src/supervisor-config.ts"
   "src/supervisor-tui.ts"
   "src/doctor.mjs"
   "src/install-layout.mjs"
@@ -744,6 +745,7 @@ chmod +x "$STAGING/bin/openalice.ts"
 chmod +x "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/bin/openalice.ts"
 node --check "$STAGING/bin/openalice.mjs"
+node --check "$STAGING/src/supervisor-config.ts"
 node --check "$STAGING/src/doctor.mjs"
 node --check "$STAGING/src/install-layout.mjs"
 node --check "$STAGING/src/install-source.mjs"
@@ -919,15 +921,16 @@ if [[ -n "$checkout" ]]; then
   printf '\n%bReady to launch%b\n' "$BOLD" "$RESET"
   printf '  Checkout     %s\n' "$checkout"
   printf '  Local UI     http://127.0.0.1:47331\n'
-  printf '  Runtime      Stays attached to this terminal; Ctrl+C stops it\n'
+  printf '  Supervisor   Starts and manages a persistent background Runtime\n'
   if [[ "$TTY_OPEN" -eq 1 ]]; then
     start_status=0
-    prompt_yes_no "Start OpenAlice now? Dependency preparation may take a few minutes." || start_status=$?
+    prompt_yes_no "Open the OpenAlice Supervisor now?" || start_status=$?
     if [[ "$start_status" -eq 0 ]]; then
       exec 3>&- 3<&-
       TTY_OPEN=0
-      printf '\nStarting OpenAlice...\n\n'
-      exec "$BIN_DIR/openalice" start "$checkout"
+      printf '\nOpening the OpenAlice Supervisor...\n\n'
+      cd "$checkout"
+      exec "$BIN_DIR/openalice"
     fi
   fi
   printf '\nStart it when you are ready:\n  cd %q\n  %s\n\n' "$checkout" "$BIN_DIR/openalice"
