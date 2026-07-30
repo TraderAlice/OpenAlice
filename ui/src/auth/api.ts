@@ -12,6 +12,8 @@ export interface AuthStatus {
   session?: { createdAt: string; lastSeenAt: string }
 }
 
+export const AUTH_STATUS_TIMEOUT_MS = 5_000
+
 /** The auth backend could not answer authoritatively. This is deliberately
  * different from `{ authed: false }`: a restart window must never manufacture
  * a logout decision. */
@@ -26,11 +28,18 @@ export class AuthStatusUnavailableError extends Error {
 }
 
 export async function getStatus(): Promise<AuthStatus> {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), AUTH_STATUS_TIMEOUT_MS)
   let res: Response
   try {
-    res = await fetch('/api/auth/status', { credentials: 'same-origin' })
+    res = await fetch('/api/auth/status', {
+      credentials: 'same-origin',
+      signal: controller.signal,
+    })
   } catch (cause) {
     throw new AuthStatusUnavailableError('Auth status request failed', { cause })
+  } finally {
+    window.clearTimeout(timeout)
   }
   if (res.status === 401) {
     return { authed: false, tokenConfigured: true }

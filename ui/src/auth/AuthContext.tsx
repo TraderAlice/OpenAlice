@@ -29,10 +29,12 @@ import {
   type ReactNode,
 } from 'react'
 import { getStatus, type AuthStatus } from './api'
+import { BACKEND_PROBE_REQUESTED_EVENT } from './backendConnectivity'
 
 type AuthState = 'loading' | 'authed' | 'login-required' | 'no-token'
 
 export const AUTH_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 3_000] as const
+export const BACKEND_HEALTH_POLL_MS = 10_000
 
 export function authRetryDelayMs(attempt: number): number {
   const index = Math.max(0, Math.min(attempt - 1, AUTH_RETRY_DELAYS_MS.length - 1))
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [retryAttempt, setRetryAttempt] = useState(0)
   const mountedRef = useRef(false)
   const requestGenerationRef = useRef(0)
+  const requestedProbeTimerRef = useRef<number | null>(null)
   const state = deriveState(status)
 
   const refresh = useCallback(async () => {
@@ -115,6 +118,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, authRetryDelayMs(retryAttempt))
     return () => window.clearTimeout(timer)
   }, [backendUnavailable, refresh, retryAttempt])
+
+  // Once Alice has answered at least once, keep a cheap core heartbeat. This
+  // detects a quiet backend shutdown even when the current page makes no API
+  // requests. The auth status route is side-effect free and does not extend a
+  // session.
+  useEffect(() => {
+    if (state === 'loading' || backendUnavailable) return
+    const timer = window.setInterval(() => {
+      void refresh()
+    }, BACKEND_HEALTH_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [backendUnavailable, refresh, state])
+
+  // Any API transport failure or route 5xx requests an immediate independent
+  // core probe. Debounce cascades from pages whose hooks fail together.
+  useEffect(() => {
+    const requestProbe = () => {
+      if (requestedProbeTimerRef.current !== null) return
+      requestedProbeTimerRef.current = window.setTimeout(() => {
+        requestedProbeTimerRef.current = null
+        void refresh()
+      }, 0)
+    }
+    window.addEventListener(BACKEND_PROBE_REQUESTED_EVENT, requestProbe)
+    return () => {
+      window.removeEventListener(BACKEND_PROBE_REQUESTED_EVENT, requestProbe)
+      if (requestedProbeTimerRef.current !== null) {
+        window.clearTimeout(requestedProbeTimerRef.current)
+        requestedProbeTimerRef.current = null
+      }
+    }
+  }, [refresh])
 
   // Wire the global unauthorized signal — any fetchJson 401 flips us
   // back to the login page, killing whatever the user was doing. This

@@ -1717,5 +1717,14 @@ export const ja: Resources = {
     noTokenHeading: '管理者トークンが設定されていません',
     loginFailed: 'ログインに失敗しました',
     reconnecting: 'OpenAlice に再接続しています…',
+    backendUnavailableEyebrow: 'コアサービスがオフライン',
+    backendUnavailableHeading: 'OpenAlice はバックエンドとの接続を失いました',
+    backendUnavailableDescription:
+      'これは個別ページのデータエラーではありません。ワークスペース、自動化、取引操作はすべて OpenAlice バックエンドに依存するため、サービスが応答するまでアプリ全体を一時停止します。',
+    backendUnavailableImpact:
+      'このウィンドウは開いたままにしてください。接続が戻ると、現在のページへ自動的に復帰します。',
+    backendUnavailableHelp:
+      'このページを提供している OpenAlice ランタイムを確認してから再試行してください。ターミナルから起動した場合は、pnpm dev または openalice up が実行中か確認してください。',
+    retryNow: '今すぐ再試行',
   },
 }

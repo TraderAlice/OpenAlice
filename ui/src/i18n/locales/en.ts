@@ -1729,6 +1729,15 @@ export const en = {
     noTokenHeading: 'No admin token configured',
     loginFailed: 'Login failed',
     reconnecting: 'Reconnecting to OpenAlice…',
+    backendUnavailableEyebrow: 'Core service offline',
+    backendUnavailableHeading: 'OpenAlice lost its backend connection',
+    backendUnavailableDescription:
+      'This is not a page-level data error. Workspaces, automation, and trading controls all depend on the OpenAlice backend, so the application is paused until that service responds.',
+    backendUnavailableImpact:
+      'Keep this window open. Your current page will return automatically when the connection is restored.',
+    backendUnavailableHelp:
+      'Check the OpenAlice runtime that owns this page, then retry. If you started it from a terminal, confirm that pnpm dev or openalice up is still running.',
+    retryNow: 'Retry now',
   },
 } as const
 
