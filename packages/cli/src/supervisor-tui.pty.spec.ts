@@ -167,4 +167,52 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
+
+  it('explains when managed source is unavailable from a source-run CLI', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-managed-source-'))
+    temporaryPaths.push(isolatedHome)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 110,
+      rows: 28,
+      cwd: isolatedHome,
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_SUPERVISOR_HOME: join(isolatedHome, 'supervisor'),
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let requestedManaged = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor managed-source TUI timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!requestedManaged && output.includes('m Managed')) {
+          requestedManaged = true
+          child.write('m')
+        } else if (!detached && output.includes('Managed source preparation is available from an installed')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor managed-source TUI exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain(
+      'Managed source preparation is available from an installed',
+    )
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
 })

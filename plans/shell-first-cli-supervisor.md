@@ -420,6 +420,22 @@ immediately use the selected instance's source checkout. General config
 editing, `config check`, last-known-good live reload, and named-instance
 management remain unchecked above.
 
+The clean-host follow-up reuses the managed-remote install-source identity for
+local startup. A stopped installed Supervisor now confirms `m Managed`, clones
+the exact CLI branch/version into an installer-owned collision-safe path,
+persists it for the selected instance, and continues through the normal
+prepare/build/start flow. This closes the manual `git clone` gap while the
+standalone headless artifact below remains the intended way to remove source
+toolchains from ordinary installs.
+
+The acceptance walk used a new isolated HOME and install root, installed only
+CLI 0.87.0-beta plus managed Pi 0.83.0, then launched from an unrelated empty
+directory. `m Managed` displayed the exact `branch dev` plan, cloned under the
+install root, installed dependencies, built the Runtime, and reached Alice
+ready on an isolated port. `/api/auth/status` and the root page passed, the
+0600 Supervisor config retained the managed path, detach/reattach reused the
+running Guardian, and TUI stop returned the home to absent.
+
 ### 7. Standalone headless Runtime artifact
 
 - [ ] Inventory server/UI/Guardian outputs, production dependencies, native

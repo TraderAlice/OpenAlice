@@ -10,6 +10,7 @@ import {
   formatInstallSelector,
   installedContentIdentity,
   installSourcesMatch,
+  managedSourceKey,
   parseInstallSource,
   readInstallSource,
   requireInstallSource,
@@ -1169,19 +1170,6 @@ function contentIdentitiesMatch(localIdentity, remoteIdentity) {
 
 function normalizeContentIdentity(value) {
   return typeof value === 'string' && /^[a-f0-9]{16}$/.test(value) ? value : null
-}
-
-function managedSourceKey(source) {
-  const normalized = requireInstallSource(source)
-  const readable = `${normalized.selector.kind}-${normalized.selector.value}`
-    .replaceAll(/[^A-Za-z0-9._-]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '')
-    .slice(0, 48) || 'source'
-  const digest = createHash('sha256')
-    .update(`${normalized.selector.kind}:${normalized.selector.value}`)
-    .digest('hex')
-    .slice(0, 8)
-  return `${readable}-${digest}`
 }
 
 function remoteStatePath(env, homeDir) {

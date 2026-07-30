@@ -101,6 +101,8 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
   metadata used when managed remote reproduces the invoking CLI.
 - `packages/cli/src/supervisor-config.ts` — machine-local Supervisor and
   selected-instance configuration loading and atomic persistence.
+- `packages/cli/src/managed-source.ts` — installer-channel-aligned local source
+  selection, validated atomic clone, and collision refusal.
 - `packages/cli/src/install-layout.mjs` — strict discovery of installer-owned
   roots from immutable release paths.
 - `packages/cli/src/update.mjs` — stable manifest checks, bounded start notice,
@@ -216,6 +218,14 @@ Supervisor does not start the Runtime until the user chooses Start inside the
 TUI. For automation,
 `--yes --with-runtime-deps` is the explicit pair that approves the displayed
 Linux package command as well as the CLI transaction.
+
+When no local checkout is discoverable after installation, bare `openalice`
+opens the Supervisor and offers two explicit stopped-state paths: `m` prepares
+an installer-managed checkout aligned to the CLI's branch or version under the
+install root, while `c` selects an existing checkout. Managed preparation never
+overwrites an occupied invalid path. Its first Start can install repository
+dependencies and build the source Runtime; the installer therefore discloses
+and optionally prepares the required native build tools before consent.
 
 ### Source Runtime build tools
 
@@ -403,15 +413,18 @@ With the default installer and Runtime roots:
 │   └── <older-ref-or-content>/
 ├── .cli-install.lock/       # present only while an installer owns it
 ├── .cli-update-check.json   # best-effort stable update cache
-├── sources/                 # selector-specific managed remote checkouts
+├── sources/                 # selector-specific managed local/remote checkouts
 ├── data/                    # application state, not installer debris
 ├── workspaces/              # user work, not installer debris
 ├── provider-keys.json       # sensitive user state
 └── sealing.key              # sensitive machine-bound key
 ```
 
-`sources/` is created by approved managed-remote orchestration, not by the
-installer itself. The installer root and Runtime `OPENALICE_HOME` independently default to
+`sources/` is created only after an approved local Supervisor or managed-remote
+source action, not by the installer transaction itself. CLI-only uninstall
+preserves it deliberately because a checkout may subsequently contain user
+work; a future purge flow must inspect ownership and dirtiness rather than
+blindly deleting it. The installer root and Runtime `OPENALICE_HOME` independently default to
 `~/.openalice`. The installer does not read an `OPENALICE_HOME` override, and
 `openalice start` does not infer Runtime home from the CLI's install location.
 Either override may therefore diverge intentionally. Their default co-location

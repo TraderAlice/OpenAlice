@@ -94,6 +94,12 @@ does not start the Runtime until the user chooses Start inside the TUI.
 Installation consent never implies service-start consent, and `--yes` remains
 installation-only for automation.
 
+On an installed CLI with no existing checkout, the stopped Supervisor exposes
+`m Managed`. After explicit confirmation it atomically clones the branch or
+version paired with that installed CLI under the install root, remembers the
+result for the selected instance, and enters the ordinary source preparation
+and detached-start path. `c Source` remains the existing-checkout path.
+
 `openalice run` and compatibility `openalice start` stay in the foreground and
 own the Guardian lifetime; `Ctrl+C` stops their self-owned local Runtime. The
 Supervisor TUI only detaches. A normal `up` reuses an already healthy matching
