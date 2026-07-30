@@ -108,7 +108,12 @@ export function resolveLaunchContext(
     pathCandidate(env['OPENALICE_HOME'], 'environment', 'OPENALICE_HOME', cwd, homeDir),
     pathCandidate(flags.home, 'cli-flag', '--home', cwd, homeDir),
   )
-  if (instance.value !== 'default' && home.provenance.source === 'default') {
+  if (
+    instance.value !== 'default'
+    && home.provenance.source !== 'instance-config'
+    && home.provenance.source !== 'environment'
+    && home.provenance.source !== 'cli-flag'
+  ) {
     throw launchContextError(
       'EINSTANCEHOME',
       `Instance "${instance.value}" needs an explicit complete home in instance config, OPENALICE_HOME, or --home.`,

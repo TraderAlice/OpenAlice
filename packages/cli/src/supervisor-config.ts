@@ -1,12 +1,24 @@
 import { randomUUID } from 'node:crypto'
+import { constants } from 'node:fs'
 import {
+  access,
   mkdir,
+  readdir,
   readFile,
+  realpath,
   rename,
   rm,
+  stat,
   writeFile,
 } from 'node:fs/promises'
-import { join } from 'node:path'
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from 'node:path'
 
 import {
   resolveLaunchContext,
@@ -22,6 +34,22 @@ import {
 const CONFIG_SCHEMA_VERSION = 1
 const INSTANCE_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
 const CONFIG_FILE_NAME = 'config.json'
+const IGNORED_HOME_ENTRIES = new Set([
+  '.DS_Store',
+  'Thumbs.db',
+  'desktop.ini',
+])
+const OPENALICE_HOME_ENTRIES = new Set([
+  'provider-keys.json',
+  'sealing.key',
+])
+const OPENALICE_HOME_MARKERS = [
+  ['data', 'config'],
+  ['workspaces', 'workspaces.json'],
+  ['state', 'guardian.lock'],
+  ['state', 'runtime.lock'],
+  ['runtime', 'broker-packs'],
+] as const
 const CONFIG_KEYS = new Set([
   'schemaVersion',
   'defaultInstance',
@@ -45,12 +73,20 @@ export interface SupervisorConfigDocument {
 
 export interface StoredLaunchContextOptions
   extends ResolveSupervisorRootOptions {
+  selectedInstance?: string
+  checkStoredHome?: (
+    path: string,
+    instance: string,
+  ) => Promise<void>
   readConfig?: (
     supervisorRoot: string,
   ) => Promise<SupervisorConfigDocument>
 }
 
 export interface PersistInstanceConfigOptions {
+  cwd?: string
+  homeDir?: string
+  platform?: NodeJS.Platform
   readConfig?: (
     supervisorRoot: string,
   ) => Promise<SupervisorConfigDocument>
@@ -58,6 +94,19 @@ export interface PersistInstanceConfigOptions {
     supervisorRoot: string,
     config: SupervisorConfigDocument,
   ) => Promise<void>
+}
+
+export interface SupervisorInstanceSummary {
+  name: string
+  home: string
+  port: number
+  portAutomatic: boolean
+  isDefault: boolean
+}
+
+export interface SupervisorInstanceRegistry {
+  defaultInstance: string
+  instances: SupervisorInstanceSummary[]
 }
 
 export async function readInstanceLaunchConfig(
@@ -84,14 +133,15 @@ export async function resolveStoredLaunchContext(
   )(supervisorRoot)
   const selectedInstance = flags.instance
     ?? env['OPENALICE_INSTANCE']
+    ?? options.selectedInstance
     ?? config.defaultInstance
     ?? 'default'
   const machineConfig: MachineSupervisorConfig = {
-    defaultInstance: config.defaultInstance,
+    defaultInstance: options.selectedInstance ?? config.defaultInstance,
     defaults: config.defaults,
   }
 
-  return resolveLaunchContext({
+  const context = resolveLaunchContext({
     flags,
     machineConfig,
     instanceConfig: config.instances?.[selectedInstance],
@@ -100,6 +150,54 @@ export async function resolveStoredLaunchContext(
     homeDir: options.homeDir,
     platform: options.platform,
   })
+  if (context.provenance.home.source === 'instance-config') {
+    await (
+      options.checkStoredHome ?? assertStoredHomePresent
+    )(context.home, context.instance)
+  }
+  return context
+}
+
+export async function resolveAvailableStoredLaunchContext(
+  options: StoredLaunchContextOptions = {},
+): Promise<ResolvedLaunchContext> {
+  const supervisorRoot = resolveSupervisorRootPath(options)
+  const config = await (
+    options.readConfig ?? readSupervisorConfig
+  )(supervisorRoot)
+  const candidates = [
+    'default',
+    ...Object.keys(config.instances ?? {})
+      .filter((name) => name !== 'default')
+      .sort(),
+  ]
+  let unavailable: unknown
+  for (const name of candidates) {
+    try {
+      return await resolveStoredLaunchContext({}, {
+        ...options,
+        selectedInstance: name,
+        readConfig: async () => config,
+      })
+    } catch (error: unknown) {
+      if (!isStoredHomeUnavailableError(error)) throw error
+      unavailable = error
+    }
+  }
+  throw unavailable ?? configError(
+    'No available OpenAlice instance could be selected.',
+  )
+}
+
+export function isStoredHomeUnavailableError(
+  error: unknown,
+): boolean {
+  return error instanceof Error
+    && 'code' in error
+    && (
+      error.code === 'ESTOREDHOMEMISSING'
+      || error.code === 'ESTOREDHOMEUNAVAILABLE'
+    )
 }
 
 export async function persistInstanceLaunchConfig(
@@ -113,9 +211,26 @@ export async function persistInstanceLaunchConfig(
   const existing = current.instances?.[context.instance] ?? {
     name: context.instance,
   }
+  if (
+    context.instance !== 'default'
+    && Object.hasOwn(patch, 'home')
+    && patch.home === undefined
+  ) {
+    throw configError(
+      `Instance "${context.instance}" must keep an explicit complete home.`,
+    )
+  }
+  const normalizedPatch = { ...patch }
+  if (typeof patch.home === 'string') {
+    normalizedPatch.home = resolveConfiguredHome(
+      context.instance,
+      patch.home,
+      options,
+    )
+  }
   const instance: InstanceLaunchConfig = {
     ...existing,
-    ...patch,
+    ...normalizedPatch,
     name: context.instance,
   }
   for (const key of [
@@ -136,6 +251,105 @@ export async function persistInstanceLaunchConfig(
       [context.instance]: instance,
     },
   }
+  await assertRegistryHomesSeparate(next, options)
+  if (typeof normalizedPatch.home === 'string') {
+    await mkdir(normalizedPatch.home, { recursive: true, mode: 0o700 })
+    await assertHomeCandidateUsable(normalizedPatch.home)
+    instance.home = await realpath(normalizedPatch.home)
+    await assertRegistryHomesSeparate(next, options)
+  }
+  await writeConfig(context.supervisorRoot, next)
+}
+
+export async function readSupervisorInstanceRegistry(
+  context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
+  options: StoredLaunchContextOptions = {},
+): Promise<SupervisorInstanceRegistry> {
+  const config = await (
+    options.readConfig ?? readSupervisorConfig
+  )(context.supervisorRoot)
+  await assertRegistryHomesSeparate(config, options)
+  return buildInstanceRegistry(config, options)
+}
+
+export async function persistSelectedSupervisorInstance(
+  context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
+  name: string,
+  options: PersistInstanceConfigOptions = {},
+): Promise<void> {
+  requireInstanceName(name, 'instance')
+  const readConfig = options.readConfig ?? readSupervisorConfig
+  const writeConfig = options.writeConfig ?? writeSupervisorConfig
+  const current = await readConfig(context.supervisorRoot)
+  if (name !== 'default' && !current.instances?.[name]) {
+    throw configError(`Instance "${name}" is not registered.`)
+  }
+  if (name !== 'default' && !current.instances?.[name]?.home) {
+    throw configError(
+      `Instance "${name}" needs an explicit complete home before it can become the default.`,
+    )
+  }
+  await assertRegistryHomesSeparate(current, options)
+  if (name !== 'default' || current.instances?.default?.home) {
+    const selected = buildInstanceRegistry(current, options)
+      .instances
+      .find((entry) => entry.name === name)
+    if (!selected) {
+      throw configError(`Instance "${name}" is not registered.`)
+    }
+    await assertStoredHomePresent(selected.home, name)
+  }
+  await writeConfig(context.supervisorRoot, {
+    ...current,
+    schemaVersion: CONFIG_SCHEMA_VERSION,
+    defaultInstance: name === 'default' ? undefined : name,
+  })
+}
+
+export async function createSupervisorInstance(
+  context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
+  name: string,
+  home: string,
+  options: PersistInstanceConfigOptions = {},
+): Promise<void> {
+  requireInstanceName(name, 'instance')
+  if (name === 'default') {
+    throw configError('The implicit "default" instance already exists.')
+  }
+  const readConfig = options.readConfig ?? readSupervisorConfig
+  const writeConfig = options.writeConfig ?? writeSupervisorConfig
+  const current = await readConfig(context.supervisorRoot)
+  if (current.instances?.[name]) {
+    throw configError(`Instance "${name}" is already registered.`)
+  }
+  let normalizedHome = resolveConfiguredHome(name, home, options)
+  const candidate: SupervisorConfigDocument = {
+    ...current,
+    schemaVersion: CONFIG_SCHEMA_VERSION,
+    defaultInstance: name,
+    instances: {
+      ...current.instances,
+      [name]: {
+        name,
+        home: normalizedHome,
+      },
+    },
+  }
+  await assertRegistryHomesSeparate(candidate, options)
+  await mkdir(normalizedHome, { recursive: true, mode: 0o700 })
+  await assertHomeCandidateUsable(normalizedHome)
+  normalizedHome = await realpath(normalizedHome)
+  const next: SupervisorConfigDocument = {
+    ...candidate,
+    instances: {
+      ...candidate.instances,
+      [name]: {
+        name,
+        home: normalizedHome,
+      },
+    },
+  }
+  await assertRegistryHomesSeparate(next, options)
   await writeConfig(context.supervisorRoot, next)
 }
 
@@ -222,6 +436,15 @@ export function parseSupervisorConfig(
       instances[name] = { ...parsed, name }
     }
   }
+  if (
+    defaultInstance !== undefined
+    && defaultInstance !== 'default'
+    && !instances?.[defaultInstance]
+  ) {
+    throw configError(
+      `defaultInstance "${defaultInstance}" is not present in instances.`,
+    )
+  }
 
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,
@@ -233,6 +456,203 @@ export function parseSupervisorConfig(
 
 export function supervisorConfigPath(supervisorRoot: string): string {
   return join(supervisorRoot, CONFIG_FILE_NAME)
+}
+
+export function validateSupervisorInstanceName(
+  value: string,
+): string | undefined {
+  if (!INSTANCE_NAME_PATTERN.test(value)) {
+    return 'Use 1-32 lowercase letters, numbers, "_" or "-", beginning with a letter.'
+  }
+  if (value === 'default') {
+    return 'The implicit "default" instance already exists.'
+  }
+  return undefined
+}
+
+function buildInstanceRegistry(
+  config: SupervisorConfigDocument,
+  options: ResolveSupervisorRootOptions,
+): SupervisorInstanceRegistry {
+  const defaultInstance = config.defaultInstance ?? 'default'
+  const names = [
+    'default',
+    ...Object.keys(config.instances ?? {})
+      .filter((name) => name !== 'default')
+      .sort(),
+  ]
+  const machineConfig: MachineSupervisorConfig = {
+    defaultInstance: config.defaultInstance,
+    defaults: config.defaults,
+  }
+  return {
+    defaultInstance,
+    instances: names.map((name) => {
+      const resolved = resolveLaunchContext({
+        flags: { instance: name },
+        machineConfig,
+        instanceConfig: config.instances?.[name],
+        env: {},
+        cwd: options.cwd,
+        homeDir: options.homeDir,
+        platform: options.platform,
+      })
+      return {
+        name,
+        home: resolved.home,
+        port: resolved.port,
+        portAutomatic: resolved.provenance.port.source === 'default',
+        isDefault: name === defaultInstance,
+      }
+    }),
+  }
+}
+
+function resolveConfiguredHome(
+  instance: string,
+  home: string,
+  options: Pick<PersistInstanceConfigOptions, 'cwd' | 'homeDir' | 'platform'>,
+): string {
+  return resolveLaunchContext({
+    flags: { instance, home },
+    env: {},
+    cwd: options.cwd,
+    homeDir: options.homeDir,
+    platform: options.platform,
+  }).home
+}
+
+async function assertRegistryHomesSeparate(
+  config: SupervisorConfigDocument,
+  options: Pick<PersistInstanceConfigOptions, 'cwd' | 'homeDir' | 'platform'>,
+): Promise<void> {
+  const registry = buildInstanceRegistry(config, options)
+  const homes = await Promise.all(registry.instances.map(async (entry) => ({
+    ...entry,
+    physicalHome: await physicalPath(entry.home),
+  })))
+  for (let leftIndex = 0; leftIndex < homes.length; leftIndex += 1) {
+    const left = homes[leftIndex]
+    if (!left) continue
+    for (let rightIndex = leftIndex + 1; rightIndex < homes.length; rightIndex += 1) {
+      const right = homes[rightIndex]
+      if (!right) continue
+      if (
+        normalizedPathKey(left.physicalHome, options.platform)
+          === normalizedPathKey(right.physicalHome, options.platform)
+        || pathContains(left.physicalHome, right.physicalHome)
+        || pathContains(right.physicalHome, left.physicalHome)
+      ) {
+        throw configError(
+          `Complete home ${right.home} for instance "${right.name}" overlaps instance "${left.name}" at ${left.home}. Choose a separate directory.`,
+        )
+      }
+    }
+  }
+}
+
+async function physicalPath(path: string): Promise<string> {
+  const absolute = resolve(path)
+  let current = absolute
+  const suffix: string[] = []
+  while (true) {
+    try {
+      return resolve(await realpath(current), ...suffix)
+    } catch (error: unknown) {
+      if (!isNodeError(error, 'ENOENT')) return absolute
+      const parent = dirname(current)
+      if (parent === current) return absolute
+      suffix.unshift(basename(current))
+      current = parent
+    }
+  }
+}
+
+async function assertHomeCandidateUsable(path: string): Promise<void> {
+  let info
+  try {
+    info = await stat(path)
+  } catch (error: unknown) {
+    if (isNodeError(error, 'ENOENT')) return
+    throw configError(
+      `Complete home ${path} is unavailable: ${errorMessage(error)}`,
+    )
+  }
+  if (!info.isDirectory()) {
+    throw configError(`Complete home ${path} is not a directory.`)
+  }
+  try {
+    await access(path, constants.R_OK | constants.W_OK)
+    const entries = (await readdir(path))
+      .filter((entry) => !IGNORED_HOME_ENTRIES.has(entry))
+    if (entries.length === 0) return
+    if (
+      entries.some((entry) => OPENALICE_HOME_ENTRIES.has(entry))
+      || await hasOpenAliceHomeMarker(path)
+    ) return
+  } catch (error: unknown) {
+    if (isConfigError(error)) throw error
+    throw configError(
+      `Complete home ${path} is unavailable or not writable: ${errorMessage(error)}`,
+    )
+  }
+  throw configError(
+    `Complete home ${path} is non-empty and is not an existing OpenAlice home. Choose an empty directory or an OpenAlice home.`,
+  )
+}
+
+async function assertStoredHomePresent(
+  path: string,
+  instance: string,
+): Promise<void> {
+  try {
+    const info = await stat(path)
+    if (!info.isDirectory()) {
+      throw configError(
+        `Registered complete home ${path} for instance "${instance}" is not a directory.`,
+        'ESTOREDHOMEUNAVAILABLE',
+      )
+    }
+    await access(path, constants.R_OK | constants.W_OK)
+  } catch (error: unknown) {
+    if (isConfigError(error)) throw error
+    const missing = isNodeError(error, 'ENOENT')
+      ? 'is missing'
+      : 'is unavailable or not writable'
+    throw configError(
+      `Registered complete home ${path} for instance "${instance}" ${missing}. Reconnect it or choose another instance.`,
+      isNodeError(error, 'ENOENT')
+        ? 'ESTOREDHOMEMISSING'
+        : 'ESTOREDHOMEUNAVAILABLE',
+    )
+  }
+}
+
+async function hasOpenAliceHomeMarker(path: string): Promise<boolean> {
+  for (const parts of OPENALICE_HOME_MARKERS) {
+    try {
+      await access(join(path, ...parts))
+      return true
+    } catch {
+      // Keep checking known complete-home markers.
+    }
+  }
+  return false
+}
+
+function normalizedPathKey(
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const normalized = resolve(path)
+  return platform === 'win32'
+    ? normalized.toLocaleLowerCase('en-US')
+    : normalized
+}
+
+function pathContains(parent: string, child: string): boolean {
+  const rel = relative(parent, child)
+  return rel.length > 0 && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
 function parseLaunchValues(
@@ -321,12 +741,15 @@ function rejectUnknownKeys(
   }
 }
 
-function configError(message: string): Error & {
+function configError(
+  message: string,
+  code = 'ESUPERVISORCONFIG',
+): Error & {
   code: string
   exitCode: number
 } {
   return Object.assign(new Error(message), {
-    code: 'ESUPERVISORCONFIG',
+    code,
     exitCode: 2,
   })
 }

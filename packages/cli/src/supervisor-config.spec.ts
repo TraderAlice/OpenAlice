@@ -1,12 +1,25 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
+  createSupervisorInstance,
   parseSupervisorConfig,
   persistInstanceLaunchConfig,
+  persistSelectedSupervisorInstance,
+  readSupervisorInstanceRegistry,
+  resolveAvailableStoredLaunchContext,
   resolveStoredLaunchContext,
   supervisorConfigPath,
 } from './supervisor-config.ts'
@@ -60,6 +73,47 @@ describe('Supervisor configuration', () => {
         home: { source: 'environment' },
         port: { source: 'cli-flag' },
         appDir: { source: 'instance-config' },
+      },
+    })
+  })
+
+  it('falls back to an available instance only after a stored default home becomes unavailable', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-recovery-'))
+    temporaryPaths.push(root)
+    const config = {
+      schemaVersion: 1 as const,
+      defaultInstance: 'missing',
+      instances: {
+        missing: {
+          name: 'missing',
+          home: join(root, 'disconnected-home'),
+        },
+      },
+    }
+    const options = {
+      homeDir: join(root, 'user'),
+      cwd: root,
+      platform: 'linux' as const,
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+      readConfig: async () => config,
+    }
+
+    await expect(resolveStoredLaunchContext({}, options)).rejects.toMatchObject({
+      code: 'ESTOREDHOMEMISSING',
+    })
+
+    const fallback = await resolveAvailableStoredLaunchContext(options)
+    expect(fallback).toMatchObject({
+      instance: 'default',
+      home: resolve(root, 'user/.openalice'),
+      provenance: {
+        instance: {
+          source: 'machine-config',
+          detail: 'machine.defaultInstance',
+        },
+        home: {
+          source: 'default',
+        },
       },
     })
   })
@@ -131,6 +185,179 @@ describe('Supervisor configuration', () => {
     })
   })
 
+  it('creates, lists, selects, and remembers named complete-home instances', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-instances-'))
+    temporaryPaths.push(root)
+    const homeDir = join(root, 'user')
+    const configRoot = join(root, 'config')
+    const context = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: configRoot },
+    })
+
+    await createSupervisorInstance(
+      context,
+      'research',
+      './research-home',
+      { homeDir, cwd: root, platform: 'linux' },
+    )
+    const researchHome = await realpath(resolve(root, 'research-home'))
+
+    const registry = await readSupervisorInstanceRegistry(context, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+    })
+    expect(registry).toEqual({
+      defaultInstance: 'research',
+      instances: [
+        {
+          name: 'default',
+          home: resolve(homeDir, '.openalice'),
+          port: 47_331,
+          portAutomatic: true,
+          isDefault: false,
+        },
+        {
+          name: 'research',
+          home: researchHome,
+          port: 47_331,
+          portAutomatic: true,
+          isDefault: true,
+        },
+      ],
+    })
+
+    const selected = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: configRoot },
+    })
+    expect(selected).toMatchObject({
+      instance: 'research',
+      home: researchHome,
+    })
+
+    await persistSelectedSupervisorInstance(context, 'default')
+    const saved = JSON.parse(
+      await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'),
+    )
+    expect(saved.defaultInstance).toBeUndefined()
+    expect(saved.instances.research.home).toBe(researchHome)
+    expect((await stat(researchHome)).isDirectory()).toBe(true)
+
+    await rm(researchHome, {
+      recursive: true,
+      force: true,
+    })
+    await expect(persistSelectedSupervisorInstance(
+      context,
+      'research',
+      { homeDir, cwd: root, platform: 'linux' },
+    )).rejects.toThrow(/Registered complete home .* is missing/)
+    expect(JSON.parse(
+      await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'),
+    ).defaultInstance).toBeUndefined()
+    await expect(resolveStoredLaunchContext({ instance: 'research' }, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: configRoot },
+    })).rejects.toThrow(/Registered complete home .* is missing/)
+  })
+
+  it('rejects duplicate, overlapping, and home-less named instances', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-collision-'))
+    temporaryPaths.push(root)
+    const homeDir = join(root, 'user')
+    const context = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+
+    await expect(createSupervisorInstance(
+      context,
+      'nested',
+      join(context.home, 'child'),
+      { homeDir, cwd: root, platform: 'linux' },
+    )).rejects.toThrow(/overlaps instance "default"/)
+
+    await createSupervisorInstance(
+      context,
+      'paper',
+      join(root, 'paper-home'),
+      { homeDir, cwd: root, platform: 'linux' },
+    )
+    await expect(createSupervisorInstance(
+      context,
+      'paper',
+      join(root, 'another-home'),
+      { homeDir, cwd: root, platform: 'linux' },
+    )).rejects.toThrow(/already registered/)
+
+    const unrelated = join(root, 'unrelated')
+    await mkdir(unrelated)
+    await writeFile(join(unrelated, 'notes.txt'), 'not OpenAlice')
+    await expect(createSupervisorInstance(
+      context,
+      'unsafe',
+      unrelated,
+      { homeDir, cwd: root, platform: 'linux' },
+    )).rejects.toThrow(/non-empty and is not an existing OpenAlice home/)
+
+    const selected = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    await expect(persistInstanceLaunchConfig(
+      selected,
+      { home: undefined },
+    )).rejects.toThrow(/must keep an explicit complete home/)
+  })
+
+  it('resolves symlinked ancestors before checking nested-home collisions', async ({ skip }) => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-symlink-'))
+    temporaryPaths.push(root)
+    const homeDir = join(root, 'user')
+    const context = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    const actual = join(root, 'actual')
+    const alias = join(root, 'alias')
+    await mkdir(actual)
+    try {
+      await symlink(actual, alias, 'dir')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') {
+        skip('symlinks unavailable on this runner')
+        return
+      }
+      throw error
+    }
+
+    await persistInstanceLaunchConfig(
+      context,
+      { home: join(actual, 'default-home') },
+      { homeDir, cwd: root, platform: 'linux' },
+    )
+    await expect(createSupervisorInstance(
+      context,
+      'nested',
+      join(alias, 'default-home', 'nested'),
+      { homeDir, cwd: root, platform: 'linux' },
+    )).rejects.toThrow(/overlaps instance "default"/)
+  })
+
   it('rejects corrupt, unknown, and mismatched configuration fields', () => {
     expect(() => parseSupervisorConfig({
       schemaVersion: 2,
@@ -145,5 +372,9 @@ describe('Supervisor configuration', () => {
         research: { name: 'other' },
       },
     })).toThrow(/must match its registry key/)
+    expect(() => parseSupervisorConfig({
+      schemaVersion: 1,
+      defaultInstance: 'missing',
+    })).toThrow(/not present in instances/)
   })
 })

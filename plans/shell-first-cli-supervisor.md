@@ -398,7 +398,7 @@ starting the Runtime.
 
 - [x] Define machine-wide Supervisor and selected-instance schemas outside
   `OPENALICE_HOME`.
-- [ ] Resolve defaults, machine config, instance config, environment, and CLI
+- [x] Resolve defaults, machine config, instance config, environment, and CLI
   flags once into `ResolvedLaunchContext`, retaining field-level provenance.
 - [ ] Add `openalice config check` plus TUI diagnostics; invalid live reload
   retains the last valid configuration.
@@ -409,10 +409,10 @@ starting the Runtime.
   session root without changing a user-installed Pi launched externally.
 - [x] Update the managed Workspace runtime owner guide and tests for the new
   managed-Pi isolation boundary.
-- [ ] Define a versioned atomic CLI-owned registry mapping names to complete
+- [x] Define a versioned atomic CLI-owned registry mapping names to complete
   homes; never store the registry inside a selected home.
-- [ ] Preserve implicit `default` without moving existing data.
-- [ ] Add `--instance`, list, TUI selection, and collision checks.
+- [x] Preserve implicit `default` without moving existing data.
+- [x] Add `--instance`, list, TUI selection, and collision checks.
 - [ ] Make deletion remove registry ownership only by default.
 - [ ] Test concurrent homes, ports, sockets, logs, foreign/stale owners,
   Electron ownership, and remote instances.
@@ -696,3 +696,24 @@ This plan is complete only when:
   its expected Guardian PID. The same isolated installed CLI then completed
   start, authenticated Web/root probes, stop/restart ownership handoff,
   reconnect, and final stop while the desktop app remained active.
+- 2026-07-30: Added `i Instances` as a first-class Supervisor path. The TUI
+  now lists the implicit default and registered instances, creates a validated
+  named entry with a separate complete home, switches the live view without
+  stopping another Runtime, and remembers the selection for the next bare
+  start. Environment/CLI-selected instance or Home overrides make the list
+  visibly read-only. Named homes cannot be cleared, duplicated, or nested
+  under another registered home.
+- 2026-07-30: Real multi-instance dogfood created `paper` entirely inside the
+  TUI, started it on 47331, switched to the implicit default while it remained
+  active, and started a second Runtime that automatically selected 47334 after
+  the first instance's Web and internal ports. Both auth-status probes passed;
+  switching back found the first live owner, and each Runtime stopped from its
+  own TUI view. The journey exposed that explicit lifecycle/observability
+  commands still bypassed the stored registry; `up`, `run`, `down`, `status`,
+  `open`, `logs`, and `doctor` now resolve TUI-registered named homes before
+  dispatch.
+- 2026-07-30: A missing registered complete Home now fails explicit
+  automation selection but no longer strands a bare interactive launch. The
+  Supervisor keeps the unavailable entry, opens on an available fallback,
+  explains the recovery, and lets `i Instances` atomically repair the
+  remembered default. Unit and real-PTY coverage preserve that distinction.
