@@ -122,6 +122,16 @@ export async function readInstanceLaunchConfig(
   }
 }
 
+export async function readMachineLaunchConfig(
+  context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
+  options: Pick<PersistInstanceConfigOptions, 'readConfig'> = {},
+): Promise<LaunchConfigValues> {
+  const config = await (
+    options.readConfig ?? readSupervisorConfig
+  )(context.supervisorRoot)
+  return { ...config.defaults }
+}
+
 export async function resolveStoredLaunchContext(
   flags: TuiLaunchFlags = {},
   options: StoredLaunchContextOptions = {},
@@ -256,6 +266,46 @@ export async function persistInstanceLaunchConfig(
     await mkdir(normalizedPatch.home, { recursive: true, mode: 0o700 })
     await assertHomeCandidateUsable(normalizedPatch.home)
     instance.home = await realpath(normalizedPatch.home)
+    await assertRegistryHomesSeparate(next, options)
+  }
+  await writeConfig(context.supervisorRoot, next)
+}
+
+export async function persistMachineLaunchConfig(
+  context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
+  patch: LaunchConfigValues,
+  options: PersistInstanceConfigOptions = {},
+): Promise<void> {
+  const readConfig = options.readConfig ?? readSupervisorConfig
+  const writeConfig = options.writeConfig ?? writeSupervisorConfig
+  const current = await readConfig(context.supervisorRoot)
+  const defaults: LaunchConfigValues = {
+    ...current.defaults,
+    ...patch,
+  }
+  for (const key of [
+    'home',
+    'port',
+    'appDir',
+    'updateChecks',
+  ] as const) {
+    if (Object.hasOwn(patch, key) && patch[key] === undefined) {
+      delete defaults[key]
+    }
+  }
+  if (typeof patch.home === 'string') {
+    defaults.home = resolveConfiguredHome('default', patch.home, options)
+  }
+  const next: SupervisorConfigDocument = {
+    ...current,
+    schemaVersion: CONFIG_SCHEMA_VERSION,
+    defaults: Object.keys(defaults).length > 0 ? defaults : undefined,
+  }
+  await assertRegistryHomesSeparate(next, options)
+  if (typeof defaults.home === 'string' && Object.hasOwn(patch, 'home')) {
+    await mkdir(defaults.home, { recursive: true, mode: 0o700 })
+    await assertHomeCandidateUsable(defaults.home)
+    defaults.home = await realpath(defaults.home)
     await assertRegistryHomesSeparate(next, options)
   }
   await writeConfig(context.supervisorRoot, next)

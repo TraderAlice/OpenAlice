@@ -201,6 +201,7 @@ Configuration resolves exactly once with observable provenance:
 
 ```text
 defaults
+  < installed Runtime provider
   < machine-wide Supervisor config
   < selected instance config
   < environment variables
@@ -405,6 +406,8 @@ starting the Runtime.
 - [x] Add a selected-instance TUI settings overlay for complete home, Web port,
   and update-check inheritance, with active-Runtime guards and visible
   environment/CLI locks.
+- [x] Let parameter-free Setup switch between selected-instance values and
+  machine defaults while preserving environment and explicit CLI priority.
 - [x] Give OpenAlice-managed Pi an instance-local `PI_CODING_AGENT_DIR` and
   session root without changing a user-installed Pi launched externally.
 - [x] Update the managed Workspace runtime owner guide and tests for the new
@@ -423,8 +426,11 @@ immediately use the selected instance's source checkout, complete home, Web
 port, and update policy. Returning a field to inheritance removes only that
 instance key. Environment and CLI provenance visibly lock lower-priority
 editing, while an active Runtime prevents its home or port from changing
-underneath it. Machine-default editing, `config check`, last-known-good live
-reload, and named-instance management remain unchecked above.
+underneath it. Setup now switches in place to machine defaults, persists their
+Home, port, and update policy atomically, and immediately re-resolves the
+selected instance. Higher-priority instance, environment, and explicit command
+layers continue to win. `config check`, last-known-good live reload, and
+registry deletion remain unchecked above.
 
 The clean-host follow-up reuses the managed-remote install-source identity for
 local startup. A stopped installed Supervisor now confirms `m Managed`, clones
@@ -753,3 +759,12 @@ This plan is complete only when:
   Supervisor keeps the unavailable entry, opens on an available fallback,
   explains the recovery, and lets `i Instances` atomically repair the
   remembered default. Unit and real-PTY coverage preserve that distinction.
+- 2026-07-30: Refined the parameter-free installed experience around the bare
+  TUI. Enter now starts a stopped Runtime and opens its verified browser
+  endpoint in one action, while `s` remains the explicit background-only
+  start. Setup uses ordinary product vocabulary, identifies the installed
+  Runtime by OpenAlice version and content identity, and edits either the
+  current instance or inherited machine defaults without weakening
+  environment/CLI precedence. Real PTY coverage exercises both persisted
+  layers, and an installed bundle dogfood launch reached Alice, opened the Web
+  UI, detached, reattached, and stopped cleanly.

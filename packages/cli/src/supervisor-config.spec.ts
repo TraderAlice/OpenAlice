@@ -17,7 +17,9 @@ import {
   createSupervisorInstance,
   parseSupervisorConfig,
   persistInstanceLaunchConfig,
+  persistMachineLaunchConfig,
   persistSelectedSupervisorInstance,
+  readMachineLaunchConfig,
   readSupervisorInstanceRegistry,
   resolveAvailableStoredLaunchContext,
   resolveStoredLaunchContext,
@@ -183,6 +185,69 @@ describe('Supervisor configuration', () => {
       name: 'default',
       updateChecks: false,
     })
+  })
+
+  it('persists machine defaults below instance, environment, and CLI layers', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-machine-'))
+    temporaryPaths.push(root)
+    const homeDir = join(root, 'user')
+    const context = await resolveStoredLaunchContext({}, {
+      homeDir,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+
+    await persistMachineLaunchConfig(context, {
+      home: join(root, 'machine-home'),
+      port: 48_001,
+      updateChecks: false,
+    }, {
+      homeDir,
+      platform: 'linux',
+    })
+
+    await expect(readMachineLaunchConfig(context)).resolves.toEqual({
+      home: await realpath(join(root, 'machine-home')),
+      port: 48_001,
+      updateChecks: false,
+    })
+    const inherited = await resolveStoredLaunchContext({}, {
+      homeDir,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    expect(inherited).toMatchObject({
+      home: await realpath(join(root, 'machine-home')),
+      port: 48_001,
+      updateChecks: false,
+      provenance: {
+        home: { source: 'machine-config' },
+        port: { source: 'machine-config' },
+        updateChecks: { source: 'machine-config' },
+      },
+    })
+
+    await persistInstanceLaunchConfig(inherited, { port: 48_002 })
+    const overridden = await resolveStoredLaunchContext({ port: 48_004 }, {
+      homeDir,
+      platform: 'linux',
+      env: {
+        XDG_CONFIG_HOME: join(root, 'config'),
+        OPENALICE_WEB_PORT: '48003',
+      },
+    })
+    expect(overridden.port).toBe(48_004)
+    expect(overridden.provenance.port.source).toBe('cli-flag')
+
+    await persistMachineLaunchConfig(overridden, {
+      home: undefined,
+      port: undefined,
+      updateChecks: undefined,
+    }, {
+      homeDir,
+      platform: 'linux',
+    })
+    await expect(readMachineLaunchConfig(context)).resolves.toEqual({})
   })
 
   it('creates, lists, selects, and remembers named complete-home instances', async () => {
