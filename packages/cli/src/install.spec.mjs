@@ -129,6 +129,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     expect(releases[0]).toMatch(/^test_ref-[a-f0-9]{16}$/)
     await expect(access(join(installRoot, 'cli-versions', releases[0], 'bin', 'openalice.ts'))).resolves.toBeUndefined()
     await expect(access(join(installRoot, 'cli-versions', releases[0], 'managed', 'pi', 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js'))).resolves.toBeUndefined()
+    await expect(access(join(installRoot, 'cli-versions', releases[0], 'managed', 'pi', 'node_modules', '@earendil-works', 'pi-tui', 'package.json'))).resolves.toBeUndefined()
     await expect(access(join(installRoot, 'bin', 'openalice.cmd'))).resolves.toBeUndefined()
     await expect(access(join(installRoot, 'bin', 'pi.cmd'))).resolves.toBeUndefined()
 

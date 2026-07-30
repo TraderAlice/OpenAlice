@@ -285,7 +285,9 @@ Before a release becomes visible, the installer:
 3. executes the staged CLI with `--version` and compares its result with the
    package manifest;
 4. verifies the Pi install manifest and lockfile against the SHA-256 values
-   pinned in the installer, then requires the staged Pi CLI to report `0.83.0`;
+   pinned in the installer, requires the staged Pi CLI to report `0.83.0`, and
+   resolves the pinned `@earendil-works/pi-tui` dependency from that exact
+   managed Pi closure;
 5. verifies and expands the matching headless Runtime when the selected release
    supplies one, then requires its product version to equal the CLI version;
 6. writes `install-source.json` with the CLI version, selected branch/tag/commit,
@@ -312,10 +314,10 @@ The resulting directory is:
 ```
 
 Installing identical content for the same ref reuses the existing directory
-only when the content hash, executable Pi version, and full Runtime manifest
-verification still match. If a
-directory claims that identity but its files no longer hash correctly or its
-managed Pi runtime is missing/damaged, it is preserved as
+only when the content hash, executable Pi version, managed `pi-tui` dependency,
+and full Runtime manifest verification still match. If a directory claims that
+identity but its files no longer hash correctly or its managed Pi runtime is
+missing/damaged, it is preserved as
 `<release>.damaged.<pid>` and replaced with the validated staging tree. The
 installer does not silently destroy the damaged evidence.
 
@@ -618,6 +620,8 @@ It verifies:
   install-provenance managed Runtime planning, cancellation, and detach;
 - idempotent managed PATH configuration;
 - identical-release reuse;
+- damaged-release preservation and repair when Pi remains runnable but its TUI
+  dependency is missing;
 - ref switching without deleting the prior release;
 - development-channel update guidance without a stable-channel network check;
 - installed uninstall execution that removes CLI assets and PATH integration

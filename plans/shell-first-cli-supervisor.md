@@ -780,3 +780,10 @@ This plan is complete only when:
   had never executed bare `openalice`; the fixture now supplies a minimal
   adapter and the Docker acceptance itself drives Enter, verifies the
   install-provenance plan, cancels, and detaches.
+- 2026-07-30: Hardened the install boundary exposed by that clean-container
+  journey. Staged installs and identical-release reuse now resolve
+  `@earendil-works/pi-tui` from the exact managed Pi closure instead of treating
+  a runnable Pi CLI as proof that the Supervisor renderer exists. Docker
+  acceptance deletes only that dependency from an otherwise healthy release,
+  verifies that the installer preserves the damaged evidence, replaces the
+  release atomically, and confirms the repaired closure before continuing.
