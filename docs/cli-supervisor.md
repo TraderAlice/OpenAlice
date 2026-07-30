@@ -120,6 +120,14 @@ small ordinary action bar. A configured instance source,
 advanced source controls. The managed source path is
 `<install root>/sources/<install-source identity>/OpenAlice`.
 
+For an older or development install without a bundled Runtime, Enter still
+owns the ordinary path. If current-directory source discovery fails, it reads
+the installed branch/version provenance and opens the same managed-source
+confirmation as `m`; accepting prepares and remembers that source, starts
+OpenAlice, and opens the browser. `c` remains the explicit manual-checkout
+path. A source-run CLI with no installed provenance falls back to the source
+path editor instead of pretending it can manage an install root.
+
 ## TUI Launch Context
 
 The TypeScript entry resolves launch-affecting values before starting terminal

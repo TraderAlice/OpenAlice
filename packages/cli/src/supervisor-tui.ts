@@ -279,6 +279,7 @@ export async function runSupervisorTui(
   let sourcePromptActive = false
   let settingsActive = false
   let instancesActive = false
+  let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
   let closeInstances: (() => void) | null = null
@@ -303,7 +304,7 @@ export async function runSupervisorTui(
       void openInstances()
     },
     onRequestManagedSource: () => {
-      void requestManagedSource()
+      void requestManagedSource('start')
     },
     onPrepareManagedSource: () => {
       void prepareManagedSourceAndStart()
@@ -384,7 +385,7 @@ export async function runSupervisorTui(
       try {
         await findSource(process.cwd())
       } catch (error: unknown) {
-        openSourcePrompt(safeError(error))
+        await requestManagedSource(action, safeError(error))
         return
       }
     }
@@ -470,7 +471,10 @@ export async function runSupervisorTui(
     }
   }
 
-  async function requestManagedSource(): Promise<void> {
+  async function requestManagedSource(
+    startAction: 'start' | 'start-open',
+    sourceFailure?: string,
+  ): Promise<void> {
     if (actionRunning) return
     const source = context.provenance.appDir.source
     if (source === 'environment' || source === 'cli-flag') {
@@ -480,6 +484,7 @@ export async function runSupervisorTui(
       return
     }
     actionRunning = true
+    let sourceFallback: string | undefined
     screen.update({
       busy: 'Inspecting managed source',
       notice: undefined,
@@ -488,23 +493,34 @@ export async function runSupervisorTui(
     try {
       const managedSource = await inspectManaged()
       if (!active) return
+      managedStartAction = startAction
       screen.update({
         managedSource,
         confirmation: 'managed-source',
       })
     } catch (error: unknown) {
       if (!active) return
-      screen.update({
-        diagnostic: `Managed source is unavailable: ${safeError(error)}`,
-      })
+      if (sourceFailure) {
+        sourceFallback = [
+          sourceFailure,
+          `Automatic Runtime setup is unavailable: ${safeError(error)}`,
+        ].join(' ')
+      } else {
+        screen.update({
+          diagnostic: `Managed source is unavailable: ${safeError(error)}`,
+        })
+      }
     } finally {
       actionRunning = false
       if (active) screen.update({ busy: undefined })
     }
+    if (sourceFallback) openSourcePrompt(sourceFallback)
   }
 
   async function prepareManagedSourceAndStart(): Promise<void> {
     if (!active || actionRunning) return
+    const startAction = managedStartAction
+    managedStartAction = 'start'
     actionRunning = true
     let prepared = false
     let actionFailure: string | undefined
@@ -538,7 +554,7 @@ export async function runSupervisorTui(
         if (actionFailure) screen.update({ diagnostic: actionFailure })
       }
     }
-    if (prepared && active) await performAction('start')
+    if (prepared && active) await performAction(startAction)
   }
 
   function openSourcePrompt(reason?: string): void {
@@ -1546,8 +1562,10 @@ export class SupervisorScreen implements Component {
           `Web: ${runtime?.endpoints?.web ?? 'not available'}`,
           `Components: ${formatComponents(runtime)}`,
         )
-        const provider = runtime?.provider?.kind
-          ?? this.snapshot.context?.runtimeProvider.kind
+        const reportedProvider = runtime?.provider?.kind
+        const provider = reportedProvider && reportedProvider !== 'unknown'
+          ? reportedProvider
+          : this.snapshot.context?.runtimeProvider.kind
         if (provider) {
           lines.push(`Provider: ${provider}${runtime?.class === 'absent' && provider === 'bundle' ? ' (installed)' : ''}`)
         }
@@ -1662,8 +1680,8 @@ function renderGuidance(
       ]
     }
     return [
-      'OpenAlice is stopped. Press Enter to start and open the browser.',
-      'Source development: m prepares managed source; c chooses a checkout.',
+      'OpenAlice is ready to start.',
+      'Enter prepares anything missing and opens the browser; c chooses a checkout.',
     ]
   }
   if (runtime.class === 'incompatible') {

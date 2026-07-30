@@ -768,3 +768,15 @@ This plan is complete only when:
   environment/CLI precedence. Real PTY coverage exercises both persisted
   layers, and an installed bundle dogfood launch reached Alice, opened the Web
   UI, detached, reattached, and stopped cleanly.
+- 2026-07-30: Removed the remaining source-only first-start detour. When Enter
+  cannot discover a checkout, an installed CLI now derives the managed source
+  plan from its own branch/version provenance, asks for consent in the TUI,
+  then preserves the original start-and-open intent after preparation. `c`
+  remains the manual checkout escape hatch, while a non-installed source-run
+  CLI still falls back to the path editor. Stopped bundle views also ignore an
+  uninformative `provider=unknown` observation and show the verified installed
+  provider from launch context. Manual clean-container review exposed that the
+  offline installer fixture did not include Pi's TUI dependency and therefore
+  had never executed bare `openalice`; the fixture now supplies a minimal
+  adapter and the Docker acceptance itself drives Enter, verifies the
+  install-provenance plan, cancels, and detaches.

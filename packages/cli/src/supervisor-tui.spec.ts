@@ -84,6 +84,7 @@ describe('Supervisor TUI screen', () => {
         home: context.home,
         owner: null,
         endpoints: {},
+        provider: { kind: 'unknown' },
       },
       context,
     })
@@ -136,7 +137,7 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['start-open'])
     expect(screen.render(100).join('\n')).toContain(
-      'Press Enter to start and open the browser',
+      'Enter prepares anything missing and opens the browser',
     )
 
     screen.update({
@@ -216,6 +217,109 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(calls).toEqual(['start', 'open'])
+  })
+
+  it('uses installed provenance to prepare missing source before Enter starts and opens', async () => {
+    const calls: string[] = []
+    let runtime: {
+      class: string
+      owner: { surface: string; pid: number } | null
+      endpoints: { web?: string }
+    } = {
+      class: 'absent',
+      owner: null,
+      endpoints: {},
+    }
+    let inputListener: ((data: string) => unknown) | undefined
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => inputListener?.('enter'))
+      }
+      stop(): void {}
+    }
+    const fakePiTui = {
+      ProcessTerminal: class {},
+      TUI: FakeTui,
+      matchesKey,
+    }
+    const initialContext = resolveLaunchContext({
+      cwd: '/tmp/empty',
+      homeDir: '/home/alice',
+      env: {},
+    })
+    const preparedContext = resolveLaunchContext({
+      cwd: '/tmp/empty',
+      homeDir: '/home/alice',
+      flags: { appDir: '/opt/openalice/managed-source' },
+      env: {},
+    })
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => initialContext,
+      inspect: async () => runtime,
+      findSource: async () => {
+        throw new Error('No OpenAlice checkout was found.')
+      },
+      inspectManagedSource: async () => {
+        calls.push('inspect-managed')
+        setTimeout(() => inputListener?.('enter'), 0)
+        return {
+          appDir: '/opt/openalice/managed-source',
+          installRoot: '/opt/openalice',
+          repositoryUrl: 'https://github.com/TraderAlice/OpenAlice.git',
+          selector: { kind: 'branch', value: 'dev' },
+          state: 'absent',
+        }
+      },
+      prepareManagedSource: async () => {
+        calls.push('prepare-managed')
+        return {
+          appDir: '/opt/openalice/managed-source',
+          installRoot: '/opt/openalice',
+          repositoryUrl: 'https://github.com/TraderAlice/OpenAlice.git',
+          selector: { kind: 'branch', value: 'dev' },
+          state: 'present',
+          created: true,
+        }
+      },
+      configureInstance: async () => {
+        calls.push('configure-instance')
+        return preparedContext
+      },
+      start: async () => {
+        calls.push('start')
+        runtime = {
+          class: 'running',
+          owner: { surface: 'cli-server', pid: 42 },
+          endpoints: { web: 'http://127.0.0.1:47331' },
+        }
+      },
+      open: async () => {
+        calls.push('open')
+        queueMicrotask(() => inputListener?.('q'))
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => fakePiTui as never,
+      version: '0.87.0-beta',
+      channel: 'branch dev',
+    })).resolves.toBe(0)
+
+    expect(calls).toEqual([
+      'inspect-managed',
+      'prepare-managed',
+      'configure-instance',
+      'start',
+      'open',
+    ])
   })
 
   it('keeps foreign-owned lifecycle mutations unavailable', () => {
