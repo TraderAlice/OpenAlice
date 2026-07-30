@@ -390,9 +390,9 @@ and verification before the next dependent branch starts from updated `dev`.
   flags once into `ResolvedLaunchContext`, retaining field-level provenance.
 - [ ] Add `openalice config check` plus TUI diagnostics; invalid live reload
   retains the last valid configuration.
-- [ ] Give OpenAlice-managed Pi an instance-local `PI_CODING_AGENT_DIR` and
+- [x] Give OpenAlice-managed Pi an instance-local `PI_CODING_AGENT_DIR` and
   session root without changing a user-installed Pi launched externally.
-- [ ] Update the managed Workspace runtime owner guide and tests for the new
+- [x] Update the managed Workspace runtime owner guide and tests for the new
   managed-Pi isolation boundary.
 - [ ] Define a versioned atomic CLI-owned registry mapping names to complete
   homes; never store the registry inside a selected home.
@@ -622,3 +622,23 @@ This plan is complete only when:
   The Docker installer playground remained unavailable because this host still
   had no reachable Docker/OrbStack daemon; the equivalent local transaction and
   real PTY lifecycle journeys passed.
+- 2026-07-30: Audited the full Pi `0.80.3` to `0.83.0` range (371 commits)
+  against OpenAlice's actual imports, generated configuration, managed runtime,
+  and installer/package paths. None of the three upstream breaking-change
+  groups are reachable from OpenAlice. The exact Supervisor `pi-tui` API
+  surface and Node floor remain compatible; `0.83.0` is the accepted baseline
+  without a compatibility fork. Recorded the break matrix and future extension
+  guardrail in [[docs/reference/pi-herdr-cli-architecture.md]].
+- 2026-07-30: Added the immutable launch-context foundation for the TUI:
+  default/machine/instance/environment/flag precedence, field provenance,
+  named complete-home selection, source root, port, update policy, and a
+  machine-wide Supervisor root outside selectable data homes. Installed
+  managed Pi now receives instance-private agent and session roots, while
+  source development, external Pi, and the standalone installed `pi` launcher
+  preserve native user state. TUI and lifecycle/observability commands now use
+  the same selected home, preventing `openalice up` from creating a different
+  managed-Pi environment than a TUI start. Added source and installed-payload
+  regression coverage plus a real PTY journey for explicit
+  instance/home/port selection. Persisted configuration schemas, registry
+  loading, and full root-parser conversion remain in the configuration
+  increment.

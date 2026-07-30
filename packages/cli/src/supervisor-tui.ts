@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Component, KeyId } from '@earendil-works/pi-tui'
 
 import { diagnoseRuntime } from './doctor.mjs'
@@ -8,6 +9,14 @@ import {
   startRuntime,
   stopRuntime,
 } from './lifecycle.mjs'
+import {
+  buildManagedPiEnv,
+  resolveLaunchContext,
+  type InstanceLaunchConfig,
+  type MachineSupervisorConfig,
+  type ResolvedLaunchContext,
+  type TuiLaunchFlags,
+} from './launch-context.ts'
 import { readRuntimeLogs } from './logs.mjs'
 import { loadPiTui } from './pi-tui-loader.ts'
 import {
@@ -81,6 +90,7 @@ export interface SupervisorSnapshot {
   version: string
   channel: string
   runtime: RuntimeSummary | null
+  context?: ResolvedLaunchContext
   diagnostic?: string
   panel?: SupervisorPanel
   busy?: string
@@ -103,6 +113,11 @@ export interface SupervisorTuiDependencies {
   diagnose?: (options: Record<string, unknown>) => Promise<DoctorReport>
   checkUpdate?: () => Promise<UpdateResult>
   discoverUpdate?: () => Promise<UpdateResult | null>
+  resolveContext?: (
+    flags: TuiLaunchFlags,
+  ) => ResolvedLaunchContext | Promise<ResolvedLaunchContext>
+  machineConfig?: MachineSupervisorConfig | null
+  instanceConfig?: InstanceLaunchConfig | null
   loadTui?: typeof loadPiTui
   version?: string
   channel?: string
@@ -121,6 +136,7 @@ interface SupervisorServices {
 }
 
 export async function runSupervisorTui(
+  launchFlags: TuiLaunchFlags = {},
   dependencies: SupervisorTuiDependencies = {},
 ): Promise<number> {
   const stdin = dependencies.stdin ?? process.stdin
@@ -132,24 +148,38 @@ export async function runSupervisorTui(
     )
   }
 
-  const services = createServices(dependencies)
+  const context = await (
+    dependencies.resolveContext
+    ?? ((flags) => resolveLaunchContext({
+      flags,
+      machineConfig: dependencies.machineConfig,
+      instanceConfig: dependencies.instanceConfig,
+      env: dependencies.env,
+    }))
+  )(launchFlags)
+  const services = createServices(dependencies, context)
   let runtime: RuntimeSummary | null = null
   let diagnostic: string | undefined
   try {
-    runtime = await services.inspect()
+    runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
   } catch (error: unknown) {
     diagnostic = safeError(error)
   }
 
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const terminal = new piTui.ProcessTerminal()
-  const ui = new piTui.TUI(terminal)
+  const ui = new piTui.TUI(
+    terminal,
+    undefined,
+    join(context.supervisorRoot, 'logs'),
+  )
   let active = true
   let actionRunning = false
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel: dependencies.channel ?? 'development',
     runtime,
+    context,
     diagnostic,
   }, {
     onAction: (action) => {
@@ -163,7 +193,7 @@ export async function runSupervisorTui(
     if (!active || actionRunning) return
     try {
       const nextRuntime = await services.inspect({
-        homeRoot: screen.snapshot.runtime?.home,
+        homeRoot: context.home,
         waitMs: 1_000,
       })
       if (!active) return
@@ -177,7 +207,7 @@ export async function runSupervisorTui(
   async function performAction(action: SupervisorAction): Promise<void> {
     if (!active || actionRunning) return
     actionRunning = true
-    const homeRoot = screen.snapshot.runtime?.home
+    const homeRoot = context.home
     const actionLabel = actionName(action)
     screen.update({ busy: actionLabel, notice: undefined, diagnostic: undefined })
     try {
@@ -185,10 +215,10 @@ export async function runSupervisorTui(
         await services.start({
           prepare: true,
           rebuild: false,
-          checkUpdates: true,
-          port: runtimeWebPort(screen.snapshot.runtime) ?? 47_331,
+          checkUpdates: context.updateChecks,
+          port: context.port,
           homeRoot,
-          appDir: screen.snapshot.runtime?.provider?.root,
+          appDir: context.appDir ?? screen.snapshot.runtime?.provider?.root,
           waitMs: 120_000,
           takeover: false,
         })
@@ -207,8 +237,8 @@ export async function runSupervisorTui(
         await services.start({
           prepare: true,
           rebuild: false,
-          checkUpdates: true,
-          port: runtimeWebPort(screen.snapshot.runtime) ?? 47_331,
+          checkUpdates: context.updateChecks,
+          port: context.port,
           homeRoot,
           appDir,
           waitMs: 120_000,
@@ -240,6 +270,7 @@ export async function runSupervisorTui(
   }
 
   async function discoverUpdateInBackground(): Promise<void> {
+    if (!context.updateChecks) return
     try {
       const update = await services.discoverUpdate()
       if (!update) return
@@ -401,7 +432,8 @@ export class SupervisorScreen implements Component {
     } else {
       lines.push(
         narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
-        `Home: ${runtime?.home ?? 'default'}`,
+        `Instance: ${this.snapshot.context?.instance ?? 'default'}`,
+        `Home: ${this.snapshot.context?.home ?? runtime?.home ?? 'default'}`,
       )
       if (!narrow) {
         lines.push(
@@ -414,6 +446,9 @@ export class SupervisorScreen implements Component {
         }
         if (Number.isInteger(runtime?.uptimeSeconds)) {
           lines.push(`Uptime: ${formatDuration(runtime?.uptimeSeconds ?? 0)}`)
+        }
+        if (this.snapshot.context) {
+          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatProvenance(this.snapshot.context.provenance.port)}`)
         }
       }
       lines.push('', ...renderGuidance(runtime))
@@ -457,8 +492,13 @@ export class SupervisorScreen implements Component {
   }
 }
 
-function createServices(dependencies: SupervisorTuiDependencies): SupervisorServices {
-  const shared = { env: dependencies.env ?? process.env }
+function createServices(
+  dependencies: SupervisorTuiDependencies,
+  context: ResolvedLaunchContext,
+): SupervisorServices {
+  const shared = {
+    env: buildManagedPiEnv(context, dependencies.env ?? process.env),
+  }
   return {
     inspect: dependencies.inspect ?? ((options) => inspectRuntime(options, shared)),
     start: dependencies.start ?? ((options) => startRuntime(options, {
@@ -622,15 +662,8 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 3_600)}h ${Math.floor((seconds % 3_600) / 60)}m`
 }
 
-function runtimeWebPort(runtime: RuntimeSummary | null): number | null {
-  const value = runtime?.endpoints?.web
-  if (!value) return null
-  try {
-    const port = Number(new URL(value).port)
-    return Number.isInteger(port) && port > 0 && port <= 65_535 ? port : null
-  } catch {
-    return null
-  }
+function formatProvenance(value: { source: string; detail: string }): string {
+  return value.source === 'default' ? '(default)' : `(${value.detail})`
 }
 
 function safeError(error: unknown): string {

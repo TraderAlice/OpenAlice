@@ -12,6 +12,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
   it('parses background startup independently from browser opening', () => {
     expect(parseLifecycleArgs('up', [
       '/tmp/OpenAlice',
+      '--instance', 'research',
       '--home', '/tmp/alice-home',
       '--port', '41000',
       '--log', '/tmp/openalice.log',
@@ -20,6 +21,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
       '--json',
     ])).toEqual(expect.objectContaining({
       appDir: '/tmp/OpenAlice',
+      instance: 'research',
       homeRoot: '/tmp/alice-home',
       port: 41000,
       logFile: '/tmp/openalice.log',
@@ -45,11 +47,13 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
   it('uses explicit control timeouts and exit-code-2 usage errors', () => {
     expect(parseLifecycleArgs('status', ['--home', '/tmp/alice-home', '--wait', '3', '--json'])).toEqual({
+      instance: null,
       homeRoot: '/tmp/alice-home',
       json: true,
       waitMs: 3_000,
     })
     expect(parseLifecycleArgs('down', [])).toEqual({
+      instance: null,
       homeRoot: null,
       json: false,
       waitMs: 15_000,
@@ -116,6 +120,52 @@ describe('OpenAlice top-level lifecycle commands', () => {
     expect(stdout.text()).toContain('keep running')
     expect(stdout.text()).toContain('Opened OpenAlice Web UI')
     expect(openRuntime).toHaveBeenCalledOnce()
+  })
+
+  it('shares named-home and managed-Pi isolation with noninteractive startup', async () => {
+    const startRuntime = vi.fn(async () => startedResult())
+    await expect(runLifecycleCommand('up', parseLifecycleArgs('up', [
+      '--instance', 'research',
+      '--home', '/tmp/research-home',
+    ]), {
+      env: {
+        OPENALICE_MANAGED_PI_PATH: '/managed/pi/cli.js',
+        PI_CODING_AGENT_DIR: '/native/pi',
+      },
+      startRuntime,
+      stdout: output(),
+    })).resolves.toBe(0)
+
+    expect(startRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instance: 'research',
+        homeRoot: '/tmp/research-home',
+      }),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          PI_CODING_AGENT_DIR: '/tmp/research-home/runtime/pi',
+          PI_CODING_AGENT_SESSION_DIR: '/tmp/research-home/runtime/pi/sessions',
+        }),
+      }),
+    )
+  })
+
+  it('does not redirect external Pi during source lifecycle commands', async () => {
+    const inspectRuntime = vi.fn(async () => absentStatus())
+    await expect(runLifecycleCommand('status', parseLifecycleArgs('status', [
+      '--home', '/tmp/source-home',
+    ]), {
+      env: { PI_CODING_AGENT_DIR: '/native/pi' },
+      inspectRuntime,
+      stdout: output(),
+    })).resolves.toBe(0)
+
+    expect(inspectRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({ homeRoot: '/tmp/source-home' }),
+      expect.objectContaining({
+        env: expect.objectContaining({ PI_CODING_AGENT_DIR: '/native/pi' }),
+      }),
+    )
   })
 
   it('keeps already-absent down idempotent', async () => {

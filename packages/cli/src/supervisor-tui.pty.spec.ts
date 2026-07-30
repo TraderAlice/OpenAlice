@@ -62,4 +62,53 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
+
+  it('renders an explicitly selected launch context before detach', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-'))
+    temporaryPaths.push(isolatedHome)
+    const instanceHome = join(isolatedHome, 'research')
+    const child = pty.spawn(process.execPath, [
+      cliEntry,
+      '--instance', 'research',
+      '--home', instanceHome,
+      '--port', '44000',
+      '--no-update-check',
+    ], {
+      cols: 120,
+      rows: 28,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor launch-context TUI timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!detached && output.includes('Resolved: home (--home) · port (--port)')) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor launch-context TUI exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Instance: research')
+    expect(transcript).toContain(`Home: ${instanceHome}`)
+    expect(transcript).toContain('Resolved: home (--home) · port (--port)')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
 })

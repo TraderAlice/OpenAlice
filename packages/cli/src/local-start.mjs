@@ -3,6 +3,7 @@ import { access, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
+import { buildManagedPiEnvForHome } from './launch-context.ts'
 import {
   LOOPBACK,
   createStartupSignalGuard,
@@ -192,7 +193,7 @@ function configuredLocalUrl(port) {
 
 export function buildLocalRuntimeEnv(env, options) {
   const runtimeEnv = {
-    ...env,
+    ...buildManagedPiEnvForHome(options.homeRoot, env),
     OPENALICE_HOME: options.homeRoot,
     OPENALICE_APP_HOME: options.appDir,
     OPENALICE_BIND_HOST: LOOPBACK,
