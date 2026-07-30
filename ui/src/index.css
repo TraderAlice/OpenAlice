@@ -262,6 +262,24 @@ body {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
+/* Page-owned navigators become touch surfaces inside the phone drawer.
+   A 40px height floor removes the old 18–28px rows; icon controls keep 36px
+   of horizontal room so adjacent workspace names remain distinguishable. */
+.oa-page-sidebar-dialog :is(button, [role="button"]) {
+  min-height: 2.5rem;
+}
+
+.oa-page-sidebar-dialog button:has(svg) {
+  min-width: 2.25rem;
+}
+
+.oa-page-sidebar-dialog :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select
+) {
+  min-height: 2.5rem;
+}
+
 .oa-disclosure-enter {
   transform-origin: top;
   animation: oa-disclosure-enter var(--motion-standard) var(--motion-ease-out) both;
