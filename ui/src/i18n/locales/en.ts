@@ -733,6 +733,7 @@ export const en = {
     openPanel: 'Open {{title}}',
     closePanel: 'Close {{title}}',
     focusContent: 'Focus content',
+    moreActions: 'More actions for {{target}}',
   },
   chat: {
     newChat: 'New chat',
@@ -1630,6 +1631,7 @@ export const en = {
     resumeSession: 'Resume {{title}}',
     stopSession: 'Stop {{title}}',
     deleteSession: 'Delete {{title}}',
+    deleteSessionAction: 'Delete session',
     notFound: 'Workspace not found. It may have been deleted.',
     newSession: 'New session',
     newSessionTitle: 'Spawn a fresh session in this workspace (⌘T)',
