@@ -173,8 +173,8 @@ export function WorkspaceListPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-6 py-6">
-        <div className="mb-6 flex items-baseline justify-between gap-4">
+      <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
+        <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-6">
           <h2 className="text-[18px] font-semibold text-foreground">{t('workspace.overviewTitle')}</h2>
           <span className="text-[12px] text-muted-foreground">
             {t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
@@ -183,7 +183,7 @@ export function WorkspaceListPage() {
           </span>
         </div>
 
-        <div className="space-y-7">
+        <div className="space-y-5 sm:space-y-7">
           {sections.map((sec) => (
             <section key={sec.key}>
               <div className="mb-3 flex items-baseline gap-2">
@@ -192,7 +192,7 @@ export function WorkspaceListPage() {
                 </h3>
                 <span className="text-[11px] text-muted-foreground">· {sec.workspaces.length}</span>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
                 {sec.workspaces.map((w) => (
                   <OverviewCard
                     key={w.id}
@@ -295,7 +295,7 @@ export function WorkspaceListPage() {
                         {!purged && workspace.lifecycle === 'departed' && (
                           <button
                             type="button"
-                            className="btn-secondary inline-flex items-center gap-1.5"
+                            className="btn-secondary inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
                             aria-label={t('workspace.restoreWorkspaceAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => {
@@ -313,7 +313,7 @@ export function WorkspaceListPage() {
                         {!purged && workspace.lifecycle === 'departed' && (
                           <button
                             type="button"
-                            className="btn-danger inline-flex items-center gap-1.5"
+                            className="btn-danger inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
                             aria-label={t('workspace.purgeFilesAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => setPendingPurge(workspace)}
