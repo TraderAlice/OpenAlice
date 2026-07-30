@@ -16,7 +16,7 @@
  * keeps running on the server. Use the sidebar's × to actually delete.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Bot, Monitor } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
@@ -26,6 +26,7 @@ import { useWorkspace } from '../tabs/store'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
 import { WorkspaceFilesToggle } from '../components/workspace/WorkspaceFilesToggle'
+import type { TerminalConnectionStatus } from '../components/workspace/Terminal'
 import type { ViewSpec } from '../tabs/types'
 
 interface Props {
@@ -46,6 +47,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   const activeRecord = sessionId
     ? sessions.find((s) => s.id === sessionId) ?? null
     : null
+  const [terminalStatus, setTerminalStatus] = useState<TerminalConnectionStatus>('connecting')
   const defaultAgentEnabled =
     ctx.defaultAgent !== null &&
     ctx.agents.some((a) => a.id === ctx.defaultAgent && a.kind !== 'utility')
@@ -83,6 +85,10 @@ export function WorkspacePage({ spec, visible }: Props) {
     return () => document.removeEventListener('keydown', handler, { capture: true })
   }, [visible, ctx, wsId, defaultAgentEnabled])
 
+  useEffect(() => {
+    setTerminalStatus('connecting')
+  }, [sessionId])
+
   if (!workspace) {
     return (
       <div className="workspaces-root flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
@@ -94,6 +100,14 @@ export function WorkspacePage({ spec, visible }: Props) {
   const workspaceName = workspaceDisplayName(workspace)
   const workspaceTitle = workspaceDisplayTitle(workspace)
   const hasCustomName = workspaceName !== workspace.tag
+  const activeTitle = activeRecord?.title?.trim() || activeRecord?.name || null
+  const hasRunningSurface = activeRecord?.state === 'running'
+  const activeStatus: TerminalConnectionStatus | null = hasRunningSurface
+    ? (activeRecord.surface === 'webpi' ? 'connected' : terminalStatus)
+    : null
+  const identityTitle = activeTitle
+    ? `${workspaceTitle}\n${activeTitle} · ${activeStatus ?? activeRecord?.state ?? ''}`
+    : workspaceTitle
 
   // Sessions list: pass the full workspace.sessions. WorkspaceView's
   // `runningSlots` is gated on sessionId so the multi-terminal mount
@@ -102,18 +116,33 @@ export function WorkspacePage({ spec, visible }: Props) {
   // state needs the full list to render resume/continue cards.
   return (
     <div className="workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {/* OpenAlice-side header bar above the launcher's WorkspaceView. The
-       *  launcher component itself is byte-faithful; we add the AI-provider
-       *  affordance here. */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-secondary/30 shrink-0">
+      {/* One page-owned identity bar. The live terminal is an embedded working
+       * surface below it, not a second application shell. */}
+      <div className="flex min-h-11 shrink-0 items-center justify-between border-b border-border bg-background px-4 py-2">
         <div
-          className="flex min-w-0 items-baseline gap-2 pr-2"
-          title={workspaceTitle}
+          className="flex min-w-0 items-center gap-2 pr-3"
+          title={identityTitle}
         >
-          <span className="truncate text-[12px] font-medium text-foreground">
+          {activeStatus && (
+            <span
+              className="workspace-runtime-dot"
+              data-status={activeStatus}
+              aria-label={activeStatus}
+            />
+          )}
+          <span
+            className={`${activeTitle ? 'max-w-[45%]' : 'max-w-full'} shrink-0 truncate text-[13px] font-semibold text-foreground`}
+          >
             {workspaceName}
           </span>
-          {hasCustomName && (
+          {activeTitle ? (
+            <>
+              <span className="shrink-0 text-muted-foreground/45" aria-hidden="true">/</span>
+              <span className="truncate text-[12px] text-muted-foreground">
+                {activeTitle}
+              </span>
+            </>
+          ) : hasCustomName && (
             <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground/70 sm:inline">
               {workspace.tag}
             </span>
@@ -155,7 +184,7 @@ export function WorkspacePage({ spec, visible }: Props) {
         </div>
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3">
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col${hasRunningSurface ? '' : ' p-3'}`}>
         <WorkspaceView
           wsId={wsId}
           sessionId={sessionId}
@@ -163,6 +192,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           activeRecord={activeRecord}
           sessions={workspace.sessions}
           label={workspaceName}
+          onTerminalStatusChange={setTerminalStatus}
           onSpawnFresh={spawnDefault}
           onResume={(id) => void ctx.resumeSession(wsId, id, source)}
           onOpenWebPi={(id) => void ctx.openWebPiSession(wsId, id, source)}

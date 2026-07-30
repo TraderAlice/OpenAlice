@@ -34,7 +34,14 @@ const DemoTerminalReplay = lazy(() =>
   import('../../demo/DemoTerminalReplay').then((m) => ({ default: m.DemoTerminalReplay })),
 );
 
-type Status = 'connecting' | 'reconnecting' | 'connected' | 'closed' | 'error' | 'kicked' | 'locked';
+export type TerminalConnectionStatus =
+  | 'connecting'
+  | 'reconnecting'
+  | 'connected'
+  | 'closed'
+  | 'error'
+  | 'kicked'
+  | 'locked';
 
 interface SocketMessageEventLike {
   readonly data: unknown;
@@ -179,6 +186,10 @@ export interface TerminalViewProps {
   readonly wsUrl?: string;
   /** OpenTUI currently corrupts to an all-black canvas in xterm's WebGL addon. */
   readonly renderer?: 'auto' | 'dom';
+  /** Main Workspace views own the surrounding page chrome themselves. */
+  readonly presentation?: 'framed' | 'embedded';
+  /** Publishes transport state to the page-owned identity bar. */
+  readonly onStatusChange?: (status: TerminalConnectionStatus) => void;
   /**
    * Fires once per WS lifetime when the server's `attached` message lands.
    */
@@ -195,12 +206,17 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   if (import.meta.env.VITE_DEMO_MODE) {
     return (
       <Suspense fallback={null}>
-        <DemoTerminalReplay label={props.label ?? props.wsId} wsId={props.wsId} sessionId={props.sessionId} />
+        <DemoTerminalReplay
+          label={props.label ?? props.wsId}
+          wsId={props.wsId}
+          sessionId={props.sessionId}
+          embedded={props.presentation === 'embedded'}
+        />
       </Suspense>
     );
   }
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [status, setStatus] = useState<Status>('connecting');
+  const [status, setStatus] = useState<TerminalConnectionStatus>('connecting');
   const [pid, setPid] = useState<number | null>(null);
   const [scrollbackTruncated, setScrollbackTruncated] = useState(false);
   const [exitInfo, setExitInfo] = useState<ExitInfo | null>(null);
@@ -227,6 +243,10 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   useEffect(() => {
     applyAppearanceRef.current?.(terminalAppearance);
   }, [terminalAppearance]);
+
+  useEffect(() => {
+    props.onStatusChange?.(status);
+  }, [props.onStatusChange, status]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -648,36 +668,48 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     };
   }, [wsId, sessionId, wsUrl, props.renderer]);
 
+  const embedded = props.presentation === 'embedded';
+  const showHeader =
+    !embedded ||
+    status !== 'connected' ||
+    childExited ||
+    scrollbackTruncated ||
+    exitInfo !== null;
+
   return (
-    <div className="terminal-shell">
-      <header className="terminal-header">
-        <StatusDot status={status} />
-        <span className="terminal-title">{props.label ?? wsId}</span>
-        <span className="terminal-meta">
-          {pid !== null ? `pid ${pid}` : ''}
-          {childExited ? ' · child exited' : ''}
-          {scrollbackTruncated ? ' · scrollback truncated' : ''}
-          {exitInfo
-            ? ` · session ended code=${exitInfo.code}${
-                exitInfo.signal !== null ? ` signal=${exitInfo.signal}` : ''
-              }`
-            : ''}
-        </span>
-        {status === 'locked' && (
-          <button
-            type="button"
-            className="terminal-header-action"
-            onClick={() => {
-              takeoverNextAttachRef.current = true;
-              setStatus('connecting');
-              connectRef.current?.();
-            }}
-            title="take over this session"
-          >
-            take over
-          </button>
-        )}
-      </header>
+    <div className={`terminal-shell${embedded ? ' is-embedded' : ''}`}>
+      {showHeader && (
+        <header className={`terminal-header${embedded ? ' is-contextual' : ''}`}>
+          <StatusDot status={status} />
+          <span className="terminal-title">
+            {embedded ? terminalStatusLabel(status) : props.label ?? wsId}
+          </span>
+          <span className="terminal-meta">
+            {!embedded && pid !== null ? `pid ${pid}` : ''}
+            {childExited ? ' · child exited' : ''}
+            {scrollbackTruncated ? ' · scrollback truncated' : ''}
+            {exitInfo
+              ? ` · session ended code=${exitInfo.code}${
+                  exitInfo.signal !== null ? ` signal=${exitInfo.signal}` : ''
+                }`
+              : ''}
+          </span>
+          {status === 'locked' && (
+            <button
+              type="button"
+              className="terminal-header-action"
+              onClick={() => {
+                takeoverNextAttachRef.current = true;
+                setStatus('connecting');
+                connectRef.current?.();
+              }}
+              title="take over this session"
+            >
+              take over
+            </button>
+          )}
+        </header>
+      )}
       {/* FitAddon reads the computed size of xterm's direct parent. Keep that
           parent padding-free: putting the visual inset on `.terminal-host`
           makes FitAddon count the padding as usable columns, so the xterm
@@ -689,8 +721,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   );
 }
 
-function StatusDot({ status }: { status: Status }): ReactElement {
-  const colors: Record<Status, string> = {
+function StatusDot({ status }: { status: TerminalConnectionStatus }): ReactElement {
+  const colors: Record<TerminalConnectionStatus, string> = {
     connecting: 'var(--warning)',
     reconnecting: 'var(--warning)',
     connected: 'var(--success)',
@@ -707,6 +739,18 @@ function StatusDot({ status }: { status: Status }): ReactElement {
       aria-label={status}
     />
   );
+}
+
+function terminalStatusLabel(status: TerminalConnectionStatus): string {
+  switch (status) {
+    case 'connecting': return 'Connecting to session';
+    case 'reconnecting': return 'Reconnecting to session';
+    case 'closed': return 'Session connection closed';
+    case 'error': return 'Session connection failed';
+    case 'kicked': return 'Session opened elsewhere';
+    case 'locked': return 'Session is controlled elsewhere';
+    case 'connected': return 'Session connected';
+  }
 }
 
 function getTerminalControllerId(): string {

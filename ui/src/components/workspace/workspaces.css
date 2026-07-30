@@ -312,6 +312,47 @@
   position: relative;
 }
 
+.workspace-view.is-running-session {
+  gap: 0;
+}
+
+.workspace-view.is-running-session .workspace-side {
+  gap: 0;
+  border-left: 1px solid var(--border);
+}
+
+.workspace-view.is-running-session .workspace-side > .panel {
+  border: 0;
+  border-radius: 0;
+}
+
+.workspace-runtime-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+
+.workspace-runtime-dot[data-status="connected"] {
+  background: var(--success);
+}
+
+.workspace-runtime-dot[data-status="connecting"],
+.workspace-runtime-dot[data-status="reconnecting"] {
+  background: var(--warning);
+}
+
+.workspace-runtime-dot[data-status="error"],
+.workspace-runtime-dot[data-status="closed"] {
+  background: var(--destructive);
+}
+
+.workspace-runtime-dot[data-status="kicked"],
+.workspace-runtime-dot[data-status="locked"] {
+  background: var(--ai-action);
+}
+
 /* Measure the space actually left for WorkspacePage after the global rail and
  * its contextual sidebar, rather than the browser viewport. At this width a
  * fixed 360px Files column would leave the terminal too narrow to be useful.
@@ -1061,6 +1102,15 @@ button.files-row:focus-visible {
   box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow-color) 35%, transparent);
 }
 
+.terminal-shell.is-embedded {
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  background: var(--background);
+  box-shadow: none;
+}
+
 .terminal-header {
   display: flex;
   align-items: center;
@@ -1073,6 +1123,11 @@ button.files-row:focus-visible {
   font-size: 12px;
   color: var(--muted-foreground);
   user-select: none;
+}
+
+.terminal-shell.is-embedded .terminal-header.is-contextual {
+  padding: 6px 12px;
+  background: var(--secondary);
 }
 
 .terminal-title {
@@ -1125,6 +1180,11 @@ button.files-row:focus-visible {
   padding: 8px 8px 4px;
   overflow: hidden;
   background: var(--background);
+}
+
+.terminal-shell.is-embedded .terminal-body {
+  flex: 1 1 auto;
+  padding: 8px 12px 6px;
 }
 
 .terminal-host {

@@ -42,4 +42,15 @@ describe('terminal responsive layout contract', () => {
     expect(declarationsFor('.terminal-title')).toContain('text-overflow: ellipsis')
     expect(declarationsFor('.terminal-meta')).toContain('text-overflow: ellipsis')
   })
+
+  it('removes nested card chrome from an embedded Workspace terminal', () => {
+    const embedded = declarationsFor('.terminal-shell.is-embedded')
+    const body = declarationsFor('.terminal-shell.is-embedded .terminal-body')
+
+    expect(embedded).toContain('display: flex')
+    expect(embedded).toContain('border: 0')
+    expect(embedded).toContain('border-radius: 0')
+    expect(embedded).toContain('box-shadow: none')
+    expect(body).toContain('flex: 1 1 auto')
+  })
 })

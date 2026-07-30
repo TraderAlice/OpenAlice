@@ -7,7 +7,7 @@ import type { SessionRecord } from './api';
 import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
-import { TerminalView } from './Terminal';
+import { TerminalView, type TerminalConnectionStatus } from './Terminal';
 import { WebPiView } from './WebPiView';
 import { useIsDesktop } from '../../live/use-is-desktop';
 import { useWorkspaceSidePanels } from '../../live/workspace-side-panels';
@@ -36,6 +36,7 @@ export interface WorkspaceViewProps {
    *  rows call this for running entries; paused entries go through `onResume`. */
   readonly onSelectSession: (sessionId: string) => void;
   readonly onSessionLost: () => void;
+  readonly onTerminalStatusChange?: (status: TerminalConnectionStatus) => void;
 }
 
 export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
@@ -80,7 +81,11 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
   const usesMobileOverlay = !isDesktop && sidePrefs.autoHideMobile;
   const showFiles = usesMobileOverlay ? sidePrefs.mobileFilesOpen : sidePrefs.files;
   const showAside = showFiles;
-  const viewClass = `workspace-view${showAside ? '' : ' has-no-side'}`;
+  const viewClass = [
+    'workspace-view',
+    showAside ? '' : 'has-no-side',
+    runningSlots.length > 0 ? 'is-running-session' : '',
+  ].filter(Boolean).join(' ');
 
   return (
     <div className={viewClass}>
@@ -120,7 +125,9 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     wsId={props.wsId}
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
-                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    presentation="embedded"
+                    onStatusChange={props.onTerminalStatusChange}
+                    label={s.title?.trim() || s.name}
                     onSessionLost={props.onSessionLost}
                   />
                 )}

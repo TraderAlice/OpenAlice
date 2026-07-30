@@ -17,15 +17,24 @@ interface DemoTerminalReplayProps {
   readonly label: string
   readonly wsId: string
   readonly sessionId: string
+  readonly embedded?: boolean
 }
 
 export function DemoTerminalReplay(props: DemoTerminalReplayProps): ReactElement {
   const transcript = transcriptsByWorkspace[props.wsId]
   if (!transcript) return <DemoTerminalStub label={props.label} />
-  return <ReplayPane key={props.sessionId} label={props.label} transcript={transcript} />
+  return <ReplayPane key={props.sessionId} label={props.label} transcript={transcript} embedded={props.embedded === true} />
 }
 
-function ReplayPane({ label, transcript }: { label: string; transcript: Transcript }): ReactElement {
+function ReplayPane({
+  label,
+  transcript,
+  embedded,
+}: {
+  label: string
+  transcript: Transcript
+  embedded: boolean
+}): ReactElement {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [done, setDone] = useState(false)
   const [replayKey, setReplayKey] = useState(0)
@@ -117,7 +126,7 @@ function ReplayPane({ label, transcript }: { label: string; transcript: Transcri
   }, [transcript, replayKey, terminalAppearance])
 
   return (
-    <div className="terminal-shell">
+    <div className={`terminal-shell${embedded ? ' is-embedded' : ''}`}>
       <header className="terminal-header">
         <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-warning">
           <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />

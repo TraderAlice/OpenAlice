@@ -14,6 +14,7 @@ const viewMocks = vi.hoisted(() => ({
     autoHideMobile: true,
     mobileFilesOpen: false,
   },
+  terminalProps: vi.fn(),
 }))
 
 vi.mock('../../live/use-is-desktop', () => ({ useIsDesktop: () => viewMocks.isDesktop }))
@@ -21,7 +22,12 @@ vi.mock('../../live/workspace-side-panels', () => ({
   useWorkspaceSidePanels: () => viewMocks.sidePrefs,
 }))
 vi.mock('./FilesPanel', () => ({ FilesPanel: () => <div data-testid="files-panel" /> }))
-vi.mock('./Terminal', () => ({ TerminalView: () => null }))
+vi.mock('./Terminal', () => ({
+  TerminalView: (props: unknown) => {
+    viewMocks.terminalProps(props)
+    return <div data-testid="terminal-view" />
+  },
+}))
 vi.mock('./WebPiView', () => ({ WebPiView: () => null }))
 
 function session(index: number, state: SessionRecord['state']): SessionRecord {
@@ -42,6 +48,7 @@ function session(index: number, state: SessionRecord['state']): SessionRecord {
 }
 
 beforeEach(async () => {
+  vi.clearAllMocks()
   viewMocks.isDesktop = true
   viewMocks.sidePrefs.files = false
   viewMocks.sidePrefs.autoHideMobile = true
@@ -154,5 +161,35 @@ describe('WorkspaceView Files panel', () => {
 
     expect(screen.getByTestId('files-panel')).toBeTruthy()
     expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(false)
+  })
+})
+
+describe('WorkspaceView live surface hierarchy', () => {
+  it('embeds a single running Terminal without creating another framed shell', () => {
+    const active = session(1, 'running')
+    const onTerminalStatusChange = vi.fn()
+    const { container } = render(
+      <WorkspaceView
+        wsId="chat-1"
+        sessionId={active.id}
+        activeRecord={active}
+        sessions={[active]}
+        label="AutoQuant"
+        onSpawnFresh={vi.fn()}
+        onResume={vi.fn()}
+        onOpenWebPi={vi.fn()}
+        onSelectSession={vi.fn()}
+        onSessionLost={vi.fn()}
+        onTerminalStatusChange={onTerminalStatusChange}
+      />,
+    )
+
+    expect(container.querySelector('.workspace-view')?.classList.contains('is-running-session')).toBe(true)
+    expect(screen.getByTestId('terminal-view')).toBeTruthy()
+    expect(viewMocks.terminalProps).toHaveBeenCalledWith(expect.objectContaining({
+      presentation: 'embedded',
+      label: 'Conversation 1',
+      onStatusChange: onTerminalStatusChange,
+    }))
   })
 })
