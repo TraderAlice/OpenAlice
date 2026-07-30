@@ -30,7 +30,7 @@ the durable truth after it changes.
 
 - [[plans/auto-quant-v2-harness.md]] — Adds AutoQuant V2 as a first-class
   version-pinned Harness, then refines it into an explicitly initialized
-  default desk with Session-first daily UI and pinned `v0.8.30` source.
+  default desk with Session-first daily UI and pinned `v0.8.31` source.
 - [[plans/cli-lifecycle-quality.md]] — Aligns the computer-level CLI with the
   OpenAlice product version and adds bounded update discovery, installer-backed
   updates, and state-preserving CLI uninstall. Delivered in PR #847.
