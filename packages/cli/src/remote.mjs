@@ -18,7 +18,7 @@ import { formatMissingRuntimeBuildTools } from './runtime-deps.mjs'
 import { connectSsh } from './ssh-connect.mjs'
 
 const MINIMUM_NODE_VERSION = '22.19.0'
-const MANAGED_PI_VERSION = '0.80.6'
+const MANAGED_PI_VERSION = '0.83.0'
 const MAX_SSH_OUTPUT_BYTES = 1024 * 1024
 const REMOTE_STATE_VERSION = 1
 const MAX_REMEMBERED_TARGETS = 32

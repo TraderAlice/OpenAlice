@@ -18,5 +18,5 @@ cli_dir="$PWD/node_modules/@earendil-works/pi-coding-agent/dist"
 mkdir -p "$cli_dir"
 printf '%s\n' \
   '#!/usr/bin/env node' \
-  "if (process.argv.includes('--version') || process.argv.includes('-v')) console.log('0.80.6')" \
+  "if (process.argv.includes('--version') || process.argv.includes('-v')) console.log('0.83.0')" \
   > "$cli_dir/cli.js"

@@ -10,7 +10,7 @@ import {
 
 describe('vendor managed runtime helpers', () => {
   it('pins the managed Pi release', () => {
-    expect(buildVendorRuntimeManifest(null).pi.version).toBe('0.80.6')
+    expect(buildVendorRuntimeManifest(null).pi.version).toBe('0.83.0')
   })
 
   it('pins both Pi search tools for every supported desktop architecture', () => {

@@ -709,7 +709,7 @@ recovered in place after the tunnel returned on the same origin. The Server was
 stopped through its control endpoint and the Sandbox was destroyed.
 
 A later user-facing Railway Sandbox completed the missing authenticated Agent
-loop. Pi `0.80.6` was installed on the live remote host, OpenAlice selected Pi
+loop. Pi `0.83.0` was installed on the live remote host, OpenAlice selected Pi
 as the Workspace default, injected a sealed LongCat-compatible provider
 credential through the normal AI Provider flow, and started a trusted Pi TUI
 without the project-trust deadlock. The prompt `请只回复：远程 OpenAlice Pi

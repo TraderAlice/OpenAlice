@@ -36,7 +36,7 @@ behavior.
 
 ## Stable Install
 
-The public installer distributes the small JavaScript CLI from the stable
+The public installer distributes the TypeScript CLI application from the stable
 `master` lane:
 
 ```bash
@@ -70,14 +70,17 @@ OpenAlice source checkout and run the CLI from inside it:
 ```bash
 git clone https://github.com/TraderAlice/OpenAlice.git
 cd OpenAlice
-openalice
+openalice up
+openalice open
 ```
 
-`openalice` finds the checkout, installs the locked workspace dependencies
+`openalice up` finds the checkout, installs the locked workspace dependencies
 without `@traderalice/desktop`, runs `pnpm build:server`, starts
-`scripts/guardian/prod.mjs` on `127.0.0.1`, and opens the normal UI. If `pnpm`
-is absent but Corepack is available, preparation uses Corepack with the pnpm
-version pinned by the repository.
+`scripts/guardian/prod.mjs` on `127.0.0.1`, and leaves it running after the
+shell exits. `openalice open` verifies and opens the normal Web UI. Bare
+`openalice` enters the Supervisor TUI; `openalice start` preserves the legacy
+foreground-and-browser path. If `pnpm` is absent but Corepack is available,
+preparation uses Corepack with the pnpm version pinned by the repository.
 
 Live broker engines are still activated through the Trading UI and
 `<OPENALICE_HOME>/runtime/broker-packs/`. The source checkout contains their
@@ -89,13 +92,14 @@ installer presents a separate, default-no `Start OpenAlice now?` prompt after
 the CLI is complete. Installation consent never implies service-start consent,
 and `--yes` remains installation-only for automation.
 
-The CLI stays in the foreground and owns the Guardian lifetime. `Ctrl+C` stops
-the local Runtime. A normal second launch reuses an already healthy local URL;
-it does not kill the existing owner. Discovery first uses the selected home's
-Guardian control endpoint; for a source `pnpm dev` owner without control
-metadata, it verifies that owner's configured Web port before reuse. It never
-guesses that another home owns a reachable port. `openalice start --takeover`
-explicitly requests the existing Guardian recovery flow.
+`openalice run` and compatibility `openalice start` stay in the foreground and
+own the Guardian lifetime; `Ctrl+C` stops their self-owned local Runtime. The
+Supervisor TUI only detaches. A normal `up` reuses an already healthy matching
+owner and never kills it. Discovery first uses the selected home's Guardian
+control endpoint; for a source `pnpm dev` owner without control metadata, it
+verifies that owner's configured Web port before reuse. It never guesses that
+another home owns a reachable port. `openalice start --takeover` explicitly
+requests the existing Guardian recovery flow.
 
 Useful controls:
 

@@ -11,6 +11,7 @@ export const LIFECYCLE_JSON_SCHEMA_VERSION = 1
 
 export const ROOT_COMMANDS = Object.freeze([
   { name: 'version', description: 'Print the OpenAlice product and install version' },
+  { name: 'tui', description: 'Open the local Supervisor TUI' },
   { name: 'up', description: 'Start a persistent local Runtime in the background' },
   { name: 'run', description: 'Run a local Runtime in the foreground' },
   { name: 'down', description: 'Stop the persistent local Runtime' },
@@ -209,8 +210,8 @@ Usage:
 Commands:
 ${commands}
 
-The current default without a command remains the compatibility foreground
-browser launcher. Use "openalice up" for a persistent background Runtime.
+The default without a command opens the Supervisor TUI. Use "openalice run"
+for a foreground Runtime or "openalice up" for a persistent background Runtime.
 
 Run "openalice <command> --help" for command details.
 `

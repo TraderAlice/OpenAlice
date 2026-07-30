@@ -105,7 +105,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.startServer).toBe(true)
     expect(plan.mutations).toEqual([
       'install remote OpenAlice CLI',
-      'install managed Pi 0.80.6',
+      'install managed Pi 0.83.0',
       'install source Runtime build tools',
       'start remote OpenAlice Server',
     ])
@@ -159,8 +159,8 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.restartServer).toBe(true)
     expect(plan.serverAppDir).toBe('/srv/OpenAlice')
     expect(plan.mutations).toEqual([
-      'install managed Pi 0.80.6',
-      'restart remote OpenAlice Server with managed Pi 0.80.6',
+      'install managed Pi 0.83.0',
+      'restart remote OpenAlice Server with managed Pi 0.83.0',
     ])
   })
 
@@ -172,7 +172,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.installRuntimeDeps).toBe(false)
     expect(plan.mutations).toEqual([
       'install remote OpenAlice CLI',
-      'install managed Pi 0.80.6',
+      'install managed Pi 0.83.0',
       'start remote OpenAlice Server',
     ])
   })
@@ -205,7 +205,7 @@ describe('OpenAlice managed remote connector', () => {
     expect(plan.installRuntimeDeps).toBe(true)
     expect(plan.mutations).toEqual([
       'install remote OpenAlice CLI',
-      'install managed Pi 0.80.6',
+      'install managed Pi 0.83.0',
       'install source Runtime build tools',
       'clone OpenAlice source (branch master)',
       'start remote OpenAlice Server',
@@ -708,7 +708,7 @@ function compatibleRemote(statusOverrides = {}) {
     nodeVersion: 'v22.23.1',
     hasCurl: true,
     piPath: '/home/alice/.openalice/bin/pi',
-    piVersion: '0.80.6',
+    piVersion: '0.83.0',
     piCompatible: true,
     sourceCheckoutPresent: null,
     sourceCheckoutState: null,

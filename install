@@ -8,11 +8,11 @@ VERSION=""
 REF_KIND=""
 REF_OPTION=""
 MINIMUM_NODE_VERSION="22.19.0"
-PI_VERSION="0.80.6"
+PI_VERSION="0.83.0"
 PI_RELEASE_BASE="${OPENALICE_PI_RELEASE_BASE_URL:-https://github.com/earendil-works/pi/releases/download/v${PI_VERSION}}"
 PI_RELEASE_BASE="${PI_RELEASE_BASE%/}"
-PI_PACKAGE_SHA256="ee080db64c3732daea5547bd6d9809465ffa236ef6099051e64a16753e48b795"
-PI_LOCK_SHA256="0f409bf498507f93bfbde3dc6f2b4c83bc58bdea2e2f5eabf3053cc2a81568d4"
+PI_PACKAGE_SHA256="41f07a3eb41227905ac436ad41d949e4589dcc34c15454d718f85f399b533cb6"
+PI_LOCK_SHA256="f5cb41dcfc60561ba54490b49c17beecec202900f73eb5f104b34f8b2a79a0af"
 PI_ASSET_SOURCE_DIR="${OPENALICE_PI_SOURCE_DIR:-}"
 NPM_BIN="${OPENALICE_NPM_BIN:-npm}"
 SOURCE_DIR=""
@@ -665,7 +665,11 @@ fi
 
 FILES=(
   "package.json"
+  "bin/openalice.ts"
   "bin/openalice.mjs"
+  "src/main.ts"
+  "src/pi-tui-loader.ts"
+  "src/supervisor-tui.ts"
   "src/doctor.mjs"
   "src/install-layout.mjs"
   "src/install-source.mjs"
@@ -735,7 +739,9 @@ PI_STAGED_VERSION="$(node "$PI_STAGED_ENTRY" --version)"
 ok "Managed Pi $PI_VERSION is ready"
 
 step 5 "Verifying the OpenAlice CLI"
+chmod +x "$STAGING/bin/openalice.ts"
 chmod +x "$STAGING/bin/openalice.mjs"
+node --check "$STAGING/bin/openalice.ts"
 node --check "$STAGING/bin/openalice.mjs"
 node --check "$STAGING/src/doctor.mjs"
 node --check "$STAGING/src/install-layout.mjs"
@@ -763,7 +769,7 @@ if [[ -n "${OPENALICE_EXPECTED_CLI_VERSION:-}" \
   && "$CLI_VERSION" != "$OPENALICE_EXPECTED_CLI_VERSION" ]]; then
   die "The downloaded CLI reported $CLI_VERSION instead of expected release $OPENALICE_EXPECTED_CLI_VERSION"
 fi
-STAGED_VERSION="$(node "$STAGING/bin/openalice.mjs" --version)"
+STAGED_VERSION="$(node "$STAGING/bin/openalice.ts" --version)"
 [[ "$STAGED_VERSION" == "$CLI_VERSION" ]] || die "The downloaded CLI did not report its package version"
 node -e '
   const { writeFileSync } = require("node:fs");
@@ -776,7 +782,7 @@ node -e '
     installerUrl,
   }, null, 2)}\n`, { mode: 0o644 });
 ' "$STAGING/install-source.json" "$REPOSITORY" "$CLI_VERSION" "$REF_KIND" "$VERSION" "$INSTALLER_URL"
-node "$STAGING/bin/openalice.mjs" version --json | node -e '
+node "$STAGING/bin/openalice.ts" version --json | node -e '
   let input = "";
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", (chunk) => { input += chunk; });
@@ -818,7 +824,7 @@ else
   STAGING=""
 fi
 
-CLI_ENTRY="$DESTINATION/bin/openalice.mjs"
+CLI_ENTRY="$DESTINATION/bin/openalice.ts"
 PI_ENTRY="$DESTINATION/$PI_RELATIVE_ENTRY"
 printf -v quoted_cli_entry '%q' "$CLI_ENTRY"
 printf -v quoted_pi_entry '%q' "$PI_ENTRY"

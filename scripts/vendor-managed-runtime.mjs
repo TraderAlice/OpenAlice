@@ -25,7 +25,7 @@ const piCliPath = resolve(
 const knownArgs = new Set(['--force', '--help', '-h'])
 let force = false
 
-const PI_VERSION = '0.80.6'
+const PI_VERSION = '0.83.0'
 const PI_RELEASE_BASE = `https://github.com/earendil-works/pi/releases/download/v${PI_VERSION}`
 const PI_ASSETS = [
   {

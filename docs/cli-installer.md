@@ -87,7 +87,7 @@ infrastructure for maintainers, not a user-facing release mirror.
 exclusive. The default install root is `~/.openalice`, and the downloaded
 OpenAlice payload is the file set declared by `FILES` in the root `install`
 script. The installer also downloads Pi's release-owned install manifest and
-lockfile for version `0.80.6`, verifies both against pinned SHA-256 values, and
+lockfile for version `0.83.0`, verifies both against pinned SHA-256 values, and
 runs `npm ci --omit=dev --ignore-scripts` in the staged release.
 
 ## Load-Bearing Files
@@ -95,7 +95,8 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
 - `install` — user-facing Bash bootstrap and durable install transaction.
 - `packages/cli/package.json` — CLI version, engine requirement, bin entry, and
   published file list.
-- `packages/cli/bin/openalice.mjs` — installed command entry point.
+- `packages/cli/bin/openalice.ts` — installed TypeScript application entry;
+  Node 22.19+ executes its erasable types directly.
 - `packages/cli/src/install-source.mjs` — validated installation-source
   metadata used when managed remote reproduces the invoking CLI.
 - `packages/cli/src/install-layout.mjs` — strict discovery of installer-owned
@@ -267,7 +268,7 @@ Before a release becomes visible, the installer:
 3. executes the staged CLI with `--version` and compares its result with the
    package manifest;
 4. verifies the Pi install manifest and lockfile against the SHA-256 values
-   pinned in the installer, then requires the staged Pi CLI to report `0.80.6`;
+   pinned in the installer, then requires the staged Pi CLI to report `0.83.0`;
 5. writes `install-source.json` with the CLI version, selected branch/tag/commit,
    and installer URL that produced this CLI;
 6. hashes the ordered OpenAlice payload, install-source metadata, and both Pi
@@ -673,7 +674,7 @@ Runtime behavior, PTY behavior, or Electron files also change.
 Before publishing or promoting a change that affects the installer:
 
 1. Confirm the CLI payload list in `install` and `packages/cli/package.json`
-   still match the imports reachable from `bin/openalice.mjs`.
+   still match the imports reachable from `bin/openalice.ts`.
 2. Confirm the intended source ref, equal root and CLI package versions, Pi
    version, release asset hashes, lockfile engine floor, and root/CLI Node
    engines. Do not accidentally advertise mutable `dev` as a stable release.
