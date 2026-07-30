@@ -86,9 +86,12 @@ separate daemons.
 
 The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 `Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
-explicit commands:
+explicit commands. Its ordinary path is intentionally parameter-free:
 
-- `s` starts the persistent Runtime when stopped;
+- Enter starts the persistent Runtime and opens the verified Web endpoint when
+  stopped, or opens the endpoint when already running;
+- `s` starts the persistent Runtime in the background without opening a
+  browser;
 - `o` opens an advertised, verified Web endpoint;
 - `x` stops and `r` restarts only a `cli-server` owner, after an impact
   confirmation;
@@ -97,8 +100,9 @@ explicit commands:
 - `u` performs an advisory product-update check;
 - `i` lists the implicit default plus registered instances, selects one without
   stopping another instance, or creates a separate named complete home;
-- `p` opens selected-instance settings for complete home, Web port, update
-  checks, and resolved source/config provenance;
+- `p` opens Setup for data home, browser port, update checks, and resolved
+  Runtime/config provenance. Setup can edit either the selected instance or
+  machine defaults inherited by instances;
 - `m` is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
 - `c` is an advanced control that chooses and remembers the selected instance's source checkout;
@@ -138,15 +142,24 @@ the Supervisor reads a versioned machine-local document at
 `<Supervisor root>/config.json`. It contains machine defaults and an instance
 map outside every selectable complete home.
 
-The `p` settings overlay atomically edits the selected instance's complete
-home, Web port, and update-check policy. A blank Home or port and the
-`Inherit` update value remove the instance override, exposing the resolved
-machine/default value immediately. Named instances must retain an explicit,
-separate complete home; only the implicit `default` may inherit its Home.
-Home and port remain read-only while the selected Runtime is active. Any value
-supplied by an environment variable or explicit CLI flag is shown with its
-resolved value and a locked provenance message; the TUI never writes a
-lower-priority value that appears to override it.
+The `p` Setup overlay atomically edits the selected instance's data home,
+browser port, and update-check policy. Its first row switches between `This
+instance` and `Machine defaults`. A blank Home or port and the `Inherit` update
+value remove that layer's override, exposing the next lower-priority value
+immediately. Named instances must retain an explicit, separate complete home;
+only the implicit `default` may inherit its Home. Home and port remain
+read-only while the selected Runtime is active when the edited layer affects
+that Runtime. A machine default may still be changed while a higher instance,
+environment, or flag layer shields the running instance.
+
+Any selected-instance value supplied by an environment variable or explicit
+CLI flag is shown with its resolved value and a locked provenance message; the
+TUI never writes a lower-priority instance value that appears to override it.
+Machine-default editing remains available because it intentionally changes the
+lower layer for future or inheriting launches. The overview reports the
+resolved field provenance, and Setup identifies the installed Runtime by the
+single OpenAlice product version plus diagnostic content identity rather than
+presenting its filesystem path as a second product concept.
 
 The `i` instance overlay reads the same atomic registry, always shows the
 implicit `default`, and adds every configured named instance. Selecting one
@@ -172,10 +185,9 @@ instead of pretending that a lower-priority selection can win.
 The `c` editor validates an OpenAlice checkout, atomically saves it as the
 selected instance's `appDir`, and starts the Runtime. If
 `OPENALICE_APP_HOME` or `--app-dir` supplied the source, the TUI reports that
-higher-priority override instead of overwriting it. Machine-default editing,
-`openalice config check`, live reload with last-known-good retention,
-registry-entry removal, and full component/instance dashboards remain later
-increments.
+higher-priority override instead of overwriting it. `openalice config check`,
+live reload with last-known-good retention, registry-entry removal, and full
+component/instance dashboards remain later increments.
 
 `OPENALICE_INSTANCE`, `OPENALICE_HOME`, `OPENALICE_WEB_PORT`,
 `OPENALICE_APP_HOME`, and `OPENALICE_NO_UPDATE_CHECK` are the corresponding

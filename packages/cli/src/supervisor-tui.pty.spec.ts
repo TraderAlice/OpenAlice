@@ -208,16 +208,19 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('p Settings')) {
+        if (!openedSettings && output.includes('p Setup')) {
           openedSettings = true
           child.write('p')
-        } else if (!selectedPort && output.includes('Instance settings · default')) {
+        } else if (!selectedPort && output.includes('OpenAlice setup · default')) {
           selectedPort = true
-          child.write('\u001b[B\r')
-        } else if (!submittedPort && output.includes('Set Web port')) {
+          child.write('\u001b[B\u001b[B\r')
+        } else if (!submittedPort && output.includes('Set instance browser port')) {
           submittedPort = true
           child.write('49001\r')
-        } else if (!closedSettings && output.includes('Saved Web port.')) {
+        } else if (
+          !closedSettings
+          && output.includes('Saved browser port for instance "default".')
+        ) {
           closedSettings = true
           child.write('\u001b')
         } else if (
@@ -239,13 +242,99 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       await readFile(join(supervisorHome, 'config.json'), 'utf8'),
     )
     expect(config.instances.default.port).toBe(49_001)
-    expect(transcript).toContain('Instance settings · default')
-    expect(transcript).toContain('Set Web port')
-    expect(transcript).toContain('Saved Web port.')
+    expect(transcript).toContain('OpenAlice setup · default')
+    expect(transcript).toContain('Set instance browser port')
+    expect(transcript).toContain('Saved browser port for instance "default".')
     expect(transcript).toContain('port (instance.default.port)')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
-  })
+  }, 15_000)
+
+  it('switches setup scope and persists machine defaults inside the TUI', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-machine-settings-'))
+    temporaryPaths.push(isolatedHome)
+    const supervisorHome = join(isolatedHome, 'supervisor')
+    const childEnv = { ...process.env }
+    delete childEnv.OPENALICE_HOME
+    delete childEnv.OPENALICE_INSTANCE
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 110,
+      rows: 30,
+      cwd: dirname(cliEntry),
+      env: {
+        ...childEnv,
+        HOME: isolatedHome,
+        OPENALICE_SUPERVISOR_HOME: supervisorHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let openedSetup = false
+      let selectedMachineScope = false
+      let selectedPort = false
+      let submittedPort = false
+      let closedSetup = false
+      let detached = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor machine settings timed out:\n${output}`))
+      }, 10_000)
+      child.onData((data) => {
+        output += data
+        if (!openedSetup && output.includes('p Setup')) {
+          openedSetup = true
+          child.write('p')
+        } else if (
+          !selectedMachineScope
+          && output.includes('Editing')
+          && output.includes('This instance')
+        ) {
+          selectedMachineScope = true
+          child.write('\r')
+        } else if (
+          !selectedPort
+          && output.includes('Editing machine defaults.')
+        ) {
+          selectedPort = true
+          child.write('\u001b[B\u001b[B\r')
+        } else if (
+          !submittedPort
+          && output.includes('Set machine-default browser port')
+        ) {
+          submittedPort = true
+          child.write('49002\r')
+        } else if (
+          !closedSetup
+          && output.includes('Saved browser port for machine default.')
+        ) {
+          closedSetup = true
+          child.write('\u001b')
+        } else if (
+          !detached
+          && output.includes('port (machine.defaults.port)')
+        ) {
+          detached = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor machine settings exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    const config = JSON.parse(
+      await readFile(join(supervisorHome, 'config.json'), 'utf8'),
+    )
+    expect(config.defaults.port).toBe(49_002)
+    expect(transcript).toContain('Editing machine defaults.')
+    expect(transcript).toContain('Set machine-default browser port')
+    expect(transcript).toContain('Saved browser port for machine default.')
+    expect(transcript).toContain('port (machine.defaults.port)')
+  }, 15_000)
 
   it('creates, selects, remembers, and switches named instances inside the TUI', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instances-'))
@@ -296,7 +385,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (
           !acceptedHome
           && output.includes('Create instance · research')
-          && output.includes('Complete home')
+          && output.includes('Data home')
         ) {
           acceptedHome = true
           child.write('\r')
@@ -458,17 +547,17 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedSettings && output.includes('p Settings')) {
+        if (!openedSettings && output.includes('p Setup')) {
           openedSettings = true
           child.write('p')
         } else if (!selectedPort && output.includes('44000 · locked')) {
           selectedPort = true
-          child.write('\u001b[B')
+          child.write('\u001b[B\u001b[B')
         } else if (!testedLockedPort && output.includes('Locked by --port.')) {
           testedLockedPort = true
           child.write('\r')
           setTimeout(() => child.write('\u001b'), 50)
-        } else if (!detached && output.includes('Instance settings closed.')) {
+        } else if (!detached && output.includes('Setup closed.')) {
           detached = true
           child.write('q')
         }
@@ -482,7 +571,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('44000 · locked')
     expect(transcript).toContain('Locked by --port.')
-    expect(transcript).not.toContain('Set Web port')
+    expect(transcript).not.toContain('Set browser port')
   })
 
   it('shows CLI-selected instances as read-only instead of pretending to switch them', async () => {

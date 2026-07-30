@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { resolveLaunchContext } from './launch-context.ts'
 import {
   resolveSupervisorChannel,
+  runSupervisorTui,
   type SupervisorAction,
   SupervisorScreen,
 } from './supervisor-tui.ts'
@@ -43,7 +45,9 @@ describe('Supervisor TUI screen', () => {
 
     expect(lines).toContain('OpenAlice  0.87.0-beta  dev')
     expect(lines).toContain('Runtime state: absent')
-    expect(lines).toContain('s Start · i Instances · p Settings · m Managed · c Source')
+    expect(lines).toContain(
+      'Enter Start & open · s Background · p Setup · i Instances · m Managed · c Source',
+    )
     expect(lines).toContain('d Doctor · l Logs · u Update · ? Help')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
   })
@@ -61,6 +65,35 @@ describe('Supervisor TUI screen', () => {
     expect(lines).toContain('Runtime: unavailable')
     expect(lines.join('\n')).not.toContain('\u001b')
     expect(lines.every((line) => line.length <= 40)).toBe(true)
+  })
+
+  it('shows the installed Runtime as a product identity instead of a long path', () => {
+    const context = resolveLaunchContext({
+      cwd: '/tmp',
+      homeDir: '/home/alice',
+      env: {
+        OPENALICE_MANAGED_RUNTIME_PATH: '/opt/openalice/releases/runtime',
+        OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY: '1234567890abcdef',
+      },
+    })
+    const screen = new SupervisorScreen({
+      version: '0.87.0-beta',
+      channel: 'stable',
+      runtime: {
+        class: 'absent',
+        home: context.home,
+        owner: null,
+        endpoints: {},
+      },
+      context,
+    })
+
+    const output = screen.render(100).join('\n')
+    expect(output).toContain('Provider: bundle (installed)')
+    expect(output).toContain(
+      'Runtime: OpenAlice 0.87.0-beta · bundle 1234567890abcdef',
+    )
+    expect(output).not.toContain('/opt/openalice/releases/runtime')
   })
 
   it('dispatches available actions and confirms Runtime mutations', () => {
@@ -88,6 +121,101 @@ describe('Supervisor TUI screen', () => {
 
     expect(screen.handleKey('enter', matchesKey)).toBe(true)
     expect(actions).toEqual(['open', 'restart'])
+  })
+
+  it('uses Enter as the human-first start-and-open or open action', () => {
+    const actions: SupervisorAction[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'development',
+      runtime: { class: 'absent', endpoints: {} },
+    }, {
+      onAction: (action) => actions.push(action),
+    })
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(actions).toEqual(['start-open'])
+    expect(screen.render(100).join('\n')).toContain(
+      'Press Enter to start and open the browser',
+    )
+
+    screen.update({
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+        endpoints: { web: 'http://127.0.0.1:47331' },
+      },
+    })
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(actions).toEqual(['start-open', 'open'])
+    expect(screen.render(100).join('\n')).toContain(
+      'Press Enter or o to open the Web UI',
+    )
+  })
+
+  it('starts the Runtime and opens the browser from one Enter key', async () => {
+    const calls: string[] = []
+    let runtime: {
+      class: string
+      owner: { surface: string; pid: number } | null
+      endpoints: { web?: string }
+    } = {
+      class: 'absent',
+      owner: null,
+      endpoints: {},
+    }
+    let inputListener: ((data: string) => unknown) | undefined
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => inputListener?.('enter'))
+      }
+      stop(): void {}
+    }
+    const fakePiTui = {
+      ProcessTerminal: class {},
+      TUI: FakeTui,
+      matchesKey,
+    }
+    const context = resolveLaunchContext({
+      cwd: '/tmp',
+      homeDir: '/home/alice',
+      env: {
+        OPENALICE_MANAGED_RUNTIME_PATH: '/opt/openalice/runtime',
+        OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY: '1234567890abcdef',
+      },
+    })
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => context,
+      inspect: async () => runtime,
+      start: async () => {
+        calls.push('start')
+        runtime = {
+          class: 'running',
+          owner: { surface: 'cli-server', pid: 42 },
+          endpoints: { web: 'http://127.0.0.1:47331' },
+        }
+      },
+      open: async () => {
+        calls.push('open')
+        queueMicrotask(() => inputListener?.('q'))
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => fakePiTui as never,
+      version: '0.87.0-beta',
+      channel: 'stable',
+    })).resolves.toBe(0)
+
+    expect(calls).toEqual(['start', 'open'])
   })
 
   it('keeps foreign-owned lifecycle mutations unavailable', () => {
