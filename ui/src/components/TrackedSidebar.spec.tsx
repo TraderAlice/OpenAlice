@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EntityListItem } from '../api/entities'
@@ -97,5 +97,27 @@ describe('TrackedSidebar collection failure', () => {
 
     expect(screen.getByText('vst')).toBeTruthy()
     expect(screen.queryByRole('status')).toBeNull()
+  })
+})
+
+describe('TrackedSidebar navigation', () => {
+  it('notifies the page shell after selecting an entity', () => {
+    mocks.entitiesState.current = {
+      entities: [trackedEntity],
+      loading: false,
+      error: null,
+      refreshing: false,
+    }
+    const onNavigate = vi.fn()
+
+    render(<TrackedSidebar onNavigate={onNavigate} />)
+    mocks.select.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'stockvst1' }))
+
+    expect(mocks.select).toHaveBeenCalledWith('stock-vst')
+    expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'tracked', params: {} })
+    expect(onNavigate).toHaveBeenCalledOnce()
   })
 })
