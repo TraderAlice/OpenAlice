@@ -23,8 +23,8 @@ quantitative assignment and open a native coding-Agent Session.
   `426d815b18450172fbcf4c6b6af77c6ae05a4967`; retain `v0.8.30` and
   `v0.8.27` in the approved catalog for reproducible explicit creation.
 - Add a generic template-source catalog and create-time version selection.
-- Materialize the exact upstream tree into OpenAlice's fresh local Git Harness
-  and commit a source receipt without installing Python dependencies.
+- Materialize the exact upstream repository into a local research branch and
+  commit a source receipt without installing Python dependencies.
 - Add an AutoQuant Activity entry that reuses the Ask Alice composer, runtime,
   credential, Workspace, Session, and file surfaces.
 - Preserve AutoQuant's own `AGENTS.md`, while injecting OpenAlice collaboration,
@@ -38,9 +38,9 @@ quantitative assignment and open a native coding-Agent Session.
 - A source version is an immutable creation input, separate from the OpenAlice
   template guidance version. Floating branches and semver ranges are not
   accepted.
-- OpenAlice's initial-commit Harness rule remains authoritative: upstream Git
-  history and pushable remotes are removed, while the exact upstream
-  repository, release, and commit are retained in a tracked receipt.
+- AutoQuant retains its upstream Git history and canonical `origin`; the
+  research branch starts at the exact approved release commit and records that
+  source in a tracked receipt.
 - Dependency installation and quantitative iteration belong to the coding
   Agent inside the desk.
 - AutoQuant Workspaces are durable desks. Generic managed-context template
@@ -71,6 +71,8 @@ quantitative assignment and open a native coding-Agent Session.
       bounded Session history and a low-frequency Workspace control.
 - [x] Default new initialization to the immutable AutoQuant V2 `v0.8.31`
       release while retaining the older approved catalog entries.
+- [x] Preserve AutoQuant's upstream Git ancestry and `origin` so later upgrades
+      remain ordinary Coding Agent-managed fetch and merge work.
 - [x] Re-run full repository, demo, browser/dev, and packaged Electron
       verification for the revised entry path.
 

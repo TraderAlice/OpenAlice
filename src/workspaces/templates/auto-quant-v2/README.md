@@ -23,7 +23,8 @@ or Dossier lifecycle.
 The default supported source is AutoQuant V2 `v0.8.31` at commit
 `426d815b18450172fbcf4c6b6af77c6ae05a4967`. The exact upstream source is
 recorded in `.alice/harness-source.json`; the Workspace itself starts a fresh
-local Git history with no pushable upstream remote.
+research branch at that commit while retaining AutoQuant's upstream history and
+`origin` remote for later Coding Agent-managed fetches and merges.
 
 ## Starting work
 
