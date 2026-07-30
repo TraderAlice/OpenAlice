@@ -517,3 +517,10 @@ This plan is complete only when:
   directly to Node. The deterministic session regression now covers the full
   guard boundary. Local CLI TUI tests pass 13 with only the Windows-only Bash
   journey skipped; the full repository passes 3,645 tests with 10 skipped.
+- 2026-07-30: A subsequent Windows run showed that successful q, Ctrl+C,
+  resize, reconnect, and Git Bash journeys could all restore the alternate
+  screen yet leave the ESM fixture waiting on a terminal stream callback;
+  ConPTY then reported exit 1 and sometimes observed a partial result file.
+  The PTY child now commits its structured evidence and final marker
+  synchronously before publishing an explicit exit code. This is fixture
+  process ownership, not a relaxation of the renderer/session assertions.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { writeFile } from 'node:fs/promises'
+import { writeFileSync, writeSync } from 'node:fs'
 
 import { createSupervisorFrame } from '../../src/tui-frame.mjs'
 import { createTerminalSession } from '../../src/tui-session.mjs'
@@ -53,48 +53,37 @@ try {
     raw: process.stdin.isRaw === true,
     errorMessage: null,
   }
-  await writeResult(result)
-  await writeTerminal(
+  writeResult(result)
+  writeTerminal(
     process.stdout,
     `\nOPENALICE_TUI_RESTORED raw=${result.raw} reason=${result.reason}\n`,
   )
-  if (outcome.reason === 'SIGINT') process.exitCode = 130
-  if (outcome.reason === 'SIGTERM') process.exitCode = 143
+  process.exitCode = outcome.reason === 'SIGINT' ? 130 : outcome.reason === 'SIGTERM' ? 143 : 0
 } catch (error) {
   const result = {
     reason: 'error',
     raw: process.stdin.isRaw === true,
     errorMessage: error instanceof Error ? error.message : String(error),
   }
-  await writeResult(result)
-  await writeTerminal(
+  writeResult(result)
+  writeTerminal(
     process.stdout,
     `\nOPENALICE_TUI_RESTORED raw=${result.raw} reason=${result.reason}\n`,
   )
-  await writeTerminal(process.stderr, `OpenAlice TUI fixture failed: ${result.errorMessage}\n`)
+  writeTerminal(process.stderr, `OpenAlice TUI fixture failed: ${result.errorMessage}\n`)
   process.exitCode = 1
 }
 
-async function writeResult(result) {
+function writeResult(result) {
   const resultPath = process.env.OPENALICE_TUI_RESULT_PATH
   if (!resultPath) return
-  await writeFile(resultPath, `${JSON.stringify(result)}\n`, 'utf8')
+  writeFileSync(resultPath, `${JSON.stringify(result)}\n`, 'utf8')
 }
 
 function writeTerminal(stream, text) {
-  return new Promise((resolve) => {
-    let settled = false
-    const finish = () => {
-      if (settled) return
-      settled = true
-      stream.off('error', finish)
-      resolve()
-    }
-    stream.once('error', finish)
-    try {
-      stream.write(text, finish)
-    } catch {
-      finish()
-    }
-  })
+  // A pending stream callback does not keep an ESM top-level await alive on
+  // every Windows ConPTY implementation. Commit the fixture's evidence before
+  // publishing an explicit child exit code so node-pty never observes a half
+  // written result or an unsettled-module failure.
+  writeSync(stream.fd, text)
 }
