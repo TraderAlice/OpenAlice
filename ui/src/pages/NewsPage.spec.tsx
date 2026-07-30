@@ -85,11 +85,23 @@ describe('NewsPage article disclosures', () => {
     await user.keyboard('{Enter}')
 
     expect(disclosure.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByRole('link', { name: 'Open original' }).getAttribute('href'))
-      .toBe('https://example.com/newest')
+    const originalLink = screen.getByRole('link', { name: 'Open original' })
+    expect(originalLink.getAttribute('href')).toBe('https://example.com/newest')
+    expect(originalLink.className).toContain('min-h-10')
 
     await user.keyboard(' ')
     expect(disclosure.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('link', { name: 'Open original' })).toBeNull()
+  })
+
+  it('labels the feed filters and exposes loading state on the article surface', async () => {
+    render(<NewsPage />)
+
+    expect(await screen.findByRole('combobox', { name: 'News time range' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'News source' })).toBeTruthy()
+
+    const article = await screen.findByRole('button', { name: 'Newest update' })
+    expect(article.className).toContain('py-3.5')
+    expect(article.closest('[aria-busy]')?.getAttribute('aria-busy')).toBe('false')
   })
 })

@@ -31,12 +31,12 @@ function ArticleRow({ article }: { article: NewsArticle }) {
         aria-label={article.title}
         aria-expanded={expanded}
         onClick={() => setExpanded((current) => !current)}
-        className="w-full px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+        className="group w-full px-4 py-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-5"
       >
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-foreground leading-snug">{article.title}</p>
-            <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm font-medium leading-snug text-foreground">{article.title}</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               {article.source && (
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">
                   {article.source}
@@ -49,27 +49,31 @@ function ArticleRow({ article }: { article: NewsArticle }) {
             </div>
           </div>
           <span
-            className="text-muted-foreground text-xs shrink-0 mt-0.5"
+            className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground transition-transform group-hover:text-foreground ${expanded ? 'rotate-90' : ''}`}
             aria-hidden
           >
-            {expanded ? '▾' : '▸'}
+            <svg viewBox="0 0 20 20" fill="none" className="size-3.5" stroke="currentColor" strokeWidth="1.8">
+              <path d="m7 4 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </span>
         </div>
 
         {!expanded && article.content && (
-          <p className="mt-1 text-[12px] text-muted-foreground/50 truncate">{contentPreview}</p>
+          <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground/75 md:line-clamp-1">
+            {contentPreview}
+          </p>
         )}
       </button>
 
       {expanded && (
-        <div className="px-4 pb-3 space-y-2">
-          <p className="text-[12px] text-muted-foreground/80 leading-relaxed whitespace-pre-wrap">{article.content}</p>
+        <div className="space-y-3 border-t border-border/40 px-4 pb-4 pt-3 sm:px-5">
+          <p className="max-w-[72ch] whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{article.content}</p>
           {article.link && (
             <a
               href={article.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="-ml-3 inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-primary transition-colors hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {t('news.openOriginal')}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -138,14 +142,15 @@ export function NewsPage() {
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader title={t('nav.item.news')} />
 
-      <div className="flex-1 flex flex-col min-h-0 px-4 md:px-6 py-5">
-        <div className="flex flex-col gap-3 h-full">
+      <div className="flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6 md:py-5">
+        <div className="mx-auto flex h-full w-full max-w-[1120px] flex-col gap-3">
           {/* Controls */}
-          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
             <select
+              aria-label={t('news.lookbackLabel')}
               value={lookback}
               onChange={(e) => setLookback(e.target.value)}
-              className="bg-muted text-foreground text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-primary"
+              className="min-h-10 rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
             >
               {LOOKBACK_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
@@ -153,9 +158,10 @@ export function NewsPage() {
             </select>
 
             <select
+              aria-label={t('news.sourceLabel')}
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="bg-muted text-foreground text-sm rounded-md border border-border px-2 py-1.5 outline-none focus:border-primary"
+              className="min-h-10 max-w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
             >
               <option value="">{t('news.allSources')}</option>
               {sources.map((s) => (
@@ -163,13 +169,16 @@ export function NewsPage() {
               ))}
             </select>
 
-            <span className="text-xs text-muted-foreground ml-auto">
+            <span aria-live="polite" className="ml-auto inline-flex min-h-10 items-center text-xs tabular-nums text-muted-foreground">
               {t('news.articleCount', { count: articles.length })}
             </span>
           </div>
 
           {/* Article list */}
-          <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border bg-background">
+          <div
+            aria-busy={loading}
+            className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+          >
             {loading && articles.length === 0 ? (
               <div className="divide-y divide-border/50">
                 {Array.from({ length: 6 }).map((_, i) => (
