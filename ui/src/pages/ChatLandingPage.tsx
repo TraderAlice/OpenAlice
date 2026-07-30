@@ -23,6 +23,7 @@ import {
   AgentLaunchSelectors,
   type AgentLaunchSelectorsHandle,
 } from '../components/workspace/AgentLaunchControls'
+import { RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
 import {
@@ -95,6 +96,9 @@ function HarnessLandingPage({
     defaultAgent,
     setDefaultAgent,
     openAgentConfig,
+    hasLoaded,
+    listError,
+    refresh,
   } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const templateName = mode === 'auto-quant' ? 'auto-quant-v2' : 'chat'
@@ -252,6 +256,18 @@ function HarnessLandingPage({
     textareaRef.current?.focus()
   }
 
+  if (!hasLoaded && listError !== null) {
+    return (
+      <RecoverySurface
+        eyebrow={t('workspace.dataUnavailableEyebrow')}
+        title={t('workspace.dataUnavailableTitle')}
+        description={t('workspace.dataUnavailableDescription')}
+        actionLabel={t('common.retry')}
+        onAction={() => void refresh()}
+      />
+    )
+  }
+
   return (
     <div
       data-testid="harness-landing-scroll"
@@ -271,6 +287,13 @@ function HarnessLandingPage({
         data-testid="harness-landing-stack"
         className="relative z-10 my-auto flex w-full max-w-2xl flex-col gap-3 md:gap-5"
       >
+        {listError !== null && (
+          <RefreshNotice
+            message={t('workspace.dataStale')}
+            actionLabel={t('common.retry')}
+            onAction={() => void refresh()}
+          />
+        )}
         <div className="text-center space-y-1.5">
           {targetWs && mode === 'chat' ? (
             <>

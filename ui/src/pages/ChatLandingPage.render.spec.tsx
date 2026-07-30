@@ -109,10 +109,13 @@ function context(
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    templatesError: null,
     autoQuantDefaultWorkspaceId,
     autoQuantPreferenceLoaded: true,
     autoQuantPreferenceError: null,
     refresh: vi.fn(),
+    refreshTemplates: vi.fn(async () => undefined),
+    refreshAutoQuantPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
@@ -258,6 +261,36 @@ describe('ChatLandingPage compact-height layout', () => {
     expect(screen.getByTestId('harness-landing-stack').className).toContain('my-auto')
     expect(screen.getByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…').className)
       .toContain('min-h-[72px]')
+  })
+})
+
+describe('ChatLandingPage Workspace inventory states', () => {
+  it('shows a recovery surface instead of a fake new-Workspace composer after the first list failure', () => {
+    const failed = {
+      ...context([]),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+    }
+    mocks.useWorkspaces.mockReturnValue(failed)
+
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByRole('heading', { name: 'Workspace data is unavailable' })).toBeTruthy()
+    expect(screen.queryByPlaceholderText('Ask Alice…')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(failed.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the composer available with an explicit stale-data notice after a later refresh fails', () => {
+    mocks.useWorkspaces.mockReturnValue({
+      ...context(workspaces),
+      listError: 'list failed: 500',
+    })
+
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByText('Live refresh failed. Showing the last known Workspace data.')).toBeTruthy()
+    expect(screen.getByPlaceholderText('Ask Alice…')).toBeTruthy()
   })
 })
 

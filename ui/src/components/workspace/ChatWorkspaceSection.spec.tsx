@@ -81,10 +81,13 @@ function workspaceContext(
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    templatesError: null,
     autoQuantDefaultWorkspaceId: null,
     autoQuantPreferenceLoaded: true,
     autoQuantPreferenceError: null,
     refresh: vi.fn(),
+    refreshTemplates: vi.fn(async () => undefined),
+    refreshAutoQuantPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
@@ -203,11 +206,53 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.queryByRole('button', { name: 'Offboard workspace' })).toBeNull()
   })
 
-  it('keeps an explicit workspace action in the empty state', () => {
+  it('keeps one explicit workspace action in the empty state', () => {
     renderSection([])
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(1)
+  })
+
+  it('reports a failed Workspace inventory without pretending the list is empty', () => {
+    const retry = vi.fn(async () => undefined)
+    const failed = {
+      ...workspaceContext([]),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+      refresh: retry,
+    }
+
+    render(
+      <WorkspacesContext.Provider value={failed}>
+        <ChatWorkspaceSection />
+      </WorkspacesContext.Provider>,
+    )
+
+    expect(screen.queryByText(i18n.t('chat.noChatWorkspacesYet'))).toBeNull()
+    expect(screen.getByText(i18n.t('workspace.dataUnavailableSidebar'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the Chat section visible when the template catalog fails', () => {
+    const retryTemplates = vi.fn(async () => undefined)
+    const failed = {
+      ...workspaceContext([chatWorkspace]),
+      templates: [],
+      templatesError: 'templates failed: 500',
+      refreshTemplates: retryTemplates,
+    }
+
+    render(
+      <WorkspacesContext.Provider value={failed}>
+        <ChatWorkspaceSection />
+      </WorkspacesContext.Provider>,
+    )
+
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
+    expect(screen.getByText(i18n.t('workspace.templatesUnavailableSidebar'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
   it('bounds expanded Workspace history and routes the full catalog to the Session library', () => {

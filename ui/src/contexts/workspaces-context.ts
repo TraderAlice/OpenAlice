@@ -27,11 +27,14 @@ export interface WorkspacesContextValue {
   readonly hasLoaded: boolean
   /** True once the templates fetch has settled (success OR failure). */
   readonly templatesLoaded: boolean
+  readonly templatesError: string | null
   /** Explicit durable desk pointer that defines AutoQuant readiness. */
   readonly autoQuantDefaultWorkspaceId: string | null
   readonly autoQuantPreferenceLoaded: boolean
   readonly autoQuantPreferenceError: string | null
-  refresh(): void
+  refresh(): Promise<void>
+  refreshTemplates(): Promise<void>
+  refreshAutoQuantPreference(): Promise<void>
   refreshWorkspaceManager(): Promise<void>
   quickStartWorkspaceManager(
     prompt: string,
