@@ -33,6 +33,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
+      let openedHelp = false
       let detached = false
       const timeout = setTimeout(() => {
         child.kill()
@@ -40,7 +41,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!detached && output.includes('q / Esc / Ctrl+C  Detach')) {
+        if (!openedHelp && output.includes('q / Esc / Ctrl+C  Detach without stopping')) {
+          openedHelp = true
+          child.write('?')
+        } else if (!detached && output.includes('Supervisor controls')) {
           detached = true
           child.write('q')
         }
@@ -54,6 +58,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     expect(transcript).toContain('OpenAlice  0.87.0-beta  development')
     expect(transcript).toContain('Runtime state: absent')
+    expect(transcript).toContain('Supervisor controls')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
