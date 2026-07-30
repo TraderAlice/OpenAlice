@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -11,6 +11,31 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
 }))
 
+function newsResponse(title: string, lookback = '24h') {
+  return {
+    items: [{
+      time: '2026-07-29T10:00:00.000Z',
+      title,
+      content: `${title} content`,
+      source: 'Reuters',
+      link: null,
+      categories: null,
+    }],
+    count: 1,
+    lookback,
+  }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 vi.mock('../api', () => ({
   api: {
     news: {
@@ -20,6 +45,7 @@ vi.mock('../api', () => ({
 }))
 
 beforeEach(async () => {
+  mocks.list.mockReset()
   await i18n.changeLanguage('en')
   mocks.list.mockResolvedValue({
     items: [
@@ -56,6 +82,7 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 
 describe('NewsPage ordering', () => {
@@ -103,5 +130,100 @@ describe('NewsPage article disclosures', () => {
     const article = await screen.findByRole('button', { name: 'Newest update' })
     expect(article.className).toContain('py-3.5')
     expect(article.closest('[aria-busy]')?.getAttribute('aria-busy')).toBe('false')
+  })
+})
+
+describe('NewsPage request recovery', () => {
+  it('reports an initial failure instead of presenting it as an empty feed, then retries', async () => {
+    mocks.list
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(newsResponse('Recovered update'))
+
+    render(<NewsPage />)
+
+    const error = await screen.findByRole('alert')
+    expect(error.textContent).toContain('Couldn’t load News')
+    expect(error.textContent).toContain('OpenAlice backend')
+    expect(screen.queryByText('No articles')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Recovered update')).toBeTruthy()
+    expect(mocks.list).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('clears mismatched articles when a new filter fails', async () => {
+    render(<NewsPage />)
+    expect(await screen.findByText('Newest update')).toBeTruthy()
+
+    mocks.list.mockRejectedValueOnce(new Error('filter unavailable'))
+    fireEvent.change(screen.getByRole('combobox', { name: 'News source' }), {
+      target: { value: 'Reuters' },
+    })
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByText('Newest update')).toBeNull()
+    expect(screen.queryByText('No articles')).toBeNull()
+  })
+
+  it('keeps the last successful feed visible when a background refresh fails', async () => {
+    let refresh: (() => void) | undefined
+    vi.spyOn(globalThis, 'setInterval').mockImplementation((handler, delay) => {
+      if (delay === 60_000) refresh = handler as () => void
+      return {} as ReturnType<typeof setInterval>
+    })
+
+    render(<NewsPage />)
+    expect(await screen.findByText('Newest update')).toBeTruthy()
+    expect(refresh).toBeTypeOf('function')
+    mocks.list.mockRejectedValueOnce(new Error('refresh unavailable'))
+
+    await act(async () => {
+      refresh?.()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const status = await screen.findByRole('status')
+    expect(status.textContent).toContain('showing the last news received')
+    expect(screen.getByText('Newest update')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    mocks.list.mockResolvedValueOnce(newsResponse('Refreshed update'))
+    fireEvent.click(within(status).getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Refreshed update')).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('lets the latest filter response win when an older request finishes last', async () => {
+    render(<NewsPage />)
+    expect(await screen.findByText('Newest update')).toBeTruthy()
+
+    const slow = deferred<ReturnType<typeof newsResponse>>()
+    const fast = deferred<ReturnType<typeof newsResponse>>()
+    mocks.list
+      .mockImplementationOnce(() => slow.promise)
+      .mockImplementationOnce(() => fast.promise)
+
+    const lookback = screen.getByRole('combobox', { name: 'News time range' })
+    fireEvent.change(lookback, { target: { value: '1h' } })
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(2))
+    fireEvent.change(lookback, { target: { value: '7d' } })
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(3))
+
+    await act(async () => {
+      fast.resolve(newsResponse('Latest response', '7d'))
+      await fast.promise
+    })
+    expect(await screen.findByText('Latest response')).toBeTruthy()
+
+    await act(async () => {
+      slow.resolve(newsResponse('Stale response', '1h'))
+      await slow.promise
+    })
+    expect(screen.getByText('Latest response')).toBeTruthy()
+    expect(screen.queryByText('Stale response')).toBeNull()
   })
 })

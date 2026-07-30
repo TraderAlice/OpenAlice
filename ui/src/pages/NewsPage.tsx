@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { CircleAlert } from 'lucide-react'
 import { formatRelativeTime } from '../lib/intl'
 import { api, type NewsArticle } from '../api'
 import { PageHeader } from '../components/PageHeader'
@@ -14,6 +15,8 @@ const LOOKBACK_OPTIONS = [
   { value: '24h', labelKey: 'news.lookback24h' },
   { value: '7d', labelKey: 'news.lookback7d' },
 ] as const
+
+type FetchMode = 'replace' | 'refresh'
 
 // ==================== Article Row ====================
 
@@ -97,7 +100,10 @@ export function NewsPage() {
   const [lookback, setLookback] = useState('24h')
   const [sourceFilter, setSourceFilter] = useState('')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [sources, setSources] = useState<string[]>([])
+  const requestGeneration = useRef(0)
   const orderedArticles = useMemo(
     () => [...articles].sort(
       (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
@@ -105,14 +111,30 @@ export function NewsPage() {
     [articles],
   )
 
-  const fetchArticles = useCallback(async (lb: string, src: string) => {
+  const fetchArticles = useCallback(async (
+    lb: string,
+    src: string,
+    mode: FetchMode = 'refresh',
+  ) => {
+    const request = ++requestGeneration.current
+    if (mode === 'replace') {
+      setArticles([])
+      setLoadError(false)
+      setLoading(true)
+    } else {
+      setRefreshing(true)
+    }
+
     try {
       const res = await api.news.list({
         lookback: lb,
         limit: 200,
         source: src || undefined,
       })
+      if (request !== requestGeneration.current) return
+
       setArticles(res.items)
+      setLoadError(false)
       const seen = new Set<string>()
       for (const item of res.items) {
         if (item.source) seen.add(item.source)
@@ -122,21 +144,40 @@ export function NewsPage() {
         return [...merged].sort()
       })
     } catch (err) {
-      console.warn('Failed to load news:', err)
+      if (request === requestGeneration.current) {
+        setLoadError(true)
+        console.warn('Failed to load news:', err)
+      }
     } finally {
-      setLoading(false)
+      if (request === requestGeneration.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [])
 
   useEffect(() => {
-    setLoading(true)
-    fetchArticles(lookback, sourceFilter)
+    void fetchArticles(lookback, sourceFilter, 'replace')
   }, [lookback, sourceFilter, fetchArticles])
 
   useEffect(() => {
-    const id = setInterval(() => fetchArticles(lookback, sourceFilter), 60_000)
+    const id = setInterval(() => {
+      void fetchArticles(lookback, sourceFilter, 'refresh')
+    }, 60_000)
     return () => clearInterval(id)
   }, [lookback, sourceFilter, fetchArticles])
+
+  useEffect(() => () => {
+    requestGeneration.current += 1
+  }, [])
+
+  const retry = useCallback(() => {
+    void fetchArticles(
+      lookback,
+      sourceFilter,
+      articles.length === 0 ? 'replace' : 'refresh',
+    )
+  }, [articles.length, fetchArticles, lookback, sourceFilter])
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -174,9 +215,13 @@ export function NewsPage() {
             </span>
           </div>
 
+          {loadError && articles.length > 0 && (
+            <NewsStaleNotice refreshing={refreshing} onRetry={retry} />
+          )}
+
           {/* Article list */}
           <div
-            aria-busy={loading}
+            aria-busy={loading || refreshing}
             className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
           >
             {loading && articles.length === 0 ? (
@@ -188,6 +233,8 @@ export function NewsPage() {
                   </div>
                 ))}
               </div>
+            ) : loadError && articles.length === 0 ? (
+              <NewsLoadError refreshing={refreshing} onRetry={retry} />
             ) : articles.length === 0 ? (
               <EmptyState title={t('news.noArticles')} description={t('news.noArticlesDescription')} />
             ) : (
@@ -203,6 +250,65 @@ export function NewsPage() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function NewsLoadError({
+  refreshing,
+  onRetry,
+}: {
+  refreshing: boolean
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="alert"
+      className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center"
+    >
+      <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
+      <h2 className="mt-3 text-[15px] font-medium text-foreground">
+        {t('news.loadErrorTitle')}
+      </h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        {t('news.loadErrorDescription')}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={refreshing}
+        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+      >
+        {refreshing ? t('common.loading') : t('common.retry')}
+      </button>
+    </div>
+  )
+}
+
+function NewsStaleNotice({
+  refreshing,
+  onRetry,
+}: {
+  refreshing: boolean
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] text-muted-foreground"
+    >
+      <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
+      <span className="min-w-0 flex-1">{t('news.stale')}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={refreshing}
+        className="oa-pressable shrink-0 rounded px-2 py-1 font-medium text-foreground hover:bg-warning/10 disabled:cursor-wait disabled:opacity-60"
+      >
+        {refreshing ? t('common.loading') : t('common.retry')}
+      </button>
     </div>
   )
 }
