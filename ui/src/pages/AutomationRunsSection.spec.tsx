@@ -217,6 +217,64 @@ describe('AutomationRunsSection workspace identity', () => {
 })
 
 describe('AutomationRunsSection run controls', () => {
+  it('keeps the mobile summary compact without dropping operational context', async () => {
+    const current = snapshot([task({ status: 'done' })])
+    current.page = { total: 147, hasMore: true, nextCursor: 'run-default' }
+    current.summary = { done: 105, needsAttention: 42 }
+    mocks.snapshot.mockResolvedValue(current)
+
+    render(<AutomationRunsSection />)
+
+    const summary = await screen.findByTestId('runs-summary')
+    expect(summary.className).toContain('grid-cols-3')
+    expect(within(summary).getByText('Workers')).toBeTruthy()
+    expect(within(summary).getByText('42 attention')).toBeTruthy()
+    expect(within(summary).getByText('CLI formats')).toBeTruthy()
+    expect(within(summary).getByText('No workers active')).toBeTruthy()
+    expect(within(summary).getByText('Showing 1 · 105 completed · 42 need attention')).toBeTruthy()
+  })
+
+  it('gives expanded run actions and pagination mobile-sized touch targets', async () => {
+    const issueTask = task({
+      taskId: 'run-touch-targets',
+      status: 'done',
+      resumable: true,
+      trigger: {
+        kind: 'issue',
+        workspaceId: liveWorkspace.id,
+        issueId: 'daily-risk-scan',
+      },
+    })
+    const current = snapshot([issueTask])
+    current.page = { total: 26, hasMore: true, nextCursor: issueTask.taskId }
+    mocks.snapshot.mockResolvedValue(current)
+    mocks.output.mockResolvedValue({
+      taskId: issueTask.taskId,
+      status: 'done',
+      structured: {
+        schemaVersion: 1,
+        assistantText: null,
+        blocks: [],
+        metrics: { textBlocks: 0, toolCalls: 0, toolFailures: 0 },
+        truncated: false,
+      },
+      stdout: null,
+      stderr: null,
+    })
+
+    render(<AutomationRunsSection />)
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: 'Run details, done: daily-risk-scan. codex in quant-desk.',
+    }))
+
+    expect(screen.getByText('Task instructions').className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'Open Issue' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'Open as session' }).className).toContain('min-h-10')
+    expect((await screen.findByText('Runtime diagnostics')).className).toContain('min-h-10')
+    expect(screen.getByTestId('runs-load-more').className).toContain('min-h-10')
+  })
+
   it('gives long task instructions a concise accessible name without hiding the visible prompt', async () => {
     const omittedTail = 'TAIL_MARKER_THAT_MUST_NOT_BE_READ_FOR_EVERY_RUN'
     const prompt = `Review the latest market snapshot and summarize material changes. ${'Include supporting detail. '.repeat(12)}${omittedTail}`

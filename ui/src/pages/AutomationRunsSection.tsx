@@ -71,7 +71,7 @@ function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'to
       : 'text-info'
   return (
     <details className="group/tool rounded-lg border border-border/60 bg-secondary/35" open={block.status === 'failed'}>
-      <summary className={`flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs ${statusClass}`}>
+      <summary className={`flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs sm:min-h-0 ${statusClass}`}>
         <Wrench size={13} className="shrink-0" />
         <span className="min-w-0 flex-1 truncate font-medium text-foreground">{block.name}</span>
         <span className="shrink-0 uppercase tracking-wide">{block.status}</span>
@@ -177,7 +177,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
       )}
 
       <details className="rounded-lg border border-border/60">
-        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground sm:min-h-0">
           <TerminalSquare size={13} />
           Runtime diagnostics
         </summary>
@@ -201,12 +201,30 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
   )
 }
 
-function SummaryCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+function SummaryCard({
+  label,
+  mobileLabel = label,
+  value,
+  detail,
+  mobileDetail = detail,
+}: {
+  label: string
+  mobileLabel?: string
+  value: string
+  detail: string
+  mobileDetail?: string
+}) {
   return (
-    <div className="rounded-lg border border-border/60 bg-secondary/25 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">{label}</div>
+    <div className="min-w-0 rounded-lg border border-border/60 bg-secondary/25 px-2 py-2 sm:px-3">
+      <div className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 sm:tracking-[0.1em]">
+        <span className="sm:hidden">{mobileLabel}</span>
+        <span className="hidden sm:inline">{label}</span>
+      </div>
       <div className="mt-0.5 text-lg font-semibold text-foreground">{value}</div>
-      <div className="text-[11px] text-muted-foreground">{detail}</div>
+      <div className="truncate text-[10px] text-muted-foreground sm:overflow-visible sm:text-clip sm:whitespace-normal sm:text-[11px]">
+        <span className="sm:hidden">{mobileDetail}</span>
+        <span className="hidden sm:inline">{detail}</span>
+      </div>
     </div>
   )
 }
@@ -408,18 +426,27 @@ export function AutomationRunsSection() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div data-testid="runs-summary" className="grid grid-cols-3 gap-2">
         <SummaryCard
           label="Concurrency"
+          mobileLabel="Workers"
           value={`${snapshot.capacity.running} / ${snapshot.capacity.limit}`}
           detail={snapshot.capacity.running === 0 ? 'No workers active' : 'Native agent workers active'}
+          mobileDetail={snapshot.capacity.running === 0 ? 'Idle' : `${snapshot.capacity.running} active`}
         />
         <SummaryCard
           label="Runs"
           value={String(snapshot.page.total)}
           detail={`Showing ${snapshot.tasks.length} · ${snapshot.summary.done} completed · ${snapshot.summary.needsAttention} need attention`}
+          mobileDetail={snapshot.summary.needsAttention === 0 ? 'All clear' : `${snapshot.summary.needsAttention} attention`}
         />
-        <SummaryCard label="Runtime parsers" value="4" detail="Claude · Codex · OpenCode · Pi" />
+        <SummaryCard
+          label="Runtime parsers"
+          mobileLabel="Parsers"
+          value="4"
+          detail="Claude · Codex · OpenCode · Pi"
+          mobileDetail="CLI formats"
+        />
       </div>
 
       {snapshot.tasks.length === 0 ? (
@@ -489,7 +516,7 @@ export function AutomationRunsSection() {
                 {isExpanded && (
                   <div className="space-y-3 border-t border-border/60 px-3 py-3">
                     <details className="rounded-lg border border-border/60 bg-secondary/25">
-                      <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+                      <summary className="flex min-h-10 cursor-pointer items-center px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground sm:min-h-0">
                         Task instructions
                       </summary>
                       <pre className="max-h-64 overflow-auto border-t border-border/50 px-3 py-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
@@ -507,7 +534,7 @@ export function AutomationRunsSection() {
                         {issueSource && (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-primary hover:bg-primary/10"
+                            className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-primary hover:bg-primary/10 sm:min-h-0"
                             onClick={() => openOrFocus({
                               kind: 'issue-detail',
                               params: {
@@ -523,7 +550,7 @@ export function AutomationRunsSection() {
                         {openable && (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10"
+                            className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10 sm:min-h-0"
                             title="Resume this run's conversation in an interactive session"
                             onClick={() => {
                               void openHeadlessRun(task.wsId, task.resumeId, {
@@ -550,7 +577,7 @@ export function AutomationRunsSection() {
                 data-testid="runs-load-more"
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
-                className="rounded-lg border border-border bg-secondary/35 px-4 py-2 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+                className="min-h-10 rounded-lg border border-border bg-secondary/35 px-4 py-2 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-wait disabled:opacity-60 sm:min-h-0"
               >
                 {loadingMore ? 'Loading older runs…' : `Load ${Math.min(RUNS_PAGE_SIZE, snapshot.page.total - snapshot.tasks.length)} older runs`}
               </button>
