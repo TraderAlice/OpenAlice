@@ -1306,6 +1306,7 @@ export const zhHant: Resources = {
       pushed: '已推送',
       accountFilter: '帳戶篩選',
       all: '全部',
+      backToQueue: '返回佇列',
       review: '審閱',
       stagedBadge: '已暫存',
       operationCount_one: '{{count}} 項操作',

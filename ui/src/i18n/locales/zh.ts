@@ -1298,6 +1298,7 @@ export const zh: Resources = {
       pushed: '已推送',
       accountFilter: '账户筛选',
       all: '全部',
+      backToQueue: '返回队列',
       review: '审阅',
       stagedBadge: '已暂存',
       operationCount_one: '{{count}} 项操作',

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, type Ref } from 'react'
 import type { TFunction } from 'i18next'
-import { AlertTriangle, CheckCircle2, Clock3, GitCommitHorizontal, GitPullRequest, History, RefreshCw, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, Clock3, GitCommitHorizontal, GitPullRequest, History, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState, Skeleton } from './StateViews'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
@@ -276,7 +276,10 @@ export function PushApprovalPanel() {
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [historyFilter, setHistoryFilter] = useState<string | null>(null)
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const [retryingVerification, setRetryingVerification] = useState(false)
+  const mobileBackRef = useRef<HTMLButtonElement | null>(null)
+  const activeQueueRowRef = useRef<HTMLButtonElement | null>(null)
   const [verification, setVerification] = useState<ReviewVerification>({
     total: 0,
     verified: 0,
@@ -449,12 +452,20 @@ export function PushApprovalPanel() {
   useEffect(() => {
     if (reviewItems.length === 0) {
       setSelectedId(null)
+      setMobileDetailOpen(false)
       return
     }
     if (!selectedId || !reviewItems.some((item) => item.id === selectedId)) {
       setSelectedId(reviewItems[0].id)
+      setMobileDetailOpen(false)
     }
   }, [reviewItems, selectedId])
+
+  useEffect(() => {
+    if (!mobileDetailOpen) return
+    if (typeof window.matchMedia === 'function' && !window.matchMedia('(max-width: 767px)').matches) return
+    mobileBackRef.current?.focus()
+  }, [mobileDetailOpen])
 
   const selected = reviewItems.find((item) => item.id === selectedId) ?? null
   const waitingCount = pending.length
@@ -498,7 +509,10 @@ export function PushApprovalPanel() {
         />
       )}
       <div className="grid min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-secondary/30 md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="flex min-h-0 min-w-0 flex-col border-b border-border bg-secondary md:border-b-0 md:border-r">
+        <div
+          data-testid="trading-review-queue"
+          className={`${mobileDetailOpen ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-secondary md:flex md:border-r`}
+        >
           <div className="shrink-0 border-b border-border/70 px-4 py-3">
             <div className="flex items-center gap-2 text-[12px] font-medium text-foreground">
               {verificationIncomplete || waitingCount > 0 ? (
@@ -559,7 +573,11 @@ export function PushApprovalPanel() {
                     key={item.id}
                     item={item}
                     active={item.id === selectedId}
-                    onClick={() => setSelectedId(item.id)}
+                    buttonRef={item.id === selectedId ? activeQueueRowRef : undefined}
+                    onClick={() => {
+                      setSelectedId(item.id)
+                      setMobileDetailOpen(true)
+                    }}
                   />
                 ))}
               </div>
@@ -571,7 +589,24 @@ export function PushApprovalPanel() {
           </div>
         </div>
 
-        <div className="min-h-0 min-w-0 overflow-y-auto">
+        <div
+          data-testid="trading-review-detail"
+          className={`${mobileDetailOpen ? 'block' : 'hidden'} min-h-0 min-w-0 overflow-x-hidden overflow-y-auto md:block`}
+        >
+          <div className="sticky top-0 z-10 border-b border-border bg-secondary/95 px-3 py-2 md:hidden">
+            <button
+              ref={mobileBackRef}
+              type="button"
+              onClick={() => {
+                setMobileDetailOpen(false)
+                requestAnimationFrame(() => activeQueueRowRef.current?.focus())
+              }}
+              className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-primary"
+            >
+              <ChevronLeft size={15} aria-hidden />
+              {t('tradingReview.queue.backToQueue')}
+            </button>
+          </div>
           <ReviewDetail
             item={selected}
             verificationIncomplete={verificationIncomplete}
@@ -668,7 +703,17 @@ function QueueStat({ label, value, tone }: { label: string; value: number; tone:
   )
 }
 
-function QueueRow({ item, active, onClick }: { item: ReviewItem; active: boolean; onClick: () => void }) {
+function QueueRow({
+  item,
+  active,
+  buttonRef,
+  onClick,
+}: {
+  item: ReviewItem
+  active: boolean
+  buttonRef?: Ref<HTMLButtonElement>
+  onClick: () => void
+}) {
   const { t } = useTranslation()
   const ops = itemOperations(item, t)
   const timestamp = itemTimestamp(item)
@@ -683,6 +728,7 @@ function QueueRow({ item, active, onClick }: { item: ReviewItem; active: boolean
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onClick}
       className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${

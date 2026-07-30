@@ -1310,6 +1310,7 @@ export const en = {
       pushed: 'Pushed',
       accountFilter: 'Account filter',
       all: 'All',
+      backToQueue: 'Back to queue',
       review: 'review',
       stagedBadge: 'staged',
       operationCount_one: '{{count}} op',
