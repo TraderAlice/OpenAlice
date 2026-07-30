@@ -24,7 +24,7 @@ describe('Supervisor TUI screen', () => {
 
     expect(lines).toContain('OpenAlice  0.87.0-beta  dev')
     expect(lines).toContain('Runtime state: absent')
-    expect(lines).toContain('s Start · d Doctor · l Logs · u Update · ? Help')
+    expect(lines).toContain('s Start · c Source · d Doctor · l Logs · u Update · ? Help')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
   })
 
@@ -88,6 +88,30 @@ describe('Supervisor TUI screen', () => {
     expect(actions).toEqual([])
     expect(screen.snapshot.confirmation).toBeUndefined()
     expect(screen.snapshot.notice).toContain('electron owns this Runtime')
+  })
+
+  it('changes source only while the selected Runtime is stopped', () => {
+    let configureRequests = 0
+    const running = new SupervisorScreen({
+      version: 'dev',
+      channel: 'development',
+      runtime: {
+        class: 'running',
+        owner: { surface: 'cli-server', pid: 42 },
+      },
+    }, {
+      onConfigureSource: () => {
+        configureRequests += 1
+      },
+    })
+
+    expect(running.handleKey('c', matchesKey)).toBe(true)
+    expect(configureRequests).toBe(0)
+    expect(running.snapshot.notice).toContain('Stop the selected Runtime')
+
+    running.update({ runtime: { class: 'absent' } })
+    expect(running.handleKey('c', matchesKey)).toBe(true)
+    expect(configureRequests).toBe(1)
   })
 
   it('navigates detail panels and requests their read-only data', () => {

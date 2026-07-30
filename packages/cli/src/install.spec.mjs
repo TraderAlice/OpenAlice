@@ -242,7 +242,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     expect(result.exitCode).toBe(0)
     expect(result.output).toContain('Continue with this install?')
     expect(result.output).toContain('OpenAlice and Pi are ready')
-    expect(result.output).toContain('Start OpenAlice now?')
+    expect(result.output).toContain('Open the OpenAlice Supervisor now?')
     expect(result.output).toContain('Start it when you are ready')
     await expect(access(join(installRoot, 'bin', 'openalice'))).resolves.toBeUndefined()
   })
@@ -296,7 +296,7 @@ function runInstallerInPty(args, { home, reply }) {
         replied = true
         terminal.write(reply)
       }
-      if (!declinedStart && output.includes('Start OpenAlice now?')) {
+      if (!declinedStart && output.includes('Open the OpenAlice Supervisor now?')) {
         declinedStart = true
         terminal.write('n\r')
       }

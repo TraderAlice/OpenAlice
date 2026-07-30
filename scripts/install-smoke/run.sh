@@ -148,6 +148,8 @@ cmp /fixture/packages/cli/src/install-source.mjs "$v1_release/src/install-source
   || fail "downloaded install-source module differs from the fixture"
 cmp /fixture/packages/cli/src/install-layout.mjs "$v1_release/src/install-layout.mjs" \
   || fail "downloaded install-layout module differs from the fixture"
+cmp /fixture/packages/cli/src/supervisor-config.ts "$v1_release/src/supervisor-config.ts" \
+  || fail "downloaded Supervisor configuration module differs from the fixture"
 cmp /fixture/packages/cli/src/lifecycle-command.mjs "$v1_release/src/lifecycle-command.mjs" \
   || fail "downloaded lifecycle command module differs from the fixture"
 cmp /fixture/packages/cli/src/lifecycle.mjs "$v1_release/src/lifecycle.mjs" \

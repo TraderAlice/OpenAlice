@@ -94,6 +94,7 @@ explicit commands:
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
 - `u` performs an advisory product-update check;
+- `c` chooses and remembers the selected instance's source checkout;
 - `?`, Tab, and the horizontal arrows expose help and detail panels.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
@@ -101,11 +102,11 @@ otherwise foreign owners. Its stop/restart confirmation states that active Web
 and agent sessions will disconnect. Detaching never implies stopping. Update
 discovery runs in the background and cannot block lifecycle controls.
 
-The current Runtime provider is still source-backed. TUI start therefore needs
-to run from an OpenAlice checkout (or reuse a source root advertised by the
-selected Runtime) until the standalone headless Runtime artifact ships.
-Unfinished controls remain inside the application shell and do not change the
-default entry back to the compatibility launcher.
+The current Runtime provider is still source-backed. TUI start discovers an
+OpenAlice checkout from the current directory, reuses a configured or
+owner-advertised source root, or opens the `c` path editor when discovery
+fails. Unfinished controls remain inside the application shell and do not
+change the default entry back to the compatibility launcher.
 
 ## TUI Launch Context
 
@@ -122,12 +123,18 @@ raw mode. Bare `openalice` and `openalice tui` accept:
 ```
 
 Resolution order is defaults, machine Supervisor configuration, selected
-instance configuration, environment, then explicit CLI flags. The current
-increment implements the immutable resolver, field provenance, environment and
-flag layers, plus typed seams for the two configuration layers. Persisted
-machine configuration and the instance registry are not active yet; a named
-instance therefore needs an explicit complete home through configuration
-injection, `OPENALICE_HOME`, or `--home`.
+instance configuration, environment, then explicit CLI flags. The immutable
+resolver retains field provenance for every layer. Before terminal raw mode,
+the Supervisor reads a versioned machine-local document at
+`<Supervisor root>/config.json`. It contains machine defaults and an instance
+map outside every selectable complete home.
+
+The `c` editor validates an OpenAlice checkout, atomically saves it as the
+selected instance's `appDir`, and starts the Runtime. If
+`OPENALICE_APP_HOME` or `--app-dir` supplied the source, the TUI reports that
+higher-priority override instead of overwriting it. General configuration
+editing, `openalice config check`, live reload with last-known-good retention,
+and named-instance management remain later increments.
 
 `OPENALICE_INSTANCE`, `OPENALICE_HOME`, `OPENALICE_WEB_PORT`,
 `OPENALICE_APP_HOME`, and `OPENALICE_NO_UPDATE_CHECK` are the corresponding
@@ -324,6 +331,8 @@ completion; detailed shell installation remains user-owned.
   application entry and default-TUI/explicit-command dispatch.
 - `packages/cli/src/launch-context.ts` — immutable launch precedence,
   provenance, instance roots, and managed-Pi environment projection.
+- `packages/cli/src/supervisor-config.ts` — versioned machine/instance
+  configuration parsing, atomic persistence, and stored-context resolution.
 - `packages/cli/src/supervisor-tui.ts` — `pi-tui` Supervisor application shell.
 - `packages/cli/src/pi-tui-loader.ts` — workspace and installed managed-Pi TUI
   resolution.

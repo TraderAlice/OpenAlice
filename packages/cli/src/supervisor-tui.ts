@@ -17,8 +17,13 @@ import {
   type ResolvedLaunchContext,
   type TuiLaunchFlags,
 } from './launch-context.ts'
+import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
 import { loadPiTui } from './pi-tui-loader.ts'
+import {
+  persistInstanceLaunchConfig,
+  resolveStoredLaunchContext,
+} from './supervisor-config.ts'
 import {
   checkForUpdate,
   maybeNotifyUpdate,
@@ -116,6 +121,11 @@ export interface SupervisorTuiDependencies {
   resolveContext?: (
     flags: TuiLaunchFlags,
   ) => ResolvedLaunchContext | Promise<ResolvedLaunchContext>
+  findSource?: (startPath: string) => Promise<string>
+  configureSource?: (
+    context: ResolvedLaunchContext,
+    appDir: string,
+  ) => Promise<ResolvedLaunchContext>
   machineConfig?: MachineSupervisorConfig | null
   instanceConfig?: InstanceLaunchConfig | null
   loadTui?: typeof loadPiTui
@@ -148,16 +158,21 @@ export async function runSupervisorTui(
     )
   }
 
-  const context = await (
+  let context = await (
     dependencies.resolveContext
-    ?? ((flags) => resolveLaunchContext({
-      flags,
-      machineConfig: dependencies.machineConfig,
-      instanceConfig: dependencies.instanceConfig,
-      env: dependencies.env,
-    }))
+    ?? ((flags) => {
+      if (dependencies.machineConfig || dependencies.instanceConfig) {
+        return resolveLaunchContext({
+          flags,
+          env: dependencies.env,
+          machineConfig: dependencies.machineConfig,
+          instanceConfig: dependencies.instanceConfig,
+        })
+      }
+      return resolveStoredLaunchContext(flags, { env: dependencies.env })
+    })
   )(launchFlags)
-  const services = createServices(dependencies, context)
+  let services = createServices(dependencies, context)
   let runtime: RuntimeSummary | null = null
   let diagnostic: string | undefined
   try {
@@ -175,6 +190,8 @@ export async function runSupervisorTui(
   )
   let active = true
   let actionRunning = false
+  let sourcePromptActive = false
+  let closeSourcePrompt: (() => void) | null = null
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel: dependencies.channel ?? 'development',
@@ -183,11 +200,25 @@ export async function runSupervisorTui(
     diagnostic,
   }, {
     onAction: (action) => {
-      void performAction(action)
+      void requestAction(action)
+    },
+    onConfigureSource: () => {
+      openSourcePrompt()
     },
     requestRender: () => ui.requestRender(),
   })
   ui.addChild(screen)
+
+  const findSource = dependencies.findSource ?? findOpenAliceRoot
+  const configureSource = dependencies.configureSource ?? (async (
+    currentContext,
+    appDir,
+  ) => {
+    await persistInstanceLaunchConfig(currentContext, { appDir })
+    return resolveStoredLaunchContext(launchFlags, {
+      env: dependencies.env,
+    })
+  })
 
   async function refreshRuntime(): Promise<void> {
     if (!active || actionRunning) return
@@ -204,9 +235,25 @@ export async function runSupervisorTui(
     }
   }
 
+  async function requestAction(action: SupervisorAction): Promise<void> {
+    if (
+      action === 'start'
+      && context.appDir === null
+    ) {
+      try {
+        await findSource(process.cwd())
+      } catch (error: unknown) {
+        openSourcePrompt(safeError(error))
+        return
+      }
+    }
+    await performAction(action)
+  }
+
   async function performAction(action: SupervisorAction): Promise<void> {
     if (!active || actionRunning) return
     actionRunning = true
+    let actionFailure: string | undefined
     const homeRoot = context.home
     const actionLabel = actionName(action)
     screen.update({ busy: actionLabel, notice: undefined, diagnostic: undefined })
@@ -256,17 +303,104 @@ export async function runSupervisorTui(
         screen.update({ update, notice: formatUpdateNotice(update) })
       }
     } catch (error: unknown) {
-      screen.update({
-        diagnostic: `${actionLabel} failed: ${safeError(error)}`,
-        confirmation: undefined,
-      })
+      actionFailure = `${actionLabel} failed: ${safeError(error)}`
+      screen.update({ confirmation: undefined })
     } finally {
       actionRunning = false
       if (active) {
         screen.update({ busy: undefined })
         await refreshRuntime()
+        if (actionFailure) screen.update({ diagnostic: actionFailure })
       }
     }
+  }
+
+  function openSourcePrompt(reason?: string): void {
+    if (sourcePromptActive || actionRunning) return
+    const source = context.provenance.appDir.source
+    if (source === 'environment' || source === 'cli-flag') {
+      screen.update({
+        notice: `Source is locked by ${context.provenance.appDir.detail}; change that override and reopen the Supervisor.`,
+      })
+      return
+    }
+
+    sourcePromptActive = true
+    let saving = false
+    const input = new (class extends piTui.Input {
+      detail = reason
+        ? `Start needs an OpenAlice source checkout. ${reason}`
+        : 'Choose the OpenAlice source checkout for this instance.'
+
+      setDetail(detail: string): void {
+        this.detail = detail
+        this.invalidate()
+        ui.requestRender()
+      }
+
+      override render(width: number): string[] {
+        return [
+          'Configure Runtime source',
+          '',
+          sanitize(this.detail),
+          '',
+          ...super.render(width),
+          '',
+          'Enter  Save for this instance and start',
+          'Esc    Cancel',
+        ]
+      }
+    })()
+    input.setValue(context.appDir ?? process.cwd())
+    input.handleInput('\u0005')
+    const overlay = ui.showOverlay(input, {
+      width: '80%',
+      maxHeight: 10,
+      anchor: 'center',
+      margin: 1,
+    })
+    ui.setShowHardwareCursor(true)
+
+    const close = (notice?: string) => {
+      if (!sourcePromptActive) return
+      sourcePromptActive = false
+      closeSourcePrompt = null
+      overlay.hide()
+      ui.setShowHardwareCursor(false)
+      if (notice) screen.update({ notice })
+    }
+    closeSourcePrompt = () => close('Source configuration cancelled.')
+    input.onEscape = closeSourcePrompt
+    input.onSubmit = (value) => {
+      if (saving) return
+      const requested = value.trim()
+      if (!requested) {
+        input.setDetail('Enter a source checkout path.')
+        return
+      }
+      saving = true
+      input.setDetail('Validating and saving the source checkout…')
+      void (async () => {
+        try {
+          const appDir = await findSource(requested)
+          const nextContext = await configureSource(context, appDir)
+          context = nextContext
+          services = createServices(dependencies, context)
+          screen.update({
+            context,
+            diagnostic: undefined,
+            notice: `Saved source checkout ${appDir}.`,
+          })
+          close()
+          await performAction('start')
+        } catch (error: unknown) {
+          input.setDetail(`Could not use that checkout: ${safeError(error)}`)
+        } finally {
+          saving = false
+        }
+      })()
+    }
+    overlay.focus()
   }
 
   async function discoverUpdateInBackground(): Promise<void> {
@@ -297,6 +431,7 @@ export async function runSupervisorTui(
       settled = true
       active = false
       clearInterval(poll)
+      closeSourcePrompt?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -305,6 +440,13 @@ export async function runSupervisorTui(
     }
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
+      if (sourcePromptActive) {
+        if (piTui.matchesKey(data, 'ctrl+c')) {
+          finish()
+          return { consume: true }
+        }
+        return undefined
+      }
       if (screen.snapshot.confirmation && piTui.matchesKey(data, 'escape')) {
         screen.cancelConfirmation()
         return { consume: true }
@@ -332,17 +474,20 @@ export async function runSupervisorTui(
 export class SupervisorScreen implements Component {
   snapshot: SupervisorSnapshot
   private readonly onAction?: (action: SupervisorAction) => void
+  private readonly onConfigureSource?: () => void
   private readonly requestRender?: () => void
 
   constructor(
     snapshot: SupervisorSnapshot,
     callbacks: {
       onAction?: (action: SupervisorAction) => void
+      onConfigureSource?: () => void
       requestRender?: () => void
     } = {},
   ) {
     this.snapshot = { panel: 'overview', ...snapshot }
     this.onAction = callbacks.onAction
+    this.onConfigureSource = callbacks.onConfigureSource
     this.requestRender = callbacks.requestRender
   }
 
@@ -377,6 +522,16 @@ export class SupervisorScreen implements Component {
     }
     if (matchesKey(data, 'tab') || matchesKey(data, 'right')) {
       this.selectAdjacentPanel(1)
+      return true
+    }
+    if (matchesKey(data, 'c')) {
+      if (this.snapshot.runtime?.class === 'absent') {
+        this.onConfigureSource?.()
+      } else {
+        this.update({
+          notice: 'Stop the selected Runtime before changing its source checkout.',
+        })
+      }
       return true
     }
     if (matchesKey(data, 'shift+tab') || matchesKey(data, 'left')) {
@@ -449,6 +604,7 @@ export class SupervisorScreen implements Component {
         }
         if (this.snapshot.context) {
           lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatProvenance(this.snapshot.context.provenance.port)}`)
+          lines.push(`Source: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
         }
       }
       lines.push('', ...renderGuidance(runtime))
@@ -532,7 +688,7 @@ function renderTabs(selected: SupervisorPanel, narrow: boolean): string {
 function renderGuidance(runtime: RuntimeSummary | null): string[] {
   if (!runtime) return ['Runtime status is unavailable. Doctor may explain why.']
   if (runtime.class === 'absent') {
-    return ['OpenAlice is stopped. Press s to start the persistent Runtime.']
+    return ['OpenAlice is stopped. Press s to start, or c to choose its source checkout.']
   }
   if (runtime.class === 'incompatible') {
     return ['The running Guardian is incompatible. Read Doctor before changing it.']
@@ -577,6 +733,7 @@ function renderHelp(): string[] {
     'x  Stop (confirmation required)   r  Restart (confirmation required)',
     'l  Bounded redacted logs          d  Read-only Doctor',
     'u  Check for product update       ?  Toggle this help',
+    'c  Choose and remember this instance\'s source checkout',
     'Tab / arrows  Change panel        q / Esc  Detach only',
     '',
     'The Supervisor manages Runtime state. Workspaces, trading, and chat stay in the Web UI.',
@@ -599,7 +756,7 @@ function renderConfirmation(
 
 function actionBar(runtime: RuntimeSummary | null, narrow: boolean): string {
   const actions = runtime?.class === 'absent'
-    ? 's Start · d Doctor · l Logs · u Update · ? Help'
+    ? 's Start · c Source · d Doctor · l Logs · u Update · ? Help'
     : 'o Open · r Restart · x Stop · d Doctor · l Logs · u Update · ? Help'
   return narrow ? actions.replaceAll(' · ', '  ') : actions
 }

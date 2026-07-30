@@ -99,6 +99,8 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
   Node 22.19+ executes its erasable types directly.
 - `packages/cli/src/install-source.mjs` — validated installation-source
   metadata used when managed remote reproduces the invoking CLI.
+- `packages/cli/src/supervisor-config.ts` — machine-local Supervisor and
+  selected-instance configuration loading and atomic persistence.
 - `packages/cli/src/install-layout.mjs` — strict discovery of installer-owned
   roots from immutable release paths.
 - `packages/cli/src/update.mjs` — stable manifest checks, bounded start notice,
@@ -205,11 +207,13 @@ before consent; no installer-owned filesystem mutation may happen there.
 | `--yes` | Approve the baseline CLI + managed Pi transaction and only the extra actions selected by flags; never implies Runtime tools and never starts the Runtime |
 | `--with-runtime-deps` | Select missing Linux build tools; does not bypass the final confirmation |
 | `--plan` | Print the same plan and exit without opening a prompt or changing files |
-| Interactive install inside a checkout | After success, separately ask `Start OpenAlice now? [y/N]` |
+| Interactive install inside a checkout | After success, separately ask `Open the OpenAlice Supervisor now? [y/N]` |
 
 The installer reads prompts from `/dev/tty`, not the curl pipe. The
-Runtime-tool selection, final plan approval, and optional service start are all
-default-no. They are intentionally different decisions. For automation,
+Runtime-tool selection, final plan approval, and optional Supervisor launch are
+all default-no. They are intentionally different decisions. Opening the
+Supervisor does not start the Runtime until the user chooses Start inside the
+TUI. For automation,
 `--yes --with-runtime-deps` is the explicit pair that approves the displayed
 Linux package command as well as the CLI transaction.
 

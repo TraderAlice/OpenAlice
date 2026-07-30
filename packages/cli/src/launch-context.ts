@@ -69,6 +69,13 @@ export interface ResolveLaunchContextOptions {
   platform?: NodeJS.Platform
 }
 
+export interface ResolveSupervisorRootOptions {
+  env?: NodeJS.ProcessEnv
+  cwd?: string
+  homeDir?: string
+  platform?: NodeJS.Platform
+}
+
 interface Candidate<T> {
   value: T
   provenance: LaunchValueProvenance
@@ -93,7 +100,7 @@ export function resolveLaunchContext(
     )
   }
 
-  const supervisorRoot = resolveSupervisorRoot(env, homeDir, platform, cwd)
+  const supervisorRoot = resolveSupervisorRootCandidate(env, homeDir, platform, cwd)
   const home = resolveField<string>(
     candidate(join(homeDir, '.openalice'), 'default', '~/.openalice'),
     pathCandidate(machine.defaults?.home, 'machine-config', 'machine.defaults.home', cwd, homeDir),
@@ -165,6 +172,17 @@ export function resolveLaunchContext(
   })
 }
 
+export function resolveSupervisorRootPath(
+  options: ResolveSupervisorRootOptions = {},
+): string {
+  return resolveSupervisorRootCandidate(
+    options.env ?? process.env,
+    options.homeDir ?? homedir(),
+    options.platform ?? process.platform,
+    options.cwd ?? process.cwd(),
+  ).value
+}
+
 export function buildManagedPiEnv(
   context: ResolvedLaunchContext,
   baseEnv: NodeJS.ProcessEnv = process.env,
@@ -234,7 +252,7 @@ function resolveInstance(
   return selected
 }
 
-function resolveSupervisorRoot(
+function resolveSupervisorRootCandidate(
   env: NodeJS.ProcessEnv,
   homeDir: string,
   platform: NodeJS.Platform,
