@@ -1750,12 +1750,23 @@ export const zhHant: Resources = {
     reconnecting: '正在重新連線 OpenAlice…',
     backendUnavailableEyebrow: '核心服務離線',
     backendUnavailableHeading: 'OpenAlice 已失去後端連線',
+    backendUnavailableRemoteHeading: 'OpenAlice 已中斷與 {{target}} 的連線',
     backendUnavailableDescription:
       '這不是單一頁面的資料錯誤。工作區、自動化與交易操作都依賴 OpenAlice 後端，因此在服務恢復回應前，整個應用會暫時停用。',
+    backendUnavailableRemoteDescription:
+      '本機瀏覽器仍在執行，但 SSH 通道已無法連上遠端 OpenAlice Runtime。遠端工作區、自動化與交易操作現已暫停。',
     backendUnavailableImpact:
       '請保持此視窗開啟。連線恢復後，你會自動回到目前頁面。',
     backendUnavailableHelp:
       '請檢查承載此頁面的 OpenAlice 執行環境，然後重試。如果是從終端啟動的，請確認 pnpm dev 或 openalice up 仍在執行。',
+    backendUnavailableRemoteHelp:
+      '請檢查持有此通道的終端，或重新執行 openalice remote {{target}}，然後重試。',
+    reconnectingRemote: '正在重新連線 {{target}}…',
+    connectionType: '連線方式',
+    sshTunnel: 'SSH 通道',
+    remoteTarget: '遠端目標',
+    localTunnelEndpoint: '本機通道',
+    remoteRuntimeEndpoint: '遠端 Runtime',
     retryNow: '立即重試',
   },
 }

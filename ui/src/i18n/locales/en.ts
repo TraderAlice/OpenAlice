@@ -1755,12 +1755,23 @@ export const en = {
     reconnecting: 'Reconnecting to OpenAlice…',
     backendUnavailableEyebrow: 'Core service offline',
     backendUnavailableHeading: 'OpenAlice lost its backend connection',
+    backendUnavailableRemoteHeading: 'OpenAlice lost its connection to {{target}}',
     backendUnavailableDescription:
       'This is not a page-level data error. Workspaces, automation, and trading controls all depend on the OpenAlice backend, so the application is paused until that service responds.',
+    backendUnavailableRemoteDescription:
+      'The local browser is still running, but its SSH tunnel is no longer reaching the remote OpenAlice Runtime. Remote workspaces, automation, and trading controls are paused.',
     backendUnavailableImpact:
       'Keep this window open. Your current page will return automatically when the connection is restored.',
     backendUnavailableHelp:
       'Check the OpenAlice runtime that owns this page, then retry. If you started it from a terminal, confirm that pnpm dev or openalice up is still running.',
+    backendUnavailableRemoteHelp:
+      'Check the terminal that owns this tunnel, or run openalice remote {{target}} again, then retry.',
+    reconnectingRemote: 'Reconnecting to {{target}}…',
+    connectionType: 'Connection',
+    sshTunnel: 'SSH tunnel',
+    remoteTarget: 'Remote target',
+    localTunnelEndpoint: 'Local tunnel',
+    remoteRuntimeEndpoint: 'Remote Runtime',
     retryNow: 'Retry now',
   },
 } as const

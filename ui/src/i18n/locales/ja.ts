@@ -1743,12 +1743,23 @@ export const ja: Resources = {
     reconnecting: 'OpenAlice に再接続しています…',
     backendUnavailableEyebrow: 'コアサービスがオフライン',
     backendUnavailableHeading: 'OpenAlice はバックエンドとの接続を失いました',
+    backendUnavailableRemoteHeading: 'OpenAlice は {{target}} との接続を失いました',
     backendUnavailableDescription:
       'これは個別ページのデータエラーではありません。ワークスペース、自動化、取引操作はすべて OpenAlice バックエンドに依存するため、サービスが応答するまでアプリ全体を一時停止します。',
+    backendUnavailableRemoteDescription:
+      'ローカルブラウザーは動作していますが、SSH トンネルがリモートの OpenAlice Runtime に到達できません。リモートのワークスペース、自動化、取引操作は一時停止しています。',
     backendUnavailableImpact:
       'このウィンドウは開いたままにしてください。接続が戻ると、現在のページへ自動的に復帰します。',
     backendUnavailableHelp:
       'このページを提供している OpenAlice ランタイムを確認してから再試行してください。ターミナルから起動した場合は、pnpm dev または openalice up が実行中か確認してください。',
+    backendUnavailableRemoteHelp:
+      'このトンネルを保持しているターミナルを確認するか、openalice remote {{target}} を再実行してから再試行してください。',
+    reconnectingRemote: '{{target}} に再接続しています…',
+    connectionType: '接続方式',
+    sshTunnel: 'SSH トンネル',
+    remoteTarget: 'リモート接続先',
+    localTunnelEndpoint: 'ローカルトンネル',
+    remoteRuntimeEndpoint: 'リモート Runtime',
     retryNow: '今すぐ再試行',
   },
 }

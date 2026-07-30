@@ -12,7 +12,7 @@ vi.mock('./api', () => ({
 }))
 
 import { AuthProvider, BACKEND_HEALTH_POLL_MS, useAuth } from './AuthContext'
-import { AuthGate } from './AuthGate'
+import { AuthGate, BackendUnavailableScreen } from './AuthGate'
 import { BACKEND_PROBE_REQUESTED_EVENT } from './backendConnectivity'
 
 function WorkspaceHarness() {
@@ -39,6 +39,29 @@ afterEach(() => {
 })
 
 describe('AuthProvider backend recovery', () => {
+  it('shows the exact SSH route when a remote Runtime is unavailable', () => {
+    render(
+      <BackendUnavailableScreen
+        retry={vi.fn(async () => undefined)}
+        connection={{
+          kind: 'remote',
+          target: 'alice@example.com',
+          sshPort: 2222,
+          runtimePort: 47331,
+          localEndpoint: '127.0.0.1:40123',
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('alertdialog', {
+      name: 'OpenAlice lost its connection to alice@example.com:2222',
+    })).toBeTruthy()
+    expect(screen.getByText('SSH tunnel')).toBeTruthy()
+    expect(screen.getByText('127.0.0.1:40123')).toBeTruthy()
+    expect(screen.getByText('127.0.0.1:47331')).toBeTruthy()
+    expect(screen.getAllByText('alice@example.com:2222').length).toBeGreaterThan(0)
+  })
+
   it('does not manufacture a login screen during a cold-start outage', async () => {
     vi.useFakeTimers()
     mocks.getStatus
