@@ -71,10 +71,10 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
     props.activeRecord.state === 'paused';
   const showEmptyCta = props.sessionId === null;
 
-  // Files panel visibility. Desktop follows the persisted user preference;
-  // auto-hidden mobile layouts get an explicit transient overlay state. This
-  // keeps the first phone view clear without turning the Files button into a
-  // dead control or silently changing the user's desktop layout.
+  // Files panel visibility. Desktop uses runtime-only disclosure state so each
+  // UI load starts collapsed; auto-hidden mobile layouts get their own
+  // transient overlay state. This keeps the first view clear without turning
+  // the Files button into a dead control.
   const isDesktop = useIsDesktop();
   const sidePrefs = useWorkspaceSidePanels();
   const usesMobileOverlay = !isDesktop && sidePrefs.autoHideMobile;

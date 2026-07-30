@@ -51,7 +51,7 @@ describe('WorkspaceFilesToggle', () => {
     })
   })
 
-  it('continues to toggle the persisted preference on desktop', () => {
+  it('toggles the runtime disclosure state on desktop', () => {
     render(<WorkspaceFilesToggle />)
 
     const button = screen.getByRole('button', { name: 'Files' })

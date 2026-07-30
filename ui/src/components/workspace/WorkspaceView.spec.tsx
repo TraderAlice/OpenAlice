@@ -147,7 +147,7 @@ describe('WorkspaceView Files panel', () => {
     expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(false)
   })
 
-  it('continues to follow the persisted Files preference on desktop', () => {
+  it('follows the runtime Files disclosure state on desktop', () => {
     viewMocks.sidePrefs.files = true
 
     const { container } = renderWorkspace()
