@@ -1,3 +1,5 @@
+import { resolve } from 'node:path'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -90,7 +92,7 @@ describe('observability command presenter', () => {
     expect(readLogs).toHaveBeenCalledWith(
       expect.objectContaining({
         instance: 'research',
-        homeRoot: '/tmp/research',
+        homeRoot: resolve('/tmp/research'),
       }),
       expect.any(Object),
     )

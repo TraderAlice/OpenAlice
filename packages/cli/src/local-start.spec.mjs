@@ -165,8 +165,8 @@ describe('OpenAlice local Runtime launcher', () => {
     })
 
     expect(runtimeEnv).toEqual(expect.objectContaining({
-      PI_CODING_AGENT_DIR: '/tmp/alice-home/runtime/pi',
-      PI_CODING_AGENT_SESSION_DIR: '/tmp/alice-home/runtime/pi/sessions',
+      PI_CODING_AGENT_DIR: join('/tmp/alice-home', 'runtime', 'pi'),
+      PI_CODING_AGENT_SESSION_DIR: join('/tmp/alice-home', 'runtime', 'pi', 'sessions'),
     }))
   })
 
