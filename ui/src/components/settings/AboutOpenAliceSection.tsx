@@ -201,7 +201,7 @@ export function AboutOpenAliceSection() {
               type="button"
               onClick={() => void installAndRestart()}
               disabled={installing}
-              className="btn-primary-sm inline-flex items-center gap-1.5"
+              className="btn-primary-sm inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${installing ? 'animate-spin motion-reduce:animate-none' : ''}`} />
               {installing ? t('settings.about.installing') : t('settings.about.installAndRestart')}
@@ -211,7 +211,7 @@ export function AboutOpenAliceSection() {
               type="button"
               onClick={() => void checkForUpdates()}
               disabled={checking}
-              className="btn-primary-sm inline-flex items-center gap-1.5"
+              className="btn-primary-sm inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${checking ? 'animate-spin motion-reduce:animate-none' : ''}`} />
               {checking ? t('settings.about.checking') : t('settings.about.check')}
@@ -220,7 +220,7 @@ export function AboutOpenAliceSection() {
           <button
             type="button"
             onClick={() => void openRelease()}
-            className="btn-secondary-sm inline-flex items-center gap-1.5"
+            className="btn-secondary-sm inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {t('settings.about.viewReleases')}
