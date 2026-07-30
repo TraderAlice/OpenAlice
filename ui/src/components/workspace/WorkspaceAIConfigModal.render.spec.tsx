@@ -194,6 +194,35 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' }))
   })
 
+  it('keeps compact settings chrome fixed around one scroll owner', async () => {
+    render(
+      <WorkspaceAIConfigModal
+        wsId="chat-1"
+        initialSection="ai"
+        initialAgent="pi"
+        onClose={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByTestId('workspace-settings-dialog')
+    const sectionNav = screen.getByTestId('workspace-settings-section-nav')
+    const scrollArea = screen.getByTestId('workspace-settings-ai-scroll')
+    const footer = screen.getByTestId('workspace-settings-ai-footer')
+
+    expect(dialog.className).toContain('h-full')
+    expect(dialog.className).toContain('overflow-hidden')
+    expect(dialog.className).toContain('sm:max-h-[85dvh]')
+    expect(sectionNav.className).toContain('overflow-x-auto')
+    expect(screen.getByRole('button', { name: '通用' }).className).toContain('min-h-11')
+    expect(screen.getByRole('button', { name: 'Claude Code' }).className).toContain('min-h-11')
+    expect(scrollArea.className).toContain('min-h-0')
+    expect(scrollArea.className).toContain('overflow-y-auto')
+    expect(footer.className).toContain('shrink-0')
+
+    expect(await screen.findByText('— 没有兼容 Pi 的凭证 —')).toBeTruthy()
+    expect(screen.queryByText('从已保存凭证载入')).toBeNull()
+  })
+
   it('keeps forward and reverse Tab navigation inside the dialog', () => {
     render(
       <WorkspaceAIConfigModal

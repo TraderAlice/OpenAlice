@@ -11,7 +11,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, GitMerge, Info, Layers3, Rocket, Settings, X } from 'lucide-react'
+import { Bot, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
 import {
   getAgentConfig,
   listCredentials,
@@ -666,21 +666,22 @@ export function WorkspaceAIConfigModal({
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-backdrop backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-stretch justify-center bg-backdrop backdrop-blur-sm sm:items-center"
       onMouseDown={handleBackdropMouseDown}
     >
       <div
         ref={dialogRef}
+        data-testid="workspace-settings-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={dialogTitleId}
         aria-describedby={dialogDescriptionId}
         tabIndex={-1}
-        className="bg-background border border-border rounded-xl shadow-2xl w-[calc(100vw-24px)] max-w-3xl max-h-[85vh] flex flex-col"
+        className="flex h-full w-full flex-col overflow-hidden border-y border-border bg-background shadow-2xl sm:h-auto sm:w-[calc(100vw-24px)] sm:max-w-3xl sm:max-h-[85dvh] sm:rounded-xl sm:border"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:p-4">
           <div className="min-w-0">
             <h2 id={dialogTitleId} className="text-[15px] font-semibold text-foreground">{t('workspaceSettings.title')}</h2>
             <p id={dialogDescriptionId} className="mt-0.5 truncate text-[11px] text-muted-foreground">{workspaceLabel}</p>
@@ -696,13 +697,16 @@ export function WorkspaceAIConfigModal({
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
-          <aside className="grid w-full shrink-0 grid-cols-2 gap-1 border-b border-border bg-secondary/25 p-2 sm:block sm:w-40 sm:border-b-0 sm:border-r">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row">
+          <aside
+            data-testid="workspace-settings-section-nav"
+            className="flex w-full shrink-0 gap-1 overflow-x-auto overscroll-x-contain border-b border-border bg-secondary/25 px-2 py-1.5 [scrollbar-width:none] sm:block sm:w-40 sm:overflow-visible sm:border-b-0 sm:border-r sm:p-2"
+          >
             <button
               type="button"
               onClick={() => setSection('general')}
               aria-current={section === 'general' ? 'page' : undefined}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:min-h-0 sm:w-full ${
                 section === 'general'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -715,7 +719,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('launch')}
               aria-current={section === 'launch' ? 'page' : undefined}
-              className={`flex min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'launch'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -728,7 +732,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('ai')}
               aria-current={section === 'ai' ? 'page' : undefined}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'ai'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -741,7 +745,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('template')}
               aria-current={section === 'template' ? 'page' : undefined}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'template'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -757,7 +761,7 @@ export function WorkspaceAIConfigModal({
               type="button"
               onClick={() => setSection('absorb')}
               aria-current={section === 'absorb' ? 'page' : undefined}
-              className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:w-full ${
+              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
                 section === 'absorb'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -768,10 +772,10 @@ export function WorkspaceAIConfigModal({
             </button>
           </aside>
 
-          <div className="min-w-0 flex flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {section === 'general' && (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                   <div className="max-w-xl space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-muted-foreground mb-1">{t('workspaceSettings.general.displayName')}</label>
@@ -829,8 +833,8 @@ export function WorkspaceAIConfigModal({
                   )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 border-t border-border bg-secondary/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-[11px] text-muted-foreground/75">
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-secondary/30 px-3 py-2.5 sm:grid sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <p className="hidden min-w-0 text-[11px] leading-snug text-muted-foreground/75 sm:block">
                     {t('workspaceSettings.general.storedIn')}
                   </p>
                   <div className="flex justify-end gap-2">
@@ -838,7 +842,7 @@ export function WorkspaceAIConfigModal({
                       type="button"
                       onClick={onClose}
                       disabled={metadataSaving}
-                      className="px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px] disabled:opacity-40"
+                      className="whitespace-nowrap px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px] disabled:opacity-40"
                     >
                       {t('common.cancel')}
                     </button>
@@ -846,7 +850,7 @@ export function WorkspaceAIConfigModal({
                       type="button"
                       onClick={handleSaveMetadata}
                       disabled={metadataSaving || !metadataDirty}
-                      className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                      className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
                     >
                       {metadataSaving ? t('common.saving') : t('common.save')}
                     </button>
@@ -856,32 +860,42 @@ export function WorkspaceAIConfigModal({
             )}
 
             {section === 'ai' && (
-              <>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* Tabs */}
-        <div className="flex border-b border-border bg-secondary/50">
+        <div className="flex shrink-0 overflow-x-auto overscroll-x-contain border-b border-border bg-secondary/50 [scrollbar-width:none]">
           {(['claude', 'codex', 'opencode', 'pi'] as const).map((id) => (
             <button
               key={id}
+              aria-label={TAB_LABEL[id]}
               onClick={() => {
                 setTab(id)
                 setPickedCredential('')
                 setPickedWireShape('')
               }}
-              className={`flex-1 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+              className={`min-h-11 flex-none whitespace-nowrap px-3 py-2 text-[13px] font-medium transition-colors sm:flex-1 sm:px-4 sm:py-2.5 ${
                 tab === id
                   ? 'text-primary border-b-2 border-primary -mb-px'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {TAB_LABEL[id]}
+              <span className="sm:hidden">{id === 'claude' ? 'Claude' : TAB_LABEL[id]}</span>
+              <span className="hidden sm:inline">{TAB_LABEL[id]}</span>
             </button>
           ))}
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div
+          data-testid="workspace-settings-ai-scroll"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [scrollbar-gutter:stable]"
+        >
           {/* Quick pick — load a saved credential into the form */}
-          <div className="rounded-lg border border-border bg-secondary/30 p-3">
+          {credentials.length === 0 ? (
+            <p className="text-[11px] leading-snug text-muted-foreground/75">
+              {t('workspaceSettings.ai.noCompatibleCredential', { agent: TAB_LABEL[tab] })}
+            </p>
+          ) : (
+            <div className="rounded-lg border border-border bg-secondary/30 p-3">
             <label className="block text-xs font-medium text-muted-foreground mb-2">
               {t('workspaceSettings.ai.loadSaved')}
             </label>
@@ -954,7 +968,8 @@ export function WorkspaceAIConfigModal({
                 </>
               )
             })()}
-          </div>
+            </div>
+          )}
 
           {/* Manual fields */}
           {(tabProviderCapabilities?.wirePreference.length ?? 0) > 1 && (
@@ -1306,21 +1321,27 @@ export function WorkspaceAIConfigModal({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col gap-2 p-3 border-t border-border bg-secondary/30 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          data-testid="workspace-settings-ai-footer"
+          className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-secondary/30 px-3 py-2.5"
+        >
           <div className="flex gap-2">
             <button
+              type="button"
+              aria-label={t('workspaceSettings.ai.reset')}
               onClick={handleReset}
               disabled={saving}
-              className="px-3 py-2 rounded-md border border-border text-muted-foreground hover:text-foreground text-[12px] disabled:opacity-40"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-40"
             >
-              {t('workspaceSettings.ai.reset')}
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline">{t('workspaceSettings.ai.reset')}</span>
             </button>
           </div>
           <div className="flex justify-end gap-2">
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px]"
+              className="whitespace-nowrap px-3 py-2 rounded-md text-muted-foreground hover:text-foreground text-[13px]"
             >
               {t('common.cancel')}
             </button>
@@ -1332,7 +1353,7 @@ export function WorkspaceAIConfigModal({
                 onClick={handleTest}
                 disabled={!canTest || testing || saving}
                 title={!canTest ? t('workspaceSettings.ai.fillRequired') : undefined}
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
               >
                 {testing ? t('common.testing') : t('common.test')}
               </button>
@@ -1340,14 +1361,14 @@ export function WorkspaceAIConfigModal({
               <button
                 onClick={handleSave}
                 disabled={saving || !dirty}
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                className="whitespace-nowrap px-4 py-2 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
               >
                 {saving ? t('common.saving') : t('common.save')}
               </button>
             )}
           </div>
         </div>
-              </>
+              </div>
             )}
 
             {section === 'launch' && (
