@@ -1299,6 +1299,7 @@ export const ja: Resources = {
       pushed: 'プッシュ済み',
       accountFilter: '口座フィルター',
       all: 'すべて',
+      backToQueue: 'キューに戻る',
       review: '確認',
       stagedBadge: 'ステージ済み',
       operationCount_one: '{{count}} 件の操作',
