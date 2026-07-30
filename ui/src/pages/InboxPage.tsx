@@ -555,14 +555,14 @@ export function InboxAttachment({
           />
         </button>
         {isMarkdownPath(doc.path) && (
-          <div className="flex shrink-0 items-center gap-0.5 border-l border-border/60 px-2">
+          <div className="flex shrink-0 items-center gap-0.5 border-l border-border/60 px-1 sm:px-2">
             <button
               type="button"
               onClick={copyMarkdown}
               disabled={!markdownActionsAvailable}
               title={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
               aria-label={copied ? t('inbox.docCopiedMarkdown') : t('inbox.docCopyMarkdown')}
-              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55"
+              className="oa-pressable inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55 sm:h-7 sm:w-7"
             >
               {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
             </button>
@@ -572,7 +572,7 @@ export function InboxAttachment({
               disabled={!markdownActionsAvailable}
               title={t('inbox.docDownloadMarkdown')}
               aria-label={t('inbox.docDownloadMarkdown')}
-              className="oa-pressable inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55"
+              className="oa-pressable inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground/55 hover:bg-muted hover:text-primary disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/55 sm:h-7 sm:w-7"
             >
               <Download size={14} strokeWidth={1.75} />
             </button>

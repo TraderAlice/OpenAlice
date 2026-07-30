@@ -79,6 +79,25 @@ describe('InboxAttachment', () => {
     expect(await screen.findByTitle('HTML report: research/close-report.html')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Collapse attachment close-report.html' })).toBeTruthy()
   })
+
+  it('keeps markdown asset actions touch-sized on mobile and compact on desktop', async () => {
+    render(
+      <InboxAttachment
+        workspaceId="ws-1"
+        doc={{ path: 'research/close-report.md' }}
+        defaultExpanded={false}
+      />,
+    )
+
+    const copy = await screen.findByRole('button', { name: 'Copy Markdown' })
+    const download = screen.getByRole('button', { name: 'Download Markdown' })
+    for (const action of [copy, download]) {
+      expect(action.className).toContain('h-10')
+      expect(action.className).toContain('w-10')
+      expect(action.className).toContain('sm:h-7')
+      expect(action.className).toContain('sm:w-7')
+    }
+  })
 })
 
 describe('InboxPage deletion', () => {
