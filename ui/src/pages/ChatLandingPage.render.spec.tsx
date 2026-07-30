@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
 import { i18n } from '../i18n'
 import type { AgentInfo, Workspace } from '../components/workspace/api'
-import { ChatLandingPage } from './ChatLandingPage'
+import { AutoQuantLandingPage, ChatLandingPage } from './ChatLandingPage'
 
 const mocks = vi.hoisted(() => ({
   useWorkspaces: vi.fn(),
@@ -93,7 +93,10 @@ function chatWorkspace(): Workspace {
   }
 }
 
-function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
+function context(
+  workspaces: readonly Workspace[],
+  autoQuantDefaultWorkspaceId: string | null = null,
+): WorkspacesContextValue {
   return {
     workspaces,
     templates: [],
@@ -106,7 +109,7 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
-    autoQuantDefaultWorkspaceId: null,
+    autoQuantDefaultWorkspaceId,
     autoQuantPreferenceLoaded: true,
     autoQuantPreferenceError: null,
     refresh: vi.fn(),
@@ -237,6 +240,24 @@ describe('ChatLandingPage compact-height layout', () => {
     expect(controls.className).toContain('items-end')
     expect(controls.className).not.toContain('flex-col')
     expect(controls.lastElementChild?.className).toContain('shrink-0')
+  })
+
+  it('shares the compact-height contract with the AutoQuant landing', () => {
+    const autoQuantWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'auto-quant-1',
+      tag: 'quant-desk',
+      template: 'auto-quant-v2',
+    }
+    workspaces = [autoQuantWorkspace]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, autoQuantWorkspace.id))
+
+    render(<AutoQuantLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByTestId('harness-landing-scroll').className).toContain('justify-start')
+    expect(screen.getByTestId('harness-landing-stack').className).toContain('my-auto')
+    expect(screen.getByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…').className)
+      .toContain('min-h-[72px]')
   })
 })
 
