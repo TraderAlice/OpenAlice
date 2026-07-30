@@ -603,6 +603,9 @@ This plan is complete only when:
   serial PR #872 after both macOS package jobs exposed the stale `0.80.6`
   digests. The real forced vendor transaction downloaded and verified both Pi
   release assets, completed `npm ci`, and assembled the macOS managed runtime.
+  The next package step then exposed a second `0.80.6` expectation in the
+  packaged-toolchain smoke; the Supervisor-controls increment replaced that
+  hardcoded version with an exact pattern derived from the packaged manifest.
 - 2026-07-30: Connected the `pi-tui` application shell to the existing
   lifecycle, logs, Doctor, and update services. Added polled lifecycle and
   update-available states, keyboard navigation, bounded detail panels,
@@ -612,7 +615,7 @@ This plan is complete only when:
   control socket, remained inside the TUI across both transitions, and restored
   the terminal on detach.
 - 2026-07-30: Verified the interactive Supervisor increment with 135 CLI
-  tests, root TypeScript, UI TypeScript, the 3,641-test root Vitest suite, and
+  tests, root TypeScript, UI TypeScript, the 3,642-test root Vitest suite, and
   the CLI package build. An isolated local installer transaction loaded the TUI
   from managed Pi, rendered installed-provenance Doctor results, then
   `uninstall --yes` removed CLI/Pi while preserving a sentinel data directory.
