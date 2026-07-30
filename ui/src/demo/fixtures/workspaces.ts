@@ -128,6 +128,14 @@ const demoIssueWorkspaces: Workspace[] = [
     displayName: 'Auto Quant',
     dir: '/demo/workspaces/auto-quant',
     createdAt: new Date().toISOString(),
+    template: 'auto-quant-v2',
+    harnessSource: {
+      schemaVersion: 1,
+      template: 'auto-quant-v2',
+      repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+      version: 'v0.8.27',
+      commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',
+    },
     agents: ['codex'],
     sessions: [],
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
@@ -164,7 +172,27 @@ export const chatTemplate: TemplateInfo = {
   hasReadme: false,
 }
 
-export const demoTemplates: TemplateInfo[] = [chatTemplate]
+export const autoQuantTemplate: TemplateInfo = {
+  name: 'auto-quant-v2',
+  displayName: 'AutoQuant',
+  description: 'Agent-native quantitative research desk pinned to an approved AutoQuant V2 release.',
+  groupOrder: 20,
+  defaultAgents: ['codex', 'claude'],
+  version: '1.0.0',
+  hasReadme: true,
+  source: {
+    repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+    defaultVersion: 'v0.8.27',
+    versions: [
+      {
+        version: 'v0.8.27',
+        commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',
+      },
+    ],
+  },
+}
+
+export const demoTemplates: TemplateInfo[] = [chatTemplate, autoQuantTemplate]
 
 // Back-compat singleton for older callers (other fixture files reference
 // `demoTemplate` and we want a stable name). Points at the flagship.

@@ -17,6 +17,7 @@ import { NAV_SECTIONS } from './activity-navigation'
 function activitySectionFor(page: Page): ActivitySection {
   switch (page) {
     case 'chat':                 return 'chat'
+    case 'auto-quant':           return 'auto-quant'
     case 'inbox':                return 'inbox'
     case 'tracked':              return 'tracked'
     case 'workspaces':           return 'workspaces'

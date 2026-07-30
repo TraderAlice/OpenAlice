@@ -18,7 +18,10 @@ import {
 } from '../../core/config.js';
 import type { WorkspaceService } from '../../workspaces/service.js';
 import type { WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
-import { ChatWorkspaceResolver } from '../../workspaces/chat-workspace-resolver.js';
+import {
+  ChatWorkspaceResolver,
+  TemplateWorkspaceResolver,
+} from '../../workspaces/chat-workspace-resolver.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -105,6 +108,11 @@ function build(opts: {
     sessionRegistry: sessionRegistry as any,
     creator,
   });
+  const autoQuantWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry: registry as any, sessionRegistry: sessionRegistry as any, creator },
+    'auto-quant-v2',
+    'auto-quant',
+  );
   const svc = {
     // Default []: today's tag never matches → creator.create path. Tests that
     // exercise targetWsId pass the workspace in so registry resolves it by id.
@@ -115,6 +123,8 @@ function build(opts: {
     creator,
     resolveOrCreateChatWorkspace: (preferredWorkspaceId?: string | null) =>
       chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId),
+    resolveOrCreateAutoQuantWorkspace: (preferredWorkspaceId?: string | null, sourceVersion?: string) =>
+      autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion),
     resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
     adapters: { get: (id: string) => adapters[id] },
     sessionRegistry,
@@ -594,6 +604,25 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(r.status).toBe(201);
     expect(creator.create).toHaveBeenCalledWith('chat', 'chat');
     expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('creates a pinned AutoQuant V2 workspace without changing Chat preferences', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+      sourceVersion: 'v0.8.27',
+    });
+
+    expect(r.status).toBe(201);
+    expect(creator.create).toHaveBeenCalledWith(
+      'auto-quant',
+      'auto-quant-v2',
+      undefined,
+      'v0.8.27',
+    );
+    expect(rememberRecentChatWorkspace).not.toHaveBeenCalled();
   });
 
   // targetWsId — the chat sidebar's per-workspace "+": spawn INTO the given

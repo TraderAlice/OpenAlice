@@ -222,6 +222,8 @@ describe('ChatLandingPage keyboard submission', () => {
       'pi',
       'google-1',
       'chat-1',
+      'chat',
+      undefined,
     ))
   })
 })

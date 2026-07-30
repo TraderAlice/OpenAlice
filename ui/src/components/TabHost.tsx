@@ -4,6 +4,7 @@ import { type Tab } from '../tabs/types'
 import { getView, getViewShell } from '../tabs/registry'
 import { EmptyEditor } from './EmptyEditor'
 import { ChatPageShell } from '../pages/ChatPageShell'
+import { AutoQuantPageShell } from '../pages/AutoQuantPageShell'
 
 /**
  * Main content host.
@@ -85,6 +86,10 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
         <ChatPageShell>
           <Component key={tab.id} spec={tab.spec} visible={visible} />
         </ChatPageShell>
+      ) : shell === 'auto-quant' ? (
+        <AutoQuantPageShell>
+          <Component key={tab.id} spec={tab.spec} visible={visible} />
+        </AutoQuantPageShell>
       ) : (
         <Component key={tab.id} spec={tab.spec} visible={visible} />
       )}

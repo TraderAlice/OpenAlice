@@ -59,7 +59,11 @@ export function FileViewerPage({ spec }: Props) {
       openOrFocus({ kind: 'tracked', params: {} })
       return
     }
-    setSidebar(source === 'chat' ? 'chat' : 'workspaces')
+    setSidebar(
+      source === 'chat'
+        ? 'chat'
+        : source === 'auto-quant' ? 'auto-quant' : 'workspaces',
+    )
     openOrFocus({
       kind: 'workspace',
       params: {

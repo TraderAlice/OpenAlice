@@ -47,8 +47,9 @@ Before changing files:
   or satellite repositories. Do not grow a parallel workflow engine in `src/`.
 - UTA is optional for non-trading use. Startup, onboarding, and Chat must remain
   usable in lite/read-only mode when no broker carrier is available.
-- Chat workspaces are durable and reusable by default. Auto-Quant workspaces are
-  isolated/ephemeral by design; do not apply one lifecycle policy to both.
+- Chat and AutoQuant V2 workspaces are durable and reusable by default.
+  AutoQuant's internal projects and experiments remain owned by its Coding
+  Agent; do not reproduce that lifecycle in Alice.
 - `OPENALICE_HOME` is the user-state root. Changes to persisted state must use
   the migration framework; never hide one-off cleanup in startup code.
 - Secrets never belong in tracked files, logs, fixtures, PR bodies, or agent

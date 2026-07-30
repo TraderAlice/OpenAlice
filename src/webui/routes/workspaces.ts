@@ -662,6 +662,7 @@ export function createWorkspaceRoutes(
         defaultAgents: t.defaultAgents,
         version: t.version,
         hasReadme: t.readmePath !== undefined,
+        ...(t.source ? { source: t.source } : {}),
       })),
     });
   });
@@ -844,15 +845,21 @@ export function createWorkspaceRoutes(
     const agentsRequested = Array.isArray(rawAgents)
       ? rawAgents.filter((a): a is string => typeof a === 'string' && a.length > 0)
       : undefined;
+    const rawSourceVersion = fields['sourceVersion'];
+    const sourceVersion = typeof rawSourceVersion === 'string' && rawSourceVersion.length > 0
+      ? rawSourceVersion
+      : undefined;
     const result = await svc.creator.create(
       tag,
       templateName,
       agentsRequested && agentsRequested.length > 0 ? agentsRequested : undefined,
+      sourceVersion,
     );
     if (!result.ok) {
       const status =
         result.code === 'invalid_tag' ? 400
         : result.code === 'unknown_template' ? 400
+        : result.code === 'unknown_source_version' ? 400
         : result.code === 'unknown_agent' ? 400
         : result.code === 'tag_in_use' ? 409
         : result.code === 'insufficient_storage' ? 507
@@ -1268,17 +1275,17 @@ export function createWorkspaceRoutes(
     return c.json(result.session, 201);
   });
 
-  // Quick-chat launch — the "type a message → you're in" front door, decoupled
-  // from the explicit create-workspace UI. Enters the recent Chat workspace (or
-  // creates one stable starter workspace when none exists), then spawns a fresh
-  // interactive session seeded with the user's first message. One POST returns
-  // both workspace and live session so the client can enter the TUI directly.
-  // Body: { prompt: string; agent?: string }
+  // Conversational harness launch — the "type a message → you're in" front
+  // door shared by Ask Alice and AutoQuant. The harness chooses only the
+  // Workspace template; the native Coding Agent remains the worker.
+  // Body: { prompt, agent?, targetWsId?, template?, sourceVersion? }
   app.post('/quick-chat', async (c) => {
     let prompt: string;
     let agentId: string | undefined;
     let credentialSlug: string | undefined;
     let targetWsId: string | undefined;
+    let templateName = 'chat';
+    let sourceVersion: string | undefined;
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -1296,6 +1303,17 @@ export function createWorkspaceRoutes(
       // chat sidebar's per-workspace "+" ("Ask Alice, but in this workspace").
       const rawTarget = fields['targetWsId'];
       if (typeof rawTarget === 'string' && rawTarget.length > 0) targetWsId = rawTarget;
+      const rawTemplate = fields['template'];
+      if (rawTemplate !== undefined) {
+        if (rawTemplate !== 'chat' && rawTemplate !== 'auto-quant-v2') {
+          return c.json({ error: 'unknown_template' }, 400);
+        }
+        templateName = rawTemplate;
+      }
+      const rawSourceVersion = fields['sourceVersion'];
+      if (typeof rawSourceVersion === 'string' && rawSourceVersion.length > 0) {
+        sourceVersion = rawSourceVersion;
+      }
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
@@ -1309,20 +1327,26 @@ export function createWorkspaceRoutes(
       // Targeted: spawn a new session into the given existing workspace.
       const found = svc.registry.list().find((w) => w.id === targetWsId);
       if (!found) return c.json({ error: 'workspace_not_found' }, 404);
+      if (templateName === 'auto-quant-v2' && found.template !== templateName) {
+        return c.json({ error: 'workspace_template_mismatch' }, 400);
+      }
       meta = found;
-      await rememberRecentChat(meta);
+      if (templateName === 'chat') await rememberRecentChat(meta);
     } else {
-      const preference = await quickChatPreferences.readQuickChatPreferences().catch((err) => {
-        launcherLogger.warn('quick_chat.preference_read_failed', { err });
-        return null;
-      });
-      const target = await svc.resolveOrCreateChatWorkspace(
-        preference?.recentChatWorkspaceId,
-      );
+      const target = templateName === 'auto-quant-v2'
+        ? await svc.resolveOrCreateAutoQuantWorkspace(undefined, sourceVersion)
+        : await (async () => {
+            const preference = await quickChatPreferences.readQuickChatPreferences().catch((err) => {
+              launcherLogger.warn('quick_chat.preference_read_failed', { err });
+              return null;
+            });
+            return svc.resolveOrCreateChatWorkspace(preference?.recentChatWorkspaceId);
+          })();
       if (!target.ok) {
         const status =
           target.code === 'tag_in_use' ? 409
           : target.code === 'unknown_template' ? 400
+          : target.code === 'unknown_source_version' ? 400
           : target.code === 'invalid_tag' ? 400
           : target.code === 'unknown_agent' ? 400
           : 500;
@@ -1336,7 +1360,7 @@ export function createWorkspaceRoutes(
         );
       }
       meta = target.workspace;
-      await rememberRecentChat(meta);
+      if (templateName === 'chat') await rememberRecentChat(meta);
     }
 
     const spawn = await spawnInteractiveSession(meta, {

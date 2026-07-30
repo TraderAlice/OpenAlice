@@ -14,7 +14,8 @@ import { EventEmitter } from 'node:events';
 import * as childProcess from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { resolveCreateAgents, runScript } from './workspace-creator.js';
+import { resolveCreateAgents, resolveTemplateSource, runScript } from './workspace-creator.js';
+import type { TemplateMeta } from './template-registry.js';
 
 vi.mock('node:child_process', async (importOriginal) => ({
   ...await importOriginal<typeof import('node:child_process')>(),
@@ -83,6 +84,30 @@ describe('resolveCreateAgents — single home of the agent policy', () => {
 
   it('treats an empty explicit request as "not pinned" → full expansion', () => {
     expect(resolveCreateAgents([], ['claude', 'codex'], ALL)).toEqual(ALL);
+  });
+});
+
+describe('resolveTemplateSource', () => {
+  const template = {
+    name: 'auto-quant-v2',
+    source: {
+      repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+      defaultVersion: 'v0.8.27',
+      versions: [
+        { version: 'v0.8.27', commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3' },
+      ],
+    },
+  } as TemplateMeta;
+
+  it('uses the catalog default when the caller omits a version', () => {
+    expect(resolveTemplateSource(template)).toEqual({
+      version: 'v0.8.27',
+      commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',
+    });
+  });
+
+  it('rejects versions outside the explicit source catalog', () => {
+    expect(resolveTemplateSource(template, 'main')).toBeUndefined();
   });
 });
 

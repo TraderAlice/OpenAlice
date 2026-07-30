@@ -359,6 +359,7 @@ export const workspacesHandlers = [
     const body = await request.json().catch(() => ({})) as {
       tag?: unknown
       template?: unknown
+      sourceVersion?: unknown
     }
     if (typeof body.tag !== 'string') {
       return HttpResponse.json({ error: 'tag_required', message: 'Workspace tag is required.' }, { status: 400 })
@@ -393,6 +394,16 @@ export const workspacesHandlers = [
         message: `Unknown Workspace template: ${templateName}`,
       }, { status: 400 })
     }
+    const sourceVersion = typeof body.sourceVersion === 'string'
+      ? body.sourceVersion
+      : template.source?.defaultVersion
+    const source = template.source?.versions.find((candidate) => candidate.version === sourceVersion)
+    if (template.source && !source) {
+      return HttpResponse.json({
+        error: 'unknown_source_version',
+        message: `Unknown source version: ${String(sourceVersion)}`,
+      }, { status: 400 })
+    }
 
     demoWorkspaceCreateSequence += 1
     const workspace: Workspace = {
@@ -401,6 +412,17 @@ export const workspacesHandlers = [
       dir: `/demo/workspaces/${tag}`,
       createdAt: new Date().toISOString(),
       template: template.name,
+      ...(source && template.source
+        ? {
+            harnessSource: {
+              schemaVersion: 1 as const,
+              template: template.name,
+              repository: template.source.repository,
+              version: source.version,
+              commit: source.commit,
+            },
+          }
+        : {}),
       ...(template.version
         ? { spawnedFromVersion: template.version, currentVersion: template.version }
         : {}),
@@ -869,11 +891,14 @@ export const workspacesHandlers = [
       prompt?: unknown
       agent?: unknown
       targetWsId?: unknown
+      template?: unknown
     } | null
     const explicit = typeof body?.targetWsId === 'string'
       ? demoWorkspaces.find((workspace) => workspace.id === body.targetWsId)
       : undefined
-    const fallback = demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
+    const fallback = body?.template === 'auto-quant-v2'
+      ? demoWorkspaces.find((workspace) => workspace.template === 'auto-quant-v2')
+      : demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
     const ws = explicit ?? fallback
     if (!ws) return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
 

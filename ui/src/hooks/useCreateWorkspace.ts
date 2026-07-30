@@ -27,6 +27,8 @@ interface UseCreateWorkspaceOpts {
   template: string
   /** Called with the new workspace after a successful create. */
   onCreated: (workspace: Workspace) => void
+  /** Exact optional upstream source version selected for this template. */
+  sourceVersion?: string
 }
 
 interface UseCreateWorkspaceState {
@@ -69,7 +71,7 @@ export function useCreateWorkspace(opts: UseCreateWorkspaceOpts): UseCreateWorks
     }
     setCreating(true)
     setError(null)
-    const result = await createWorkspace(t, opts.template)
+    const result = await createWorkspace(t, opts.template, undefined, opts.sourceVersion)
     setCreating(false)
     if (result.ok) {
       setTag('')
