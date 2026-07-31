@@ -113,6 +113,20 @@ describe('injectWorkspaceContext — skills', () => {
     expect(existsSync(join(dir, '.pi/skills'))).toBe(false);                        // no Pi collision copy
   });
 
+  it('copies the Chat AutoQuant delegation contract into both discovery paths', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ bundledSkills: ['delegate-autoquant'] }),
+      wsId: 'ws-chat',
+      dir,
+    });
+    for (const root of ['.claude/skills', '.agents/skills']) {
+      const skill = await read(`${root}/delegate-autoquant/SKILL.md`);
+      expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
+      expect(skill).toContain('The universal result is the Agent\'s ordinary `assistantText` handoff');
+      expect(skill).toContain('does not automatically publish either artifact to the');
+    }
+  });
+
   it('injects the per-CLI playbooks (alice* + traderhub) for a tool-bearing template', async () => {
     await injectWorkspaceContext({
       template: makeTemplate({ injectTools: true, bundledSkills: ['scan-value-chain'] }),
