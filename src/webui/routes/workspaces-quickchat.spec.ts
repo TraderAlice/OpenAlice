@@ -8,6 +8,9 @@
  * touching the real ai-provider-manager.json.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { createWorkspaceRoutes } from './workspaces.js';
 import {
@@ -23,6 +26,7 @@ import {
   TemplateWorkspaceResolver,
 } from '../../workspaces/chat-workspace-resolver.js';
 import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
+import { writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -763,6 +767,23 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
     expect(r.status).toBe(201);
     expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
+  });
+
+  it('omitted agent prefers the target Workspace runtime over the installation default', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-runtime-'));
+    try {
+      await writeWorkspaceMetadata(dir, { defaultAgent: 'opencode' });
+      vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('claude');
+      vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(r.status).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('unknown targetWsId → 404 workspace_not_found, no spawn', async () => {

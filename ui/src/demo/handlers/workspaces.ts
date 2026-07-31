@@ -668,7 +668,11 @@ export const workspacesHandlers = [
   http.patch('/api/workspaces/:id/metadata', async ({ params, request }) => {
     const workspace = demoWorkspaces.find((w) => w.id === String(params.id))
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
-    const mutableWorkspace = workspace as { displayName?: string; description?: string }
+    const mutableWorkspace = workspace as {
+      displayName?: string
+      description?: string
+      defaultAgent?: string
+    }
 
     const body = (await request.json().catch(() => ({}))) as WorkspaceMetadataPatch
     if ('displayName' in body) {
@@ -683,6 +687,13 @@ export const workspacesHandlers = [
         delete mutableWorkspace.description
       } else {
         mutableWorkspace.description = body.description.trim()
+      }
+    }
+    if ('defaultAgent' in body) {
+      if (body.defaultAgent == null || body.defaultAgent.trim() === '') {
+        delete mutableWorkspace.defaultAgent
+      } else {
+        mutableWorkspace.defaultAgent = body.defaultAgent.trim()
       }
     }
     return HttpResponse.json({ workspace })
@@ -942,7 +953,7 @@ export const workspacesHandlers = [
       : 'Show me how this Workspace is doing.'
     const agent = typeof body?.agent === 'string'
       ? body.agent
-      : 'pi'
+      : ws.defaultAgent ?? 'pi'
     const startedAt = Date.now()
     const now = new Date(startedAt).toISOString()
     const sessionId = `demo-quick-chat-${++demoQuickChatSequence}`

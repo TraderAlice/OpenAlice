@@ -49,7 +49,6 @@ export function WorkspacesSidebar() {
             console.error('workspaces.open_headless_run_failed', { wsId, taskId, err }),
           )
         }}
-        onSetDefaultAgent={(agent) => void ctx.setDefaultAgent(agent)}
         onPauseSession={(wsId, id) => void ctx.pauseSession(wsId, id)}
         onResumeSession={(wsId, id) => void ctx.resumeSession(wsId, id)}
         onDeleteSession={(wsId, id) => ctx.requestDeleteSession(wsId, id)}

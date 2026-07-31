@@ -12,17 +12,27 @@ Owner guides:
 
 ## Scope
 
-Expose the next fresh Workspace Session's read-only launch plan from the
-existing Workspace settings modal. The plan must come from the same command,
-environment, cwd, adapter, and platform-resolution path used by the real PTY
-spawn, while keeping credentials and other sensitive values out of the API.
+Make the existing Workspace settings modal the explicit home for both the
+default Agent runtime used by fresh Sessions and the read-only resolved launch
+plan. The plan must come from the same command, environment, cwd, adapter, and
+platform-resolution path used by the real PTY spawn, while keeping credentials
+and other sensitive values out of the API.
 
-This increment does not add editable hooks, custom runtimes, or a general
-cross-platform shell preference.
+This increment does not add custom runtimes or a general cross-platform shell
+preference.
 
 ## Decisions
 
-- Add a dedicated **Launch** section beside General and AI Provider.
+- Add a dedicated **Sessions** section beside General and AI Provider.
+- Persist an optional Workspace-local `defaultAgent` in
+  `.alice/workspace.json`; the optional field is backwards compatible and does
+  not require a persisted-state migration.
+- Resolve a fresh Session runtime in this order: an explicit one-run choice,
+  the target Workspace default, the legacy installation-wide default, then the
+  first registered runtime.
+- Treat Quick Chat, sidebar, CLI, and API runtime choices as one-Session
+  overrides. They must not silently rewrite either Workspace or installation
+  defaults.
 - Preview one enabled Workspace runtime at a time, with the Shell utility
   always available because it shares the common launcher environment.
 - Show both adapter-composed argv and the platform-resolved process argv when
@@ -39,7 +49,11 @@ cross-platform shell preference.
 - [x] Extend the canonical spawn plan with platform resolution and safe
   environment contribution metadata.
 - [x] Add and test a read-only Workspace launch-plan endpoint.
-- [x] Add the Launch section, translations, demo handler, and component tests.
+- [x] Add the original launch-preview section, translations, demo handler, and
+  component tests, then evolve it into the Sessions section.
+- [x] Add a Workspace-local default runtime editor shared by Chat and AutoQuant.
+- [x] Apply the Workspace default to normal, Quick Chat, sidebar, CLI, API, and
+  Issue fallback paths without changing explicit launch overrides.
 - [x] Verify the real browser route and Electron PTY/package paths.
 - [x] Record completion and move this plan to the Completed index.
 
@@ -48,14 +62,18 @@ cross-platform shell preference.
 - `npx tsc --noEmit`
 - `cd ui && npx tsc -b`
 - `pnpm test`
-- Real Workspace settings route in browser/demo mode at desktop and 390 px
-  widths, including runtime switching and browser-console review
+- Real AutoQuant Workspace settings route in the browser, including the
+  Sessions editor and resolved launch preview
+- Demo AutoQuant route, including saving a default and observing inheritance
+  in the launch surface
 - `pnpm electron:smoke:pty`
 - `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace`
 
 ## Completion
 
-The Workspace settings panel can explain the exact safe launch plan for every
-enabled runtime and the always-available Shell utility. Browser and Electron
-transports can read the same API shape, and all required checks pass without
-exposing credentials or changing launch behavior.
+The Workspace settings panel can explicitly configure the default Agent
+runtime used by new Chat or AutoQuant Sessions and explain the exact safe
+launch plan for every enabled runtime plus the always-available Shell utility.
+Explicit launch choices remain one-run overrides. Browser and Electron
+transports use the same API shape, and all required checks pass without
+exposing credentials.

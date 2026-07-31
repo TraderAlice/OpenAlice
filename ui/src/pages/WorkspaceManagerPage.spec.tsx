@@ -303,7 +303,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
       'claude',
       undefined,
     ))
-    expect(mocks.setDefaultAgent).toHaveBeenCalledWith('claude')
+    expect(mocks.setDefaultAgent).not.toHaveBeenCalled()
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace-manager',
       params: { sessionId: 'manager-session' },

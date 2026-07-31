@@ -98,7 +98,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [configuringAgentTarget, setConfiguringAgentTarget] = useState<{
     wsId: string
     agent?: AgentId
-    section?: 'general' | 'ai' | 'template' | 'absorb'
+    section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'
   } | null>(null)
   const [pendingSessionDelete, setPendingSessionDelete] = useState<{ wsId: string; sessionId: string } | null>(null)
   const { t } = useTranslation()
@@ -504,7 +504,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const saveWorkspaceMetadata = useCallback(
     async (
       wsId: string,
-      metadata: { displayName?: string | null; description?: string | null },
+      metadata: { displayName?: string | null; description?: string | null; defaultAgent?: string | null },
     ): Promise<void> => {
       const updated = await updateWorkspaceMetadata(wsId, metadata)
       setWorkspaces((prev) => prev.map((w) => (w.id === wsId ? updated : w)))
@@ -631,7 +631,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         resumeSession,
         openWebPiSession,
         requestDeleteSession,
-        openAgentConfig: (wsId: string, agent?: AgentId, section?: 'general' | 'ai' | 'template' | 'absorb') =>
+        openAgentConfig: (wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb') =>
           setConfiguringAgentTarget({
             wsId,
             ...(agent ? { agent } : {}),

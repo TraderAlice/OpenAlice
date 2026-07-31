@@ -18,7 +18,10 @@ import {
 interface Props {
   readonly wsId: string
   readonly agents: readonly string[]
+  readonly workspaceDefaultAgent?: string | null
+  readonly installationDefaultAgent: string | null
   readonly initialAgent?: string
+  readonly onSaveDefaultAgent: (agent: string | null) => Promise<void>
 }
 
 const RUNTIME_LABELS: Readonly<Record<string, string>> = {
@@ -67,19 +70,37 @@ function CommandTokens({ command }: { readonly command: readonly string[] }) {
 export function WorkspaceLaunchConfigurationPanel({
   wsId,
   agents,
+  workspaceDefaultAgent,
+  installationDefaultAgent,
   initialAgent,
+  onSaveDefaultAgent,
 }: Props) {
   const { t } = useTranslation()
+  const agentIds = useMemo(() => [...new Set(agents.filter((id) => id !== 'shell'))], [agents])
   const runtimeIds = useMemo(() => [...new Set([...agents, 'shell'])], [agents])
-  const preferred = initialAgent && runtimeIds.includes(initialAgent)
-    ? initialAgent
-    : runtimeIds[0] ?? ''
+  const inheritedDefault = installationDefaultAgent && agentIds.includes(installationDefaultAgent)
+    ? installationDefaultAgent
+    : agentIds[0] ?? ''
+  const storedDefault = workspaceDefaultAgent && agentIds.includes(workspaceDefaultAgent)
+    ? workspaceDefaultAgent
+    : ''
+  const preferred = storedDefault || inheritedDefault || (
+    initialAgent && runtimeIds.includes(initialAgent) ? initialAgent : runtimeIds[0] ?? ''
+  )
   const [selectedAgent, setSelectedAgent] = useState(preferred)
+  const [defaultAgentDraft, setDefaultAgentDraft] = useState(storedDefault)
+  const [defaultSaving, setDefaultSaving] = useState(false)
+  const [defaultSaved, setDefaultSaved] = useState(false)
+  const [defaultError, setDefaultError] = useState<string | null>(null)
   const [plan, setPlan] = useState<WorkspaceLaunchPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    setDefaultAgentDraft(storedDefault)
+  }, [storedDefault, wsId])
 
   useEffect(() => {
     if (runtimeIds.includes(selectedAgent)) return
@@ -119,6 +140,20 @@ export function WorkspaceLaunchConfigurationPanel({
     setCopied(true)
   }
 
+  const saveDefaultAgent = async () => {
+    setDefaultSaving(true)
+    setDefaultError(null)
+    try {
+      await onSaveDefaultAgent(defaultAgentDraft || null)
+      setDefaultSaved(true)
+      window.setTimeout(() => setDefaultSaved(false), 1800)
+    } catch (cause) {
+      setDefaultError((cause as Error).message)
+    } finally {
+      setDefaultSaving(false)
+    }
+  }
+
   const resolvedDiffers = plan
     ? !sameCommand(plan.launch.composedCommand, plan.launch.resolvedCommand)
     : false
@@ -131,33 +166,83 @@ export function WorkspaceLaunchConfigurationPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-secondary/50 p-2">
-        {runtimeIds.map((id) => (
-          <button
-            type="button"
-            key={id}
-            onClick={() => setSelectedAgent(id)}
-            className={`oa-pressable shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium ${
-              selectedAgent === id
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            }`}
-          >
-            {RUNTIME_LABELS[id] ?? id}
-          </button>
-        ))}
-      </div>
-
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto max-w-2xl space-y-4">
-          <div>
+          <section>
             <h3 className="text-sm font-semibold text-foreground">
               {t('workspaceSettings.launch.title')}
             </h3>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               {t('workspaceSettings.launch.description')}
             </p>
-          </div>
+            <div className="mt-3 rounded-lg border border-border bg-secondary/30 p-3">
+              <label className="block text-xs font-medium text-foreground" htmlFor="workspace-default-agent">
+                {t('workspaceSettings.launch.defaultRuntime')}
+              </label>
+              <select
+                id="workspace-default-agent"
+                value={defaultAgentDraft}
+                onChange={(event) => {
+                  const next = event.target.value
+                  setDefaultAgentDraft(next)
+                  setDefaultSaved(false)
+                  if (next) setSelectedAgent(next)
+                }}
+                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:border-primary focus:outline-none"
+              >
+                <option value="">
+                  {t('workspaceSettings.launch.inheritRuntime', {
+                    runtime: inheritedDefault ? (RUNTIME_LABELS[inheritedDefault] ?? inheritedDefault) : t('workspaceSettings.launch.automaticRuntime'),
+                  })}
+                </option>
+                {agentIds.map((id) => (
+                  <option key={id} value={id}>{RUNTIME_LABELS[id] ?? id}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground">
+                {t('workspaceSettings.launch.defaultRuntimeHelp')}
+              </p>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="min-h-5 text-[11px]">
+                  {defaultSaved && <span className="text-success">{t('workspaceSettings.launch.defaultSaved')}</span>}
+                  {defaultError && <span className="text-destructive">{defaultError}</span>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void saveDefaultAgent()}
+                  disabled={defaultSaving || defaultAgentDraft === storedDefault}
+                  className="rounded-md bg-primary px-4 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {defaultSaving ? t('common.saving') : t('common.save')}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="border-t border-border pt-4">
+            <h3 className="text-sm font-semibold text-foreground">
+              {t('workspaceSettings.launch.previewTitle')}
+            </h3>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              {t('workspaceSettings.launch.previewDescription')}
+            </p>
+            <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-border bg-secondary/40 p-1.5">
+              {runtimeIds.map((id) => (
+                <button
+                  type="button"
+                  key={id}
+                  onClick={() => setSelectedAgent(id)}
+                  className={`oa-pressable shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium ${
+                    selectedAgent === id
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  {RUNTIME_LABELS[id] ?? id}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {loading && (
             <div className="oa-status-surface rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
@@ -313,7 +398,7 @@ export function WorkspaceLaunchConfigurationPanel({
 
       <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/30 p-3">
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          {t('workspaceSettings.launch.readOnly')}
+          {t('workspaceSettings.launch.previewReadOnly')}
         </p>
         <button
           type="button"
