@@ -1852,12 +1852,23 @@ export const zh: Resources = {
     reconnecting: '正在重新连接 OpenAlice…',
     backendUnavailableEyebrow: '核心服务离线',
     backendUnavailableHeading: 'OpenAlice 已失去后端连接',
+    backendUnavailableRemoteHeading: 'OpenAlice 已断开与 {{target}} 的连接',
     backendUnavailableDescription:
       '这不是某个页面的数据错误。工作区、自动化和交易操作都依赖 OpenAlice 后端，因此在服务恢复响应前，整个应用会暂时停用。',
+    backendUnavailableRemoteDescription:
+      '本地浏览器仍在运行，但 SSH 隧道已经无法访问远端 OpenAlice Runtime。远端工作区、自动化和交易操作现已暂停。',
     backendUnavailableImpact:
       '请保持此窗口打开。连接恢复后，你会自动回到当前页面。',
     backendUnavailableHelp:
       '请检查承载此页面的 OpenAlice 运行时，然后重试。如果是从终端启动的，请确认 pnpm dev 或 openalice up 仍在运行。',
+    backendUnavailableRemoteHelp:
+      '请检查持有此隧道的终端，或重新运行 openalice remote {{target}}，然后重试。',
+    reconnectingRemote: '正在重新连接 {{target}}…',
+    connectionType: '连接方式',
+    sshTunnel: 'SSH 隧道',
+    remoteTarget: '远端目标',
+    localTunnelEndpoint: '本地隧道',
+    remoteRuntimeEndpoint: '远端 Runtime',
     retryNow: '立即重试',
   },
 }

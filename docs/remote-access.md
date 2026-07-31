@@ -266,6 +266,16 @@ state. An explicit `--local-port` wins. If an automatically remembered port is
 already occupied, `remote` reports the conflict, allocates a free loopback port,
 and remembers the replacement only after the tunnel passes OpenAlice readiness.
 
+The browser also needs enough client-owned identity to explain a tunnel outage
+after the remote Runtime becomes unreachable. `openalice ssh` and
+`openalice remote` therefore open the local UI with a short-lived URL fragment
+containing only the validated SSH destination, SSH port, and remote loopback
+Runtime port. The Web UI consumes that fragment into tab-scoped session storage
+before rendering and immediately removes it from the address bar. Fragments are
+not sent in HTTP requests, so this context never becomes remote Runtime state or
+server log data. The global offline screen may use it to distinguish a broken
+SSH route from a local Runtime outage and show the exact endpoints to retry.
+
 ## Server Lifecycle
 
 ```mermaid
