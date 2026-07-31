@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 
 import { useWorkspaces } from '../../contexts/workspaces-context'
-import { Skeleton } from '../StateViews'
+import { RefreshNotice, Skeleton } from '../StateViews'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
 import {
@@ -34,6 +34,7 @@ import {
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog'
 import { SessionRow } from './Sidebar'
+import { SidebarActionMenu } from './SidebarActionMenu'
 import { workspaceDisplayName, workspaceDisplayTitle } from './display'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
 import { useReorderMotion } from './useReorderMotion'
@@ -72,6 +73,7 @@ export function ChatWorkspaceSection({
   const selection = isWsFocus
     ? { wsId: focused.params.wsId, sessionId: focused.params.sessionId ?? null }
     : null
+  const landingOwnsStatus = focused?.kind === landingKind
   const chatWorkspaces = useMemo(
     () => orderWorkspacesForSidebar(
       ctx.workspaces.filter((workspace) => workspace.template === templateName),
@@ -100,7 +102,7 @@ export function ChatWorkspaceSection({
   // so hid the cold-load skeleton (and the New-chat CTA) during the exact 30s
   // window we want to fill, leaving a blank pane. Only bail once templates are
   // known-loaded AND there genuinely is no chat template (broken deployment).
-  if (ctx.templatesLoaded && !chatTemplate) return null
+  if (ctx.templatesLoaded && !chatTemplate && ctx.templatesError === null) return null
 
   return (
     <>
@@ -199,17 +201,21 @@ export function ChatWorkspaceSection({
             <p className="text-[12px] text-muted-foreground/60">
               {mode === 'auto-quant' ? t('autoQuant.noWorkspacesYet') : t('chat.noChatWorkspacesYet')}
             </p>
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <PanelsTopLeft size={13} strokeWidth={2} />
-              <span>{mode === 'auto-quant' ? t('autoQuant.newWorkspace') : t('chat.newWorkspace')}</span>
-            </button>
           </li>
         )}
-        {showListError && <li className="px-3 py-1 text-[11px] text-destructive">{ctx.listError}</li>}
+        {(ctx.listError !== null || ctx.templatesError !== null) && !landingOwnsStatus && (
+          <li className="px-2 py-1">
+            <RefreshNotice
+              message={ctx.listError !== null
+                ? (ctx.hasLoaded
+                    ? t('workspace.dataStale')
+                    : t('workspace.dataUnavailableSidebar'))
+                : t('workspace.templatesUnavailableSidebar')}
+              actionLabel={t('common.retry')}
+              onAction={() => void Promise.all([ctx.refresh(), ctx.refreshTemplates()])}
+            />
+          </li>
+        )}
         {chatWorkspaces.map((w) => (
           <ChatWorkspaceRow
             key={w.id}
@@ -296,7 +302,7 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           type="button"
           onClick={() => setExpanded((current) => !current)}
           disabled={sessions.length === 0}
-          className="oa-icon-action relative ml-1 flex h-8 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30"
+          className="oa-icon-action oa-workspace-row-action relative ml-1 flex h-8 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/55 hover:text-foreground disabled:cursor-default disabled:opacity-30"
           aria-label={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
           title={expanded ? t('chat.collapseSessions') : t('chat.expandSessions')}
         >
@@ -308,6 +314,7 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
           type="button"
           onClick={props.onOpen}
           aria-label={t('workspaceManager.title')}
+          aria-current={props.isFocused && props.activeSessionId === null ? 'page' : undefined}
           className="oa-pressable relative flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-1 pr-3 text-left"
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
@@ -405,7 +412,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             setExpanded((v) => !v)
           }}
-          className="flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-foreground sm:h-5 sm:w-4"
+          className="oa-workspace-row-action flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground/50 hover:text-foreground sm:h-5 sm:w-4"
           aria-label={expanded
             ? t('chat.workspaceActions.collapse', { workspace: actionWorkspace })
             : t('chat.workspaceActions.expand', { workspace: actionWorkspace })}
@@ -422,6 +429,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
         <button
           type="button"
           onClick={props.onOpen}
+          aria-current={isSelected ? 'page' : undefined}
           className="flex-1 min-w-0 flex items-center gap-2 text-left"
         >
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`} aria-hidden="true" />
@@ -450,38 +458,30 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             e.stopPropagation()
             props.onSpawn()
           }}
-          className="oa-icon-action flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-secondary hover:text-foreground sm:h-5 sm:w-5"
+          className="oa-icon-action oa-workspace-row-action flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-secondary hover:text-foreground sm:h-5 sm:w-5"
           title={t('chat.workspaceActions.newConversation', { workspace: actionWorkspace })}
           aria-label={t('chat.workspaceActions.newConversation', { workspace: actionWorkspace })}
         >
           <MessageSquarePlus size={13} strokeWidth={2.1} />
         </button>
-        <span className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              props.onConfigure()
-            }}
-            className="oa-icon-action flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground sm:h-5 sm:w-5"
-            title={t('chat.workspaceActions.configure', { workspace: actionWorkspace })}
-            aria-label={t('chat.workspaceActions.configure', { workspace: actionWorkspace })}
-          >
-            <SettingsIcon size={12} strokeWidth={2} />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              props.onDelete()
-            }}
-            className="oa-icon-action flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:h-5 sm:w-5"
-            title={t('chat.workspaceActions.offboard', { workspace: actionWorkspace })}
-            aria-label={t('chat.workspaceActions.offboard', { workspace: actionWorkspace })}
-          >
-            <X size={12} strokeWidth={2.5} />
-          </button>
-        </span>
+        <SidebarActionMenu
+          label={t('common.moreActions', { target: actionWorkspace })}
+          items={[
+            {
+              label: t('workspace.configure'),
+              ariaLabel: t('chat.workspaceActions.configure', { workspace: actionWorkspace }),
+              icon: <SettingsIcon size={13} strokeWidth={2} />,
+              onSelect: props.onConfigure,
+            },
+            {
+              label: t('chat.deleteWorkspace'),
+              ariaLabel: t('chat.workspaceActions.offboard', { workspace: actionWorkspace }),
+              icon: <X size={13} strokeWidth={2.5} />,
+              onSelect: props.onDelete,
+              danger: true,
+            },
+          ]}
+        />
       </div>
       {expanded && orderedSessions.length > 0 && (
         <div ref={sessionListRef} className="oa-disclosure-enter ml-[18px] border-l border-border/50">

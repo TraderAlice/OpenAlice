@@ -17,21 +17,23 @@ import { Spinner } from '../components/StateViews'
 
 function BackendUnavailableScreen({ retry }: { retry: () => Promise<void> }) {
   const { t } = useTranslation()
-  const retryRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    retryRef.current?.focus()
+    dialogRef.current?.focus({ preventScroll: true })
   }, [])
 
   return (
     <div
+      ref={dialogRef}
       role="alertdialog"
+      tabIndex={-1}
       aria-modal="true"
       aria-labelledby="backend-unavailable-title"
       aria-describedby="backend-unavailable-description"
-      className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center overflow-y-auto bg-background px-5 py-10"
+      className="fixed inset-0 z-[100] flex min-h-dvh items-start justify-start overflow-y-auto bg-background px-5 py-10"
     >
-      <section className="oa-view-enter w-full max-w-[620px]">
+      <section className="oa-view-enter mx-auto my-auto w-full max-w-[620px]">
         <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/[0.08] text-destructive">
           <CloudOff aria-hidden className="h-7 w-7" />
         </div>
@@ -60,7 +62,6 @@ function BackendUnavailableScreen({ retry }: { retry: () => Promise<void> }) {
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
-            ref={retryRef}
             type="button"
             onClick={() => void retry()}
             className="btn-primary oa-pressable inline-flex min-h-10 items-center justify-center gap-2 px-4"
