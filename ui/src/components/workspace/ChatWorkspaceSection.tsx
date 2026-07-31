@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 
 import { useWorkspaces } from '../../contexts/workspaces-context'
-import { Skeleton } from '../StateViews'
+import { RefreshNotice, Skeleton } from '../StateViews'
 import { useWorkspace } from '../../tabs/store'
 import { getFocusedTab } from '../../tabs/types'
 import {
@@ -73,6 +73,7 @@ export function ChatWorkspaceSection({
   const selection = isWsFocus
     ? { wsId: focused.params.wsId, sessionId: focused.params.sessionId ?? null }
     : null
+  const landingOwnsStatus = focused?.kind === landingKind
   const chatWorkspaces = useMemo(
     () => orderWorkspacesForSidebar(
       ctx.workspaces.filter((workspace) => workspace.template === templateName),
@@ -101,7 +102,7 @@ export function ChatWorkspaceSection({
   // so hid the cold-load skeleton (and the New-chat CTA) during the exact 30s
   // window we want to fill, leaving a blank pane. Only bail once templates are
   // known-loaded AND there genuinely is no chat template (broken deployment).
-  if (ctx.templatesLoaded && !chatTemplate) return null
+  if (ctx.templatesLoaded && !chatTemplate && ctx.templatesError === null) return null
 
   return (
     <>
@@ -200,17 +201,21 @@ export function ChatWorkspaceSection({
             <p className="text-[12px] text-muted-foreground/60">
               {mode === 'auto-quant' ? t('autoQuant.noWorkspacesYet') : t('chat.noChatWorkspacesYet')}
             </p>
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <PanelsTopLeft size={13} strokeWidth={2} />
-              <span>{mode === 'auto-quant' ? t('autoQuant.newWorkspace') : t('chat.newWorkspace')}</span>
-            </button>
           </li>
         )}
-        {showListError && <li className="px-3 py-1 text-[11px] text-destructive">{ctx.listError}</li>}
+        {(ctx.listError !== null || ctx.templatesError !== null) && !landingOwnsStatus && (
+          <li className="px-2 py-1">
+            <RefreshNotice
+              message={ctx.listError !== null
+                ? (ctx.hasLoaded
+                    ? t('workspace.dataStale')
+                    : t('workspace.dataUnavailableSidebar'))
+                : t('workspace.templatesUnavailableSidebar')}
+              actionLabel={t('common.retry')}
+              onAction={() => void Promise.all([ctx.refresh(), ctx.refreshTemplates()])}
+            />
+          </li>
+        )}
         {chatWorkspaces.map((w) => (
           <ChatWorkspaceRow
             key={w.id}

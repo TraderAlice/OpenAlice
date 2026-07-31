@@ -76,10 +76,13 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    templatesError: null,
     autoQuantDefaultWorkspaceId: null,
     autoQuantPreferenceLoaded: true,
     autoQuantPreferenceError: null,
     refresh: vi.fn(),
+    refreshTemplates: vi.fn(async () => undefined),
+    refreshAutoQuantPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
@@ -129,5 +132,57 @@ describe('AutoQuant setup', () => {
     await waitFor(() => {
       expect(mocks.setAutoQuantDefaultWorkspace).toHaveBeenCalledWith('aq-existing')
     })
+  })
+
+  it('leaves the loading spinner when the Workspace inventory fails and offers retry', () => {
+    const failed = {
+      ...context([]),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+    }
+    mocks.useWorkspaces.mockReturnValue(failed)
+    render(<AutoQuantSetupPage />)
+
+    expect(screen.queryByLabelText('Loading AutoQuant')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Workspace data is unavailable' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(failed.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('retries the AutoQuant preference without reloading the page', () => {
+    const failed = {
+      ...context([]),
+      autoQuantPreferenceError: 'preference failed: 500',
+    }
+    mocks.useWorkspaces.mockReturnValue(failed)
+    render(<AutoQuantSetupPage />)
+
+    expect(screen.getByRole('heading', { name: 'AutoQuant status is unavailable' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(failed.refreshAutoQuantPreference).toHaveBeenCalledOnce()
+  })
+
+  it('does not offer initialization when the template catalog is unavailable', () => {
+    const failed = {
+      ...context([]),
+      templates: [],
+      templatesError: 'templates failed: 500',
+    }
+    mocks.useWorkspaces.mockReturnValue(failed)
+    render(<AutoQuantSetupPage />)
+
+    expect(screen.getByRole('heading', { name: 'Workspace templates are unavailable' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Initialize AutoQuant' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(failed.refreshTemplates).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the setup heading reachable in a short viewport', () => {
+    mocks.useWorkspaces.mockReturnValue(context([]))
+    render(<AutoQuantSetupPage />)
+
+    expect(screen.getByTestId('autoquant-setup-scroll').className).toContain('items-start')
+    expect(screen.getByTestId('autoquant-setup-scroll').className).toContain('justify-start')
+    expect(screen.getByTestId('autoquant-setup-stack').className).toContain('my-auto')
   })
 })
