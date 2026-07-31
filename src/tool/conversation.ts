@@ -148,7 +148,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
   build(ctx) {
     return tool({
       description: [
-        'Ask a known product Session, an Issue owner, or a fresh worker in one Workspace.',
+        "Ask a known product Session, an Issue's attributable creator, or a fresh worker in one Workspace.",
         '',
         'Use exactly one addressing form: resumeId for an exact Session; issueId (optionally',
         'scoped by wsId) for Issue provenance; or wsId alone to recruit a fresh worker.',
@@ -169,7 +169,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         wsId: z.string().min(1).optional()
           .describe('Workspace for a fresh worker, or optional scope for issueId.'),
         issueId: z.string().min(1).optional()
-          .describe('Issue whose attributable Session should answer. Defaults to the current Workspace.'),
+          .describe("Issue whose attributable creator should answer. Defaults to the current Workspace; use `issue ask --owner` for the declared owner."),
       }),
       execute: async ({
         prompt,
@@ -331,7 +331,8 @@ export const conversationReadFactory: WorkspaceToolFactory = {
       ].join('\n'),
       inputSchema: z.object({
         taskId: z.string().min(1).describe('taskId returned by conversation_ask.'),
-        mode: z.enum(['summary', 'detailed']).optional().default('summary'),
+        mode: z.enum(['summary', 'detailed']).optional().default('summary')
+          .describe('`summary` returns status and assistant text; `detailed` also returns normalized tool, error, and message blocks.'),
       }),
       execute: async ({ taskId, mode }) => {
         if (!ctx.conversation) {

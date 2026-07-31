@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Tool } from 'ai'
+import { resolve } from 'node:path'
 import { inboxReadFactory } from './inbox-read.js'
 import { createMemoryInboxStore, type InboxOrigin } from '../core/inbox-store.js'
 import type { WorkspaceToolContext } from '../core/workspace-tool-center.js'
@@ -20,6 +21,11 @@ async function run(tool: Tool, args: Record<string, unknown>) {
       workspace: string
       comments?: string
       docs: string[]
+      files: Array<{
+        relativePath: string
+        absolutePath: string | null
+        revision?: string
+      }>
       docRevisions?: Record<string, string>
       origin?: InboxOrigin
     }>
@@ -50,6 +56,11 @@ async function seeded(): Promise<WorkspaceToolContext> {
     workspaceLabel: 'Mine',
     inboxStore,
     entityStore: {} as never,
+    resolveWorkspace: (id) => ({
+      id,
+      tag: id === WS ? 'Mine' : 'Theirs',
+      dir: resolve('/workspaces', id),
+    }),
     resolveInboxOrigin: (entry) => entry.origin?.runId === 'run-peer'
       ? { ...entry.origin, resumeId: 'resume-peer' }
       : entry.origin,
@@ -105,6 +116,29 @@ describe('inbox_read', () => {
     const res = await run(inboxReadFactory.build(await seeded()), { self: true })
     expect(res.entries[0].docs).toEqual(['b.md', 'c.md'])
     expect(res.entries[0].docRevisions).toEqual({ 'b.md': 'sha256:bbbb' })
+    expect(res.entries[0].files).toEqual([
+      {
+        relativePath: 'b.md',
+        absolutePath: resolve('/workspaces', WS, 'b.md'),
+        revision: 'sha256:bbbb',
+      },
+      {
+        relativePath: 'c.md',
+        absolutePath: resolve('/workspaces', WS, 'c.md'),
+      },
+    ])
+  })
+
+  it('returns a null absolute path instead of escaping the Workspace root', async () => {
+    const inboxStore = createMemoryInboxStore()
+    await inboxStore.append({ workspaceId: OTHER, docs: [{ path: '../outside.md' }] })
+    const base = await seeded()
+    const res = await run(inboxReadFactory.build({ ...base, inboxStore }), {})
+
+    expect(res.entries[0].files).toEqual([{
+      relativePath: '../outside.md',
+      absolutePath: null,
+    }])
   })
 
   it('`limit` caps the newest-first window and reports hasMore', async () => {

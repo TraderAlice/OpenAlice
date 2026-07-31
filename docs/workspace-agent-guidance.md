@@ -72,10 +72,12 @@ groups. Top-level and group help must explain which namespace owns an action
 before listing verbs. Skills may teach workflows, but an old copied skill must
 be able to recover from current live help.
 
-`alice-workspace peer path` is an addressing primitive only. Once a Workspace
-root is resolved, native Coding Agent file, search, and Git capabilities own
-the read flow. Do not grow a second Workspace file API merely to reproduce
-those capabilities; adapter permission problems belong at the runtime boundary.
+`alice-workspace inbox read` projects each attached document with a directly
+usable absolute path when its source Workspace is available. `peer path` is the
+lower-level addressing primitive for inspecting that desk. In both cases,
+native Coding Agent file, search, and Git capabilities own the read flow. Do
+not grow a second Workspace file API merely to reproduce those capabilities;
+adapter permission problems belong at the runtime boundary.
 
 ## Snapshot and upgrade semantics
 
