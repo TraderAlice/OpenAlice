@@ -337,6 +337,19 @@
     background: var(--background);
     box-shadow: -18px 0 36px -28px color-mix(in srgb, var(--shadow-color) 65%, transparent);
   }
+
+  /* The Files overlay lives inside `.workspace-view`. When the terminal owns
+   * that view's titlebar, leave the titlebar exposed so its Files toggle can
+   * close the overlay again. */
+  .workspace-page-shell.is-terminal-canvas .workspace-side {
+    inset-block-start: 37px;
+  }
+}
+
+@container (max-width: 520px) {
+  .workspace-page-shell .workspace-side {
+    width: 100%;
+  }
 }
 
 /* Both side panels hidden (or auto-hidden on mobile) — collapse the
