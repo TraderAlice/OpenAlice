@@ -724,6 +724,7 @@ export const ja: Resources = {
     openPanel: '{{title}}を開く',
     closePanel: '{{title}}を閉じる',
     focusContent: 'コンテンツに集中',
+    moreActions: '{{target}}のその他の操作',
   },
   chat: {
     newChat: '新しいチャット',
@@ -1715,6 +1716,7 @@ export const ja: Resources = {
     resumeSession: '「{{title}}」を再開',
     stopSession: '「{{title}}」を停止',
     deleteSession: '「{{title}}」を削除',
+    deleteSessionAction: 'セッションを削除',
     notFound: 'ワークスペースが見つかりません。削除された可能性があります。',
     newSession: '新しいセッション',
     newSessionTitle: 'このワークスペースで新しいセッションを開始（⌘T）',

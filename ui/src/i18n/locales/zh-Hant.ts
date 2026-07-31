@@ -731,6 +731,7 @@ export const zhHant: Resources = {
     openPanel: '開啟{{title}}',
     closePanel: '關閉{{title}}',
     focusContent: '聚焦內容區',
+    moreActions: '{{target}}的更多操作',
   },
   chat: {
     newChat: '新對話',
@@ -1722,6 +1723,7 @@ export const zhHant: Resources = {
     resumeSession: '繼續「{{title}}」',
     stopSession: '暫停「{{title}}」',
     deleteSession: '刪除「{{title}}」',
+    deleteSessionAction: '刪除工作階段',
     notFound: '找不到工作區，它可能已被刪除。',
     newSession: '新工作階段',
     newSessionTitle: '在此工作區新增工作階段（⌘T）',

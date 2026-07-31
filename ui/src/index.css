@@ -273,6 +273,15 @@ body {
   min-width: 2.25rem;
 }
 
+/* Workspace tree controls stay compact for a fine pointer, but touch-capable
+   desktop/tablet layouts must not collapse them back into 20px hit targets. */
+@media (hover: none), (pointer: coarse) {
+  .oa-workspace-row-action {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+  }
+}
+
 .oa-page-sidebar-dialog :is(
   input:not([type="checkbox"]):not([type="radio"]),
   select

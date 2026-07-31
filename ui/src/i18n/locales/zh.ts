@@ -723,6 +723,7 @@ export const zh: Resources = {
     openPanel: '打开{{title}}',
     closePanel: '关闭{{title}}',
     focusContent: '聚焦内容区',
+    moreActions: '{{target}}的更多操作',
   },
   chat: {
     newChat: '新对话',
@@ -1714,6 +1715,7 @@ export const zh: Resources = {
     resumeSession: '继续“{{title}}”',
     stopSession: '暂停“{{title}}”',
     deleteSession: '删除“{{title}}”',
+    deleteSessionAction: '删除会话',
     notFound: '未找到工作区，它可能已被删除。',
     newSession: '新会话',
     newSessionTitle: '在此工作区中新建会话（⌘T）',
