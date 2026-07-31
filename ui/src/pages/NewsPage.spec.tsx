@@ -180,7 +180,7 @@ describe('NewsPage article disclosures', () => {
     mocks.list.mockResolvedValue({
       items: [
         {
-          time: '2026-07-28T09:00:00.000Z',
+          time: '2020-07-28T09:00:00.000Z',
           title: 'Older day',
           content: '',
           source: 'Reuters',
@@ -188,7 +188,7 @@ describe('NewsPage article disclosures', () => {
           categories: null,
         },
         {
-          time: '2026-07-29T08:00:00.000Z',
+          time: '2020-07-29T08:00:00.000Z',
           title: 'Newer day second',
           content: '',
           source: 'Reuters',
@@ -196,7 +196,7 @@ describe('NewsPage article disclosures', () => {
           categories: null,
         },
         {
-          time: '2026-07-29T10:00:00.000Z',
+          time: '2020-07-29T10:00:00.000Z',
           title: 'Newer day first',
           content: '',
           source: 'Reuters',
@@ -218,6 +218,13 @@ describe('NewsPage article disclosures', () => {
     expect(second.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(first.closest('[data-news-day]')).toBe(second.closest('[data-news-day]'))
     expect(second.closest('[data-news-day]')).not.toBe(older.closest('[data-news-day]'))
+    const newestDay = new Intl.DateTimeFormat('en', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(new Date('2020-07-29T10:00:00.000Z'))
+    expect(screen.getByRole('heading', { name: newestDay })).toBeTruthy()
   })
 })
 

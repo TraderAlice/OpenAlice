@@ -34,15 +34,15 @@ function localDayKey(date: Date): string {
   ].join('-')
 }
 
-function articleDayLabel(date: Date): string {
+function articleDayLabel(date: Date, locale: string): string {
   const today = new Date()
   const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
   const dayDistance = Math.round((targetDay - todayStart) / 86_400_000)
   if (dayDistance >= -1 && dayDistance <= 1) {
-    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(dayDistance, 'day')
+    return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(dayDistance, 'day')
   }
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(locale, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -50,7 +50,7 @@ function articleDayLabel(date: Date): string {
   }).format(date)
 }
 
-function groupArticlesByDay(articles: NewsArticle[]): ArticleGroup[] {
+function groupArticlesByDay(articles: NewsArticle[], locale: string): ArticleGroup[] {
   const groups = new Map<string, ArticleGroup>()
   for (const article of articles) {
     const date = new Date(article.time)
@@ -58,7 +58,7 @@ function groupArticlesByDay(articles: NewsArticle[]): ArticleGroup[] {
     const key = valid ? localDayKey(date) : article.time
     const group = groups.get(key) ?? {
       key,
-      label: valid ? articleDayLabel(date) : article.time,
+      label: valid ? articleDayLabel(date, locale) : article.time,
       articles: [],
     }
     group.articles.push(article)
@@ -163,7 +163,7 @@ function ArticleRow({ article }: { article: NewsArticle }) {
 // ==================== Page ====================
 
 export function NewsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [articles, setArticles] = useState<NewsArticle[]>([])
   const [lookback, setLookback] = useState('24h')
   const [sourceFilter, setSourceFilter] = useState('')
@@ -178,7 +178,11 @@ export function NewsPage() {
     ),
     [articles],
   )
-  const articleGroups = useMemo(() => groupArticlesByDay(orderedArticles), [orderedArticles])
+  const locale = i18n.resolvedLanguage ?? i18n.language
+  const articleGroups = useMemo(
+    () => groupArticlesByDay(orderedArticles, locale),
+    [locale, orderedArticles],
+  )
 
   const fetchArticles = useCallback(async (
     lb: string,
