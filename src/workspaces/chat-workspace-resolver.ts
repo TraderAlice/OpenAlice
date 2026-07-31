@@ -100,7 +100,6 @@ export class TemplateWorkspaceResolver {
         : await this.deps.creator.create(
             this.starterTag(),
             this.templateName,
-            undefined,
             sourceVersion,
           );
     } catch (error) {

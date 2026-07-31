@@ -24,12 +24,6 @@ export interface WorkspaceMeta {
    * missing this field — treat as unknown rather than back-filling.
    */
   readonly spawnedFromVersion?: string;
-  /**
-   * Adapter ids enabled in this workspace. Order is significant: the first
-   * entry is the default for one-click spawns. Legacy rows (missing this
-   * field) are normalized to `['claude']` at load time.
-   */
-  readonly agents: readonly string[];
 }
 
 interface FileShape {
@@ -153,15 +147,11 @@ function validateFile(value: unknown): WorkspaceMeta[] {
     ) {
       throw new Error(`workspaces.json: entry ${i} has wrong shape`);
     }
-    const agents = Array.isArray(e['agents'])
-      ? (e['agents'].filter((a): a is string => typeof a === 'string') as string[])
-      : ['claude']; // legacy migration
     const base: WorkspaceMeta = {
       id: e['id'],
       tag: e['tag'],
       dir: e['dir'],
       createdAt: e['createdAt'],
-      agents: agents.length > 0 ? agents : ['claude'],
     };
     let withTemplate: WorkspaceMeta = typeof e['template'] === 'string'
       ? { ...base, template: e['template'] }

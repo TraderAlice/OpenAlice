@@ -36,8 +36,7 @@ function humanize(name: string): string {
 
 interface Props {
   template: TemplateInfo
-  /** All registered agents — every workspace enables all of them, so the card
-   *  shows the full set (not a per-template subset). */
+  /** All registered agents; eligibility is installation-wide. */
   agents: readonly AgentInfo[]
   onOpen: () => void
 }

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { migrateWorkspaceDepartureCatalog } from './0021_workspace_departure_catalog/index.js'
+import { migrateWorkspaceDepartureCatalog, migration } from './0021_workspace_departure_catalog/index.js'
 
 let root: string
 
@@ -77,5 +77,20 @@ describe('0021 Workspace departure catalog', () => {
     expect(existsSync(join(root, 'workspaces', 'chat-second-orphan'))).toBe(true)
     expect(existsSync(join(root, 'departed-workspaces', 'chat-orphan'))).toBe(true)
     expect(existsSync(join(root, 'departed-workspaces', 'chat-second-orphan'))).toBe(false)
+  })
+
+  it('derives the launcher root from the migration context', async () => {
+    const instance = join(root, 'isolated-instance')
+    const configDir = join(instance, 'data', 'config')
+    await mkdir(configDir, { recursive: true })
+
+    await migration.up({
+      configDir: () => configDir,
+      readJson: async () => undefined,
+      writeJson: async () => undefined,
+      removeJson: async () => undefined,
+    })
+
+    expect(existsSync(join(instance, 'workspaces', 'state', 'workspace-catalog.json'))).toBe(true)
   })
 })

@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,7 +14,7 @@ vi.mock('./api', () => ({
 }))
 
 import { AuthProvider, BACKEND_HEALTH_POLL_MS, useAuth } from './AuthContext'
-import { AuthGate } from './AuthGate'
+import { AuthGate, BackendUnavailableScreen } from './AuthGate'
 import { BACKEND_PROBE_REQUESTED_EVENT } from './backendConnectivity'
 
 function WorkspaceHarness() {
@@ -39,6 +41,29 @@ afterEach(() => {
 })
 
 describe('AuthProvider backend recovery', () => {
+  it('shows the exact SSH route when a remote Runtime is unavailable', () => {
+    render(
+      <BackendUnavailableScreen
+        retry={vi.fn(async () => undefined)}
+        connection={{
+          kind: 'remote',
+          target: 'alice@example.com',
+          sshPort: 2222,
+          runtimePort: 47331,
+          localEndpoint: '127.0.0.1:40123',
+        }}
+      />,
+    )
+
+    expect(screen.getByRole('alertdialog', {
+      name: 'OpenAlice lost its connection to alice@example.com:2222',
+    })).toBeTruthy()
+    expect(screen.getByText('SSH tunnel')).toBeTruthy()
+    expect(screen.getByText('127.0.0.1:40123')).toBeTruthy()
+    expect(screen.getByText('127.0.0.1:47331')).toBeTruthy()
+    expect(screen.getAllByText('alice@example.com:2222').length).toBeGreaterThan(0)
+  })
+
   it('does not manufacture a login screen during a cold-start outage', async () => {
     vi.useFakeTimers()
     mocks.getStatus
@@ -52,8 +77,10 @@ describe('AuthProvider backend recovery', () => {
     )
     await flushEffects()
 
-    expect(screen.getByRole('alertdialog')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Retry now' })).toBe(document.activeElement)
+    const recoveryDialog = screen.getByRole('alertdialog')
+    expect(recoveryDialog).toBeTruthy()
+    expect(recoveryDialog).toBe(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Retry now' })).toBeTruthy()
     expect(screen.queryByText('workspace-app')).toBeNull()
     expect(document.querySelector('input[type="password"]')).toBeNull()
 

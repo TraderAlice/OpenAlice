@@ -63,17 +63,18 @@ when no owner exists. Ordinary start never signals another owner. `--takeover`
 delegates replacement to Guardian's established discover, TERM, grace, KILL,
 wait, then acquire ordering.
 
-The current Runtime provider remains source-backed. `up` and `run` therefore
-accept the checkout, preparation, rebuild, home, port, wait, and takeover
-options documented in [[docs/local-runtime.md]]. `up` is browserless by default;
-`--open` performs a separate verified browser open after readiness.
+Stable installs use the verified bundle provider. `up` and `run` remain
+browserless lifecycle commands and accept home, port, wait, and takeover
+options; `--app-dir` is an advanced source override with the preparation and
+rebuild options documented in [[docs/local-runtime.md]]. `--open` performs a
+separate verified browser open after readiness.
 
 ## Default and Compatibility Surface
 
 - bare `openalice` enters the local Supervisor TUI;
 - `openalice tui` is the explicit equivalent for tests and scripts;
-- `openalice start` retains the existing foreground, browser-oriented source
-  launcher;
+- `openalice start` retains the existing foreground, browser-oriented
+  compatibility launcher and also selects the installed bundle by default;
 - `openalice server run|start|status|stop` remains available for managed remote
   and existing scripts;
 - new code uses `run|up|status|down`;
@@ -85,20 +86,26 @@ separate daemons.
 
 The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 `Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
-explicit commands:
+explicit commands. Its ordinary path is intentionally parameter-free:
 
-- `s` starts the persistent Runtime when stopped;
+- Enter starts the persistent Runtime and opens the verified Web endpoint when
+  stopped, or opens the endpoint when already running;
+- `s` starts the persistent Runtime in the background without opening a
+  browser;
 - `o` opens an advertised, verified Web endpoint;
 - `x` stops and `r` restarts only a `cli-server` owner, after an impact
   confirmation;
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
 - `u` performs an advisory product-update check;
-- `p` opens selected-instance settings for complete home, Web port, update
-  checks, and resolved source/config provenance;
-- `m` confirms, prepares, remembers, and starts an installer-managed source
+- `i` lists the implicit default plus registered instances, selects one without
+  stopping another instance, or creates a separate named complete home;
+- `p` opens Setup for data home, browser port, update checks, and resolved
+  Runtime/config provenance. Setup can edit either the selected instance or
+  machine defaults inherited by instances;
+- `m` is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
-- `c` chooses and remembers the selected instance's source checkout;
+- `c` is an advanced control that chooses and remembers the selected instance's source checkout;
 - `?`, Tab, and the horizontal arrows expose help and detail panels.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
@@ -106,14 +113,20 @@ otherwise foreign owners. Its stop/restart confirmation states that active Web
 and agent sessions will disconnect. Detaching never implies stopping. Update
 discovery runs in the background and cannot block lifecycle controls.
 
-The current Runtime provider is still source-backed. TUI start discovers an
-OpenAlice checkout from the current directory, reuses a configured or
-owner-advertised source root, opens the `c` path editor when discovery fails,
-or explicitly prepares an installer-owned checkout through `m`. The managed
-path is `<install root>/sources/<install-source identity>/OpenAlice`; a branch
-install clones that branch and a version install checks out its immutable ref.
-Unfinished controls remain inside the application shell and do not change the
-default entry back to the compatibility launcher.
+The installed Runtime is the default provider below stored configuration and
+above cwd discovery. TUI start therefore works from any directory and shows a
+small ordinary action bar. A configured instance source,
+`OPENALICE_APP_HOME`, or `--app-dir` overrides the bundle; `m` and `c` remain
+advanced source controls. The managed source path is
+`<install root>/sources/<install-source identity>/OpenAlice`.
+
+For an older or development install without a bundled Runtime, Enter still
+owns the ordinary path. If current-directory source discovery fails, it reads
+the installed branch/version provenance and opens the same managed-source
+confirmation as `m`; accepting prepares and remembers that source, starts
+OpenAlice, and opens the browser. `c` remains the explicit manual-checkout
+path. A source-run CLI with no installed provenance falls back to the source
+path editor instead of pretending it can manage an install root.
 
 ## TUI Launch Context
 
@@ -129,54 +142,94 @@ raw mode. Bare `openalice` and `openalice tui` accept:
 --update-check
 ```
 
-Resolution order is defaults, machine Supervisor configuration, selected
-instance configuration, environment, then explicit CLI flags. The immutable
+Resolution order is defaults, installed Runtime, machine Supervisor
+configuration, selected instance configuration, environment, then explicit CLI
+flags. The immutable
 resolver retains field provenance for every layer. Before terminal raw mode,
 the Supervisor reads a versioned machine-local document at
 `<Supervisor root>/config.json`. It contains machine defaults and an instance
 map outside every selectable complete home.
 
-The `p` settings overlay atomically edits the selected instance's complete
-home, Web port, and update-check policy. A blank Home or port and the
-`Inherit` update value remove the instance override, exposing the resolved
-machine/default value immediately. Home and port remain read-only while the
-selected Runtime is active. Any value supplied by an environment variable or
-explicit CLI flag is shown with its resolved value and a locked provenance
-message; the TUI never writes a lower-priority value that appears to override
-it.
+The `p` Setup overlay atomically edits the selected instance's data home,
+browser port, and update-check policy. Its first row switches between `This
+instance` and `Machine defaults`. A blank Home or port and the `Inherit` update
+value remove that layer's override, exposing the next lower-priority value
+immediately. Named instances must retain an explicit, separate complete home;
+only the implicit `default` may inherit its Home. Home and port remain
+read-only while the selected Runtime is active when the edited layer affects
+that Runtime. A machine default may still be changed while a higher instance,
+environment, or flag layer shields the running instance.
+
+Any selected-instance value supplied by an environment variable or explicit
+CLI flag is shown with its resolved value and a locked provenance message; the
+TUI never writes a lower-priority instance value that appears to override it.
+Machine-default editing remains available because it intentionally changes the
+lower layer for future or inheriting launches. The overview reports the
+resolved field provenance, and Setup identifies the installed Runtime by the
+single OpenAlice product version plus diagnostic content identity rather than
+presenting its filesystem path as a second product concept.
+
+The `i` instance overlay reads the same atomic registry, always shows the
+implicit `default`, and adds every configured named instance. Selecting one
+switches the live Supervisor view and records it as the next bare-start
+default; it does not stop, move, copy, or delete another instance. Creating an
+instance collects a validated lowercase name and separate complete home
+inside the TUI, rejects equal or nested registered homes, and selects the new
+entry atomically. An existing target must be empty or recognizable as an
+OpenAlice complete home; an unrelated non-empty directory is rejected. A new
+target is created and canonicalized when registered, so a later missing
+registered Home is never silently recreated. A bare TUI launch falls back to
+the first available instance, keeps the unavailable registry entry intact,
+and shows a persistent notice directing the user to `i Instances`; selecting
+the displayed fallback repairs the remembered default. An explicit
+environment/flag selection still fails instead of falling back because
+automation must never run against a different Home. The suggested Home is a
+sibling such as
+`~/.openalice-research` and remains editable before creation. A session whose
+instance or complete home came from `OPENALICE_INSTANCE`,
+`OPENALICE_HOME`, `--instance`, or `--home` shows the registry read-only
+instead of pretending that a lower-priority selection can win.
 
 The `c` editor validates an OpenAlice checkout, atomically saves it as the
 selected instance's `appDir`, and starts the Runtime. If
 `OPENALICE_APP_HOME` or `--app-dir` supplied the source, the TUI reports that
-higher-priority override instead of overwriting it. Machine-default editing,
-`openalice config check`, live reload with last-known-good retention, and
-named-instance management remain later increments.
+higher-priority override instead of overwriting it. `openalice config check`,
+live reload with last-known-good retention, registry-entry removal, and full
+component/instance dashboards remain later increments.
 
 `OPENALICE_INSTANCE`, `OPENALICE_HOME`, `OPENALICE_WEB_PORT`,
 `OPENALICE_APP_HOME`, and `OPENALICE_NO_UPDATE_CHECK` are the corresponding
 environment overrides. `OPENALICE_SUPERVISOR_HOME` may relocate the
 machine-wide Supervisor root, which remains outside every selectable complete
-home.
+home. Installer launchers supply the lower-priority internal pair
+`OPENALICE_MANAGED_RUNTIME_PATH` and
+`OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY`; ordinary users do not need to set
+them.
 
 Only an installer-owned Runtime carrying `OPENALICE_MANAGED_PI_PATH` receives
 instance-private `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`
 values. Source development and an external Pi retain their native user
 configuration and session roots.
 
-The same resolver selects homes for `up`, `run`, `down`, `status`, `open`,
-`logs`, and `doctor`; those commands also accept `--instance <name>`.
+The same stored resolver selects homes for `up`, `run`, `down`, `status`,
+`open`, `logs`, and `doctor`; those commands also accept
+`--instance <name>` and load a Home registered through the TUI.
 Consequently a Runtime started through the TUI and one started by
-`openalice up` receive the same managed-Pi environment. The transitional
-presenters still own their existing command-specific port, source, timeout,
-and output parsing until the root parser conversion is complete.
+`openalice up` receive the same managed-Pi environment, source, Web-port
+policy, and update-check setting unless an explicit command option overrides
+them. The transitional `start` and `server` compatibility presenters still
+own their legacy option parsing and output until the root parser conversion is
+complete.
 
-The selected Web port is explicit for the source-backed built Guardian.
-Unconfigured MCP/local-tool, UTA, and Connector ports retain their independent
-probe-upward behavior, so another complete home or the desktop app can occupy
-the historical internal defaults without breaking this CLI Runtime. Explicit
-internal environment or `data/config/ports.json` values still fail visibly on
-collision. Stop and restart wait for Guardian plus Alice ownership evidence to
-clear, not merely for the control socket to disappear.
+An inherited default Web port remains automatic for the source-backed built
+Guardian: it probes upward from 47331 together with unconfigured
+MCP/local-tool, UTA, and Connector ports. Consequently multiple complete homes
+or the desktop app may occupy historical defaults without breaking a CLI
+Runtime. A machine/instance setting, environment value, or explicit flag pins
+the Web port and fails visibly on collision, as do explicit internal
+environment or `data/config/ports.json` values. Stop and restart wait for
+Guardian plus Alice ownership evidence to clear, not merely for the control
+socket to disappear.
 
 ## Presentation-neutral Core
 

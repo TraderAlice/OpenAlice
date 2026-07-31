@@ -45,7 +45,6 @@ const chatWorkspace: Workspace = {
   dir: '/tmp/chat-jul11',
   createdAt: '2026-07-11T00:00:00.000Z',
   template: 'chat',
-  agents: ['pi'],
   sessions: [],
 }
 
@@ -82,10 +81,13 @@ function workspaceContext(
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    templatesError: null,
     autoQuantDefaultWorkspaceId: null,
     autoQuantPreferenceLoaded: true,
     autoQuantPreferenceError: null,
     refresh: vi.fn(),
+    refreshTemplates: vi.fn(async () => undefined),
+    refreshAutoQuantPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
@@ -134,7 +136,7 @@ describe('ChatWorkspaceSection actions', () => {
     const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
     const newSession = screen.getByRole('button', { name: 'New conversation in chat-jul11' })
-    const configureWorkspace = screen.getByRole('button', { name: 'Configure chat-jul11' })
+    const moreWorkspaceActions = screen.getByRole('button', { name: 'More actions for chat-jul11' })
 
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
@@ -145,7 +147,8 @@ describe('ChatWorkspaceSection actions', () => {
     expect(newWorkspace.querySelector('.lucide-panels-top-left')).toBeTruthy()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
-    fireEvent.click(configureWorkspace)
+    fireEvent.click(moreWorkspaceActions)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
     expect(onNavigate).not.toHaveBeenCalled()
 
     fireEvent.click(newChat)
@@ -186,29 +189,74 @@ describe('ChatWorkspaceSection actions', () => {
     const newConversation = screen.getByRole('button', {
       name: 'New conversation in Optical Networking Follow-up (chat-jun30)',
     })
-    const configure = screen.getByRole('button', {
+    const more = screen.getByRole('button', {
+      name: 'More actions for Optical Networking Follow-up (chat-jun30)',
+    })
+    fireEvent.click(more)
+    const configure = screen.getByRole('menuitem', {
       name: 'Configure Optical Networking Follow-up (chat-jun30)',
     })
-    expect(screen.getByRole('button', {
+    expect(screen.getByRole('menuitem', {
       name: 'Offboard Optical Networking Follow-up (chat-jun30)',
     })).toBeTruthy()
     expect(collapse.className).toContain('h-7')
     expect(newConversation.className).toContain('h-7')
-    expect(configure.className).toContain('h-7')
-    expect(configure.parentElement?.className).toContain('opacity-100')
-    expect(configure.parentElement?.className).toContain('sm:opacity-0')
-    expect(configure.parentElement?.className).toContain('sm:focus-within:opacity-100')
+    expect(more.className).toContain('oa-workspace-row-action')
+    expect(more.className).not.toContain('opacity-0')
+    expect(configure.textContent).toContain('Configure')
 
     expect(screen.queryByRole('button', { name: 'New conversation in this workspace' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Configure this workspace' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Offboard workspace' })).toBeNull()
   })
 
-  it('keeps an explicit workspace action in the empty state', () => {
+  it('keeps one explicit workspace action in the empty state', () => {
     renderSection([])
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(1)
+  })
+
+  it('reports a failed Workspace inventory without pretending the list is empty', () => {
+    const retry = vi.fn(async () => undefined)
+    const failed = {
+      ...workspaceContext([]),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+      refresh: retry,
+    }
+
+    render(
+      <WorkspacesContext.Provider value={failed}>
+        <ChatWorkspaceSection />
+      </WorkspacesContext.Provider>,
+    )
+
+    expect(screen.queryByText(i18n.t('chat.noChatWorkspacesYet'))).toBeNull()
+    expect(screen.getByText(i18n.t('workspace.dataUnavailableSidebar'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the Chat section visible when the template catalog fails', () => {
+    const retryTemplates = vi.fn(async () => undefined)
+    const failed = {
+      ...workspaceContext([chatWorkspace]),
+      templates: [],
+      templatesError: 'templates failed: 500',
+      refreshTemplates: retryTemplates,
+    }
+
+    render(
+      <WorkspacesContext.Provider value={failed}>
+        <ChatWorkspaceSection />
+      </WorkspacesContext.Provider>,
+    )
+
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
+    expect(screen.getByText(i18n.t('workspace.templatesUnavailableSidebar'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
   it('bounds expanded Workspace history and routes the full catalog to the Session library', () => {
@@ -295,7 +343,8 @@ describe('ChatWorkspaceSection actions', () => {
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'Delete Coordinate owners' }))
+    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' }))
+    fireEvent.click(within(pausedRow as HTMLElement).getByRole('menuitem', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
     expect(onNavigate).toHaveBeenCalledTimes(2)
 

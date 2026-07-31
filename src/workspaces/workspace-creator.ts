@@ -61,8 +61,7 @@ export type CreateResult =
         | 'bootstrap_failed'
         | 'injection_failed'
         | 'unknown_template'
-        | 'unknown_source_version'
-        | 'unknown_agent';
+        | 'unknown_source_version';
       readonly message: string;
       readonly stderr?: string;
       readonly exitCode?: number;
@@ -72,28 +71,22 @@ const TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/;
 export const MIN_WORKSPACE_FREE_BYTES = 64 * 1024 * 1024;
 
 /**
- * Resolve the adapter set a new workspace is created with. This is the single
- * home of the agent policy, so every create path — the form, quick-chat,
- * headless — converges on it:
- *
- * - An explicit `agentsRequested` (a caller pinning a subset) wins verbatim.
- * - Otherwise a workspace gets EVERY registered adapter enabled; restricting
- *   it was a create-time decision with no first-action basis. The template's
- *   `defaultAgents` is honored as an ordering hint for agent runtimes, while
- *   utility adapters such as `shell` are kept at the tail so they never become
- *   an implicit workload.
- *
- * This used to live in the frontend create hook alone, which silently left
- * backend-only callers (quick-chat) on the bare-`defaultAgents` set.
+ * Order the live adapter registry for transient Workspace preparation.
+ * Templates may put preferred runtimes first, but this order is never
+ * persisted as a Workspace capability boundary.
  */
-export function resolveCreateAgents(
-  agentsRequested: readonly string[] | undefined,
+export function orderCreateAdapters(
   templateDefaultAgents: readonly string[],
   allAdapterIds: readonly string[],
 ): readonly string[] {
-  if (agentsRequested && agentsRequested.length > 0) return agentsRequested;
   const utility = new Set(['shell']);
-  const ordered = [...new Set([...templateDefaultAgents, ...allAdapterIds])];
+  const registered = new Set(allAdapterIds);
+  const ordered = [
+    ...new Set([
+      ...templateDefaultAgents.filter((id) => registered.has(id)),
+      ...allAdapterIds,
+    ]),
+  ];
   return [
     ...ordered.filter((id) => !utility.has(id)),
     ...ordered.filter((id) => utility.has(id)),
@@ -124,7 +117,6 @@ export class WorkspaceCreator {
   async create(
     tag: string,
     templateName: string,
-    agentsRequested?: readonly string[],
     sourceVersion?: string,
   ): Promise<CreateResult> {
     if (!TAG_RE.test(tag)) {
@@ -159,24 +151,10 @@ export class WorkspaceCreator {
       };
     }
 
-    // Agent policy lives in `resolveCreateAgents` (this file) so every create
-    // path — form, quick-chat, headless — converges on it.
-    const agents = resolveCreateAgents(
-      agentsRequested,
+    const adapters = orderCreateAdapters(
       template.defaultAgents,
       this.opts.adapterRegistry.list().map((a) => a.id),
     );
-
-    // Validate every requested adapter exists in the registry.
-    for (const a of agents) {
-      if (!this.opts.adapterRegistry.get(a)) {
-        return {
-          ok: false,
-          code: 'unknown_agent',
-          message: `unknown agent: ${a}`,
-        };
-      }
-    }
 
     const storage = await inspectWorkspaceStorage(this.opts.workspacesRoot);
     if (!storage.ok) return insufficientStorageResult(storage.availableBytes);
@@ -194,7 +172,7 @@ export class WorkspaceCreator {
       id,
       dir,
       template: templateName,
-      agents,
+      adapters,
       ...(templateSource ? { sourceVersion: templateSource.version } : {}),
     });
 
@@ -247,8 +225,10 @@ export class WorkspaceCreator {
     }
 
     // Launcher-owned context injection (MCP / persona / skills, gated by the
-    // template manifest), then the initial commit. The launcher — not the
-    // bootstrap script — owns what lands in the workspace's first commit.
+    // template manifest), then the launcher commit. The launcher — not the
+    // bootstrap script — owns what lands in that commit. Snapshot templates
+    // make it the root commit; source-backed templates may append it to their
+    // retained upstream history.
     try {
       await injectWorkspaceContext({ template, wsId: id, dir });
     } catch (err) {
@@ -276,8 +256,8 @@ export class WorkspaceCreator {
 
     // Run the same per-runtime preparation hook used before later process
     // launches. Hooks are idempotent. A single adapter failure does not fail
-    // Workspace creation; another enabled runtime can still be used.
-    for (const a of agents) {
+    // Workspace creation; another registered runtime can still be used.
+    for (const a of adapters) {
       const adapter = this.opts.adapterRegistry.get(a);
       if (!adapter) continue;
       try {
@@ -298,7 +278,7 @@ export class WorkspaceCreator {
     // with any template-declared `agentCredentials` — the template wins per agent
     // (explicit per-template intent), though in practice no in-repo template
     // declares them, so the user defaults are the effective source. Best-effort:
-    // a miss (disabled agent, dangling slug, incompatible wire) warns + skips,
+    // a miss (dangling slug or incompatible wire) warns + skips,
     // the workspace stays usable.
     try {
       const userDefaults = await readWorkspaceCredentialDefaults();
@@ -310,7 +290,6 @@ export class WorkspaceCreator {
         const credentials = await readCredentials();
         await injectWorkspaceCredentials({
           dir,
-          agents,
           agentCredentials: effective,
           adapterRegistry: this.opts.adapterRegistry,
           credentials,
@@ -328,7 +307,6 @@ export class WorkspaceCreator {
       createdAt: new Date().toISOString(),
       template: templateName,
       spawnedFromVersion: template.version,
-      agents,
     };
     try {
       // The first commit is the exact Base for every future Template Upgrade.
@@ -438,11 +416,12 @@ function insufficientStorageResult(availableBytes: number | null = null): Create
 }
 
 /**
- * The launcher's initial commit — uniform across templates (the "Harness rule":
- * every workspace is a fresh-git repo with a clean initial commit, no inherited
- * history, no pushable remote). Replaces the old per-template `commit_initial`
- * bash helper, byte-identical in message + author. The bootstrap script has
- * already run `git init` and set excludes; we just stage and commit.
+ * The launcher's workspace commit, uniform across templates. Snapshot templates
+ * initialize a fresh repository, while source-backed templates may retain an
+ * upstream repository and append this commit to it. Replaces the old
+ * per-template `commit_initial` bash helper, byte-identical in message + author.
+ * The bootstrap script has already prepared Git and its excludes; we just stage
+ * and commit.
  */
 export async function commitInitial(dir: string, message: string): Promise<void> {
   await runGit(dir, ['add', '.']);

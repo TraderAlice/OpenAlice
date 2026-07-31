@@ -187,7 +187,6 @@ export interface WorkspaceToolContext {
     id: string
     tag: string
     template?: string
-    agents: readonly string[]
     createdAt: string
     sessions: {
       total: number

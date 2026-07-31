@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
 import {
@@ -30,6 +30,7 @@ import { useIssues } from '../hooks/useIssues'
 import { useWorkspace } from '../tabs/store'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
+import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import type { InboxEntry, InboxDoc } from '../api/inbox'
 
 interface InboxPageProps {
@@ -225,7 +226,10 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   const { workspaces } = workspacesCtx
   const aliveWorkspace = workspaces.find((w) => w.id === entry.workspaceId) ?? null
   const wsAlive = aliveWorkspace !== null
-  const displayLabel = aliveWorkspace?.tag ?? entry.workspaceLabel ?? entry.workspaceId
+  const displayLabel = aliveWorkspace
+    ? workspaceDisplayName(aliveWorkspace)
+    : entry.workspaceLabel ?? entry.workspaceId
+  const displayTitle = aliveWorkspace ? workspaceDisplayTitle(aliveWorkspace) : displayLabel
 
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
@@ -238,6 +242,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   const issueId = origin?.issueId
   const senderSignature = origin?.resumeId ? `@${origin.resumeId}` : null
   const senderLabel = [origin?.agent, senderSignature].filter(Boolean).join(' · ') || null
+  const senderDisplay = origin?.agent ?? (senderSignature ? t('inbox.senderSession') : null)
   // Interactive provenance — the human-attended session this push came from
   // (server-stamped from AQ_SESSION_ID, validated against the session registry).
   // Navigable: opens/focuses that exact session tab.
@@ -249,6 +254,9 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   const hasSenderIdentity = !!(origin?.resumeId || origin?.runId || origin?.sessionId)
   const [continuing, setContinuing] = useState(false)
   const [continueError, setContinueError] = useState<string | null>(null)
+  const [senderPopoverOpen, setSenderPopoverOpen] = useState(false)
+  const senderPopoverRef = useRef<HTMLSpanElement>(null)
+  const senderTriggerRef = useRef<HTMLButtonElement>(null)
   // Resolve the issue id (a filename stem) to its display title via the warm,
   // process-cached board snapshot — a cheap path (no extra fetch on the hot
   // line). Falls back to the stem when the board hasn't resolved it.
@@ -258,6 +266,31 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     const ws = issueBoard?.workspaces.find((w) => w.wsId === entry.workspaceId)
     return ws?.issues.find((i) => i.id === issueId)?.title ?? null
   }, [issueBoard, entry.workspaceId, issueId])
+
+  useEffect(() => {
+    setSenderPopoverOpen(false)
+  }, [entry.id])
+
+  useEffect(() => {
+    if (!senderPopoverOpen) return
+    const closeOnOutsideClick = (event: globalThis.MouseEvent) => {
+      if (!senderPopoverRef.current?.contains(event.target as Node)) {
+        setSenderPopoverOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setSenderPopoverOpen(false)
+      senderTriggerRef.current?.focus({ preventScroll: true })
+    }
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [senderPopoverOpen])
 
   const openWorkspace = () => {
     if (!wsAlive) return
@@ -300,6 +333,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
       } else {
         openWorkspace()
       }
+      setSenderPopoverOpen(false)
     } catch (err) {
       setContinueError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -320,30 +354,70 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   return (
     <div className="mx-auto max-w-[920px] px-4 py-6 md:px-8 md:py-8">
       {/* Provenance is identity, not a third way to open the same Session. */}
-      <header className="mb-6 border-b border-border/70 pb-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+      <header className="mb-5 border-b border-border/70 pb-3">
+        <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <span
                 className={`text-[14px] font-semibold ${
                   wsAlive ? 'text-foreground' : 'text-muted-foreground/70 line-through'
                 }`}
-                title={wsAlive ? undefined : t('inbox.workspaceNotExists')}
+                title={wsAlive ? displayTitle : t('inbox.workspaceNotExists')}
               >
                 {displayLabel}
               </span>
-              {senderLabel && (
-                <span
-                  className="inline-flex min-w-0 items-start gap-1.5 text-[11px] text-muted-foreground/75 sm:items-center"
-                  title={t('inbox.senderIdentityTitle', { sender: senderLabel })}
-                >
-                  <ChevronRight size={11} className="shrink-0 text-muted-foreground/35" aria-hidden />
-                  {origin?.kind === 'interactive'
-                    ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
-                    : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
-                  <span className="min-w-0 break-all sm:max-w-[380px] sm:truncate">
-                    {t('inbox.fromSender', { sender: senderLabel })}
-                  </span>
+              {senderLabel && senderDisplay && (
+                <span ref={senderPopoverRef} className="relative inline-flex min-w-0 items-center">
+                  <ChevronRight size={11} className="mr-1 shrink-0 text-muted-foreground/35" aria-hidden />
+                  <button
+                    ref={senderTriggerRef}
+                    type="button"
+                    aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
+                    aria-haspopup="dialog"
+                    aria-expanded={senderPopoverOpen}
+                    aria-controls={`inbox-sender-${entry.id}`}
+                    onClick={() => setSenderPopoverOpen((open) => !open)}
+                    className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[11px] font-medium text-muted-foreground/75 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-0"
+                  >
+                    {origin?.kind === 'interactive'
+                      ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
+                      : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
+                    <span>{t('inbox.fromSender', { sender: senderDisplay })}</span>
+                  </button>
+                  {senderPopoverOpen && (
+                    <div
+                      id={`inbox-sender-${entry.id}`}
+                      role="dialog"
+                      aria-label={t('inbox.senderIdentityTitle', { sender: senderLabel })}
+                      className="oa-popover-enter absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg"
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+                        {t('inbox.senderSession')}
+                      </p>
+                      {origin?.agent && (
+                        <p className="mt-1 text-[12px] font-medium text-foreground">{origin.agent}</p>
+                      )}
+                      {senderSignature && (
+                        <p className="mt-0.5 break-all font-mono text-[10px] leading-relaxed text-muted-foreground">
+                          {senderSignature}
+                        </p>
+                      )}
+                      {wsAlive && (
+                        <button
+                          type="button"
+                          onClick={() => void continueOrigin()}
+                          disabled={continuing}
+                          className="oa-pressable mt-3 min-h-10 w-full rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
+                        >
+                          {continuing
+                            ? t('inbox.continuingSession')
+                            : canContinueOrigin
+                              ? t('inbox.openConversation')
+                              : t('inbox.openWorkspace')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </span>
               )}
               {issueId && (
@@ -351,7 +425,7 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                   type="button"
                   onClick={openIssue}
                   title={t('inbox.fromIssueTitle', { issue: issueId })}
-                  className="oa-pressable inline-flex min-h-10 w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-left text-[11px] text-muted-foreground/75 hover:bg-primary/10 hover:text-primary sm:min-h-0 sm:w-auto sm:py-0.5"
+                  className="oa-pressable inline-flex min-h-10 min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-left text-[11px] text-muted-foreground/75 hover:bg-primary/10 hover:text-primary sm:min-h-0 sm:py-0.5"
                 >
                   <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
                   <span className="min-w-0 break-words sm:max-w-[220px] sm:truncate">
@@ -366,13 +440,13 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
               {formatRelativeTime(entry.ts)}
             </div>
           </div>
-          <div className="flex w-full items-center gap-2 sm:-mr-1 sm:w-auto sm:shrink-0 sm:gap-1">
-            {wsAlive && (
+          <div className="-mr-1 flex shrink-0 items-center gap-1">
+            {wsAlive && !senderLabel && (
               <button
                 type="button"
                 onClick={() => void continueOrigin()}
                 disabled={continuing}
-                className="oa-pressable inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 sm:h-8 sm:flex-none sm:px-2.5"
+                className="oa-pressable inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45 sm:h-8 sm:px-2.5"
                 title={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
                 aria-label={canContinueOrigin ? t('inbox.openConversation') : t('inbox.openWorkspace')}
               >

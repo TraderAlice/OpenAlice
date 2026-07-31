@@ -99,10 +99,65 @@ describe('ResolvedLaunchContext', () => {
     expect(context.provenance.home.detail).toBe('OPENALICE_HOME')
   })
 
+  it('uses the installed Runtime below stored and explicit source overrides', () => {
+    const installed = resolveLaunchContext({
+      homeDir: '/home/alice',
+      cwd: '/repo',
+      platform: 'linux',
+      env: {
+        OPENALICE_MANAGED_RUNTIME_PATH: '/installed/runtime',
+        OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY: '0123456789abcdef',
+      },
+    })
+
+    expect(installed.appDir).toBe('/installed/runtime')
+    expect(installed.runtimeProvider).toEqual({
+      kind: 'bundle',
+      contentIdentity: '0123456789abcdef',
+    })
+    expect(installed.provenance.appDir).toEqual({
+      source: 'installed-runtime',
+      detail: 'installed OpenAlice Runtime',
+    })
+
+    const configured = resolveLaunchContext({
+      homeDir: '/home/alice',
+      cwd: '/repo',
+      platform: 'linux',
+      machineConfig: { defaults: { appDir: '/configured/source' } },
+      env: {
+        OPENALICE_MANAGED_RUNTIME_PATH: '/installed/runtime',
+        OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY: '0123456789abcdef',
+      },
+    })
+    expect(configured.appDir).toBe('/configured/source')
+    expect(configured.runtimeProvider).toEqual({
+      kind: 'source',
+      contentIdentity: null,
+    })
+  })
+
+  it('refuses an installed Runtime without its paired content identity', () => {
+    expect(() => resolveLaunchContext({
+      env: {
+        OPENALICE_MANAGED_RUNTIME_PATH: '/installed/runtime',
+      },
+    })).toThrow(/CONTENT_IDENTITY/)
+  })
+
   it('requires a complete home for a named non-default instance', () => {
     expect(() => resolveLaunchContext({
       homeDir: '/home/alice',
       env: { OPENALICE_INSTANCE: 'research' },
+    })).toThrow(/needs an explicit complete home/)
+    expect(() => resolveLaunchContext({
+      homeDir: '/home/alice',
+      machineConfig: {
+        defaultInstance: 'research',
+        defaults: { home: '/shared-machine-home' },
+      },
+      instanceConfig: { name: 'research' },
+      env: {},
     })).toThrow(/needs an explicit complete home/)
   })
 

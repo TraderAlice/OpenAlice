@@ -3,9 +3,9 @@
  *
  * OpenAlice supplies the approved repository/version/commit through the
  * template-source contract. The upstream tree is verified before it is copied,
- * then its history and remote are removed so the resulting desk follows the
- * OpenAlice Harness rule: one fresh local Git repository owned by the coding
- * Agent, with no pushable upstream remote.
+ * then the resulting desk keeps that upstream history and canonical remote.
+ * OpenAlice creates a local research branch at the approved commit so the
+ * Coding Agent can later fetch and merge another approved AutoQuant release.
  *
  * Dependency installation is intentionally absent. AutoQuant's Coding Agent
  * owns `uv`/Python setup and every later research commit inside the desk.
@@ -14,7 +14,6 @@
 import {
   existsSync,
   mkdirSync,
-  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -69,11 +68,8 @@ if (resolved !== commit) {
 }
 
 await git(['clone', '--quiet', '--local', '--no-checkout', source, outDir], dirname(outDir))
-await git(['checkout', '--quiet', '--detach', commit], outDir)
-
-rmSync(join(outDir, '.git'), { recursive: true, force: true })
-await git(['init', '-q'], outDir)
-await git(['checkout', '-q', '-b', `research/${tag}`], outDir)
+await git(['remote', 'set-url', 'origin', repository], outDir)
+await git(['checkout', '--quiet', '-b', `research/${tag}`, commit], outDir)
 setupGitExcludes(outDir)
 
 const receiptDir = join(outDir, '.alice')

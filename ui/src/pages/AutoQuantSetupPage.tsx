@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowRight, Check, Loader2, Microscope, PanelsTopLeft } from 'lucide-react'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
+import { RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
 
@@ -48,6 +49,30 @@ export function AutoQuantSetupPage() {
     }
   }
 
+  if (!ctx.hasLoaded && ctx.listError !== null) {
+    return (
+      <RecoverySurface
+        eyebrow={t('workspace.dataUnavailableEyebrow')}
+        title={t('workspace.dataUnavailableTitle')}
+        description={t('workspace.dataUnavailableDescription')}
+        actionLabel={t('common.retry')}
+        onAction={() => void ctx.refresh()}
+      />
+    )
+  }
+
+  if (ctx.templatesLoaded && ctx.templatesError !== null) {
+    return (
+      <RecoverySurface
+        eyebrow={t('workspace.dataUnavailableEyebrow')}
+        title={t('workspace.templatesUnavailableTitle')}
+        description={t('workspace.templatesUnavailableDescription')}
+        actionLabel={t('common.retry')}
+        onAction={() => void ctx.refreshTemplates()}
+      />
+    )
+  }
+
   if (!ctx.hasLoaded || !ctx.templatesLoaded || !ctx.autoQuantPreferenceLoaded) {
     return (
       <div className="flex h-full items-center justify-center bg-background text-muted-foreground">
@@ -58,25 +83,37 @@ export function AutoQuantSetupPage() {
 
   if (ctx.autoQuantPreferenceError) {
     return (
-      <div className="flex h-full items-center justify-center bg-background px-6">
-        <div className="max-w-md rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm">
-          <div className="font-medium text-foreground">{t('autoQuantSetup.loadErrorTitle')}</div>
-          <p className="mt-1.5 text-muted-foreground">{t('autoQuantSetup.loadErrorBody')}</p>
-        </div>
-      </div>
+      <RecoverySurface
+        eyebrow={t('workspace.dataUnavailableEyebrow')}
+        title={t('autoQuantSetup.loadErrorTitle')}
+        description={t('autoQuantSetup.loadErrorBody')}
+        actionLabel={t('common.retry')}
+        onAction={() => void ctx.refreshAutoQuantPreference()}
+      />
     )
   }
 
   const hasExisting = workspaces.length > 0
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-auto bg-background px-5 py-10">
+    <div
+      data-testid="autoquant-setup-scroll"
+      className="relative flex h-full w-full items-start justify-start overflow-auto bg-background px-5 py-10"
+    >
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-accent to-transparent" />
         <div className="absolute inset-0 opacity-[0.045] [background-image:linear-gradient(to_right,var(--foreground)_1px,transparent_1px),linear-gradient(to_bottom,var(--foreground)_1px,transparent_1px)] [background-size:96px_96px]" />
       </div>
 
-      <main className="relative z-10 w-full max-w-xl">
+      <main data-testid="autoquant-setup-stack" className="relative z-10 mx-auto my-auto w-full max-w-xl">
+        {ctx.listError !== null && (
+          <RefreshNotice
+            message={t('workspace.dataStale')}
+            actionLabel={t('common.retry')}
+            onAction={() => void ctx.refresh()}
+            className="mb-5"
+          />
+        )}
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
             <Microscope className="h-6 w-6" />

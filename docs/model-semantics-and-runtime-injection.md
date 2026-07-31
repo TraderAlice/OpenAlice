@@ -161,6 +161,26 @@ model changes future resolution but must not silently rewrite existing
 Workspace files. Existing configurations change only through their normal
 explicit apply/create paths.
 
+Runtime compatibility belongs to the runtime adapter, not to the shared
+credential or route layers. Every provider-capable adapter declares
+`capabilities.aiProvider` with:
+
+- whether native/global login is sufficient or a Workspace credential is
+  required;
+- accepted wire shapes in native preference order and the blank-form default;
+- any vendor-specific wire narrowing and narrowly scoped legacy repair;
+- which custom-model facts it registers (`contextWindow`, `reasoning`, and
+  effort variants).
+
+`src/workspaces/adapters/index.ts` is the single built-in registration point.
+The Workspace `/agents` contract serializes these declarations for UI launch,
+credential, and model controls. Adding a provider-capable runtime therefore
+means implementing its adapter, declaring these capabilities, and registering
+it once. Shared injection, readiness, config routes, and UI helpers must not
+add a second adapter-id matrix. Runtime-exclusive behavior such as a structured
+surface, transcript parser, native config format, or CLI argument spelling
+remains in the adapter or its explicitly runtime-owned UI.
+
 An upstream catalog such as Models.dev may later generate part of this table at
 build time. OpenAlice-specific overrides still own protocol quirks and runtime
 compatibility, and Workspace launch must not depend on a live catalog fetch.
@@ -257,8 +277,10 @@ contain credentials.
 - `src/ai-providers/model-semantics.ts` — exact semantic resolution and runtime-neutral binding inputs.
 - `src/ai-providers/presets.ts` — backend-to-UI preset serialization.
 - `src/core/config.ts` — credential access and creation-time Workspace defaults.
+- `src/workspaces/cli-adapter.ts` — adapter capability and provider-projection contract.
 - `src/workspaces/credential-injection.ts` — credential + selection + semantics composition.
-- `src/workspaces/adapters/` — native runtime projection and round-trip parsing.
+- `src/workspaces/adapters/index.ts` — built-in adapter registration.
+- `src/workspaces/adapters/` — declared runtime compatibility, native projection, and round-trip parsing.
 - `src/workspaces/adapters/owned-toml-config.ts` — reversible Codex project-scalar ownership.
 - `src/workspaces/schedule/scanner.ts` — Issue selection to one-run override dispatch.
 - `src/workspaces/headless-task-registry.ts` — durable requested model/effort provenance.
@@ -277,6 +299,8 @@ Tests for this subsystem must cover:
 - provider-only thinking switches never become fabricated effort values;
 - non-reasoning and unknown models do not receive fabricated capabilities;
 - model changes cannot retain a capability override for the previous id;
+- a synthetic unknown adapter works from its capability declaration without a
+  shared-layer id branch;
 - adapter write/read/write round trips preserve semantic fields;
 - reset removes only OpenAlice-owned configuration and restores prior values;
 - credential secrets never appear in logs, docs, committed fixtures, or test snapshots;

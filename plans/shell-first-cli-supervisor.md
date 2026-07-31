@@ -201,6 +201,7 @@ Configuration resolves exactly once with observable provenance:
 
 ```text
 defaults
+  < installed Runtime provider
   < machine-wide Supervisor config
   < selected instance config
   < environment variables
@@ -398,21 +399,23 @@ starting the Runtime.
 
 - [x] Define machine-wide Supervisor and selected-instance schemas outside
   `OPENALICE_HOME`.
-- [ ] Resolve defaults, machine config, instance config, environment, and CLI
+- [x] Resolve defaults, machine config, instance config, environment, and CLI
   flags once into `ResolvedLaunchContext`, retaining field-level provenance.
 - [ ] Add `openalice config check` plus TUI diagnostics; invalid live reload
   retains the last valid configuration.
 - [x] Add a selected-instance TUI settings overlay for complete home, Web port,
   and update-check inheritance, with active-Runtime guards and visible
   environment/CLI locks.
+- [x] Let parameter-free Setup switch between selected-instance values and
+  machine defaults while preserving environment and explicit CLI priority.
 - [x] Give OpenAlice-managed Pi an instance-local `PI_CODING_AGENT_DIR` and
   session root without changing a user-installed Pi launched externally.
 - [x] Update the managed Workspace runtime owner guide and tests for the new
   managed-Pi isolation boundary.
-- [ ] Define a versioned atomic CLI-owned registry mapping names to complete
+- [x] Define a versioned atomic CLI-owned registry mapping names to complete
   homes; never store the registry inside a selected home.
-- [ ] Preserve implicit `default` without moving existing data.
-- [ ] Add `--instance`, list, TUI selection, and collision checks.
+- [x] Preserve implicit `default` without moving existing data.
+- [x] Add `--instance`, list, TUI selection, and collision checks.
 - [ ] Make deletion remove registry ownership only by default.
 - [ ] Test concurrent homes, ports, sockets, logs, foreign/stale owners,
   Electron ownership, and remote instances.
@@ -423,8 +426,11 @@ immediately use the selected instance's source checkout, complete home, Web
 port, and update policy. Returning a field to inheritance removes only that
 instance key. Environment and CLI provenance visibly lock lower-priority
 editing, while an active Runtime prevents its home or port from changing
-underneath it. Machine-default editing, `config check`, last-known-good live
-reload, and named-instance management remain unchecked above.
+underneath it. Setup now switches in place to machine defaults, persists their
+Home, port, and update policy atomically, and immediately re-resolves the
+selected instance. Higher-priority instance, environment, and explicit command
+layers continue to win. `config check`, last-known-good live reload, and
+registry deletion remain unchecked above.
 
 The clean-host follow-up reuses the managed-remote install-source identity for
 local startup. A stopped installed Supervisor now confirms `m Managed`, clones
@@ -444,25 +450,57 @@ running Guardian, and TUI stop returned the home to absent.
 
 ### 7. Standalone headless Runtime artifact
 
-- [ ] Inventory server/UI/Guardian outputs, production dependencies, native
+- [x] Inventory server/UI/Guardian outputs, production dependencies, native
   modules, Broker Pack boundary, and managed Pi injection.
 - [ ] Produce deterministic platform/architecture archives.
 - [ ] Define authenticated manifest, version, compatibility, Node requirement,
   file hashes, and content identity.
-- [ ] Install immutable Runtime versions and validate without a checkout.
-- [ ] Add providers for bundle, source-development, Docker, Electron, and
+- [x] Install immutable Runtime versions and validate without a checkout.
+- [x] Add providers for bundle, source-development, Docker, Electron, and
   managed remote.
 - [ ] Prove clean-host Alice, optional components, Web, Workspace PTY, and Pi.
-- [ ] Re-run unsigned Electron package acceptance for shared build changes.
+- [x] Re-run unsigned Electron package acceptance for shared build changes.
 
 ### 8. Installer integration and source-development split
 
-- [ ] Add the Runtime bytes and size to installer plan/consent.
-- [ ] Make normal `up` select the bundle independent of cwd.
+- [x] Add the Runtime identity/platform to installer plan/consent.
+- [x] Make normal `up` select the bundle independent of cwd.
 - [ ] Move checkout preparation/rebuild to explicit development provider.
-- [ ] Make managed remote reuse the release artifact and trust chain.
-- [ ] Distinguish installer-owned Runtime releases from preserved data and
+- [x] Make managed remote reuse the release artifact and trust chain.
+- [x] Distinguish installer-owned Runtime releases from preserved data and
   sources during uninstall.
+
+The first bundle increment on 2026-07-30 produced a 107 MiB darwin-arm64
+archive from three production dependency closures. Content-aware hard-link
+deduplication removed 500 MiB from the expanded tree before compression. The
+34,613-entry manifest verifies product version, Node floor, platform,
+architecture, modes, hashes, symlinks, required Guardian/Alice/UI/UTA/Connector
+layout, and content identity. A release matrix now builds darwin/linux on arm64
+and x64, installs each archive outside the checkout, boots it, runs Doctor, and
+stops it before publication.
+
+The installer places CLI, Pi, and Runtime beneath the same immutable
+`cli-versions/<ref>-<content-id>` directory and atomically switches one launcher
+that exports both managed providers. Stable versioned installers download
+release metadata plus the matching archive, verify both archive SHA-256 and
+the internal manifest, and bind CLI and Runtime to one OpenAlice version.
+Local development can pass `--runtime-archive` and `--runtime-sha256`.
+
+Dogfood installed the candidate into a fresh temporary root, launched
+`openalice up` from `/tmp` with no checkout, reached Alice at loopback, passed
+Doctor with zero failures, opened the bare `pi-tui` Supervisor against the
+surviving Runtime, detached without stopping it, and stopped it cleanly.
+Guardian reported `provider=bundle`, product/runtime `0.87.0-beta`, and content
+`d4a8e69b270f3cd1`. The OrbStack Linux arm64 SSH fixture then installed the
+matching bundle through the ordinary remote installer, launched and tunneled
+without a checkout or build tools, survived disconnect, repaired managed Pi,
+reconnected, and stopped through Guardian. Remaining work in this increment is
+reproducibility/authenticity hardening. The unsigned packaged-Electron Workspace
+acceptance passed its real Electron PTY, Shell, managed Pi response, scheduled
+Issue, and cleanup checks. The interactive clean-container installer playground
+also passed manual review of consent, plan copy, command/version JSON,
+completion, update policy, uninstall preservation, managed Pi, PATH, and
+source-tool planning.
 
 ### 9. Atomic Runtime update, activation, and rollback
 
@@ -608,6 +646,10 @@ This plan is complete only when:
   smoke, real isolated background `up/status/down`, foreground PTY Ctrl+C,
   clean installer upgrade/uninstall Docker smoke, managed remote SSH smoke, UI
   typecheck, server build, and Electron PTY smoke.
+- 2026-07-30: Built the first standalone headless Runtime increment. A clean
+  macOS install booted outside any checkout and the OrbStack Linux arm64 SSH
+  fixture installed, started, tunneled, repaired, reconnected, and stopped the
+  release bundle without creating a managed source checkout.
 - 2026-07-30: Published increment 1 as serial PR #853 targeting `dev`.
 - 2026-07-30: Completed increment 2 implementation and local verification:
   additive control API/capability negotiation, expanded product/provider/status
@@ -696,3 +738,52 @@ This plan is complete only when:
   its expected Guardian PID. The same isolated installed CLI then completed
   start, authenticated Web/root probes, stop/restart ownership handoff,
   reconnect, and final stop while the desktop app remained active.
+- 2026-07-30: Added `i Instances` as a first-class Supervisor path. The TUI
+  now lists the implicit default and registered instances, creates a validated
+  named entry with a separate complete home, switches the live view without
+  stopping another Runtime, and remembers the selection for the next bare
+  start. Environment/CLI-selected instance or Home overrides make the list
+  visibly read-only. Named homes cannot be cleared, duplicated, or nested
+  under another registered home.
+- 2026-07-30: Real multi-instance dogfood created `paper` entirely inside the
+  TUI, started it on 47331, switched to the implicit default while it remained
+  active, and started a second Runtime that automatically selected 47334 after
+  the first instance's Web and internal ports. Both auth-status probes passed;
+  switching back found the first live owner, and each Runtime stopped from its
+  own TUI view. The journey exposed that explicit lifecycle/observability
+  commands still bypassed the stored registry; `up`, `run`, `down`, `status`,
+  `open`, `logs`, and `doctor` now resolve TUI-registered named homes before
+  dispatch.
+- 2026-07-30: A missing registered complete Home now fails explicit
+  automation selection but no longer strands a bare interactive launch. The
+  Supervisor keeps the unavailable entry, opens on an available fallback,
+  explains the recovery, and lets `i Instances` atomically repair the
+  remembered default. Unit and real-PTY coverage preserve that distinction.
+- 2026-07-30: Refined the parameter-free installed experience around the bare
+  TUI. Enter now starts a stopped Runtime and opens its verified browser
+  endpoint in one action, while `s` remains the explicit background-only
+  start. Setup uses ordinary product vocabulary, identifies the installed
+  Runtime by OpenAlice version and content identity, and edits either the
+  current instance or inherited machine defaults without weakening
+  environment/CLI precedence. Real PTY coverage exercises both persisted
+  layers, and an installed bundle dogfood launch reached Alice, opened the Web
+  UI, detached, reattached, and stopped cleanly.
+- 2026-07-30: Removed the remaining source-only first-start detour. When Enter
+  cannot discover a checkout, an installed CLI now derives the managed source
+  plan from its own branch/version provenance, asks for consent in the TUI,
+  then preserves the original start-and-open intent after preparation. `c`
+  remains the manual checkout escape hatch, while a non-installed source-run
+  CLI still falls back to the path editor. Stopped bundle views also ignore an
+  uninformative `provider=unknown` observation and show the verified installed
+  provider from launch context. Manual clean-container review exposed that the
+  offline installer fixture did not include Pi's TUI dependency and therefore
+  had never executed bare `openalice`; the fixture now supplies a minimal
+  adapter and the Docker acceptance itself drives Enter, verifies the
+  install-provenance plan, cancels, and detaches.
+- 2026-07-30: Hardened the install boundary exposed by that clean-container
+  journey. Staged installs and identical-release reuse now resolve
+  `@earendil-works/pi-tui` from the exact managed Pi closure instead of treating
+  a runnable Pi CLI as proof that the Supervisor renderer exists. Docker
+  acceptance deletes only that dependency from an otherwise healthy release,
+  verifies that the installer preserves the damaged evidence, replaces the
+  release atomically, and confirms the repaired closure before continuing.

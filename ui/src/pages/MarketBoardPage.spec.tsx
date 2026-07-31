@@ -108,6 +108,52 @@ describe('MarketBoardPage', () => {
     expect(screen.getByRole('button', { name: '成长科技' }).getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('gives Global Macro a scan-first mobile hierarchy without removing the desktop comparison table', async () => {
+    await i18n.changeLanguage('en')
+    mocks.boardData = {
+      meta: {},
+      rows: [{
+        country: 'US',
+        label: 'United States',
+        cpiYoy: { value: 4.25, date: '2026-06-01' },
+        shortRate: { value: 3.625, date: '2026-07-29' },
+        cli: { value: 100.8, date: '2026-06-01' },
+        housePrice: { value: 156.4, date: '2026-05-01' },
+        sharePrice: { value: null, date: null, error: 'market closed' },
+      }],
+    }
+
+    render(
+      <MarketBoardPage
+        spec={{ kind: 'market-board', params: { board: 'global-macro' } }}
+        visible
+      />,
+    )
+
+    const mobile = screen.getByTestId('global-macro-mobile')
+    const desktop = screen.getByTestId('global-macro-desktop')
+    expect(mobile.className).toContain('md:hidden')
+    expect(mobile.className).not.toContain('overflow-x-auto')
+    expect(desktop.className).toContain('hidden')
+    expect(desktop.className).toContain('md:block')
+    expect(desktop.className).toContain('overflow-x-auto')
+
+    expect(within(mobile).getByRole('heading', { name: 'United States' })).toBeTruthy()
+    const metricGroups = mobile.querySelectorAll('dl')
+    expect(metricGroups).toHaveLength(2)
+    expect(metricGroups[0]?.className).toContain('grid-cols-3')
+    expect(metricGroups[1]?.className).toContain('grid-cols-2')
+
+    expect(within(mobile).getByLabelText('CPI YoY: 4.25% · 2026-06-01').className).toContain('text-destructive')
+    expect(within(mobile).getByLabelText('Short rate (3M): 3.63% · 2026-07-29')).toBeTruthy()
+    expect(within(mobile).getByLabelText('CLI: 100.8 · 2026-06-01').className).toContain('text-success')
+    expect(within(mobile).getByLabelText('House (2015=100): 156.4 · 2026-05-01')).toBeTruthy()
+    expect(within(mobile).getByLabelText('Equity (2015=100): — · market closed').className).toContain('text-muted-foreground/50')
+
+    const comparisonTable = within(desktop).getByRole('table')
+    expect(within(comparisonTable).getAllByRole('columnheader')).toHaveLength(6)
+  })
+
   it('keeps Shipping card metadata intact when the card narrows', () => {
     mocks.boardData = {
       meta: {},

@@ -56,9 +56,84 @@ beforeEach(async () => {
       dir: '/tmp/chat-1',
       createdAt: '2026-07-18T00:00:00.000Z',
       template: 'chat',
-      agents: ['pi'],
       sessions: [],
     }],
+    agents: [
+      {
+        id: 'claude',
+        displayName: 'Claude Code',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: false,
+          resumeById: true,
+          transcriptDiscovery: 'fs-watch',
+          aiProvider: {
+            credentialSource: 'runtime-or-workspace',
+            wirePreference: ['anthropic'],
+          },
+        },
+      },
+      {
+        id: 'codex',
+        displayName: 'Codex',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'subprocess',
+          aiProvider: {
+            credentialSource: 'runtime-or-workspace',
+            wirePreference: ['openai-responses'],
+          },
+        },
+      },
+      {
+        id: 'opencode',
+        displayName: 'opencode',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'subprocess',
+          aiProvider: {
+            credentialSource: 'workspace-required',
+            wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+            vendorPolicies: {
+              minimax: {
+                wirePreference: ['anthropic'],
+                legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+              },
+            },
+            modelRegistration: {
+              contextWindow: true,
+              reasoning: true,
+              effortVariants: true,
+            },
+          },
+        },
+      },
+      {
+        id: 'pi',
+        displayName: 'Pi',
+        capabilities: {
+          parallelPerCwd: true,
+          resumeLast: true,
+          resumeById: true,
+          transcriptDiscovery: 'none',
+          aiProvider: {
+            credentialSource: 'workspace-required',
+            wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+            vendorPolicies: {
+              minimax: {
+                wirePreference: ['anthropic'],
+                legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+              },
+            },
+            modelRegistration: { contextWindow: true, reasoning: true },
+          },
+        },
+      },
+    ],
     refresh: vi.fn(),
     saveWorkspaceMetadata: vi.fn(),
   })
@@ -117,6 +192,35 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     expect(screen.getByRole('button', { name: '通用' }).getAttribute('aria-current')).toBe('page')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '通用' }))
+  })
+
+  it('keeps compact settings chrome fixed around one scroll owner', async () => {
+    render(
+      <WorkspaceAIConfigModal
+        wsId="chat-1"
+        initialSection="ai"
+        initialAgent="pi"
+        onClose={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByTestId('workspace-settings-dialog')
+    const sectionNav = screen.getByTestId('workspace-settings-section-nav')
+    const scrollArea = screen.getByTestId('workspace-settings-ai-scroll')
+    const footer = screen.getByTestId('workspace-settings-ai-footer')
+
+    expect(dialog.className).toContain('h-full')
+    expect(dialog.className).toContain('overflow-hidden')
+    expect(dialog.className).toContain('sm:max-h-[85dvh]')
+    expect(sectionNav.className).toContain('overflow-x-auto')
+    expect(screen.getByRole('button', { name: '通用' }).className).toContain('min-h-11')
+    expect(screen.getByRole('button', { name: 'Claude Code' }).className).toContain('min-h-11')
+    expect(scrollArea.className).toContain('min-h-0')
+    expect(scrollArea.className).toContain('overflow-y-auto')
+    expect(footer.className).toContain('shrink-0')
+
+    expect(await screen.findByText('— 没有兼容 Pi 的凭证 —')).toBeTruthy()
+    expect(screen.queryByText('从已保存凭证载入')).toBeNull()
   })
 
   it('keeps forward and reverse Tab navigation inside the dialog', () => {

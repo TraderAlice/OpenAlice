@@ -68,7 +68,7 @@ export async function startRuntimeServer(options, dependencies = {}) {
     emit: (event) => {
       if (event.type !== 'ready') return
       const ready = event.result
-      stdout.write(`OpenAlice source: ${ready.appDir}\n`)
+      stdout.write(`OpenAlice ${ready.status.provider?.kind === 'bundle' ? 'Runtime' : 'source'}: ${ready.appDir}\n`)
       stdout.write(`OpenAlice home: ${ready.homeRoot}\n`)
       stdout.write(`OpenAlice Server: ${ready.status.endpoints.web}\n`)
       if (detached) {
@@ -119,7 +119,7 @@ top-level "openalice run|up|status|down" commands in new scripts.
 Alice are ready.
 
 Run/start options:
-  --app-dir <path>   OpenAlice checkout (default: current directory or parent)
+  --app-dir <path>   Advanced source override (default: installed Runtime)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --port <port>      Local web port (default: 47331)
   --log <path>       Detached Server log (default: <home>/logs/server.log)

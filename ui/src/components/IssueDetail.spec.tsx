@@ -64,7 +64,7 @@ vi.mock('../contexts/workspaces-context', () => ({
     ],
     defaultAgent: 'pi',
     issueDefaultAgent: null,
-    workspaces: [{ id: 'demo-ws-auto-quant', agents: ['codex', 'pi'] }],
+    workspaces: [{ id: 'demo-ws-auto-quant' }],
     openAgentConfig: mocks.openAgentConfig,
     openHeadlessRun: mocks.openHeadlessRun,
   }),

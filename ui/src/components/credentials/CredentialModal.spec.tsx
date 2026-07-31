@@ -1,9 +1,12 @@
+// @vitest-environment jsdom
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Preset } from '../../api/types'
 import { api } from '../../api'
 import { i18n } from '../../i18n'
+import type { AgentInfo } from '../workspace/api'
 import { CredentialModal } from './CredentialModal'
 
 vi.mock('../../api', () => ({
@@ -122,6 +125,36 @@ const customPreset: Preset = {
   },
 }
 
+const agents: AgentInfo[] = [
+  {
+    id: 'claude',
+    displayName: 'Claude Code',
+    capabilities: {
+      parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch',
+      aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'] },
+    },
+  },
+  {
+    id: 'codex',
+    displayName: 'Codex',
+    capabilities: {
+      parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess',
+      aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'] },
+    },
+  },
+  ...['opencode', 'pi'].map((id): AgentInfo => ({
+    id,
+    displayName: id === 'pi' ? 'Pi' : 'opencode',
+    capabilities: {
+      parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess',
+      aiProvider: {
+        credentialSource: 'workspace-required',
+        wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+      },
+    },
+  })),
+]
+
 function setup() {
   const onClose = vi.fn()
   const onSaved = vi.fn().mockResolvedValue(undefined)
@@ -129,6 +162,7 @@ function setup() {
     <CredentialModal
       mode="add"
       presets={[openAiPreset]}
+      agents={agents}
       onClose={onClose}
       onSaved={onSaved}
     />,
@@ -148,11 +182,44 @@ afterEach(() => {
 })
 
 describe('CredentialModal', () => {
+  it('uses the shared long-form dialog contract and restores the opener', () => {
+    const opener = document.createElement('button')
+    opener.textContent = 'Open credentials'
+    document.body.append(opener)
+    opener.focus()
+    const onClose = vi.fn()
+
+    const { unmount } = render(
+      <CredentialModal
+        mode="add"
+        presets={[openAiPreset]}
+        agents={agents}
+        onClose={onClose}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: 'Add credential' })
+    const scrollArea = screen.getByTestId('credential-modal-scroll')
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(dialog.className).toContain('h-full')
+    expect(scrollArea.className).toContain('min-h-0')
+    expect(scrollArea.className).toContain('overflow-y-auto')
+    expect(document.activeElement).toBe(screen.getByPlaceholderText('Search providers…'))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(document.activeElement).toBe(opener)
+    opener.remove()
+  })
+
   it('explains provider-specific key, runtime, and model behavior before testing', () => {
     render(
       <CredentialModal
         mode="add"
         presets={[geminiPreset]}
+        agents={agents}
         initialPresetId={geminiPreset.id}
         onClose={vi.fn()}
         onSaved={vi.fn()}
@@ -174,6 +241,7 @@ describe('CredentialModal', () => {
       <CredentialModal
         mode="add"
         presets={[customPreset]}
+        agents={agents}
         initialPresetId={customPreset.id}
         onClose={vi.fn()}
         onSaved={vi.fn()}
@@ -195,6 +263,7 @@ describe('CredentialModal', () => {
       <CredentialModal
         mode="add"
         presets={[openAiPreset]}
+        agents={agents}
         initialPresetId={openAiPreset.id}
         initialApiKey="sk-prefilled"
         onClose={vi.fn()}
@@ -245,6 +314,7 @@ describe('CredentialModal', () => {
       <CredentialModal
         mode="add"
         presets={[onboardingTestPreset]}
+        agents={agents}
         initialPresetId={onboardingTestPreset.id}
         initialApiKey="oa_test_ok"
         onClose={vi.fn()}
@@ -284,6 +354,7 @@ describe('CredentialModal', () => {
           lastModel: 'gpt-account-specific',
         }}
         presets={[openAiPreset]}
+        agents={agents}
         onClose={vi.fn()}
         onSaved={onSaved}
       />,

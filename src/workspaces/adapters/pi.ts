@@ -250,6 +250,21 @@ export const piAdapter: CliAdapter = {
     // immune to pi's lazy transcript write.
     assignsSessionId: true,
     headless: true,
+    aiProvider: {
+      credentialSource: 'workspace-required',
+      wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+      defaultWire: 'openai-chat',
+      vendorPolicies: {
+        minimax: {
+          wirePreference: ['anthropic'],
+          legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+        },
+      },
+      modelRegistration: {
+        contextWindow: true,
+        reasoning: true,
+      },
+    },
   },
 
   lifecycle: {

@@ -1,8 +1,13 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  dirname,
+  join,
+} from 'node:path'
 import type {
   Component,
   KeyId,
+  SelectItem,
+  SelectListTheme,
   SettingItem,
   SettingsListTheme,
 } from '@earendil-works/pi-tui'
@@ -35,9 +40,18 @@ import {
 } from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
 import {
+  createSupervisorInstance,
   persistInstanceLaunchConfig,
+  persistMachineLaunchConfig,
+  persistSelectedSupervisorInstance,
   readInstanceLaunchConfig,
+  readMachineLaunchConfig,
+  readSupervisorInstanceRegistry,
+  isStoredHomeUnavailableError,
+  resolveAvailableStoredLaunchContext,
   resolveStoredLaunchContext,
+  validateSupervisorInstanceName,
+  type SupervisorInstanceRegistry,
 } from './supervisor-config.ts'
 import {
   checkForUpdate,
@@ -48,6 +62,8 @@ const SILENT_OUTPUT = Object.freeze({ write: () => true })
 const INHERIT_SETTING = 'Inherit'
 const ENABLED_SETTING = 'Enabled'
 const DISABLED_SETTING = 'Disabled'
+const INSTANCE_SCOPE = 'This instance'
+const MACHINE_SCOPE = 'Machine defaults'
 
 interface RuntimeSummary {
   class?: string
@@ -102,6 +118,7 @@ interface UpdateResult {
 export type SupervisorPanel = 'overview' | 'logs' | 'doctor' | 'help'
 export type SupervisorAction =
   | 'start'
+  | 'start-open'
   | 'open'
   | 'stop'
   | 'restart'
@@ -145,9 +162,28 @@ export interface SupervisorTuiDependencies {
     context: ResolvedLaunchContext,
     patch: LaunchConfigValues,
   ) => Promise<ResolvedLaunchContext>
+  configureMachine?: (
+    context: ResolvedLaunchContext,
+    patch: LaunchConfigValues,
+  ) => Promise<ResolvedLaunchContext>
   loadInstanceConfig?: (
     context: ResolvedLaunchContext,
   ) => Promise<InstanceLaunchConfig>
+  loadMachineConfig?: (
+    context: ResolvedLaunchContext,
+  ) => Promise<LaunchConfigValues>
+  loadInstanceRegistry?: (
+    context: ResolvedLaunchContext,
+  ) => Promise<SupervisorInstanceRegistry>
+  selectInstance?: (
+    context: ResolvedLaunchContext,
+    name: string,
+  ) => Promise<ResolvedLaunchContext>
+  createInstance?: (
+    context: ResolvedLaunchContext,
+    name: string,
+    home: string,
+  ) => Promise<ResolvedLaunchContext>
   prepareManagedSource?: () => Promise<ManagedSourceResult>
   inspectManagedSource?: () => Promise<ManagedSourcePlan>
   machineConfig?: MachineSupervisorConfig | null
@@ -183,9 +219,8 @@ export async function runSupervisorTui(
     )
   }
 
-  let context = await (
-    dependencies.resolveContext
-    ?? ((flags) => {
+  const resolveContext = dependencies.resolveContext
+    ?? ((flags: TuiLaunchFlags) => {
       if (dependencies.machineConfig || dependencies.instanceConfig) {
         return resolveLaunchContext({
           flags,
@@ -196,7 +231,31 @@ export async function runSupervisorTui(
       }
       return resolveStoredLaunchContext(flags, { env: dependencies.env })
     })
-  )(launchFlags)
+  let context: ResolvedLaunchContext
+  let startupNotice: string | undefined
+  try {
+    context = await resolveContext(launchFlags)
+  } catch (error: unknown) {
+    const env = dependencies.env ?? process.env
+    const explicitSelection = launchFlags.instance !== undefined
+      || launchFlags.home !== undefined
+      || env['OPENALICE_INSTANCE'] !== undefined
+      || env['OPENALICE_HOME'] !== undefined
+    const customResolution = dependencies.resolveContext !== undefined
+      || dependencies.machineConfig !== undefined
+      || dependencies.instanceConfig !== undefined
+    if (
+      explicitSelection
+      || customResolution
+      || !isStoredHomeUnavailableError(error)
+    ) {
+      throw error
+    }
+    context = await resolveAvailableStoredLaunchContext({
+      env: dependencies.env,
+    })
+    startupNotice = storedHomeRecoveryNotice(error, context.instance)
+  }
   let services = createServices(dependencies, context)
   let runtime: RuntimeSummary | null = null
   let diagnostic: string | undefined
@@ -219,14 +278,18 @@ export async function runSupervisorTui(
   let actionRunning = false
   let sourcePromptActive = false
   let settingsActive = false
+  let instancesActive = false
+  let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
+  let closeInstances: (() => void) | null = null
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
     runtime,
     context,
     diagnostic,
+    notice: startupNotice,
   }, {
     onAction: (action) => {
       void requestAction(action)
@@ -237,8 +300,11 @@ export async function runSupervisorTui(
     onSettings: () => {
       void openSettings()
     },
+    onInstances: () => {
+      void openInstances()
+    },
     onRequestManagedSource: () => {
-      void requestManagedSource()
+      void requestManagedSource('start')
     },
     onPrepareManagedSource: () => {
       void prepareManagedSourceAndStart()
@@ -259,6 +325,38 @@ export async function runSupervisorTui(
   })
   const loadInstanceConfig = dependencies.loadInstanceConfig
     ?? readInstanceLaunchConfig
+  const loadMachineConfig = dependencies.loadMachineConfig
+    ?? readMachineLaunchConfig
+  const configureMachine = dependencies.configureMachine ?? (async (
+    currentContext,
+    patch,
+  ) => {
+    await persistMachineLaunchConfig(currentContext, patch)
+    return resolveStoredLaunchContext(launchFlags, {
+      env: dependencies.env,
+    })
+  })
+  const loadInstanceRegistry = dependencies.loadInstanceRegistry
+    ?? readSupervisorInstanceRegistry
+  const selectInstance = dependencies.selectInstance ?? (async (
+    currentContext,
+    name,
+  ) => {
+    await persistSelectedSupervisorInstance(currentContext, name)
+    return resolveStoredLaunchContext(launchFlags, {
+      env: dependencies.env,
+    })
+  })
+  const createInstance = dependencies.createInstance ?? (async (
+    currentContext,
+    name,
+    home,
+  ) => {
+    await createSupervisorInstance(currentContext, name, home)
+    return resolveStoredLaunchContext(launchFlags, {
+      env: dependencies.env,
+    })
+  })
   const prepareManaged = dependencies.prepareManagedSource
     ?? (() => prepareManagedSource())
   const inspectManaged = dependencies.inspectManagedSource
@@ -281,13 +379,13 @@ export async function runSupervisorTui(
 
   async function requestAction(action: SupervisorAction): Promise<void> {
     if (
-      action === 'start'
+      (action === 'start' || action === 'start-open')
       && context.appDir === null
     ) {
       try {
         await findSource(process.cwd())
       } catch (error: unknown) {
-        openSourcePrompt(safeError(error))
+        await requestManagedSource(action, safeError(error))
         return
       }
     }
@@ -302,18 +400,31 @@ export async function runSupervisorTui(
     const actionLabel = actionName(action)
     screen.update({ busy: actionLabel, notice: undefined, diagnostic: undefined })
     try {
-      if (action === 'start') {
+      if (action === 'start' || action === 'start-open') {
         await services.start({
           prepare: true,
           rebuild: false,
           checkUpdates: context.updateChecks,
-          port: context.port,
+          runtimeProvider: context.runtimeProvider,
+          port: runtimeStartPort(context),
           homeRoot,
           appDir: context.appDir ?? screen.snapshot.runtime?.provider?.root,
           waitMs: 120_000,
           takeover: false,
         })
-        screen.update({ notice: 'Runtime started.' })
+        if (action === 'start-open') {
+          screen.update({ notice: 'Runtime started.' })
+          try {
+            await services.open({ homeRoot, waitMs: 2_000 })
+            screen.update({
+              notice: 'OpenAlice started and opened in your browser.',
+            })
+          } catch (error: unknown) {
+            actionFailure = `OpenAlice is running, but the browser did not open: ${safeError(error)}`
+          }
+        } else {
+          screen.update({ notice: 'Runtime started in the background.' })
+        }
       } else if (action === 'open') {
         await services.open({ homeRoot, waitMs: 2_000 })
         screen.update({ notice: 'Opened the verified Web UI.' })
@@ -329,7 +440,8 @@ export async function runSupervisorTui(
           prepare: true,
           rebuild: false,
           checkUpdates: context.updateChecks,
-          port: context.port,
+          runtimeProvider: context.runtimeProvider,
+          port: runtimeStartPort(context),
           homeRoot,
           appDir,
           waitMs: 120_000,
@@ -359,7 +471,10 @@ export async function runSupervisorTui(
     }
   }
 
-  async function requestManagedSource(): Promise<void> {
+  async function requestManagedSource(
+    startAction: 'start' | 'start-open',
+    sourceFailure?: string,
+  ): Promise<void> {
     if (actionRunning) return
     const source = context.provenance.appDir.source
     if (source === 'environment' || source === 'cli-flag') {
@@ -369,6 +484,7 @@ export async function runSupervisorTui(
       return
     }
     actionRunning = true
+    let sourceFallback: string | undefined
     screen.update({
       busy: 'Inspecting managed source',
       notice: undefined,
@@ -377,23 +493,34 @@ export async function runSupervisorTui(
     try {
       const managedSource = await inspectManaged()
       if (!active) return
+      managedStartAction = startAction
       screen.update({
         managedSource,
         confirmation: 'managed-source',
       })
     } catch (error: unknown) {
       if (!active) return
-      screen.update({
-        diagnostic: `Managed source is unavailable: ${safeError(error)}`,
-      })
+      if (sourceFailure) {
+        sourceFallback = [
+          sourceFailure,
+          `Automatic Runtime setup is unavailable: ${safeError(error)}`,
+        ].join(' ')
+      } else {
+        screen.update({
+          diagnostic: `Managed source is unavailable: ${safeError(error)}`,
+        })
+      }
     } finally {
       actionRunning = false
       if (active) screen.update({ busy: undefined })
     }
+    if (sourceFallback) openSourcePrompt(sourceFallback)
   }
 
   async function prepareManagedSourceAndStart(): Promise<void> {
     if (!active || actionRunning) return
+    const startAction = managedStartAction
+    managedStartAction = 'start'
     actionRunning = true
     let prepared = false
     let actionFailure: string | undefined
@@ -427,11 +554,16 @@ export async function runSupervisorTui(
         if (actionFailure) screen.update({ diagnostic: actionFailure })
       }
     }
-    if (prepared && active) await performAction('start')
+    if (prepared && active) await performAction(startAction)
   }
 
   function openSourcePrompt(reason?: string): void {
-    if (sourcePromptActive || settingsActive || actionRunning) return
+    if (
+      sourcePromptActive
+      || settingsActive
+      || instancesActive
+      || actionRunning
+    ) return
     const source = context.provenance.appDir.source
     if (source === 'environment' || source === 'cli-flag') {
       screen.update({
@@ -519,16 +651,25 @@ export async function runSupervisorTui(
   }
 
   async function openSettings(): Promise<void> {
-    if (settingsActive || sourcePromptActive || actionRunning) return
+    if (
+      settingsActive
+      || sourcePromptActive
+      || instancesActive
+      || actionRunning
+    ) return
     actionRunning = true
     screen.update({
       busy: 'Loading instance settings',
       notice: undefined,
       diagnostic: undefined,
     })
-    let stored: InstanceLaunchConfig
+    let storedInstance: InstanceLaunchConfig
+    let storedMachine: LaunchConfigValues
     try {
-      stored = await loadInstanceConfig(context)
+      ;[storedInstance, storedMachine] = await Promise.all([
+        loadInstanceConfig(context),
+        loadMachineConfig(context),
+      ])
     } catch (error: unknown) {
       screen.update({
         diagnostic: `Could not load instance settings: ${safeError(error)}`,
@@ -542,7 +683,8 @@ export async function runSupervisorTui(
 
     settingsActive = true
     let saving = false
-    let message = 'Changes are saved to this instance. Higher-priority overrides stay locked.'
+    let scope: typeof INSTANCE_SCOPE | typeof MACHINE_SCOPE = INSTANCE_SCOPE
+    let message = 'Changes apply to this instance. Env vars and command options remain locked.'
     const items: SettingItem[] = []
     let settings: InstanceType<typeof piTui.SettingsList>
 
@@ -550,7 +692,7 @@ export async function runSupervisorTui(
       message = next
       ui.requestRender()
     }
-    const close = (notice = 'Instance settings closed.') => {
+    const close = (notice = 'Setup closed.') => {
       if (!settingsActive) return
       settingsActive = false
       closeSettings = null
@@ -563,9 +705,10 @@ export async function runSupervisorTui(
       initialValue: string,
       validate: (value: string) => string | undefined,
       done: (selectedValue?: string) => void,
+      initialDetail = 'Leave blank to inherit from the next lower-priority layer.',
     ): Component => {
       const input = new (class extends piTui.Input {
-        detail = 'Leave blank to inherit from the next lower-priority layer.'
+        detail = initialDetail
 
         setDetail(next: string): void {
           this.detail = next
@@ -607,47 +750,83 @@ export async function runSupervisorTui(
     }
 
     const syncItems = () => {
+      const stored = scope === INSTANCE_SCOPE ? storedInstance : storedMachine
+      const editingMachine = scope === MACHINE_SCOPE
       const runtimeStopped = screen.snapshot.runtime?.class === 'absent'
-      const homeLocked = settingOverrideLock(context.provenance.home)
-      const portLocked = settingOverrideLock(context.provenance.port)
-      const updatesLocked = settingOverrideLock(context.provenance.updateChecks)
+      const homeLocked = editingMachine
+        ? undefined
+        : settingOverrideLock(context.provenance.home)
+      const portLocked = editingMachine
+        ? undefined
+        : settingOverrideLock(context.provenance.port)
+      const updatesLocked = editingMachine
+        ? undefined
+        : settingOverrideLock(context.provenance.updateChecks)
+      const homeAffectsRunning = !editingMachine
+        || machineDefaultAffectsCurrent('home', context)
+      const portAffectsRunning = !editingMachine
+        || machineDefaultAffectsCurrent('port', context)
+      const homeEditable = !homeLocked
+        && (runtimeStopped || !homeAffectsRunning)
+      const portEditable = !portLocked
+        && (runtimeStopped || !portAffectsRunning)
+      const layerDescription = editingMachine
+        ? 'Default for instances that do not set their own value.'
+        : `Overrides machine defaults for instance "${context.instance}".`
       const homeItem: SettingItem = {
         id: 'home',
-        label: 'Complete home',
+        label: 'Data home',
         currentValue: homeLocked
           ? `${context.home} · locked`
-          : inheritedSettingValue(stored.home, context.home),
+          : editingMachine
+            ? machineHomeSettingValue(stored.home)
+            : inheritedSettingValue(stored.home, context.home),
         description: homeLocked
           ?? (
-            runtimeStopped
-              ? 'Complete state root for this instance. Blank removes the instance override.'
-              : 'Stop the selected Runtime before changing its complete home.'
+            homeEditable
+              ? (
+                  editingMachine
+                    ? 'Default data home for the implicit "default" instance. Blank uses ~/.openalice.'
+                    : context.instance === 'default'
+                    ? 'Where this instance keeps settings, credentials, and local state. Blank uses the inherited location.'
+                    : 'Where this named instance keeps its separate settings, credentials, and local state.'
+                )
+              : 'Stop OpenAlice before changing the data-home layer used by this running instance.'
           ),
       }
-      if (!homeLocked && runtimeStopped) {
+      if (homeEditable) {
         homeItem.submenu = (_currentValue, done) => inputSubmenu(
-          'Set complete home',
+          editingMachine ? 'Set machine-default data home' : 'Set instance data home',
           stored.home ?? '',
-          () => undefined,
+          (value) => (
+            !editingMachine && context.instance !== 'default' && value === ''
+              ? 'Named instances require an explicit data home.'
+              : undefined
+          ),
           done,
+          editingMachine || context.instance === 'default'
+            ? 'Leave blank to inherit from the next lower-priority layer.'
+            : 'Named instances require a separate data home.',
         )
       }
       const portItem: SettingItem = {
         id: 'port',
-        label: 'Web port',
+        label: 'Browser port',
         currentValue: portLocked
           ? `${context.port} · locked`
-          : inheritedSettingValue(stored.port, context.port),
+          : editingMachine
+            ? machinePortSettingValue(stored.port)
+            : portSettingValue(stored.port, context),
         description: portLocked
           ?? (
-            runtimeStopped
-              ? 'Port for the local Web UI. Blank removes the instance override.'
-              : 'Stop the selected Runtime before changing its Web port.'
+            portEditable
+              ? `${layerDescription} Blank chooses an available port automatically.`
+              : 'Stop OpenAlice before changing the browser-port layer used by this running instance.'
           ),
       }
-      if (!portLocked && runtimeStopped) {
+      if (portEditable) {
         portItem.submenu = (_currentValue, done) => inputSubmenu(
-          'Set Web port',
+          editingMachine ? 'Set machine-default browser port' : 'Set instance browser port',
           stored.port?.toString() ?? '',
           validatePortSetting,
           done,
@@ -658,9 +837,11 @@ export async function runSupervisorTui(
         label: 'Update checks',
         currentValue: updatesLocked
           ? `${context.updateChecks ? ENABLED_SETTING : DISABLED_SETTING} · locked`
-          : booleanSettingValue(stored.updateChecks),
+          : editingMachine
+            ? machineBooleanSettingValue(stored.updateChecks)
+            : booleanSettingValue(stored.updateChecks),
         description: updatesLocked
-          ?? `Check for CLI/product updates when the Supervisor opens. Resolved: ${context.updateChecks ? 'enabled' : 'disabled'}.`,
+          ?? `${layerDescription} Current instance resolves to ${context.updateChecks ? 'enabled' : 'disabled'}.`,
       }
       if (!updatesLocked) {
         updateItem.values = [
@@ -669,47 +850,90 @@ export async function runSupervisorTui(
           DISABLED_SETTING,
         ]
       }
+      const runtimeItem: SettingItem = context.runtimeProvider.kind === 'bundle'
+        ? {
+            id: 'source',
+            label: 'Installed Runtime',
+            currentValue: `OpenAlice ${screen.snapshot.version} · ${context.runtimeProvider.contentIdentity ?? 'verified'}`,
+            description: `Managed by the installer at ${context.appDir ?? 'an unavailable path'}. No source checkout is needed.`,
+          }
+        : {
+            id: 'source',
+            label: 'Source checkout',
+            currentValue: context.appDir ?? 'current directory discovery',
+            description: 'Advanced development provider. Use m for managed source or c to choose a checkout.',
+          }
       items.splice(0, items.length,
+        {
+          id: 'scope',
+          label: 'Editing',
+          currentValue: scope,
+          values: [INSTANCE_SCOPE, MACHINE_SCOPE],
+          description: editingMachine
+            ? 'Machine defaults are inherited by instances without their own value.'
+            : 'Instance values override machine defaults. Env vars and command options remain higher priority.',
+        },
         homeItem,
         portItem,
         updateItem,
-        {
-          id: 'source',
-          label: 'Runtime source',
-          currentValue: context.appDir ?? 'current directory discovery',
-          description: 'Read-only here. Use m for installer-managed source or c for an existing checkout.',
-        },
+        runtimeItem,
         {
           id: 'config',
-          label: 'Config file',
+          label: 'Advanced config',
           currentValue: join(context.supervisorRoot, 'config.json'),
-          description: 'Machine defaults and every named instance live in this atomic JSON document.',
+          description: 'Read-only location for machine defaults and named-instance settings.',
         },
       )
     }
     syncItems()
+    const updateDisplayedValues = () => {
+      for (const item of items) {
+        settings.updateValue(item.id, item.currentValue)
+      }
+    }
+    const restoreDisplayedValue = (id: string) => {
+      syncItems()
+      const item = items.find((candidate) => candidate.id === id)
+      if (item) settings.updateValue(id, item.currentValue)
+    }
 
     const applySetting = async (
       id: string,
       newValue: string,
     ): Promise<void> => {
       if (saving) return
+      if (id === 'scope') {
+        scope = newValue === MACHINE_SCOPE ? MACHINE_SCOPE : INSTANCE_SCOPE
+        syncItems()
+        updateDisplayedValues()
+        setMessage(
+          scope === MACHINE_SCOPE
+            ? 'Editing machine defaults. Instance, env, and command layers remain above them.'
+            : `Editing instance "${context.instance}". Env and command layers remain above it.`,
+        )
+        return
+      }
       const field = settingField(id)
       if (!field) return
-      const lock = settingOverrideLock(context.provenance[field])
+      const editingMachine = scope === MACHINE_SCOPE
+      const lock = editingMachine
+        ? undefined
+        : settingOverrideLock(context.provenance[field])
       if (lock) {
         setMessage(lock)
-        syncItems()
-        settings.updateValue(id, settingItemValue(id, stored, context))
+        restoreDisplayedValue(id)
         return
       }
       if (
         (field === 'home' || field === 'port')
         && screen.snapshot.runtime?.class !== 'absent'
+        && (
+          !editingMachine
+          || machineDefaultAffectsCurrent(field, context)
+        )
       ) {
-        setMessage(`Stop the selected Runtime before changing its ${field === 'home' ? 'complete home' : 'Web port'}.`)
-        syncItems()
-        settings.updateValue(id, settingItemValue(id, stored, context))
+        setMessage(`Stop OpenAlice before changing its ${field === 'home' ? 'data home' : 'browser port'}.`)
+        restoreDisplayedValue(id)
         return
       }
 
@@ -728,23 +952,26 @@ export async function runSupervisorTui(
             }
       saving = true
       actionRunning = true
-      setMessage(`Saving ${settingLabel(field)}…`)
+      const layerLabel = editingMachine ? 'machine default' : `instance "${context.instance}"`
+      setMessage(`Saving ${settingLabel(field)} for ${layerLabel}…`)
       try {
-        context = await configureInstance(context, patch)
+        context = editingMachine
+          ? await configureMachine(context, patch)
+          : await configureInstance(context, patch)
         services = createServices(dependencies, context)
-        stored = await loadInstanceConfig(context)
+        ;[storedInstance, storedMachine] = await Promise.all([
+          loadInstanceConfig(context),
+          loadMachineConfig(context),
+        ])
         syncItems()
-        for (const item of items) {
-          settings.updateValue(item.id, item.currentValue)
-        }
+        updateDisplayedValues()
         screen.update({
           context,
           diagnostic: undefined,
         })
-        setMessage(`Saved ${settingLabel(field)}.`)
+        setMessage(`Saved ${settingLabel(field)} for ${layerLabel}.`)
       } catch (error: unknown) {
-        syncItems()
-        settings.updateValue(id, settingItemValue(id, stored, context))
+        restoreDisplayedValue(id)
         setMessage(`Could not save ${settingLabel(field)}: ${safeError(error)}`)
       } finally {
         actionRunning = false
@@ -762,7 +989,7 @@ export async function runSupervisorTui(
     }
     settings = new piTui.SettingsList(
       items,
-      5,
+      6,
       theme,
       (id, newValue) => {
         void applySetting(id, newValue)
@@ -772,7 +999,7 @@ export async function runSupervisorTui(
     const panel = new (class implements Component {
       render(width: number): string[] {
         return [
-          `Instance settings · ${context.instance}`,
+          `OpenAlice setup · ${context.instance}`,
           '─'.repeat(Math.max(1, width)),
           '',
           ...settings.render(width),
@@ -796,6 +1023,281 @@ export async function runSupervisorTui(
       margin: 1,
     })
     closeSettings = () => close()
+    overlay.focus()
+  }
+
+  async function openInstances(): Promise<void> {
+    if (
+      instancesActive
+      || sourcePromptActive
+      || settingsActive
+      || actionRunning
+    ) return
+    actionRunning = true
+    screen.update({
+      busy: 'Loading instances',
+      notice: undefined,
+      diagnostic: undefined,
+    })
+    let registry: SupervisorInstanceRegistry
+    try {
+      registry = await loadInstanceRegistry(context)
+    } catch (error: unknown) {
+      screen.update({
+        diagnostic: `Could not load instances: ${safeError(error)}`,
+      })
+      return
+    } finally {
+      actionRunning = false
+      if (active) screen.update({ busy: undefined })
+    }
+    if (!active) return
+
+    instancesActive = true
+    let changing = false
+    let message = 'Selecting an instance also makes it the next bare-start default.'
+    const lock = instanceSelectionOverrideLock(context)
+    if (lock) message = lock
+    const createValue = '__create_instance__'
+    const visibleInstances = registry.instances.some(
+      (entry) => entry.name === context.instance,
+    )
+      ? registry.instances
+      : [
+          ...registry.instances,
+          {
+            name: context.instance,
+            home: context.home,
+            port: context.port,
+            portAutomatic: context.provenance.port.source === 'default',
+            isDefault: false,
+          },
+        ]
+    const items: SelectItem[] = visibleInstances.map((entry) => ({
+      value: entry.name,
+      label: [
+        entry.name,
+        entry.name === context.instance ? 'current' : undefined,
+        entry.isDefault ? 'default' : undefined,
+      ].filter(Boolean).join(' · '),
+      description: `${entry.home} · Web ${entry.portAutomatic ? `auto from ${entry.port}` : entry.port}`,
+    }))
+    if (!lock) {
+      items.push({
+        value: createValue,
+        label: '+ Create instance…',
+        description: 'Register a separate data home and select it.',
+      })
+    }
+
+    const theme: SelectListTheme = {
+      selectedPrefix: (text) => text,
+      selectedText: (text) => text,
+      description: (text) => text,
+      scrollInfo: (text) => text,
+      noMatch: (text) => text,
+    }
+    const list = new piTui.SelectList(items, 8, theme, {
+      minPrimaryColumnWidth: 20,
+      maxPrimaryColumnWidth: 32,
+    })
+    const selectedIndex = items.findIndex(
+      (item) => item.value === context.instance,
+    )
+    list.setSelectedIndex(Math.max(0, selectedIndex))
+    let component: Component = list
+
+    const setMessage = (next: string) => {
+      message = next
+      ui.requestRender()
+    }
+    const close = (notice = 'Instance selection closed.') => {
+      if (!instancesActive) return
+      instancesActive = false
+      closeInstances = null
+      overlay.hide()
+      ui.setShowHardwareCursor(false)
+      screen.update({ notice })
+    }
+    const showList = () => {
+      ui.setShowHardwareCursor(false)
+      component = list
+      setMessage(lock ?? 'Selecting an instance also makes it the next bare-start default.')
+    }
+    const activateContext = async (
+      operation: () => Promise<ResolvedLaunchContext>,
+      notice: (next: ResolvedLaunchContext) => string,
+    ) => {
+      if (changing) return
+      changing = true
+      actionRunning = true
+      setMessage('Switching instance…')
+      try {
+        const next = await operation()
+        context = next
+        services = createServices(dependencies, context)
+        screen.update({
+          context,
+          runtime: null,
+          diagnostic: undefined,
+        })
+        close(notice(next))
+      } catch (error: unknown) {
+        setMessage(`Could not switch instance: ${safeError(error)}`)
+      } finally {
+        actionRunning = false
+        changing = false
+        await refreshRuntime()
+      }
+    }
+    const showCreateHomeInput = (name: string) => {
+      const defaultHome = registry.instances.find(
+        (entry) => entry.name === 'default',
+      )?.home ?? context.home
+      const suggestedHome = join(
+        dirname(defaultHome),
+        `.openalice-${name}`,
+      )
+      const input = new (class extends piTui.Input {
+        detail = 'Use a separate data home. An empty directory is prepared when registered.'
+
+        setDetail(next: string): void {
+          this.detail = next
+          this.invalidate()
+          ui.requestRender()
+        }
+
+        override render(width: number): string[] {
+          return [
+            `Create instance · ${name}`,
+            '',
+            'Data home',
+            ...super.render(width),
+            '',
+            sanitize(this.detail),
+            '',
+            'Enter  Create and select · Esc  Back',
+          ]
+        }
+      })()
+      input.setValue(suggestedHome)
+      input.focused = true
+      ui.setShowHardwareCursor(true)
+      input.onEscape = () => {
+        input.focused = false
+        showList()
+      }
+      input.onSubmit = (value) => {
+        const home = value.trim()
+        if (!home) {
+          input.setDetail('Enter a data home for this instance.')
+          return
+        }
+        void activateContext(
+          () => createInstance(context, name, home),
+          (next) => `Created and selected instance ${next.instance}.`,
+        )
+      }
+      component = input
+      setMessage('The new instance owns only its registry entry; its data is never copied or deleted.')
+    }
+    const showCreateNameInput = () => {
+      const input = new (class extends piTui.Input {
+        detail = 'Use a short lowercase name such as research or paper.'
+
+        setDetail(next: string): void {
+          this.detail = next
+          this.invalidate()
+          ui.requestRender()
+        }
+
+        override render(width: number): string[] {
+          return [
+            'Create instance',
+            '',
+            'Instance name',
+            ...super.render(width),
+            '',
+            sanitize(this.detail),
+            '',
+            'Enter  Continue · Esc  Back',
+          ]
+        }
+      })()
+      input.focused = true
+      ui.setShowHardwareCursor(true)
+      input.onEscape = () => {
+        input.focused = false
+        showList()
+      }
+      input.onSubmit = (value) => {
+        const name = value.trim()
+        const validation = validateSupervisorInstanceName(name)
+        if (validation) {
+          input.setDetail(validation)
+          return
+        }
+        if (registry.instances.some((entry) => entry.name === name)) {
+          input.setDetail(`Instance "${name}" is already registered.`)
+          return
+        }
+        input.focused = false
+        showCreateHomeInput(name)
+      }
+      component = input
+      setMessage('Create a named instance without leaving the Supervisor.')
+    }
+
+    list.onCancel = () => close()
+    list.onSelect = (item) => {
+      if (item.value === createValue) {
+        showCreateNameInput()
+        return
+      }
+      if (lock) {
+        setMessage(lock)
+        return
+      }
+      if (
+        item.value === context.instance
+        && item.value === registry.defaultInstance
+      ) {
+        close(`Instance ${context.instance} is already selected.`)
+        return
+      }
+      void activateContext(
+        () => selectInstance(context, item.value),
+        (next) => `Selected instance ${next.instance}; future bare starts use it.`,
+      )
+    }
+
+    const panel = new (class implements Component {
+      render(width: number): string[] {
+        return [
+          'OpenAlice instances',
+          '─'.repeat(Math.max(1, width)),
+          '',
+          ...component.render(width),
+          '',
+          sanitize(message),
+        ]
+      }
+
+      handleInput(data: string): void {
+        if (!changing) component.handleInput?.(data)
+      }
+
+      invalidate(): void {
+        component.invalidate()
+      }
+    })()
+    const overlay = ui.showOverlay(panel, {
+      width: '92%',
+      maxHeight: '90%',
+      anchor: 'center',
+      margin: 1,
+    })
+    closeInstances = () => close()
     overlay.focus()
   }
 
@@ -829,6 +1331,7 @@ export async function runSupervisorTui(
       clearInterval(poll)
       closeSourcePrompt?.()
       closeSettings?.()
+      closeInstances?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -837,7 +1340,7 @@ export async function runSupervisorTui(
     }
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
-      if (sourcePromptActive || settingsActive) {
+      if (sourcePromptActive || settingsActive || instancesActive) {
         if (piTui.matchesKey(data, 'ctrl+c')) {
           finish()
           return { consume: true }
@@ -894,6 +1397,7 @@ export class SupervisorScreen implements Component {
   private readonly onAction?: (action: SupervisorAction) => void
   private readonly onConfigureSource?: () => void
   private readonly onSettings?: () => void
+  private readonly onInstances?: () => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
@@ -904,6 +1408,7 @@ export class SupervisorScreen implements Component {
       onAction?: (action: SupervisorAction) => void
       onConfigureSource?: () => void
       onSettings?: () => void
+      onInstances?: () => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
       requestRender?: () => void
@@ -913,6 +1418,7 @@ export class SupervisorScreen implements Component {
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
     this.onSettings = callbacks.onSettings
+    this.onInstances = callbacks.onInstances
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
@@ -951,6 +1457,17 @@ export class SupervisorScreen implements Component {
       this.update({ panel: this.snapshot.panel === 'help' ? 'overview' : 'help' })
       return true
     }
+    if (matchesKey(data, 'enter')) {
+      const action = primaryAction(this.snapshot.runtime)
+      if (action && this.actionAvailable(action)) {
+        this.onAction?.(action)
+      } else {
+        this.update({
+          notice: 'No primary action is available in the current Runtime state.',
+        })
+      }
+      return true
+    }
     if (matchesKey(data, 'tab') || matchesKey(data, 'right')) {
       this.selectAdjacentPanel(1)
       return true
@@ -967,6 +1484,10 @@ export class SupervisorScreen implements Component {
     }
     if (matchesKey(data, 'p')) {
       this.onSettings?.()
+      return true
+    }
+    if (matchesKey(data, 'i')) {
+      this.onInstances?.()
       return true
     }
     if (matchesKey(data, 'm')) {
@@ -1041,18 +1562,28 @@ export class SupervisorScreen implements Component {
           `Web: ${runtime?.endpoints?.web ?? 'not available'}`,
           `Components: ${formatComponents(runtime)}`,
         )
-        if (runtime?.provider?.kind) {
-          lines.push(`Provider: ${runtime.provider.kind}`)
+        const reportedProvider = runtime?.provider?.kind
+        const provider = reportedProvider && reportedProvider !== 'unknown'
+          ? reportedProvider
+          : this.snapshot.context?.runtimeProvider.kind
+        if (provider) {
+          lines.push(`Provider: ${provider}${runtime?.class === 'absent' && provider === 'bundle' ? ' (installed)' : ''}`)
         }
         if (Number.isInteger(runtime?.uptimeSeconds)) {
           lines.push(`Uptime: ${formatDuration(runtime?.uptimeSeconds ?? 0)}`)
         }
         if (this.snapshot.context) {
-          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatProvenance(this.snapshot.context.provenance.port)}`)
-          lines.push(`Source: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
+          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
+          if (this.snapshot.context.runtimeProvider.kind === 'bundle') {
+            lines.push(
+              `Runtime: OpenAlice ${this.snapshot.version} · bundle ${this.snapshot.context.runtimeProvider.contentIdentity ?? 'verified'}`,
+            )
+          } else {
+            lines.push(`Source: ${this.snapshot.context.appDir ?? runtime?.provider?.root ?? 'current directory discovery'} ${formatProvenance(this.snapshot.context.provenance.appDir)}`)
+          }
         }
       }
-      lines.push('', ...renderGuidance(runtime))
+      lines.push('', ...renderGuidance(runtime, this.snapshot.context))
     }
 
     if (this.snapshot.confirmation) {
@@ -1069,7 +1600,7 @@ export class SupervisorScreen implements Component {
     }
     lines.push(
       '',
-      ...actionBar(runtime, width),
+      ...actionBar(runtime, this.snapshot.context, width),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
     return lines.map((line) => truncate(line, width))
@@ -1080,7 +1611,9 @@ export class SupervisorScreen implements Component {
   private actionAvailable(action: SupervisorAction): boolean {
     const runtime = this.snapshot.runtime
     if (action === 'logs' || action === 'doctor' || action === 'update') return true
-    if (action === 'start') return runtime?.class === 'absent'
+    if (action === 'start' || action === 'start-open') {
+      return runtime?.class === 'absent'
+    }
     if (action === 'open') return Boolean(runtime?.endpoints?.web)
     return runtime?.owner?.surface === 'cli-server'
       && runtime.class !== 'absent'
@@ -1134,16 +1667,28 @@ function renderTabs(selected: SupervisorPanel, narrow: boolean): string {
     .join('  ')
 }
 
-function renderGuidance(runtime: RuntimeSummary | null): string[] {
+function renderGuidance(
+  runtime: RuntimeSummary | null,
+  context?: ResolvedLaunchContext,
+): string[] {
   if (!runtime) return ['Runtime status is unavailable. Doctor may explain why.']
   if (runtime.class === 'absent') {
-    return ['OpenAlice is stopped. Press s to start, m for managed source, or c for an existing checkout.']
+    if (context?.runtimeProvider.kind === 'bundle') {
+      return [
+        'OpenAlice is ready to start.',
+        'Press Enter to start and open the browser, or p to review setup first.',
+      ]
+    }
+    return [
+      'OpenAlice is ready to start.',
+      'Enter prepares anything missing and opens the browser; c chooses a checkout.',
+    ]
   }
   if (runtime.class === 'incompatible') {
     return ['The running Guardian is incompatible. Read Doctor before changing it.']
   }
   if (runtime.class === 'running') {
-    return ['Runtime is ready. Press o to hand product interaction to the Web UI.']
+    return ['OpenAlice is ready. Press Enter or o to open the Web UI.']
   }
   return [`Runtime is ${runtime.class ?? runtime.state ?? 'unknown'}; status will refresh automatically.`]
 }
@@ -1178,13 +1723,15 @@ function renderHelp(): string[] {
   return [
     'Supervisor controls',
     '',
-    's  Start persistent Runtime       o  Open verified Web UI',
+    'Enter  Start and open / open Web UI',
+    's  Start in background            o  Open verified Web UI',
     'x  Stop (confirmation required)   r  Restart (confirmation required)',
     'l  Bounded redacted logs          d  Read-only Doctor',
     'u  Check for product update       ?  Toggle this help',
-    'p  Configure selected instance settings',
-    'm  Prepare installer-managed source and start',
-    'c  Choose and remember this instance\'s source checkout',
+    'i  Select or create an instance',
+    'p  Review setup for this instance',
+    'm  Advanced: prepare installer-managed source and start',
+    'c  Advanced: choose and remember a source checkout',
     'Tab / arrows  Change panel        q / Esc  Detach only',
     '',
     'The Supervisor manages Runtime state. Workspaces, trading, and chat stay in the Web UI.',
@@ -1217,10 +1764,16 @@ function renderConfirmation(
   ]
 }
 
-function actionBar(runtime: RuntimeSummary | null, width: number): string[] {
+function actionBar(
+  runtime: RuntimeSummary | null,
+  context: ResolvedLaunchContext | undefined,
+  width: number,
+): string[] {
   const primary = runtime?.class === 'absent'
-    ? 's Start · p Settings · m Managed · c Source'
-    : 'o Open · p Settings · r Restart · x Stop'
+    ? context?.runtimeProvider.kind === 'bundle'
+      ? 'Enter Start & open · s Background · p Setup · i Instances'
+      : 'Enter Start & open · s Background · p Setup · i Instances · m Managed · c Source'
+    : 'Enter / o Open · i Instances · p Setup · r Restart · x Stop'
   const secondary = 'd Doctor · l Logs · u Update · ? Help'
   const actions = `${primary} · ${secondary}`
   if (actions.length <= width) return [actions]
@@ -1250,6 +1803,7 @@ function unavailableActionMessage(
 function actionName(action: SupervisorAction): string {
   return {
     start: 'Starting Runtime',
+    'start-open': 'Starting and opening OpenAlice',
     open: 'Opening Web UI',
     stop: 'Stopping Runtime',
     restart: 'Restarting Runtime',
@@ -1257,6 +1811,14 @@ function actionName(action: SupervisorAction): string {
     doctor: 'Running Doctor',
     update: 'Checking for updates',
   }[action]
+}
+
+function primaryAction(
+  runtime: RuntimeSummary | null,
+): SupervisorAction | undefined {
+  if (runtime?.class === 'absent') return 'start-open'
+  if (runtime?.endpoints?.web) return 'open'
+  return undefined
 }
 
 function formatUpdateNotice(update: UpdateResult): string {
@@ -1267,6 +1829,14 @@ function formatUpdateNotice(update: UpdateResult): string {
     return `OpenAlice ${update.currentVersion ?? ''} is current.`.trim()
   }
   return update.message ?? 'Automatic update is unavailable for this install channel.'
+}
+
+function runtimeStartPort(
+  context: ResolvedLaunchContext,
+): number | undefined {
+  return context.provenance.port.source === 'default'
+    ? undefined
+    : context.port
 }
 
 function formatOwner(runtime: RuntimeSummary | null): string {
@@ -1295,6 +1865,12 @@ function formatProvenance(value: { source: string; detail: string }): string {
   return value.source === 'default' ? '(default)' : `(${value.detail})`
 }
 
+function formatPortResolution(context: ResolvedLaunchContext): string {
+  return context.provenance.port.source === 'default'
+    ? `(automatic from ${context.port})`
+    : formatProvenance(context.provenance.port)
+}
+
 type EditableSettingField = 'home' | 'port' | 'updateChecks'
 
 function settingField(id: string): EditableSettingField | undefined {
@@ -1304,8 +1880,8 @@ function settingField(id: string): EditableSettingField | undefined {
 
 function settingLabel(field: EditableSettingField): string {
   return {
-    home: 'complete home',
-    port: 'Web port',
+    home: 'data home',
+    port: 'browser port',
     updateChecks: 'update checks',
   }[field]
 }
@@ -1322,6 +1898,18 @@ function settingOverrideLock(
   return `Locked by ${provenance.detail}. Change that higher-priority override and reopen the Supervisor.`
 }
 
+function instanceSelectionOverrideLock(
+  context: ResolvedLaunchContext,
+): string | undefined {
+  const instanceLock = settingOverrideLock(context.provenance.instance)
+  if (instanceLock) return `Instance selection is read-only. ${instanceLock}`
+  const homeLock = settingOverrideLock(context.provenance.home)
+  if (homeLock) {
+    return `Instance selection is read-only while this session's data home is fixed. ${homeLock}`
+  }
+  return undefined
+}
+
 function inheritedSettingValue(
   stored: string | number | undefined,
   resolved: string | number,
@@ -1331,48 +1919,71 @@ function inheritedSettingValue(
     : String(stored)
 }
 
+function portSettingValue(
+  stored: number | undefined,
+  context: ResolvedLaunchContext,
+): string {
+  if (stored !== undefined) return String(stored)
+  return context.provenance.port.source === 'default'
+    ? `${INHERIT_SETTING} → automatic from ${context.port}`
+    : `${INHERIT_SETTING} → ${context.port}`
+}
+
 function booleanSettingValue(stored: boolean | undefined): string {
   if (stored === undefined) return INHERIT_SETTING
   return stored ? ENABLED_SETTING : DISABLED_SETTING
 }
 
-function settingItemValue(
-  id: string,
-  stored: InstanceLaunchConfig,
+function machineHomeSettingValue(stored: string | undefined): string {
+  return stored ?? `${INHERIT_SETTING} → ~/.openalice`
+}
+
+function machinePortSettingValue(stored: number | undefined): string {
+  return stored?.toString()
+    ?? `${INHERIT_SETTING} → automatic from 47331`
+}
+
+function machineBooleanSettingValue(stored: boolean | undefined): string {
+  return stored === undefined
+    ? INHERIT_SETTING
+    : stored ? ENABLED_SETTING : DISABLED_SETTING
+}
+
+function machineDefaultAffectsCurrent(
+  field: 'home' | 'port',
   context: ResolvedLaunchContext,
-): string {
-  if (id === 'home') {
-    return settingOverrideLock(context.provenance.home)
-      ? `${context.home} · locked`
-      : inheritedSettingValue(stored.home, context.home)
-  }
-  if (id === 'port') {
-    return settingOverrideLock(context.provenance.port)
-      ? `${context.port} · locked`
-      : inheritedSettingValue(stored.port, context.port)
-  }
-  if (id === 'updateChecks') {
-    return settingOverrideLock(context.provenance.updateChecks)
-      ? `${context.updateChecks ? ENABLED_SETTING : DISABLED_SETTING} · locked`
-      : booleanSettingValue(stored.updateChecks)
-  }
-  if (id === 'source') return context.appDir ?? 'current directory discovery'
-  return join(context.supervisorRoot, 'config.json')
+): boolean {
+  return context.provenance[field].source === 'default'
+    || context.provenance[field].source === 'machine-config'
 }
 
 function validatePortSetting(value: string): string | undefined {
   if (!value) return undefined
   if (!/^\d+$/.test(value)) {
-    return 'Web port must be a whole number from 1 to 65535.'
+    return 'Browser port must be a whole number from 1 to 65535.'
   }
   const port = Number(value)
   return port >= 1 && port <= 65_535
     ? undefined
-    : 'Web port must be a whole number from 1 to 65535.'
+    : 'Browser port must be a whole number from 1 to 65535.'
 }
 
 function safeError(error: unknown): string {
   return sanitize(error instanceof Error ? error.message : String(error))
+}
+
+function storedHomeRecoveryNotice(
+  error: unknown,
+  fallbackInstance: string,
+): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const match = message.match(/for instance "([^"]+)" (is missing|is unavailable or not writable)/)
+  const unavailable = match
+    ? `Instance "${match[1]}" ${match[2]}.`
+    : 'The remembered instance home is unavailable.'
+  return sanitize(
+    `${unavailable} Using "${fallbackInstance}"; press i Instances to recover.`,
+  )
 }
 
 function sanitize(value: string): string {

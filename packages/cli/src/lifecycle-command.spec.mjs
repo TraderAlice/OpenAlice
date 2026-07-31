@@ -152,6 +152,99 @@ describe('OpenAlice top-level lifecycle commands', () => {
     )
   })
 
+  it('loads a TUI-registered named home for explicit lifecycle commands', async () => {
+    const inspectRuntime = vi.fn(async () => absentStatus())
+    await expect(runLifecycleCommand(
+      'status',
+      parseLifecycleArgs('status', ['--instance', 'research']),
+      {
+        env: {},
+        homeDir: '/home/alice',
+        platform: 'linux',
+        readSupervisorConfig: async () => ({
+          schemaVersion: 1,
+          instances: {
+            research: {
+              name: 'research',
+              home: '/srv/openalice-research',
+            },
+          },
+        }),
+        checkStoredHome: async () => {},
+        inspectRuntime,
+        stdout: output(),
+      },
+    )).resolves.toBe(0)
+
+    expect(inspectRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instance: 'research',
+        homeRoot: '/srv/openalice-research',
+      }),
+      expect.any(Object),
+    )
+  })
+
+  it('inherits stored start settings and leaves an unconfigured Web port automatic', async () => {
+    const automaticStart = vi.fn(async () => startedResult())
+    await expect(runLifecycleCommand(
+      'up',
+      parseLifecycleArgs('up', []),
+      {
+        env: {},
+        homeDir: '/home/alice',
+        platform: 'linux',
+        readSupervisorConfig: async () => ({ schemaVersion: 1 }),
+        startRuntime: automaticStart,
+        stdout: output(),
+      },
+    )).resolves.toBe(0)
+    expect(automaticStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appDir: null,
+        homeRoot: '/home/alice/.openalice',
+        port: undefined,
+        checkUpdates: true,
+      }),
+      expect.any(Object),
+    )
+
+    const configuredStart = vi.fn(async () => startedResult())
+    await expect(runLifecycleCommand(
+      'up',
+      parseLifecycleArgs('up', ['--instance', 'research']),
+      {
+        env: {},
+        homeDir: '/home/alice',
+        platform: 'linux',
+        readSupervisorConfig: async () => ({
+          schemaVersion: 1,
+          instances: {
+            research: {
+              name: 'research',
+              home: '/srv/openalice-research',
+              appDir: '/srv/OpenAlice',
+              port: 49_001,
+              updateChecks: false,
+            },
+          },
+        }),
+        checkStoredHome: async () => {},
+        startRuntime: configuredStart,
+        stdout: output(),
+      },
+    )).resolves.toBe(0)
+    expect(configuredStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appDir: '/srv/OpenAlice',
+        homeRoot: '/srv/openalice-research',
+        port: 49_001,
+        checkUpdates: false,
+      }),
+      expect.any(Object),
+    )
+  })
+
   it('does not redirect external Pi during source lifecycle commands', async () => {
     const inspectRuntime = vi.fn(async () => absentStatus())
     await expect(runLifecycleCommand('status', parseLifecycleArgs('status', [
@@ -184,7 +277,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
     for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'completion']) {
       expect(help).toContain(command)
     }
-    expect(formatLifecycleHelp('up')).toContain('persistent background Runtime')
+    expect(formatLifecycleHelp('up')).toContain('installed OpenAlice Runtime in the background')
     expect(formatLifecycleHelp('run')).toContain('foreground')
     expect(formatShellCompletion('bash')).toContain('complete -F _openalice_completion openalice')
     expect(formatShellCompletion('zsh')).toContain('#compdef openalice')

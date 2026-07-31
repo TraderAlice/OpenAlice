@@ -620,7 +620,7 @@ describe('opencodeAdapter AI-config', () => {
         anthropic: 'https://api.minimax.io/anthropic',
         'openai-chat': 'https://api.minimax.io/v1',
       },
-    }, 'opencode', { model: 'MiniMax-M2.5' })!;
+    }, opencodeAdapter, { model: 'MiniMax-M2.5' })!;
 
     await opencodeAdapter.writeAiConfig!(dir, cred);
     const config = JSON.parse(await read('opencode.json'));

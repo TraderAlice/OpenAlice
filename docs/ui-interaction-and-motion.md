@@ -51,6 +51,15 @@ Narrow layouts are a change in information hierarchy, not a compressed desktop.
 Keep the primary identity, state, value, and next action visible. Move secondary
 metadata into disclosure rows, detail views, or drawers.
 
+Long, task-oriented dialogs may use the complete phone work area while remaining
+centered cards at wider breakpoints. Keep their identity and primary actions in
+fixed header/footer regions, make the content body the only vertical scroll
+owner, and carry `min-height: 0` through every intervening flex child. Compact
+confirmations should remain dialogs rather than expanding into full-screen
+forms. When a dialog has multiple navigation levels, keep each mobile level to
+one touch-sized row and let secondary choices scroll horizontally instead of
+stacking enough chrome to hide the form.
+
 Do not make a desktop comparison table fit a phone by shrinking its type or
 requiring routine horizontal scrolling. Preserve the dense table at widths
 where comparison is useful and provide a scan-first representation below that

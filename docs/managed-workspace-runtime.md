@@ -334,11 +334,11 @@ PTY pool, then shows:
 - only launcher-controlled environment contributions, grouped by terminal,
   Workspace, toolchain, and adapter ownership.
 
-The Shell utility is always present in this surface even when it is not listed
-as a Workspace agent runtime. Its plan uses the same launcher-built base
-environment and cwd as coding agents, so the injected `alice*` and `traderhub`
-CLI path and local tool transport remain visible. Shell does not receive an AI
-provider credential or another runtime's adapter-specific environment.
+The Shell utility is always present in this surface alongside the registered
+agent runtimes. Its plan uses the same launcher-built base environment and cwd
+as coding agents, so the injected `alice*` and `traderhub` CLI path and local
+tool transport remain visible. Shell does not receive an AI provider credential
+or another runtime's adapter-specific environment.
 
 Reading a launch plan never runs `prepareWorkspace`, writes native runtime
 configuration, or starts a process. The response omits inherited host
@@ -447,10 +447,11 @@ POSIX shell exists.
 
 A source-backed Harness receives only repository, release, and exact commit
 values approved by its template catalog. AutoQuant V2 verifies that tuple,
-copies the exact tree, removes upstream history/remotes, starts a fresh local
-research branch, and writes `.alice/harness-source.json`. Bootstrap does not
-install Python or quantitative dependencies; the native Coding Agent owns
-environment setup and later research commits inside the Workspace.
+copies the repository, keeps its upstream ancestry and canonical `origin`,
+starts a local research branch at the approved commit, and writes
+`.alice/harness-source.json`. Bootstrap does not install Python or quantitative
+dependencies; the native Coding Agent owns environment setup, later research
+commits, and explicit fetch/merge upgrades inside the Workspace.
 
 OpenAlice copies Workspace skills into two canonical project paths:
 

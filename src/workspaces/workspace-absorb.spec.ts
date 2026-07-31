@@ -271,7 +271,6 @@ function workspace(id: string, tag: string): WorkspaceMeta {
     dir: join(root, 'workspaces', id),
     createdAt: '2026-01-01T00:00:00.000Z',
     template: 'chat',
-    agents: ['pi'],
   }
 }
 

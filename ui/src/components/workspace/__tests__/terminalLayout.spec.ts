@@ -42,4 +42,16 @@ describe('terminal responsive layout contract', () => {
     expect(declarationsFor('.terminal-title')).toContain('text-overflow: ellipsis')
     expect(declarationsFor('.terminal-meta')).toContain('text-overflow: ellipsis')
   })
+
+  it('lets the Files overlay own the full Workspace width on a phone', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 520px\)[\s\S]*?\.workspace-page-shell \.workspace-side\s*\{[\s\S]*?width: 100%/,
+    )
+  })
+
+  it('keeps the terminal titlebar exposed above a narrow Files overlay', () => {
+    expect(css).toMatch(
+      /@container \(max-width: 900px\)[\s\S]*?\.workspace-page-shell\.is-terminal-canvas \.workspace-side\s*\{[\s\S]*?inset-block-start: 37px/,
+    )
+  })
 })

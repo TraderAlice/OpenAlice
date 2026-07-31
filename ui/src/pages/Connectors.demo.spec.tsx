@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PublicConnectorConfig } from '../api'
@@ -75,6 +77,63 @@ describe('Connector demo routes', () => {
     expect(screen.getByText('Telegram')).toBeTruthy()
     expect(screen.getByText('Application ID')).toBeTruthy()
     expect(screen.getAllByText('Bot token')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Send test' })).toBeNull()
+  })
+
+  it('localizes Connector setup state and credential controls', async () => {
+    await i18n.changeLanguage('zh')
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.telegram.configuredSecrets = ['botToken']
+    mocks.load.mockResolvedValue(snapshot)
+    render(<ConnectorsPage />)
+
+    expect(await screen.findByRole('heading', { name: '连接器' })).toBeTruthy()
+    expect(screen.getByText('运行外部通知连接器')).toBeTruthy()
+    expect(screen.getByText('需要凭据')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Discord 应用 ID' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '管理 Telegram 连接信息' })).toBeTruthy()
+    expect(screen.queryByText('Connection details')).toBeNull()
+  })
+
+  it('collapses saved connection details and promotes testing into the lifecycle row', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.discord = {
+      enabled: true,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-07-31T00:00:00.000Z',
+        adapters: [{
+          id: 'discord',
+          enabled: true,
+          status: 'healthy',
+          owner: 'owner-1',
+        }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorsPage />)
+
+    const manage = await screen.findByRole('button', { name: 'Manage Discord connection details' })
+    expect(manage.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('textbox', { name: 'Discord Application ID' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Send test' })).toBeTruthy()
+
+    fireEvent.click(manage)
+    expect(screen.getByRole('button', { name: 'Hide Discord connection details' }).getAttribute('aria-expanded'))
+      .toBe('true')
+    expect(screen.getByRole('textbox', { name: 'Discord Application ID' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send test' }))
+    await waitFor(() => expect(mocks.test).toHaveBeenCalledWith('discord'))
+    expect(await screen.findByText('connector-probe-demo')).toBeTruthy()
   })
 
   it('keeps a secret as a local draft until the user saves it explicitly', async () => {

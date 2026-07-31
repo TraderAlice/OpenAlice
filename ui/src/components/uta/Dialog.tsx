@@ -3,13 +3,23 @@ import {
   useEffect,
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
 } from 'react'
 
-/** Generic modal dialog used by the UTA wizard + edit flows. */
-export function Dialog({ onClose, width, ariaLabel, children }: {
+/** Generic modal dialog used by settings, Workspace, and UTA flows. */
+export function Dialog({
+  onClose,
+  width,
+  ariaLabel,
+  mobileFullscreen = false,
+  initialFocusRef,
+  children,
+}: {
   onClose: () => void
   width?: string
   ariaLabel: string
+  mobileFullscreen?: boolean
+  initialFocusRef?: RefObject<HTMLElement | null>
   children: React.ReactNode
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null)
@@ -27,7 +37,7 @@ export function Dialog({ onClose, width, ariaLabel, children }: {
     document.addEventListener('keydown', handleKeyDown)
     const surface = surfaceRef.current
     if (surface && !surface.contains(document.activeElement)) {
-      const initialFocus = focusableElements(surface)[0] ?? surface
+      const initialFocus = initialFocusRef?.current ?? focusableElements(surface)[0] ?? surface
       initialFocus.focus()
     }
 
@@ -36,7 +46,7 @@ export function Dialog({ onClose, width, ariaLabel, children }: {
       const previousFocus = restoreFocusRef.current
       if (previousFocus?.isConnected) previousFocus.focus()
     }
-  }, [handleKeyDown])
+  }, [handleKeyDown, initialFocusRef])
 
   const trapFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Tab') return
@@ -62,9 +72,16 @@ export function Dialog({ onClose, width, ariaLabel, children }: {
     }
   }
 
+  const viewportLayout = mobileFullscreen
+    ? 'items-stretch p-0 sm:items-center sm:p-4'
+    : 'items-center p-4'
+  const surfaceLayout = mobileFullscreen
+    ? 'h-full max-h-none max-w-none rounded-none border-x-0 sm:h-auto sm:max-h-[85vh] sm:max-w-[95vw] sm:rounded-xl sm:border-x'
+    : 'max-h-[85vh] max-w-[95vw] rounded-xl'
+
   return (
     // z-[60] keeps dialogs above the mobile nav drawers (z-50).
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-[60] flex justify-center ${viewportLayout}`}>
       <div
         aria-hidden
         className="oa-dialog-backdrop absolute inset-0 bg-backdrop"
@@ -77,7 +94,7 @@ export function Dialog({ onClose, width, ariaLabel, children }: {
         aria-label={ariaLabel}
         tabIndex={-1}
         onKeyDown={trapFocus}
-        className={`oa-dialog-surface relative ${width || 'w-full sm:w-[560px]'} max-w-[95vw] max-h-[85vh] bg-background rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden`}
+        className={`oa-dialog-surface relative ${width || 'w-full sm:w-[560px]'} ${surfaceLayout} flex flex-col overflow-hidden border border-border bg-background shadow-2xl`}
       >
         {children}
       </div>

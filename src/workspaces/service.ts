@@ -25,15 +25,12 @@ import {
   rememberRecentChatWorkspace,
 } from '@/core/preferences.js';
 
-import { claudeAdapter } from './adapters/claude.js';
-import { codexAdapter } from './adapters/codex.js';
-import { opencodeAdapter } from './adapters/opencode.js';
+import { createBuiltinAdapterRegistry } from './adapters/index.js';
 import { piAdapter } from './adapters/pi.js';
-import { shellAdapter } from './adapters/shell.js';
 import {
-  AdapterRegistry,
   isAgentRuntime,
   prepareAgentRuntimeWorkspace,
+  type AdapterRegistry,
   type CliAdapter,
   type HeadlessRunOverrides,
 } from './cli-adapter.js';
@@ -387,7 +384,7 @@ export interface WorkspaceService {
     preferredWorkspaceId?: string | null,
     sourceVersion?: string,
   ): Promise<TemplateWorkspaceResolution>;
-  /** Resolve the configured Workspace runtime, then fall back to its first enabled runtime. */
+  /** Resolve the installation default, then fall back to the first registered agent runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
   /** Open the same persisted Pi Session through Pi RPC instead of its PTY. */
@@ -761,12 +758,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     });
   }
 
-  const adapters = new AdapterRegistry();
-  adapters.register(claudeAdapter, { default: true });
-  adapters.register(codexAdapter);
-  adapters.register(opencodeAdapter);
-  adapters.register(piAdapter);
-  adapters.register(shellAdapter);
+  const adapters = createBuiltinAdapterRegistry();
   const sessionTitleResolver = new NativeSessionTitleResolver({
     sessionRegistry,
     resumeRegistry,
@@ -775,10 +767,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   });
   const refreshSessionTitles = (meta: WorkspaceMeta): Promise<void> =>
     sessionTitleResolver.refreshWorkspace(meta);
-  const managerWorkspace = createManagerWorkspaceMeta(
-    config.launcherRoot,
-    adapters.list().filter(isAgentRuntime).map((adapter) => adapter.id),
-  );
+  const managerWorkspace = createManagerWorkspaceMeta(config.launcherRoot);
   await mkdir(managerWorkspace.dir, { recursive: true });
   const resolveRuntimeWorkspace = (workspaceId: string): WorkspaceMeta | undefined =>
     workspaceId === managerWorkspace.id ? managerWorkspace : registry.get(workspaceId);
@@ -823,30 +812,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
   );
 
-  const resolveAdapter = (wsMeta: WorkspaceMeta, agentId?: string): CliAdapter => {
+  const resolveAdapter = (_wsMeta: WorkspaceMeta, agentId?: string): CliAdapter => {
     if (agentId) {
       const a = adapters.get(agentId);
-      if (a) return a;
-    }
-    const fromWorkspace = wsMeta.agents.find((id) => {
-      const a = adapters.get(id);
-      return a ? isAgentRuntime(a) : false;
-    });
-    if (fromWorkspace) {
-      const a = adapters.get(fromWorkspace);
       if (a) return a;
     }
     return adapters.resolve(null);
   };
 
-  const firstWorkspaceRuntime = (wsMeta: WorkspaceMeta): string | undefined =>
-    wsMeta.agents.find((id) => {
-      const adapter = adapters.get(id);
-      return adapter ? isAgentRuntime(adapter) : false;
-    });
+  const firstRegisteredRuntime = (): string | undefined =>
+    adapters.list().find(isAgentRuntime)?.id;
 
-  const validRuntimeForWorkspace = (wsMeta: WorkspaceMeta, agentId: string | null): string | undefined => {
-    if (!agentId || !wsMeta.agents.includes(agentId)) return undefined;
+  const validRegisteredRuntime = (agentId: string | null): string | undefined => {
+    if (!agentId) return undefined;
     const adapter = adapters.get(agentId);
     return adapter && isAgentRuntime(adapter) ? agentId : undefined;
   };
@@ -854,14 +832,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   /**
    * Default for scheduled issues with no frontmatter `agent`: issue-specific
    * setting first, then the interactive workspace default for backwards
-   * continuity, then the workspace's first enabled runtime.
+   * continuity, then the first registered runtime.
    */
-  const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
-    validRuntimeForWorkspace(wsMeta, await readWorkspaceDefaultAgent().catch(() => null)) ??
-    firstWorkspaceRuntime(wsMeta);
+  const resolveDefaultAgentId = async (_wsMeta: WorkspaceMeta): Promise<string | undefined> =>
+    validRegisteredRuntime(await readWorkspaceDefaultAgent().catch(() => null)) ??
+    firstRegisteredRuntime();
 
   const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
-    validRuntimeForWorkspace(wsMeta, await readIssueDefaultAgent().catch(() => null)) ??
+    validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
     await resolveDefaultAgentId(wsMeta);
 
   /**
@@ -984,7 +962,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     availability?: AgentAvailability,
   ): AgentRuntimeReadinessSource => {
-    if (adapter.id === 'claude' || adapter.id === 'codex') return 'global-login';
+    if (adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace') {
+      return 'global-login';
+    }
     const binaryPath = availability?.path ?? '';
     if (
       adapter.id === 'pi' &&
@@ -1051,13 +1031,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   ): Promise<boolean> => {
     if (!adapter.writeAiConfig) return false;
     const credentials = await readCredentials();
-    const [, credential] = compatibleCredentials(credentials, adapter.id)[0] ?? [];
+    const [, credential] = compatibleCredentials(credentials, adapter)[0] ?? [];
     if (!credential) return false;
 
     const model = resolveInjectionModel(credential);
     const workspaceCredential = credentialToWorkspaceAiCred(
       credential,
-      adapter.id,
+      adapter,
       model ? { model } : {},
     );
     if (!workspaceCredential) return false;

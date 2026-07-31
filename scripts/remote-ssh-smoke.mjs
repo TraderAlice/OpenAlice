@@ -120,10 +120,12 @@ try {
   const piVersion = run('ssh', [remoteTarget, '"$HOME/.openalice/bin/pi" --version'], { env: smokeEnv }).trim()
   if (piVersion !== '0.83.0') throw new Error(`Remote managed Pi version mismatch: ${piVersion}`)
   const launchRoot = running.owner?.launchRoot
-  if (typeof launchRoot !== 'string' || !launchRoot.includes('/.openalice/sources/')) {
-    throw new Error(`Remote Server did not use a managed checkout: ${JSON.stringify(launchRoot)}`)
+  if (typeof launchRoot !== 'string' || !launchRoot.includes('/.openalice/cli-versions/')) {
+    throw new Error(`Remote Server did not use an installed Runtime: ${JSON.stringify(launchRoot)}`)
   }
-  run('ssh', [remoteTarget, `test -d ${shellQuote(join(launchRoot, '.git'))}`], { env: smokeEnv })
+  if (running.provider?.kind !== 'bundle') {
+    throw new Error(`Remote Server did not report the bundle provider: ${JSON.stringify(running.provider)}`)
+  }
 
   console.log('[remote-ssh-smoke] repairing a legacy CLI Server with its managed Pi launcher missing')
   run('ssh', [remoteTarget, 'rm -f "$HOME/.openalice/bin/pi" "$HOME/.openalice/bin/pi.cmd"'], { env: smokeEnv })
