@@ -630,7 +630,7 @@ jobs:
           cmp /tmp/openalice-install /tmp/openalice-site-install
           bash -n /tmp/openalice-install
           bash /tmp/openalice-install --plan | tee /tmp/openalice-install-plan
-          grep -Eq '^  Branch[[:space:]]+master$' /tmp/openalice-install-plan
+          grep -Fq "GitHub ref: TraderAlice/OpenAlice@${TAG}" /tmp/openalice-install-plan
           INSTALLER_PATH=/tmp/openalice-install MANIFEST_URL="${BASE_URL}/manifest.json" node -e '
             const { createHash } = require("node:crypto");
             const { readFileSync } = require("node:fs");
