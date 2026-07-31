@@ -11,6 +11,7 @@ export type AgentConversationSource =
 export type AgentConversationTarget =
   | { kind: 'resume'; resumeId: string }
   | { kind: 'workspace'; workspaceId: string }
+  | { kind: 'harness'; harness: 'chat' | 'autoquant' }
   | { kind: 'inbox'; inboxEntryId: string; workspaceId?: string }
   | { kind: 'issue'; workspaceId: string; issueId: string; action?: string }
   | { kind: 'report'; workspaceId: string; path: string; revision?: string; action?: string }

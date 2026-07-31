@@ -309,6 +309,8 @@ function requestedTargetLabel(target: AgentConversationRecord['requestedTarget']
       return `Session ${target.resumeId}`
     case 'workspace':
       return `Workspace ${target.workspaceId}`
+    case 'harness':
+      return `Harness ${target.harness}`
     case 'inbox':
       return `Inbox ${target.inboxEntryId}`
     case 'issue':
