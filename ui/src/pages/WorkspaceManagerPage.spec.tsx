@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
@@ -67,7 +68,26 @@ vi.mock('../api/config', () => ({
 }))
 
 vi.mock('../components/workspace/Terminal', () => ({
-  TerminalView: () => <div data-testid="terminal-view" />,
+  TerminalView: ({
+    chrome,
+    headerActions,
+    label,
+    sessionLabel,
+  }: {
+    chrome?: string
+    headerActions?: ReactNode
+    label?: string
+    sessionLabel?: string
+  }) => (
+    <div
+      data-testid="terminal-view"
+      data-chrome={chrome}
+      data-label={label}
+      data-session-label={sessionLabel}
+    >
+      {headerActions}
+    </div>
+  ),
 }))
 
 vi.mock('../components/workspace/WebPiView', () => ({
@@ -489,6 +509,37 @@ describe('WorkspaceManagerPage runtime selection', () => {
       session.id,
     )
     expect(mocks.openWebPiSession).not.toHaveBeenCalled()
+  })
+
+  it('makes a running Manager terminal the owning canvas', () => {
+    const session: SessionRecord = {
+      id: 'manager-codex-running',
+      resumeId: 'manager-codex-running-resume',
+      wsId: 'workspace-manager',
+      agent: 'codex',
+      name: 'x1',
+      createdAt: '2026-07-16T00:00:00.000Z',
+      lastActiveAt: '2026-07-16T00:00:00.000Z',
+      state: 'running',
+      surface: 'terminal',
+      pid: 42,
+      startedAt: 1,
+      title: 'Inspect the floor',
+    }
+    mocks.useWorkspaces.mockImplementation(() => context('codex', managerSnapshot([session])))
+
+    const { container } = render(<WorkspaceManagerPage spec={{
+      kind: 'workspace-manager',
+      params: { sessionId: session.id },
+    }} />)
+
+    const terminal = screen.getByTestId('terminal-view')
+    expect(terminal.getAttribute('data-chrome')).toBe('canvas')
+    expect(terminal.getAttribute('data-label')).toBe('Workspace Manager')
+    expect(terminal.getAttribute('data-session-label')).toBe('Inspect the floor')
+    expect(container.firstElementChild?.classList.contains('workspace-manager-terminal-canvas')).toBe(true)
+    expect(screen.getAllByRole('button', { name: i18n.t('workspaceManager.back') })).toHaveLength(1)
+    expect(screen.getByText('Codex · TUI')).toBeTruthy()
   })
 
   it('reopens a paused Pi Manager Session in its saved WebPi surface', () => {
