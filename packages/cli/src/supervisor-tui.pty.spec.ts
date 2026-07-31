@@ -17,6 +17,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 const cliEntry = join(dirname(fileURLToPath(import.meta.url)), '../bin/openalice.ts')
 const cliPackageRoot = dirname(dirname(cliEntry))
+const cliVersion = JSON.parse(
+  await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
+).version
 const temporaryPaths: string[] = []
 
 afterEach(async () => {
@@ -66,7 +69,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('OpenAlice  0.87.0-beta  development')
+    expect(transcript).toContain(`OpenAlice  ${cliVersion}  development`)
     expect(transcript).toContain('Runtime state: absent')
     expect(transcript).toContain('Supervisor controls')
     expect(transcript).toContain('\u001b[?25h')
@@ -196,7 +199,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       writeFile(join(releaseRoot, 'install-source.json'), JSON.stringify({
         schemaVersion: 1,
         repository: 'TraderAlice/OpenAlice',
-        cliVersion: '0.87.0-beta',
+        cliVersion,
         selector: { kind: 'branch', value: 'dev' },
         installerUrl: 'https://openalice.ai/install',
       })),
@@ -249,7 +252,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('OpenAlice  0.87.0-beta  branch dev')
+    expect(transcript).toContain(`OpenAlice  ${cliVersion}  branch dev`)
     expect(transcript).toContain('installer-managed OpenAlice source branch dev')
     expect(transcript).not.toContain('Configure Runtime source')
     expect(transcript).toContain('\u001b[?25h')
