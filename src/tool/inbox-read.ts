@@ -14,9 +14,9 @@
  * The `self` case is the load-bearing one: an entry's `docs` are paths
  * relative to the workspace that pushed it. For self-entries that root IS
  * the agent's own cwd, so once it has the paths back it reads the files
- * with ordinary shell tools — no cross-workspace file API needed. Foreign
- * entries' doc paths are relative to *another* workspace's root and are
- * surfaced for awareness only, not directly readable from here.
+ * with ordinary native file tools — no Workspace-level file-read API needed.
+ * Foreign entries carry the other Workspace id so `peer path` can resolve an
+ * absolute root for those same native tools.
  */
 
 import { tool } from 'ai'
@@ -51,7 +51,7 @@ export const inboxReadFactory: WorkspaceToolFactory = {
           .stringbool()
           .optional()
           .describe(
-            'Only entries pushed by THIS workspace. Their doc paths are relative to your own cwd, so you can read the files directly.',
+            'Only entries pushed by THIS workspace. Their doc paths are relative to your own cwd, so you can use native file tools directly.',
           ),
         limit: z
           .number()

@@ -34,16 +34,15 @@ files, Issues, Inbox reports, tracked entities, and attributable Sessions.
 
 ## Choose the right surface
 
-OpenAlice places these CLIs on PATH. Their skills own the current manuals; read
-the relevant skill before the first domain command and use `<cli> --help` /
-`<cli> <group> <verb> --help` instead of guessing flags or positional
-arguments.
+OpenAlice places four boundary-specific CLIs on PATH. Their live top-level help
+explains each group; their skills own procedures and exact examples. Read the
+relevant skill before the first domain command and never guess flags.
 
 | Need | Surface | Skill |
 |---|---|---|
 | Current market boards, fundamentals, macro, calendars | `traderhub` | `traderhub` |
-| Symbol discovery, collected research, quantitative panels | `alice` / `alice analysis` | `alice`, `alice-analysis` |
-| Inbox, Issues, tracked entities, provenance, peer questions | `alice-workspace` | `alice-workspace` |
+| Symbol discovery, collected RSS, K-lines and bounded analysis | `alice` | `alice`, `alice-analysis` |
+| Peer addressing, Agent conversation, Inbox, Issues and provenance | `alice-workspace` | `alice-workspace` |
 | Issue files, schedules, headless delivery contracts | `.alice/issues/` + `alice-workspace issue` | `self-scheduling` |
 | Accounts, positions, orders, trading-as-git | `alice-uta` | `alice-uta` |
 | Optional sources Alice does not ship | `opencli` | `opencli-reader` |
@@ -52,28 +51,24 @@ Use the bundled research skills (`build-thesis`, `sector-rotation`,
 `scan-value-chain`, `retrospective`) when their workflow matches the request.
 They are methods, not mandatory ceremony.
 
-## Collaboration decisions
+## Collaboration model
 
-- **Need to understand an Inbox result:** use `inbox ask --id … --await`.
-- **Need the creator, owner, or one run of an Issue:** use `issue ask` with the
-  corresponding target and start with `--await`.
-- **Need to delegate new work to another desk:** use `conversation ask --ws-id
-  …` with a normal coworker prompt. Omit `--await` when the peer should accept
-  the work, manage it locally, and report back later.
-- **Need a missing author's intent reconstructed:** add `--reconstruct`
-  explicitly. Ordinary peer messages must not carry reconstruction framing.
-- **Need several independent answers:** dispatch the asks concurrently, then
-  collect them; do not write shell sleep loops.
-- **Need a long-running result surfaced to the user:** ask the peer to commit
-  its report and push it to Inbox. Inbox is human-facing delivery; later
-  `read`/`await`/`collect` retrieves the direct Agent reply.
-- **Need to record progress on this Workspace's own Issue:** use `issue comment`.
-- **Need to read a peer artifact:** resolve its Workspace from the Inbox entry,
-  then read the referenced file. Autonomous runs never edit a peer Workspace.
+- `peer` discovers desks and resolves absolute paths. Use native Coding Agent
+  file, search, and Git capabilities after resolution; OpenAlice does not wrap
+  them in another Workspace read API.
+- `conversation` carries ordinary Agent-to-Agent requests and replies.
+- `inbox` delivers committed reports to the human and supports attributable
+  follow-up; it is not general peer chat.
+- `issue` records durable work and discussion. A comment is not an Agent call.
+- `provenance` identifies the responsible product Session. Ask that Session
+  instead of guessing intent or selecting an arbitrary historical coworker.
 
-The `alice-workspace` skill contains the exact commands and provenance rules.
-If attribution is unavailable, say so and recruit a fresh Session only in the
-known Workspace; never choose an arbitrary old Session.
+For long delegation, let the peer manage its work locally and return an
+ordinary reply; when the result also deserves human attention, have it commit
+the report and push the exact file to Inbox.
+
+The `alice-workspace` skill contains the exact commands. It also owns waiting
+rhythms, reconstruction rules, and the report-reading flow.
 
 ## Durable objects
 
@@ -81,8 +76,8 @@ known Workspace; never choose an arbitrary old Session.
   publishing so the sent revision is recoverable.
 - **Issue:** an owned work item. Add a schedule only when time should trigger
   execution; scheduling is an Issue capability, not a separate task system.
-- **Inbox entry:** a human-facing notification or handoff, not general chat
-  between agents.
+- **Inbox entry:** a human-facing notification or report handoff, not general
+  chat between Agents.
 - **Tracked entity:** the cross-workspace index for a lasting asset or topic.
 - **Session signature (`resumeId`):** the product handle for attributable
   follow-up. Never expose or depend on an Agent Runtime's native session id.

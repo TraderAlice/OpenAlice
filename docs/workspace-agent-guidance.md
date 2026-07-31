@@ -57,6 +57,26 @@ product bug.
 Use the real shim in the verification loop; direct tool calls do not exercise
 argv parsing or manifest help.
 
+The four public CLI names are deliberate authority boundaries rather than one
+flat command bag:
+
+| CLI | Boundary |
+|---|---|
+| `alice` | Workspace research data, subscribed-feed archive, symbols, and bounded K-line analysis |
+| `traderhub` | Low-frequency boards, fundamentals, macro, and calendars |
+| `alice-workspace` | Peer addressing, Agent conversation, human Inbox delivery, durable work, and provenance |
+| `alice-uta` | Broker reads plus explicit trading mutations and approval flow |
+
+Every export manifest supplies intent-first descriptions for its command
+groups. Top-level and group help must explain which namespace owns an action
+before listing verbs. Skills may teach workflows, but an old copied skill must
+be able to recover from current live help.
+
+`alice-workspace peer path` is an addressing primitive only. Once a Workspace
+root is resolved, native Coding Agent file, search, and Git capabilities own
+the read flow. Do not grow a second Workspace file API merely to reproduce
+those capabilities; adapter permission problems belong at the runtime boundary.
+
 ## Snapshot and upgrade semantics
 
 Guidance is copied into a Workspace at creation and committed as part of its
