@@ -124,6 +124,8 @@ describe('injectWorkspaceContext — skills', () => {
       expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
       expect(skill).toContain('The universal result is the Agent\'s ordinary `assistantText` handoff');
       expect(skill).toContain('does not automatically publish either artifact to the');
+      expect(skill).toContain('Primary deliverable directory: <absolute path>');
+      expect(skill).toContain('Do not rerun the research.');
     }
   });
 

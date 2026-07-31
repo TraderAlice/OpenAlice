@@ -40,7 +40,7 @@ Research question: <question>
 Decision this supports: <decision>
 Caller-owned scope and constraints: <assets, direction, horizon, cadence, benchmark, costs, limits>
 Available evidence or data: <paths and provenance, or say what is missing>
-Expected handoff: answer in plain language; name the Project and every applicable immutable Run, Experiment, Report, or Dossier id and useful path; distinguish validation, visible-test, and external-holdout evidence; state assumptions, unsupported claims, and that trading authority is none.
+Expected handoff: answer in plain language; name the Project and every applicable immutable Run, Experiment, Report, or Dossier id; give the absolute Project root and end with `Primary deliverable directory: <absolute path>` pointing to the Dossier bundle, Report bundle, or Project directory that contains the named evidence; distinguish validation, visible-test, and external-holdout evidence; state assumptions, unsupported claims, and that trading authority is none.
 Ask before proceeding if a missing caller-owned fact would materially change the study. Do not manufacture a Report or Dossier solely for transport.
 '
 ```
@@ -74,15 +74,25 @@ OpenAlice Inbox.
 
 ## Consume and continue
 
-1. Read the direct handoff first. Require the Project identity, applicable
-   evidence ids or paths, assumptions, limitations, and no-trading boundary.
-2. Resolve the returned AutoQuant `workspaceId` with
-   `alice-workspace peer path --id <workspaceId>` when a file needs inspection,
-   then use native Read/Search/Git capabilities on only the named artifacts.
-3. If the answer is incomplete or a clarification round is needed, continue
-   the returned `resumeId`; do not recruit a new AutoQuant Session and discard
-   its context.
-4. Translate the evidence for the user, separating AutoQuant's findings from
+1. Read the direct handoff first. Require the Project identity and absolute
+   root, the primary deliverable's absolute directory, applicable evidence ids,
+   assumptions, limitations, and no-trading boundary.
+2. If the absolute deliverable directory is missing, continue the returned
+   Session immediately instead of searching the desk or recruiting another
+   worker:
+
+   ```bash
+   alice-workspace conversation ask --resume-id <resumeId> --await \
+     --prompt 'Please provide the absolute directory path of the primary Report, Dossier, or Project evidence from your completed assignment. Do not rerun the research.'
+   ```
+
+3. Use native Read/Search/Git capabilities directly on the returned directory
+   and only the named artifacts. Use
+   `alice-workspace peer path --id <workspaceId>` only as an addressing fallback
+   when the reported absolute path is unavailable.
+4. If the answer needs substantive clarification, continue that same
+   `resumeId`; do not recruit a new AutoQuant Session and discard its context.
+5. Translate the evidence for the user, separating AutoQuant's findings from
    your judgment. Any live account or execution decision returns to
    `alice-uta` and its approval flow.
 
