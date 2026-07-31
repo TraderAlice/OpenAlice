@@ -12,14 +12,12 @@ export const MANAGER_WORKSPACE_TAG = 'Workspace Manager'
 
 export function createManagerWorkspaceMeta(
   launcherRoot: string,
-  agentIds: readonly string[],
 ): WorkspaceMeta {
   return {
     id: MANAGER_WORKSPACE_ID,
     tag: MANAGER_WORKSPACE_TAG,
     dir: join(launcherRoot, 'workspaces'),
     createdAt: new Date(0).toISOString(),
-    agents: [...agentIds],
   }
 }
 

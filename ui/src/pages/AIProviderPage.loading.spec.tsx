@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getCredentials: vi.fn(),
   getPresets: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
+  listAgents: vi.fn(),
 }))
 
 vi.mock('../api', () => ({
@@ -22,6 +23,11 @@ vi.mock('../api', () => ({
   },
 }))
 
+vi.mock('../components/workspace/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/workspace/api')>()
+  return { ...actual, listAgents: mocks.listAgents }
+})
+
 beforeEach(async () => {
   vi.clearAllMocks()
   await i18n.changeLanguage('en')
@@ -30,6 +36,7 @@ beforeEach(async () => {
     defaults: {},
     compatibleByAgent: {},
   })
+  mocks.listAgents.mockResolvedValue([])
 })
 
 afterEach(cleanup)

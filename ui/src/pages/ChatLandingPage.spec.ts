@@ -50,7 +50,6 @@ function workspace(
     dir: `/tmp/${id}`,
     createdAt,
     template,
-    agents: ['pi'],
     sessions: lastActiveAt
       ? [{
           id: `${id}-session`,
@@ -72,7 +71,7 @@ function workspace(
 describe('resolveChatWorkspaceTarget', () => {
   const older = workspace('older', '2026-07-01T00:00:00Z', '2026-07-09T00:00:00Z')
   const active = workspace('active', '2026-07-02T00:00:00Z', '2026-07-10T00:00:00Z')
-  const autoQuant = workspace('auto-quant', '2026-07-11T00:00:00Z', undefined, 'auto-quant')
+  const autoQuant = workspace('auto-quant', '2026-07-11T00:00:00Z', undefined, 'auto-quant-v2')
 
   it('uses an explicit Chat workspace ahead of the remembered target', () => {
     expect(resolveChatWorkspaceTarget([older, active], older.id, active.id)?.id).toBe(older.id)
@@ -88,6 +87,15 @@ describe('resolveChatWorkspaceTarget', () => {
 
   it('returns null when the first Quick Chat must create a starter workspace', () => {
     expect(resolveChatWorkspaceTarget([autoQuant], null, null)).toBeNull()
+  })
+
+  it('uses the latest AutoQuant desk when asked for the V2 Harness', () => {
+    expect(resolveChatWorkspaceTarget(
+      [older, autoQuant],
+      null,
+      null,
+      'auto-quant-v2',
+    )?.id).toBe(autoQuant.id)
   })
 })
 

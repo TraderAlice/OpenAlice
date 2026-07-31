@@ -337,6 +337,19 @@
     background: var(--background);
     box-shadow: -18px 0 36px -28px color-mix(in srgb, var(--shadow-color) 65%, transparent);
   }
+
+  /* The Files overlay lives inside `.workspace-view`. When the terminal owns
+   * that view's titlebar, leave the titlebar exposed so its Files toggle can
+   * close the overlay again. */
+  .workspace-page-shell.is-terminal-canvas .workspace-side {
+    inset-block-start: 37px;
+  }
+}
+
+@container (max-width: 520px) {
+  .workspace-page-shell .workspace-side {
+    width: 100%;
+  }
 }
 
 /* Both side panels hidden (or auto-hidden on mobile) — collapse the
@@ -1002,18 +1015,25 @@
   grid-template-columns: 18px 1fr auto;
   gap: 8px;
   align-items: baseline;
+  width: 100%;
   padding: 3px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 12px;
   cursor: default;
 }
-.files-row.files-dir,
-.files-row.files-symlink {
+button.files-row {
   cursor: pointer;
 }
-.files-row.files-dir:hover,
-.files-row.files-symlink:hover {
+button.files-row:hover {
   background: var(--accent);
+}
+button.files-row:focus-visible {
+  background: var(--accent);
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
 
 .files-icon {
@@ -1088,6 +1108,28 @@
   font-variant-numeric: tabular-nums;
 }
 
+.terminal-title-separator {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+}
+
+.terminal-session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+
+.terminal-header-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
 .terminal-header-action {
   height: 24px;
   padding: 0 8px;
@@ -1102,6 +1144,39 @@
 .terminal-header-action:hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+/* A pinned terminal is the Workspace page's primary canvas, not a card inside
+ * another card. Its titlebar absorbs the Workspace actions and its shell runs
+ * edge-to-edge; the remaining borders describe actual pane splits. */
+.workspace-page-shell.is-terminal-canvas .workspace-view {
+  gap: 0;
+}
+
+.workspace-page-shell.is-terminal-canvas .workspace-side > .panel {
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+}
+
+.terminal-shell.is-canvas {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.terminal-shell.is-canvas .terminal-header {
+  padding-block: 6px;
+  background: var(--secondary);
+}
+
+@container (max-width: 680px) {
+  .terminal-shell.is-canvas .terminal-meta {
+    display: none;
+  }
+
+  .terminal-shell.is-canvas .terminal-session-title {
+    flex: 1 1 auto;
+  }
 }
 
 .status-dot {

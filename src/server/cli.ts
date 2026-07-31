@@ -20,7 +20,8 @@
  * Each export resolves tools from ONE scope (global ToolCenter for `data`,
  * the per-workspace WorkspaceToolCenter for `workspace`) and invoke is gated to
  * that export's own map — so `alice` can't reach a collaboration tool and
- * vice-versa, and trading/cron stay off entirely (no `uta` export yet).
+ * vice-versa. Trading has its own explicit `uta` export; cron remains off the
+ * CLI surface and is available only through its owned scheduling paths.
  */
 
 import type { Hono } from 'hono'
@@ -33,12 +34,18 @@ import {
   makeWorkspaceResolver,
 } from '../core/workspace-tool-center.js'
 import type { IInboxStore, InboxOrigin } from '../core/inbox-store.js'
+import { sessionDisplayTitle } from '../workspaces/session-registry.js'
 import type { IEntityStore } from '../core/entity-store.js'
 import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
 import { logger as launcherLogger } from '../workspaces/logger.js'
 import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
-import { type CliExport, getExport, mappedToolNames } from './cli-commands.js'
+import {
+  type CliExport,
+  getExport,
+  mappedToolNames,
+  mappedToolNamesForScope,
+} from './cli-commands.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { extractTradeDecisionRefs } from './trade-provenance.js'
 import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
@@ -102,13 +109,13 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
         ...(svc ? {
           workspaceInventory: async () => Promise.all(svc.registry.list().map(async (meta) => {
             await svc.sessionRegistry.ensureLoaded(meta.id)
+            void svc.refreshSessionTitles?.(meta)
             const sessions = svc.sessionRegistry.listFor(meta.id)
             const activity = svc.workspaceRuntimeActivity(meta.id)
             return {
               id: meta.id,
               tag: meta.tag,
               ...(meta.template ? { template: meta.template } : {}),
-              agents: meta.agents,
               createdAt: meta.createdAt,
               sessions: {
                 total: sessions.length,
@@ -120,7 +127,7 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
                   .map((session) => ({
                     resumeId: session.resumeId,
                     agent: session.agent,
-                    title: session.title?.trim() || session.name,
+                    title: sessionDisplayTitle(session),
                     state: session.state,
                     lastActiveAt: session.lastActiveAt,
                   })),
@@ -219,12 +226,19 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
       }
     }
 
-    // No-silent-caps: surface tools registered IN THIS SCOPE but not reachable
-    // via this export, so coverage gaps are visible rather than implied-complete.
-    const mapped = mappedToolNames(c.req.param('export'))
+    // No-silent-caps diagnostics: surface tools registered in this registry
+    // scope but not owned by ANY public CLI. Sibling global exports deliberately
+    // share ToolCenter, so a UTA tool must not look like a missing `alice` verb.
+    const mapped = mappedToolNamesForScope(r.exp.scope)
     const unmapped = cat.inventoryNames().filter((n) => !mapped.has(n))
 
-    return c.json({ export: c.req.param('export'), description: r.exp.description, groups, unmapped })
+    return c.json({
+      export: c.req.param('export'),
+      description: r.exp.description,
+      groupDescriptions: r.exp.groupDescriptions,
+      groups,
+      unmapped,
+    })
   })
 
   app.post('/cli/:wsId/:export/invoke', async (c) => {

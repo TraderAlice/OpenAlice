@@ -19,6 +19,7 @@ import { ArchiveRestore, GitMerge, Trash2 } from 'lucide-react'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useWorkspace } from '../tabs/store'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { PageLoading, RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { OverviewCard } from '../components/workspace/OverviewCard'
 import {
   getGitLog,
@@ -104,7 +105,16 @@ function buildSections(
 
 export function WorkspaceListPage() {
   const { t } = useTranslation()
-  const { workspaces, templates, openAgentConfig, refresh } = useWorkspaces()
+  const {
+    workspaces,
+    templates,
+    openAgentConfig,
+    refresh,
+    refreshTemplates,
+    hasLoaded,
+    listError,
+    templatesError,
+  } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const [departed, setDeparted] = useState<DepartedWorkspace[]>([])
   const [departedError, setDepartedError] = useState<string | null>(null)
@@ -160,30 +170,71 @@ export function WorkspaceListPage() {
     [workspaces, templates, t],
   )
 
-  if (workspaces.length === 0 && departed.length === 0) {
+  if (!hasLoaded && listError === null) {
+    return (
+      <div className="flex h-full">
+        <PageLoading />
+      </div>
+    )
+  }
+
+  if (!hasLoaded && listError !== null && departed.length === 0) {
+    return (
+      <RecoverySurface
+        eyebrow={t('workspace.dataUnavailableEyebrow')}
+        title={t('workspace.dataUnavailableTitle')}
+        description={t('workspace.dataUnavailableDescription')}
+        actionLabel={t('common.retry')}
+        onAction={() => void refresh()}
+      />
+    )
+  }
+
+  if (hasLoaded && workspaces.length === 0 && departed.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-6">
         <h2 className="text-lg font-medium text-foreground mb-2">{t('workspace.emptyTitle')}</h2>
         <p className="text-sm max-w-md text-center">
           {t('workspace.emptyBody')}
         </p>
+        <button
+          type="button"
+          onClick={() => openOrFocus({ kind: 'template-catalog', params: {} })}
+          className="btn-primary oa-pressable mt-5 inline-flex min-h-10 items-center justify-center px-4"
+        >
+          {t('workspace.createFromTemplates')}
+        </button>
       </div>
     )
   }
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-6 py-6">
-        <div className="mb-6 flex items-baseline justify-between gap-4">
+      <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
+        {(listError !== null || templatesError !== null) && (
+          <RefreshNotice
+            message={listError !== null
+              ? (hasLoaded
+                  ? t('workspace.dataStale')
+                  : t('workspace.activeInventoryUnavailable'))
+              : t('workspace.templatesStale')}
+            actionLabel={t('common.retry')}
+            onAction={() => void Promise.all([refresh(), refreshTemplates()])}
+            className="mb-4 sm:mb-5"
+          />
+        )}
+        <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-6">
           <h2 className="text-[18px] font-semibold text-foreground">{t('workspace.overviewTitle')}</h2>
           <span className="text-[12px] text-muted-foreground">
-            {t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
-              count: workspaces.length,
-            })}
+            {hasLoaded
+              ? t(workspaces.length === 1 ? 'workspace.workspaceSingular' : 'workspace.workspacePlural', {
+                  count: workspaces.length,
+                })
+              : t('workspace.activeCountUnavailable')}
           </span>
         </div>
 
-        <div className="space-y-7">
+        <div className="space-y-5 sm:space-y-7">
           {sections.map((sec) => (
             <section key={sec.key}>
               <div className="mb-3 flex items-baseline gap-2">
@@ -192,7 +243,7 @@ export function WorkspaceListPage() {
                 </h3>
                 <span className="text-[11px] text-muted-foreground">· {sec.workspaces.length}</span>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
                 {sec.workspaces.map((w) => (
                   <OverviewCard
                     key={w.id}
@@ -295,7 +346,7 @@ export function WorkspaceListPage() {
                         {!purged && workspace.lifecycle === 'departed' && (
                           <button
                             type="button"
-                            className="btn-secondary inline-flex items-center gap-1.5"
+                            className="btn-secondary inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
                             aria-label={t('workspace.restoreWorkspaceAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => {
@@ -313,7 +364,7 @@ export function WorkspaceListPage() {
                         {!purged && workspace.lifecycle === 'departed' && (
                           <button
                             type="button"
-                            className="btn-danger inline-flex items-center gap-1.5"
+                            className="btn-danger inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
                             aria-label={t('workspace.purgeFilesAria', { workspace: workspace.tag })}
                             disabled={lifecycleBusy !== null}
                             onClick={() => setPendingPurge(workspace)}

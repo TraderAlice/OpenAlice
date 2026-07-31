@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
   IssueDetail as IssueDetailData,
   IssueProvenanceRecord,
 } from '../api/issues'
+import { i18n } from '../i18n'
 import { IssueActivity, IssueDetail } from './IssueDetail'
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   openAgentConfig: vi.fn(),
   openHeadlessRun: vi.fn(),
+  getWorkspaceSessionDirectory: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -62,7 +64,7 @@ vi.mock('../contexts/workspaces-context', () => ({
     ],
     defaultAgent: 'pi',
     issueDefaultAgent: null,
-    workspaces: [{ id: 'demo-ws-auto-quant', agents: ['codex', 'pi'] }],
+    workspaces: [{ id: 'demo-ws-auto-quant' }],
     openAgentConfig: mocks.openAgentConfig,
     openHeadlessRun: mocks.openHeadlessRun,
   }),
@@ -71,12 +73,18 @@ vi.mock('../contexts/workspaces-context', () => ({
 vi.mock('./workspace/api', () => ({
   detectWorkspaceCredential: mocks.detectWorkspaceCredential,
   getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
-  getWorkspaceSessionDirectory: vi.fn().mockResolvedValue({ sessions: [] }),
+  getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
 }))
 
 vi.mock('./MarkdownWhatEditor', () => ({
   MarkdownWhatEditor: ({ value }: { value: string }) => <div>{value}</div>,
 }))
+
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
+  delete scheduledIssue.issue.automationHealth
+  mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
+})
 
 afterEach(() => {
   cleanup()
@@ -137,10 +145,21 @@ describe('IssueDetail property controls', () => {
   it('names every editable property and resolves inherited runtime defaults', async () => {
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
-    expect(screen.getByRole('combobox', { name: 'Status' })).toBeTruthy()
+    const title = screen.getByRole('heading', { level: 1, name: 'Morning movers scan' })
+    const header = title.closest('header')
+    const identityRow = header?.querySelector('div')
+    expect(header).toBeTruthy()
+    expect(identityRow?.className).toContain('flex-col')
+    expect(identityRow?.className).toContain('sm:flex-row')
+
+    const status = screen.getByRole('combobox', { name: 'Status' })
+    expect(status).toBeTruthy()
+    expect(status.className).toContain('min-h-10')
+    expect(screen.getByText('Status').parentElement?.className).toContain('max-[359px]:flex-col')
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('min-h-10')
     const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
     const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
     await waitFor(() => {
@@ -150,5 +169,179 @@ describe('IssueDetail property controls', () => {
 
     fireEvent.change(model, { target: { value: 'custom' } })
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+  })
+
+  it('places mobile work-item controls before long-form Issue content', async () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const workItem = screen.getByRole('heading', { level: 3, name: 'Work item' })
+    const what = screen.getByRole('heading', { level: 2, name: 'What' })
+    const activity = screen.getByRole('heading', { level: 2, name: 'Activity' })
+    const sectionNavigation = screen.getByRole('navigation', { name: 'Issue sections' })
+
+    expect(workItem.compareDocumentPosition(what) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(workItem.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(sectionNavigation.className).toContain('sticky')
+    expect(sectionNavigation.className).toContain('overflow-x-auto')
+    expect(sectionNavigation.className).toContain('flex-nowrap')
+    const workItemLink = sectionNavigation.querySelector('a[href="#issue-work-item"]')
+    expect(workItemLink).toBeTruthy()
+    expect(workItemLink?.className).toContain('min-h-10')
+    expect(workItemLink?.getAttribute('aria-current')).toBe('location')
+    expect(workItemLink?.className).toContain('bg-primary-muted')
+    const whatLink = sectionNavigation.querySelector('a[href="#issue-what"]') as HTMLAnchorElement
+    expect(whatLink).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-activity"]')).toBeTruthy()
+    expect(sectionNavigation.querySelector('a[href="#issue-reply"]')?.textContent).toBe('Reply')
+    expect(document.querySelector('#issue-reply textarea')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Comment & ask' }).className).toContain('min-h-10')
+    expect(sectionNavigation.querySelector('a[href="#issue-runs"]')).toBeNull()
+    expect(sectionNavigation.querySelector('a[href="#issue-inbox-reports"]')).toBeNull()
+
+    const rect = (top: number, height = 100): DOMRect => ({
+      x: 0,
+      y: top,
+      top,
+      right: 320,
+      bottom: top + height,
+      left: 0,
+      width: 320,
+      height,
+      toJSON: () => ({}),
+    })
+    Object.defineProperty(sectionNavigation, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(53, 54),
+    })
+    Object.defineProperty(document.getElementById('issue-work-item')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(-900),
+    })
+    Object.defineProperty(document.getElementById('issue-what')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(-300),
+    })
+    Object.defineProperty(document.getElementById('issue-activity')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(132),
+    })
+    Object.defineProperty(document.getElementById('issue-reply')!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(600),
+    })
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(sectionNavigation.querySelector('a[href="#issue-activity"]')?.getAttribute('aria-current')).toBe('location')
+      expect(workItemLink?.getAttribute('aria-current')).toBeNull()
+    })
+
+    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(1_000)
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(700)
+    vi.spyOn(window, 'scrollY', 'get').mockReturnValue(300)
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(sectionNavigation.querySelector('a[href="#issue-reply"]')?.getAttribute('aria-current')).toBe('location')
+    })
+
+    const whatSection = document.getElementById('issue-what')!
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(whatSection, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    fireEvent.click(whatLink)
+
+    expect(replaceState).toHaveBeenCalledWith(window.history.state, '', '#issue-what')
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
+    expect(whatLink.getAttribute('aria-current')).toBe('location')
+  })
+
+  it.each([
+    ['en', 'Work item', 'Status', 'What', 'Activity', 'Issue sections', 'Tap or click the text to edit · changes save automatically.', 'Schedule is valid and has not run yet.'],
+    ['zh', '工作项', '状态', '任务内容', '动态', '议题分区', '点按文字即可编辑 · 更改会自动保存。', '运行计划有效，但尚未执行。'],
+    ['zh-Hant', '工作項目', '狀態', '任務內容', '動態', '議題區段', '點按文字即可編輯 · 變更會自動儲存。', '執行排程有效，但尚未執行。'],
+    ['ja', '作業項目', 'ステータス', '作業内容', 'アクティビティ', '課題セクション', 'テキストをタップまたはクリックして編集 · 変更は自動保存されます。', 'スケジュールは有効ですが、まだ実行されていません。'],
+  ] as const)(
+    'localizes Issue chrome in %s while preserving authored content',
+    async (locale, workItem, status, what, activity, sectionNavigation, editHint, healthMessage) => {
+      await i18n.changeLanguage(locale)
+      scheduledIssue.issue.automationHealth = {
+        state: 'not_started',
+        message: 'Schedule is valid and has not run yet.',
+      }
+
+      render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+      expect(screen.getByRole('heading', { level: 3, name: workItem })).toBeTruthy()
+      expect(screen.getByRole('combobox', { name: status })).toBeTruthy()
+      expect(screen.getByRole('heading', { level: 2, name: what })).toBeTruthy()
+      expect(screen.getByRole('heading', { level: 2, name: activity })).toBeTruthy()
+      expect(screen.getByRole('navigation', { name: sectionNavigation })).toBeTruthy()
+      expect(screen.getByText(editHint)).toBeTruthy()
+      expect(screen.getByText(healthMessage)).toBeTruthy()
+      expect(screen.getByText('Morning movers scan')).toBeTruthy()
+      expect(screen.getByText('Scan the market and publish a brief.')).toBeTruthy()
+    },
+  )
+
+  it('keeps authoritative runtime diagnostics verbatim in localized chrome', async () => {
+    await i18n.changeLanguage('zh')
+    scheduledIssue.issue.automationHealth = {
+      state: 'failed',
+      message: 'Provider rejected model MODEL_NOT_FOUND.',
+    }
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    expect(screen.getByText('运行状态')).toBeTruthy()
+    expect(screen.getByText('Provider rejected model MODEL_NOT_FOUND.')).toBeTruthy()
+  })
+
+  it('keeps stable Session identities first in a large assignee picker', async () => {
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [
+        {
+          resumeId: 'resume-recent-worker',
+          agent: 'codex',
+          createdAt: Date.now() - 120_000,
+          updatedAt: Date.now() - 60_000,
+          resumable: true,
+          active: false,
+          latestExecution: {
+            taskId: 'task-1',
+            status: 'done',
+            startedAt: Date.now() - 90_000,
+            assistantPreview: 'Updated a very long financial and industrial rotation report.',
+          },
+        },
+        {
+          resumeId: 'resume-active-owner',
+          agent: 'pi',
+          createdAt: Date.now() - 86_400_000,
+          updatedAt: Date.now() - 3_600_000,
+          resumable: true,
+          active: true,
+          interactive: {
+            name: 'p1',
+            title: 'Current thesis room',
+            state: 'running',
+            lastActiveAt: new Date().toISOString(),
+          },
+        },
+      ],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const assignee = screen.getByRole('combobox', { name: 'Assignee' }) as HTMLSelectElement
+    await waitFor(() => expect(assignee.options).toHaveLength(4))
+    const labels = Array.from(assignee.options, (option) => option.textContent ?? '')
+
+    expect(labels[2]).toBe('@resume-active-owner · pi · active — Current thesis room')
+    expect(labels[3]).toMatch(/^@resume-recent-worker · codex · .+ — Updated a very long financi…$/)
+    expect(labels.some((label) => label.startsWith('Updated a very long'))).toBe(false)
   })
 })

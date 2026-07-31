@@ -28,6 +28,7 @@ describe('workspace metadata', () => {
     await writeMetadata(JSON.stringify({
       displayName: 'NVDA earnings thesis',
       description: 'Research the earnings setup.',
+      defaultAgent: 'pi',
     }))
 
     expect(await readWorkspaceMetadata(dir)).toEqual({
@@ -35,6 +36,7 @@ describe('workspace metadata', () => {
       metadata: {
         displayName: 'NVDA earnings thesis',
         description: 'Research the earnings setup.',
+        defaultAgent: 'pi',
       },
     })
   })
@@ -71,11 +73,11 @@ describe('workspace metadata', () => {
   })
 
   it('writes canonical JSON through the same schema the reader uses', async () => {
-    await writeWorkspaceMetadata(dir, { displayName: '  AAPL review  ' })
+    await writeWorkspaceMetadata(dir, { displayName: '  AAPL review  ', defaultAgent: '  codex  ' })
 
     expect(await readWorkspaceMetadata(dir)).toEqual({
       ok: true,
-      metadata: { displayName: 'AAPL review' },
+      metadata: { displayName: 'AAPL review', defaultAgent: 'codex' },
     })
   })
 })

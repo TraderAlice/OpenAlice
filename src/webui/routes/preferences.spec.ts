@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createPreferencesRoutes } from './preferences.js'
+import { AdapterRegistry, type CliAdapter } from '../../workspaces/cli-adapter.js'
 
 const unusedShellStatus = vi.fn(async () => ({ supported: false as const }))
 const unusedShellSave = vi.fn(async () => ({ supported: false as const }))
@@ -52,6 +53,46 @@ describe('preferences routes', () => {
     })
     expect(response.status).toBe(200)
     expect(remember).toHaveBeenCalledWith('pi', 'minimax-1')
+  })
+
+  it('accepts a future workspace-required adapter without changing the route schema', async () => {
+    const futureAdapter: CliAdapter = {
+      id: 'future',
+      displayName: 'Future Runtime',
+      capabilities: {
+        parallelPerCwd: true,
+        resumeLast: false,
+        resumeById: false,
+        transcriptDiscovery: 'none',
+        aiProvider: {
+          credentialSource: 'workspace-required',
+          wirePreference: ['openai-chat'],
+        },
+      },
+      composeCommand: (base) => base,
+    }
+    const registry = new AdapterRegistry()
+    registry.register(futureAdapter, { default: true })
+    const remember = vi.fn(async (agent: string, credentialSlug: string | null) => ({
+      lastCredentialByAgent: { [agent]: credentialSlug! },
+      recentChatWorkspaceId: null,
+    }))
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: remember,
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    }, registry)
+
+    const response = await app.request('/quick-chat', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agent: 'future', credentialSlug: 'future-1' }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(remember).toHaveBeenCalledWith('future', 'future-1')
   })
 
   it('rejects unknown runtimes and empty slugs without writing', async () => {

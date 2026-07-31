@@ -24,7 +24,11 @@ import { listDir, PathTraversal, readWorkspaceFile } from '../../workspaces/file
 import { gitLog, gitStatus } from '../../workspaces/git-service.js';
 import { logger as launcherLogger } from '../../workspaces/logger.js';
 import { readWorkspaceMetadata, workspaceMetadataSchema, writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
-import type { SessionRecord } from '../../workspaces/session-registry.js';
+import {
+  normalizeSessionTitle,
+  sessionPreferredTitle,
+  type SessionRecord,
+} from '../../workspaces/session-registry.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import {
@@ -51,11 +55,17 @@ import {
 } from '../../workspaces/agent-credential-readiness.js';
 import { validateTerminalViewAttributes } from '../../workspaces/terminal-view-attributes.js';
 import {
+  readAutoQuantPreferences,
   readQuickChatPreferences,
+  rememberAutoQuantDefaultWorkspace,
   rememberRecentChatWorkspace,
+  type AutoQuantPreferences,
   type QuickChatPreferences,
 } from '../../core/preferences.js';
-import { CHAT_WORKSPACE_TEMPLATE } from '../../workspaces/chat-workspace-resolver.js';
+import {
+  AUTO_QUANT_WORKSPACE_TEMPLATE,
+  CHAT_WORKSPACE_TEMPLATE,
+} from '../../workspaces/chat-workspace-resolver.js';
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import {
@@ -85,11 +95,16 @@ const resumeInFlight = new Map<string, Promise<unknown>>();
 interface QuickChatWorkspacePreferenceDeps {
   readQuickChatPreferences(): Promise<QuickChatPreferences>;
   rememberRecentChatWorkspace(workspaceId: string | null): Promise<QuickChatPreferences>;
+  readAutoQuantPreferences?(): Promise<AutoQuantPreferences>;
+  rememberAutoQuantDefaultWorkspace?(workspaceId: string | null): Promise<AutoQuantPreferences>;
 }
 
 const defaultQuickChatWorkspacePreferenceDeps: QuickChatWorkspacePreferenceDeps = {
   readQuickChatPreferences: () => readQuickChatPreferences(),
   rememberRecentChatWorkspace: (workspaceId) => rememberRecentChatWorkspace(workspaceId),
+  readAutoQuantPreferences: () => readAutoQuantPreferences(),
+  rememberAutoQuantDefaultWorkspace: (workspaceId) =>
+    rememberAutoQuantDefaultWorkspace(workspaceId),
 };
 
 /**
@@ -137,9 +152,6 @@ function redactLaunchCommand(argv: readonly string[]): readonly string[] {
   return out;
 }
 
-/** Max stored length of a session title (the seed message); the row truncates further. */
-const MAX_SESSION_TITLE = 200;
-
 /** The 201 body both `/:id/sessions/spawn` and `/quick-chat` return. */
 interface SpawnedSessionBody {
   readonly sessionId: string;
@@ -149,7 +161,7 @@ interface SpawnedSessionBody {
   readonly agent: string;
   readonly resumeId: string;
   readonly startedAt: number;
-  /** The seed message, when the session was seeded — its sidebar title. */
+  /** Native Session title, falling back to the launch-time prompt. */
   readonly title: string | null;
 }
 
@@ -183,6 +195,18 @@ export function createWorkspaceRoutes(
 ): Hono {
   const app = new Hono();
   const headlessSessionInFlight = new Map<string, Promise<OpenHeadlessSessionResult>>();
+  const readAutoQuantPreference = () =>
+    (quickChatPreferences.readAutoQuantPreferences ?? readAutoQuantPreferences)();
+  const rememberAutoQuantWorkspace = (workspaceId: string | null) =>
+    (quickChatPreferences.rememberAutoQuantDefaultWorkspace
+      ?? rememberAutoQuantDefaultWorkspace)(workspaceId);
+  const resolveAutoQuantDefaultWorkspace = async (): Promise<WorkspaceMeta | undefined> => {
+    const preference = await readAutoQuantPreference();
+    const workspace = preference.defaultWorkspaceId
+      ? svc.registry.get(preference.defaultWorkspaceId)
+      : undefined;
+    return workspace?.template === AUTO_QUANT_WORKSPACE_TEMPLATE ? workspace : undefined;
+  };
 
   // Renderer truth for hidden/headless terminal color queries. App-global,
   // matching Orca's terminal-view-attribute bridge rather than a spawn env.
@@ -195,15 +219,17 @@ export function createWorkspaceRoutes(
   });
 
   const resolveDefaultAgentId = async (meta: WorkspaceMeta): Promise<string | undefined> => {
+    const metadata = await readWorkspaceMetadata(meta.dir);
+    if (metadata.ok && metadata.metadata.defaultAgent) {
+      const adapter = svc.adapters.get(metadata.metadata.defaultAgent);
+      if (adapter && isAgentRuntime(adapter)) return metadata.metadata.defaultAgent;
+    }
     const configured = await readWorkspaceDefaultAgent().catch(() => null);
-    if (configured && meta.agents.includes(configured)) {
+    if (configured) {
       const adapter = svc.adapters.get(configured);
       if (adapter && isAgentRuntime(adapter)) return configured;
     }
-    return meta.agents.find((id) => {
-      const adapter = svc.adapters.get(id);
-      return adapter ? isAgentRuntime(adapter) : false;
-    });
+    return svc.adapters.list().find(isAgentRuntime)?.id;
   };
 
   /**
@@ -261,7 +287,7 @@ export function createWorkspaceRoutes(
     if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
     const agentId = opts.agentId ?? requestedIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!agentId) {
-      return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' } };
+      return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'no agent runtime is registered' } };
     }
     if (!svc.adapters.get(agentId)) {
       return { ok: false, status: 400, body: { error: 'unknown_agent', message: `no adapter: ${agentId}` } };
@@ -316,8 +342,7 @@ export function createWorkspaceRoutes(
     });
     const recordName = svc.sessionRegistry.nextName(id, adapter.id, prefix);
     const nowIso = new Date().toISOString();
-    const titleSource = opts.title?.trim() || initialPrompt;
-    const title = titleSource ? titleSource.slice(0, MAX_SESSION_TITLE) : undefined;
+    const fallbackTitle = normalizeSessionTitle(opts.title) ?? normalizeSessionTitle(initialPrompt);
     const claimedResume = opts.resumeId
       ? (svc.claimResume?.(opts.resumeId) ?? true)
       : false;
@@ -349,7 +374,7 @@ export function createWorkspaceRoutes(
       lastActiveAt: nowIso,
       state: 'running',
       surface: 'terminal',
-      ...(title !== undefined ? { title } : {}),
+      ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(resume && resume !== 'last'
         ? { resumeHint: { kind: 'agent-session-id' as const, value: resume.sessionId } }
@@ -391,7 +416,7 @@ export function createWorkspaceRoutes(
           agent: adapter.id,
           resumeId: identity.resumeId,
           startedAt: session.startedAt,
-          title: title ?? null,
+          title: sessionPreferredTitle(record) ?? null,
         },
       };
     } catch (err) {
@@ -420,7 +445,7 @@ export function createWorkspaceRoutes(
       resumeId: record.resumeId,
       pid: terminal?.pid ?? browser?.pid ?? null,
       startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-      title: record.title ?? null,
+      title: sessionPreferredTitle(record) ?? null,
       sourceRunId: record.sourceRunId ?? null,
     };
   };
@@ -514,6 +539,7 @@ export function createWorkspaceRoutes(
   const publicManager = async () => {
     const meta = svc.managerWorkspace;
     await svc.sessionRegistry.ensureLoaded(meta.id);
+    void svc.refreshSessionTitles?.(meta);
     return {
       id: meta.id,
       tag: meta.tag,
@@ -556,12 +582,16 @@ export function createWorkspaceRoutes(
     const meta = svc.managerWorkspace;
     const resolvedAgentId = agentId ?? await resolveDefaultAgentId(meta);
     if (!resolvedAgentId) {
-      return c.json({ error: 'no_agent_runtime', message: 'Workspace Manager has no agent runtime enabled' }, 400);
+      return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
     }
-    if (!meta.agents.includes(resolvedAgentId)) {
+    const resolvedAdapter = svc.adapters.get(resolvedAgentId);
+    if (!resolvedAdapter) {
+      return c.json({ error: 'unknown_agent', message: `no adapter: ${resolvedAgentId}` }, 400);
+    }
+    if (!isAgentRuntime(resolvedAdapter)) {
       return c.json({
         error: 'unsupported_agent_runtime',
-        message: `${resolvedAgentId} is not an enabled Workspace Manager agent runtime`,
+        message: `${resolvedAgentId} is not an agent runtime`,
       }, 400);
     }
     const spawned = await spawnInteractiveSession(meta, {
@@ -662,6 +692,7 @@ export function createWorkspaceRoutes(
         defaultAgents: t.defaultAgents,
         version: t.version,
         hasReadme: t.readmePath !== undefined,
+        ...(t.source ? { source: t.source } : {}),
       })),
     });
   });
@@ -714,12 +745,6 @@ export function createWorkspaceRoutes(
     }
     const adapter = svc.adapters.get(agentId);
     if (!adapter) return c.json({ error: 'unknown_agent' }, 400);
-    if (isAgentRuntime(adapter) && !meta.agents.includes(agentId)) {
-      return c.json({
-        error: 'agent_not_enabled',
-        message: `agent "${agentId}" not enabled on this workspace`,
-      }, 400);
-    }
 
     const availability = svc.detectAgents()[agentId];
     const plan = svc.computeSpawnPlan(meta, adapter, undefined);
@@ -819,6 +844,80 @@ export function createWorkspaceRoutes(
     }
   });
 
+  app.get('/auto-quant/default-workspace', async (c) => {
+    try {
+      const preference = await readAutoQuantPreference();
+      const configured = preference.defaultWorkspaceId;
+      const workspace = configured ? svc.registry.get(configured) : undefined;
+      const valid = workspace?.template === AUTO_QUANT_WORKSPACE_TEMPLATE;
+      return c.json({
+        defaultWorkspaceId: valid ? workspace.id : null,
+        configuredWorkspaceId: configured,
+        ready: valid,
+      });
+    } catch (err) {
+      launcherLogger.warn('auto_quant.preference_read_failed', { err });
+      return c.json({ error: 'preferences_read_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.put('/auto-quant/default-workspace', async (c) => {
+    const body = await safeJson(c).catch(() => null);
+    const workspaceId = body && typeof body === 'object'
+      ? (body as Record<string, unknown>)['workspaceId']
+      : undefined;
+    if (typeof workspaceId !== 'string' || !validId(workspaceId)) {
+      return c.json({ error: 'invalid_workspace_id' }, 400);
+    }
+    const workspace = svc.registry.get(workspaceId);
+    if (!workspace) return c.json({ error: 'workspace_not_found' }, 404);
+    if (workspace.template !== AUTO_QUANT_WORKSPACE_TEMPLATE) {
+      return c.json({ error: 'workspace_template_mismatch' }, 400);
+    }
+    try {
+      await rememberAutoQuantWorkspace(workspace.id);
+      return c.json({ defaultWorkspaceId: workspace.id, ready: true });
+    } catch (err) {
+      launcherLogger.warn('auto_quant.preference_write_failed', { id: workspace.id, err });
+      return c.json({ error: 'preferences_write_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/auto-quant/initialize', async (c) => {
+    try {
+      const preference = await readAutoQuantPreference();
+      const configured = preference.defaultWorkspaceId
+        ? svc.registry.get(preference.defaultWorkspaceId)
+        : undefined;
+      if (configured?.template === AUTO_QUANT_WORKSPACE_TEMPLATE) {
+        return c.json({ workspace: await svc.publicMeta(configured) });
+      }
+      if (svc.registry.list().some((workspace) =>
+        workspace.template === AUTO_QUANT_WORKSPACE_TEMPLATE)) {
+        return c.json({
+          error: 'auto_quant_workspace_selection_required',
+          message: 'select an existing AutoQuant Workspace before continuing',
+        }, 409);
+      }
+
+      const result = await svc.resolveOrCreateAutoQuantWorkspace();
+      if (!result.ok) {
+        const status =
+          result.code === 'tag_in_use' ? 409
+          : result.code === 'unknown_template' ? 400
+          : result.code === 'unknown_source_version' ? 400
+          : result.code === 'invalid_tag' ? 400
+          : 500;
+        return c.json({ error: result.code, message: result.message }, status as 400 | 409 | 500);
+      }
+      await rememberAutoQuantWorkspace(result.workspace.id);
+      return c.json({ workspace: await svc.publicMeta(result.workspace) }, 201);
+    } catch (err) {
+      launcherLogger.error('auto_quant.initialize_failed', { err });
+      return c.json({ error: 'auto_quant_initialize_failed', message: (err as Error).message }, 500);
+    }
+  });
+
   app.post('/', async (c) => {
     const body = await safeJson(c);
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -840,20 +939,20 @@ export function createWorkspaceRoutes(
       }
       templateName = def;
     }
-    const rawAgents = fields['agents'];
-    const agentsRequested = Array.isArray(rawAgents)
-      ? rawAgents.filter((a): a is string => typeof a === 'string' && a.length > 0)
+    const rawSourceVersion = fields['sourceVersion'];
+    const sourceVersion = typeof rawSourceVersion === 'string' && rawSourceVersion.length > 0
+      ? rawSourceVersion
       : undefined;
     const result = await svc.creator.create(
       tag,
       templateName,
-      agentsRequested && agentsRequested.length > 0 ? agentsRequested : undefined,
+      sourceVersion,
     );
     if (!result.ok) {
       const status =
         result.code === 'invalid_tag' ? 400
         : result.code === 'unknown_template' ? 400
-        : result.code === 'unknown_agent' ? 400
+        : result.code === 'unknown_source_version' ? 400
         : result.code === 'tag_in_use' ? 409
         : result.code === 'insufficient_storage' ? 507
         : 500;
@@ -885,6 +984,20 @@ export function createWorkspaceRoutes(
       const v = fields['description'];
       if (v === null) delete nextObj['description'];
       else nextObj['description'] = v;
+    }
+    if ('defaultAgent' in fields) {
+      const v = fields['defaultAgent'];
+      if (v === null) {
+        delete nextObj['defaultAgent'];
+      } else if (typeof v === 'string') {
+        const adapter = svc.adapters.get(v);
+        if (!adapter || !isAgentRuntime(adapter)) {
+          return c.json({ error: 'invalid_agent', message: `unknown agent runtime: ${v}` }, 400);
+        }
+        nextObj['defaultAgent'] = v;
+      } else {
+        return c.json({ error: 'invalid_agent', message: 'defaultAgent must be a runtime id or null' }, 400);
+      }
     }
     const next = workspaceMetadataSchema.safeParse(nextObj);
     if (!next.success) {
@@ -1268,17 +1381,16 @@ export function createWorkspaceRoutes(
     return c.json(result.session, 201);
   });
 
-  // Quick-chat launch — the "type a message → you're in" front door, decoupled
-  // from the explicit create-workspace UI. Enters the recent Chat workspace (or
-  // creates one stable starter workspace when none exists), then spawns a fresh
-  // interactive session seeded with the user's first message. One POST returns
-  // both workspace and live session so the client can enter the TUI directly.
-  // Body: { prompt: string; agent?: string }
+  // Conversational harness launch — the "type a message → you're in" front
+  // door shared by Ask Alice and AutoQuant. The harness chooses only the
+  // Workspace template; the native Coding Agent remains the worker.
+  // Body: { prompt, agent?, targetWsId?, template? }
   app.post('/quick-chat', async (c) => {
     let prompt: string;
     let agentId: string | undefined;
     let credentialSlug: string | undefined;
     let targetWsId: string | undefined;
+    let templateName = 'chat';
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -1296,6 +1408,13 @@ export function createWorkspaceRoutes(
       // chat sidebar's per-workspace "+" ("Ask Alice, but in this workspace").
       const rawTarget = fields['targetWsId'];
       if (typeof rawTarget === 'string' && rawTarget.length > 0) targetWsId = rawTarget;
+      const rawTemplate = fields['template'];
+      if (rawTemplate !== undefined) {
+        if (rawTemplate !== 'chat' && rawTemplate !== 'auto-quant-v2') {
+          return c.json({ error: 'unknown_template' }, 400);
+        }
+        templateName = rawTemplate;
+      }
     } catch (err) {
       return c.json({ error: 'bad_request', message: (err as Error).message }, 400);
     }
@@ -1309,22 +1428,52 @@ export function createWorkspaceRoutes(
       // Targeted: spawn a new session into the given existing workspace.
       const found = svc.registry.list().find((w) => w.id === targetWsId);
       if (!found) return c.json({ error: 'workspace_not_found' }, 404);
+      if (templateName === 'auto-quant-v2' && found.template !== templateName) {
+        return c.json({ error: 'workspace_template_mismatch' }, 400);
+      }
+      if (templateName === 'auto-quant-v2') {
+        const defaultWorkspace = await resolveAutoQuantDefaultWorkspace().catch((err) => {
+          launcherLogger.warn('auto_quant.preference_read_failed', { err });
+          return undefined;
+        });
+        if (!defaultWorkspace) {
+          return c.json({ error: 'auto_quant_not_initialized' }, 409);
+        }
+        if (defaultWorkspace.id !== found.id) {
+          return c.json({ error: 'auto_quant_workspace_not_default' }, 400);
+        }
+      }
       meta = found;
-      await rememberRecentChat(meta);
+      if (templateName === 'chat') await rememberRecentChat(meta);
     } else {
-      const preference = await quickChatPreferences.readQuickChatPreferences().catch((err) => {
-        launcherLogger.warn('quick_chat.preference_read_failed', { err });
-        return null;
-      });
-      const target = await svc.resolveOrCreateChatWorkspace(
-        preference?.recentChatWorkspaceId,
-      );
+      const target = templateName === 'auto-quant-v2'
+        ? await (async () => {
+            const workspace = await resolveAutoQuantDefaultWorkspace().catch((err) => {
+              launcherLogger.warn('auto_quant.preference_read_failed', { err });
+              return undefined;
+            });
+            return workspace
+              ? { ok: true as const, workspace }
+              : {
+                  ok: false as const,
+                  code: 'auto_quant_not_initialized' as const,
+                  message: 'AutoQuant needs a default Workspace before research can start',
+                };
+          })()
+        : await (async () => {
+            const preference = await quickChatPreferences.readQuickChatPreferences().catch((err) => {
+              launcherLogger.warn('quick_chat.preference_read_failed', { err });
+              return null;
+            });
+            return svc.resolveOrCreateChatWorkspace(preference?.recentChatWorkspaceId);
+          })();
       if (!target.ok) {
         const status =
           target.code === 'tag_in_use' ? 409
           : target.code === 'unknown_template' ? 400
+          : target.code === 'unknown_source_version' ? 400
           : target.code === 'invalid_tag' ? 400
-          : target.code === 'unknown_agent' ? 400
+          : target.code === 'auto_quant_not_initialized' ? 409
           : 500;
         launcherLogger.error('quick_chat.create_failed', {
           code: target.code,
@@ -1336,7 +1485,7 @@ export function createWorkspaceRoutes(
         );
       }
       meta = target.workspace;
-      await rememberRecentChat(meta);
+      if (templateName === 'chat') await rememberRecentChat(meta);
     }
 
     const spawn = await spawnInteractiveSession(meta, {
@@ -1560,7 +1709,7 @@ export function createWorkspaceRoutes(
           pid: session.pid,
           agent: adapter.id,
           startedAt: session.startedAt,
-          title: record.title ?? null,
+          title: sessionPreferredTitle(record) ?? null,
         });
       } catch (err) {
         launcherLogger.error('workspace.session_resume_failed', { id, token, err });
@@ -1728,7 +1877,6 @@ export function createWorkspaceRoutes(
       workspace: {
         id: meta.id,
         dir: meta.dir,
-        agents: meta.agents,
       },
       record: {
         id: record.id,
@@ -1869,7 +2017,7 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
     let prompt: string;
-    let timeoutMs: number;
+    let timeoutMs: number | undefined;
     let agentId: string | undefined;
     let resumeId: string | undefined;
     let wait = false;
@@ -1887,8 +2035,9 @@ export function createWorkspaceRoutes(
       }
       prompt = rawPrompt;
       const rawTimeout = fields['timeoutMs'];
-      timeoutMs =
-        typeof rawTimeout === 'number' && rawTimeout > 0 ? Math.min(rawTimeout, 1_800_000) : 300_000;
+      timeoutMs = typeof rawTimeout === 'number' && rawTimeout > 0
+        ? Math.min(rawTimeout, 2_147_478_647)
+        : undefined;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       const rawResumeId = fields['resumeId'];
@@ -1910,17 +2059,9 @@ export function createWorkspaceRoutes(
     if (agentId && !svc.adapters.get(agentId)) {
       return c.json({ error: 'unknown_agent', message: `no adapter: ${agentId}` }, 400);
     }
-    // An explicit agent must be one ENABLED on this workspace — else
-    // resolveAdapter would honor it and spawn a CLI with no provider config
-    // injected (silent fallback to the user's global config). Omitting `agent`
-    // resolves through the user default / first enabled agent runtime, never
-    // through utility adapters such as shell.
-    if (agentId && !meta.agents.includes(agentId)) {
-      return c.json({ error: 'agent_not_enabled', message: `agent "${agentId}" not enabled on this workspace` }, 400);
-    }
     const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
-      return c.json({ error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' }, 400);
+      return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
     }
     const adapter = svc.resolveAdapter(meta, effectiveAgentId);
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
@@ -1930,7 +2071,7 @@ export function createWorkspaceRoutes(
       id,
       agent: adapter.id,
       promptLen: prompt.length,
-      timeoutMs,
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       wait,
     });
     // `wait:true` → run synchronously and return the full result (curl/tests).
@@ -2015,11 +2156,14 @@ export function createWorkspaceRoutes(
       // mode; the dropdown receives only presentation/injection metadata, while
       // the unfiltered Workspace modal keeps the key-bearing response.
       const agent = c.req.query('agent');
-      const entries = agent ? compatibleCredentials(credentials, agent) : Object.entries(credentials);
+      const adapter = agent ? svc.adapters.get(agent) : undefined;
+      const entries = agent
+        ? adapter ? compatibleCredentials(credentials, adapter) : []
+        : Object.entries(credentials);
       const list = entries.map(([slug, cred]) => {
         const resolvedModel = resolveInjectionModel(cred);
-        const projected = agent && resolvedModel
-          ? credentialToWorkspaceAiCred(cred, agent, { model: resolvedModel })
+        const projected = adapter && resolvedModel
+          ? credentialToWorkspaceAiCred(cred, adapter, { model: resolvedModel })
           : null;
         const reasoningMode = resolveModelSemantics(cred.vendor, resolvedModel)?.reasoning?.mode;
         return {
@@ -2089,13 +2233,14 @@ export function createWorkspaceRoutes(
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
-      const [claude, codex, opencode, pi] = await Promise.all([
-        svc.adapters.get('claude')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('codex')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('opencode')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('pi')?.readAiConfig?.(meta.dir) ?? null,
-      ]);
-      return c.json({ claude, codex, opencode, pi });
+      const configurable = svc.adapters.list().filter(
+        (adapter) => adapter.capabilities.aiProvider && adapter.readAiConfig,
+      );
+      const entries = await Promise.all(configurable.map(async (adapter) => [
+        adapter.id,
+        await adapter.readAiConfig!(meta.dir),
+      ] as const));
+      return c.json(Object.fromEntries(entries));
     } catch (err) {
       if (err instanceof PathTraversal) return c.json({ error: 'invalid_path' }, 400);
       launcherLogger.warn('agent_config.read_failed', { id, err });
@@ -2149,9 +2294,9 @@ export function createWorkspaceRoutes(
     try {
       const credentials = await readCredentials();
       const rows = await Promise.all(
-        meta.agents
-          .map((agentId) => ({ agentId, adapter: svc.adapters.get(agentId) }))
-          .filter(({ adapter }) => adapter !== undefined && isAgentRuntime(adapter))
+        svc.adapters.list()
+          .filter(isAgentRuntime)
+          .map((adapter) => ({ agentId: adapter.id, adapter }))
           .map(({ agentId, adapter }) =>
             getAgentCredentialReadiness({ meta, agentId, adapter, credentials }),
           ),
@@ -2188,7 +2333,8 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    if (agent !== 'claude' && agent !== 'codex' && agent !== 'opencode' && agent !== 'pi') {
+    const adapter = svc.adapters.get(agent);
+    if (!adapter?.capabilities.aiProvider || !adapter.writeAiConfig) {
       return c.json({ error: 'unknown_agent' }, 400);
     }
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
@@ -2197,8 +2343,6 @@ export function createWorkspaceRoutes(
     const body = (await safeJson(c)) as WorkspaceAiCred | null;
     const cfg = body && typeof body === 'object' ? body : {};
     try {
-      const adapter = svc.adapters.get(agent);
-      if (!adapter?.writeAiConfig) return c.json({ error: 'unknown_agent' }, 400);
       const credentials = cfg.apiKey ? await readCredentials() : {};
       const slug = matchCredentialByApiKey(credentials, cfg.apiKey);
       const vendor = slug
@@ -2208,7 +2352,11 @@ export function createWorkspaceRoutes(
             baseUrl: cfg.baseUrl ?? undefined,
             wireShape: cfg.wireShape ?? undefined,
           });
-      const projected = applyRegisteredModelSemantics(cfg, agent, vendor);
+      const projected = applyRegisteredModelSemantics(
+        cfg,
+        adapter.capabilities.aiProvider,
+        vendor,
+      );
       await adapter.writeAiConfig(meta.dir, projected);
       // Remember an explicit model choice on the originating vault credential
       // (matched by apiKey) so quick-chat can reuse it without re-prompting.
@@ -2236,7 +2384,7 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ ok: false, error: 'invalid_id' }, 400);
-    if (agent !== 'claude' && agent !== 'codex' && agent !== 'opencode' && agent !== 'pi') {
+    if (!svc.adapters.get(agent)?.capabilities.aiProvider) {
       return c.json({ ok: false, error: 'unknown_agent' }, 400);
     }
 

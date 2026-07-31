@@ -14,11 +14,25 @@ allowBuilds:
   node-pty: true
   protobufjs: false
 
+minimumReleaseAgeExclude:
+  - '@earendil-works/pi-tui@0.83.0'
+
 overrides:
-  '@alpacahq/alpaca-trade-api>axios': ^0.32.0
+  '@alpacahq/alpaca-trade-api>axios': ^0.33.0
   '@alpacahq/alpaca-trade-api>eslint': '-'
-  protobufjs: ^7.5.8
-  fast-uri: ^3.1.2
+  '@babel/core': ^7.29.6
+  '@hono/node-server': ^2.0.12
+  body-parser: ^2.3.0
+  'brace-expansion@^1.0.0': 5.0.8
+  'brace-expansion@^2.0.0': 5.0.8
+  'brace-expansion@>=3.0.0': 5.0.8
+  esbuild: ^0.28.1
+  fast-uri: ^3.1.4
+  hono: ^4.12.32
+  js-yaml: ^4.3.0
+  postcss: ^8.5.18
+  protobufjs: ^7.6.5
+  tar: ^7.5.22
   qs: ^6.15.2
   ip-address: ^10.1.1
   tmp: ^0.2.6

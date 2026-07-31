@@ -39,6 +39,7 @@ import {
   vendorPreset,
 } from '../lib/presetHelpers'
 import { notifyWorkspaceDefaultsChanged } from '../lib/workspaceAiEvents'
+import { listAgents, type AgentInfo } from '../components/workspace/api'
 
 function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'label'>): string {
   return cred.label?.trim() || cred.slug
@@ -93,6 +94,7 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
 
 export function AIProviderPage() {
   const { t } = useTranslation()
+  const [agents, setAgents] = useState<AgentInfo[]>([])
   const [credentials, setCredentials] = useState<CredentialSummary[] | null>(null)
   const [credentialsLoadError, setCredentialsLoadError] = useState(false)
   const [presets, setPresets] = useState<Preset[]>([])
@@ -113,6 +115,7 @@ export function AIProviderPage() {
   useEffect(() => {
     void reload()
     api.config.getPresets().then(({ presets: p }) => setPresets(p)).catch(() => {})
+    void listAgents().then(setAgents).catch(() => setAgents([]))
   }, [reload])
 
   const apiKeyPresets = useMemo(() => presets.filter(isApiKeyPreset), [presets])
@@ -176,7 +179,7 @@ export function AIProviderPage() {
 
             <div className="space-y-2.5">
               {credentials.map((cred) => {
-                const compatibleAgents = compatibleAgentIds(cred.wires)
+                const compatibleAgents = compatibleAgentIds(cred.wires, agents)
                 return (
                   <div key={cred.slug} className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
                     <div className="flex-1 min-w-0">
@@ -201,12 +204,20 @@ export function AIProviderPage() {
                     </div>
                     <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                       <button
+                        type="button"
                         onClick={() => setModal({ mode: 'edit', cred })}
+                        title={t('aiProvider.editCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
+                        aria-label={t('aiProvider.editCredentialAria', {
+                          credential: credentialLabel(cred),
+                        })}
                         className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {t('common.edit')}
                       </button>
                       <button
+                        type="button"
                         onClick={() => setPendingDelete(cred)}
                         title={t('aiProvider.deleteCredentialAria', {
                           credential: credentialLabel(cred),
@@ -235,7 +246,7 @@ export function AIProviderPage() {
           </section>
 
           {/* ============== Default workspace credentials ============== */}
-          <WorkspaceDefaultsSection credentials={credentials} presets={presets} />
+          <WorkspaceDefaultsSection credentials={credentials} presets={presets} agents={agents} />
         </div>
 
         {/* Runtime descriptions are reference material, not a prerequisite for
@@ -282,6 +293,7 @@ export function AIProviderPage() {
           mode={modal.mode}
           cred={modal.mode === 'edit' ? modal.cred : undefined}
           presets={apiKeyPresets}
+          agents={agents}
           onClose={() => setModal(null)}
           onSaved={async () => { await reload(); setModal(null) }}
         />
@@ -327,7 +339,15 @@ const ADVANCED_DEFAULT_AGENTS = [
   { id: 'codex', name: 'Codex' },
 ] as const
 
-function WorkspaceDefaultsSection({ credentials, presets }: { credentials: CredentialSummary[]; presets: Preset[] }) {
+function WorkspaceDefaultsSection({
+  credentials,
+  presets,
+  agents,
+}: {
+  credentials: CredentialSummary[]
+  presets: Preset[]
+  agents: readonly AgentInfo[]
+}) {
   const { t } = useTranslation()
   const [data, setData] = useState<WorkspaceCredentialDefaultsResponse | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -379,7 +399,7 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
     const nextDefaults = { ...data.defaults }
     if (slug) {
       const cred = credentials.find((candidate) => candidate.slug === slug)
-      const wireShape = cred ? agentWireShapes(cred.wires, agentId, cred.vendor)[0] : undefined
+      const wireShape = cred ? agentWireShapes(cred.wires, agents, agentId, cred.vendor)[0] : undefined
       nextDefaults[agentId] = { credentialSlug: slug, ...(wireShape ? { wireShape } : {}) }
     } else {
       delete nextDefaults[agentId]
@@ -426,7 +446,7 @@ function WorkspaceDefaultsSection({ credentials, presets }: { credentials: Crede
     const current = data?.defaults[agent.id]?.credentialSlug ?? ''
     const selectedCredential = credentials.find((candidate) => candidate.slug === current)
     const wireShapes = selectedCredential
-      ? agentWireShapes(selectedCredential.wires, agent.id, selectedCredential.vendor)
+      ? agentWireShapes(selectedCredential.wires, agents, agent.id, selectedCredential.vendor)
       : []
     const configuredWire = data?.defaults[agent.id]?.wireShape
     const selectedWire = configuredWire && wireShapes.includes(configuredWire)

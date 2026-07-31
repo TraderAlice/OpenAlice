@@ -10,6 +10,7 @@ import {
   formatInstallSelector,
   installedContentIdentity,
   installSourcesMatch,
+  managedSourceKey,
   parseInstallSource,
   readInstallSource,
   requireInstallSource,
@@ -18,7 +19,7 @@ import { formatMissingRuntimeBuildTools } from './runtime-deps.mjs'
 import { connectSsh } from './ssh-connect.mjs'
 
 const MINIMUM_NODE_VERSION = '22.19.0'
-const MANAGED_PI_VERSION = '0.80.6'
+const MANAGED_PI_VERSION = '0.83.0'
 const MAX_SSH_OUTPUT_BYTES = 1024 * 1024
 const REMOTE_STATE_VERSION = 1
 const MAX_REMEMBERED_TARGETS = 32
@@ -437,7 +438,9 @@ function formatManagedRemoteStatus(destination, remote) {
     `Runtime: ${status?.class ?? 'unknown'}${status?.owner?.surface ? ` (${status.owner.surface})` : ''}`,
   ]
   if (status?.home) lines.push(`Home:    ${status.home}`)
-  if (status?.owner?.launchRoot) lines.push(`Source:  ${status.owner.launchRoot}`)
+  if (status?.owner?.launchRoot) {
+    lines.push(`${status.provider?.kind === 'bundle' ? 'Runtime' : 'Source'}:  ${status.owner.launchRoot}`)
+  }
   if (status?.endpoints?.web) lines.push(`Web:     ${status.endpoints.web}`)
   return `${lines.join('\n')}\n\n`
 }
@@ -458,7 +461,11 @@ export function createRemotePlan(options, remote, install = {}) {
   let rebuildSource = false
   let startServer = false
   let restartServer = false
-  let serverAppDir = options.appDir || remote.managedAppDir || ''
+  const bundledRuntime = !options.appDir
+    && remote.managedRuntime?.compatible === true
+  let serverAppDir = options.appDir
+    || (bundledRuntime ? remote.managedRuntime.path : remote.managedAppDir)
+    || ''
   let remotePort = options.remotePort
 
   if (!['linux', 'darwin'].includes(remote.platform?.os)) {
@@ -529,7 +536,7 @@ export function createRemotePlan(options, remote, install = {}) {
     }
   }
 
-  if (!blocker && !options.appDir && remote.sourceCheckoutState === 'present' && remote.sourceUpdateAvailable === true) {
+  if (!blocker && !bundledRuntime && !options.appDir && remote.sourceCheckoutState === 'present' && remote.sourceUpdateAvailable === true) {
     if (remote.sourceDirty) {
       blocker = `${serverAppDir} has tracked local changes, so OpenAlice will not update the managed checkout. Preserve the changes with a separate checkout and pass --app-dir.`
     } else {
@@ -544,7 +551,7 @@ export function createRemotePlan(options, remote, install = {}) {
     }
   }
 
-  if (!blocker && startServer) {
+  if (!blocker && startServer && !bundledRuntime) {
     if (remote.sourceCheckoutState === 'invalid') {
       blocker = `${serverAppDir} exists but is not an OpenAlice source checkout. Choose another --app-dir or move the existing path.`
     } else if (remote.sourceCheckoutState === 'absent') {
@@ -554,7 +561,7 @@ export function createRemotePlan(options, remote, install = {}) {
   }
 
   const runtimeBuildToolsMissing = remote.runtimeBuildToolsMissing ?? []
-  if (!blocker && startServer && remote.sourceArtifactsReady !== true && runtimeBuildToolsMissing.length > 0) {
+  if (!blocker && startServer && !bundledRuntime && remote.sourceArtifactsReady !== true && runtimeBuildToolsMissing.length > 0) {
     if (remote.platform?.os === 'linux') {
       installRuntimeDeps = true
     } else {
@@ -586,7 +593,15 @@ export function createRemotePlan(options, remote, install = {}) {
     appDir: serverAppDir || 'not selected',
     serverAppDir,
     remoteHome: options.remoteHome || '~/.openalice (remote default)',
-    sourceMode: options.appDir ? 'user-selected' : 'managed',
+    sourceMode: options.appDir
+      ? 'user-selected'
+      : bundledRuntime
+        ? 'installed-bundle'
+        : 'managed',
+    bundledRuntime,
+    runtimeContentIdentity: bundledRuntime
+      ? remote.managedRuntime.contentIdentity
+      : null,
     sourceCheckoutState: remote.sourceCheckoutState ?? null,
     remotePort,
     localPort: options.localPort || (options.preferredLocalPort ? `${options.preferredLocalPort} (remembered)` : 'auto'),
@@ -617,7 +632,9 @@ export function formatRemotePlan(plan) {
   const actions = plan.mutations.length > 0
     ? [...plan.mutations, 'open local SSH tunnel']
     : ['reuse compatible remote CLI Server', 'open local SSH tunnel']
-  const buildTools = plan.sourceArtifactsReady === true
+  const buildTools = plan.bundledRuntime
+    ? 'Not needed (installed Runtime)'
+    : plan.sourceArtifactsReady === true
     ? 'Not needed (built artifacts present)'
     : plan.runtimeBuildToolsMissing.length > 0
       ? `Missing: ${formatMissingRuntimeBuildTools(plan.runtimeBuildToolsMissing)}`
@@ -627,7 +644,9 @@ export function formatRemotePlan(plan) {
   const cliState = plan.cliCompatible && plan.cliMatchesLocal
     ? ', compatible and matches local CLI'
     : ', install/update required'
-  const sourceState = plan.cloneSource
+  const sourceState = plan.bundledRuntime
+    ? `, content ${plan.runtimeContentIdentity}`
+    : plan.cloneSource
     ? ', will clone'
     : plan.updateSource
       ? ', update available'
@@ -725,6 +744,7 @@ export async function probeRemoteHost(options, dependencies = {}) {
   let cliVersion = null
   let remoteInstallSource = null
   let cliContentIdentity = null
+  let managedRuntime = null
   let status = null
   let cliCompatible = false
   try {
@@ -734,6 +754,11 @@ export async function probeRemoteHost(options, dependencies = {}) {
       if (versionInfo.version === cliVersion) {
         remoteInstallSource = versionInfo.installSource
         cliContentIdentity = versionInfo.contentIdentity
+        managedRuntime = normalizeRemoteManagedRuntime(
+          versionInfo.managedRuntime,
+          cliVersion,
+          platform,
+        )
       }
     } catch {
       remoteInstallSource = null
@@ -744,7 +769,7 @@ export async function probeRemoteHost(options, dependencies = {}) {
   } catch {
     cliCompatible = false
   }
-  return { platform, shellHome, managedAppDir, nodeVersion, hasCurl, sourceCheckoutState, sourceCheckoutPresent, sourceArtifactsReady, sourceUpdateAvailable, sourceDirty, runtimeBuildToolsMissing, piPath, piVersion, piCompatible, cliPath, cliVersion, cliContentIdentity, installSource: remoteInstallSource, cliCompatible, status }
+  return { platform, shellHome, managedAppDir, managedRuntime, nodeVersion, hasCurl, sourceCheckoutState, sourceCheckoutPresent, sourceArtifactsReady, sourceUpdateAvailable, sourceDirty, runtimeBuildToolsMissing, piPath, piVersion, piCompatible, cliPath, cliVersion, cliContentIdentity, installSource: remoteInstallSource, cliCompatible, status }
 }
 
 async function probeRemoteControl(options, dependencies) {
@@ -852,14 +877,13 @@ export function buildRemoteStatusCommand(options, cliPath) {
 }
 
 export function buildRemoteServerStartCommand(options, cliPath) {
-  if (!options.appDir) throw new Error('--app-dir is required to start the remote Server')
   const args = [
     shellQuote(cliPath),
     'server', 'start',
-    '--app-dir', shellQuote(options.appDir),
     '--port', String(options.remotePort),
     '--wait', String(Math.ceil(options.waitMs / 1_000)),
   ]
+  if (options.appDir) args.push('--app-dir', shellQuote(options.appDir))
   if (options.remoteHome) args.push('--home', shellQuote(options.remoteHome))
   if (options.rebuild) args.push('--rebuild')
   if (options.takeover) args.push('--takeover')
@@ -880,6 +904,7 @@ export function buildRemoteInstallCommand(installSource, installBaseUrl = '', wi
   const installEnv = [
     `OPENALICE_INSTALL_URL=${url}`,
     'OPENALICE_INSTALL_CONTEXT=remote',
+    `OPENALICE_EXPECTED_CLI_VERSION=${shellQuote(source.cliVersion)}`,
     installBaseUrl ? `OPENALICE_INSTALL_BASE_URL=${shellQuote(installBaseUrl)}` : '',
   ].filter(Boolean).join(' ')
   const runtimeDepsFlag = withRuntimeDeps ? ' --with-runtime-deps' : ''
@@ -1024,13 +1049,13 @@ export function formatRemoteHelp() {
   return `Usage:
   openalice remote <user@host> [options]
 
-Plans and, after explicit consent, prepares a source-backed OpenAlice Server on
-the SSH host. It then opens the normal loopback browser tunnel. Disconnecting
-closes only the tunnel; the remote Server keeps running.
+Plans and, after explicit consent, installs or reuses the matching OpenAlice
+Runtime on the SSH host. It then opens the normal loopback browser tunnel.
+Disconnecting closes only the tunnel; the remote Server keeps running.
 
-When --app-dir is omitted, OpenAlice selects a private managed checkout under
-the remote OPENALICE_HOME and clones it when needed. Pass an absolute checkout
-path to keep source ownership manual.
+When --app-dir is omitted, OpenAlice prefers the installed platform Runtime and
+falls back to a private managed checkout only for older/source-only installs.
+Pass an absolute checkout path to keep source ownership manual.
 
 Options:
   --app-dir <path>        Existing or new checkout path (default: managed)
@@ -1065,7 +1090,37 @@ function parseRemoteVersionInfo(output) {
     version: value.version,
     installSource,
     contentIdentity: normalizeContentIdentity(value.contentIdentity),
+    managedRuntime: value.managedRuntime ?? null,
   }
+}
+
+function normalizeRemoteManagedRuntime(value, cliVersion, platform) {
+  if (
+    !value
+    || typeof value !== 'object'
+    || value.productVersion !== cliVersion
+    || value.platform !== platform.os
+    || value.arch !== normalizeRemoteArchitecture(platform.architecture)
+  ) {
+    return null
+  }
+  const path = normalizeRemoteExecutablePath(value.path, 'managed Runtime')
+  const contentIdentity = normalizeContentIdentity(value.contentIdentity)
+  if (!contentIdentity) return null
+  return {
+    path,
+    contentIdentity,
+    productVersion: value.productVersion,
+    platform: value.platform,
+    arch: value.arch,
+    compatible: true,
+  }
+}
+
+function normalizeRemoteArchitecture(value) {
+  if (value === 'x86_64' || value === 'amd64') return 'x64'
+  if (value === 'arm64' || value === 'aarch64') return 'arm64'
+  return 'unsupported'
 }
 
 function parseRemoteStatus(output) {
@@ -1169,19 +1224,6 @@ function contentIdentitiesMatch(localIdentity, remoteIdentity) {
 
 function normalizeContentIdentity(value) {
   return typeof value === 'string' && /^[a-f0-9]{16}$/.test(value) ? value : null
-}
-
-function managedSourceKey(source) {
-  const normalized = requireInstallSource(source)
-  const readable = `${normalized.selector.kind}-${normalized.selector.value}`
-    .replaceAll(/[^A-Za-z0-9._-]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '')
-    .slice(0, 48) || 'source'
-  const digest = createHash('sha256')
-    .update(`${normalized.selector.kind}:${normalized.selector.value}`)
-    .digest('hex')
-    .slice(0, 8)
-  return `${readable}-${digest}`
 }
 
 function remoteStatePath(env, homeDir) {

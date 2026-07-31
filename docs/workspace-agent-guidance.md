@@ -12,6 +12,10 @@ contract, discoverable skills, and the live CLI surface.
 Alice persona and written to both `CLAUDE.md` and `AGENTS.md` by
 `src/workspaces/context-injector.ts`.
 
+Templates may opt out of this persona layer with `injectPersona: false`.
+AutoQuant V2 does so to preserve the upstream `AGENTS.md`; OpenAlice adds only
+discoverable collaboration/data/trading skills alongside it.
+
 This layer may define only durable behavior:
 
 - how to distinguish chat, durable work, Inbox delivery, and trading;
@@ -33,6 +37,7 @@ One concept has one primary owner:
 | Concept | Owner |
 |---|---|
 | Inbox, Issue collaboration, provenance, peer questions | `alice-workspace` |
+| Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market/fundamental/macro data | `traderhub` |
 | Quantitative K-line panels and source choice | `alice-analysis` |
@@ -52,6 +57,28 @@ product bug.
 
 Use the real shim in the verification loop; direct tool calls do not exercise
 argv parsing or manifest help.
+
+The four public CLI names are deliberate authority boundaries rather than one
+flat command bag:
+
+| CLI | Boundary |
+|---|---|
+| `alice` | Workspace research data, subscribed-feed archive, symbols, and bounded K-line analysis |
+| `traderhub` | Low-frequency boards, fundamentals, macro, and calendars |
+| `alice-workspace` | Peer addressing, Agent conversation, human Inbox delivery, durable work, and provenance |
+| `alice-uta` | Broker reads plus explicit trading mutations and approval flow |
+
+Every export manifest supplies intent-first descriptions for its command
+groups. Top-level and group help must explain which namespace owns an action
+before listing verbs. Skills may teach workflows, but an old copied skill must
+be able to recover from current live help.
+
+`alice-workspace inbox read` projects each attached document with a directly
+usable absolute path when its source Workspace is available. `peer path` is the
+lower-level addressing primitive for inspecting that desk. In both cases,
+native Coding Agent file, search, and Git capabilities own the read flow. Do
+not grow a second Workspace file API merely to reproduce those capabilities;
+adapter permission problems belong at the runtime boundary.
 
 ## Snapshot and upgrade semantics
 

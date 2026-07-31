@@ -1,6 +1,8 @@
+import { createReadStream } from 'node:fs';
 import { readFile, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 
 import type {
   AgentInteractiveSetupStatus,
@@ -27,6 +29,33 @@ const CLAUDE_OWNED_PATHS = [
 
 const CLAUDE_PROJECT_EFFORTS = new Set<ModelReasoningEffort>(['low', 'medium', 'high', 'xhigh']);
 const CLAUDE_RUN_EFFORTS = new Set<ModelReasoningEffort>(['low', 'medium', 'high', 'max']);
+
+export async function readClaudeSessionTitleFile(path: string): Promise<string | null> {
+  let customTitle: string | undefined;
+  let aiTitle: string | undefined;
+  try {
+    const lines = createInterface({
+      input: createReadStream(path, { encoding: 'utf8' }),
+      crlfDelay: Infinity,
+    });
+    for await (const line of lines) {
+      let entry: Record<string, unknown>;
+      try {
+        entry = JSON.parse(line) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      if (entry['type'] === 'custom-title' && typeof entry['customTitle'] === 'string') {
+        customTitle = entry['customTitle'].trim() || undefined;
+      } else if (entry['type'] === 'ai-title' && typeof entry['aiTitle'] === 'string') {
+        aiTitle = entry['aiTitle'].trim() || undefined;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return customTitle ?? aiTitle ?? null;
+}
 
 function claudeProjectEffort(value: unknown): ModelReasoningEffort | null {
   return typeof value === 'string' && CLAUDE_PROJECT_EFFORTS.has(value as ModelReasoningEffort)
@@ -159,6 +188,11 @@ export const claudeAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'fs-watch',
     headless: true,
+    aiProvider: {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['anthropic'],
+      defaultWire: 'anthropic',
+    },
   },
 
   readInteractiveSetupStatus: readClaudeInteractiveSetupStatus,
@@ -389,5 +423,10 @@ export const claudeAdapter: CliAdapter = {
   extractSessionId(filename: string): string | null {
     const m = SESSION_FILE_RE.exec(filename);
     return m && m[1] ? m[1] : null;
+  },
+  readSessionTitle(cwd: string, sessionId: string): Promise<string | null> {
+    return readClaudeSessionTitleFile(
+      join(homedir(), '.claude', 'projects', projectKey(cwd), `${sessionId}.jsonl`),
+    );
   },
 };

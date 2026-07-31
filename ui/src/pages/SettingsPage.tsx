@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Moon, RotateCcw, Sun } from 'lucide-react'
+import { useState, useEffect, useCallback, useId, useMemo } from 'react'
+import { ChevronDown, Moon, RotateCcw, Sun } from 'lucide-react'
 import { api } from '../api'
 import type { ToolInfo } from '../api/tools'
 import { Toggle } from '../components/Toggle'
@@ -42,6 +42,8 @@ export function AppearanceSection() {
   const effectiveSlot = useEffectivePreferenceSlot()
   const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
+  const [customizingPalettes, setCustomizingPalettes] = useState(false)
+  const paletteEditorId = useId()
   const modes: readonly AppTheme[] = ['auto', 'day', 'night']
   const activePalette = effectiveSlot === 'day' ? dayPalette : nightPalette
   const activePaletteDefinition = paletteDefinition(activePalette)
@@ -59,6 +61,11 @@ export function AppearanceSection() {
   const chooseSlot = (slot: ThemePreferenceSlot) => {
     setEditingSlot(slot)
     setPaletteFilter('recommended')
+  }
+
+  const editSlot = (slot: ThemePreferenceSlot) => {
+    chooseSlot(slot)
+    setCustomizingPalettes(true)
   }
 
   const choosePalette = (palette: ThemePaletteId) => {
@@ -93,7 +100,7 @@ export function AppearanceSection() {
                 if (mode !== 'auto') chooseSlot(mode)
               }}
               aria-pressed={theme === mode}
-              className={`oa-pressable rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+              className={`oa-pressable min-h-10 rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors sm:min-h-0 ${
                 theme === mode
                   ? 'border-primary bg-primary-muted text-primary'
                   : 'border-border bg-background text-muted-foreground hover:text-foreground'
@@ -135,33 +142,44 @@ export function AppearanceSection() {
           </div>
           <button
             type="button"
-            onClick={resetPair}
-            disabled={isDefaultPair}
-            className="oa-pressable inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-45"
+            onClick={() => setCustomizingPalettes((current) => !current)}
+            aria-expanded={customizingPalettes}
+            aria-controls={paletteEditorId}
+            className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/35 hover:text-primary sm:min-h-8"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            {t('settings.appearance.resetPair')}
+            {t(customizingPalettes
+              ? 'settings.appearance.hidePaletteEditor'
+              : 'settings.appearance.customizePalettes')}
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${customizingPalettes ? 'rotate-180' : ''}`}
+              aria-hidden
+            />
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,17rem),1fr))] gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-3">
           <PaletteSlotCard
             slot="day"
             palette={paletteDefinition(dayPalette)}
             active={effectiveSlot === 'day'}
             editing={editingSlot === 'day'}
-            onSelect={() => chooseSlot('day')}
+            onSelect={() => editSlot('day')}
           />
           <PaletteSlotCard
             slot="night"
             palette={paletteDefinition(nightPalette)}
             active={effectiveSlot === 'night'}
             editing={editingSlot === 'night'}
-            onSelect={() => chooseSlot('night')}
+            onSelect={() => editSlot('night')}
           />
         </div>
 
-        <div className="mt-4 rounded-xl border border-border/70 bg-secondary/35 p-3 sm:p-4">
+        <div
+          id={paletteEditorId}
+          hidden={!customizingPalettes}
+          inert={!customizingPalettes ? true : undefined}
+          className="oa-disclosure-enter mt-4 border-t border-border/60 pt-4"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <span className="text-sm font-medium text-foreground">
@@ -171,26 +189,37 @@ export function AppearanceSection() {
                 {t('settings.appearance.paletteLibraryDescription')}
               </p>
             </div>
-            <div
-              className="inline-flex rounded-md border border-border bg-background p-0.5"
-              role="group"
-              aria-label={t('settings.appearance.paletteFilter')}
-            >
-              {(['recommended', 'all'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setPaletteFilter(filter)}
-                  aria-pressed={paletteFilter === filter}
-                  className={`rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    paletteFilter === filter
-                      ? 'bg-primary-muted text-primary'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {t(`settings.appearance.paletteFilterOption.${filter}`)}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={resetPair}
+                disabled={isDefaultPair}
+                className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-45 sm:min-h-8"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                {t('settings.appearance.resetPair')}
+              </button>
+              <div
+                className="inline-flex rounded-md border border-border bg-background p-0.5"
+                role="group"
+                aria-label={t('settings.appearance.paletteFilter')}
+              >
+                {(['recommended', 'all'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setPaletteFilter(filter)}
+                    aria-pressed={paletteFilter === filter}
+                    className={`min-h-10 rounded px-2.5 py-1 text-[11px] font-medium transition-colors sm:min-h-0 ${
+                      paletteFilter === filter
+                        ? 'bg-primary-muted text-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {t(`settings.appearance.paletteFilterOption.${filter}`)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -234,16 +263,16 @@ function PaletteSlotCard({
         palette: t(palette.labelKey),
       })}
       onClick={onSelect}
-      className="oa-palette-preview oa-pressable min-w-0 rounded-xl border p-3 text-left shadow-sm transition-[border-color,box-shadow,transform]"
+      className="oa-palette-preview oa-pressable min-w-0 rounded-xl border p-2.5 text-left shadow-sm transition-[border-color,box-shadow,transform] sm:p-3"
     >
-      <span className="flex min-w-0 items-start justify-between gap-3">
+      <span className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
         <span className="min-w-0">
           <span className="flex items-center gap-1.5 text-[11px] font-medium">
             <Icon className="h-3.5 w-3.5" />
             {t(`theme.mode.${slot}`)}
           </span>
           <span className="mt-1 block truncate text-[14px] font-semibold">{t(palette.labelKey)}</span>
-          <span className="oa-palette-preview-muted mt-0.5 block text-[10.5px] leading-snug">
+          <span className="oa-palette-preview-muted mt-0.5 hidden text-[10.5px] leading-snug sm:block">
             {t(palette.descriptionKey)}
           </span>
         </span>
@@ -260,12 +289,12 @@ function PaletteSlotCard({
           )}
         </span>
       </span>
-      <span className="mt-3 flex items-center gap-1.5" aria-hidden>
-        <span className="h-2.5 flex-1 rounded-sm bg-primary" />
-        <span className="h-2.5 flex-1 rounded-sm bg-success" />
-        <span className="h-2.5 flex-1 rounded-sm bg-warning" />
-        <span className="h-2.5 flex-1 rounded-sm bg-destructive" />
-        <span className="h-2.5 flex-1 rounded-sm bg-ai-action" />
+      <span className="mt-2.5 flex items-center gap-1 sm:mt-3 sm:gap-1.5" aria-hidden>
+        <span className="h-2 flex-1 rounded-sm bg-primary sm:h-2.5" />
+        <span className="h-2 flex-1 rounded-sm bg-success sm:h-2.5" />
+        <span className="h-2 flex-1 rounded-sm bg-warning sm:h-2.5" />
+        <span className="h-2 flex-1 rounded-sm bg-destructive sm:h-2.5" />
+        <span className="h-2 flex-1 rounded-sm bg-ai-action sm:h-2.5" />
       </span>
     </button>
   )
@@ -374,7 +403,7 @@ export function LanguageSection() {
             type="button"
             onClick={() => setLocale(l)}
             aria-pressed={locale === l}
-            className={`px-3 py-1.5 text-sm rounded border transition-colors ${
+            className={`min-h-10 rounded border px-3 py-1.5 text-sm transition-colors sm:min-h-0 ${
               locale === l
                 ? 'border-primary text-primary bg-primary/10'
                 : 'border-border text-muted-foreground hover:text-foreground'
@@ -484,7 +513,7 @@ export function DataHomeSection() {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="btn-secondary-sm"
+          className="btn-secondary-sm min-h-10 sm:min-h-0"
           disabled={!status || busy}
           onClick={() => void bridge.openCurrent()
             .then((message) => { if (message) setError(t('settings.dataHome.openError')) })
@@ -495,7 +524,7 @@ export function DataHomeSection() {
         <button
           data-testid="data-home-choose"
           type="button"
-          className="btn-primary-sm"
+          className="btn-primary-sm min-h-10 sm:min-h-0"
           disabled={!status || busy || restarting || status.selectionLocked}
           onClick={() => void runAction(() => bridge.chooseAndRestart())}
         >
@@ -531,7 +560,7 @@ export function DataHomeSection() {
                 </span>
                 <button
                   type="button"
-                  className="btn-secondary-sm shrink-0"
+                  className="btn-secondary-sm min-h-10 shrink-0 sm:min-h-0"
                   disabled={busy || restarting || status?.selectionLocked}
                   onClick={() => void runAction(() => bridge.useRecentAndRestart(path))}
                 >
@@ -642,7 +671,7 @@ function WorkspaceShellSection() {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="btn-primary-sm"
+          className="btn-primary-sm min-h-10 sm:min-h-0"
           disabled={saving || (mode === 'custom' && customPath.trim().length === 0)}
           onClick={() => void save()}
         >
@@ -735,7 +764,7 @@ function PersonaEditor() {
         <button
           onClick={handleSave}
           disabled={saving || !dirty}
-          className="btn-primary-sm"
+          className="btn-primary-sm min-h-10 sm:min-h-0"
         >
           {saving ? t('settings.persona.saving') : t('settings.persona.save')}
         </button>
@@ -865,7 +894,7 @@ export function ToolsSection() {
         loadError ? (
           <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-sm font-medium text-foreground">{t('settings.tools.loadError')}</p>
-            <button type="button" className="btn-secondary-sm mt-4" onClick={() => void loadTools()}>
+            <button type="button" className="btn-secondary-sm mt-4 min-h-10 sm:min-h-0" onClick={() => void loadTools()}>
               {t('common.retry')}
             </button>
           </div>
@@ -925,14 +954,18 @@ function ToolGroupCard({
 }: ToolGroupCardProps) {
   const enabledCount = group.tools.filter((t) => !disabled.has(t.name)).length
   const noneEnabled = enabledCount === 0
+  const toolListId = useId()
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
       {/* Group header */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-secondary">
         <button
+          type="button"
           onClick={onToggleExpanded}
-          className="flex items-center gap-2 flex-1 text-left min-w-0"
+          className="-my-2.5 flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-secondary"
+          aria-expanded={expanded}
+          aria-controls={toolListId}
         >
           <svg
             width="14" height="14" viewBox="0 0 24 24"
@@ -956,6 +989,9 @@ function ToolGroupCard({
 
       {/* Tool list */}
       <div
+        id={toolListId}
+        aria-hidden={!expanded}
+        inert={!expanded ? true : undefined}
         className={`transition-all duration-150 ${
           expanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
         } overflow-hidden`}
@@ -1022,7 +1058,7 @@ export function SettingsTabBar({
           type="button"
           onClick={() => onSelect(item.key)}
           aria-pressed={tab === item.key}
-          className={`px-3 py-2 text-sm font-medium transition-colors relative ${
+          className={`relative min-h-10 px-3 py-2 text-sm font-medium transition-colors sm:min-h-0 ${
             tab === item.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
           }`}
         >

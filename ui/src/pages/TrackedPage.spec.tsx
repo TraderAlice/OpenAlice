@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EntityDetail, EntityListItem } from '../api/entities'
@@ -28,6 +28,15 @@ const mocks = vi.hoisted(() => ({
   getEntity: vi.fn(),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
+  refreshEntities: vi.fn(),
+  entitiesState: {
+    current: {
+      entities: [] as EntityListItem[],
+      loading: false,
+      error: null as string | null,
+      refreshing: false,
+    },
+  },
 }))
 
 vi.mock('../api', () => ({
@@ -40,9 +49,10 @@ vi.mock('../api', () => ({
 
 vi.mock('../live/entities', () => ({
   entitiesLive: {
-    useStore: (selector: (state: { entities: EntityListItem[]; loading: boolean }) => unknown) =>
-      selector({ entities: [trackedEntity], loading: false }),
+    useStore: (selector: (state: typeof mocks.entitiesState.current) => unknown) =>
+      selector(mocks.entitiesState.current),
   },
+  refreshEntities: mocks.refreshEntities,
 }))
 
 vi.mock('../live/tracked-selection', () => ({
@@ -63,6 +73,12 @@ vi.mock('../tabs/store', () => ({
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  mocks.entitiesState.current = {
+    entities: [trackedEntity],
+    loading: false,
+    error: null,
+    refreshing: false,
+  }
   await i18n.changeLanguage('en')
   mocks.getEntity.mockResolvedValue(detail)
 })
@@ -76,6 +92,10 @@ describe('TrackedPage artifact navigation', () => {
     const backlink = await screen.findByRole('button', {
       name: /research\/power\.md/,
     })
+    expect(backlink.className).toContain('min-h-10')
+    expect(within(backlink).getByText('research/power.md').className).toContain('break-all')
+    expect(within(backlink).getAllByText('power')).toHaveLength(2)
+    expect(screen.getByRole('heading', { name: 'stock-vst' }).className).toContain('break-words')
     fireEvent.click(backlink)
 
     await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
@@ -108,5 +128,43 @@ describe('TrackedPage detail recovery', () => {
     expect(await screen.findByRole('heading', { name: 'stock-vst' })).toBeTruthy()
     expect(mocks.getEntity).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('TrackedPage collection recovery', () => {
+  it('distinguishes an unavailable list from a genuinely empty watchlist', () => {
+    mocks.entitiesState.current = {
+      entities: [],
+      loading: false,
+      error: 'offline',
+      refreshing: false,
+    }
+
+    render(<TrackedPage />)
+
+    const error = screen.getByRole('alert')
+    expect(error.textContent).toContain('Couldn’t load Tracked')
+    expect(error.textContent).toContain('Nothing has been removed')
+    expect(screen.queryByText('Nothing tracked yet.')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(mocks.refreshEntities).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps stale entities visible while reporting a failed refresh', async () => {
+    mocks.entitiesState.current = {
+      entities: [trackedEntity],
+      loading: false,
+      error: 'offline',
+      refreshing: false,
+    }
+
+    render(<TrackedPage />)
+
+    expect(await screen.findByRole('heading', { name: 'stock-vst' })).toBeTruthy()
+    const status = screen.getByRole('status')
+    expect(status.textContent).toContain('showing the last known tracked items')
+    fireEvent.click(within(status).getByRole('button', { name: 'Retry' }))
+    expect(mocks.refreshEntities).toHaveBeenCalledTimes(1)
   })
 })

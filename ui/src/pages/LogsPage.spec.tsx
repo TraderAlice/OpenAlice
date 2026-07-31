@@ -104,6 +104,20 @@ describe('LogsPage Agent conversations', () => {
     expect(screen.getByText('run-reconstructed')).toBeTruthy()
   })
 
+  it('shows Harness-default addressing in the routing detail', async () => {
+    mocks.conversationQuery.mockResolvedValue({
+      entries: [{ ...ordinary, requestedTarget: { kind: 'harness', harness: 'autoquant' } }],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
+    })
+    render(<LogsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Run an ordinary research task/ }))
+    expect(screen.getByText('Harness autoquant')).toBeTruthy()
+  })
+
   it('can switch back to the existing tool-call log', async () => {
     render(<LogsPage />)
     await screen.findByText(/2 conversations/)

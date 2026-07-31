@@ -19,6 +19,12 @@ const MAX_DESCRIPTION = 1000
 export const workspaceMetadataSchema = z.object({
   displayName: z.string().trim().min(1).max(MAX_DISPLAY_NAME).optional(),
   description: z.string().trim().min(1).max(MAX_DESCRIPTION).optional(),
+  /**
+   * Workspace-local default for a fresh Session. The routes validate that the
+   * id names a registered agent runtime before writing it; keeping the schema
+   * adapter-agnostic lets future runtimes participate without a data migration.
+   */
+  defaultAgent: z.string().trim().min(1).max(64).optional(),
 }).strict()
 
 export type WorkspaceMetadata = z.infer<typeof workspaceMetadataSchema>

@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 
 import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
 import { resolveBashPath } from '@/core/shell-resolver.js';
@@ -27,6 +28,39 @@ import {
 const PI_TRUST_FILENAME = 'trust.json';
 
 let piTrustWriteQueue: Promise<void> = Promise.resolve();
+
+export async function readPiSessionTitleFile(path: string): Promise<string | null> {
+  let title: string | undefined;
+  try {
+    const lines = createInterface({
+      input: createReadStream(path, { encoding: 'utf8' }),
+      crlfDelay: Infinity,
+    });
+    for await (const line of lines) {
+      let entry: Record<string, unknown>;
+      try {
+        entry = JSON.parse(line) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      if (entry['type'] === 'session_info') {
+        title = typeof entry['name'] === 'string' ? entry['name'].trim() || undefined : undefined;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return title ?? null;
+}
+
+function piSessionDir(cwd: string): string {
+  const configured = process.env['PI_CODING_AGENT_SESSION_DIR']?.trim();
+  if (configured) {
+    return resolve(configured.replace(/^~(?=$|[/\\])/, process.env['HOME']?.trim() || ''));
+  }
+  const safeCwd = resolve(cwd).replace(/^[/\\]/, '').replace(/[/\\:]/g, '-');
+  return join(resolvePiAgentDir(process.env), 'sessions', `--${safeCwd}--`);
+}
 
 function piRunModel(cwd: string, model: string): string {
   try {
@@ -216,6 +250,21 @@ export const piAdapter: CliAdapter = {
     // immune to pi's lazy transcript write.
     assignsSessionId: true,
     headless: true,
+    aiProvider: {
+      credentialSource: 'workspace-required',
+      wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+      defaultWire: 'openai-chat',
+      vendorPolicies: {
+        minimax: {
+          wirePreference: ['anthropic'],
+          legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+        },
+      },
+      modelRegistration: {
+        contextWindow: true,
+        reasoning: true,
+      },
+    },
   },
 
   lifecycle: {
@@ -252,6 +301,19 @@ export const piAdapter: CliAdapter = {
     if (ctx.resume === undefined) return [...head, ...seed];
     if (ctx.resume === 'last') return [...head, '--continue', ...seed];
     return [...head, '--session-id', ctx.resume.sessionId, ...seed];
+  },
+
+  async readSessionTitle(cwd: string, sessionId: string): Promise<string | null> {
+    let files: string[];
+    try {
+      files = await readdir(piSessionDir(cwd));
+    } catch {
+      return null;
+    }
+    const filename = files.find((name) => name.endsWith(`_${sessionId}.jsonl`));
+    return filename
+      ? readPiSessionTitleFile(join(piSessionDir(cwd), filename))
+      : null;
   },
 
   // WebPi is a second VIEW over the same Pi session, not another runtime.

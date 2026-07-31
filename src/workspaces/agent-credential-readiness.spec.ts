@@ -28,7 +28,6 @@ const meta: WorkspaceMeta = {
   dir: '/tmp/ws-1',
   createdAt: '2026-07-04T00:00:00.000Z',
   template: 'chat',
-  agents: ['claude', 'opencode', 'pi'],
 };
 
 const openaiKey: Credential = {
@@ -47,6 +46,15 @@ function adapter(id: string, cfg: WorkspaceAiCred | null = null) {
       resumeLast: true,
       resumeById: true,
       transcriptDiscovery: 'none',
+      aiProvider: {
+        credentialSource: id === 'opencode' || id === 'pi'
+          ? 'workspace-required'
+          : 'runtime-or-workspace',
+        wirePreference: id === 'claude' ? ['anthropic'] : ['openai-chat'],
+        ...(id === 'opencode' || id === 'pi'
+          ? { modelRegistration: { contextWindow: true, reasoning: true } }
+          : {}),
+      },
     },
     composeCommand: () => [id],
     readAiConfig: vi.fn(async () => cfg),

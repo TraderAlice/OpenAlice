@@ -75,7 +75,9 @@ describe('WorkspaceLaunchConfigurationPanel', () => {
       <WorkspaceLaunchConfigurationPanel
         wsId="chat-1"
         agents={['codex', 'shell']}
+        installationDefaultAgent="codex"
         initialAgent="codex"
+        onSaveDefaultAgent={vi.fn(async () => undefined)}
       />,
     )
 
@@ -97,7 +99,9 @@ describe('WorkspaceLaunchConfigurationPanel', () => {
       <WorkspaceLaunchConfigurationPanel
         wsId="chat-1"
         agents={['codex']}
+        installationDefaultAgent="codex"
         initialAgent="codex"
+        onSaveDefaultAgent={vi.fn(async () => undefined)}
       />,
     )
 
@@ -114,6 +118,8 @@ describe('WorkspaceLaunchConfigurationPanel', () => {
       <WorkspaceLaunchConfigurationPanel
         wsId="chat-1"
         agents={[]}
+        installationDefaultAgent={null}
+        onSaveDefaultAgent={vi.fn(async () => undefined)}
       />,
     )
 
@@ -128,12 +134,38 @@ describe('WorkspaceLaunchConfigurationPanel', () => {
       <WorkspaceLaunchConfigurationPanel
         wsId="chat-1"
         agents={['codex']}
+        installationDefaultAgent="codex"
         initialAgent="codex"
+        onSaveDefaultAgent={vi.fn(async () => undefined)}
       />,
     )
 
     expect(await screen.findByText('无法读取启动计划')).toBeTruthy()
     expect(screen.getByText('workspace_not_found')).toBeTruthy()
-    expect(screen.getByText(/只读预览/)).toBeTruthy()
+    expect(screen.getByText(/仅预览/)).toBeTruthy()
+  })
+
+  it('saves a Workspace runtime default without changing it when only previewing', async () => {
+    const onSaveDefaultAgent = vi.fn(async () => undefined)
+    render(
+      <WorkspaceLaunchConfigurationPanel
+        wsId="chat-1"
+        agents={['claude', 'codex', 'pi']}
+        workspaceDefaultAgent="codex"
+        installationDefaultAgent="claude"
+        onSaveDefaultAgent={onSaveDefaultAgent}
+      />,
+    )
+
+    const selector = screen.getByLabelText('新 Session Runtime')
+    expect((selector as HTMLSelectElement).value).toBe('codex')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pi' }))
+    expect((selector as HTMLSelectElement).value).toBe('codex')
+    expect(onSaveDefaultAgent).not.toHaveBeenCalled()
+
+    fireEvent.change(selector, { target: { value: 'pi' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(onSaveDefaultAgent).toHaveBeenCalledWith('pi'))
   })
 })

@@ -11,10 +11,11 @@ const mocks = vi.hoisted(() => ({
   setSidebar: vi.fn(),
   selectTracked: vi.fn(),
   readWorkspaceFile: vi.fn(),
+  workspaces: [] as Array<{ id: string; tag: string; displayName?: string }>,
 }))
 
 vi.mock('../contexts/workspaces-context', () => ({
-  useWorkspaces: () => ({ workspaces: [{ id: 'chat-1', tag: 'chat-jul20' }] }),
+  useWorkspaces: () => ({ workspaces: mocks.workspaces }),
 }))
 
 vi.mock('../tabs/store', () => ({
@@ -44,6 +45,11 @@ vi.mock('../components/FileContentView', () => ({
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.readWorkspaceFile.mockResolvedValue({ kind: 'ok', content: 'hello' })
+  mocks.workspaces = [{
+    id: 'chat-1',
+    tag: 'chat-jul20',
+    displayName: 'Semis and supply chain',
+  }]
 })
 
 afterEach(cleanup)
@@ -64,8 +70,14 @@ describe('FileViewerPage back navigation', () => {
       />,
     )
 
-    const back = screen.getByRole('button', { name: 'Back to chat-jul20' })
-    expect(back.getAttribute('title')).toBe('Back to chat-jul20')
+    const back = screen.getByRole('button', { name: 'Back to Semis and supply chain' })
+    expect(back.getAttribute('title')).toBe('Back to Semis and supply chain')
+    expect(back.className).toContain('h-10')
+    expect(back.className).toContain('w-10')
+    expect(back.className).toContain('sm:h-7')
+    expect(screen.getByText('research/note.md').className).toContain('break-all')
+    const workspaceIdentity = screen.getByText('Semis and supply chain')
+    expect(workspaceIdentity.getAttribute('title')).toBe('Semis and supply chain\nchat-jul20')
     fireEvent.click(back)
 
     expect(mocks.setSidebar).toHaveBeenCalledWith('chat')
@@ -80,6 +92,8 @@ describe('FileViewerPage back navigation', () => {
   })
 
   it('retains the existing generic Workspace fallback', () => {
+    mocks.workspaces = [{ id: 'chat-1', tag: 'chat-jul20' }]
+
     render(
       <FileViewerPage
         spec={{ kind: 'file-viewer', params: { wsId: 'chat-1', path: 'README.md' } }}

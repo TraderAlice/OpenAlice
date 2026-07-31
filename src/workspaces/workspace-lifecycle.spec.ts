@@ -51,7 +51,6 @@ beforeEach(async () => {
     dir: activeDir,
     createdAt: '2026-01-01T00:00:00.000Z',
     template: 'chat',
-    agents: ['pi', 'shell'],
   }
   registry = await WorkspaceRegistry.load(join(root, 'workspaces.json'), noopLogger)
   await registry.add(workspace)

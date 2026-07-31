@@ -15,6 +15,7 @@ COPY --chown=smoke:smoke scripts/install-smoke/interactive.sh /fixture/interacti
 COPY --chown=smoke:smoke scripts/install-smoke/run.sh /fixture/run.sh
 COPY --chown=smoke:smoke scripts/install-smoke/fake-package-manager.sh /fixture/fake-package-manager.sh
 COPY --chown=smoke:smoke scripts/install-smoke/fake-npm.sh /fixture/fake-npm.sh
+COPY --chown=smoke:smoke scripts/install-smoke/fake-pi-tui.mjs /fixture/fake-pi-tui.mjs
 COPY --chown=smoke:smoke scripts/install-smoke/pi-assets /fixture/pi-assets
 COPY --chown=smoke:smoke scripts/install-smoke/static-server.mjs /fixture/static-server.mjs
 

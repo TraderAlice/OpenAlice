@@ -40,13 +40,14 @@ On the remote host:
 - Linux or macOS;
 - Node.js `22.19.0` or newer;
 - `curl`;
-- enough disk and memory for the source Runtime.
+- enough disk and memory for the installed Runtime.
 
-The remote plan can install missing Git, Python 3, make, and C++ tools on
-supported Linux hosts after showing the exact package-manager command. On
-macOS, install Command Line Tools locally with `xcode-select --install` when
-the plan asks for them. OpenAlice does not install Node.js or configure SSH
-keys for you.
+The release Runtime does not require Git or source-build tools. If you
+explicitly select a source checkout, the remote plan can install missing Git,
+Python 3, make, and C++ tools on supported Linux hosts after showing the exact
+package-manager command. On macOS, install Command Line Tools locally with
+`xcode-select --install` when that source plan asks for them. OpenAlice does
+not install Node.js or configure SSH keys for you.
 
 ## 1. Install the CLI on Your Laptop
 
@@ -95,19 +96,17 @@ openalice remote openalice-box --plan
 ```
 
 The read-only plan reports the remote platform, Node.js, CLI and Pi, Runtime
-owner, source location, build tools, ports, and every proposed change. On a
-new host it normally includes:
+owner and provider, ports, and every proposed change. On a new supported host
+it normally includes:
 
-1. install the matching OpenAlice CLI and managed Pi;
-2. install missing Linux source-build tools, when needed;
-3. clone a matching managed source checkout;
-4. build and start the detached OpenAlice Server;
-5. open a local loopback tunnel.
+1. install the matching OpenAlice CLI, managed Pi, and platform Runtime;
+2. verify and start the detached OpenAlice Server from that immutable Runtime;
+3. open a local loopback tunnel.
 
-The managed checkout lives below the selected remote `OPENALICE_HOME`, under a
-selector-specific `sources/` directory. You do not need to SSH in, clone the
-repository, find its absolute path, or repeat `--app-dir` on later connections.
-Nothing changes until you approve the plan.
+The installed Runtime lives in the installer's immutable `cli-versions/`
+release directory. You do not need to SSH in, clone the repository, install a
+compiler, find an absolute source path, or repeat `--app-dir` on later
+connections. Nothing changes until you approve the plan.
 
 ## 4. Connect
 
@@ -155,15 +154,16 @@ platform-neutral message. Raw platform diagnostics are shown only when the
 connection finally fails, so a provider's temporary SSH control-plane noise
 does not become the normal OpenAlice experience.
 
-## Managed and User-Owned Source
+## Installed Runtime and User-Owned Source
 
-The default managed checkout is maintained by OpenAlice:
+The default installed Runtime is maintained by the ordinary OpenAlice
+installer:
 
-- a missing checkout is cloned atomically after consent;
-- a clean branch checkout is compared with its selected upstream on reconnect;
-- an available fast-forward is shown in the plan, then applied with a Server
-  restart and source rebuild;
-- tracked local changes block the managed update instead of being overwritten.
+- the CLI, managed Pi, and Runtime carry the same OpenAlice product version;
+- archives are selected for the remote platform and architecture;
+- the archive checksum and internal file manifest are verified before
+  activation;
+- reconnect reuses a compatible healthy Runtime without mutation.
 
 For development or a deliberately pinned checkout, pass your own absolute
 path:
@@ -191,7 +191,7 @@ openalice remote openalice-box --no-open
 openalice remote alice@server.example.com \
   --identity ~/.ssh/id_ed25519
 
-# Put durable state and the managed source on a mounted volume.
+# Put durable state on a mounted volume.
 openalice remote openalice-box \
   --home /data/openalice-home
 ```
@@ -204,7 +204,7 @@ openalice remote openalice-box \
 - Provider credentials, Workspace history, files, and Agent state live under
   the remote home; the browser is not a backup.
 - For an ephemeral VM or container, place `--home` on persistent storage. The
-  managed source then follows that home onto the same volume.
+  Runtime can be reinstalled; the home is the durable state that must survive.
 - A platform replacement can reattach a volume whose Guardian lock names the
   removed machine. OpenAlice refuses cross-machine takeover automatically;
   confirm the previous instance is gone before following the operator recovery

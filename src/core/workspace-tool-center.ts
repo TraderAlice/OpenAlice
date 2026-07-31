@@ -45,6 +45,7 @@ import type {
 export type WorkspaceConversationTarget =
   | { kind: 'resume'; resumeId: string }
   | { kind: 'workspace'; workspaceId: string }
+  | { kind: 'harness'; harness: 'chat' | 'autoquant' }
   | { kind: 'inbox'; inboxEntryId: string; workspaceId?: string }
   | {
       kind: 'issue'
@@ -83,7 +84,7 @@ export type WorkspaceConversationResolution =
   | {
       mode: 'reconstructed'
       workspaceId: string
-      reason: 'explicit-workspace' | 'missing-origin' | 'non-session-origin' | 'prior-reconstruction' | 'unavailable-reconstruction'
+      reason: 'explicit-workspace' | 'harness-default' | 'missing-origin' | 'non-session-origin' | 'prior-reconstruction' | 'unavailable-reconstruction'
       /** Present when continuing a previously recruited reconstruction worker. */
       origin?: SessionOrigin
       artifact?: ArtifactRef
@@ -98,6 +99,8 @@ export type WorkspaceConversationResolution =
         | 'purged-workspace'
         | 'deleted-workspace'
         | 'missing-workspace'
+        | 'chat-workspace-unavailable'
+        | 'autoquant-not-initialized'
       attributedOrigin?: SessionOrigin
       artifact?: ArtifactRef
     }
@@ -135,7 +138,8 @@ export type WorkspaceConversationAskResult =
 export interface WorkspaceConversationControl {
   ask(input: {
     readonly prompt: string
-    readonly timeoutMs: number
+    /** Optional execution watchdog. Omit to let the Session run to completion. */
+    readonly timeoutMs?: number
     readonly target: WorkspaceConversationTarget
     readonly agent?: string
     /** Add the artifact-reconstruction preamble when a fresh fallback worker is
@@ -176,18 +180,17 @@ export interface WorkspaceToolContext {
   /** Durable Session -> artifact occurrence trail. Optional for older/tests. */
   provenanceStore?: IProvenanceStore
   /** Resolve ANY workspace's location by id (not just this one) — the backing
-   *  for cross-workspace collaboration: an inbox entry from a peer carries its
+   *  for cross-workspace collaboration: an Inbox entry from a peer carries its
    *  workspaceId, and `workspace_path` turns that into the peer's absolute dir
-   *  so the agent can read/edit its files with native tools. Optional because
-   *  it needs the live WorkspaceService (created after this center); the two
-   *  build sites (cli.ts, mcp.ts) inject a lazy closure, tests may omit it. */
+   *  for native file/search/Git tools. Optional because it needs the live
+   *  WorkspaceService (created after this center); the two build sites (cli.ts,
+   *  mcp.ts) inject a lazy closure, tests may omit it. */
   resolveWorkspace?: (id: string) => { id: string; dir: string; tag: string } | null
   /** Active-desk inventory for manager and peer-discovery flows. */
   workspaceInventory?: () => Promise<readonly {
     id: string
     tag: string
     template?: string
-    agents: readonly string[]
     createdAt: string
     sessions: {
       total: number

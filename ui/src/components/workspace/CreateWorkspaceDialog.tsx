@@ -27,7 +27,11 @@ export interface CreateWorkspaceDialogProps {
 export function CreateWorkspaceDialog(props: CreateWorkspaceDialogProps): ReactElement {
   const { t } = useTranslation()
   return (
-    <Dialog onClose={props.onClose} width="w-[460px]">
+    <Dialog
+      ariaLabel={t('createWorkspace.dialogTitle')}
+      onClose={props.onClose}
+      width="w-[460px]"
+    >
       <div className="px-5 py-4 border-b border-border">
         <h2 className="text-[15px] font-semibold text-foreground">{t('createWorkspace.dialogTitle')}</h2>
         <p className="text-[12px] text-muted-foreground mt-0.5">

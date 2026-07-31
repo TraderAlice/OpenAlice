@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@grammyjs/auto-retry": "^2.0.2",
-    "@hono/node-server": "^2.0.0",
+    "@hono/node-server": "^2.0.12",
     "@traderalice/connector-protocol": "workspace:*",
     "discord.js": "14.26.5",
     "grammy": "^1.40.0",
-    "hono": "^4.12.21",
+    "hono": "^4.12.32",
     "zod": "^4.3.6"
   },
   "devDependencies": {

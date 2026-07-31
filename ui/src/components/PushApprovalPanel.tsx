@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, type Ref } from 'react'
 import type { TFunction } from 'i18next'
-import { AlertTriangle, CheckCircle2, Clock3, GitCommitHorizontal, GitPullRequest, History, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, Clock3, GitCommitHorizontal, GitPullRequest, History, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState, Skeleton } from './StateViews'
 import { formatRelativeTime, getIntlLocale } from '../lib/intl'
@@ -27,6 +27,13 @@ interface AccountHistory {
   accountId: string
   label: string
   commits: WalletCommitLog[]
+}
+
+interface ReviewVerification {
+  total: number
+  verified: number
+  failed: AccountRef[]
+  listUnavailable: boolean
 }
 
 interface FlatCommit {
@@ -236,6 +243,23 @@ function itemOperations(item: ReviewItem, t: TFunction): OperationDisplay[] {
   return item.status.staged.map((operation) => operationDisplay(operation, t))
 }
 
+function mergeAccountResults<T>(
+  accounts: AccountRef[],
+  verifiedAccountIds: Set<string>,
+  fresh: T[],
+  previous: T[],
+  accountId: (item: T) => string,
+): T[] {
+  const freshByAccount = new Map(fresh.map((item) => [accountId(item), item]))
+  const previousByAccount = new Map(previous.map((item) => [accountId(item), item]))
+  return accounts.flatMap((account) => {
+    const item = verifiedAccountIds.has(account.id)
+      ? freshByAccount.get(account.id)
+      : previousByAccount.get(account.id)
+    return item ? [item] : []
+  })
+}
+
 // ==================== Component ====================
 
 export function PushApprovalPanel() {
@@ -252,6 +276,16 @@ export function PushApprovalPanel() {
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [historyFilter, setHistoryFilter] = useState<string | null>(null)
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
+  const [retryingVerification, setRetryingVerification] = useState(false)
+  const mobileBackRef = useRef<HTMLButtonElement | null>(null)
+  const activeQueueRowRef = useRef<HTMLButtonElement | null>(null)
+  const [verification, setVerification] = useState<ReviewVerification>({
+    total: 0,
+    verified: 0,
+    failed: [],
+    listUnavailable: false,
+  })
 
   const poll = useCallback(async () => {
     try {
@@ -262,6 +296,8 @@ export function PushApprovalPanel() {
       const stagedResults: StagedAccount[] = []
       const pendingResults: PendingAccount[] = []
       const historyResults: AccountHistory[] = []
+      const verifiedAccountIds = new Set<string>()
+      const failedAccounts: AccountRef[] = []
 
       for (const account of accts) {
         try {
@@ -277,16 +313,46 @@ export function PushApprovalPanel() {
           if (commits.length > 0) {
             historyResults.push({ accountId: account.id, label: accountLabel(account), commits })
           }
+          verifiedAccountIds.add(account.id)
         } catch {
-          /* skip unreachable account */
+          failedAccounts.push(account)
         }
       }
 
-      setStaged(stagedResults)
-      setPending(pendingResults)
-      setHistory(historyResults)
+      setStaged((previous) => mergeAccountResults(
+        accts,
+        verifiedAccountIds,
+        stagedResults,
+        previous,
+        (item) => item.account.id,
+      ))
+      setPending((previous) => mergeAccountResults(
+        accts,
+        verifiedAccountIds,
+        pendingResults,
+        previous,
+        (item) => item.account.id,
+      ))
+      setHistory((previous) => mergeAccountResults(
+        accts,
+        verifiedAccountIds,
+        historyResults,
+        previous,
+        (item) => item.accountId,
+      ))
+      setVerification({
+        total: accts.length,
+        verified: verifiedAccountIds.size,
+        failed: failedAccounts,
+        listUnavailable: false,
+      })
     } catch {
-      /* ignore list failures here; global API surfaces already show errors */
+      setVerification((current) => ({
+        ...current,
+        verified: 0,
+        failed: [],
+        listUnavailable: true,
+      }))
     } finally {
       setLoaded(true)
     }
@@ -296,6 +362,15 @@ export function PushApprovalPanel() {
     poll()
     const id = setInterval(poll, 3000)
     return () => clearInterval(id)
+  }, [poll])
+
+  const retryVerification = useCallback(async () => {
+    setRetryingVerification(true)
+    try {
+      await poll()
+    } finally {
+      setRetryingVerification(false)
+    }
   }, [poll])
 
   const handlePush = useCallback(async (accountId: string) => {
@@ -377,19 +452,35 @@ export function PushApprovalPanel() {
   useEffect(() => {
     if (reviewItems.length === 0) {
       setSelectedId(null)
+      setMobileDetailOpen(false)
       return
     }
     if (!selectedId || !reviewItems.some((item) => item.id === selectedId)) {
       setSelectedId(reviewItems[0].id)
+      setMobileDetailOpen(false)
     }
   }, [reviewItems, selectedId])
+
+  useEffect(() => {
+    if (!mobileDetailOpen) return
+    if (typeof window.matchMedia === 'function' && !window.matchMedia('(max-width: 767px)').matches) return
+    mobileBackRef.current?.focus()
+  }, [mobileDetailOpen])
 
   const selected = reviewItems.find((item) => item.id === selectedId) ?? null
   const waitingCount = pending.length
   const stagedCount = staged.length
   const historyCount = mergedHistory.length
+  const verificationIncomplete = verification.listUnavailable || verification.failed.length > 0
   const statusLabel =
-    waitingCount > 0
+    verificationIncomplete
+      ? verification.listUnavailable
+        ? t('tradingReview.queue.verificationUnknown')
+        : t('tradingReview.queue.verificationCount', {
+          verified: verification.verified,
+          total: verification.total,
+        })
+      : waitingCount > 0
       ? t('tradingReview.queue.waitingApproval', { count: waitingCount })
       : stagedCount > 0
         ? t('tradingReview.queue.stagedWaiting', { count: stagedCount })
@@ -397,7 +488,7 @@ export function PushApprovalPanel() {
 
   if (!loaded) return <TradingReviewSkeleton />
 
-  if (accounts.length === 0) {
+  if (accounts.length === 0 && !verification.listUnavailable) {
     return (
       <div className="h-full rounded-lg border border-border bg-secondary/30">
         <EmptyState
@@ -409,93 +500,176 @@ export function PushApprovalPanel() {
   }
 
   return (
-    <div className="grid h-full min-h-0 min-w-0 overflow-hidden rounded-lg border border-border bg-secondary/30 md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
-      <div className="flex min-h-0 min-w-0 flex-col border-b border-border bg-secondary md:border-b-0 md:border-r">
-        <div className="shrink-0 border-b border-border/70 px-4 py-3">
-          <div className="flex items-center gap-2 text-[12px] font-medium text-foreground">
-            {waitingCount > 0 ? (
-              <AlertTriangle size={15} className="text-warning" aria-hidden />
-            ) : (
-              <CheckCircle2 size={15} className="text-success" aria-hidden />
-            )}
-            <span className="truncate">{statusLabel}</span>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-            <QueueStat label={t('tradingReview.queue.needs')} value={waitingCount} tone={waitingCount > 0 ? 'warn' : 'muted'} />
-            <QueueStat label={t('tradingReview.queue.staged')} value={stagedCount} tone={stagedCount > 0 ? 'warn' : 'muted'} />
-            <QueueStat label={t('tradingReview.queue.pushed')} value={historyCount} tone="muted" />
-          </div>
-        </div>
-
-        {historyAccounts.length > 1 && (
-          <div className="shrink-0 border-b border-border/60 px-4 py-2">
-            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-              {t('tradingReview.queue.accountFilter')}
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+      {verificationIncomplete && (
+        <VerificationNotice
+          verification={verification}
+          retrying={retryingVerification}
+          onRetry={() => void retryVerification()}
+        />
+      )}
+      <div className="grid min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-secondary/30 md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div
+          data-testid="trading-review-queue"
+          className={`${mobileDetailOpen ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-col bg-secondary md:flex md:border-r`}
+        >
+          <div className="shrink-0 border-b border-border/70 px-4 py-3">
+            <div className="flex items-center gap-2 text-[12px] font-medium text-foreground">
+              {verificationIncomplete || waitingCount > 0 ? (
+                <AlertTriangle size={15} className="text-warning" aria-hidden />
+              ) : (
+                <CheckCircle2 size={15} className="text-success" aria-hidden />
+              )}
+              <span className="truncate">{statusLabel}</span>
             </div>
-            <div className="flex flex-wrap gap-1">
-              <button
-                type="button"
-                onClick={() => setHistoryFilter(null)}
-                className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
-                  effectiveFilter === null
-                    ? 'border-border bg-muted text-foreground'
-                    : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
-                }`}
-              >
-                {t('tradingReview.queue.all')}
-              </button>
-              {historyAccounts.map((account) => (
+            <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+              <QueueStat label={t('tradingReview.queue.needs')} value={waitingCount} tone={waitingCount > 0 ? 'warn' : 'muted'} />
+              <QueueStat label={t('tradingReview.queue.staged')} value={stagedCount} tone={stagedCount > 0 ? 'warn' : 'muted'} />
+              <QueueStat label={t('tradingReview.queue.pushed')} value={historyCount} tone="muted" />
+            </div>
+          </div>
+
+          {historyAccounts.length > 1 && (
+            <div className="shrink-0 border-b border-border/60 px-4 py-2">
+              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                {t('tradingReview.queue.accountFilter')}
+              </div>
+              <div className="flex flex-wrap gap-1">
                 <button
-                  key={account.id}
                   type="button"
-                  onClick={() => setHistoryFilter(account.id)}
-                  title={account.label}
-                  className={`max-w-[120px] truncate rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
-                    effectiveFilter === account.id
+                  onClick={() => setHistoryFilter(null)}
+                  className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                    effectiveFilter === null
                       ? 'border-border bg-muted text-foreground'
                       : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
                   }`}
                 >
-                  {account.label}
+                  {t('tradingReview.queue.all')}
                 </button>
-              ))}
+                {historyAccounts.map((account) => (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => setHistoryFilter(account.id)}
+                    title={account.label}
+                    className={`max-w-[120px] truncate rounded-full border px-2 py-0.5 text-[10px] transition-colors ${
+                      effectiveFilter === account.id
+                        ? 'border-border bg-muted text-foreground'
+                        : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
+                    }`}
+                  >
+                    {account.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {reviewItems.length > 0 ? (
-            <div className="space-y-1">
-              {reviewItems.map((item) => (
-                <QueueRow
-                  key={item.id}
-                  item={item}
-                  active={item.id === selectedId}
-                  onClick={() => setSelectedId(item.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <CleanQueue />
           )}
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {reviewItems.length > 0 ? (
+              <div className="space-y-1">
+                {reviewItems.map((item) => (
+                  <QueueRow
+                    key={item.id}
+                    item={item}
+                    active={item.id === selectedId}
+                    buttonRef={item.id === selectedId ? activeQueueRowRef : undefined}
+                    onClick={() => {
+                      setSelectedId(item.id)
+                      setMobileDetailOpen(true)
+                    }}
+                  />
+                ))}
+              </div>
+            ) : verificationIncomplete ? (
+              <UnverifiedQueue />
+            ) : (
+              <CleanQueue />
+            )}
+          </div>
+        </div>
+
+        <div
+          data-testid="trading-review-detail"
+          className={`${mobileDetailOpen ? 'block' : 'hidden'} min-h-0 min-w-0 overflow-x-hidden overflow-y-auto md:block`}
+        >
+          <div className="sticky top-0 z-10 border-b border-border bg-secondary/95 px-3 py-2 md:hidden">
+            <button
+              ref={mobileBackRef}
+              type="button"
+              onClick={() => {
+                setMobileDetailOpen(false)
+                requestAnimationFrame(() => activeQueueRowRef.current?.focus())
+              }}
+              className="oa-pressable inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-primary"
+            >
+              <ChevronLeft size={15} aria-hidden />
+              {t('tradingReview.queue.backToQueue')}
+            </button>
+          </div>
+          <ReviewDetail
+            item={selected}
+            verificationIncomplete={verificationIncomplete}
+            lastResult={lastResult}
+            error={error}
+            confirmingPush={confirmingPush}
+            pushing={pushing}
+            rejecting={rejecting}
+            onConfirmPush={setConfirmingPush}
+            onPush={handlePush}
+            onReject={handleReject}
+            onDismissError={() => setError(null)}
+            onDismissResult={() => setLastResult(null)}
+          />
         </div>
       </div>
+    </div>
+  )
+}
 
-      <div className="min-h-0 min-w-0 overflow-y-auto">
-        <ReviewDetail
-          item={selected}
-          lastResult={lastResult}
-          error={error}
-          confirmingPush={confirmingPush}
-          pushing={pushing}
-          rejecting={rejecting}
-          onConfirmPush={setConfirmingPush}
-          onPush={handlePush}
-          onReject={handleReject}
-          onDismissError={() => setError(null)}
-          onDismissResult={() => setLastResult(null)}
-        />
+function VerificationNotice({
+  verification,
+  retrying,
+  onRetry,
+}: {
+  verification: ReviewVerification
+  retrying: boolean
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  const failedAccounts = verification.failed.map(accountLabel).join(', ')
+  return (
+    <div className="flex shrink-0 flex-wrap items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-warning" role="status">
+      <AlertTriangle size={17} className="mt-0.5 shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-semibold text-foreground">
+          {verification.listUnavailable
+            ? t('tradingReview.queue.verificationUnknown')
+            : t('tradingReview.queue.verificationCount', {
+              verified: verification.verified,
+              total: verification.total,
+            })}
+        </div>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+          {verification.listUnavailable
+            ? t('tradingReview.queue.listUnavailableDescription')
+            : t('tradingReview.queue.verificationDescription')}
+        </p>
+        {failedAccounts && (
+          <p className="mt-1 text-[11px] text-warning">
+            {t('tradingReview.queue.failedAccounts', { accounts: failedAccounts })}
+          </p>
+        )}
       </div>
+      <button
+        type="button"
+        disabled={retrying}
+        onClick={onRetry}
+        className="oa-pressable inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md border border-warning/35 bg-background px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:bg-warning/10 disabled:cursor-wait disabled:opacity-60"
+      >
+        <RefreshCw size={13} className={retrying ? 'animate-spin' : undefined} aria-hidden />
+        {retrying ? t('tradingReview.queue.retrying') : t('tradingReview.queue.retry')}
+      </button>
     </div>
   )
 }
@@ -529,7 +703,17 @@ function QueueStat({ label, value, tone }: { label: string; value: number; tone:
   )
 }
 
-function QueueRow({ item, active, onClick }: { item: ReviewItem; active: boolean; onClick: () => void }) {
+function QueueRow({
+  item,
+  active,
+  buttonRef,
+  onClick,
+}: {
+  item: ReviewItem
+  active: boolean
+  buttonRef?: Ref<HTMLButtonElement>
+  onClick: () => void
+}) {
   const { t } = useTranslation()
   const ops = itemOperations(item, t)
   const timestamp = itemTimestamp(item)
@@ -544,6 +728,7 @@ function QueueRow({ item, active, onClick }: { item: ReviewItem; active: boolean
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onClick}
       className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
@@ -582,8 +767,22 @@ function CleanQueue() {
   )
 }
 
+function UnverifiedQueue() {
+  const { t } = useTranslation()
+  return (
+    <div className="flex h-full min-h-[220px] flex-col items-center justify-center px-4 text-center">
+      <AlertTriangle size={26} className="text-warning/80" aria-hidden />
+      <div className="mt-3 text-[13px] font-medium text-foreground">{t('tradingReview.queue.verificationUnknown')}</div>
+      <div className="mt-1 max-w-[210px] text-[12px] leading-relaxed text-muted-foreground/70">
+        {t('tradingReview.queue.verificationDescription')}
+      </div>
+    </div>
+  )
+}
+
 function ReviewDetail({
   item,
+  verificationIncomplete,
   lastResult,
   error,
   confirmingPush,
@@ -596,6 +795,7 @@ function ReviewDetail({
   onDismissResult,
 }: {
   item: ReviewItem | null
+  verificationIncomplete: boolean
   lastResult: { accountId: string; data: WalletPushResult } | null
   error: string | null
   confirmingPush: string | null
@@ -612,9 +812,15 @@ function ReviewDetail({
     return (
       <div className="flex min-h-full items-center justify-center p-6">
         <EmptyState
-          icon={<CheckCircle2 size={24} aria-hidden />}
-          title={t('tradingReview.queue.clean')}
-          description={t('tradingReview.queue.cleanDetailDescription')}
+          icon={verificationIncomplete
+            ? <AlertTriangle size={24} className="text-warning" aria-hidden />
+            : <CheckCircle2 size={24} aria-hidden />}
+          title={t(verificationIncomplete
+            ? 'tradingReview.queue.verificationUnknown'
+            : 'tradingReview.queue.clean')}
+          description={t(verificationIncomplete
+            ? 'tradingReview.queue.verificationDescription'
+            : 'tradingReview.queue.cleanDetailDescription')}
         />
       </div>
     )

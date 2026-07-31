@@ -16,7 +16,6 @@ import type { HeadlessInquiryScope, HeadlessInquirySubject, HeadlessTaskRecord }
 import { issueAssigneeResumeId } from '../../workspaces/issues/declaration.js'
 import { HeadlessCapacityError, HeadlessResumeError, type WorkspaceService } from '../../workspaces/service.js'
 
-const DEFAULT_TIMEOUT_MS = 300_000
 const MAX_PROMPT_CHARS = 16_000
 const LIST_LIMIT = 50
 
@@ -105,7 +104,6 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
       const result = await conversation.ask({
         prompt: request.prompt,
         target,
-        timeoutMs: DEFAULT_TIMEOUT_MS,
         source: { kind: 'human' },
         ...(request.reconstruct ? { reconstruct: true } : {}),
         subject: { kind: 'inbox', entryId: entry.id },
@@ -176,7 +174,6 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
       const result = await conversation.ask({
         prompt,
         target,
-        timeoutMs: DEFAULT_TIMEOUT_MS,
         source: { kind: 'human' },
         ...(body.reconstruct === true ? { reconstruct: true } : {}),
         subject,

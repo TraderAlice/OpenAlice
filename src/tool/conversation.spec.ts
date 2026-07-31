@@ -1,6 +1,7 @@
 import type { Tool } from 'ai'
 import { describe, expect, it, vi } from 'vitest'
 
+import { createMemoryInboxStore } from '../core/inbox-store.js'
 import type { WorkspaceToolContext } from '../core/workspace-tool-center.js'
 import {
   conversationAskFactory,
@@ -61,9 +62,22 @@ describe('conversation_ask', () => {
     expect(ask).toHaveBeenCalledWith({
       prompt: 'why?',
       target,
-      timeoutMs: 300_000,
       source: { kind: 'workspace', workspaceId: 'ws-caller' },
     })
+  })
+
+  it('installs an execution watchdog only when timeoutMs is explicit', async () => {
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'task-1', resumeId: 'resume-1', workspaceId: 'ws-peer',
+      workspace: 'peer', agent: 'pi',
+      resolution: { mode: 'reconstructed' as const, workspaceId: 'ws-peer', reason: 'explicit-workspace' as const },
+    }))
+    const tool = conversationAskFactory.build(context({ conversation: { ask, read: vi.fn() } }))
+
+    await run(tool, { prompt: 'why?', wsId: 'ws-peer', timeoutMs: 42_000 })
+
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 42_000 }))
   })
 
   it('surfaces unavailable attribution without starting another worker', async () => {
@@ -90,13 +104,70 @@ describe('conversation_ask', () => {
       conversation: { ask: vi.fn(), read: vi.fn() },
     }))
     await expect(run(tool, { prompt: 'why?' })).resolves.toMatchObject({
-      ok: false, error: expect.stringContaining('provide --resume-id'),
+      ok: false, error: expect.stringContaining('choose exactly one target'),
     })
     await expect(run(tool, {
       prompt: 'why?', resumeId: 'resume-1', wsId: 'ws-peer',
     })).resolves.toMatchObject({
-      ok: false, error: expect.stringContaining('choose one target'),
+      ok: false, error: expect.stringContaining('choose exactly one target'),
     })
+  })
+
+  it('resolves an Inbox id to the attributable sender and preserves the subject', async () => {
+    const inboxStore = createMemoryInboxStore()
+    const entry = await inboxStore.append({
+      workspaceId: 'ws-peer',
+      comments: 'report ready',
+      origin: { kind: 'headless', runId: 'run-peer', agent: 'pi' },
+    })
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'task-1', resumeId: 'resume-peer', workspaceId: 'ws-peer',
+      workspace: 'peer', agent: 'pi',
+      resolution: {
+        mode: 'exact' as const,
+        origin: { kind: 'session' as const, workspaceId: 'ws-peer', resumeId: 'resume-peer', agent: 'pi' },
+      },
+    }))
+    const tool = conversationAskFactory.build(context({
+      inboxStore,
+      resolveInboxOrigin: () => ({
+        kind: 'headless', runId: 'run-peer', resumeId: 'resume-peer', agent: 'pi',
+      }),
+      conversation: { ask, read: vi.fn() },
+    }))
+
+    await expect(run(tool, {
+      prompt: 'What did you send?', inboxId: entry.id,
+    })).resolves.toMatchObject({
+      ok: true,
+      subject: { kind: 'inbox', id: entry.id },
+    })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'resume', resumeId: 'resume-peer' },
+      subject: { kind: 'inbox', entryId: entry.id },
+    }))
+  })
+
+  it('addresses a fresh Session through a Harness default', async () => {
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'task-1', resumeId: 'resume-fresh', workspaceId: 'ws-aq',
+      workspace: 'quant', agent: 'codex',
+      resolution: {
+        mode: 'reconstructed' as const,
+        workspaceId: 'ws-aq',
+        reason: 'harness-default' as const,
+      },
+    }))
+    const tool = conversationAskFactory.build(context({
+      conversation: { ask, read: vi.fn() },
+    }))
+
+    await run(tool, { prompt: 'Start a new study.', harness: 'autoquant' })
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'harness', harness: 'autoquant' },
+    }))
   })
 
   it('passes reconstruction guidance only when explicitly requested', async () => {

@@ -3,6 +3,7 @@ import { access, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
+import { buildManagedPiEnvForHome } from './launch-context.ts'
 import {
   LOOPBACK,
   createStartupSignalGuard,
@@ -35,6 +36,7 @@ export function parseLocalStartArgs(argv) {
     prepare: true,
     rebuild: false,
     takeover: false,
+    checkUpdates: true,
     waitMs: 120_000,
   }
 
@@ -55,6 +57,10 @@ export function parseLocalStartArgs(argv) {
     }
     if (arg === '--takeover') {
       options.takeover = true
+      continue
+    }
+    if (arg === '--no-update-check') {
+      options.checkUpdates = false
       continue
     }
     if (arg === '--app-dir') {
@@ -113,8 +119,14 @@ export async function startLocal(options, dependencies = {}) {
     return 0
   }
 
+  const requestedAppDir = options.appDir
+    ?? env['OPENALICE_APP_HOME']?.trim()
+    ?? env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
+    ?? dependencies.cwd
+    ?? process.cwd()
   const resolveRoot = dependencies.resolveRoot ?? findOpenAliceRoot
-  const appDir = await resolveRoot(options.appDir ?? dependencies.cwd ?? process.cwd())
+  const appDir = await resolveRoot(requestedAppDir)
+  const runtimeProvider = resolveLocalRuntimeProvider(appDir, env)
   const prepareSource = dependencies.prepareSource ?? prepareSourceCheckout
   await prepareSource(appDir, options, { stdout, env })
 
@@ -128,6 +140,11 @@ export async function startLocal(options, dependencies = {}) {
     port: options.port,
     takeover: options.takeover,
   })
+  runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
+  delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
+  if (runtimeProvider.contentIdentity) {
+    runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY = runtimeProvider.contentIdentity
+  }
   const runtime = spawnProcess(nodeBinary, ['scripts/guardian/prod.mjs'], {
     cwd: appDir,
     env: runtimeEnv,
@@ -170,6 +187,22 @@ export async function startLocal(options, dependencies = {}) {
   }
 }
 
+function resolveLocalRuntimeProvider(appDir, env) {
+  const managedPath = env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
+  if (!managedPath || resolve(managedPath) !== resolve(appDir)) {
+    return { kind: 'source', contentIdentity: null }
+  }
+  const contentIdentity = env[
+    'OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY'
+  ]?.trim()
+  if (!contentIdentity || !/^[a-f0-9]{16}$/.test(contentIdentity)) {
+    throw new Error(
+      'The installed OpenAlice Runtime is missing its valid 16-character content identity. Reinstall or update OpenAlice.',
+    )
+  }
+  return { kind: 'bundle', contentIdentity }
+}
+
 export async function readHomeWebPort(homeRoot, options = {}) {
   const readFileImpl = options.readFileImpl ?? readFile
   try {
@@ -187,14 +220,18 @@ function configuredLocalUrl(port) {
 
 export function buildLocalRuntimeEnv(env, options) {
   const runtimeEnv = {
-    ...env,
+    ...buildManagedPiEnvForHome(options.homeRoot, env),
     OPENALICE_HOME: options.homeRoot,
     OPENALICE_APP_HOME: options.appDir,
     OPENALICE_BIND_HOST: LOOPBACK,
-    OPENALICE_WEB_PORT: String(options.port),
     OPENALICE_WEB_TRANSPORT: 'http',
     OPENALICE_LAUNCHER: 'cli',
     OPENALICE_NODE_BINARY: options.nodeBinary,
+  }
+  if (options.port === undefined || options.port === null) {
+    delete runtimeEnv.OPENALICE_WEB_PORT
+  } else {
+    runtimeEnv.OPENALICE_WEB_PORT = String(options.port)
   }
   delete runtimeEnv.OPENALICE_DISABLE_AUTH
   delete runtimeEnv.OPENALICE_TAKEOVER
@@ -302,6 +339,7 @@ Options:
   --rebuild          Reinstall dependencies and rebuild server artifacts
   --skip-prepare     Fail instead of installing/building missing artifacts
   --takeover         Replace the recorded local Guardian owner tree
+  --no-update-check  Skip the bounded stable-release update check
   --wait <seconds>   Readiness timeout, 1-600 (default: 120)
   --no-open          Print the URL without opening a browser
   -h, --help         Show this help

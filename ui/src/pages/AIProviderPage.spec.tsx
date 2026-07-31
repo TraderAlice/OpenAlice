@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceCredentialDefaults: vi.fn(),
   setWorkspaceCredentialDefaults: vi.fn(),
   deleteCredential: vi.fn(),
+  listAgents: vi.fn(),
 }))
 
 vi.mock('../api', () => ({
@@ -25,6 +26,11 @@ vi.mock('../api', () => ({
     },
   },
 }))
+
+vi.mock('../components/workspace/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/workspace/api')>()
+  return { ...actual, listAgents: mocks.listAgents }
+})
 
 beforeEach(async () => {
   vi.clearAllMocks()
@@ -50,6 +56,23 @@ beforeEach(async () => {
     defaults,
   }))
   mocks.deleteCredential.mockResolvedValue(undefined)
+  mocks.listAgents.mockResolvedValue([
+    {
+      id: 'pi',
+      displayName: 'Pi',
+      capabilities: {
+        parallelPerCwd: true,
+        resumeLast: true,
+        resumeById: true,
+        transcriptDiscovery: 'none',
+        aiProvider: {
+          credentialSource: 'workspace-required',
+          wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+          modelRegistration: { contextWindow: true, reasoning: true },
+        },
+      },
+    },
+  ])
 })
 
 afterEach(cleanup)
@@ -79,6 +102,13 @@ describe('AIProviderPage', () => {
       { pi: { credentialSlug: 'google-1', wireShape: 'google-generative-ai' } },
     ))
     expect(await screen.findByText('已保存')).toBeTruthy()
+  })
+
+  it('names each credential edit action with the credential it changes', async () => {
+    render(<AIProviderPage />)
+
+    expect(await screen.findByRole('button', { name: '编辑 Gemini' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
   })
 
   it('confirms credential deletion and explains the default cleanup', async () => {

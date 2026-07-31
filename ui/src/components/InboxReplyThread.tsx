@@ -72,7 +72,7 @@ export function InboxReplyThread({
             type="button"
             onClick={() => void thread.submit()}
             disabled={thread.sending || thread.prompt.trim().length === 0}
-            className="oa-pressable inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-35 sm:px-3"
+            className="oa-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-0 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-35 sm:h-8 sm:w-auto sm:px-3"
             aria-label={thread.sending ? t('inbox.replySending') : t('inbox.replyAction')}
           >
             {thread.sending

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, Layers } from 'lucide-react'
+import { Clock, Layers, Search, X } from 'lucide-react'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
 import { inboxLive } from '../live/inbox'
@@ -8,6 +8,7 @@ import { useInboxRead } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
 import { groupThreads, previewForEntry } from '../live/inbox-threads'
+import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
 import type { InboxEntry } from '../api/inbox'
 
@@ -33,12 +34,24 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const markRead = useInboxRead((s) => s.markRead)
   const mode = useInboxViewMode((s) => s.mode)
   const { workspaces } = useWorkspaces()
+  const [query, setQuery] = useState('')
 
-  const threads = useMemo(() => groupThreads(entries), [entries])
   const workspaceLabels = useMemo(
+    () => new Map(workspaces.map((workspace) => [workspace.id, workspaceDisplayName(workspace)])),
+    [workspaces],
+  )
+  const workspaceTags = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspace.tag])),
     [workspaces],
   )
+  const normalizedQuery = normalizeSearch(query)
+  const filteredEntries = useMemo(
+    () => normalizedQuery
+      ? entries.filter((entry) => inboxSearchText(entry, workspaceLabels, workspaceTags).includes(normalizedQuery))
+      : entries,
+    [entries, normalizedQuery, workspaceLabels, workspaceTags],
+  )
+  const threads = useMemo(() => groupThreads(filteredEntries), [filteredEntries])
   const readIds = useMemo(() => {
     const ids: Record<string, true> = {}
     for (const entry of entries) {
@@ -50,8 +63,8 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   // The visible order j/k and default-select walk: clustered order in
   // workspace mode, plain newest-first in time mode.
   const ordered = useMemo(
-    () => (mode === 'workspace' ? threads.flatMap((th) => th.entries) : entries),
-    [mode, threads, entries],
+    () => (mode === 'workspace' ? threads.flatMap((th) => th.entries) : filteredEntries),
+    [mode, threads, filteredEntries],
   )
 
   /** select + mark read in one. Used by every selection mutation site. */
@@ -112,26 +125,94 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto py-1">
-      {mode === 'workspace' ? (
-        <WorkspaceView
-          threads={threads}
-          selectedId={selectedId}
-          readIds={readIds}
-          workspaceLabels={workspaceLabels}
-          onSelect={selectAndRead}
-        />
-      ) : (
-        <TimeView
-          entries={entries}
-          selectedId={selectedId}
-          readIds={readIds}
-          workspaceLabels={workspaceLabels}
-          onSelect={selectAndRead}
-        />
-      )}
+    <div className="flex h-full min-h-0 flex-col py-1">
+      <div className="shrink-0 px-2 pb-1.5 pt-1">
+        <div className="relative">
+          <Search
+            size={13}
+            strokeWidth={1.8}
+            aria-hidden
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/55"
+          />
+          <input
+            type="text"
+            role="searchbox"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('inbox.searchPlaceholder')}
+            aria-label={t('inbox.searchPlaceholder')}
+            className="h-8 w-full rounded-md border border-border/70 bg-background/65 pl-7.5 pr-7 text-[11px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/45 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label={t('inbox.clearSearch')}
+              className="oa-icon-action absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-muted-foreground/55 hover:text-foreground"
+            >
+              <X size={12} strokeWidth={1.8} aria-hidden />
+            </button>
+          )}
+        </div>
+        {normalizedQuery && (
+          <div
+            aria-live="polite"
+            className="px-1 pt-1 text-[10px] tabular-nums text-muted-foreground/55"
+          >
+            {t('inbox.searchResults', { count: filteredEntries.length, total: entries.length })}
+          </div>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {normalizedQuery && filteredEntries.length === 0 ? (
+          <div className="px-3 py-5 text-center text-[11px] leading-relaxed text-muted-foreground/65">
+            {t('inbox.noSearchResults', { query: query.trim() })}
+          </div>
+        ) : mode === 'workspace' ? (
+          <WorkspaceView
+            threads={threads}
+            selectedId={selectedId}
+            readIds={readIds}
+            workspaceLabels={workspaceLabels}
+            onSelect={selectAndRead}
+          />
+        ) : (
+          <TimeView
+            entries={filteredEntries}
+            selectedId={selectedId}
+            readIds={readIds}
+            workspaceLabels={workspaceLabels}
+            onSelect={selectAndRead}
+          />
+        )}
+      </div>
     </div>
   )
+}
+
+function normalizeSearch(value: string): string {
+  return value.normalize('NFKC').trim().toLocaleLowerCase()
+}
+
+function inboxSearchText(
+  entry: InboxEntry,
+  workspaceLabels: ReadonlyMap<string, string>,
+  workspaceTags: ReadonlyMap<string, string>,
+): string {
+  return normalizeSearch([
+    workspaceLabels.get(entry.workspaceId),
+    workspaceTags.get(entry.workspaceId),
+    entry.workspaceLabel,
+    entry.workspaceId,
+    entry.comments,
+    entry.origin?.agent,
+    entry.origin?.resumeId,
+    entry.origin?.issueId,
+    entry.origin?.runId,
+    entry.origin?.sessionId,
+    ...(entry.docs ?? []).map((doc) => doc.path),
+  ].filter(Boolean).join(' '))
 }
 
 /** Header toggle (mounted via the section's `Actions` slot). Segmented
@@ -248,6 +329,8 @@ function ClusterRow({
   unread: boolean
   onClick: () => void
 }) {
+  const { t } = useTranslation()
+  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
   return (
     <div
       role="button"
@@ -271,7 +354,7 @@ function ClusterRow({
         className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
       />
       <span className={`min-w-0 truncate text-[11px] leading-5 ${unread ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
-        {previewForEntry(entry)}
+        {preview}
       </span>
       <span className="col-start-2 text-[10px] text-muted-foreground/50 tabular-nums">
         {formatRelativeTime(entry.ts)}
@@ -330,6 +413,9 @@ function TimeRow({
   workspaceLabel?: string
   onClick: () => void
 }) {
+  const { t } = useTranslation()
+  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
+  const source = workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId
   return (
     <div
       role="button"
@@ -341,7 +427,7 @@ function TimeRow({
           onClick()
         }
       }}
-      className={`group relative flex min-h-14 flex-col gap-0.5 px-3 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative flex min-h-14 flex-col justify-center gap-1 px-3 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
@@ -349,23 +435,30 @@ function TimeRow({
         <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
       )}
 
-      {/* Line 1: unread dot · workspace · time */}
-      <div className="flex items-center gap-1.5">
+      {/* Line 1: the update itself is the object users are scanning. */}
+      <div className="flex min-w-0 items-center gap-1.5">
         <span
           aria-hidden
           className={`shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
         />
-        <span className={`flex-1 truncate text-[12px] ${unread ? 'font-medium text-foreground' : 'text-foreground'}`}>
-          {workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId}
+        <span
+          className={`min-w-0 flex-1 truncate text-[12px] ${
+            unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+          }`}
+          title={preview}
+        >
+          {preview}
+        </span>
+      </div>
+
+      {/* Line 2: source and time are supporting provenance. */}
+      <div className="flex min-w-0 items-center gap-2 pl-3">
+        <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground/60">
+          {source}
         </span>
         <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
           {formatRelativeTime(entry.ts)}
         </span>
-      </div>
-
-      {/* Line 2: preview */}
-      <div className={`pl-3 text-[11px] truncate ${unread ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
-        {previewForEntry(entry)}
       </div>
     </div>
   )

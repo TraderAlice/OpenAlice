@@ -32,6 +32,42 @@ const CODEX_INTERACTIVE_PERMISSION_ARGS = [
   'never',
 ] as const;
 
+function codexHome(cwd: string): string {
+  const relativeHome = isolatedHomePath(cwd);
+  return relativeHome ? join(cwd, relativeHome) : join(homedir(), '.codex');
+}
+
+const codexTitleIndexInFlight = new Map<string, Promise<ReadonlyMap<string, string>>>();
+
+function readCodexSessionTitleIndex(cwd: string): Promise<ReadonlyMap<string, string>> {
+  const home = codexHome(cwd);
+  const existing = codexTitleIndexInFlight.get(home);
+  if (existing) return existing;
+  const read = (async () => {
+    let raw: string;
+    try {
+      raw = await readFile(join(home, 'session_index.jsonl'), 'utf8');
+    } catch {
+      return new Map<string, string>();
+    }
+    const titles = new Map<string, string>();
+    for (const line of raw.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        const row = JSON.parse(line) as Record<string, unknown>;
+        const id = typeof row['id'] === 'string' ? row['id'] : null;
+        const title = typeof row['thread_name'] === 'string' ? row['thread_name'].trim() : '';
+        if (id && title) titles.set(id, title);
+      } catch {
+        // A partially-written tail must not hide the rest of the index.
+      }
+    }
+    return titles;
+  })().finally(() => codexTitleIndexInFlight.delete(home));
+  codexTitleIndexInFlight.set(home, read);
+  return read;
+}
+
 /**
  * OpenAI Codex CLI (Rust rewrite, `codex-cli`).
  *
@@ -93,6 +129,11 @@ export const codexAdapter: CliAdapter = {
     // resumeHint. Then `codex resume <id>` (composeCommand) resumes by id.
     transcriptDiscovery: 'subprocess',
     headless: true,
+    aiProvider: {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['openai-responses'],
+      defaultWire: 'openai-responses',
+    },
   },
 
   /**
@@ -483,10 +524,7 @@ export const codexAdapter: CliAdapter = {
    * newest dated leaves since a just-spawned session is today's.
    */
   async listOnDisk(cwd: string): Promise<readonly OnDiskSession[]> {
-    const relativeHome = isolatedHomePath(cwd);
-    const root = relativeHome
-      ? join(cwd, relativeHome, 'sessions')
-      : join(homedir(), '.codex', 'sessions');
+    const root = join(codexHome(cwd), 'sessions');
     const target = resolve(cwd);
     const out: OnDiskSession[] = [];
     for (const leaf of await recentDatedLeaves(root, 2)) {
@@ -516,6 +554,10 @@ export const codexAdapter: CliAdapter = {
       }
     }
     return out;
+  },
+
+  async readSessionTitle(cwd: string, sessionId: string): Promise<string | null> {
+    return (await readCodexSessionTitleIndex(cwd)).get(sessionId) ?? null;
   },
 };
 

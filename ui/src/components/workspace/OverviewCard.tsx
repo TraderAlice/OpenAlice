@@ -24,6 +24,9 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
   shell: Terminal,
 }
 
+const SESSION_PREVIEW_LIMIT = 5
+const MOBILE_SESSION_PREVIEW_LIMIT = 2
+
 function AgentGlyph({ agent }: { agent: string }) {
   const Icon = AGENT_ICONS[agent]
   if (Icon) return <Icon size={12} strokeWidth={2.25} aria-hidden="true" />
@@ -53,6 +56,9 @@ export function OverviewCard({
   const w = workspace
   const label = workspaceDisplayName(w)
   const hasRunning = w.sessions.some((s) => s.state === 'running')
+  const previewSessions = w.sessions.slice(0, SESSION_PREVIEW_LIMIT)
+  const hiddenSessionCount = w.sessions.length - previewSessions.length
+  const mobileHiddenSessionCount = Math.max(0, w.sessions.length - MOBILE_SESSION_PREVIEW_LIMIT)
 
   const lastActivityMs = useMemo(() => {
     const sessionTs = w.sessions
@@ -76,7 +82,7 @@ export function OverviewCard({
 
   return (
     <article
-      className="group relative rounded-lg border border-border bg-secondary p-4 transition-colors hover:border-border/80 hover:bg-muted/40"
+      className="group relative rounded-lg border border-border bg-secondary p-3 transition-colors hover:border-border/80 hover:bg-muted/40 sm:p-4"
     >
       <button
         type="button"
@@ -109,7 +115,7 @@ export function OverviewCard({
                 from: w.upgradeAvailable.from,
                 to: w.upgradeAvailable.to,
               })}
-              className="oa-pressable pointer-events-auto shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-primary border border-primary/40 hover:border-primary/80 hover:bg-primary/10 transition-colors disabled:cursor-default disabled:hover:border-primary/40 disabled:hover:bg-transparent"
+              className="oa-pressable pointer-events-auto flex min-h-10 shrink-0 items-center gap-1 rounded border border-primary/40 px-1.5 py-0.5 text-[10px] font-medium text-primary transition-colors hover:border-primary/80 hover:bg-primary/10 disabled:cursor-default disabled:hover:border-primary/40 disabled:hover:bg-transparent sm:min-h-0"
             >
               <ArrowUpCircle size={10} strokeWidth={2.25} />
               <span>v{w.upgradeAvailable.to}</span>
@@ -119,20 +125,24 @@ export function OverviewCard({
 
         {/* Sessions */}
         <div className="border-t border-border pt-3">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-1.5">
-            {t('workspace.sessions')}
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+            <span>{t('workspace.sessions')}</span>
+            <span className="tabular-nums text-muted-foreground/45">{w.sessions.length}</span>
           </div>
           {w.sessions.length === 0 ? (
             <p className="text-[12px] text-muted-foreground/80 italic">{t('workspace.noSessions')}</p>
           ) : (
             <ul className="space-y-0.5 -mx-2">
-              {w.sessions.map((s) => (
-                <li key={s.id}>
+              {previewSessions.map((s, index) => (
+                <li
+                  key={s.id}
+                  className={index >= MOBILE_SESSION_PREVIEW_LIMIT ? 'hidden sm:list-item' : undefined}
+                >
                   <button
                     type="button"
                     aria-label={`${s.name} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
                     onClick={() => onOpenSession(s.id)}
-                    className="oa-nav-row pointer-events-auto flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
                   >
                     <span className="w-3 flex justify-center text-muted-foreground">
                       <AgentGlyph agent={s.agent} />
@@ -147,18 +157,51 @@ export function OverviewCard({
                     </span>
                     <ChevronRight
                       size={10}
-                      className="ml-auto text-muted-foreground opacity-0 group-hover:opacity-60 transition-opacity"
+                      className="ml-auto text-muted-foreground opacity-60 transition-opacity sm:opacity-0 sm:group-hover:opacity-60"
                     />
                   </button>
                 </li>
               ))}
+              {mobileHiddenSessionCount > 0 && (
+                <li className={`mt-1 border-t border-border/60 pt-1 ${hiddenSessionCount === 0 ? 'sm:hidden' : ''}`}>
+                  <button
+                    type="button"
+                    onClick={onOpen}
+                    aria-label={t('workspace.viewAllSessions', { count: w.sessions.length })}
+                    className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] font-medium text-primary hover:bg-primary/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
+                  >
+                    <span>{t('workspace.viewAllSessions', { count: w.sessions.length })}</span>
+                    <span className="ml-auto tabular-nums text-muted-foreground/55 sm:hidden">
+                      +{mobileHiddenSessionCount}
+                    </span>
+                    <span className="ml-auto hidden tabular-nums text-muted-foreground/55 sm:inline">
+                      +{hiddenSessionCount}
+                    </span>
+                    <ChevronRight size={11} className="text-primary/65" aria-hidden />
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </div>
 
         {/* Footer — only rendered when there's something to show */}
-        {(overrideAgents.length > 0 || lastCommit || (w.template && w.spawnedFromVersion)) && (
+        {(overrideAgents.length > 0 || lastCommit || w.harnessSource || (w.template && w.spawnedFromVersion)) && (
           <div className="border-t border-border pt-3 space-y-1.5">
+            {w.harnessSource && (
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />
+                <span
+                  className="truncate"
+                  title={`${w.harnessSource.version} · ${w.harnessSource.commit}`}
+                >
+                  {t('workspace.fromHarnessSource', {
+                    version: w.harnessSource.version,
+                    commit: w.harnessSource.commit.slice(0, 12),
+                  })}
+                </span>
+              </div>
+            )}
             {w.template && w.spawnedFromVersion && (
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 <GitBranch size={11} strokeWidth={2.25} className="shrink-0" />
@@ -174,7 +217,7 @@ export function OverviewCard({
               <button
                 type="button"
                 onClick={onConfigure}
-                className="pointer-events-auto flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+                className="pointer-events-auto flex min-h-10 w-full items-center gap-2 text-left text-[11px] text-muted-foreground transition-colors hover:text-foreground sm:min-h-0"
               >
                 <Settings size={11} strokeWidth={2.25} className="shrink-0" />
                 <span>{t('workspace.override', { agents: overrideAgents.join(', ') })}</span>

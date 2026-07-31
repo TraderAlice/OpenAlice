@@ -92,6 +92,7 @@ describe('injectWorkspaceContext — persona', () => {
     expect(instruction.split('\n').length).toBeLessThan(120);
     expect(instruction).toContain('Every price, return, date, ratio');
     expect(instruction).toContain('A comment is a board');
+    expect(instruction).toContain('OpenAlice does not wrap');
     expect(instruction).toContain('The `alice-workspace` skill contains the exact commands');
     expect(instruction).not.toContain('alice-workspace issue comment --text');
     expect(instruction).not.toContain('alice-workspace inbox push --doc');
@@ -112,6 +113,22 @@ describe('injectWorkspaceContext — skills', () => {
     expect(existsSync(join(dir, '.pi/skills'))).toBe(false);                        // no Pi collision copy
   });
 
+  it('copies the Chat AutoQuant delegation contract into both discovery paths', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ bundledSkills: ['delegate-autoquant'] }),
+      wsId: 'ws-chat',
+      dir,
+    });
+    for (const root of ['.claude/skills', '.agents/skills']) {
+      const skill = await read(`${root}/delegate-autoquant/SKILL.md`);
+      expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
+      expect(skill).toContain('The universal result is the Agent\'s ordinary `assistantText` handoff');
+      expect(skill).toContain('does not automatically publish either artifact to the');
+      expect(skill).toContain('Primary deliverable directory: <absolute path>');
+      expect(skill).toContain('Do not rerun the research.');
+    }
+  });
+
   it('injects the per-CLI playbooks (alice* + traderhub) for a tool-bearing template', async () => {
     await injectWorkspaceContext({
       template: makeTemplate({ injectTools: true, bundledSkills: ['scan-value-chain'] }),
@@ -123,6 +140,21 @@ describe('injectWorkspaceContext — skills', () => {
       expect(existsSync(join(dir, '.agents/skills', name, 'SKILL.md')), name).toBe(true);
     }
     expect(existsSync(join(dir, '.pi/skills'))).toBe(false);
+  });
+
+  it('keeps peer file access on native Coding Agent capabilities', async () => {
+    await injectWorkspaceContext({
+      template: makeTemplate({ injectTools: true }),
+      wsId: 'ws-abc',
+      dir,
+    });
+    const skill = await read('.agents/skills/alice-workspace/SKILL.md');
+    expect(skill).toContain('There is deliberately no Workspace-level file-read command');
+    expect(skill).toContain('alice-workspace peer path --id <workspaceId>');
+    expect(skill).toContain("Coding Agent's native Read/Search/Glob/Git capabilities");
+    expect(skill).toContain('alice-workspace conversation ask --inbox-id <entryId>');
+    expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
+    expect(skill).not.toContain('peer file-read');
   });
 
   it('gives every runtime copyable UTA read recipes', async () => {

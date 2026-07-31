@@ -33,7 +33,6 @@ export const demoWorkspace: Workspace = {
   spawnedFromVersion: '0.1.0',
   currentVersion: '0.1.0',
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
-  agents: ['pi'],
   sessions: [demoSession],
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
@@ -116,7 +115,6 @@ export const demoChatWorkspace: Workspace = {
   spawnedFromVersion: '0.1.0',
   currentVersion: '0.1.0',
   upgradeAvailable: null,
-  agents: ['claude', 'codex', 'opencode', 'pi'],
   sessions: demoChatSessions,
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
@@ -128,7 +126,14 @@ const demoIssueWorkspaces: Workspace[] = [
     displayName: 'Auto Quant',
     dir: '/demo/workspaces/auto-quant',
     createdAt: new Date().toISOString(),
-    agents: ['codex'],
+    template: 'auto-quant-v2',
+    harnessSource: {
+      schemaVersion: 1,
+      template: 'auto-quant-v2',
+      repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+      version: 'v0.8.31',
+      commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
+    },
     sessions: [],
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
   },
@@ -138,7 +143,6 @@ const demoIssueWorkspaces: Workspace[] = [
     displayName: 'Macro Research',
     dir: '/demo/workspaces/macro-research',
     createdAt: new Date().toISOString(),
-    agents: ['codex'],
     sessions: [],
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
   },
@@ -164,7 +168,35 @@ export const chatTemplate: TemplateInfo = {
   hasReadme: false,
 }
 
-export const demoTemplates: TemplateInfo[] = [chatTemplate]
+export const autoQuantTemplate: TemplateInfo = {
+  name: 'auto-quant-v2',
+  displayName: 'AutoQuant',
+  description: 'Agent-native quantitative research desk pinned to an approved AutoQuant V2 release.',
+  groupOrder: 20,
+  defaultAgents: ['codex', 'claude'],
+  version: '1.0.0',
+  hasReadme: true,
+  source: {
+    repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+    defaultVersion: 'v0.8.31',
+    versions: [
+      {
+        version: 'v0.8.31',
+        commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
+      },
+      {
+        version: 'v0.8.30',
+        commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f',
+      },
+      {
+        version: 'v0.8.27',
+        commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',
+      },
+    ],
+  },
+}
+
+export const demoTemplates: TemplateInfo[] = [chatTemplate, autoQuantTemplate]
 
 // Back-compat singleton for older callers (other fixture files reference
 // `demoTemplate` and we want a stable name). Points at the flagship.

@@ -33,6 +33,7 @@ function fakeService(opts: {
   reconstruction?: ProvenanceRecord | null
   task?: HeadlessTaskRecord | null
   logsDir?: string
+  workspaceTemplate?: string
 } = {}) {
   const adapter = fakeAdapter()
   const workspace = {
@@ -40,7 +41,7 @@ function fakeService(opts: {
     tag: 'peer-desk',
     dir: '/tmp/peer-desk',
     createdAt: '2026-07-11T00:00:00.000Z',
-    agents: ['pi'],
+    ...(opts.workspaceTemplate ? { template: opts.workspaceTemplate } : {}),
   }
   const dispatchHeadlessTask = vi.fn(async () => ({
     taskId: 'task-follow-up',
@@ -59,6 +60,7 @@ function fakeService(opts: {
       append: appendProvenance,
     },
     resolveDefaultAgentId: vi.fn(async () => 'pi'),
+    resolveOrCreateChatWorkspace: vi.fn(async () => ({ ok: true as const, workspace })),
     dispatchHeadlessTask,
     headlessTasks: { get: () => opts.task ?? null },
     headlessLogsDir: opts.logsDir ?? '/tmp/logs',
@@ -148,6 +150,73 @@ describe('Workspace conversation target resolution', () => {
 })
 
 describe('Workspace conversation control', () => {
+  it('creates a fresh Session in the resolved default Chat Workspace', async () => {
+    const { svc, workspace, dispatchHeadlessTask } = fakeService()
+    const rememberRecentChatWorkspace = vi.fn(async () => undefined)
+    const result = await createWorkspaceConversationControl(svc, {
+      readQuickChatPreferences: vi.fn(async () => ({ recentChatWorkspaceId: workspace.id })),
+      rememberRecentChatWorkspace,
+      readAutoQuantPreferences: vi.fn(async () => ({ defaultWorkspaceId: null })),
+    }).ask({
+      target: { kind: 'harness', harness: 'chat' },
+      prompt: 'Start fresh.',
+    })
+
+    expect(result).toMatchObject({
+      status: 'dispatched',
+      resumeId: 'resume-fresh',
+      resolution: { mode: 'reconstructed', reason: 'harness-default' },
+    })
+    expect(svc.resolveOrCreateChatWorkspace).toHaveBeenCalledWith(workspace.id)
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith(workspace.id)
+    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+      workspace,
+      expect.anything(),
+      'Start fresh.',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      expect.anything(),
+    )
+  })
+
+  it('creates a fresh Session only in the initialized default AutoQuant Workspace', async () => {
+    const { svc, workspace } = fakeService({ workspaceTemplate: 'auto-quant-v2' })
+    const dependencies = {
+      readQuickChatPreferences: vi.fn(async () => ({ recentChatWorkspaceId: null })),
+      rememberRecentChatWorkspace: vi.fn(async () => undefined),
+      readAutoQuantPreferences: vi.fn(async () => ({ defaultWorkspaceId: workspace.id })),
+    }
+    await expect(createWorkspaceConversationControl(svc, dependencies).ask({
+      target: { kind: 'harness', harness: 'autoquant' },
+      prompt: 'Start a study.',
+      timeoutMs: 300_000,
+    })).resolves.toMatchObject({
+      status: 'dispatched',
+      workspaceId: workspace.id,
+      resolution: { mode: 'reconstructed', reason: 'harness-default' },
+    })
+  })
+
+  it('does not create an AutoQuant Workspace when the Harness is not initialized', async () => {
+    const { svc, dispatchHeadlessTask } = fakeService()
+    await expect(createWorkspaceConversationControl(svc, {
+      readQuickChatPreferences: vi.fn(async () => ({ recentChatWorkspaceId: null })),
+      rememberRecentChatWorkspace: vi.fn(async () => undefined),
+      readAutoQuantPreferences: vi.fn(async () => ({ defaultWorkspaceId: null })),
+    }).ask({
+      target: { kind: 'harness', harness: 'autoquant' },
+      prompt: 'Start a study.',
+      timeoutMs: 300_000,
+    })).resolves.toMatchObject({
+      status: 'unavailable',
+      resolution: { reason: 'autoquant-not-initialized' },
+    })
+    expect(dispatchHeadlessTask).not.toHaveBeenCalled()
+  })
+
   it('continues the exact Session behind Issue provenance', async () => {
     const identity = { ...origin, wsId: origin.workspaceId, agentSessionId: 'native-private' }
     const { svc, adapter, workspace, dispatchHeadlessTask } = fakeService({

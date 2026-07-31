@@ -27,3 +27,6 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0025_retire_global_compaction_config` | 0.83.0-beta | 2026-07-19 | compaction.json, ai-provider-manager.json | Remove retired global context and compaction limits so model and native Agent runtime semantics remain authoritative. |
 | `0026_agent_conversation_log` | 0.87.0-beta | 2026-07-29 | workspaces/state/agent-conversations.jsonl | Create the private append-only cross-Agent conversation event log. |
 | `0027_repair_snapshot_interval` | 0.87.0-beta | 2026-07-29 | snapshot.json | Repair invalid historical portfolio snapshot intervals before strict duration validation loads them. |
+| `0028_auto_quant_default_workspace` | 0.87.0-beta | 2026-07-30 | data/preferences.json | Add the explicit default Workspace pointer that defines whether AutoQuant is initialized. |
+| `0029_session_native_titles` | 0.87.0-beta | 2026-07-30 | workspaces/state/sessions/*.json | Treat the first Session message as a fallback and reserve the preferred title for native runtime metadata. |
+| `0030_retire_workspace_agent_pins` | 0.87.0-beta | 2026-07-31 | workspaces/workspaces.json, workspaces/state/workspace-catalog.json | Remove per-Workspace adapter allowlists so runtime availability follows the live installation registry. |

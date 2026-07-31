@@ -6,6 +6,7 @@ import {
   exportKeyForBinary,
   getExport,
   mappedToolNames,
+  mappedToolNamesForScope,
 } from './cli-commands.js'
 import { createNewsArchiveTools } from '../tool/news.js'
 import { createMarketSearchTools } from '../tool/market.js'
@@ -120,6 +121,17 @@ describe('CLI_EXPORTS — workspace export (scoped collaboration tools)', () => 
 })
 
 describe('CLI_EXPORTS — structure', () => {
+  it('describes every group exactly once for live intent-first help', () => {
+    for (const [key, exp] of Object.entries(CLI_EXPORTS)) {
+      expect(Object.keys(exp.groupDescriptions), `${key}: group help drift`).toEqual(
+        Object.keys(exp.commands),
+      )
+      for (const [group, description] of Object.entries(exp.groupDescriptions)) {
+        expect(description.trim().length, `${key} ${group}: empty group description`).toBeGreaterThan(0)
+      }
+    }
+  })
+
   it('no export maps the same tool from two verbs', () => {
     for (const [key, exp] of Object.entries(CLI_EXPORTS)) {
       const seen = new Set<string>()
@@ -130,6 +142,18 @@ describe('CLI_EXPORTS — structure', () => {
         }
       }
     }
+  })
+
+  it('unions sibling exports without crossing registry scopes', () => {
+    const global = mappedToolNamesForScope('global')
+    const scoped = mappedToolNamesForScope('scoped')
+    expect(global).toEqual(new Set([
+      ...mappedToolNames('data'),
+      ...mappedToolNames('traderhub'),
+      ...mappedToolNames('uta'),
+    ]))
+    expect(scoped).toEqual(mappedToolNames('workspace'))
+    for (const name of scoped) expect(global.has(name)).toBe(false)
   })
 
   it('maps a binary name to its export key (alice -> data, alice-<x> -> <x>)', () => {

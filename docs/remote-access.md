@@ -7,6 +7,7 @@ path toward an independent Studio frontend.
 
 Start with [[docs/remote-quickstart.md]] for the user-facing setup and daily
 workflow. This owner guide complements [[docs/local-runtime.md]],
+[[docs/cli-supervisor.md]],
 [[docs/docker-deployment.md]], and [[docs/managed-workspace-runtime.md]]. The
 Herdr comparison that informed this design is recorded in
 [[docs/reference/herdr-remote-architecture.md]]. That reference is research;
@@ -14,25 +15,30 @@ this guide is the OpenAlice contract.
 
 ## Status
 
-The repository now contains the source-backed Stage 0 through Stage 2 path:
+The repository now contains the bundle-backed Stage 0 through Stage 2 path,
+with source checkout support retained as an explicit development fallback:
 
-- `openalice start` prepares a source checkout, runs Guardian in the
-  foreground, and optionally opens the local browser;
+- `openalice up|run` prefers the installer-owned headless Runtime bundle and
+  starts Guardian without requiring a checkout or a current working directory;
+- `openalice start` remains a compatibility entry point and follows the same
+  installed-Runtime preference;
+- `openalice up|run|status|open|down` provides the canonical local Shell
+  lifecycle and presentation over the same `cli-server` Guardian owner;
 - `openalice ssh <target>` creates a loopback SSH tunnel to an already-running
   remote OpenAlice Runtime;
 - `openalice server run|start|status|stop` provides a browserless foreground or
   detached Runtime lifecycle backed by Guardian's local control endpoint;
-- `openalice remote <target>` probes, plans, installs the ordinary CLI when
-  approved, installs missing Linux source-build tools, atomically creates or
-  fast-forwards a managed checkout when needed, starts or reuses the remote
-  Server, and opens the same loopback tunnel;
+- `openalice remote <target>` probes, plans, installs the ordinary CLI plus its
+  matching Runtime bundle when approved, starts or reuses the remote Server,
+  and opens the same loopback tunnel; explicit source providers still prepare
+  build tools and checkouts when needed;
 - Electron remains a complete local desktop distribution.
 
-These commands are source-backed behavior distributed by the selected CLI
-lane, not a standalone headless release. The clean Docker SSH acceptance covers the
-management and tunnel loop; real long-latency Agent TUI measurements remain a
-separate release observation rather than a reason to invent a new terminal
-protocol preemptively.
+The release-owned installer advances CLI, managed Pi, and the platform Runtime
+as one OpenAlice version. The clean Docker SSH acceptance covers bundle
+download, install, management, and the tunnel loop. Real long-latency Agent TUI
+measurements remain a separate release observation rather than a reason to
+invent a new terminal protocol preemptively.
 
 ## Product Decision
 
@@ -89,14 +95,17 @@ protocol is deferred until the local/server boundary is stable.
    install, update, start, takeover, or stop consent.
 6. Disconnecting a browser, Electron renderer, CLI, or SSH tunnel does not stop
    a detached Server.
-7. `server stop` asks the owning Guardian to terminate its own tree and verifies
-   completion. It does not signal a guessed PID or delete a live lock.
+7. top-level `down` and compatibility `server stop` ask the owning Guardian to
+   terminate its own tree and verify completion. They do not signal a guessed
+   PID or delete a live lock.
 8. `--takeover` remains the only command-line authority to replace another
    recorded Guardian owner.
 9. Remote bootstrap reuses the invoking local CLI's recorded ordinary
    installer source, selector, and installed content identity. It does not
    carry a second SSH-only installer or upload the full OpenAlice Runtime
-   through SSH. A missing managed checkout clones directly on the remote host.
+   through SSH. The ordinary installer downloads the matching platform Runtime
+   directly on the remote host. An explicitly selected source provider clones
+   directly on that host when its checkout is missing.
 10. Shared Runtime facts use presentation-neutral names and versioned schemas.
     Browser layout, Electron chrome, modal state, and other client UI state do
     not become server truth.
@@ -146,15 +155,25 @@ updates, starts, stops, or takes over the remote Runtime.
 ### Server lifecycle
 
 ```bash
+openalice run [app-dir]
+openalice up [app-dir]
+openalice status
+openalice open
+openalice down
+
+# compatibility surface used by managed remote and existing scripts
 openalice server run [app-dir]
 openalice server start [app-dir]
 openalice server status
 openalice server stop
 ```
 
-All server commands accept the same explicit `--home`, `--port`, and source
-checkout selection as local start. `run` and `start` also accept `--rebuild` and
-`--takeover` where the existing start contract does.
+The top-level lifecycle is canonical for direct Shell use. The `server`
+commands remain its compatibility presenter because managed remote must keep
+working across CLI upgrades. Both families operate the same `cli-server`
+Guardian owner and accept the same explicit `--home`, `--port`, and source
+checkout selection as local start. `run`, `up`, and `server start` also accept
+`--rebuild` and `--takeover` where the existing start contract does.
 
 | Command | Lifetime and side effects |
 |---|---|
@@ -192,9 +211,9 @@ openalice remote <target>
 
 1. verify ordinary SSH connectivity and host-key policy;
 2. detect remote platform, home, and an installed `openalice` CLI;
-3. select the explicit `--app-dir` or a selector-specific managed checkout
-   beneath remote `OPENALICE_HOME`;
-4. probe `openalice server status --json`, source state, and protocol
+3. select a compatible installed Runtime bundle, or the explicit `--app-dir`
+   or selector-specific managed checkout used by a source provider;
+4. probe `openalice server status --json`, Runtime provider state, and protocol
    compatibility;
 5. compare the remote CLI version, installer source/selector, and immutable
    installed content identity with the invoking local CLI;
@@ -202,9 +221,11 @@ openalice remote <target>
    separately before calling the normal installer on the remote host;
 7. re-probe and re-plan after installation so a newly visible owner can block
    or require a second explicit takeover decision;
-8. clone a missing managed checkout atomically, or fast-forward a clean managed
-   branch checkout and rebuild after the plan names that update;
-9. run `openalice server start --app-dir ...` remotely and wait for readiness;
+8. when an explicit source provider is selected, clone a missing managed
+   checkout atomically, or fast-forward a clean managed branch checkout and
+   rebuild after the plan names that update;
+9. run `openalice server start` with the selected installed Runtime or explicit
+   source root and wait for readiness;
 10. create the same loopback tunnel used by `openalice ssh`;
 11. reuse the last successful local port for this target and remote home when it
    is available, so an existing browser tab can reconnect to the same origin;
@@ -226,15 +247,15 @@ openalice remote <target> --stop
 
 Neither command conflates “disconnect” with “stop my remote work.”
 
-When `--app-dir` is absent, the source-backed phase selects a private managed
-checkout beneath the remote home. A missing checkout is cloned only after the
-visible plan is approved. A clean managed branch checkout is compared with its
-selected upstream; an available fast-forward is planned together with a Server
-restart and rebuild. Tracked changes block that update. An explicit
+When `--app-dir` is absent, managed remote prefers the verified Runtime bundle
+installed with the matching CLI. No Git checkout or compiler is needed. On a
+lane or platform without that artifact it can fall back to a private managed
+checkout beneath the remote home. A missing fallback checkout is cloned only
+after the visible plan is approved. A clean managed branch checkout is compared
+with its selected upstream; an available fast-forward is planned together with
+a Server restart and rebuild. Tracked changes block that update. An explicit
 `--app-dir` is user-owned: it may be cloned when wholly absent, but existing
-source is never fetched, switched, reset, or overwritten. A future headless
-release bundle can remove the source-checkout requirement without changing the
-command or lifecycle contract.
+source is never fetched, switched, reset, or overwritten.
 
 `--yes` may approve the displayed install/update/start plan for automation, but
 it never implies `--takeover`. Non-interactive execution without a sufficient
@@ -244,6 +265,16 @@ The remembered local port is user-local connection state, not remote Runtime
 state. An explicit `--local-port` wins. If an automatically remembered port is
 already occupied, `remote` reports the conflict, allocates a free loopback port,
 and remembers the replacement only after the tunnel passes OpenAlice readiness.
+
+The browser also needs enough client-owned identity to explain a tunnel outage
+after the remote Runtime becomes unreachable. `openalice ssh` and
+`openalice remote` therefore open the local UI with a short-lived URL fragment
+containing only the validated SSH destination, SSH port, and remote loopback
+Runtime port. The Web UI consumes that fragment into tab-scoped session storage
+before rendering and immediately removes it from the address bar. Fragments are
+not sent in HTTP requests, so this context never becomes remote Runtime state or
+server log data. The global offline screen may use it to distinguish a broken
+SSH route from a local Runtime outage and show the exact endpoints to retry.
 
 ## Server Lifecycle
 
@@ -535,9 +566,11 @@ The read-only plan reports:
 - detected OpenAlice CLI path, version, and whether its install source and
   content identity match the invoking local CLI;
 - control protocol compatibility;
-- Server state and source/bundle root;
-- whether the selected source checkout already has complete Runtime artifacts;
-- whether source will be cloned, is user-owned, or has a safe managed
+- Server state, Runtime provider, bundle identity, and source/bundle root;
+- whether an installed bundle matches the CLI product version, platform, and
+  architecture;
+- for a source provider, whether its checkout already has complete Runtime
+  artifacts and whether it will be cloned, is user-owned, or has a safe managed
   fast-forward available;
 - missing Git, Python 3, make, or C++ tools and the package-manager action that
   would provide them;
@@ -548,9 +581,12 @@ The read-only plan reports:
 
 Apply rules:
 
-1. no matching compatible CLI: ask before invoking the normal installer with
-   the local CLI's recorded branch/tag/commit selector;
-2. source artifacts absent and Linux build tools missing: include
+1. no matching compatible CLI or Runtime: ask before invoking the normal
+   installer with the local CLI's recorded branch/tag/commit selector and
+   expected product version; the installer obtains the matching platform
+   Runtime from the same release;
+2. an explicitly selected source provider with absent artifacts and missing
+   Linux build tools: include
    `--with-runtime-deps` in that same normal installer invocation after plan
    consent;
 3. complete source artifacts: do not modify system packages merely because a
@@ -629,13 +665,14 @@ Runtime model.
 - stop is structured and self-owned;
 - Electron behavior remains unchanged.
 
-### Stage 2 — managed source-backed remote (implemented baseline)
+### Stage 2 — managed bundle-backed remote (implemented baseline)
 
 - `openalice remote` plan/apply orchestration;
-- probe and bootstrap the existing CLI plus pinned managed Pi with explicit
-  consent;
-- choose, atomically clone, and safely fast-forward selector-specific managed
-  source without requiring manual SSH setup;
+- probe and bootstrap the existing CLI, pinned managed Pi, and matching
+  headless Runtime with explicit consent;
+- prefer the installed release Runtime without Git or build tools;
+- retain source-provider selection, atomic clone, and safe fast-forward for
+  development and unsupported release lanes;
 - when an older healthy CLI Server lacks managed Pi, infer its recorded source
   root, install Pi, stop that self-owned Server through `runtime.stop`, and
   restart it so the Guardian tree inherits the managed runtime;
@@ -644,6 +681,17 @@ Runtime model.
 - leave the Server alive after disconnect;
 - remaining release observation: validate ordinary Agent TUI interaction under
   representative network shaping before deciding whether Stage 3 is useful.
+
+#### Bundle-backed Linux SSH observation — 2026-07-30
+
+The disposable OrbStack Docker SSH fixture exercised an ordinary Linux arm64
+remote with no source checkout. The remote plan detected the missing CLI, the
+normal installer downloaded and verified the matching Runtime archive, and the
+refreshed plan selected `provider=bundle` beneath `cli-versions/` without Git,
+Python, make, or a compiler. Detached readiness, `/api/auth/status`, tunnel
+disconnect persistence, managed Pi repair with a self-owned restart, same-port
+reconnect, status, and structured stop all passed. The fixture also asserted
+that no managed source checkout was created.
 
 #### Railway cold-host observation — 2026-07-15
 
@@ -695,7 +743,7 @@ recovered in place after the tunnel returned on the same origin. The Server was
 stopped through its control endpoint and the Sandbox was destroyed.
 
 A later user-facing Railway Sandbox completed the missing authenticated Agent
-loop. Pi `0.80.6` was installed on the live remote host, OpenAlice selected Pi
+loop. Pi `0.83.0` was installed on the live remote host, OpenAlice selected Pi
 as the Workspace default, injected a sealed LongCat-compatible provider
 credential through the normal AI Provider flow, and started a trusted Pi TUI
 without the project-trust deadlock. The prompt `请只回复：远程 OpenAlice Pi
@@ -748,10 +796,12 @@ permission to reclaim a shared volume.
 - consider relay/device enrollment only after direct SSH is operationally
   understood.
 
-### Stage 5 — standalone headless Runtime bundle
+### Stage 5 — standalone headless Runtime hardening (in progress)
 
-- replace source checkout preparation with signed, content-addressed release
-  assets where supported;
+- the initial content-addressed platform archive, hashed manifest, installer
+  integration, and managed-remote selection are implemented;
+- add release signature/provenance verification and reproducible-build
+  evidence before describing the asset as cryptographically authenticated;
 - retain the same `server` and `remote` commands, status schema, state root, and
   consent model;
 - keep source-backed development as a supported diagnostic path.
@@ -784,7 +834,9 @@ permission to reclaim a shared volume.
 | missing remote CLI, interactive | shows plan; default no leaves host unchanged |
 | missing remote CLI, non-interactive | fails unless explicit approval is present |
 | incompatible running Server | explains process impact before update/restart |
-| managed remote source missing | plan names the exact clone destination and selector; default no leaves it absent |
+| matching installed Runtime bundle | plan selects it without a checkout or build-tool mutation |
+| missing remote CLI and Runtime | ordinary installer obtains matching platform artifacts; default no leaves the host unchanged |
+| managed remote source fallback missing | plan names the exact clone destination and selector; default no leaves it absent |
 | explicit source path missing | plan may clone only that exact path; an occupied non-OpenAlice path is refused |
 | managed branch advanced | clean checkout fast-forwards, rebuilds, and restarts; tracked changes block without overwrite |
 | source artifacts missing, build tools missing | plan names the tools and normal installer command; default no leaves packages untouched |

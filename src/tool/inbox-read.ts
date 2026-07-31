@@ -14,13 +14,14 @@
  * The `self` case is the load-bearing one: an entry's `docs` are paths
  * relative to the workspace that pushed it. For self-entries that root IS
  * the agent's own cwd, so once it has the paths back it reads the files
- * with ordinary shell tools — no cross-workspace file API needed. Foreign
- * entries' doc paths are relative to *another* workspace's root and are
- * surfaced for awareness only, not directly readable from here.
+ * with ordinary native file tools — no Workspace-level file-read API needed.
+ * Foreign entries carry the other Workspace id so `peer path` can resolve an
+ * absolute root for those same native tools.
  */
 
 import { tool } from 'ai'
 import { z } from 'zod'
+import { resolve, sep } from 'node:path'
 import {
   toSafeInboxOrigin,
   type WorkspaceToolFactory,
@@ -28,6 +29,14 @@ import {
 } from '../core/workspace-tool-center.js'
 
 const DEFAULT_LIMIT = 20
+
+function resolveInboxDocPath(workspaceDir: string | undefined, docPath: string): string | null {
+  if (!workspaceDir) return null
+  const root = resolve(workspaceDir)
+  const absolutePath = resolve(root, docPath)
+  if (absolutePath !== root && !absolutePath.startsWith(`${root}${sep}`)) return null
+  return absolutePath
+}
 
 export const inboxReadFactory: WorkspaceToolFactory = {
   name: 'inbox_read',
@@ -38,9 +47,11 @@ export const inboxReadFactory: WorkspaceToolFactory = {
         '',
         'Use this to recall what you already reported, or to see the broader stream of what every workspace has surfaced to the user.',
         '',
-        "Pass `self` to limit the list to entries THIS workspace pushed; their `docs` paths are relative to your own workspace root, so you can open them directly with your shell (cat / read the path).",
+        "Pass `self` to limit the list to entries THIS workspace pushed.",
         '',
-        'Entries from other workspaces each carry a `workspaceId` — resolve it with `workspace_path` (CLI: `alice-workspace peer path`) to locate and read that peer\'s files.',
+        'Each attachment appears in `files` with its stored `relativePath`, a directly usable `absolutePath`, and the published `revision` when known. `absolutePath` is null only when the source Workspace is unavailable or the stored path is unsafe.',
+        '',
+        'The legacy `docs` relative-path list and `docRevisions` map remain for compatibility. `workspaceId` can still be resolved with `workspace_path` (CLI: `alice-workspace peer path`) when inspecting the source desk itself.',
         '',
         'When an entry came from an agent run/session, `origin` carries its safe OpenAlice provenance (`runId` / `sessionId`, `resumeId`, `issueId`, `agent`). Native runtime session ids are never exposed.',
         '',
@@ -51,7 +62,7 @@ export const inboxReadFactory: WorkspaceToolFactory = {
           .stringbool()
           .optional()
           .describe(
-            'Only entries pushed by THIS workspace. Their doc paths are relative to your own cwd, so you can read the files directly.',
+            'Only entries pushed by THIS workspace. Their doc paths are relative to your own cwd, so you can use native file tools directly.',
           ),
         limit: z
           .number()
@@ -72,6 +83,12 @@ export const inboxReadFactory: WorkspaceToolFactory = {
             hasMore,
             entries: entries.map((e) => {
               const origin = toSafeInboxOrigin(ctx.resolveInboxOrigin?.(e) ?? e.origin)
+              const workspace = ctx.resolveWorkspace?.(e.workspaceId)
+              const files = (e.docs ?? []).map((doc) => ({
+                relativePath: doc.path,
+                absolutePath: resolveInboxDocPath(workspace?.dir, doc.path),
+                ...(doc.revision ? { revision: doc.revision } : {}),
+              }))
               return {
                 id: e.id,
                 ts: new Date(e.ts).toISOString(),
@@ -84,6 +101,7 @@ export const inboxReadFactory: WorkspaceToolFactory = {
                 workspace: e.workspaceLabel ?? e.workspaceId,
                 comments: e.comments,
                 docs: (e.docs ?? []).map((d) => d.path),
+                files,
                 ...((e.docs ?? []).some((doc) => doc.revision)
                   ? {
                       docRevisions: Object.fromEntries(

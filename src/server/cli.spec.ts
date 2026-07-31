@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import { tool } from 'ai'
 import { z } from 'zod'
+import { resolve } from 'node:path'
 import { ToolCenter } from '../core/tool-center.js'
 import { WorkspaceToolCenter } from '../core/workspace-tool-center.js'
 import { createThinkingTools } from '../tool/thinking.js'
@@ -121,9 +122,16 @@ describe('CLI gateway — export scope isolation', () => {
   it('the workspace export manifest resolves (its own scope)', async () => {
     const res = await app.request('/cli/ws1/workspace/manifest')
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { export: string; groups: Record<string, unknown> }
+    const body = (await res.json()) as {
+      export: string
+      groupDescriptions: Record<string, string>
+      groups: Record<string, unknown>
+    }
     expect(body.export).toBe('workspace')
     expect(typeof body.groups).toBe('object')
+    expect(body.groupDescriptions['peer']).toContain('absolute filesystem locations')
+    expect(body.groupDescriptions['conversation']).toContain('Agent-to-Agent')
+    expect(body.groupDescriptions['inbox']).toContain('human Inbox')
   })
 })
 
@@ -192,13 +200,28 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
   // stringbool + number coercion through extractMcpShape + strictObject.
   async function makeWsApp(): Promise<Hono> {
     const inboxStore = createMemoryInboxStore()
-    await inboxStore.append({ workspaceId: 'ws1', workspaceLabel: 'demo', comments: 'mine' })
+    await inboxStore.append({
+      workspaceId: 'ws1',
+      workspaceLabel: 'demo',
+      comments: 'mine',
+      docs: [{ path: 'reports/mine.md' }],
+    })
     await inboxStore.append({ workspaceId: 'other', workspaceLabel: 'them', comments: 'theirs' })
 
     const wtc = new WorkspaceToolCenter()
     wtc.register(inboxReadFactory)
 
-    const fakeSvc = { registry: { get: (id: string) => (id === 'ws1' ? { id: 'ws1', tag: 'demo' } : undefined) } }
+    const fakeSvc = {
+      registry: {
+        get: (id: string) => (
+          id === 'ws1'
+            ? { id: 'ws1', tag: 'demo', dir: resolve('/workspaces/ws1') }
+            : id === 'other'
+              ? { id: 'other', tag: 'them', dir: resolve('/workspaces/other') }
+              : undefined
+        ),
+      },
+    }
     const app = new Hono()
     registerCliRoutes(app, {
       toolCenter: new ToolCenter(),
@@ -227,6 +250,10 @@ describe('CLI gateway — inbox read (scoped, string-arg coercion)', () => {
     expect(status).toBe(200)
     expect(payload.count).toBe(1)
     expect(payload.entries[0].mine).toBe(true)
+    expect(payload.entries[0].files).toEqual([{
+      relativePath: 'reports/mine.md',
+      absolutePath: resolve('/workspaces/ws1/reports/mine.md'),
+    }])
   })
 
   it('no flags returns the full cross-workspace stream', async () => {

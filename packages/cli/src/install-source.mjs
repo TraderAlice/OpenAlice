@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
@@ -83,6 +84,19 @@ export function installSourcesMatch(left, right) {
 export function formatInstallSelector(source) {
   const normalized = normalizeInstallSource(source)
   return `${normalized.selector.kind} ${normalized.selector.value}`
+}
+
+export function managedSourceKey(source) {
+  const normalized = requireInstallSource(source)
+  const readable = `${normalized.selector.kind}-${normalized.selector.value}`
+    .replaceAll(/[^A-Za-z0-9._-]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '')
+    .slice(0, 48) || 'source'
+  const digest = createHash('sha256')
+    .update(`${normalized.selector.kind}:${normalized.selector.value}`)
+    .digest('hex')
+    .slice(0, 8)
+  return `${readable}-${digest}`
 }
 
 function cloneInstallSource(source) {

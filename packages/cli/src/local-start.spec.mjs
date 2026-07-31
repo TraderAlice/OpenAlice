@@ -38,6 +38,7 @@ describe('OpenAlice local Runtime launcher', () => {
       prepare: true,
       rebuild: true,
       takeover: true,
+      checkUpdates: true,
       waitMs: 15_000,
     })
   })
@@ -149,6 +150,38 @@ describe('OpenAlice local Runtime launcher', () => {
     }))
     expect(runtimeEnv).not.toHaveProperty('OPENALICE_DISABLE_AUTH')
     expect(runtimeEnv).not.toHaveProperty('OPENALICE_TAKEOVER')
+  })
+
+  it('leaves the Web port unpinned when the Supervisor selected an automatic port', () => {
+    const runtimeEnv = buildLocalRuntimeEnv({
+      OPENALICE_WEB_PORT: '41000',
+    }, {
+      appDir: '/tmp/OpenAlice',
+      homeRoot: '/tmp/alice-home',
+      nodeBinary: '/test/node',
+      port: undefined,
+      takeover: false,
+    })
+
+    expect(runtimeEnv).not.toHaveProperty('OPENALICE_WEB_PORT')
+  })
+
+  it('isolates managed Pi for every local Guardian launch path', () => {
+    const runtimeEnv = buildLocalRuntimeEnv({
+      OPENALICE_MANAGED_PI_PATH: '/managed/pi/cli.js',
+      PI_CODING_AGENT_DIR: '/native/pi',
+    }, {
+      appDir: '/tmp/OpenAlice',
+      homeRoot: '/tmp/alice-home',
+      nodeBinary: '/test/node',
+      port: 41_000,
+      takeover: false,
+    })
+
+    expect(runtimeEnv).toEqual(expect.objectContaining({
+      PI_CODING_AGENT_DIR: join('/tmp/alice-home', 'runtime', 'pi'),
+      PI_CODING_AGENT_SESSION_DIR: join('/tmp/alice-home', 'runtime', 'pi', 'sessions'),
+    }))
   })
 
   it('starts the built Guardian on loopback and preserves explicit takeover', async () => {

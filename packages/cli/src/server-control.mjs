@@ -5,7 +5,9 @@ import { createConnection } from 'node:net'
 import { resolve } from 'node:path'
 
 export const GUARDIAN_CONTROL_PROTOCOL = 1
+export const GUARDIAN_CONTROL_API_VERSION = 1
 const MAX_RESPONSE_BYTES = 1024 * 1024
+const MAX_UPTIME_SECONDS = 10 * 365 * 24 * 60 * 60
 
 export function resolveOpenAliceHome(homeRoot, options = {}) {
   const env = options.env ?? process.env
@@ -100,19 +102,14 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
     return classifyControlStatus(homeRoot, runtime)
   } catch (error) {
     if (!isUnavailableControlError(error)) {
-      return {
-        protocol: GUARDIAN_CONTROL_PROTOCOL,
-        class: error?.code === 'EINCOMPATIBLE' || error?.code === 'incompatible_protocol'
+      return emptyRuntimeStatus(
+        homeRoot,
+        error?.code === 'EINCOMPATIBLE' || error?.code === 'incompatible_protocol'
           ? 'incompatible'
           : 'unhealthy',
-        state: 'unknown',
-        home: homeRoot,
-        owner: null,
-        endpoints: {},
-        components: {},
-        capabilities: [],
-        detail: error instanceof Error ? error.message : String(error),
-      }
+        'unknown',
+        error instanceof Error ? error.message : String(error),
+      )
     }
   }
 
@@ -123,28 +120,16 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
   })
   if (owner?.active) {
     return {
-      protocol: GUARDIAN_CONTROL_PROTOCOL,
-      class: 'owned_elsewhere',
-      state: 'running',
-      home: homeRoot,
+      ...emptyRuntimeStatus(
+        homeRoot,
+        'owned_elsewhere',
+        'running',
+        'Guardian ownership is active but no compatible CLI Server control endpoint is available',
+      ),
       owner: owner.publicOwner,
-      endpoints: {},
-      components: {},
-      capabilities: [],
-      detail: 'Guardian ownership is active but no compatible CLI Server control endpoint is available',
     }
   }
-  return {
-    protocol: GUARDIAN_CONTROL_PROTOCOL,
-    class: 'absent',
-    state: 'absent',
-    home: homeRoot,
-    owner: null,
-    endpoints: {},
-    components: {},
-    capabilities: [],
-    ...(owner?.detail ? { detail: owner.detail } : {}),
-  }
+  return emptyRuntimeStatus(homeRoot, 'absent', 'absent', owner?.detail)
 }
 
 export async function stopRuntimeServer(options = {}, dependencies = {}) {
@@ -180,10 +165,14 @@ export async function stopRuntimeServer(options = {}, dependencies = {}) {
 export function formatRuntimeStatus(status) {
   const lines = [`OpenAlice Server: ${status.class}`]
   lines.push(`Home: ${status.home}`)
+  if (status.productVersion || status.runtimeVersion) {
+    lines.push(`Version: ${status.productVersion ?? status.runtimeVersion}`)
+  }
   if (status.owner) {
     lines.push(`Owner: ${status.owner.surface} (pid ${status.owner.pid})`)
   }
   if (status.endpoints?.web) lines.push(`Web: ${status.endpoints.web}`)
+  if (status.provider?.kind) lines.push(`Provider: ${status.provider.kind}`)
   if (status.owner?.launchRoot) lines.push(`Runtime source: ${status.owner.launchRoot}`)
   if (status.detail) lines.push(`Detail: ${status.detail}`)
   return `${lines.join('\n')}\n`
@@ -191,90 +180,295 @@ export function formatRuntimeStatus(status) {
 
 function classifyControlStatus(homeRoot, runtime) {
   if (!runtime || typeof runtime !== 'object') {
-    return {
-      protocol: GUARDIAN_CONTROL_PROTOCOL,
-      class: 'unhealthy',
-      state: 'unknown',
-      home: homeRoot,
-      owner: null,
-      endpoints: {},
-      components: {},
-      capabilities: [],
-      detail: 'Guardian returned an invalid runtime.status result',
-    }
+    return emptyRuntimeStatus(
+      homeRoot,
+      'unhealthy',
+      'unknown',
+      'Guardian returned an invalid runtime.status result',
+    )
   }
   const owner = sanitizeControlOwner(runtime.owner)
   const surface = owner?.surface
-  const state = typeof runtime.state === 'string' ? runtime.state : 'unknown'
+  const state = typeof runtime.state === 'string' && /^[a-z][a-z0-9.-]{0,63}$/.test(runtime.state)
+    ? runtime.state
+    : 'unknown'
+  const control = sanitizeControlCompatibility(runtime.control)
+  const capabilities = sanitizeCapabilities(runtime.capabilities)
+  if (
+    control.minClientApiVersion > GUARDIAN_CONTROL_API_VERSION
+    || control.apiVersion < GUARDIAN_CONTROL_API_VERSION
+  ) {
+    return {
+      ...emptyRuntimeStatus(
+        homeRoot,
+        'incompatible',
+        state,
+        `Guardian control API ${control.minClientApiVersion}-${control.apiVersion} is incompatible with CLI API ${GUARDIAN_CONTROL_API_VERSION}`,
+      ),
+      owner,
+      control,
+      capabilities,
+    }
+  }
   let statusClass
   if (surface !== 'cli-server') statusClass = 'owned_elsewhere'
   else if (state === 'starting' || state === 'stopping') statusClass = state
   else if (state === 'running' && runtime.components?.alice === 'ready') statusClass = 'running'
   else statusClass = 'unhealthy'
+  const productVersion = sanitizeVersion(runtime.productVersion)
+    ?? sanitizeVersion(runtime.runtimeVersion)
+    ?? 'unknown'
+  const components = sanitizeComponents(runtime.components)
   return {
     protocol: GUARDIAN_CONTROL_PROTOCOL,
+    control,
     class: statusClass,
-    runtimeVersion: typeof runtime.runtimeVersion === 'string' ? runtime.runtimeVersion : 'unknown',
+    productVersion,
+    runtimeVersion: sanitizeVersion(runtime.runtimeVersion) ?? productVersion,
     state,
     home: homeRoot,
     owner,
     endpoints: sanitizeEndpoints(runtime.endpoints),
-    components: sanitizeComponents(runtime.components),
-    capabilities: Array.isArray(runtime.capabilities)
-      ? runtime.capabilities.filter((item) => typeof item === 'string')
-      : [],
+    provider: sanitizeProvider(runtime.provider, owner),
+    pendingActivation: sanitizePendingActivation(runtime.pendingActivation),
+    uptimeSeconds: sanitizeUptime(runtime.uptimeSeconds, owner?.startedAt),
+    components,
+    componentDetail: sanitizeComponentDetail(runtime.componentDetail, components),
+    capabilities,
+    ...(sanitizeDetail(runtime.detail) ? { detail: sanitizeDetail(runtime.detail) } : {}),
+  }
+}
+
+function emptyRuntimeStatus(homeRoot, statusClass, state, detail) {
+  return {
+    protocol: GUARDIAN_CONTROL_PROTOCOL,
+    control: {
+      apiVersion: GUARDIAN_CONTROL_API_VERSION,
+      minClientApiVersion: GUARDIAN_CONTROL_API_VERSION,
+      capabilities: [],
+    },
+    class: statusClass,
+    productVersion: 'unknown',
+    runtimeVersion: 'unknown',
+    state,
+    home: homeRoot,
+    owner: null,
+    endpoints: {},
+    provider: { kind: 'unknown' },
+    pendingActivation: null,
+    uptimeSeconds: null,
+    components: {},
+    componentDetail: {},
+    capabilities: [],
+    ...(detail ? { detail: sanitizeDetail(detail) } : {}),
   }
 }
 
 async function inspectGuardianOwner(homeRoot, options = {}) {
-  let owner
-  try {
-    owner = JSON.parse(await readFile(resolve(homeRoot, 'state', 'guardian.lock', 'owner.json'), 'utf8'))
-  } catch (error) {
-    if (error?.code === 'ENOENT') return null
-    return { active: true, publicOwner: null, detail: 'Guardian owner metadata is unreadable' }
-  }
-  if (!Number.isInteger(owner?.pid) || typeof owner?.launcher !== 'string') {
-    return { active: true, publicOwner: null, detail: 'Guardian owner metadata is invalid' }
-  }
+  const ownerPaths = [
+    resolve(homeRoot, 'state', 'guardian.lock', 'owner.json'),
+    resolve(homeRoot, 'state', 'runtime.lock', 'owner.json'),
+    resolve(homeRoot, 'workspaces', 'state', 'runtime.lock', 'owner.json'),
+  ]
   const localHostname = options.hostname ?? hostname()
-  const sameHost = typeof owner.hostname !== 'string' || owner.hostname === localHostname
   const isAlive = options.isProcessAlive ?? isProcessAlive
-  const active = !sameHost || isAlive(owner.pid)
-  return {
-    active,
-    publicOwner: {
-      surface: owner.launcher.startsWith('guardian-') ? owner.launcher.slice('guardian-'.length) : owner.launcher,
+  let staleOwner = null
+  for (const ownerPath of ownerPaths) {
+    let owner
+    try {
+      owner = JSON.parse(await readFile(ownerPath, 'utf8'))
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue
+      return {
+        active: true,
+        publicOwner: null,
+        detail: `Runtime owner metadata is unreadable at ${ownerPath}`,
+      }
+    }
+    if (!Number.isInteger(owner?.pid) || typeof owner?.launcher !== 'string') {
+      return {
+        active: true,
+        publicOwner: null,
+        detail: `Runtime owner metadata is invalid at ${ownerPath}`,
+      }
+    }
+    const sameHost = typeof owner.hostname !== 'string'
+      || owner.hostname === localHostname
+    const active = !sameHost || isAlive(owner.pid)
+    const publicOwner = {
+      surface: owner.launcher.startsWith('guardian-')
+        ? owner.launcher.slice('guardian-'.length)
+        : owner.launcher,
       pid: owner.pid,
-      startedAt: typeof owner.acquiredAt === 'string' ? owner.acquiredAt : null,
-    },
-    ...(!active ? { detail: 'A stale Guardian owner record is present; the next start may recover it' } : {}),
+      startedAt: typeof owner.acquiredAt === 'string'
+        ? owner.acquiredAt
+        : null,
+    }
+    if (active) return { active: true, publicOwner }
+    staleOwner = publicOwner
   }
+  return staleOwner
+    ? {
+        active: false,
+        publicOwner: staleOwner,
+        detail: 'A stale Runtime owner record is present; the next start may recover it',
+      }
+    : null
 }
 
 function sanitizeControlOwner(owner) {
   if (!owner || typeof owner !== 'object' || !Number.isInteger(owner.pid)) return null
   return {
-    surface: typeof owner.surface === 'string' ? owner.surface : 'unknown',
+    surface: typeof owner.surface === 'string' && /^[a-z][a-z0-9.-]{0,63}$/.test(owner.surface)
+      ? owner.surface
+      : 'unknown',
     pid: owner.pid,
-    instanceId: typeof owner.instanceId === 'string' ? owner.instanceId : 'unknown',
+    instanceId: typeof owner.instanceId === 'string' && /^[A-Za-z0-9._-]{1,128}$/.test(owner.instanceId)
+      ? owner.instanceId
+      : 'unknown',
     startedAt: typeof owner.startedAt === 'string' ? owner.startedAt : null,
-    ...(typeof owner.launchRoot === 'string' ? { launchRoot: owner.launchRoot } : {}),
-    ...(typeof owner.mode === 'string' ? { mode: owner.mode } : {}),
+    ...(safePath(owner.launchRoot) ? { launchRoot: safePath(owner.launchRoot) } : {}),
+    ...(['foreground', 'detached'].includes(owner.mode) ? { mode: owner.mode } : {}),
   }
 }
 
 function sanitizeEndpoints(endpoints) {
-  return typeof endpoints?.web === 'string' ? { web: endpoints.web } : {}
+  if (typeof endpoints?.web !== 'string') return {}
+  try {
+    const url = new URL(endpoints.web)
+    if (
+      url.protocol !== 'http:'
+      || url.hostname !== '127.0.0.1'
+      || url.username !== ''
+      || url.password !== ''
+    ) {
+      return {}
+    }
+    return { web: url.toString().replace(/\/$/, '') }
+  } catch {
+    return {}
+  }
 }
 
 function sanitizeComponents(components) {
   if (!components || typeof components !== 'object') return {}
   const output = {}
   for (const name of ['alice', 'uta', 'connector']) {
-    if (typeof components[name] === 'string') output[name] = components[name]
+    if (typeof components[name] === 'string' && /^[a-z][a-z0-9.-]{0,63}$/.test(components[name])) {
+      output[name] = components[name]
+    }
   }
   return output
+}
+
+function sanitizeComponentDetail(componentDetail, components) {
+  const output = {}
+  for (const name of ['alice', 'uta', 'connector']) {
+    const source = componentDetail?.[name]
+    const state = typeof source?.state === 'string' ? source.state : components[name]
+    if (!state) continue
+    output[name] = {
+      state,
+      ...(Number.isInteger(source?.pid) && source.pid > 0 ? { pid: source.pid } : {}),
+      ...(typeof source?.required === 'boolean' ? { required: source.required } : {}),
+      ...(sanitizeDetail(source?.detail) ? { detail: sanitizeDetail(source.detail) } : {}),
+    }
+  }
+  return output
+}
+
+function sanitizeControlCompatibility(control) {
+  if (!control || typeof control !== 'object') {
+    return {
+      apiVersion: GUARDIAN_CONTROL_API_VERSION,
+      minClientApiVersion: GUARDIAN_CONTROL_API_VERSION,
+      capabilities: [],
+    }
+  }
+  const apiVersion = positiveInteger(control.apiVersion) ?? GUARDIAN_CONTROL_API_VERSION
+  const minClientApiVersion = positiveInteger(control.minClientApiVersion) ?? 1
+  return {
+    apiVersion,
+    minClientApiVersion,
+    capabilities: sanitizeCapabilities(control.capabilities),
+  }
+}
+
+function sanitizeCapabilities(capabilities) {
+  if (!Array.isArray(capabilities)) return []
+  return [...new Set(capabilities.filter(
+    (item) => typeof item === 'string' && /^[a-z][a-z0-9.-]{0,63}$/.test(item),
+  ))].sort()
+}
+
+function sanitizeProvider(provider, owner) {
+  const allowedKinds = new Set(['source', 'bundle', 'docker', 'electron', 'remote', 'unknown'])
+  const fallbackKind = owner?.launchRoot ? 'source' : 'unknown'
+  if (!provider || typeof provider !== 'object') {
+    return {
+      kind: fallbackKind,
+      ...(owner?.launchRoot ? { root: owner.launchRoot } : {}),
+    }
+  }
+  const kind = allowedKinds.has(provider.kind) ? provider.kind : fallbackKind
+  return {
+    kind,
+    ...(safePath(provider.root)
+      ? { root: safePath(provider.root) }
+      : owner?.launchRoot ? { root: owner.launchRoot } : {}),
+    ...(typeof provider.contentIdentity === 'string'
+      && /^[A-Za-z0-9._-]{1,128}$/.test(provider.contentIdentity)
+      ? { contentIdentity: provider.contentIdentity }
+      : {}),
+  }
+}
+
+function sanitizePendingActivation(value) {
+  if (!value || typeof value !== 'object') return null
+  const productVersion = sanitizeVersion(value.productVersion)
+  if (!productVersion) return null
+  return {
+    productVersion,
+    restartRequired: value.restartRequired === true,
+    ...(sanitizeDetail(value.reason) ? { reason: sanitizeDetail(value.reason) } : {}),
+  }
+}
+
+function sanitizeUptime(value, startedAt) {
+  if (Number.isFinite(value)) {
+    return Math.min(MAX_UPTIME_SECONDS, Math.max(0, Math.floor(value)))
+  }
+  const startedAtMs = Date.parse(startedAt ?? '')
+  if (!Number.isFinite(startedAtMs)) return null
+  return Math.min(MAX_UPTIME_SECONDS, Math.max(0, Math.floor((Date.now() - startedAtMs) / 1_000)))
+}
+
+function sanitizeVersion(value) {
+  return typeof value === 'string' && /^[0-9A-Za-z][0-9A-Za-z.+_-]{0,127}$/.test(value)
+    ? value
+    : null
+}
+
+function sanitizeDetail(value) {
+  if (typeof value !== 'string') return null
+  const normalized = value
+    .replaceAll(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [REDACTED]')
+    .replace(
+      /((?:api[-_ ]?key|access[-_ ]?token|refresh[-_ ]?token|token|secret|password|private[-_ ]?key|sealing[-_ ]?key)\s*[:=]\s*)[^\s,;&]+/gi,
+      '$1[REDACTED]',
+    )
+    .trim()
+  return normalized ? normalized.slice(0, 500) : null
+}
+
+function safePath(value) {
+  if (typeof value !== 'string' || value.length < 1 || value.length > 4096) return null
+  return /[\u0000-\u001f\u007f]/.test(value) ? null : value
+}
+
+function positiveInteger(value) {
+  return Number.isInteger(value) && value > 0 ? value : null
 }
 
 function isUnavailableControlError(error) {

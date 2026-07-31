@@ -4,7 +4,7 @@ import { TrendingUp, Hash, FileText, ListChecks, CircleAlert } from 'lucide-reac
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
 import { api } from '../api'
-import { entitiesLive } from '../live/entities'
+import { entitiesLive, refreshEntities } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
 import type { EntityDetail, Backlink } from '../api/entities'
@@ -23,6 +23,8 @@ export function TrackedPage() {
   const { t } = useTranslation()
   const entities = entitiesLive.useStore((s) => s.entities)
   const loading = entitiesLive.useStore((s) => s.loading)
+  const listError = entitiesLive.useStore((s) => s.error)
+  const refreshing = entitiesLive.useStore((s) => s.refreshing)
   const selectedName = useTrackedSelection((s) => s.selectedName)
 
   const [detail, setDetail] = useState<EntityDetail | null>(null)
@@ -67,8 +69,13 @@ export function TrackedPage() {
         description={t('tracked.pageDescription', { count: entities.length })}
       />
       <div className="flex-1 overflow-y-auto min-h-0">
+        {listError && entities.length > 0 && (
+          <StaleCollectionNotice refreshing={refreshing} onRetry={refreshEntities} />
+        )}
         {loading && entities.length === 0 ? (
           <TrackedListSkeleton />
+        ) : listError && entities.length === 0 ? (
+          <CollectionLoadError refreshing={refreshing} onRetry={refreshEntities} />
         ) : entities.length === 0 ? (
           <EmptyState />
         ) : !selectedName ? (
@@ -84,6 +91,65 @@ export function TrackedPage() {
           <Detail detail={detail} />
         )}
       </div>
+    </div>
+  )
+}
+
+function CollectionLoadError({
+  refreshing,
+  onRetry,
+}: {
+  refreshing: boolean
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="alert"
+      className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center"
+    >
+      <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
+      <h2 className="mt-3 text-[15px] font-medium text-foreground">
+        {t('tracked.listLoadErrorTitle')}
+      </h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        {t('tracked.listLoadErrorDescription')}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={refreshing}
+        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+      >
+        {refreshing ? t('common.loading') : t('common.retry')}
+      </button>
+    </div>
+  )
+}
+
+function StaleCollectionNotice({
+  refreshing,
+  onRetry,
+}: {
+  refreshing: boolean
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="status"
+      className="mx-4 mt-4 flex items-center gap-2 rounded-md border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[12px] text-muted-foreground md:mx-8"
+    >
+      <CircleAlert size={14} className="shrink-0 text-warning" aria-hidden />
+      <span className="min-w-0 flex-1">{t('tracked.listStale')}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={refreshing}
+        className="oa-pressable shrink-0 rounded px-2 py-1 font-medium text-foreground hover:bg-warning/10 disabled:cursor-wait disabled:opacity-60"
+      >
+        {refreshing ? t('common.loading') : t('common.retry')}
+      </button>
     </div>
   )
 }
@@ -156,10 +222,12 @@ function Detail({ detail }: { detail: EntityDetail }) {
   const Icon = entity.type === 'asset' ? TrendingUp : Hash
   return (
     <div className="max-w-[820px] mx-auto py-6 px-4 md:px-8">
-      <div className="flex items-center gap-2.5 mb-2">
+      <div className="mb-2 flex items-start gap-2.5 sm:items-center">
         <Icon size={20} strokeWidth={1.75} className="shrink-0 text-muted-foreground" aria-hidden />
-        <h2 className="text-[20px] font-semibold font-mono text-foreground">{entity.name}</h2>
-        <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide">
+        <h2 className="min-w-0 break-words font-mono text-[18px] font-semibold leading-snug text-foreground sm:text-[20px]">
+          {entity.name}
+        </h2>
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
           {entity.type}
         </span>
       </div>
@@ -244,16 +312,25 @@ function BacklinkRow({
       type="button"
       onClick={open}
       title={issueId ? `Open issue ${issueId}` : `Open ${backlink.path}`}
-      className="group flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border bg-muted/30 hover:bg-muted hover:border-primary/40 transition-colors text-left"
+      className="group flex min-h-10 items-start gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-muted sm:items-center sm:py-2"
     >
       <Icon
         size={14}
         strokeWidth={1.75}
-        className="shrink-0 text-muted-foreground/70 group-hover:text-primary transition-colors"
+        className="mt-0.5 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary sm:mt-0"
         aria-hidden
       />
-      <span className="flex-1 min-w-0 truncate font-mono text-[12px] text-foreground">{label}</span>
-      <span className="shrink-0 text-[11px] text-muted-foreground/60">{backlink.workspaceTag}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block break-all font-mono text-[12px] leading-5 text-foreground sm:truncate sm:leading-normal">
+          {label}
+        </span>
+        <span className="mt-0.5 block break-all text-[11px] text-muted-foreground/60 sm:hidden">
+          {backlink.workspaceTag}
+        </span>
+      </span>
+      <span className="hidden max-w-[35%] shrink-0 truncate text-[11px] text-muted-foreground/60 sm:block">
+        {backlink.workspaceTag}
+      </span>
     </button>
   )
 }

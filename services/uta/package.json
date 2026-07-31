@@ -12,12 +12,12 @@
     "test": "echo 'no tests yet'"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.0",
+    "@hono/node-server": "^2.0.12",
     "@traderalice/ibkr": "workspace:*",
     "@traderalice/guardian-runtime": "workspace:*",
     "@traderalice/uta-protocol": "workspace:*",
     "decimal.js": "^10.6.0",
-    "hono": "^4.12.21",
+    "hono": "^4.12.32",
     "zod": "^4.3.6"
   },
   "devDependencies": {

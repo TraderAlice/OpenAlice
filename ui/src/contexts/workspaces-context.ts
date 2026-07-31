@@ -27,7 +27,14 @@ export interface WorkspacesContextValue {
   readonly hasLoaded: boolean
   /** True once the templates fetch has settled (success OR failure). */
   readonly templatesLoaded: boolean
-  refresh(): void
+  readonly templatesError: string | null
+  /** Explicit durable desk pointer that defines AutoQuant readiness. */
+  readonly autoQuantDefaultWorkspaceId: string | null
+  readonly autoQuantPreferenceLoaded: boolean
+  readonly autoQuantPreferenceError: string | null
+  refresh(): Promise<void>
+  refreshTemplates(): Promise<void>
+  refreshAutoQuantPreference(): Promise<void>
   refreshWorkspaceManager(): Promise<void>
   quickStartWorkspaceManager(
     prompt: string,
@@ -42,15 +49,23 @@ export interface WorkspacesContextValue {
   ): Promise<void>
   setDefaultAgent(agent: string | null): Promise<void>
   setIssueDefaultAgent(agent: string | null): Promise<void>
-  quickChat(prompt: string, agent?: string, credentialSlug?: string, targetWsId?: string): Promise<string>
+  initializeAutoQuant(): Promise<Workspace>
+  setAutoQuantDefaultWorkspace(workspaceId: string): Promise<void>
+  quickChat(
+    prompt: string,
+    agent?: string,
+    credentialSlug?: string,
+    targetWsId?: string,
+    template?: 'chat' | 'auto-quant-v2',
+  ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   openWebPiSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
-  openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'ai' | 'template' | 'absorb'): void
+  openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,
-    metadata: { displayName?: string | null; description?: string | null },
+    metadata: { displayName?: string | null; description?: string | null; defaultAgent?: string | null },
   ): Promise<void>
   renameWorkspace(wsId: string, displayName: string): Promise<void>
 }

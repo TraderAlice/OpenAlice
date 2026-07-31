@@ -1,4 +1,13 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
@@ -34,6 +43,47 @@ export interface AgentLaunchSelectorsHandle {
   openAgentMenu(): void
 }
 
+function menuItems(menuRef: RefObject<HTMLDivElement | null>): HTMLButtonElement[] {
+  return Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
+}
+
+function focusMenuEdge(
+  menuRef: RefObject<HTMLDivElement | null>,
+  edge: 'first' | 'last',
+): void {
+  const items = menuItems(menuRef)
+  items[edge === 'first' ? 0 : items.length - 1]?.focus()
+}
+
+function handleMenuKeyDown(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  menuRef: RefObject<HTMLDivElement | null>,
+  close: () => void,
+  triggerRef: RefObject<HTMLButtonElement | null>,
+): void {
+  const items = menuItems(menuRef)
+  if (items.length === 0) return
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    close()
+    triggerRef.current?.focus()
+    return
+  }
+
+  const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
+  let nextIndex: number | null = null
+  if (event.key === 'ArrowDown') nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length
+  if (event.key === 'ArrowUp') nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = items.length - 1
+  if (nextIndex === null) return
+
+  event.preventDefault()
+  items[nextIndex]?.focus()
+}
+
 /** The shared runtime + credential selector used by every chat-style launch
  * surface. Selection behavior and presentation now evolve together. */
 export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, AgentLaunchSelectorsProps>(function AgentLaunchSelectors(
@@ -45,10 +95,17 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
   const [credentialMenuOpen, setCredentialMenuOpen] = useState(false)
   const agentBoxRef = useRef<HTMLDivElement>(null)
   const credentialBoxRef = useRef<HTMLDivElement>(null)
+  const agentTriggerRef = useRef<HTMLButtonElement>(null)
+  const credentialTriggerRef = useRef<HTMLButtonElement>(null)
+  const agentMenuRef = useRef<HTMLDivElement>(null)
+  const credentialMenuRef = useRef<HTMLDivElement>(null)
+  const agentFocusEdgeRef = useRef<'first' | 'last'>('first')
+  const credentialFocusEdgeRef = useRef<'first' | 'last'>('first')
   const SelectedIcon = config.selectedAgent ? AGENT_ICONS[config.selectedAgent.id] : undefined
 
   useImperativeHandle(ref, () => ({
     openAgentMenu() {
+      agentFocusEdgeRef.current = 'first'
       setCredentialMenuOpen(false)
       setAgentMenuOpen(true)
     },
@@ -69,14 +126,42 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
     return () => document.removeEventListener('mousedown', onDown)
   }, [agentMenuOpen, credentialMenuOpen])
 
+  useEffect(() => {
+    if (!agentMenuOpen) return
+    focusMenuEdge(agentMenuRef, agentFocusEdgeRef.current)
+    agentFocusEdgeRef.current = 'first'
+  }, [agentMenuOpen])
+
+  useEffect(() => {
+    if (!credentialMenuOpen) return
+    focusMenuEdge(credentialMenuRef, credentialFocusEdgeRef.current)
+    credentialFocusEdgeRef.current = 'first'
+  }, [credentialMenuOpen])
+
   return (
     <>
-      <div ref={agentBoxRef} className="relative">
+      <div
+        ref={agentBoxRef}
+        className="relative"
+        onBlur={(event) => {
+          const next = event.relatedTarget as Node | null
+          if (!next || !event.currentTarget.contains(next)) setAgentMenuOpen(false)
+        }}
+      >
         <button
+          ref={agentTriggerRef}
           type="button"
           onClick={() => {
+            agentFocusEdgeRef.current = 'first'
             setAgentMenuOpen((open) => !open)
             setCredentialMenuOpen(false)
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+            event.preventDefault()
+            agentFocusEdgeRef.current = event.key === 'ArrowUp' ? 'last' : 'first'
+            setCredentialMenuOpen(false)
+            setAgentMenuOpen(true)
           }}
           disabled={config.agents.length === 0}
           aria-haspopup="menu"
@@ -90,7 +175,14 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         </button>
         {agentMenuOpen && config.agents.length > 0 && (
           <div
+            ref={agentMenuRef}
             role="menu"
+            onKeyDown={(event) => handleMenuKeyDown(
+              event,
+              agentMenuRef,
+              () => setAgentMenuOpen(false),
+              agentTriggerRef,
+            )}
             className="oa-popover-enter absolute bottom-full left-0 z-20 mb-1 min-w-[180px] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg"
           >
             {config.agents.map((agent) => {
@@ -102,9 +194,11 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                   key={agent.id}
                   type="button"
                   role="menuitem"
+                  tabIndex={-1}
                   onClick={() => {
                     config.selectAgent(agent.id)
                     setAgentMenuOpen(false)
+                    agentTriggerRef.current?.focus()
                   }}
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
                 >
@@ -131,12 +225,28 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
       )}
 
       {config.needsCredential && !config.noCredentials && config.credentials && config.credentials.length > 0 && (
-        <div ref={credentialBoxRef} className="relative">
+        <div
+          ref={credentialBoxRef}
+          className="relative"
+          onBlur={(event) => {
+            const next = event.relatedTarget as Node | null
+            if (!next || !event.currentTarget.contains(next)) setCredentialMenuOpen(false)
+          }}
+        >
           <button
+            ref={credentialTriggerRef}
             type="button"
             onClick={() => {
+              credentialFocusEdgeRef.current = 'first'
               setCredentialMenuOpen((open) => !open)
               setAgentMenuOpen(false)
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+              event.preventDefault()
+              credentialFocusEdgeRef.current = event.key === 'ArrowUp' ? 'last' : 'first'
+              setAgentMenuOpen(false)
+              setCredentialMenuOpen(true)
             }}
             aria-haspopup="menu"
             aria-expanded={credentialMenuOpen}
@@ -151,7 +261,14 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
           </button>
           {credentialMenuOpen && (
             <div
+              ref={credentialMenuRef}
               role="menu"
+              onKeyDown={(event) => handleMenuKeyDown(
+                event,
+                credentialMenuRef,
+                () => setCredentialMenuOpen(false),
+                credentialTriggerRef,
+              )}
               className="oa-popover-enter absolute bottom-full left-0 z-20 mb-1 min-w-[200px] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg"
             >
               {config.credentials.map((credential) => {
@@ -161,9 +278,11 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                     key={credential.slug}
                     type="button"
                     role="menuitem"
+                    tabIndex={-1}
                     onClick={() => {
                       config.selectCredential(credential.slug)
                       setCredentialMenuOpen(false)
+                      credentialTriggerRef.current?.focus()
                     }}
                     className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : 'text-foreground'}`}
                   >

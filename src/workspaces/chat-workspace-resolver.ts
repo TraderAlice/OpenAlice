@@ -3,15 +3,17 @@ import type { CreateResult, WorkspaceCreator } from './workspace-creator.js';
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
 
 export const CHAT_WORKSPACE_TEMPLATE = 'chat';
+export const AUTO_QUANT_WORKSPACE_TEMPLATE = 'auto-quant-v2';
 
 type CreateFailure = Extract<CreateResult, { readonly ok: false }>;
 
-export type ChatWorkspaceResolution =
+export type TemplateWorkspaceResolution =
   | { readonly ok: true; readonly workspace: WorkspaceMeta }
   | CreateFailure
   | { readonly ok: false; readonly code: 'create_failed'; readonly message: string };
+export type ChatWorkspaceResolution = TemplateWorkspaceResolution;
 
-interface ChatWorkspaceResolverDeps {
+interface TemplateWorkspaceResolverDeps {
   readonly registry: Pick<WorkspaceRegistry, 'get' | 'list'>;
   readonly sessionRegistry: Pick<SessionRegistry, 'ensureLoaded' | 'listFor'>;
   readonly creator: Pick<WorkspaceCreator, 'create'>;
@@ -24,15 +26,22 @@ interface ChatWorkspaceResolverDeps {
  * The in-process gate prevents two first-use callers from creating parallel
  * starter workspaces. WorkspaceCreator remains the durable tag/registry guard.
  */
-export class ChatWorkspaceResolver {
+export class TemplateWorkspaceResolver {
   private gate: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly deps: ChatWorkspaceResolverDeps) {}
+  constructor(
+    private readonly deps: TemplateWorkspaceResolverDeps,
+    private readonly templateName: string,
+    private readonly starterTagBase: string,
+  ) {}
 
-  resolveOrCreate(preferredWorkspaceId?: string | null): Promise<ChatWorkspaceResolution> {
+  resolveOrCreate(
+    preferredWorkspaceId?: string | null,
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution> {
     const run = this.gate
       .catch(() => undefined)
-      .then(() => this.resolveOrCreateUnlocked(preferredWorkspaceId));
+      .then(() => this.resolveOrCreateUnlocked(preferredWorkspaceId, sourceVersion));
     this.gate = run;
     return run;
   }
@@ -49,12 +58,12 @@ export class ChatWorkspaceResolver {
       : Number.isFinite(created) ? created : 0;
   }
 
-  private async mostRecentlyActiveChat(): Promise<WorkspaceMeta | undefined> {
-    const chats = this.deps.registry
+  private async mostRecentlyActiveWorkspace(): Promise<WorkspaceMeta | undefined> {
+    const workspaces = this.deps.registry
       .list()
-      .filter((workspace) => workspace.template === CHAT_WORKSPACE_TEMPLATE);
-    if (chats.length <= 1) return chats[0];
-    const ranked = await Promise.all(chats.map(async (workspace) => ({
+      .filter((workspace) => workspace.template === this.templateName);
+    if (workspaces.length <= 1) return workspaces[0];
+    const ranked = await Promise.all(workspaces.map(async (workspace) => ({
       workspace,
       activity: await this.workspaceActivityMs(workspace),
     })));
@@ -64,31 +73,38 @@ export class ChatWorkspaceResolver {
 
   private starterTag(): string {
     const tags = new Set(this.deps.registry.list().map((workspace) => workspace.tag));
-    if (!tags.has(CHAT_WORKSPACE_TEMPLATE)) return CHAT_WORKSPACE_TEMPLATE;
+    if (!tags.has(this.starterTagBase)) return this.starterTagBase;
     let suffix = 2;
-    while (tags.has(`${CHAT_WORKSPACE_TEMPLATE}-${suffix}`)) suffix += 1;
-    return `${CHAT_WORKSPACE_TEMPLATE}-${suffix}`;
+    while (tags.has(`${this.starterTagBase}-${suffix}`)) suffix += 1;
+    return `${this.starterTagBase}-${suffix}`;
   }
 
   private async resolveOrCreateUnlocked(
     preferredWorkspaceId?: string | null,
-  ): Promise<ChatWorkspaceResolution> {
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution> {
     const preferred = preferredWorkspaceId
       ? this.deps.registry.get(preferredWorkspaceId)
       : undefined;
-    if (preferred?.template === CHAT_WORKSPACE_TEMPLATE) {
+    if (preferred?.template === this.templateName) {
       return { ok: true, workspace: preferred };
     }
 
-    const existing = await this.mostRecentlyActiveChat();
+    const existing = await this.mostRecentlyActiveWorkspace();
     if (existing) return { ok: true, workspace: existing };
 
     let created: CreateResult;
     try {
-      created = await this.deps.creator.create(this.starterTag(), CHAT_WORKSPACE_TEMPLATE);
+      created = sourceVersion === undefined
+        ? await this.deps.creator.create(this.starterTag(), this.templateName)
+        : await this.deps.creator.create(
+            this.starterTag(),
+            this.templateName,
+            sourceVersion,
+          );
     } catch (error) {
       // A concurrent or external creator may have committed a Chat workspace.
-      const after = await this.mostRecentlyActiveChat();
+      const after = await this.mostRecentlyActiveWorkspace();
       if (after) return { ok: true, workspace: after };
       return {
         ok: false,
@@ -99,9 +115,15 @@ export class ChatWorkspaceResolver {
 
     if (created.ok) return { ok: true, workspace: created.workspace };
     if (created.code === 'tag_in_use') {
-      const after = await this.mostRecentlyActiveChat();
+      const after = await this.mostRecentlyActiveWorkspace();
       if (after) return { ok: true, workspace: after };
     }
     return created;
+  }
+}
+
+export class ChatWorkspaceResolver extends TemplateWorkspaceResolver {
+  constructor(deps: TemplateWorkspaceResolverDeps) {
+    super(deps, CHAT_WORKSPACE_TEMPLATE, CHAT_WORKSPACE_TEMPLATE);
   }
 }

@@ -63,7 +63,11 @@ export function WorkspaceOffboardingDialog({
   }
 
   return (
-    <Dialog onClose={busy ? () => {} : onClose} width="w-[560px]">
+    <Dialog
+      ariaLabel={t('workspace.offboardTitle')}
+      onClose={busy ? () => {} : onClose}
+      width="w-[560px]"
+    >
       <div className="border-b border-border px-5 py-4">
         <h2 className="text-[15px] font-semibold text-foreground">{t('workspace.offboardTitle')}</h2>
         <p className="mt-1 text-[12px] text-muted-foreground">

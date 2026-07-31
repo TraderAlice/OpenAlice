@@ -12,10 +12,15 @@ import { basename, dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { claudeAdapter } from './claude.js';
+import { claudeAdapter, readClaudeSessionTitleFile } from './claude.js';
 import { codexAdapter } from './codex.js';
-import { opencodeAdapter } from './opencode.js';
-import { piAdapter, syncPiProjectTrust, syncPiWindowsShellPath } from './pi.js';
+import { openCodeSessionTitle, opencodeAdapter } from './opencode.js';
+import {
+  piAdapter,
+  readPiSessionTitleFile,
+  syncPiProjectTrust,
+  syncPiWindowsShellPath,
+} from './pi.js';
 import { migrateLegacyPiAgentDir, piWorkspaceProviderId } from './pi-config.js';
 import { prepareAgentRuntimeWorkspace } from '../cli-adapter.js';
 import { credentialToWorkspaceAiCred } from '../credential-injection.js';
@@ -51,6 +56,16 @@ describe('claudeAdapter AI-config', () => {
   it('composeCommand: "last" resume throws (intentionally unsupported)', () => {
     expect(() => claudeAdapter.composeCommand(['claude'], { cwd: dir, env: {}, resume: 'last' }))
       .toThrow(/"last" resume not supported/);
+  });
+
+  it('prefers Claude custom titles over generated titles', async () => {
+    const transcript = join(dir, 'claude-session.jsonl');
+    await writeFile(transcript, [
+      JSON.stringify({ type: 'ai-title', aiTitle: 'Generated title', sessionId: 'native-1' }),
+      JSON.stringify({ type: 'custom-title', customTitle: '  User renamed title  ', sessionId: 'native-1' }),
+      '',
+    ].join('\n'));
+    expect(await readClaudeSessionTitleFile(transcript)).toBe('User renamed title');
   });
 
   it('writes full x-api-key config byte-exact', async () => {
@@ -375,10 +390,30 @@ describe('codexAdapter AI-config', () => {
   it('listOnDisk returns [] when there are no sessions', async () => {
     expect(await codexAdapter.listOnDisk!(dir)).toEqual([]);
   });
+
+  it('reads Codex native titles from its session index', async () => {
+    await codexAdapter.writeAiConfig!(dir, { baseUrl: 'https://oai.test/v1', model: 'gpt-x' });
+    const home = join(dir, '.codex', 'openalice-home');
+    await mkdir(home, { recursive: true });
+    await writeFile(join(home, 'session_index.jsonl'), [
+      JSON.stringify({ id: 'native-1', thread_name: '  Native Codex title  ', updated_at: '2026-07-30' }),
+      '{"partially-written":',
+      '',
+    ].join('\n'));
+    expect(await codexAdapter.readSessionTitle!(dir, 'native-1')).toBe('Native Codex title');
+    expect(await codexAdapter.readSessionTitle!(dir, 'missing')).toBeNull();
+  });
 });
 
 describe('opencodeAdapter AI-config', () => {
   const mcpEnv = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-abc' };
+
+  it('uses the title returned by OpenCode session list', () => {
+    expect(openCodeSessionTitle([
+      { id: 'ses_1', title: '  Native OpenCode title  ' },
+    ], 'ses_1')).toBe('Native OpenCode title');
+    expect(openCodeSessionTitle([], 'ses_1')).toBeNull();
+  });
 
   it('prepares OpenCode to derive its theme from the terminal palette', async () => {
     await mkdir(join(dir, '.git/info'), { recursive: true });
@@ -585,7 +620,7 @@ describe('opencodeAdapter AI-config', () => {
         anthropic: 'https://api.minimax.io/anthropic',
         'openai-chat': 'https://api.minimax.io/v1',
       },
-    }, 'opencode', { model: 'MiniMax-M2.5' })!;
+    }, opencodeAdapter, { model: 'MiniMax-M2.5' })!;
 
     await opencodeAdapter.writeAiConfig!(dir, cred);
     const config = JSON.parse(await read('opencode.json'));
@@ -852,6 +887,17 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
 
 describe('piAdapter AI-config', () => {
   const mcpEnv = { OPENALICE_MCP_URL: 'http://127.0.0.1:47332/mcp', AQ_WS_ID: 'ws-abc' };
+
+  it('uses the latest explicit Pi session name', async () => {
+    const transcript = join(dir, 'pi-session.jsonl');
+    await writeFile(transcript, [
+      JSON.stringify({ type: 'session', id: 'native-1', cwd: dir }),
+      JSON.stringify({ type: 'session_info', name: 'First name' }),
+      JSON.stringify({ type: 'session_info', name: '  Renamed in Pi  ' }),
+      '',
+    ].join('\n'));
+    expect(await readPiSessionTitleFile(transcript)).toBe('Renamed in Pi');
+  });
   let previousPiAgentDir: string | undefined;
 
   beforeEach(() => {

@@ -41,6 +41,7 @@ const demoManagerSession = {
 let demoManagerMessages: unknown[] = []
 let demoQuickChatSequence = 0
 let demoWorkspaceCreateSequence = 0
+let demoAutoQuantDefaultWorkspaceId: string | null = DEMO_AUTO_QUANT_WORKSPACE_ID
 const demoCreatedWorkspaceIds = new Set<string>()
 const DEMO_WORKSPACE_TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
 
@@ -51,6 +52,7 @@ export function resetDemoWorkspaceCreateState(): void {
   }
   demoCreatedWorkspaceIds.clear()
   demoWorkspaceCreateSequence = 0
+  demoAutoQuantDefaultWorkspaceId = DEMO_AUTO_QUANT_WORKSPACE_ID
 }
 
 function webPiKey(wsId: string, sessionId: string): string {
@@ -317,6 +319,40 @@ const demoTemplateUpgradePlan = (workspaceId: string) => ({
 })
 
 export const workspacesHandlers = [
+  http.get('/api/workspaces/auto-quant/default-workspace', () => {
+    const workspace = demoAutoQuantDefaultWorkspaceId
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === demoAutoQuantDefaultWorkspaceId
+          && candidate.template === 'auto-quant-v2')
+      : undefined
+    return HttpResponse.json({
+      defaultWorkspaceId: workspace?.id ?? null,
+      configuredWorkspaceId: demoAutoQuantDefaultWorkspaceId,
+      ready: workspace !== undefined,
+    })
+  }),
+  http.put('/api/workspaces/auto-quant/default-workspace', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as { workspaceId?: unknown } | null
+    const workspace = typeof body?.workspaceId === 'string'
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === body.workspaceId
+          && candidate.template === 'auto-quant-v2')
+      : undefined
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoQuantDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ defaultWorkspaceId: workspace.id, ready: true })
+  }),
+  http.post('/api/workspaces/auto-quant/initialize', () => {
+    const workspace = demoWorkspaces.find((candidate) =>
+      candidate.template === 'auto-quant-v2')
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoQuantDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ workspace })
+  }),
   http.put('/api/workspaces/terminal-view-attributes', () =>
     HttpResponse.json({ ok: true, changed: true })),
   http.get('/api/workspaces', () => HttpResponse.json({ workspaces: demoWorkspaces })),
@@ -359,6 +395,7 @@ export const workspacesHandlers = [
     const body = await request.json().catch(() => ({})) as {
       tag?: unknown
       template?: unknown
+      sourceVersion?: unknown
     }
     if (typeof body.tag !== 'string') {
       return HttpResponse.json({ error: 'tag_required', message: 'Workspace tag is required.' }, { status: 400 })
@@ -393,6 +430,16 @@ export const workspacesHandlers = [
         message: `Unknown Workspace template: ${templateName}`,
       }, { status: 400 })
     }
+    const sourceVersion = typeof body.sourceVersion === 'string'
+      ? body.sourceVersion
+      : template.source?.defaultVersion
+    const source = template.source?.versions.find((candidate) => candidate.version === sourceVersion)
+    if (template.source && !source) {
+      return HttpResponse.json({
+        error: 'unknown_source_version',
+        message: `Unknown source version: ${String(sourceVersion)}`,
+      }, { status: 400 })
+    }
 
     demoWorkspaceCreateSequence += 1
     const workspace: Workspace = {
@@ -401,11 +448,21 @@ export const workspacesHandlers = [
       dir: `/demo/workspaces/${tag}`,
       createdAt: new Date().toISOString(),
       template: template.name,
+      ...(source && template.source
+        ? {
+            harnessSource: {
+              schemaVersion: 1 as const,
+              template: template.name,
+              repository: template.source.repository,
+              version: source.version,
+              commit: source.commit,
+            },
+          }
+        : {}),
       ...(template.version
         ? { spawnedFromVersion: template.version, currentVersion: template.version }
         : {}),
       upgradeAvailable: null,
-      agents: ['claude', 'codex', 'opencode', 'pi'],
       sessions: [],
       agentOverride: { claude: false, codex: false, opencode: false, pi: false },
     }
@@ -611,7 +668,11 @@ export const workspacesHandlers = [
   http.patch('/api/workspaces/:id/metadata', async ({ params, request }) => {
     const workspace = demoWorkspaces.find((w) => w.id === String(params.id))
     if (!workspace) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
-    const mutableWorkspace = workspace as { displayName?: string; description?: string }
+    const mutableWorkspace = workspace as {
+      displayName?: string
+      description?: string
+      defaultAgent?: string
+    }
 
     const body = (await request.json().catch(() => ({}))) as WorkspaceMetadataPatch
     if ('displayName' in body) {
@@ -628,6 +689,13 @@ export const workspacesHandlers = [
         mutableWorkspace.description = body.description.trim()
       }
     }
+    if ('defaultAgent' in body) {
+      if (body.defaultAgent == null || body.defaultAgent.trim() === '') {
+        delete mutableWorkspace.defaultAgent
+      } else {
+        mutableWorkspace.defaultAgent = body.defaultAgent.trim()
+      }
+    }
     return HttpResponse.json({ workspace })
   }),
 
@@ -642,10 +710,10 @@ export const workspacesHandlers = [
       // probe, so present everything as installed (a clean showcase, not a
       // "go install things" prompt).
       agents: [
-        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch' } },
-        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess' } },
-        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess' } },
-        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none' } },
+        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
+        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
+        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'workspace-required', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
+        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', aiProvider: { credentialSource: 'workspace-required', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
       ],
     }),
   ),
@@ -869,20 +937,23 @@ export const workspacesHandlers = [
       prompt?: unknown
       agent?: unknown
       targetWsId?: unknown
+      template?: unknown
     } | null
     const explicit = typeof body?.targetWsId === 'string'
       ? demoWorkspaces.find((workspace) => workspace.id === body.targetWsId)
       : undefined
-    const fallback = demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
+    const fallback = body?.template === 'auto-quant-v2'
+      ? demoWorkspaces.find((workspace) => workspace.template === 'auto-quant-v2')
+      : demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
     const ws = explicit ?? fallback
     if (!ws) return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
 
     const prompt = typeof body?.prompt === 'string' && body.prompt.trim()
       ? body.prompt.trim()
       : 'Show me how this Workspace is doing.'
-    const agent = typeof body?.agent === 'string' && ws.agents.includes(body.agent)
+    const agent = typeof body?.agent === 'string'
       ? body.agent
-      : 'pi'
+      : ws.defaultAgent ?? 'pi'
     const startedAt = Date.now()
     const now = new Date(startedAt).toISOString()
     const sessionId = `demo-quick-chat-${++demoQuickChatSequence}`
@@ -907,7 +978,6 @@ export const workspacesHandlers = [
     }
     const updatedWorkspace = {
       ...ws,
-      agents: ws.agents.includes(agent) ? ws.agents : [...ws.agents, agent],
       sessions: [...ws.sessions, record],
     }
     const workspaceIndex = demoWorkspaces.findIndex((workspace) => workspace.id === ws.id)

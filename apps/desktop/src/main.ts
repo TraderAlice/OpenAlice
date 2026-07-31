@@ -307,7 +307,7 @@ async function runRendererPtySmoke(win: BrowserWindow): Promise<void> {
       const created = await json(await fetch('/api/workspaces', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ tag, template: 'chat', agents: ['shell'] }),
+        body: JSON.stringify({ tag, template: 'chat' }),
       }))
       workspaceId = created.workspace.id
       const spawned = await json(await fetch('/api/workspaces/' + encodeURIComponent(workspaceId) + '/sessions/spawn', {

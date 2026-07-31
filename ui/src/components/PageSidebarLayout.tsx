@@ -1,13 +1,23 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Sidebar } from './Sidebar'
+import { useRegisterMobilePageNavigation } from '../contexts/MobilePageNavigationContext'
 
 const MIN_WIDTH = 200
 const MAX_WIDTH = 420
 const MAIN_PANE_MIN_WIDTH = 500
 const COLLAPSED_WIDTH = 44
 const RESIZE_HANDLE_WIDTH = 10
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+  '[contenteditable="true"]',
+].join(',')
 
 function clampWidth(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
@@ -94,7 +104,11 @@ export function PageSidebarLayout({
 }: PageSidebarLayoutProps) {
   const { t } = useTranslation()
   const isDesktop = useIsDesktop(desktopMinWidth)
+  const isAppDesktop = useIsDesktop(768)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const mobileDrawerRef = useRef<HTMLDialogElement | null>(null)
+  const mobileDrawerId = useId()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => readStoredCollapsed(storageKey))
   const [preferredWidth, setPreferredWidth] = useState(() =>
@@ -106,9 +120,18 @@ export function PageSidebarLayout({
   const maxWidth = responsiveMaxWidth(containerWidth)
   const width = Math.min(preferredWidth, maxWidth)
   const closeMobileDrawer = useCallback(() => setDrawerOpen(false), [])
+  const openMobileDrawer = useCallback(() => setDrawerOpen(true), [])
   const sidebarContent = typeof sidebar === 'function'
     ? sidebar({ closeMobileDrawer })
     : sidebar
+  const usesAppContextBar = useRegisterMobilePageNavigation({
+    title,
+    controlsId: mobileDrawerId,
+    expanded: drawerOpen,
+    triggerRef: mobileTriggerRef,
+    open: openMobileDrawer,
+    close: closeMobileDrawer,
+  }, !isAppDesktop && !isDesktop)
 
   const persistWidth = useCallback((next: number) => {
     window.localStorage.setItem(storageName(storageKey), String(next))
@@ -151,6 +174,75 @@ export function PageSidebarLayout({
   useEffect(() => {
     if (isDesktop) setDrawerOpen(false)
   }, [isDesktop])
+
+  useEffect(() => {
+    if (isDesktop) return
+    const drawer = mobileDrawerRef.current
+    if (!drawer) return
+
+    if (drawerOpen && !drawer.open) {
+      if (typeof drawer.showModal === 'function') {
+        drawer.showModal()
+      } else {
+        drawer.setAttribute('open', '')
+      }
+    } else if (!drawerOpen && drawer.open) {
+      if (typeof drawer.close === 'function') {
+        drawer.close()
+      } else {
+        drawer.removeAttribute('open')
+      }
+    }
+  }, [drawerOpen, isDesktop])
+
+  useEffect(() => {
+    if (isDesktop || !drawerOpen) return
+    const drawer = mobileDrawerRef.current
+    if (!drawer) return
+
+    const focusableElements = () =>
+      Array.from(drawer.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+        .filter((element) => element.getAttribute('aria-hidden') !== 'true')
+
+    const current = drawer.querySelector<HTMLElement>('[aria-current="page"]')
+    const initialFocus = current?.matches(FOCUSABLE_SELECTOR)
+      ? current
+      : focusableElements()[0] ?? drawer
+    initialFocus.focus({ preventScroll: true })
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setDrawerOpen(false)
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusables = focusableElements()
+      if (focusables.length === 0) {
+        event.preventDefault()
+        drawer.focus({ preventScroll: true })
+        return
+      }
+
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (event.shiftKey && (active === first || !drawer.contains(active))) {
+        event.preventDefault()
+        last.focus({ preventScroll: true })
+      } else if (!event.shiftKey && (active === last || !drawer.contains(active))) {
+        event.preventDefault()
+        first.focus({ preventScroll: true })
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      mobileTriggerRef.current?.focus({ preventScroll: true })
+    }
+  }, [drawerOpen, isDesktop])
 
   useEffect(() => {
     if (!isDesktop) return
@@ -258,32 +350,54 @@ export function PageSidebarLayout({
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/70 bg-secondary/40 px-3">
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="oa-icon-action flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          aria-label={t('common.openPanel', { title })}
-          title={title}
-        >
-          <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
-        </button>
-        <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">{title}</span>
+      <div
+        aria-hidden={drawerOpen ? true : undefined}
+        inert={drawerOpen ? true : undefined}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {!usesAppContextBar && (
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-secondary/40 px-3">
+            <button
+              ref={mobileTriggerRef}
+              type="button"
+              onClick={openMobileDrawer}
+              className="oa-icon-action flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label={t('common.openPanel', { title })}
+              aria-expanded={drawerOpen}
+              aria-controls={mobileDrawerId}
+              aria-haspopup="dialog"
+              title={title}
+            >
+              <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
+            </button>
+            <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">{title}</span>
+          </div>
+        )}
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
 
-      <div
-        className={`absolute inset-0 z-30 bg-backdrop transition-opacity duration-200 ${
-          drawerOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={() => setDrawerOpen(false)}
-      />
-      <div
+      <dialog
+        ref={mobileDrawerRef}
+        id={mobileDrawerId}
         data-testid="page-sidebar-drawer"
         data-state={drawerOpen ? 'open' : 'closed'}
-        className={`absolute inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] transition-transform duration-200 ${
-          drawerOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        role="dialog"
+        aria-label={title}
+        aria-modal={drawerOpen ? true : undefined}
+        aria-hidden={!drawerOpen}
+        inert={!drawerOpen ? true : undefined}
+        tabIndex={-1}
+        className="oa-page-sidebar-dialog fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[280px] max-w-[85vw] overflow-hidden border-0 bg-transparent p-0 text-foreground outline-none"
+        onCancel={(event) => {
+          event.preventDefault()
+          setDrawerOpen(false)
+        }}
+        onClose={() => {
+          if (drawerOpen) setDrawerOpen(false)
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setDrawerOpen(false)
+        }}
       >
         <Sidebar
           title={title}
@@ -292,7 +406,7 @@ export function PageSidebarLayout({
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
-              className="text-muted-foreground hover:text-foreground p-1 -ml-1"
+              className="oa-icon-action -ml-2 flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               aria-label={t('common.closePanel', { title })}
             >
               <X size={15} strokeWidth={1.75} aria-hidden />
@@ -301,7 +415,7 @@ export function PageSidebarLayout({
         >
           {sidebarContent}
         </Sidebar>
-      </div>
+      </dialog>
     </div>
   )
 }

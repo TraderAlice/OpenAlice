@@ -49,7 +49,7 @@ function build(
     composeHeadlessCommand: () => [],
     lifecycle: { prepareWorkspace: vi.fn(async () => {}) },
   };
-  const meta = opts.meta ?? { id: 'ws-1', dir: '/w', agents: ['claude'] };
+  const meta = opts.meta ?? { id: 'ws-1', dir: '/w' };
   const adapters = opts.adapters ?? { claude };
   const runHeadlessTask = vi.fn(async () => HEADLESS_RESULT);
   const dispatchHeadlessTask = opts.dispatch ?? vi.fn(async () => ({ taskId: 'task-1', resumeId: 'resume-1' }));
@@ -114,7 +114,10 @@ function build(
   const svc = {
     registry: { get: (id: string) => (id === 'ws-1' ? meta : undefined) },
     resolveRuntimeWorkspace: (id: string) => (id === meta.id ? meta : undefined),
-    adapters: { get: (a: string) => adapters[a] },
+    adapters: {
+      get: (a: string) => adapters[a],
+      list: () => Object.values(adapters),
+    },
     resolveAdapter: (_m: any, a?: string) => opts.resolveTo ?? adapters[a ?? 'claude'] ?? claude,
     detectAgents: () => opts.availability ?? {
       claude: { installed: true, path: '/usr/bin/claude' },
@@ -187,7 +190,7 @@ describe('GET /:id/resumes', () => {
 })
 
 describe('GET /:id/launch-plan', () => {
-  it('returns the safe fresh launch plan for an enabled Workspace runtime', async () => {
+  it('returns the safe fresh launch plan for a registered runtime', async () => {
     const { app } = build()
     const result = await get(app, '/ws-1/launch-plan?agent=claude')
 
@@ -218,7 +221,7 @@ describe('GET /:id/launch-plan', () => {
     })
   })
 
-  it('rejects missing, unknown, and disabled agent runtimes but permits the Shell utility', async () => {
+  it('rejects missing and unknown adapters while permitting any registered adapter', async () => {
     const codex = {
       id: 'codex',
       displayName: 'Codex',
@@ -243,7 +246,10 @@ describe('GET /:id/launch-plan', () => {
 
     expect((await get(app, '/ws-1/launch-plan')).body.error).toBe('agent_required')
     expect((await get(app, '/ws-1/launch-plan?agent=ghost')).body.error).toBe('unknown_agent')
-    expect((await get(app, '/ws-1/launch-plan?agent=codex')).body.error).toBe('agent_not_enabled')
+    expect(await get(app, '/ws-1/launch-plan?agent=codex')).toMatchObject({
+      status: 200,
+      body: { agent: { id: 'codex' } },
+    })
     expect(await get(app, '/ws-1/launch-plan?agent=shell')).toMatchObject({
       status: 200,
       body: {
@@ -489,7 +495,7 @@ describe('PATCH /:id/metadata', () => {
   it('writes workspace-owned display metadata without changing launcher identity', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'workspace-route-meta-'));
     try {
-      const meta = { id: 'ws-1', tag: 'aapl-q1', dir, agents: ['claude'] };
+      const meta = { id: 'ws-1', tag: 'aapl-q1', dir };
       const { app } = build({ meta });
 
       const r = await patch(app, '/ws-1/metadata', { displayName: 'AAPL earnings review' });
@@ -510,13 +516,55 @@ describe('PATCH /:id/metadata', () => {
   it('ignores attempts to smuggle registry fields into workspace metadata', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'workspace-route-meta-'));
     try {
-      const { app } = build({ meta: { id: 'ws-1', tag: 'stable-tag', dir, agents: ['claude'] } });
+      const { app } = build({ meta: { id: 'ws-1', tag: 'stable-tag', dir } });
       const r = await patch(app, '/ws-1/metadata', { displayName: 'Nice label', id: 'different' });
 
       expect(r.status).toBe(200);
       expect(r.body.workspace.id).toBe('ws-1');
       expect(r.body.workspace.tag).toBe('stable-tag');
       expect(r.body.workspace.displayName).toBe('Nice label');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('persists a registered Workspace default agent runtime', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-runtime-'));
+    try {
+      const codex = { id: 'codex', capabilities: { headless: true } };
+      const { app } = build({
+        meta: { id: 'ws-1', tag: 'stable-tag', dir },
+        adapters: { codex },
+      });
+
+      const saved = await patch(app, '/ws-1/metadata', { defaultAgent: 'codex' });
+      expect(saved.status).toBe(200);
+      expect(saved.body.workspace.defaultAgent).toBe('codex');
+      expect(await readWorkspaceMetadata(dir)).toEqual({
+        ok: true,
+        metadata: { defaultAgent: 'codex' },
+      });
+
+      const cleared = await patch(app, '/ws-1/metadata', { defaultAgent: null });
+      expect(cleared.status).toBe(200);
+      expect(cleared.body.workspace.defaultAgent).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects utility and unknown adapters as a Workspace default runtime', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-runtime-'));
+    try {
+      const shell = { id: 'shell', kind: 'utility', capabilities: {} };
+      const { app } = build({
+        meta: { id: 'ws-1', tag: 'stable-tag', dir },
+        adapters: { shell },
+      });
+
+      expect((await patch(app, '/ws-1/metadata', { defaultAgent: 'shell' })).status).toBe(400);
+      expect((await patch(app, '/ws-1/metadata', { defaultAgent: 'future-runtime' })).status).toBe(400);
+      expect(await readWorkspaceMetadata(dir)).toEqual({ ok: false, reason: 'absent' });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -590,27 +638,27 @@ describe('POST /:id/headless', () => {
     expect((await post(app, '/ws-1/headless', { prompt: 'x', agent: 'ghost' })).body.error).toBe('unknown_agent');
   });
 
-  it('400 agent_not_enabled when the agent exists but is not on the workspace', async () => {
+  it('accepts a registered headless agent without a Workspace allowlist', async () => {
     const codex = { id: 'codex', capabilities: { headless: true }, composeHeadlessCommand: () => [] };
     const { app } = build({
-      meta: { id: 'ws-1', dir: '/w', agents: ['claude'] },
+      meta: { id: 'ws-1', dir: '/w' },
       adapters: { claude: { id: 'claude', capabilities: { headless: true } }, codex },
     });
-    expect((await post(app, '/ws-1/headless', { prompt: 'x', agent: 'codex' })).body.error).toBe('agent_not_enabled');
+    expect((await post(app, '/ws-1/headless', { prompt: 'x', agent: 'codex' })).status).toBe(202);
   });
 
   it('400 no_headless when the resolved adapter has no headless mode', async () => {
     const shell = { id: 'shell', capabilities: {} };
-    const { app } = build({ meta: { id: 'ws-1', dir: '/w', agents: ['shell'] }, adapters: { shell }, resolveTo: shell });
+    const { app } = build({ meta: { id: 'ws-1', dir: '/w' }, adapters: { shell }, resolveTo: shell });
     expect((await post(app, '/ws-1/headless', { prompt: 'x', agent: 'shell' })).body.error).toBe('no_headless');
   });
 
-  it('clamps timeoutMs to <= 1_800_000 and defaults to 300_000', async () => {
+  it('enables the watchdog only for an explicit timeoutMs', async () => {
     const { app, dispatchHeadlessTask } = build();
-    await post(app, '/ws-1/headless', { prompt: 'x', timeoutMs: 9e9 });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 1_800_000);
+    await post(app, '/ws-1/headless', { prompt: 'x', timeoutMs: 42_000 });
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 42_000);
     await post(app, '/ws-1/headless', { prompt: 'x' });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 300_000);
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', undefined);
   });
 
   it('continues a headless conversation by product resumeId only', async () => {
@@ -623,7 +671,7 @@ describe('POST /:id/headless', () => {
     expect(response.status).toBe(202);
     expect(response.body).toMatchObject({ taskId: 'task-1', resumeId: 'resume-1' });
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), 'follow up', 300_000, undefined, 'resume-1',
+      expect.anything(), expect.anything(), 'follow up', undefined, undefined, 'resume-1',
     );
   });
 
@@ -723,7 +771,7 @@ describe('POST /:id/headless/:taskId/session', () => {
       });
     }
     const svc = {
-      registry: { get: (id: string) => id === 'ws-1' ? { id, dir: '/w', agents: ['codex'] } : undefined },
+      registry: { get: (id: string) => id === 'ws-1' ? { id, dir: '/w' } : undefined },
       headlessTasks: { get: (id: string) => id === task.taskId ? task : null },
       sessionRegistry,
       resumeRegistry: {
@@ -758,7 +806,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(Array.from(records.values())[0]).toMatchObject({
       sourceRunId: 'run-1',
       resumeId: 'resume-run-1',
-      title: 'Investigate the earnings anomaly',
+      fallbackTitle: 'Investigate the earnings anomaly',
       resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
     });
   });
@@ -840,9 +888,9 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
       sessionRegistry: { get: () => record, update: vi.fn(async () => {}) },
       resumeRegistry: { get: () => ({ agentSessionId: 'aid' }) },
       pool: { get: () => live, spawn, disposeToken: vi.fn() },
-      registry: { get: () => resolverOnly ? undefined : ({ id: workspaceId, dir: '/w', agents: ['claude'] }) },
+      registry: { get: () => resolverOnly ? undefined : ({ id: workspaceId, dir: '/w' }) },
       resolveRuntimeWorkspace: resolverOnly
-        ? () => ({ id: workspaceId, dir: '/w', agents: ['claude'] })
+        ? () => ({ id: workspaceId, dir: '/w' })
         : undefined,
       adapters: { get: () => adapter },
       computeSpawnPlan: () => ({
@@ -925,7 +973,7 @@ describe('WebPi surface routes', () => {
       abort: vi.fn(async () => snapshot),
     };
     const svc = {
-      registry: { get: () => ({ id: 'ws-1', dir: '/w', agents: ['pi'] }) },
+      registry: { get: () => ({ id: 'ws-1', dir: '/w' }) },
       sessionRegistry: {
         get: () => record,
         update: vi.fn(async (_wsId: string, _id: string, patch: any) => Object.assign(record, patch)),
@@ -975,7 +1023,6 @@ describe('Workspace manager surface routes', () => {
       id: 'workspace-manager',
       tag: 'Workspace Manager',
       dir: '/floor/workspaces',
-      agents: ['opencode'],
       createdAt: new Date(0).toISOString(),
     };
     const session = {
@@ -1051,7 +1098,6 @@ describe('Workspace manager surface routes', () => {
       id: 'workspace-manager',
       tag: 'Workspace Manager',
       dir: '/floor/workspaces',
-      agents: ['pi'],
       createdAt: new Date(0).toISOString(),
     };
     let createdRecord: any = null;
@@ -1084,7 +1130,10 @@ describe('Workspace manager surface routes', () => {
         list: () => [{ id: 'ws-1' }, { id: 'ws-2' }],
         get: () => undefined,
       },
-      adapters: { get: (id: string) => id === 'pi' ? adapter : undefined },
+      adapters: {
+        get: (id: string) => id === 'pi' ? adapter : undefined,
+        list: () => [adapter],
+      },
       resolveAdapter: () => adapter,
       getAgentRuntimeReadiness: () => ({
         agents: { pi: { ready: true, source: 'managed-runtime' } },
@@ -1148,12 +1197,11 @@ describe('Workspace manager surface routes', () => {
     expect(prompt).toHaveBeenCalledWith(createdRecord.id, 'Audit the floor.');
   });
 
-  it('starts any enabled agent runtime in its native TUI with the manager contract', async () => {
+  it('starts any registered agent runtime in its native TUI with the manager contract', async () => {
     const meta = {
       id: 'workspace-manager',
       tag: 'Workspace Manager',
       dir: '/floor/workspaces',
-      agents: ['claude', 'codex', 'opencode', 'pi'],
       createdAt: new Date(0).toISOString(),
     };
     const records = new Map<string, any>();
@@ -1169,7 +1217,14 @@ describe('Workspace manager surface routes', () => {
     const svc = {
       managerWorkspace: meta,
       registry: { list: () => [{ id: 'ws-1' }], get: () => undefined },
-      adapters: { get: (id: string) => id === 'codex' ? adapter : undefined },
+      adapters: {
+        get: (id: string) => id === 'codex'
+          ? adapter
+          : id === 'shell'
+            ? { id: 'shell', kind: 'utility', capabilities: {} }
+            : undefined,
+        list: () => [adapter],
+      },
       resolveAdapter: () => adapter,
       getAgentRuntimeReadiness: () => ({
         agents: { codex: { ready: true, source: 'global-login' } },

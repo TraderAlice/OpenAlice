@@ -12,10 +12,12 @@ COPY install /fixture/install
 COPY packages/cli /fixture/packages/cli
 COPY scripts/install-smoke/static-server.mjs /fixture/static-server.mjs
 COPY scripts/install-smoke/fake-npm.sh /fixture/fake-npm.sh
+COPY scripts/install-smoke/fake-pi-tui.mjs /fixture/fake-pi-tui.mjs
 COPY scripts/install-smoke/pi-assets /fixture/pi-assets
 COPY scripts/guardian/control-server.mjs /fixture/OpenAlice/scripts/guardian/control-server.mjs
 COPY scripts/remote-smoke/fixture-guardian.mjs /fixture/OpenAlice/scripts/guardian/prod.mjs
 COPY scripts/remote-smoke/fixture-package.json /fixture/OpenAlice/package.json
+COPY scripts/remote-smoke/build-runtime-fixture.mjs /fixture/scripts/remote-smoke/build-runtime-fixture.mjs
 COPY scripts/remote-smoke/entrypoint.sh /fixture/entrypoint.sh
 
 RUN mkdir -p \
@@ -40,6 +42,7 @@ RUN mkdir -p \
   && git -C /fixture/OpenAlice add --force . \
   && git -C /fixture/OpenAlice commit -m 'remote smoke fixture' \
   && git -C /fixture/OpenAlice tag remote-smoke \
+  && node /fixture/scripts/remote-smoke/build-runtime-fixture.mjs \
   && chmod +x /fixture/entrypoint.sh /fixture/fake-npm.sh \
   && chown -R smoke:smoke /fixture/OpenAlice /home/smoke
 

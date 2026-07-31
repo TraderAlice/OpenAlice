@@ -21,8 +21,22 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
+  Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
+  headless release bundle, atomic update/rollback, and real N-1 plus PTY
+  acceptance through serial increments.
+
 ## Completed
 
+- [[plans/retire-workspace-adapter-pins.md]] — Retires the legacy per-Workspace
+  adapter allowlist so runtime availability comes from the live installation
+  registry and future default-enabled choices can live in global preferences.
+- [[plans/auto-quant-v2-harness.md]] — Adds AutoQuant V2 as a first-class
+  version-pinned Harness, then refines it into an explicitly initialized
+  default desk with Session-first daily UI and pinned `v0.8.31` source.
+- [[plans/cli-lifecycle-quality.md]] — Aligns the computer-level CLI with the
+  OpenAlice product version and adds bounded update discovery, installer-backed
+  updates, and state-preserving CLI uninstall. Delivered in PR #847.
 - [[plans/agent-conversation-log-ui.md]] — Adds a read-only, paginated Agent
   collaboration view to Dev Logs without exposing launcher file paths or
   introducing a new dispatch surface. Delivered in PR #742.
@@ -33,8 +47,9 @@ the durable truth after it changes.
 - [[plans/broker-pack-release-safety.md]] — Repaired the v0.85 existing-user
   Broker Pack upgrade gap, shipped v0.86.0-beta, and made N-1→N reconciliation
   a blocking release contract.
-- [[plans/workspace-launch-configuration.md]] — Made the next Workspace runtime
-  launch plan inspectable from the existing Workspace settings panel.
+- [[plans/workspace-launch-configuration.md]] — Adds a Workspace-local default
+  Session runtime and makes the resolved launch plan inspectable from the
+  existing Workspace settings panel.
 - [[plans/windows-headless-launch.md]] — Safely launches Windows npm Agent
   runtimes for scheduled work and makes pre-process failures observable.
 - [[plans/issue-model-effort-overrides.md]] — Separated login-backed Workspace

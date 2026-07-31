@@ -44,6 +44,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
   mocks.getWebPiSession.mockResolvedValue(snapshot('compacting'))
   mocks.abortWebPiSession.mockResolvedValue(snapshot('idle'))
+  mocks.promptWebPiSession.mockResolvedValue(snapshot('idle'))
 })
 
 afterEach(() => {
@@ -107,6 +108,28 @@ describe('WebPi transcript scrolling', () => {
     expect(mocks.getWebPiSession).toHaveBeenCalledTimes(2)
     expect(scroller.scrollTo).toHaveBeenCalledTimes(scrollCallsBeforeUpdate)
     expect(screen.getByRole('button', { name: 'Jump to latest' })).toBeTruthy()
+  })
+})
+
+describe('WebPi composer keyboard submission', () => {
+  it('does not submit when Enter confirms an IME composition candidate', async () => {
+    mocks.getWebPiSession.mockResolvedValue(snapshot('idle'))
+    render(
+      <WebPiView wsId="workspace-manager" sessionId="p1" onSessionLost={vi.fn()} />,
+    )
+
+    const composer = await screen.findByPlaceholderText('Message Pi…')
+    fireEvent.change(composer, { target: { value: '继续检查' } })
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: true })
+    expect(mocks.promptWebPiSession).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: false })
+    await waitFor(() => expect(mocks.promptWebPiSession).toHaveBeenCalledWith(
+      'workspace-manager',
+      'p1',
+      '继续检查',
+    ))
   })
 })
 

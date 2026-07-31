@@ -1,0 +1,4 @@
+interface:
+  display_name: "AutoQuant Coworker"
+  short_description: "Delegate quantitative research to AutoQuant"
+  default_prompt: "Use $delegate-autoquant to hand this quantitative research assignment to the AutoQuant desk."

@@ -22,7 +22,7 @@ function build(opts: { assignee?: string } = {}) {
   ) => ({ taskId: 'run-new', resumeId: _resumeId ?? 'resume-new' }))
   const list = vi.fn((_filters: unknown) => [] as HeadlessTaskRecord[])
   const svc = {
-    registry: { get: (id: string) => id === 'ws-1' ? { id, tag: 'Research', dir: '/tmp/ws-1', agents: ['pi'] } : undefined },
+    registry: { get: (id: string) => id === 'ws-1' ? { id, tag: 'Research', dir: '/tmp/ws-1' } : undefined },
     resumeRegistry: {
       get: (id: string) => id === 'resume-author' || id === 'resume-owner' || id === 'resume-run'
         ? { resumeId: id, wsId: 'ws-1', agent: 'pi', agentSessionId: `native-${id}` }
@@ -69,7 +69,7 @@ describe('business inquiry routes', () => {
     expect(response.status).toBe(202)
     expect((await json(response)).resolution.mode).toBe('exact')
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), 'Why?', 300_000, undefined, 'resume-author',
+      expect.anything(), expect.anything(), 'Why?', undefined, undefined, 'resume-author',
       expect.objectContaining({
         subject: { kind: 'inbox', entryId: entry.id },
         question: 'Why?',

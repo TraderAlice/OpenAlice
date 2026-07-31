@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
 import { i18n } from '../i18n'
 import type { AgentInfo, Workspace } from '../components/workspace/api'
-import { ChatLandingPage } from './ChatLandingPage'
+import { AutoQuantLandingPage, ChatLandingPage } from './ChatLandingPage'
 
 const mocks = vi.hoisted(() => ({
   useWorkspaces: vi.fn(),
@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   probeAgentRuntimeReadiness: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
   getQuickChat: vi.fn(),
+  quickChat: vi.fn(),
   rememberRecentChatWorkspace: vi.fn(),
   rememberQuickChatCredential: vi.fn(),
 }))
@@ -67,7 +68,18 @@ const piAgent: AgentInfo = {
     resumeLast: true,
     resumeById: true,
     transcriptDiscovery: 'fs-watch',
+    aiProvider: {
+      credentialSource: 'workspace-required',
+      wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+      modelRegistration: { contextWindow: true, reasoning: true },
+    },
   },
+}
+
+const opencodeAgent: AgentInfo = {
+  ...piAgent,
+  id: 'opencode',
+  displayName: 'opencode',
 }
 
 function chatWorkspace(): Workspace {
@@ -77,16 +89,18 @@ function chatWorkspace(): Workspace {
     dir: '/tmp/chat-jul16',
     createdAt: '2026-07-16T00:00:00.000Z',
     template: 'chat',
-    agents: ['pi'],
     sessions: [],
   }
 }
 
-function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
+function context(
+  workspaces: readonly Workspace[],
+  autoQuantDefaultWorkspaceId: string | null = null,
+): WorkspacesContextValue {
   return {
     workspaces,
     templates: [],
-    agents: [piAgent],
+    agents: [piAgent, opencodeAgent],
     defaultAgent: 'pi',
     issueDefaultAgent: null,
     listError: null,
@@ -95,14 +109,22 @@ function context(workspaces: readonly Workspace[]): WorkspacesContextValue {
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    templatesError: null,
+    autoQuantDefaultWorkspaceId,
+    autoQuantPreferenceLoaded: true,
+    autoQuantPreferenceError: null,
     refresh: vi.fn(),
+    refreshTemplates: vi.fn(async () => undefined),
+    refreshAutoQuantPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
     openHeadlessRun: vi.fn(async () => undefined),
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
-    quickChat: vi.fn(async () => 'chat-1'),
+    initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
+    quickChat: mocks.quickChat,
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
     openWebPiSession: vi.fn(async () => undefined),
@@ -181,6 +203,7 @@ beforeEach(async () => {
     lastCredentialByAgent: {},
     recentChatWorkspaceId: 'chat-1',
   })
+  mocks.quickChat.mockResolvedValue('chat-1')
   mocks.rememberRecentChatWorkspace.mockResolvedValue(undefined)
   mocks.rememberQuickChatCredential.mockResolvedValue(undefined)
 })
@@ -200,6 +223,107 @@ describe('ChatLandingPage polling stability', () => {
 
     expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(1)
     expect(mocks.getAgentReadiness).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ChatLandingPage compact-height layout', () => {
+  it('pins overflow to the reachable top edge while centering content when room allows', () => {
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    const scrollArea = screen.getByTestId('harness-landing-scroll')
+    const stack = screen.getByTestId('harness-landing-stack')
+    const controls = screen.getByTestId('harness-landing-controls')
+    const composer = screen.getByPlaceholderText('Ask Alice…')
+
+    expect(scrollArea.className).toContain('justify-start')
+    expect(scrollArea.className).toContain('overflow-x-hidden')
+    expect(scrollArea.className).toContain('overflow-y-auto')
+    expect(stack.className).toContain('my-auto')
+    expect(composer.className).toContain('min-h-[72px]')
+    expect(controls.className).toContain('items-end')
+    expect(controls.className).not.toContain('flex-col')
+    expect(controls.lastElementChild?.className).toContain('shrink-0')
+  })
+
+  it('shares the compact-height contract with the AutoQuant landing', () => {
+    const autoQuantWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'auto-quant-1',
+      tag: 'quant-desk',
+      template: 'auto-quant-v2',
+    }
+    workspaces = [autoQuantWorkspace]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, autoQuantWorkspace.id))
+
+    render(<AutoQuantLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByTestId('harness-landing-scroll').className).toContain('justify-start')
+    expect(screen.getByTestId('harness-landing-stack').className).toContain('my-auto')
+    expect(screen.getByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…').className)
+      .toContain('min-h-[72px]')
+  })
+})
+
+describe('ChatLandingPage Workspace inventory states', () => {
+  it('shows a recovery surface instead of a fake new-Workspace composer after the first list failure', () => {
+    const failed = {
+      ...context([]),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+    }
+    mocks.useWorkspaces.mockReturnValue(failed)
+
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByRole('heading', { name: 'Workspace data is unavailable' })).toBeTruthy()
+    expect(screen.queryByPlaceholderText('Ask Alice…')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(failed.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the composer available with an explicit stale-data notice after a later refresh fails', () => {
+    mocks.useWorkspaces.mockReturnValue({
+      ...context(workspaces),
+      listError: 'list failed: 500',
+    })
+
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByText('Live refresh failed. Showing the last known Workspace data.')).toBeTruthy()
+    expect(screen.getByPlaceholderText('Ask Alice…')).toBeTruthy()
+  })
+})
+
+describe('ChatLandingPage adapter inventory', () => {
+  it('offers installation-level runtimes regardless of Workspace age', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Select agent' }))
+
+    expect(screen.getByRole('menuitem', { name: /Pi/ })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /opencode/ })).toBeTruthy()
+  })
+})
+
+describe('ChatLandingPage keyboard submission', () => {
+  it('does not submit when Enter confirms an IME composition candidate', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    await screen.findByLabelText('Model gemini-3.1-flash-lite')
+    const composer = screen.getByPlaceholderText('Ask Alice…')
+    fireEvent.change(composer, { target: { value: '你好' } })
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: true })
+    expect(mocks.quickChat).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(composer, { key: 'Enter', code: 'Enter', isComposing: false })
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      '你好',
+      'pi',
+      'google-1',
+      'chat-1',
+      'chat',
+    ))
   })
 })
 

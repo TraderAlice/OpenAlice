@@ -75,11 +75,11 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
   const displayName = displayNameForUTA(uta, preset)
 
   return (
-    <Dialog onClose={onClose} width="w-[560px]">
+    <Dialog ariaLabel={`Edit ${displayName}`} onClose={onClose} width="w-full sm:w-[560px]">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="min-w-0">
+      <div className="relative shrink-0 border-b border-border px-4 py-3 sm:flex sm:items-center sm:justify-between sm:px-6 sm:py-4">
+        <div className="flex min-w-0 items-center gap-2 pr-8 sm:gap-3 sm:pr-0">
+          <div className="min-w-0 flex-1">
             <h3 className="text-[14px] font-semibold text-foreground truncate">{displayName}</h3>
             {displayName !== uta.id && (
               <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{uta.id}</div>
@@ -87,7 +87,7 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
           </div>
           <HealthBadge health={health} size="md" />
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className={`${onViewInPortfolio ? 'mt-2' : ''} flex shrink-0 items-center sm:mt-0 sm:gap-3`}>
           {onViewInPortfolio && (
             <button
               onClick={onViewInPortfolio}
@@ -100,7 +100,12 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
               </svg>
             </button>
           )}
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 transition-colors">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={`Close ${displayName} editor`}
+            className="absolute right-4 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:static"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
@@ -109,7 +114,10 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+      <div
+        data-testid="edit-uta-scroll"
+        className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-6 sm:py-6"
+      >
         <Section title="Configuration">
           <div className="mb-3">
             <span className="text-[12px] text-muted-foreground">Type</span>
@@ -189,8 +197,11 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 flex items-center px-6 py-4 border-t border-border">
-        <div className="flex items-center gap-3">
+      <div
+        data-testid="edit-uta-footer"
+        className="flex shrink-0 items-center gap-2 border-t border-border px-4 py-3 sm:gap-3 sm:px-6 sm:py-4"
+      >
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
           {dirty && (
             <button onClick={handleSave} disabled={saving} className="btn-primary">
               {saving ? 'Saving...' : 'Save'}
@@ -211,7 +222,6 @@ export function EditUTADialog({ uta, preset, health, onSave, onDelete, onViewInP
           </label>
           {msg && <span className="text-[12px] text-muted-foreground">{msg}</span>}
         </div>
-        <div className="flex-1" />
         <DeleteButton label="Delete UTA" onConfirm={onDelete} />
       </div>
     </Dialog>
@@ -223,7 +233,7 @@ function DeleteButton({ label, onConfirm }: { label: string; onConfirm: () => vo
 
   if (confirming) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <button onClick={() => { onConfirm(); setConfirming(false) }} className="btn-danger">
           Confirm
         </button>
@@ -235,7 +245,7 @@ function DeleteButton({ label, onConfirm }: { label: string; onConfirm: () => vo
   }
 
   return (
-    <button onClick={() => setConfirming(true)} className="btn-danger">
+    <button onClick={() => setConfirming(true)} className="btn-danger shrink-0">
       {label}
     </button>
   )

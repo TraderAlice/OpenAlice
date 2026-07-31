@@ -8,6 +8,9 @@
  * touching the real ai-provider-manager.json.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { createWorkspaceRoutes } from './workspaces.js';
 import {
@@ -18,7 +21,12 @@ import {
 } from '../../core/config.js';
 import type { WorkspaceService } from '../../workspaces/service.js';
 import type { WorkspaceAiCred } from '../../workspaces/cli-adapter.js';
-import { ChatWorkspaceResolver } from '../../workspaces/chat-workspace-resolver.js';
+import {
+  ChatWorkspaceResolver,
+  TemplateWorkspaceResolver,
+} from '../../workspaces/chat-workspace-resolver.js';
+import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
+import { writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -40,16 +48,17 @@ function build(opts: {
   workspaces?: any[];
   sessionsByWorkspace?: Record<string, any[]>;
   recentChatWorkspaceId?: string | null;
+  autoQuantDefaultWorkspaceId?: string | null;
   claudeConfig?: WorkspaceAiCred | null;
   claudeInteractiveSetupStatus?: 'ready' | 'runtime-onboarding-required' | 'workspace-trust-required' | 'unknown';
   opencodeConfig?: WorkspaceAiCred | null;
   opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
   runtimeWorkspace?: any;
 } = {}) {
+  const builtinAdapters = createBuiltinAdapterRegistry();
   const META = {
     id: 'ws-1',
     dir: '/w',
-    agents: ['claude', 'opencode'],
     template: 'chat',
     tag: 'chat-x',
     createdAt: '2026-07-01T00:00:00.000Z',
@@ -57,16 +66,23 @@ function build(opts: {
   const opencode = {
     id: 'opencode',
     namePrefix: 'o',
+    capabilities: builtinAdapters.get('opencode')!.capabilities,
     writeAiConfig: vi.fn(async () => {}),
     readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
   const claude = {
     id: 'claude',
     namePrefix: 'c',
+    capabilities: builtinAdapters.get('claude')!.capabilities,
     readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
     readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
   };
-  const shell = { id: 'shell', kind: 'utility', namePrefix: 'sh' };
+  const shell = {
+    id: 'shell',
+    kind: 'utility',
+    namePrefix: 'sh',
+    capabilities: builtinAdapters.get('shell')!.capabilities,
+  };
   const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn((_wsId: string, ctx: any) => ({
     recordId: ctx.recordId,
@@ -77,7 +93,12 @@ function build(opts: {
     startedAt: 1,
   }));
   const setTerminalViewAttributes = vi.fn(() => true);
-  const creator = { create: vi.fn(async () => ({ ok: true as const, workspace: META })) };
+  const creator = {
+    create: vi.fn(async (tag: string, template: string) => ({
+      ok: true as const,
+      workspace: { ...META, tag, template },
+    })),
+  };
   const registry = {
     list: () => opts.workspaces ?? [],
     get: (id: string) => (opts.workspaces ?? []).find((w) => w.id === id) ?? (id === META.id ? META : undefined),
@@ -105,6 +126,11 @@ function build(opts: {
     sessionRegistry: sessionRegistry as any,
     creator,
   });
+  const autoQuantWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry: registry as any, sessionRegistry: sessionRegistry as any, creator },
+    'auto-quant-v2',
+    'auto-quant',
+  );
   const svc = {
     // Default []: today's tag never matches → creator.create path. Tests that
     // exercise targetWsId pass the workspace in so registry resolves it by id.
@@ -115,12 +141,17 @@ function build(opts: {
     creator,
     resolveOrCreateChatWorkspace: (preferredWorkspaceId?: string | null) =>
       chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId),
+    resolveOrCreateAutoQuantWorkspace: (preferredWorkspaceId?: string | null, sourceVersion?: string) =>
+      autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion),
     resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
-    adapters: { get: (id: string) => adapters[id] },
+    adapters: {
+      get: (id: string) => adapters[id],
+      list: () => [claude, opencode, shell],
+    },
     sessionRegistry,
     resumeRegistry,
     pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
-    publicMeta: vi.fn(async () => META),
+    publicMeta: vi.fn(async (workspace: any) => workspace),
     config: { launcherRepoRoot: '/repo' },
     getAgentRuntimeReadiness: vi.fn(() => ({
       agents: opts.opencodeRuntimeSource
@@ -146,14 +177,29 @@ function build(opts: {
     lastCredentialByAgent: {},
     recentChatWorkspaceId: workspaceId,
   }));
+  const rememberAutoQuantDefaultWorkspace = vi.fn(async (workspaceId: string | null) => ({
+    defaultWorkspaceId: workspaceId,
+  }));
   const app = createWorkspaceRoutes(svc, {
     readQuickChatPreferences: vi.fn(async () => ({
       lastCredentialByAgent: {},
       recentChatWorkspaceId: opts.recentChatWorkspaceId ?? null,
     })),
     rememberRecentChatWorkspace,
+    readAutoQuantPreferences: vi.fn(async () => ({
+      defaultWorkspaceId: opts.autoQuantDefaultWorkspaceId ?? null,
+    })),
+    rememberAutoQuantDefaultWorkspace,
   });
-  return { app, opencode, spawn, creator, rememberRecentChatWorkspace, setTerminalViewAttributes };
+  return {
+    app,
+    opencode,
+    spawn,
+    creator,
+    rememberRecentChatWorkspace,
+    rememberAutoQuantDefaultWorkspace,
+    setTerminalViewAttributes,
+  };
 }
 
 async function quickChat(app: any, body: unknown) {
@@ -386,7 +432,6 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       runtimeWorkspace: {
         id: 'workspace-manager',
         dir: '/manager',
-        agents: ['opencode'],
         template: 'workspace-manager',
         tag: 'Workspace Manager',
         createdAt: '2026-07-16T00:00:00.000Z',
@@ -428,7 +473,6 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       runtimeWorkspace: {
         id: 'workspace-manager',
         dir: '/manager',
-        agents: ['opencode'],
         template: 'workspace-manager',
         tag: 'Workspace Manager',
         createdAt: '2026-07-16T00:00:00.000Z',
@@ -546,7 +590,6 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const recent = {
       id: 'ws-recent',
       dir: '/recent',
-      agents: ['claude'],
       template: 'chat',
       tag: 'long-running-chat',
       createdAt: '2026-06-01T00:00:00.000Z',
@@ -564,11 +607,11 @@ describe('POST /quick-chat — loginless credential injection', () => {
 
   it('falls back to the most recently active Chat workspace and remembers it', async () => {
     const older = {
-      id: 'ws-older', dir: '/older', agents: ['claude'], template: 'chat', tag: 'older',
+      id: 'ws-older', dir: '/older', template: 'chat', tag: 'older',
       createdAt: '2026-07-09T00:00:00.000Z',
     };
     const active = {
-      id: 'ws-active', dir: '/active', agents: ['claude'], template: 'chat', tag: 'active',
+      id: 'ws-active', dir: '/active', template: 'chat', tag: 'active',
       createdAt: '2026-07-01T00:00:00.000Z',
     };
     const { app, creator, spawn, rememberRecentChatWorkspace } = build({
@@ -596,11 +639,107 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
   });
 
+  it('requires AutoQuant initialization instead of creating a Workspace from the composer', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+    });
+
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('auto_quant_not_initialized');
+    expect(creator.create).not.toHaveBeenCalled();
+    expect(rememberRecentChatWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('initializes the first AutoQuant Workspace and stores it as the default', async () => {
+    const { app, creator, rememberAutoQuantDefaultWorkspace } = build();
+    const response = await app.request('/auto-quant/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'auto-quant', template: 'auto-quant-v2' });
+    expect(creator.create).toHaveBeenCalledWith('auto-quant', 'auto-quant-v2');
+    expect(rememberAutoQuantDefaultWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('requires explicit selection when an AutoQuant Workspace already exists', async () => {
+    const existing = {
+      id: 'aq-existing',
+      dir: '/aq',
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator } = build({ workspaces: [existing] });
+
+    const response = await app.request('/auto-quant/initialize', { method: 'POST' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: 'auto_quant_workspace_selection_required',
+    });
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('uses the explicitly selected AutoQuant default for targetless research', async () => {
+    const existing = {
+      id: 'aq-existing',
+      dir: '/aq',
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, spawn } = build({
+      workspaces: [existing],
+      autoQuantDefaultWorkspaceId: existing.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+    });
+    expect(r.status).toBe(201);
+    expect((spawn.mock.calls[0] as any[])[0]).toBe(existing.id);
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('does not let an explicit target bypass the AutoQuant default pointer', async () => {
+    const defaultWorkspace = {
+      id: 'aq-default',
+      dir: '/aq-default',
+      template: 'auto-quant-v2',
+      tag: 'auto-quant',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const otherWorkspace = {
+      ...defaultWorkspace,
+      id: 'aq-other',
+      dir: '/aq-other',
+      tag: 'auto-quant-2',
+    };
+    const { app, spawn } = build({
+      workspaces: [defaultWorkspace, otherWorkspace],
+      autoQuantDefaultWorkspaceId: defaultWorkspace.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'research momentum',
+      agent: 'claude',
+      template: 'auto-quant-v2',
+      targetWsId: otherWorkspace.id,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('auto_quant_workspace_not_default');
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   // targetWsId — the chat sidebar's per-workspace "+": spawn INTO the given
   // workspace, not today's (so no creator.create).
   it('targetWsId spawns into the given workspace, skipping find-or-create', async () => {
     const { app, spawn, creator } = build({
-      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['claude'], template: 'chat', tag: 'chat-x' }],
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
     });
     const r = await quickChat(app, { prompt: 'hi', agent: 'claude', targetWsId: 'ws-1' });
     expect(r.status).toBe(201);
@@ -609,9 +748,9 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect((spawn.mock.calls[0] as any[])[0]).toBe('ws-1'); // spawned into the target
   });
 
-  it('omitted agent ignores shell at agents[0] and uses the first agent runtime', async () => {
+  it('omitted agent ignores utility adapters and uses the first registered agent runtime', async () => {
     const { app, spawn } = build({
-      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['shell', 'claude'], template: 'chat', tag: 'chat-x' }],
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
     });
     const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
     expect(r.status).toBe(201);
@@ -619,15 +758,32 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('claude');
   });
 
-  it('omitted agent honors a configured default runtime when enabled', async () => {
+  it('omitted agent honors a configured default runtime when registered', async () => {
     vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('opencode');
     vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
     const { app, spawn } = build({
-      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['shell', 'claude', 'opencode'], template: 'chat', tag: 'chat-x' }],
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
     });
     const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
     expect(r.status).toBe(201);
     expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
+  });
+
+  it('omitted agent prefers the target Workspace runtime over the installation default', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-runtime-'));
+    try {
+      await writeWorkspaceMetadata(dir, { defaultAgent: 'opencode' });
+      vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('claude');
+      vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(r.status).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('unknown targetWsId → 404 workspace_not_found, no spawn', async () => {

@@ -214,6 +214,11 @@ body {
   to { opacity: 1; }
 }
 
+@keyframes oa-page-sidebar-enter {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
+}
+
 @keyframes oa-disclosure-enter {
   from {
     opacity: 0;
@@ -246,6 +251,42 @@ body {
 
 .oa-dialog-backdrop {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
+}
+
+.oa-page-sidebar-dialog[open] {
+  animation: oa-page-sidebar-enter var(--motion-standard) var(--motion-ease-out) both;
+}
+
+.oa-page-sidebar-dialog::backdrop {
+  background: var(--backdrop);
+  animation: oa-backdrop-enter var(--motion-standard) ease-out both;
+}
+
+/* Page-owned navigators become touch surfaces inside the phone drawer.
+   A 40px height floor removes the old 18–28px rows; icon controls keep 36px
+   of horizontal room so adjacent workspace names remain distinguishable. */
+.oa-page-sidebar-dialog :is(button, [role="button"]) {
+  min-height: 2.5rem;
+}
+
+.oa-page-sidebar-dialog button:has(svg) {
+  min-width: 2.25rem;
+}
+
+/* Workspace tree controls stay compact for a fine pointer, but touch-capable
+   desktop/tablet layouts must not collapse them back into 20px hit targets. */
+@media (hover: none), (pointer: coarse) {
+  .oa-workspace-row-action {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+  }
+}
+
+.oa-page-sidebar-dialog :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select
+) {
+  min-height: 2.5rem;
 }
 
 .oa-disclosure-enter {
@@ -282,6 +323,29 @@ body {
 }
 .text-micro {
   @apply text-[11px] tracking-wide;
+}
+
+/* Page headers normally keep compact actions inline. Dense operational
+   controls can opt into a content-pane-aware stack so their title and status
+   retain full width after app/local sidebars are accounted for. */
+@container (max-width: 34rem) {
+  .oa-page-header-stack-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .oa-page-header-stack-actions > :first-child {
+    width: 100%;
+  }
+
+  .oa-page-header-actions {
+    width: 100%;
+  }
+
+  .oa-uta-header-divider {
+    display: none;
+  }
 }
 
 /* ==================== Live-data pulse ====================
@@ -535,6 +599,8 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-view-enter,
   .oa-dialog-surface,
   .oa-dialog-backdrop,
+  .oa-page-sidebar-dialog[open],
+  .oa-page-sidebar-dialog::backdrop,
   .oa-disclosure-enter,
   .oa-popover-enter {
     animation: none;
@@ -786,7 +852,7 @@ html[lang="ja"] .oa-onboarding-title {
 }
 .what-editor-content .ProseMirror p.is-editor-empty:first-child::before {
   color: var(--muted-foreground);
-  content: 'Describe what this Issue should accomplish…';
+  content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;

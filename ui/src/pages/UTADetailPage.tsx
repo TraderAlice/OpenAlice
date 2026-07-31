@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import type { ViewSpec } from '../tabs/types'
 import { api } from '../api'
 import { getIntlLocale } from '../lib/intl'
@@ -205,6 +206,7 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
       <PageHeader
         title={displayName}
         live={{ lastUpdated }}
+        stackActionsOnNarrow
         description={
           <>
             <Link to="/trading" className="text-muted-foreground hover:text-foreground">← Trading</Link>
@@ -220,25 +222,32 @@ export function UTADetailPage({ spec }: UTADetailPageProps) {
           // secondary actions share btn-secondary-sm; Place Order is the
           // single filled-accent primary at the same size. No hand-rolled
           // paddings — mixed sizes were what made this row look drunk.
-          <div className="flex items-center gap-2">
-            <Toggle
-              ariaLabel={`${preset?.label ?? uta.id} enabled`}
-              size="sm"
-              checked={!isDisabled}
-              onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
-            />
-            <div className="w-px h-5 bg-border" />
-            <ReconnectButton accountId={uta.id} />
-            <button onClick={() => setEditing(true)} className="btn-secondary-sm">
-              Edit
-            </button>
-            <button
-              onClick={() => setOrderMode({ kind: 'place' })}
-              disabled={isDisabled}
-              className="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-all active:scale-[0.98] cursor-pointer"
-            >
-              + Place Order
-            </button>
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <div className="mr-auto flex items-center gap-2">
+              <Toggle
+                ariaLabel={`${preset?.label ?? uta.id} enabled`}
+                size="sm"
+                checked={!isDisabled}
+                onChange={async (v) => { await tc.saveUTA({ ...uta, enabled: v }) }}
+              />
+              <span className="text-[11px] text-muted-foreground">
+                {isDisabled ? 'Account disabled' : 'Account enabled'}
+              </span>
+            </div>
+            <div className="oa-uta-header-divider h-5 w-px bg-border" />
+            <div className="flex flex-wrap items-center gap-2">
+              <ReconnectButton accountId={uta.id} />
+              <button onClick={() => setEditing(true)} className="btn-secondary-sm">
+                Edit
+              </button>
+              <button
+                onClick={() => setOrderMode({ kind: 'place' })}
+                disabled={isDisabled}
+                className="btn-primary-sm"
+              >
+                + Place Order
+              </button>
+            </div>
           </div>
         }
       />
@@ -611,7 +620,50 @@ export function PositionsSection({ positions, onCloseClick }: {
 
   return (
     <Section title={`Positions (${positions.length})`}>
-      <div className="border border-border rounded-lg overflow-x-auto">
+      <div
+        data-testid="uta-positions-mobile"
+        className="overflow-hidden rounded-lg border border-border md:hidden"
+      >
+        {groups.map((g) => {
+          const sumValue = g.positions.reduce((sum, position) => sum + Number(position.marketValue), 0)
+          const sumPnl = g.positions.reduce((sum, position) => sum + Number(position.unrealizedPnL), 0)
+          const currencies = new Set(g.positions.map(position => position.currency))
+          const groupCcy = currencies.size === 1 ? [...currencies][0] : undefined
+          return (
+            <div key={g.class} className="border-t border-border first:border-t-0">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 bg-muted/40 px-3 py-2 text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-foreground">{assetClassLabel(g.class)}</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="text-muted-foreground">
+                    {g.positions.length} position{g.positions.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 tabular-nums">
+                  <span className="text-foreground">
+                    {groupCcy ? fmt(sumValue, groupCcy) : `$${sumValue.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </span>
+                  <span className={sumPnl >= 0 ? 'text-success' : 'text-destructive'}>
+                    {groupCcy ? fmtPnl(sumPnl, groupCcy) : `${sumPnl >= 0 ? '+' : ''}${sumPnl.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </span>
+                </div>
+              </div>
+              {g.positions.map((position, index) => (
+                <PositionMobileRow
+                  key={`${g.class}-${index}`}
+                  position={position}
+                  onClose={() => onCloseClick(position)}
+                />
+              ))}
+            </div>
+          )
+        })}
+      </div>
+
+      <div
+        data-testid="uta-positions-desktop"
+        className="hidden overflow-x-auto rounded-lg border border-border md:block"
+      >
         <table className="w-full text-[13px]">
           <thead>
             <tr className="bg-secondary text-muted-foreground text-left">
@@ -665,6 +717,82 @@ export function PositionsSection({ positions, onCloseClick }: {
         </table>
       </div>
     </Section>
+  )
+}
+
+function PositionMetric({
+  label,
+  value,
+  valueClassName = 'text-foreground',
+}: {
+  label: string
+  value: string
+  valueClassName?: string
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className={`mt-0.5 truncate text-[12px] tabular-nums ${valueClassName}`} title={value}>{value}</dd>
+    </div>
+  )
+}
+
+function PositionMobileRow({ position: p, onClose }: { position: Position; onClose: () => void }) {
+  const ccy = p.currency ?? 'USD'
+  const cost = Number(p.avgCost) * Number(p.quantity)
+  const pnl = Number(p.unrealizedPnL)
+  const pct = cost > 0 ? (pnl / cost) * 100 : 0
+  const pnlTone = pnl >= 0 ? 'text-success' : 'text-destructive'
+  const name = contractPrimary(p.contract)
+
+  return (
+    <details className="group border-t border-border">
+      <summary
+        aria-label={`${name} ${p.side} position, market value ${fmt(p.marketValue, ccy)}, PnL ${fmtPnl(pnl, ccy)}, ${fmtPctSigned(pct)}. Expand for position details.`}
+        className="list-none px-3 py-3 outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
+      >
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_16px] items-start gap-2">
+          <div className="min-w-0">
+            <ContractCell contract={p.contract} />
+            <span className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${p.side === 'long' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+              {p.side}
+            </span>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-[13px] font-semibold tabular-nums text-foreground">{fmt(p.marketValue, ccy)}</div>
+            <div className={`mt-1 text-[11px] tabular-nums ${pnlTone}`}>
+              {fmtPnl(pnl, ccy)} · {fmtPctSigned(pct)}
+            </div>
+          </div>
+          <ChevronDown
+            size={14}
+            aria-hidden
+            className="mt-1 text-muted-foreground transition-transform group-open:rotate-180"
+          />
+        </div>
+      </summary>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border bg-secondary/35 px-3 py-3">
+        <PositionMetric label="Quantity" value={fmtNum(p.quantity)} />
+        <PositionMetric label="Average cost" value={fmt(p.avgCost, ccy)} />
+        <PositionMetric label="Current price" value={fmt(p.marketPrice, ccy)} />
+        <PositionMetric
+          label="Unrealized PnL"
+          value={fmtPnl(pnl, ccy)}
+          valueClassName={pnlTone}
+        />
+      </dl>
+      <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/20 px-3 py-2">
+        <span className="text-[11px] text-muted-foreground">Position action</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={`Close ${name} position`}
+          className="oa-pressable inline-flex min-h-10 items-center justify-center rounded-md border border-destructive/30 px-3 text-[12px] font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
+        >
+          Close position
+        </button>
+      </div>
+    </details>
   )
 }
 

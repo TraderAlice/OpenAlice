@@ -27,6 +27,8 @@ interface UseCreateWorkspaceOpts {
   template: string
   /** Called with the new workspace after a successful create. */
   onCreated: (workspace: Workspace) => void
+  /** Exact optional upstream source version selected for this template. */
+  sourceVersion?: string
 }
 
 interface UseCreateWorkspaceState {
@@ -45,12 +47,9 @@ interface UseCreateWorkspaceState {
  * agent-checkbox state + submit handler. They've drifted in small ways
  * over time; bundling here keeps them in lockstep.
  *
- * Adapter enablement policy lives in the backend (`WorkspaceCreator.create`):
- * every workspace gets every registered adapter enabled, with template
- * defaults kept only as ordering hints. The user's default runtime is stored
- * separately; `shell` is a utility adapter, not a default workload candidate.
- * This hook sends NO agent set, so the form, quick-chat, and headless all
- * converge on that one source of truth.
+ * Adapter availability is installation-wide. The user's default runtime is
+ * stored separately; `shell` is a utility adapter, not a default workload
+ * candidate.
  */
 export function useCreateWorkspace(opts: UseCreateWorkspaceOpts): UseCreateWorkspaceState {
   const [tag, setTag] = useState('')
@@ -69,7 +68,7 @@ export function useCreateWorkspace(opts: UseCreateWorkspaceOpts): UseCreateWorks
     }
     setCreating(true)
     setError(null)
-    const result = await createWorkspace(t, opts.template)
+    const result = await createWorkspace(t, opts.template, opts.sourceVersion)
     setCreating(false)
     if (result.ok) {
       setTag('')

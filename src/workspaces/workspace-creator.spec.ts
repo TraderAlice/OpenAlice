@@ -14,7 +14,8 @@ import { EventEmitter } from 'node:events';
 import * as childProcess from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { resolveCreateAgents, runScript } from './workspace-creator.js';
+import { orderCreateAdapters, resolveTemplateSource, runScript } from './workspace-creator.js';
+import type { TemplateMeta } from './template-registry.js';
 
 vi.mock('node:child_process', async (importOriginal) => ({
   ...await importOriginal<typeof import('node:child_process')>(),
@@ -49,40 +50,76 @@ function setPlatform(value: NodeJS.Platform): void {
   Object.defineProperty(process, 'platform', { value, configurable: true });
 }
 
-describe('resolveCreateAgents — single home of the agent policy', () => {
+describe('orderCreateAdapters', () => {
   const ALL = ['claude', 'codex', 'opencode', 'pi', 'shell'];
 
-  it('enables EVERY registered adapter when the caller pins nothing', () => {
-    // The quick-chat bug: it called create() with no explicit set, so it used
-    // to get only the template head (claude+codex). Policy now expands here.
-    expect(resolveCreateAgents(undefined, ['claude', 'codex'], ALL)).toEqual(ALL);
-  });
-
-  it('honors template defaultAgents as the agent-runtime order head', () => {
-    // A template that wants codex first still gets all four, codex leading.
-    expect(resolveCreateAgents(undefined, ['codex'], ALL)).toEqual([
+  it('uses template defaults only as a transient preparation order', () => {
+    expect(orderCreateAdapters(['codex'], ALL)).toEqual([
       'codex', 'claude', 'opencode', 'pi', 'shell',
     ]);
   });
 
   it('first-wins dedupes when the head repeats a registered id', () => {
-    expect(resolveCreateAgents(undefined, ['pi', 'claude'], ALL)).toEqual([
+    expect(orderCreateAdapters(['pi', 'claude'], ALL)).toEqual([
       'pi', 'claude', 'codex', 'opencode', 'shell',
     ]);
   });
 
-  it('keeps shell enabled but never ahead of agent runtimes', () => {
-    expect(resolveCreateAgents(undefined, ['shell', 'codex'], ALL)).toEqual([
+  it('keeps utility adapters behind agent runtimes', () => {
+    expect(orderCreateAdapters(['shell', 'codex'], ALL)).toEqual([
       'codex', 'claude', 'opencode', 'pi', 'shell',
     ]);
   });
 
-  it('an explicit non-empty request wins verbatim (subset pinning)', () => {
-    expect(resolveCreateAgents(['claude'], ['claude', 'codex'], ALL)).toEqual(['claude']);
+  it('falls back to registry order when a template has no defaults', () => {
+    expect(orderCreateAdapters([], ALL)).toEqual(ALL);
   });
 
-  it('treats an empty explicit request as "not pinned" → full expansion', () => {
-    expect(resolveCreateAgents([], ['claude', 'codex'], ALL)).toEqual(ALL);
+  it('ignores stale template defaults that are not registered', () => {
+    expect(orderCreateAdapters(['future-agent', 'codex'], ALL)).toEqual([
+      'codex', 'claude', 'opencode', 'pi', 'shell',
+    ]);
+  });
+});
+
+describe('resolveTemplateSource', () => {
+  const template = {
+    name: 'auto-quant-v2',
+    bootstrapScript: '',
+    filesDir: '',
+    templateDir: '',
+    version: '1.0.0',
+    defaultAgents: ['codex'],
+    injectTools: true,
+    injectPersona: false,
+    bundledSkills: [],
+    source: {
+      repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+      defaultVersion: 'v0.8.31',
+      versions: [
+        { version: 'v0.8.31', commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967' },
+        { version: 'v0.8.30', commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f' },
+        { version: 'v0.8.27', commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3' },
+      ],
+    },
+  } satisfies TemplateMeta;
+
+  it('uses the catalog default when the caller omits a version', () => {
+    expect(resolveTemplateSource(template)).toEqual({
+      version: 'v0.8.31',
+      commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
+    });
+  });
+
+  it('keeps an older approved release selectable explicitly', () => {
+    expect(resolveTemplateSource(template, 'v0.8.27')).toEqual({
+      version: 'v0.8.27',
+      commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3',
+    });
+  });
+
+  it('rejects versions outside the explicit source catalog', () => {
+    expect(resolveTemplateSource(template, 'main')).toBeUndefined();
   });
 });
 

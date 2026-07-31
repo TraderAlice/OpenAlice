@@ -334,11 +334,11 @@ PTY pool, then shows:
 - only launcher-controlled environment contributions, grouped by terminal,
   Workspace, toolchain, and adapter ownership.
 
-The Shell utility is always present in this surface even when it is not listed
-as a Workspace agent runtime. Its plan uses the same launcher-built base
-environment and cwd as coding agents, so the injected `alice*` and `traderhub`
-CLI path and local tool transport remain visible. Shell does not receive an AI
-provider credential or another runtime's adapter-specific environment.
+The Shell utility is always present in this surface alongside the registered
+agent runtimes. Its plan uses the same launcher-built base environment and cwd
+as coding agents, so the injected `alice*` and `traderhub` CLI path and local
+tool transport remain visible. Shell does not receive an AI provider credential
+or another runtime's adapter-specific environment.
 
 Reading a launch plan never runs `prepareWorkspace`, writes native runtime
 configuration, or starts a process. The response omits inherited host
@@ -396,13 +396,27 @@ Do not add external-Pi version probing or upgrade UX to preserve flags used by
 the packaged runtime. Compatibility for the packaged app is maintained by
 pinning and upgrading the bundled Pi with the OpenAlice release.
 
-OpenAlice always updates trust in Pi's normal user agent directory (or an
-explicit user-provided `PI_CODING_AGENT_DIR`). Provider overrides do not change
-that directory: OpenAlice adds a namespaced provider to its `models.json` and
-uses the native Workspace `.pi/settings.json` layer to select it. This keeps
-Pi's global settings, packages, auth, resources, trust, and sessions visible.
-An old Workspace `.pi-agent/` tree is migrated into this native layout before
-launch and removed only after its configuration and session data are preserved.
+Source development and user-installed Pi update trust in Pi's normal user
+agent directory (or an explicit user-provided `PI_CODING_AGENT_DIR`). Provider
+overrides do not change that directory: OpenAlice adds a namespaced provider to
+its `models.json` and uses the native Workspace `.pi/settings.json` layer to
+select it. This keeps the user's global settings, packages, auth, resources,
+trust, and sessions visible.
+
+An installer-owned OpenAlice Runtime is a separate managed boundary. A launcher
+carrying `OPENALICE_MANAGED_PI_PATH` causes the selected complete home to set
+`PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR` beneath that instance's
+complete home before Guardian starts. Managed settings, trust, resources, and
+sessions are therefore shared within one OpenAlice instance but isolated from
+another instance and from a Pi launched directly in the user's shell. The
+standalone installer-provided `pi` launcher intentionally does not set those
+overrides. The environment projection lives in the common local-Runtime
+environment builder, so TUI, lifecycle, and transitional `start`/`server`
+launch paths cannot diverge on this boundary.
+
+An old Workspace `.pi-agent/` tree is migrated into the applicable native
+agent-directory layout before launch and removed only after its configuration
+and session data are preserved.
 
 ### Codex interactive permissions
 
@@ -430,6 +444,14 @@ managed PortableGit directory.
 Do not add new Bash bootstraps for built-in templates. `bootstrap.sh` remains
 a compatibility fallback for third-party templates and only works where a
 POSIX shell exists.
+
+A source-backed Harness receives only repository, release, and exact commit
+values approved by its template catalog. AutoQuant V2 verifies that tuple,
+copies the repository, keeps its upstream ancestry and canonical `origin`,
+starts a local research branch at the approved commit, and writes
+`.alice/harness-source.json`. Bootstrap does not install Python or quantitative
+dependencies; the native Coding Agent owns environment setup, later research
+commits, and explicit fetch/merge upgrades inside the Workspace.
 
 OpenAlice copies Workspace skills into two canonical project paths:
 

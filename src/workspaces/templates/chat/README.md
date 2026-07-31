@@ -1,5 +1,5 @@
 ---
-version: 1.6.4
+version: 1.8.2
 ---
 
 # Chat

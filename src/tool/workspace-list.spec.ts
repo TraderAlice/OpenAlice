@@ -14,7 +14,6 @@ function ctx(overrides: Partial<WorkspaceToolContext> = {}): WorkspaceToolContex
       id: 'ws-market',
       tag: 'Market Desk',
       template: 'chat',
-      agents: ['pi'],
       createdAt: '2026-07-15T00:00:00.000Z',
       sessions: {
         total: 3,
@@ -46,7 +45,6 @@ describe('workspace_list', () => {
         id: 'ws-market',
         tag: 'Market Desk',
         template: 'chat',
-        agents: ['pi'],
         createdAt: '2026-07-15T00:00:00.000Z',
         sessions: {
           total: 3,

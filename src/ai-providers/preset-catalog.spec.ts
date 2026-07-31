@@ -5,6 +5,7 @@ import {
   CLAUDE_OAUTH,
   CODEX_API,
   CODEX_OAUTH,
+  DEEPSEEK,
   DEFAULT_MODEL_BY_VENDOR,
   GEMINI,
   LONGCAT,
@@ -66,6 +67,19 @@ describe('credential form catalog', () => {
       'gemini-2.5-flash',
       'gemini-2.5-flash-lite',
     ]);
+  });
+
+  it('offers the stable DeepSeek V4 API ids with registered semantics', () => {
+    expect(DEEPSEEK.models?.map((model) => model.id)).toEqual([
+      'deepseek-v4-pro',
+      'deepseek-v4-flash',
+    ]);
+    expect(DEEPSEEK.models?.find((model) => model.id === 'deepseek-v4-flash')?.semantics)
+      .toMatchObject({
+        contextWindow: 1_000_000,
+        maxOutputTokens: 384_000,
+        reasoning: { efforts: ['low', 'high', 'max'], defaultEffort: 'high' },
+      });
   });
 
   it('serializes provider-aware setup guidance for every API-key preset', () => {

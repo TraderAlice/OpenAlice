@@ -1,9 +1,9 @@
 /**
  * End-to-end check of the create flow, exercising the real moving parts in
  * order: bootstrap.mjs (run on the bundled Node + dugite's bundled git) →
- * launcher context injection → launcher initial commit. Proves the workspace
- * is a fresh-git repo with exactly one clean commit (the "Harness rule"), and
- * — via the PATH-stripped case — that creation needs NO system git or bash.
+ * launcher context injection → launcher commit. Proves Chat starts a clean
+ * local repository, AutoQuant retains its verified upstream ancestry, and —
+ * via the PATH-stripped case — creation needs NO system git or bash.
  */
 
 import { spawn } from 'node:child_process';
@@ -23,7 +23,7 @@ const HERE = fileURLToPath(new URL('.', import.meta.url)); // src/workspaces/
 const CHAT_DIR = join(HERE, 'templates', 'chat');
 const CHAT_FILES = join(CHAT_DIR, 'files');
 const CHAT_BOOTSTRAP = join(CHAT_DIR, 'bootstrap.mjs');
-const AQ_DIR = join(HERE, 'templates', 'auto-quant');
+const AQ_DIR = join(HERE, 'templates', 'auto-quant-v2');
 const AQ_BOOTSTRAP = join(AQ_DIR, 'bootstrap.mjs');
 
 /**
@@ -45,13 +45,13 @@ function runBootstrap(
 
 function autoQuantMeta(): TemplateMeta {
   return {
-    name: 'auto-quant',
+    name: 'auto-quant-v2',
     bootstrapScript: AQ_BOOTSTRAP,
     filesDir: join(AQ_DIR, 'files'),
     templateDir: AQ_DIR,
     version: '1.0.0',
     defaultAgents: ['claude', 'codex'],
-    injectTools: false,
+    injectTools: true,
     injectPersona: false,
     bundledSkills: [],
   };
@@ -79,7 +79,7 @@ function chatMeta(): TemplateMeta {
     defaultAgents: ['claude', 'codex'],
     injectTools: true,
     injectPersona: true,
-    bundledSkills: ['scan-value-chain'],
+    bundledSkills: ['scan-value-chain', 'delegate-autoquant'],
   };
 }
 
@@ -109,6 +109,8 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
       'CLAUDE.md', 'AGENTS.md', 'README.md',
       '.claude/skills/scan-value-chain/SKILL.md',
       '.agents/skills/scan-value-chain/SKILL.md',
+      '.claude/skills/delegate-autoquant/SKILL.md',
+      '.agents/skills/delegate-autoquant/SKILL.md',
       // per-CLI playbooks injected for every tool-bearing template
       '.claude/skills/alice/SKILL.md',
       '.claude/skills/alice-analysis/SKILL.md',
@@ -138,30 +140,53 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
   });
 });
 
-describe('auto-quant workspace create: clone → scrub → commit', () => {
-  it('scrubs cloned history + remote into a fresh-git workspace with one launcher commit', async () => {
+describe('auto-quant workspace create: clone → branch → commit', () => {
+  it('retains verified upstream ancestry and origin under the local research branch', async () => {
     // fake upstream: history + an origin pointing at the public repo
     const src = join(parent, 'fake-auto-quant');
     await run('git', ['init', '-q', '-b', 'main', src]);
     await writeFile(join(src, 'strategy.py'), 'print("hi")\n');
+    await writeFile(join(src, 'AGENTS.md'), '# AutoQuant upstream instructions\n');
     await run('git', ['-C', src, 'add', '.']);
     await run('git', ['-C', src, '-c', 'user.email=u@x', '-c', 'user.name=u', 'commit', '-q', '-m', 'upstream history']);
+    const sourceCommit = (await run('git', ['-C', src, 'rev-parse', 'HEAD'])).trim();
+    await run('git', ['-C', src, 'tag', 'v0.8.27']);
     await run('git', ['-C', src, 'remote', 'add', 'origin', 'https://github.com/TraderAlice/Auto-Quant.git']);
 
     const aqDir = join(parent, 'aq-workspace');
-    await runBootstrap(AQ_BOOTSTRAP, ['aqtag', aqDir], { AQ_TEMPLATE_DIR: src });
-    // auto-quant injects nothing (all flags false); launcher still commits.
+    await runBootstrap(AQ_BOOTSTRAP, ['aqtag', aqDir], {
+      AQ_TEMPLATE_DIR: src,
+      AQ_LAUNCHER_ROOT: parent,
+      OPENALICE_TEMPLATE_SOURCE_REPOSITORY: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+      OPENALICE_TEMPLATE_SOURCE_VERSION: 'v0.8.27',
+      OPENALICE_TEMPLATE_SOURCE_COMMIT: sourceCommit,
+    });
+    // Preserve AutoQuant's own instructions; inject only OpenAlice CLI skills.
     await injectWorkspaceContext({ template: autoQuantMeta(), wsId: 'ws-aq-1', dir: aqDir });
-    await commitInitial(aqDir, 'auto-quant: aqtag');
+    await commitInitial(aqDir, 'auto-quant-v2: aqtag');
 
-    // working tree carries the upstream content + the results scaffold...
+    // working tree carries the exact upstream content and a source receipt.
     expect(existsSync(join(aqDir, 'strategy.py'))).toBe(true);
-    expect(existsSync(join(aqDir, 'results.tsv'))).toBe(true);
-    // ...but history + remote are scrubbed (the Harness rule)
-    expect((await run('git', ['-C', aqDir, 'remote', '-v'])).trim()).toBe('');
-    expect((await run('git', ['-C', aqDir, 'log', '--pretty=%s'])).trim()).toBe('auto-quant: aqtag');
+    expect(await readFile(join(aqDir, 'AGENTS.md'), 'utf8')).toBe('# AutoQuant upstream instructions\n');
+    expect(existsSync(join(aqDir, '.claude/skills/alice/SKILL.md'))).toBe(true);
+    expect(JSON.parse(await readFile(join(aqDir, '.alice/harness-source.json'), 'utf8'))).toEqual({
+      schemaVersion: 1,
+      template: 'auto-quant-v2',
+      repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
+      version: 'v0.8.27',
+      commit: sourceCommit,
+    });
+    // The launcher commit sits directly on the verified upstream commit, and
+    // origin remains the canonical repository for later Agent-managed updates.
+    expect((await run('git', ['-C', aqDir, 'rev-parse', 'HEAD^'])).trim()).toBe(sourceCommit);
+    expect((await run('git', ['-C', aqDir, 'remote', 'get-url', 'origin'])).trim()).toBe(
+      'https://github.com/TraderAlice/Auto-Quant-V2.git',
+    );
+    expect((await run('git', ['-C', aqDir, 'log', '--pretty=%s'])).trim()).toBe(
+      'auto-quant-v2: aqtag\nupstream history',
+    );
     expect((await run('git', ['-C', aqDir, 'status', '--porcelain'])).trim()).toBe('');
-    expect((await run('git', ['-C', aqDir, 'rev-parse', '--abbrev-ref', 'HEAD'])).trim()).toBe('autoresearch/aqtag');
+    expect((await run('git', ['-C', aqDir, 'rev-parse', '--abbrev-ref', 'HEAD'])).trim()).toBe('research/aqtag');
   });
 });
 

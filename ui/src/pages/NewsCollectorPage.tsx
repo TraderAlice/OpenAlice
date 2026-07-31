@@ -5,6 +5,7 @@ import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../compone
 import { Toggle } from '../components/Toggle'
 import { useConfigPage } from '../hooks/useConfigPage'
 import { PageHeader } from '../components/PageHeader'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 // ==================== Config Section ====================
 
@@ -98,6 +99,10 @@ export function FeedsSection({
   const [newUrl, setNewUrl] = useState('')
   const [newSource, setNewSource] = useState('')
   const [newDescription, setNewDescription] = useState('')
+  const [pendingRemoval, setPendingRemoval] = useState<{
+    feed: NewsCollectorFeed
+    index: number
+  } | null>(null)
 
   const activeCount = useMemo(() => feeds.filter((f) => f.enabled !== false).length, [feeds])
   const feedUrlValid = isValidFeedUrl(newUrl)
@@ -164,9 +169,11 @@ export function FeedsSection({
                   </div>
                 </div>
                 <button
-                  onClick={() => removeFeed(i)}
-                  className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
-                  title="Remove feed"
+                  type="button"
+                  onClick={() => setPendingRemoval({ feed, index: i })}
+                  aria-label={`Remove ${feed.name}`}
+                  className="oa-icon-action shrink-0 p-1 text-muted-foreground transition-colors hover:text-destructive"
+                  title={`Remove ${feed.name}`}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -217,6 +224,26 @@ export function FeedsSection({
           Add Feed
         </button>
       </div>
+
+      {pendingRemoval && (
+        <ConfirmDialog
+          title={`Remove ${pendingRemoval.feed.name}?`}
+          message={(
+            <>
+              OpenAlice will stop collecting new articles from{' '}
+              <strong>{pendingRemoval.feed.name}</strong> and remove it from your saved News Sources.
+              Existing articles remain available until the configured retention period expires.
+            </>
+          )}
+          confirmLabel="Remove feed"
+          workingLabel="Removing…"
+          onConfirm={() => {
+            removeFeed(pendingRemoval.index)
+            setPendingRemoval(null)
+          }}
+          onClose={() => setPendingRemoval(null)}
+        />
+      )}
     </ConfigSection>
   )
 }

@@ -6,6 +6,7 @@ install -m 0600 -o smoke -g smoke /tmp/authorized_keys /home/smoke/.ssh/authoriz
 printf '%s\n' \
   'OPENALICE_NPM_BIN=/fixture/fake-npm.sh' \
   'OPENALICE_PI_RELEASE_BASE_URL=http://127.0.0.1:18080/pi-assets' \
+  'OPENALICE_RUNTIME_RELEASE_BASE_URL=http://127.0.0.1:18080/runtime-assets' \
   > /home/smoke/.ssh/environment
 chown smoke:smoke /home/smoke/.ssh/environment
 chmod 0600 /home/smoke/.ssh/environment

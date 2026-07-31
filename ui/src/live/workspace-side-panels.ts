@@ -5,21 +5,21 @@ import { reloadOnHotUpdate } from '../lib/hmr'
 reloadOnHotUpdate('live/workspace-side-panels')
 
 /**
- * User preference for the workspace right-pane Files panel.
+ * View state for the workspace right-pane Files panel.
  *
- * Stored at the user level (not per-workspace) — every workspace has the
- * same Files panel, so a per-workspace toggle would be friction for no
- * payoff. Toggled from the Files button in the workspace header; when off,
- * the right column collapses entirely and the terminal gets full width.
+ * Shared at runtime (not per-workspace) — every workspace has the same Files
+ * panel, so a per-workspace toggle would be friction for no payoff. Toggled
+ * from the Files button in the workspace header; when off, the right column
+ * collapses entirely and the terminal gets full width.
  *
- * Defaults to collapsed: in day-to-day chat-workspace use almost nobody
- * reads the raw files tree, so the terminal getting full width is the
- * better resting state. Users who do want it flip the Files button once
- * and the preference sticks.
+ * Files always starts collapsed when the UI loads. Opening a temporary tool
+ * panel must not turn it into the default layout for later visits, so `files`
+ * is deliberately excluded from persisted state.
  *
- * `autoHideMobile` hides the panel at sub-md viewports regardless. Default
- * true: on a phone, the right column eating 360px is worse than not seeing
- * files at all.
+ * `autoHideMobile` gives sub-md viewports their own transient Files state.
+ * Default true: a desktop preference must not make a 360px panel appear when
+ * a phone first opens a Workspace. Mobile users can still open Files
+ * explicitly; that choice is intentionally reset on reload.
  *
  * (The Git panel was removed — nobody reads workspace git by hand anymore,
  * the agent does. So this is Files-only now.)
@@ -28,12 +28,15 @@ reloadOnHotUpdate('live/workspace-side-panels')
 interface WorkspaceSidePanelsState {
   files: boolean
   autoHideMobile: boolean
+  mobileFilesOpen: boolean
 }
 
 interface WorkspaceSidePanelsActions {
   setFiles: (enabled: boolean) => void
   toggleFiles: () => void
   setAutoHideMobile: (enabled: boolean) => void
+  setMobileFilesOpen: (enabled: boolean) => void
+  toggleMobileFiles: () => void
 }
 
 export const useWorkspaceSidePanels = create<WorkspaceSidePanelsState & WorkspaceSidePanelsActions>()(
@@ -41,13 +44,26 @@ export const useWorkspaceSidePanels = create<WorkspaceSidePanelsState & Workspac
     (set) => ({
       files: false,
       autoHideMobile: true,
+      mobileFilesOpen: false,
       setFiles: (enabled) => set({ files: enabled }),
       toggleFiles: () => set((s) => ({ files: !s.files })),
       setAutoHideMobile: (enabled) => set({ autoHideMobile: enabled }),
+      setMobileFilesOpen: (enabled) => set({ mobileFilesOpen: enabled }),
+      toggleMobileFiles: () => set((s) => ({ mobileFilesOpen: !s.mobileFilesOpen })),
     }),
-    // version bumped 2 → 3 to reset the old `files: true` default for
-    // existing users (no migrate → persisted state is discarded, falling
-    // back to the new collapsed default).
-    { name: 'openalice.workspace.side-panels.v1', version: 3 },
+    {
+      name: 'openalice.workspace.side-panels.v1',
+      // Version 4 retires the persisted desktop Files toggle. The migration
+      // keeps the responsive preference while discarding any legacy
+      // `files: true` value.
+      version: 4,
+      migrate: (persistedState) => {
+        const previous = persistedState as Partial<WorkspaceSidePanelsState> | undefined
+        return {
+          autoHideMobile: previous?.autoHideMobile ?? true,
+        }
+      },
+      partialize: ({ autoHideMobile }) => ({ autoHideMobile }),
+    },
   ),
 )

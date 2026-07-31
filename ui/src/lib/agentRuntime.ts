@@ -1,12 +1,10 @@
 import type { AgentId, AgentInfo, AgentRuntimeReadinessSnapshot } from '../components/workspace/api'
 
-/** Agent runtimes without a first-party login flow need an injected provider. */
-export type LoginlessAgentId = 'opencode' | 'pi'
-
-export const LOGINLESS_AGENT_IDS = new Set<LoginlessAgentId>(['opencode', 'pi'])
-
-export function isLoginlessAgent(agentId: string | null): agentId is LoginlessAgentId {
-  return agentId !== null && LOGINLESS_AGENT_IDS.has(agentId as LoginlessAgentId)
+/** Whether this adapter must receive a concrete Workspace provider binding. */
+export function requiresWorkspaceCredential(
+  agent: Pick<AgentInfo, 'capabilities'> | null,
+): boolean {
+  return agent?.capabilities.aiProvider?.credentialSource === 'workspace-required'
 }
 
 const WORKSPACE_AI_AGENT_IDS = new Set<AgentId>(['claude', 'codex', 'opencode', 'pi'])

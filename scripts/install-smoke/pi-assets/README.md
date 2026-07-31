@@ -1,11 +1,11 @@
 # Managed Pi installer fixture
 
-These are the exact Pi `0.80.6` install manifest and lockfile consumed by the
+These are the exact Pi `0.83.0` install manifest and lockfile consumed by the
 OpenAlice bootstrap. They come from Pi's public MIT-licensed release assets:
 
 - `pi-coding-agent-install-package.json`
 - `pi-coding-agent-install-package-lock.json`
-- release: `https://github.com/earendil-works/pi/releases/tag/v0.80.6`
+- release: `https://github.com/earendil-works/pi/releases/tag/v0.83.0`
 
 The root `install` script pins and verifies these SHA-256 values before npm:
 

@@ -11,6 +11,75 @@ OpenAlice is a working console, not a static report. Motion should make the
 interface feel responsive and help the eye retain context without turning live
 trading surfaces into ambient animation.
 
+## Visual Language: Warm Editorial Workstation
+
+OpenAlice should feel like a calm, paper-like professional desk: warm,
+information-dense, precise, and operational. It is neither a generic admin
+dashboard nor a decorative consumer-finance app.
+
+Build hierarchy with typography, spacing, alignment, and thin separators before
+adding another container. One dominant surface should own a task; supporting
+information should recede without becoming illegible.
+
+- Use warm neutral surfaces and the existing theme tokens. Do not introduce
+  isolated hard-coded palettes.
+- Reserve blue for interaction and selection. Reserve green and red for
+  financial or safety meaning, and amber for warnings. Do not use semantic
+  colors as decoration.
+- Prefer restrained radii, borders, and tonal changes over nested cards,
+  floating glass panels, gradients, neon effects, or large ambient shadows.
+- Use tabular numerals for quantities, prices, percentages, and timestamps.
+  Use monospace selectively for identifiers, symbols, commands, and machine
+  output rather than for ordinary prose.
+- Keep copy direct and operational. Lead with the state or object, then the
+  explanation and next action.
+
+The stable page hierarchy is:
+
+1. global shell and activity rail;
+2. page-owned navigator when the product area needs one;
+3. one focused working view;
+4. dialogs, drawers, and popovers for temporary decisions.
+
+Avoid duplicating these layers inside the focused view. A page navigator should
+not be restyled as a stack of cards, and a detail surface should not create a
+second page shell inside itself.
+
+### Responsive Behavior
+
+Narrow layouts are a change in information hierarchy, not a compressed desktop.
+Keep the primary identity, state, value, and next action visible. Move secondary
+metadata into disclosure rows, detail views, or drawers.
+
+Long, task-oriented dialogs may use the complete phone work area while remaining
+centered cards at wider breakpoints. Keep their identity and primary actions in
+fixed header/footer regions, make the content body the only vertical scroll
+owner, and carry `min-height: 0` through every intervening flex child. Compact
+confirmations should remain dialogs rather than expanding into full-screen
+forms. When a dialog has multiple navigation levels, keep each mobile level to
+one touch-sized row and let secondary choices scroll horizontally instead of
+stacking enough chrome to hide the form.
+
+Do not make a desktop comparison table fit a phone by shrinking its type or
+requiring routine horizontal scrolling. Preserve the dense table at widths
+where comparison is useful and provide a scan-first representation below that
+breakpoint.
+
+Hidden surfaces must also be absent from keyboard and assistive-technology
+navigation. Drawers and collapsed panels should use the shared `aria-hidden`
+and `inert` contract while they are not interactive.
+
+### Interaction States
+
+Every interactive element needs an explicit resting, hover, pressed,
+focus-visible, disabled, and loading state where applicable. Do not hide required
+information behind hover. Loading and failure feedback should stay local to the
+surface that owns the request and provide a retry when the user can recover.
+
+Prefer native controls and disclosure semantics. Menus, popovers, and custom
+selects must support keyboard dismissal, predictable focus movement, and focus
+return to their trigger.
+
 Use motion for four jobs:
 
 1. **Affordance** — buttons and clickable rows visibly respond to hover/press.
@@ -73,6 +142,21 @@ unless their own lifecycle explicitly requires otherwise.
 
 Keyboard focus is not a motion effect. Interactive controls still require a
 clear `focus-visible` treatment, meaningful labels, and sensible tab order.
+
+## UI Change Review
+
+Every UI PR should answer these questions in its description or review:
+
+1. What visual or interaction noise does this remove?
+2. Which information hierarchy becomes clearer?
+3. Is the next action more obvious?
+4. What happens at narrow, medium, and wide widths?
+5. Which existing tokens or shared primitives does it reuse?
+6. Does it introduce a new visual dialect? If so, why is that necessary?
+
+Judge improvements against the real route and realistic data. A polished empty
+fixture does not prove that long names, errors, financial values, and dense
+operational states remain usable.
 
 ## Verification
 

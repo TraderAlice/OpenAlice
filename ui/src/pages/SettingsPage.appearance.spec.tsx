@@ -52,14 +52,30 @@ describe('AppearanceSection palette pair editor', () => {
     expect(screen.queryByText('Show editor tabs')).toBeNull()
   })
 
-  it('shows the active slot and one recommended palette library at a time', () => {
+  it('keeps the palette library collapsed until the user asks to customize it', () => {
     render(<AppearanceSection />)
 
     expect(screen.getByText('Currently using Day · Paper')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Day palette: Paper' }).getAttribute('aria-pressed'))
       .toBe('true')
+    const disclosure = screen.getByRole('button', { name: 'Customize palettes' })
+    const editor = document.getElementById(disclosure.getAttribute('aria-controls') ?? '')
+
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false')
+    expect(editor?.hidden).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Recommended' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Reset pair' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Choose Paper' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Auto' }).className).toContain('min-h-10')
+
+    fireEvent.click(disclosure)
+
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true')
+    expect(editor?.hidden).toBe(false)
     expect(screen.getByRole('button', { name: 'Recommended' }).getAttribute('aria-pressed'))
       .toBe('true')
+    expect(screen.getByRole('button', { name: 'Recommended' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'Reset pair' }).className).toContain('min-h-10')
     expect(screen.getByRole('button', { name: 'Choose Paper' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Choose Linen' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Choose Graphite' })).toBeNull()
@@ -96,6 +112,7 @@ describe('AppearanceSection palette pair editor', () => {
     useThemeStore.setState({ theme: 'night', dayPalette: 'linen', nightPalette: 'midnight' })
     render(<AppearanceSection />)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Customize palettes' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reset pair' }))
 
     expect(useThemeStore.getState().theme).toBe('night')
@@ -110,5 +127,19 @@ describe('AppearanceSection palette pair editor', () => {
     expect(screen.getByText('Currently using Night · Graphite')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Edit Night palette: Graphite' }).getAttribute('aria-pressed'))
       .toBe('true')
+  })
+
+  it('preserves a selected pair when the palette editor is collapsed again', () => {
+    render(<AppearanceSection />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Customize palettes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Linen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide palette editor' }))
+
+    expect(useThemeStore.getState().dayPalette).toBe('linen')
+    expect(screen.getByRole('button', { name: 'Edit Day palette: Linen' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Customize palettes' }).getAttribute('aria-expanded'))
+      .toBe('false')
+    expect(screen.queryByRole('button', { name: 'Choose Linen' })).toBeNull()
   })
 })

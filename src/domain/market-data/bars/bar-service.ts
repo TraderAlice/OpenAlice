@@ -23,7 +23,7 @@ import type {
   BarMeta,
   BarCapability,
 } from './types.js'
-import { formatBarId, parseBarId } from './types.js'
+import { formatBarId, isDerivativeBarId, parseBarId } from './types.js'
 
 /** Hard ceiling on bars returned by any single fetch (explosion guard). */
 const MAX_BARS = 5000
@@ -350,15 +350,18 @@ export function createBarService(deps: BarServiceDeps): BarService {
         }
       }
 
-      // User intent first, freshness second: an exact delayed EURUSD result must
-      // not disappear below dozens of vaguely-related realtime contracts. Auto
-      // source resolution applies its own derivative/freshness policy later.
+      // User intent first, real/spot exposure second, freshness third. A bare
+      // ticker such as AAPL must not open a realtime synthetic
+      // AAPL/USDT:USDT contract ahead of the actual equity merely because the
+      // derivative is fresher. This mirrors bare-symbol auto resolution while
+      // preserving every provider as an explicit selectable result.
       const FRESHNESS_RANK: Record<BarCapability, number> = {
         realtime: 0, iex: 1, subscription: 2, delayed: 3, free: 4,
       }
       out.sort(
         (a, b) =>
           candidateRelevance(query, b) - candidateRelevance(query, a) ||
+          Number(isDerivativeBarId(a.barId)) - Number(isDerivativeBarId(b.barId)) ||
           (a.barCapability ? FRESHNESS_RANK[a.barCapability] : 5) -
           (b.barCapability ? FRESHNESS_RANK[b.barCapability] : 5),
       )

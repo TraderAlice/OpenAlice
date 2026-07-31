@@ -45,7 +45,6 @@ const chatWorkspace: Workspace = {
   dir: '/tmp/chat-jul11',
   createdAt: '2026-07-11T00:00:00.000Z',
   template: 'chat',
-  agents: ['pi'],
   sessions: [],
 }
 
@@ -82,13 +81,21 @@ function workspaceContext(
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    templatesError: null,
+    autoQuantDefaultWorkspaceId: null,
+    autoQuantPreferenceLoaded: true,
+    autoQuantPreferenceError: null,
     refresh: vi.fn(),
+    refreshTemplates: vi.fn(async () => undefined),
+    refreshAutoQuantPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
     openHeadlessRun: vi.fn(async () => undefined),
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
+    initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: vi.fn(async () => 'session-1'),
     pauseSession: actions.pauseSession,
     resumeSession: actions.resumeSession,
@@ -103,10 +110,11 @@ function workspaceContext(
 function renderSection(
   workspaces: readonly Workspace[] = [chatWorkspace],
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
+  onNavigate?: () => void,
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
-      <ChatWorkspaceSection />
+      <ChatWorkspaceSection onNavigate={onNavigate} />
     </WorkspacesContext.Provider>,
   )
 }
@@ -120,13 +128,15 @@ afterEach(cleanup)
 
 describe('ChatWorkspaceSection actions', () => {
   it('keeps conversation creation primary and scopes workspace creation to the workspace list', () => {
-    renderSection()
+    const onNavigate = vi.fn()
+    renderSection([chatWorkspace], null, onNavigate)
 
     const newChat = screen.getByRole('button', { name: 'New chat' })
     const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
     const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
-    const newSession = screen.getByRole('button', { name: 'New conversation in this workspace' })
+    const newSession = screen.getByRole('button', { name: 'New conversation in chat-jul11' })
+    const moreWorkspaceActions = screen.getByRole('button', { name: 'More actions for chat-jul11' })
 
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
@@ -137,32 +147,122 @@ describe('ChatWorkspaceSection actions', () => {
     expect(newWorkspace.querySelector('.lucide-panels-top-left')).toBeTruthy()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
+    fireEvent.click(moreWorkspaceActions)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
+    expect(onNavigate).not.toHaveBeenCalled()
+
     fireEvent.click(newChat)
     expect(openOrFocus).toHaveBeenCalledWith({ kind: 'chat-landing', params: {} })
+    expect(onNavigate).toHaveBeenCalledTimes(1)
 
     fireEvent.click(workspaceButton)
     expect(openOrFocus).toHaveBeenLastCalledWith({
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(2)
 
     fireEvent.click(newSession)
     expect(openOrFocus).toHaveBeenLastCalledWith({
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(3)
   })
 
-  it('keeps an explicit workspace action in the empty state', () => {
+  it('keeps named Workspace identity compact and scopes every row action to it', () => {
+    const namedWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-optical',
+      tag: 'chat-jun30',
+      displayName: 'Optical Networking Follow-up',
+      dir: '/tmp/chat-jun30',
+    }
+
+    renderSection([chatWorkspace, namedWorkspace])
+
+    expect(screen.getAllByText('Optical Networking Follow-up')).toHaveLength(1)
+    expect(screen.getByText('chat-jun30')).toBeTruthy()
+    const collapse = screen.getByRole('button', {
+      name: 'Collapse sessions in Optical Networking Follow-up (chat-jun30)',
+    })
+    const newConversation = screen.getByRole('button', {
+      name: 'New conversation in Optical Networking Follow-up (chat-jun30)',
+    })
+    const more = screen.getByRole('button', {
+      name: 'More actions for Optical Networking Follow-up (chat-jun30)',
+    })
+    fireEvent.click(more)
+    const configure = screen.getByRole('menuitem', {
+      name: 'Configure Optical Networking Follow-up (chat-jun30)',
+    })
+    expect(screen.getByRole('menuitem', {
+      name: 'Offboard Optical Networking Follow-up (chat-jun30)',
+    })).toBeTruthy()
+    expect(collapse.className).toContain('h-7')
+    expect(newConversation.className).toContain('h-7')
+    expect(more.className).toContain('oa-workspace-row-action')
+    expect(more.className).not.toContain('opacity-0')
+    expect(configure.textContent).toContain('Configure')
+
+    expect(screen.queryByRole('button', { name: 'New conversation in this workspace' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Configure this workspace' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Offboard workspace' })).toBeNull()
+  })
+
+  it('keeps one explicit workspace action in the empty state', () => {
     renderSection([])
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(1)
+  })
+
+  it('reports a failed Workspace inventory without pretending the list is empty', () => {
+    const retry = vi.fn(async () => undefined)
+    const failed = {
+      ...workspaceContext([]),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+      refresh: retry,
+    }
+
+    render(
+      <WorkspacesContext.Provider value={failed}>
+        <ChatWorkspaceSection />
+      </WorkspacesContext.Provider>,
+    )
+
+    expect(screen.queryByText(i18n.t('chat.noChatWorkspacesYet'))).toBeNull()
+    expect(screen.getByText(i18n.t('workspace.dataUnavailableSidebar'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the Chat section visible when the template catalog fails', () => {
+    const retryTemplates = vi.fn(async () => undefined)
+    const failed = {
+      ...workspaceContext([chatWorkspace]),
+      templates: [],
+      templatesError: 'templates failed: 500',
+      refreshTemplates: retryTemplates,
+    }
+
+    render(
+      <WorkspacesContext.Provider value={failed}>
+        <ChatWorkspaceSection />
+      </WorkspacesContext.Provider>,
+    )
+
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
+    expect(screen.getByText(i18n.t('workspace.templatesUnavailableSidebar'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
   it('bounds expanded Workspace history and routes the full catalog to the Session library', () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
-    renderSection([{ ...chatWorkspace, sessions }])
+    const onNavigate = vi.fn()
+    renderSection([{ ...chatWorkspace, sessions }], null, onNavigate)
 
     expect(screen.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(6)
     expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
@@ -172,9 +272,11 @@ describe('ChatWorkspaceSection actions', () => {
       kind: 'workspace',
       params: { wsId: chatWorkspace.id, source: 'chat' },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(1)
   })
 
   it('owns Manager Session navigation and lifecycle actions under the Manager entry', () => {
+    const onNavigate = vi.fn()
     const manager: ManagerWorkspaceSnapshot = {
       id: MANAGER_WORKSPACE_ID,
       tag: 'Workspace Manager',
@@ -211,7 +313,7 @@ describe('ChatWorkspaceSection actions', () => {
       ],
     }
 
-    renderSection([], manager)
+    renderSection([], manager, onNavigate)
 
     const managerButton = screen.getByRole('button', { name: 'Workspace Manager' })
     const managerSection = managerButton.parentElement?.parentElement
@@ -229,19 +331,25 @@ describe('ChatWorkspaceSection actions', () => {
       kind: 'workspace-manager',
       params: { sessionId: 'manager-opencode' },
     })
+    expect(onNavigate).toHaveBeenCalledTimes(1)
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Stop Inspect the floor' }))
     expect(actions.pauseSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-opencode')
+    expect(onNavigate).toHaveBeenCalledTimes(1)
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Resume Coordinate owners' }))
     expect(actions.openWebPiSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
+    expect(onNavigate).toHaveBeenCalledTimes(2)
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'Delete Coordinate owners' }))
+    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' }))
+    fireEvent.click(within(pausedRow as HTMLElement).getByRole('menuitem', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
+    expect(onNavigate).toHaveBeenCalledTimes(2)
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Collapse sessions' }))
     expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
+    expect(onNavigate).toHaveBeenCalledTimes(2)
   })
 })

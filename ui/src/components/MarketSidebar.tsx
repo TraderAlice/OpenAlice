@@ -219,10 +219,10 @@ export function MarketSidebar() {
                       e.stopPropagation()
                       removeFromWatchlist(entry.assetClass, entry.symbol)
                     }}
-                    className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/70 hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:text-destructive"
                     aria-label={t('market.removeFromWatchlist', { symbol: entry.symbol })}
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                   </button>

@@ -100,7 +100,7 @@ Restore is “rehire with the old desk”:
 
 1. refuse a missing archive, occupied active path, or active tag collision;
 2. move the checkout back to its immutable original `activeDir`;
-3. re-add the exact `WorkspaceMeta` to the active registry;
+3. re-add the exact durable `WorkspaceMeta` to the active registry;
 4. recall its resume identities without changing their ids or native mappings;
 5. mark the Catalog row active.
 
@@ -126,6 +126,11 @@ that is absent from `workspaces.json` moves to `departed-workspaces/` and gets a
 best-effort departed Catalog row. Nothing is deleted. Session files are used to
 recover known runtime names; unknown metadata stays visibly marked as a legacy
 import.
+
+Migration `0030_retire_workspace_agent_pins` removes the obsolete `agents`
+array from active and lifecycle rows. Restored desks use the live installation
+adapter registry like every other Workspace; the adapter set present when a
+desk was created or departed is not part of its durable identity.
 
 Before moving anything, the migration preflights the complete directory set. If
 both an active orphan path and its departed destination exist, or a registered

@@ -5,9 +5,14 @@ import { App } from './App'
 import { ToastProvider } from './components/Toast'
 import { AuthProvider } from './auth/AuthContext'
 import { AuthGate } from './auth/AuthGate'
+import { initializeBackendConnection } from './auth/backendConnection'
+import { installBackendRequestObserver } from './auth/backendConnectivity'
 import './index.css'
 import './theme' // side-effect: resolve persisted mode + palette pair on <html>
 import './i18n' // side-effect: init react-i18next + seed locale before first render
+
+initializeBackendConnection()
+installBackendRequestObserver()
 
 if (import.meta.env.VITE_DEMO_MODE) {
   await (await import('./demo')).startWorker()

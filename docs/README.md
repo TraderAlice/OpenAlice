@@ -15,6 +15,7 @@ GitHub navigation.
 | [[docs/model-semantics-and-runtime-injection.md]] | [Model semantics and runtime injection](model-semantics-and-runtime-injection.md) | AI credential access, model semantics, Workspace selection, and native Agent projection |
 | [[docs/broker-packs.md]] | [Broker Packs](broker-packs.md) | Optional broker SDK packaging, UI installation, activation, runtime loading, release assets |
 | [[docs/cli-installer.md]] | [CLI installer](cli-installer.md) | Bootstrap consent, installed layout, atomic updates, PATH integration, installer tests, and release checks |
+| [[docs/cli-supervisor.md]] | [Shell CLI Supervisor](cli-supervisor.md) | Top-level Runtime lifecycle, status/JSON presentation, browser opening, completion, compatibility aliases, and TUI boundary |
 | [[docs/local-runtime.md]] | [Local Runtime and CLI bootstrap](local-runtime.md) | Source-backed localhost startup, dependency bootstrap, Runtime ownership, and headless bundle boundary |
 | [[docs/data-locations.md]] | [Data locations](data-locations.md) | Complete-home selection, desktop launcher preferences, concurrent instances, and directory safety |
 | [[docs/docker-deployment.md]] | [Docker deployment](docker-deployment.md) | Server image topology, remote-host safety, persistence, health, and container acceptance |
@@ -46,6 +47,9 @@ Reference notes under `docs/reference/` are non-authoritative research
 material. The [installer script note](reference/install-script/README.md)
 records Claude Code and Codex upstream links and design lessons without
 vendoring third-party code. The
+[Pi and Herdr CLI architecture note](reference/pi-herdr-cli-architecture.md)
+pins the TypeScript TUI, startup, configuration, persistent Runtime, command,
+and running-update comparison behind the Shell CLI plan. The
 [Herdr remote Runtime note](reference/herdr-remote-architecture.md) records a
 pinned public-source architecture comparison behind the authoritative remote
 guide, also without vendoring third-party code.

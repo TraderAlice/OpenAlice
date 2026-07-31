@@ -81,6 +81,7 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - MiniMax Anthropic API: https://platform.minimax.io/docs/api-reference/text-anthropic-api
  * - MiniMax OpenAI `reasoning_split`: https://platform.minimax.io/docs/api-reference/text-openai-api
  * - Kimi thinking models: https://platform.kimi.ai/docs/guide/use-kimi-k2-thinking-model
+ * - DeepSeek models/limits: https://api-docs.deepseek.com/quick_start/pricing
  * - DeepSeek thinking: https://api-docs.deepseek.com/guides/thinking_mode
  * - LongCat Chat API: https://longcat.chat/platform/docs/api/chat.html
  *
@@ -233,6 +234,16 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   deepseek: {
+    'deepseek-v4-flash': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 384_000,
+      reasoning: {
+        mode: 'optional',
+        efforts: ['low', 'high', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    },
     'deepseek-v4-pro': {
       contextWindow: 1_000_000,
       maxOutputTokens: 384_000,

@@ -93,6 +93,27 @@ development/CLI operation that may stop an owner of the same home. Separate
 homes are the normal choice for concurrent worktrees; takeover is recovery,
 not concurrency.
 
+Bare `openalice` exposes those separate homes through `i Instances`. The
+machine-local Supervisor registry lives outside every complete home. It always
+retains the implicit `default`, may register named homes, and remembers the
+selected name for the next bare start. Creating or selecting an entry does not
+move, copy, stop, or delete another home. Named entries require an explicit
+separate Home; equal and nested registered paths are rejected. An inherited
+existing target must be empty or recognizable as an OpenAlice home. An
+accepted target is created/canonicalized during registration; if that
+registered path later disappears, a bare Supervisor launch keeps the entry,
+falls back to an available instance, and directs the user to `i Instances` to
+repair the remembered selection. An explicit environment/flag selection fails
+instead of falling back, so automation cannot accidentally target another
+Home. The missing path is never silently recreated. An inherited Web port
+remains automatic from 47331 so concurrent instances probe upward, while a
+configured port is intentionally pinned.
+
+`OPENALICE_INSTANCE`, `OPENALICE_HOME`, `--instance`, and `--home` remain
+higher-priority one-run/automation inputs. When they fix the selected instance
+or Home, the TUI explains that instance selection is read-only rather than
+persisting a choice that cannot affect the current process.
+
 ## Switching and Failure Safety
 
 Switching never moves, copies, merges, or deletes current data. The desktop

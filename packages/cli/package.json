@@ -1,24 +1,41 @@
 {
   "name": "@traderalice/openalice-cli",
-  "version": "0.2.0",
+  "version": "0.88.0-beta",
   "description": "OpenAlice local runtime and remote connection CLI",
   "type": "module",
   "bin": {
-    "openalice": "./bin/openalice.mjs"
+    "openalice": "./bin/openalice.ts"
   },
   "files": [
+    "bin/openalice.ts",
     "bin/openalice.mjs",
+    "src/launch-context.ts",
+    "src/main.ts",
+    "src/managed-source.ts",
+    "src/pi-tui-loader.ts",
+    "src/supervisor-config.ts",
+    "src/supervisor-tui.ts",
+    "src/doctor.mjs",
+    "src/install-layout.mjs",
     "src/install-source.mjs",
+    "src/lifecycle-command.mjs",
+    "src/lifecycle.mjs",
     "src/local-start.mjs",
+    "src/logs.mjs",
+    "src/observability-command.mjs",
     "src/remote.mjs",
     "src/runtime-deps.mjs",
+    "src/runtime-bundle.mjs",
     "src/runtime-client.mjs",
     "src/server.mjs",
     "src/server-control.mjs",
-    "src/ssh-connect.mjs"
+    "src/ssh-connect.mjs",
+    "src/uninstall.mjs",
+    "src/update.mjs"
   ],
   "scripts": {
-    "build": "node --check bin/openalice.mjs && node --check src/install-source.mjs && node --check src/local-start.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs",
+    "build": "tsc -p tsconfig.json --noEmit && node --check bin/openalice.ts && node --check bin/openalice.mjs && node --check src/managed-source.ts && node --check src/supervisor-config.ts && node --check src/doctor.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/logs.mjs && node --check src/observability-command.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-bundle.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --root ../.. --config vitest.config.ts --project node packages/cli/src"
   },
   "engines": {
@@ -32,5 +49,8 @@
     "type": "git",
     "url": "git+https://github.com/TraderAlice/OpenAlice.git",
     "directory": "packages/cli"
+  },
+  "dependencies": {
+    "@earendil-works/pi-tui": "0.83.0"
   }
 }

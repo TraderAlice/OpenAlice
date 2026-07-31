@@ -1,5 +1,5 @@
 import { ChevronDown, Info, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
@@ -17,6 +17,7 @@ import { NAV_SECTIONS } from './activity-navigation'
 function activitySectionFor(page: Page): ActivitySection {
   switch (page) {
     case 'chat':                 return 'chat'
+    case 'auto-quant':           return 'auto-quant'
     case 'inbox':                return 'inbox'
     case 'tracked':              return 'tracked'
     case 'workspaces':           return 'workspaces'
@@ -41,6 +42,8 @@ interface ActivityBarProps {
   railMode?: 'compact' | 'narrow' | 'full'
   /** Force the static rail into icon-only mode at narrow desktop widths. */
   compactRailForced?: boolean
+  /** Mobile drawer trigger that receives focus again when the drawer closes. */
+  returnFocusRef?: RefObject<HTMLElement | null>
 }
 
 function useMediaQuery(query: string): boolean {
@@ -79,6 +82,7 @@ export function ActivityBar({
   desktopStatic = true,
   railMode = 'full',
   compactRailForced = false,
+  returnFocusRef,
 }: ActivityBarProps) {
   const { t } = useTranslation()
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
@@ -98,12 +102,67 @@ export function ActivityBar({
   const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
+  const mobileDrawerClosed = !desktopStatic && !open
+  const drawerRef = useRef<HTMLElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    if (!open || desktopStatic) return
+    const drawer = drawerRef.current
+    if (!drawer) return
+
+    const previousFocus = returnFocusRef?.current
+      ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
+    const initialFocus = drawer.querySelector<HTMLElement>('[aria-current="page"]')
+      ?? drawerFocusableElements(drawer)[0]
+      ?? drawer
+    initialFocus.focus()
+
+    const handleDrawerKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusable = drawerFocusableElements(drawer)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        drawer.focus()
+        return
+      }
+
+      const first = focusable[0]!
+      const last = focusable[focusable.length - 1]!
+      const active = document.activeElement
+      if (!drawer.contains(active)) {
+        event.preventDefault()
+        first.focus()
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleDrawerKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleDrawerKeyDown)
+      if (previousFocus?.isConnected) previousFocus.focus()
+    }
+  }, [desktopStatic, open, returnFocusRef])
 
   return (
     <>
       {/* Backdrop — mobile only */}
       <div
-        className={`fixed inset-0 bg-backdrop z-40 md:hidden transition-opacity duration-200 ${
+        aria-hidden
+        className={`fixed inset-0 bg-backdrop z-40 md:hidden transition-opacity duration-200 motion-reduce:transition-none ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -112,11 +171,20 @@ export function ActivityBar({
       {/* ActivityBar — Linear-style workspace rail. Mobile: slide-in over
        *  page with backdrop. Desktop: static column flush left. */}
       <aside
+        ref={drawerRef}
+        id="activity-bar"
+        data-testid="activity-bar"
+        role={!desktopStatic ? 'dialog' : undefined}
+        aria-modal={!desktopStatic && open ? 'true' : undefined}
+        aria-label={!desktopStatic ? t('nav.primaryNavigation') : undefined}
+        aria-hidden={mobileDrawerClosed}
+        inert={mobileDrawerClosed ? true : undefined}
+        tabIndex={!desktopStatic ? -1 : undefined}
         className={`
           w-[280px] ${compactRail ? 'md:w-[60px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
           bg-muted
           border-r border-border/80
-          fixed z-50 top-0 left-0 transition-[transform,width] duration-200
+          fixed z-50 top-0 left-0 transition-[transform,width] duration-200 motion-reduce:transition-none
           ${open ? 'translate-x-0' : '-translate-x-full'}
           md:static md:translate-x-0 md:z-auto
         `}
@@ -190,6 +258,7 @@ export function ActivityBar({
                           type="button"
                           onClick={handleClick}
                           title={t(item.labelKey)}
+                          aria-current={isActive ? 'page' : undefined}
                           className={`oa-nav-item relative flex items-center rounded-md text-left ${
                             compactRail
                               ? denseRail
@@ -197,7 +266,7 @@ export function ActivityBar({
                                 : 'md:h-9 md:w-11 md:min-h-9 md:justify-center md:gap-0 md:px-0 md:py-0'
                               : denseRail
                                 ? `min-h-[28px] ${narrowRail ? 'gap-2 px-2' : 'gap-2.5 px-2.5'} py-1 text-[12px]`
-                                : `min-h-[34px] ${narrowRail ? 'gap-2 px-2.5' : 'gap-3 px-3'} py-1.5 text-[13px]`
+                                : `min-h-10 md:min-h-[34px] ${narrowRail ? 'gap-2 px-2.5' : 'gap-3 px-3'} py-1.5 text-[13px]`
                           } ${
                             isActive
                               ? 'bg-primary-muted text-foreground'
@@ -254,6 +323,8 @@ export function ActivityBar({
               onClick={() => setRailCollapsed(!railCollapsed)}
               title={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
               aria-label={t(railCollapsed ? 'nav.expandRail' : 'nav.collapseRail')}
+              aria-hidden={!desktopStatic ? true : undefined}
+              tabIndex={!desktopStatic ? -1 : undefined}
               className={`oa-icon-action hidden ${denseRail ? 'h-9 w-9 md:h-[26px] md:w-[26px]' : 'h-9 w-9'} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:flex`}
             >
               {railCollapsed
@@ -265,6 +336,23 @@ export function ActivityBar({
       </aside>
     </>
   )
+}
+
+const DRAWER_FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+function drawerFocusableElements(drawer: HTMLElement): HTMLElement[] {
+  return [...drawer.querySelectorAll<HTMLElement>(DRAWER_FOCUSABLE_SELECTOR)]
+    .filter((element) => (
+      element.tabIndex >= 0 &&
+      element.closest('[hidden], [aria-hidden="true"], [inert]') === null
+    ))
 }
 
 // ==================== SectionHeader ====================
@@ -306,7 +394,7 @@ function SectionHeader({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex min-h-7 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-10 flex-1 items-center gap-1.5 py-1 text-left text-[12px] font-semibold text-muted-foreground transition-colors hover:text-foreground md:min-h-7"
           aria-expanded={!isCollapsed}
           aria-controls={controlsId}
           title={label}
@@ -325,7 +413,7 @@ function SectionHeader({
           <button
             type="button"
             onClick={() => setHintOpen((o) => !o)}
-            className={`flex min-h-7 min-w-7 items-center justify-center p-0.5 transition-colors ${
+            className={`flex min-h-10 min-w-10 items-center justify-center p-0.5 transition-colors md:min-h-7 md:min-w-7 ${
               hintOpen ? 'text-muted-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground'
             }`}
             aria-label={t('nav.about', { label })}

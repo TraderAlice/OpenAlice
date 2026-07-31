@@ -363,6 +363,8 @@ function isConversationTarget(value: unknown): value is WorkspaceConversationTar
       return typeof value.resumeId === 'string'
     case 'workspace':
       return typeof value.workspaceId === 'string'
+    case 'harness':
+      return value.harness === 'chat' || value.harness === 'autoquant'
     case 'inbox':
       return typeof value.inboxEntryId === 'string'
         && (value.workspaceId === undefined || typeof value.workspaceId === 'string')

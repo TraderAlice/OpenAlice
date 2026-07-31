@@ -42,9 +42,10 @@ Launchers share the same ownership model:
   host. It starts Alice/UTA through Electron's Node mode.
 - `scripts/guardian/prod.mjs` supervises built Runtime services for Docker and
   the source-backed local CLI. Docker defaults to the `docker` launcher;
-  `openalice start` supplies the `cli` launcher, while `openalice server`
-  supplies `cli-server` plus a versioned local status/stop capability. All CLI
-  browser and SSH paths keep Alice on loopback.
+  `openalice start` supplies the compatibility `cli` launcher, while canonical
+  `openalice up|run` and compatibility `openalice server` supply `cli-server`
+  plus a versioned local status/stop capability. All CLI browser and SSH paths
+  keep Alice on loopback.
 - `packages/guardian-runtime/` owns cross-launcher single-writer locks,
   heartbeat metadata, process identity, and controlled takeover.
 
@@ -69,7 +70,7 @@ src/                           Alice process
 │   │                          schedules, CLI shims, file/git operations
 │   ├── adapters/              claude / codex / opencode / pi / shell
 │   ├── cli/                   alice, alice-uta, alice-workspace, traderhub
-│   └── templates/             built-in chat and auto-quant templates
+│   └── templates/             built-in Chat and pinned AutoQuant V2 Harnesses
 ├── services/
 │   ├── auth/                  admin token and web session services
 │   ├── uta-client/            Alice-side UTA SDK adapters
@@ -112,6 +113,13 @@ and git repository plus PTY sessions, scrollback, issues, schedules, and agent
 configuration. The launcher supplies reusable infrastructure; the work itself
 lives in templates, skills, files, and satellite repositories.
 
+Coding-agent adapters are installation capabilities, not Workspace identity.
+Every registered adapter is eligible in every active Workspace; install and
+credential readiness are checked when a runtime is selected. Workspace registry
+and lifecycle rows do not persist adapter allowlists. A future user choice for
+the default enabled adapter set belongs in installation preferences, never in
+historical Workspace metadata.
+
 Chat uses that boundary deliberately:
 
 - **New conversation** creates a Session inside the recent Chat Workspace.
@@ -128,6 +136,19 @@ Chat uses that boundary deliberately:
 Do not reintroduce date-based automatic Chat Workspaces. A date is not a
 context boundary, and new daily repositories strand files, issues, git history,
 and agent configuration in yesterday's Workspace.
+
+AutoQuant uses the same durable Workspace boundary with a stricter entry rule:
+
+- `autoQuant.defaultWorkspaceId` in `data/preferences.json` is the readiness
+  pointer for the AutoQuant Harness.
+- A missing or stale pointer shows initialization or explicit selection; the
+  research composer never guesses the latest desk and never creates one as a
+  side effect of sending.
+- Once initialized, daily navigation is Session-first. Workspace creation,
+  configuration, and default switching remain low-frequency controls.
+- AutoQuant's Coding Agent owns Projects, Studies, experiments, dependencies,
+  artifacts, and local Git history inside that desk; Alice does not reproduce
+  those lifecycles.
 
 Load-bearing paths:
 
@@ -173,6 +194,9 @@ trade-decision attribution — follow [[docs/conversation-provenance.md]].
 Built-in templates use cross-platform `bootstrap.mjs` files and route git
 through `src/workspaces/templates/_common.mjs`. Do not add new Bash bootstraps
 for built-in templates. `bootstrap.sh` remains only as a third-party fallback.
+Source-backed Harnesses declare an explicit repository and version-to-commit
+catalog in `template.json`; creation records the chosen immutable source in
+`.alice/harness-source.json`.
 
 Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
@@ -263,7 +287,7 @@ sealing, and Broker Packs must remain coherent.
 │   ├── departed-workspaces/   retained offboarded repositories
 │   ├── state/                 lifecycle catalog, Sessions, scrollback, tasks,
 │   │                          provenance, Agent conversation log, compatibility lock
-│   └── auto-quant-mirror/     shared Auto-Quant source mirror
+│   └── auto-quant-v2-mirror/  shared AutoQuant V2 source mirror
 ├── state/
 │   ├── guardian.lock          launcher ownership
 │   └── runtime.lock           shared writer ownership

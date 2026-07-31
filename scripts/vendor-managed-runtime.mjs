@@ -25,18 +25,18 @@ const piCliPath = resolve(
 const knownArgs = new Set(['--force', '--help', '-h'])
 let force = false
 
-const PI_VERSION = '0.80.6'
+const PI_VERSION = '0.83.0'
 const PI_RELEASE_BASE = `https://github.com/earendil-works/pi/releases/download/v${PI_VERSION}`
 const PI_ASSETS = [
   {
     name: 'package.json',
     url: `${PI_RELEASE_BASE}/pi-coding-agent-install-package.json`,
-    sha256: 'ee080db64c3732daea5547bd6d9809465ffa236ef6099051e64a16753e48b795',
+    sha256: '41f07a3eb41227905ac436ad41d949e4589dcc34c15454d718f85f399b533cb6',
   },
   {
     name: 'package-lock.json',
     url: `${PI_RELEASE_BASE}/pi-coding-agent-install-package-lock.json`,
-    sha256: '0f409bf498507f93bfbde3dc6f2b4c83bc58bdea2e2f5eabf3053cc2a81568d4',
+    sha256: 'f5cb41dcfc60561ba54490b49c17beecec202900f73eb5f104b34f8b2a79a0af',
   },
 ]
 

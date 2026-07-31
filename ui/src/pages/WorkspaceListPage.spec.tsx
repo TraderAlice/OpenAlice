@@ -50,7 +50,13 @@ function context(): WorkspacesContextValue {
     workspaceManagerError: null,
     hasLoaded: true,
     templatesLoaded: true,
+    templatesError: null,
+    autoQuantDefaultWorkspaceId: null,
+    autoQuantPreferenceLoaded: true,
+    autoQuantPreferenceError: null,
     refresh: vi.fn(),
+    refreshTemplates: vi.fn(async () => undefined),
+    refreshAutoQuantPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => {
       throw new Error('not used')
@@ -59,6 +65,8 @@ function context(): WorkspacesContextValue {
     openHeadlessRun: vi.fn(async () => undefined),
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
+    initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: vi.fn(async () => ''),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
@@ -153,5 +161,48 @@ describe('WorkspaceListPage departed workspaces', () => {
 
     expect(await screen.findByText('archive is locked')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '永久清理 macro-research-archive？' })).toBeTruthy()
+  })
+})
+
+describe('WorkspaceListPage inventory truthfulness', () => {
+  it('offers recovery instead of rendering a failed first load as an empty Workspace list', async () => {
+    const failed = {
+      ...context(),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+    }
+    mocks.useWorkspaces.mockReturnValue(failed)
+    mocks.listDepartedWorkspaces.mockResolvedValue([])
+
+    render(<WorkspaceListPage />)
+
+    expect(screen.getByRole('heading', { name: '暂时无法读取工作区' })).toBeTruthy()
+    expect(screen.queryByText('还没有工作区。请从侧栏新建；每个工作区都是隔离的 Git 目录，并带有持久终端会话。')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(failed.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('keeps departed records visible without claiming there are zero active Workspaces', async () => {
+    mocks.useWorkspaces.mockReturnValue({
+      ...context(),
+      hasLoaded: false,
+      listError: 'list failed: 500',
+    })
+
+    render(<WorkspaceListPage />)
+
+    expect(await screen.findByRole('heading', { name: '已离职工作区' })).toBeTruthy()
+    expect(screen.getByText('活跃数量不可用')).toBeTruthy()
+    expect(screen.queryByText('0 个工作区')).toBeNull()
+    expect(screen.getByText('活跃工作区清单暂时不可用；已离职记录仍可查看。')).toBeTruthy()
+  })
+
+  it('gives the true empty state a page-level creation path', async () => {
+    mocks.listDepartedWorkspaces.mockResolvedValue([])
+    render(<WorkspaceListPage />)
+
+    const action = screen.getByRole('button', { name: '浏览模板' })
+    fireEvent.click(action)
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'template-catalog', params: {} })
   })
 })

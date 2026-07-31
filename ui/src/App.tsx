@@ -1,13 +1,17 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
-import { MobileRailMenuButton } from './components/MobileRailMenuButton'
+import { MobileContextBar } from './components/MobileContextBar'
 import { TabHost } from './components/TabHost'
 import { DesktopUpdatePrompt } from './components/DesktopUpdatePrompt'
 import { UpdateBanner } from './components/UpdateBanner'
 import { DemoBanner } from './demo/DemoBanner'
 import { DemoAnalytics } from './demo/DemoAnalytics'
 import { WorkspacesProvider } from './contexts/WorkspacesContext'
+import {
+  MobilePageNavigationProvider,
+  useMobilePageNavigation,
+} from './contexts/MobilePageNavigationContext'
 import { UrlAdopter } from './tabs/UrlAdopter'
 import { useLocale } from './i18n/useLocale'
 
@@ -16,7 +20,7 @@ import { useLocale } from './i18n/useLocale'
  * Each maps to one or more tab kinds via tabs/registry.ts (defaultSpecForActivity).
  */
 export type Page =
-  | 'chat' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
+  | 'chat' | 'auto-quant' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
   | 'issue'
   | 'trading-as-git'
   | 'connectors'
@@ -64,15 +68,25 @@ export function App() {
 }
 
 function AppShell() {
+  return (
+    <MobilePageNavigationProvider>
+      <AppShellContent />
+    </MobilePageNavigationProvider>
+  )
+}
+
+function AppShellContent() {
   // Re-render the shell on a language switch so formatter-only subtrees
   // (charts, money/date labels that don't call t()) refresh too.
   useLocale()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const mobileRailMenuButtonRef = useRef<HTMLButtonElement>(null)
   const isDesktop = useIsDesktop() // ≥768 — rail is a static column
   const hasRailText = useHasRailText() // ≥960 — text rail is allowed
   const hasFullRail = useHasFullRail() // ≥1280 — full rail width
   const railMode = !isDesktop ? 'full' : hasFullRail ? 'full' : hasRailText ? 'narrow' : 'compact'
   const location = useLocation()
+  const mobilePageNavigation = useMobilePageNavigation()
   const showFirstRunGuide = firstRunGuideEnabled && !location.pathname.startsWith('/design/')
 
   // When the rail becomes a static column, drop its mobile drawer state.
@@ -94,10 +108,13 @@ function AppShell() {
   const mainContent = (
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">
       {/* Mobile header — visible only below md */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/80 bg-secondary shrink-0 md:hidden">
-        <MobileRailMenuButton onOpen={() => setSidebarOpen(true)} />
-        <span className="text-sm font-semibold text-foreground">OpenAlice</span>
-      </div>
+      <MobileContextBar
+        railOpen={sidebarOpen}
+        railTriggerRef={mobileRailMenuButtonRef}
+        pageNavigation={mobilePageNavigation}
+        openRail={() => setSidebarOpen(true)}
+        closeRail={() => setSidebarOpen(false)}
+      />
 
       <TabHost />
     </main>
@@ -115,8 +132,13 @@ function AppShell() {
           onClose={() => setSidebarOpen(false)}
           desktopStatic={isDesktop}
           railMode={railMode}
+          returnFocusRef={mobileRailMenuButtonRef}
         />
-        <div className="flex-1 min-h-0">
+        <div
+          aria-hidden={!isDesktop && sidebarOpen ? true : undefined}
+          inert={!isDesktop && sidebarOpen ? true : undefined}
+          className="flex-1 min-h-0"
+        >
           {mainContent}
         </div>
         <UrlAdopter />

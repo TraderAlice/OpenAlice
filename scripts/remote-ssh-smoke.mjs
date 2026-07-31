@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
-const cliEntry = join(repoRoot, 'packages/cli/bin/openalice.mjs')
+const cliEntry = join(repoRoot, 'packages/cli/bin/openalice.ts')
 const suffix = `${process.pid}-${Date.now().toString(36)}`
 const image = `openalice-remote-smoke:${suffix}`
 const args = process.argv.slice(2)
@@ -104,7 +104,7 @@ try {
     '--plan', '--no-open',
   ], { cwd: repoRoot, env: smokeEnv })
   requireText(initialPlan, 'install remote OpenAlice CLI')
-  requireText(initialPlan, 'install managed Pi 0.80.6')
+  requireText(initialPlan, 'install managed Pi 0.83.0')
   requireText(initialPlan, 'clone OpenAlice source (version remote-smoke)')
   requireText(initialPlan, 'start remote OpenAlice Server')
   run('ssh', [remoteTarget, 'test ! -x "$HOME/.openalice/bin/openalice"'], { env: smokeEnv })
@@ -118,12 +118,14 @@ try {
     throw new Error(`Remote Server did not survive tunnel disconnect: ${JSON.stringify(running)}`)
   }
   const piVersion = run('ssh', [remoteTarget, '"$HOME/.openalice/bin/pi" --version'], { env: smokeEnv }).trim()
-  if (piVersion !== '0.80.6') throw new Error(`Remote managed Pi version mismatch: ${piVersion}`)
+  if (piVersion !== '0.83.0') throw new Error(`Remote managed Pi version mismatch: ${piVersion}`)
   const launchRoot = running.owner?.launchRoot
-  if (typeof launchRoot !== 'string' || !launchRoot.includes('/.openalice/sources/')) {
-    throw new Error(`Remote Server did not use a managed checkout: ${JSON.stringify(launchRoot)}`)
+  if (typeof launchRoot !== 'string' || !launchRoot.includes('/.openalice/cli-versions/')) {
+    throw new Error(`Remote Server did not use an installed Runtime: ${JSON.stringify(launchRoot)}`)
   }
-  run('ssh', [remoteTarget, `test -d ${shellQuote(join(launchRoot, '.git'))}`], { env: smokeEnv })
+  if (running.provider?.kind !== 'bundle') {
+    throw new Error(`Remote Server did not report the bundle provider: ${JSON.stringify(running.provider)}`)
+  }
 
   console.log('[remote-ssh-smoke] repairing a legacy CLI Server with its managed Pi launcher missing')
   run('ssh', [remoteTarget, 'rm -f "$HOME/.openalice/bin/pi" "$HOME/.openalice/bin/pi.cmd"'], { env: smokeEnv })
@@ -132,7 +134,7 @@ try {
     throw new Error(`Managed Pi repair changed the remembered browser origin (${firstTunnelUrl} -> ${repairedTunnelUrl})`)
   }
   const repairedPiVersion = run('ssh', [remoteTarget, '"$HOME/.openalice/bin/pi" --version'], { env: smokeEnv }).trim()
-  if (repairedPiVersion !== '0.80.6') throw new Error(`Repaired managed Pi version mismatch: ${repairedPiVersion}`)
+  if (repairedPiVersion !== '0.83.0') throw new Error(`Repaired managed Pi version mismatch: ${repairedPiVersion}`)
 
   console.log('[remote-ssh-smoke] checking reuse plan and reconnecting')
   const reusePlan = run(process.execPath, [

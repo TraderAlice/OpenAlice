@@ -45,7 +45,6 @@ beforeEach(async () => {
     createdAt: '2026-01-01T00:00:00.000Z',
     template: 'chat',
     spawnedFromVersion: '1.0.0',
-    agents: ['pi'],
   };
   registry = await WorkspaceRegistry.load(join(root, 'workspaces.json'), logger);
   await registry.add(workspace);

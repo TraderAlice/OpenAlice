@@ -22,6 +22,18 @@ const noopLogger = {
 const baseEnv = { PATH: process.env['PATH'] ?? '' };
 
 describe('runHeadlessTask', () => {
+  it('runs to natural exit when no watchdog is requested', async () => {
+    const r = await runHeadlessTask({
+      command: ['node', '-e', 'setTimeout(() => process.stdout.write("finished"), 50)'],
+      cwd: process.cwd(),
+      env: baseEnv,
+      logger: noopLogger,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.killed).toBe(false);
+    expect(r.stdoutTail).toBe('finished');
+  });
+
   it('captures clean exit + stdout tail on a one-shot command', async () => {
     const r = await runHeadlessTask({
       command: ['node', '-e', 'process.stdout.write("hello-headless")'],

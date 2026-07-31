@@ -1,12 +1,13 @@
 # Local Runtime and CLI Bootstrap
 
 This guide owns the browser-local OpenAlice entry after CLI installation and
-the boundary between dependency bootstrap, source-backed Runtime startup,
-Electron distribution, and later downloadable Runtime bundles. Installer
+the boundary between the installed headless Runtime, explicit source-backed
+development, and Electron distribution. Installer
 consent, installed layout, PATH integration, updates, and installer release
 checks belong to [[docs/cli-installer.md]].
 
 Related guides: [[docs/cli-installer.md]],
+[[docs/cli-supervisor.md]],
 [[docs/managed-workspace-runtime.md]],
 [[docs/docker-deployment.md]], [[docs/broker-packs.md]], and
 [[docs/remote-access.md]].
@@ -17,9 +18,9 @@ The local browser path is a first-class OpenAlice distribution surface:
 
 ```text
 installed openalice CLI
-  └── local OpenAlice source checkout
-        └── built-runtime Guardian
-              ├── Alice + normal Web UI on 127.0.0.1:47331
+  └── platform-specific headless Runtime bundle
+        └── Guardian
+              ├── Alice + normal Web UI on an available 127.0.0.1 port
               ├── optional UTA on local internal ports
               └── optional Connector Service on local internal ports
 ```
@@ -35,7 +36,7 @@ behavior.
 
 ## Stable Install
 
-The public installer distributes the small JavaScript CLI from the stable
+The public installer distributes the TypeScript CLI application from the stable
 `master` lane:
 
 ```bash
@@ -43,15 +44,13 @@ curl -fsSL https://openalice.ai/install | bash
 ```
 
 Development dogfooding can opt into `dev` explicitly with `--branch dev`. The
-installer requires Node.js 22.19.0 or newer and always installs the small CLI
-plus OpenAlice's pinned Pi runtime inside the same immutable install release;
-the two visible commands are `openalice` and `pi`.
-When explicitly selected,
-it can also install missing Linux Git/Python/make/C++ tools needed to build the
-source Runtime. It does not clone OpenAlice, write application state, install
-Electron, configure a provider credential, or start a service without separate
-consent. Managed `openalice remote` can separately plan and clone a private
-remote checkout after installation; that orchestration belongs to
+installer requires Node.js 22.19.0 or newer and installs the CLI, pinned Pi,
+and matching macOS/Linux headless Runtime inside one immutable release. The two
+visible commands are `openalice` and `pi`; CLI and Runtime report the same
+OpenAlice product version. It does not clone OpenAlice, write application
+state, install Electron, configure a provider credential, or start a service
+without separate consent. Managed `openalice remote` installs or reuses the
+same platform Runtime on the SSH host; that orchestration belongs to
 [[docs/remote-access.md]]. The curl entry targets macOS, Linux, WSL, and Git Bash; native Windows
 desktop distribution remains the signed Electron installer. The complete
 consent, update, filesystem, PATH, authenticity, and test contract lives in
@@ -61,47 +60,68 @@ Installer flags, non-interactive consent, development seams, the clean Docker
 fixture, and the manual prompt playground are documented only in
 [[docs/cli-installer.md]].
 
-Until release assets include a standalone headless Runtime, users keep an
-OpenAlice source checkout and run the CLI from inside it:
+After installation, startup is independent of the current directory:
 
 ```bash
-git clone https://github.com/TraderAlice/OpenAlice.git
-cd OpenAlice
 openalice
+openalice up
+openalice open
 ```
 
-`openalice` finds the checkout, installs the locked workspace dependencies
-without `@traderalice/desktop`, runs `pnpm build:server`, starts
-`scripts/guardian/prod.mjs` on `127.0.0.1`, and opens the normal UI. If `pnpm`
-is absent but Corepack is available, preparation uses Corepack with the pnpm
-version pinned by the repository.
+`openalice up` selects the installed bundle, starts
+`scripts/guardian/prod.mjs` on loopback, and leaves it running after the shell
+exits. `openalice open` verifies and opens the normal Web UI. Bare `openalice`
+enters the Supervisor TUI; `openalice run` is the foreground form. A source
+checkout remains an advanced override through instance configuration,
+`OPENALICE_APP_HOME`, or `--app-dir`; missing source artifacts may then use the
+locked pnpm preparation path.
 
 Live broker engines are still activated through the Trading UI and
 `<OPENALICE_HOME>/runtime/broker-packs/`. The source checkout contains their
 adapter workspaces for development, but `build:server` excludes those wrappers
 from UTA Core and no live SDK is evaluated at startup.
 
-When an interactive install is run from inside an OpenAlice checkout, the
-installer presents a separate, default-no `Start OpenAlice now?` prompt after
-the CLI is complete. Installation consent never implies service-start consent,
-and `--yes` remains installation-only for automation.
+When an interactive stable install completes, the
+installer presents a separate, default-no `Open the OpenAlice Supervisor now?`
+prompt after the CLI is complete. The Supervisor can open from any directory
+but does not start the Runtime until the user chooses Start inside the TUI.
+Installation consent never implies service-start consent, and `--yes` remains
+installation-only for automation.
 
-The CLI stays in the foreground and owns the Guardian lifetime. `Ctrl+C` stops
-the local Runtime. A normal second launch reuses an already healthy local URL;
-it does not kill the existing owner. Discovery first uses the selected home's
-Guardian control endpoint; for a source `pnpm dev` owner without control
-metadata, it verifies that owner's configured Web port before reuse. It never
-guesses that another home owns a reachable port. `openalice start --takeover`
-explicitly requests the existing Guardian recovery flow.
+The stopped Supervisor offers `s Start` for the installed Runtime. `m Managed`
+and `c Source` remain advanced source-development controls and are hidden from
+the ordinary stopped action bar when a bundle is available.
+
+`openalice run` and compatibility `openalice start` stay in the foreground and
+own the Guardian lifetime; `Ctrl+C` stops their self-owned local Runtime. The
+Supervisor TUI only detaches. A normal `up` reuses an already healthy matching
+owner and never kills it. Discovery first uses the selected home's Guardian
+control endpoint; for a source `pnpm dev` owner without control metadata, it
+verifies that owner's configured Web port before reuse. It never guesses that
+another home owns a reachable port. `openalice start --takeover` explicitly
+requests the existing Guardian recovery flow.
 
 Useful controls:
 
 ```bash
+openalice up
+openalice status
+openalice open
+openalice down
+openalice run
 openalice start --no-open
 openalice start --rebuild
 openalice start --home /tmp/openalice-test-home --port 41000
 openalice start /path/to/OpenAlice
+openalice start --no-update-check
+openalice update --check
 ```
+
+An installed stable-channel CLI performs a short, daily-cached release check
+before an interactive local start. Failure is silent and never blocks startup.
+A newer release produces guidance for `openalice update`; it is not installed
+without the ordinary visible plan and consent. Exact-ref and development
+installations do not silently cross into the stable channel.
 
 For concurrent source worktrees, select a complete home outside the checkout:
 
@@ -118,17 +138,20 @@ Workspaces, runtime locks, credentials, and optional Broker Packs. See
 Use `--rebuild` after pulling source changes when existing build artifacts may
 be stale. Never use a real user-state root for launcher or recovery tests.
 
-## Server Lifecycle
+## Shell Lifecycle
 
-The browser convenience command and a persistent Server are separate lifetime
-contracts. `openalice start` remains foreground and browser-oriented. The
-installed Server surface is:
+The browser convenience command and a persistent Runtime are separate lifetime
+contracts. `openalice start` remains the compatibility foreground,
+browser-oriented path while the canonical Shell lifecycle is:
 
 ```bash
-openalice server run [app-dir]     # foreground, no browser
-openalice server start [app-dir]   # detached, wait for real readiness
-openalice server status            # read-only, with stable --json output
-openalice server stop              # ask the owning Guardian to stop itself
+openalice run [app-dir]             # foreground, no browser
+openalice up [app-dir]              # detached, wait for real readiness
+openalice status [--json]           # read-only
+openalice logs [--lines N] [--json] # bounded redacted Runtime log tail
+openalice doctor [--json]           # read-only diagnostics
+openalice open                      # verify and open the existing Web UI
+openalice down [--json]             # ask the owning Guardian to stop itself
 ```
 
 These commands reuse the same checkout preparation, build artifacts,
@@ -138,11 +161,26 @@ launcher or a PID-file kill path. Detached start succeeds only after Guardian
 ownership, the local control endpoint, and Alice HTTP are ready.
 
 The control endpoint is local to the selected home and is not an Alice HTTP
-route. `server stop` sends a versioned structured request to a matching CLI
-Server, then waits for Guardian's normal child shutdown and ownership release.
-It refuses to guess at an unreachable PID or silently stop an Electron-owned
-Runtime. Exact status classes, control fields, recovery rules, and the managed
-SSH composition live in [[docs/remote-access.md]].
+route. `down` sends a versioned structured request to a matching CLI Server,
+then waits for Guardian's normal child shutdown and ownership release. It
+refuses to guess at an unreachable PID or silently stop an Electron-owned
+Runtime. `open` requires both an owner-advertised endpoint and a successful
+OpenAlice auth-status probe. Exact command/JSON presentation belongs to
+[[docs/cli-supervisor.md]]; status classes, control fields, recovery rules, and
+the managed SSH composition live in [[docs/remote-access.md]].
+
+The legacy surface remains available for managed remote and existing scripts:
+
+```bash
+openalice server run [app-dir]
+openalice server start [app-dir]
+openalice server status
+openalice server stop
+```
+
+Both command families operate the same `cli-server` Guardian owner. The legacy
+`server status --json` keeps its raw payload while top-level JSON uses a
+versioned command envelope.
 
 The detached path is still source-backed: a user-owned or remote-managed
 checkout supplies the built Runtime while the installed CLI supplies lifecycle
@@ -169,7 +207,7 @@ Keep bootstrap observable and layered:
    downloadable headless Runtime while retaining the same CLI and localhost
    contract.
 
-The same Server command contract survives that transition. Source-backed and
+The same lifecycle contract survives that transition. Source-backed and
 standalone-bundle Runtime providers differ in preparation, not in ownership,
 status, stop, browser, or SSH behavior.
 

@@ -31,7 +31,7 @@ import { DevPage } from '../pages/DevPage'
 import { InboxPage } from '../pages/InboxPage'
 import { InboxPageShell } from '../pages/InboxPageShell'
 import { TrackedPage } from '../pages/TrackedPage'
-import { ChatLandingPage } from '../pages/ChatLandingPage'
+import { AutoQuantLandingPage, ChatLandingPage } from '../pages/ChatLandingPage'
 import { WorkspaceManagerPage } from '../pages/WorkspaceManagerPage'
 import { PageSidebarShell } from '../pages/PageSidebarShell'
 import { WorkspaceListPage } from '../pages/WorkspaceListPage'
@@ -69,7 +69,7 @@ interface ViewProps<K extends ViewKind> {
 }
 
 export type ViewLifecycle = 'active-only' | 'keep-mounted'
-export type ViewShell = 'chat'
+export type ViewShell = 'chat' | 'auto-quant'
 
 export interface ViewModule<K extends ViewKind> {
   kind: K
@@ -154,7 +154,7 @@ const trackedIssueDetailModule: ViewModule<'tracked-issue-detail'> = {
       storageKey="tracked"
       titleKey="nav.item.tracked"
       defaultWidth={232}
-      sidebar={<TrackedSidebar />}
+      sidebar={({ closeMobileDrawer }) => <TrackedSidebar onNavigate={closeMobileDrawer} />}
     >
       <TrackedIssueDetailPage spec={spec} />
     </PageSidebarShell>
@@ -381,7 +381,7 @@ const trackedModule: ViewModule<'tracked'> = {
       storageKey="tracked"
       titleKey="nav.item.tracked"
       defaultWidth={232}
-      sidebar={<TrackedSidebar />}
+      sidebar={({ closeMobileDrawer }) => <TrackedSidebar onNavigate={closeMobileDrawer} />}
     >
       <TrackedPage />
     </PageSidebarShell>
@@ -398,6 +398,18 @@ const chatLandingModule: ViewModule<'chat-landing'> = {
   },
   toUrl: () => '/chat',
   Component: ({ spec }) => <ChatLandingPage spec={spec} />,
+}
+
+const autoQuantLandingModule: ViewModule<'auto-quant-landing'> = {
+  kind: 'auto-quant-landing',
+  shell: 'auto-quant',
+  title: (spec, ctx) => {
+    if (!spec.params.targetWsId) return 'AutoQuant'
+    const tag = ctx.workspaces?.find((w) => w.id === spec.params.targetWsId)?.tag
+    return tag ? `New research · ${tag}` : 'New research'
+  },
+  toUrl: () => '/auto-quant',
+  Component: ({ spec }) => <AutoQuantLandingPage spec={spec} />,
 }
 
 const workspaceManagerModule: ViewModule<'workspace-manager'> = {
@@ -428,7 +440,9 @@ const workspaceListModule: ViewModule<'workspace-list'> = {
 
 const workspaceModule: ViewModule<'workspace'> = {
   kind: 'workspace',
-  shell: (spec) => spec.params.source === 'chat' ? 'chat' : null,
+  shell: (spec) => spec.params.source === 'chat'
+    ? 'chat'
+    : spec.params.source === 'auto-quant' ? 'auto-quant' : null,
   title: (spec, ctx) => {
     const ws = ctx.workspaces?.find((w) => w.id === spec.params.wsId)
     const tag = ws?.tag ?? spec.params.wsId.slice(0, 8)
@@ -442,12 +456,14 @@ const workspaceModule: ViewModule<'workspace'> = {
     const base =
       spec.params.source === 'chat'
         ? `/chat/workspaces/${encodeURIComponent(spec.params.wsId)}`
+        : spec.params.source === 'auto-quant'
+          ? `/auto-quant/workspaces/${encodeURIComponent(spec.params.wsId)}`
         : `/workspaces/${encodeURIComponent(spec.params.wsId)}`
     const sid = spec.params.sessionId
     return sid ? `${base}/s/${encodeURIComponent(sid)}` : base
   },
   Component: (props) =>
-    props.spec.params.source === 'chat'
+    props.spec.params.source === 'chat' || props.spec.params.source === 'auto-quant'
       ? <WorkspacePage {...props} />
       : (
         <PageSidebarShell
@@ -495,7 +511,9 @@ const templateDetailModule: ViewModule<'template-detail'> = {
 
 const fileViewerModule: ViewModule<'file-viewer'> = {
   kind: 'file-viewer',
-  shell: (spec) => spec.params.source === 'chat' ? 'chat' : null,
+  shell: (spec) => spec.params.source === 'chat'
+    ? 'chat'
+    : spec.params.source === 'auto-quant' ? 'auto-quant' : null,
   // Tab title = file basename; path itself shows in the page header.
   title: (spec) => spec.params.path.split('/').filter(Boolean).pop() ?? spec.params.path,
   toUrl: (spec) => {
@@ -507,13 +525,15 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
     }
     const base = spec.params.source === 'chat'
       ? `/chat/workspaces/${encodeURIComponent(spec.params.wsId)}`
+      : spec.params.source === 'auto-quant'
+        ? `/auto-quant/workspaces/${encodeURIComponent(spec.params.wsId)}`
       : `/workspaces/${encodeURIComponent(spec.params.wsId)}`
     const query = spec.params.returnSessionId
       ? `?sessionId=${encodeURIComponent(spec.params.returnSessionId)}`
       : ''
     return `${base}/view/${encodeURIComponent(spec.params.path)}${query}`
   },
-  Component: ({ spec }) => spec.params.source === 'chat'
+  Component: ({ spec }) => spec.params.source === 'chat' || spec.params.source === 'auto-quant'
     ? <FileViewerPage spec={spec} />
     : spec.params.source === 'tracked'
       ? (
@@ -521,7 +541,7 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
           storageKey="tracked"
           titleKey="nav.item.tracked"
           defaultWidth={232}
-          sidebar={<TrackedSidebar />}
+          sidebar={({ closeMobileDrawer }) => <TrackedSidebar onNavigate={closeMobileDrawer} />}
         >
           <FileViewerPage spec={spec} />
         </PageSidebarShell>
@@ -561,6 +581,7 @@ const VIEWS = {
   inbox: inboxModule,
   tracked: trackedModule,
   'chat-landing': chatLandingModule,
+  'auto-quant-landing': autoQuantLandingModule,
   'workspace-manager': workspaceManagerModule,
   'workspace-list': workspaceListModule,
   workspace: workspaceModule,

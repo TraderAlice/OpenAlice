@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TrendingUp, Hash } from 'lucide-react'
+import { TrendingUp, Hash, CircleAlert } from 'lucide-react'
 import { entitiesLive } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
@@ -14,10 +14,11 @@ import type { EntityListItem } from '../api/entities'
  * notes link to it. Selection lives in `useTrackedSelection` so it survives
  * remounts and is read by TrackedPage in the editor area.
  */
-export function TrackedSidebar() {
+export function TrackedSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation()
   const entities = entitiesLive.useStore((s) => s.entities)
   const loading = entitiesLive.useStore((s) => s.loading)
+  const listError = entitiesLive.useStore((s) => s.error)
   const selected = useTrackedSelection((s) => s.selectedName)
   const select = useTrackedSelection((s) => s.select)
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
@@ -48,6 +49,15 @@ export function TrackedSidebar() {
     )
   }
 
+  if (listError && entities.length === 0) {
+    return (
+      <div className="flex items-start gap-2 px-3 py-4 text-[12px] leading-relaxed text-muted-foreground">
+        <CircleAlert size={14} className="mt-0.5 shrink-0 text-destructive" aria-hidden />
+        <span>{t('tracked.listLoadErrorTitle')}</span>
+      </div>
+    )
+  }
+
   if (entities.length === 0) {
     return (
       <div className="px-3 py-4 text-[12px] text-muted-foreground/70 leading-relaxed">
@@ -70,6 +80,7 @@ export function TrackedSidebar() {
         select(entity.name)
         setSidebar('tracked')
         openOrFocus({ kind: 'tracked', params: {} })
+        onNavigate?.()
       }}
     />
   )

@@ -22,7 +22,6 @@ const workspace: Workspace = {
   template: 'chat',
   spawnedFromVersion: '0.1.0',
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
-  agents: ['codex'],
   agentOverride: {
     claude: false,
     codex: true,
@@ -82,5 +81,72 @@ describe('OverviewCard', () => {
     fireEvent.click(sessionButton)
     expect(onOpen).toHaveBeenCalledTimes(1)
     expect(onOpenSession).toHaveBeenCalledWith('session-1')
+  })
+
+  it('keeps high-session workspaces compact while preserving recent drill-ins', () => {
+    const onOpen = vi.fn()
+    const onOpenSession = vi.fn()
+    const manySessionWorkspace: Workspace = {
+      ...workspace,
+      sessions: Array.from({ length: 8 }, (_, index) => ({
+        ...workspace.sessions[0]!,
+        id: `session-${index + 1}`,
+        resumeId: `resume-${index + 1}`,
+        name: `x${index + 1}`,
+        state: index === 0 ? 'running' : 'paused',
+        lastActiveAt: `2026-07-28T00:${String(59 - index).padStart(2, '0')}:00.000Z`,
+      })),
+    }
+
+    render(
+      <OverviewCard
+        workspace={manySessionWorkspace}
+        lastCommit={null}
+        onOpen={onOpen}
+        onOpenSession={onOpenSession}
+      />,
+    )
+
+    expect(screen.getAllByRole('button', { name: / (running|paused)$/ })).toHaveLength(5)
+    expect(screen.getByRole('button', { name: 'x5 paused' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'x6 paused' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'x1 running' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'x3 paused' }).closest('li')?.className)
+      .toContain('hidden sm:list-item')
+
+    const viewAll = screen.getByRole('button', { name: 'View all 8 sessions' })
+    expect(viewAll.className).toContain('min-h-10')
+    expect(viewAll.textContent).toContain('+6')
+    expect(viewAll.textContent).toContain('+3')
+    fireEvent.click(viewAll)
+    expect(onOpen).toHaveBeenCalledTimes(1)
+    expect(onOpenSession).not.toHaveBeenCalled()
+  })
+
+  it('offers a mobile-only View all path when the desktop preview still fits', () => {
+    const threeSessionWorkspace: Workspace = {
+      ...workspace,
+      sessions: Array.from({ length: 3 }, (_, index) => ({
+        ...workspace.sessions[0]!,
+        id: `session-${index + 1}`,
+        resumeId: `resume-${index + 1}`,
+        name: `x${index + 1}`,
+      })),
+    }
+
+    render(
+      <OverviewCard
+        workspace={threeSessionWorkspace}
+        lastCommit={null}
+        onOpen={() => undefined}
+        onOpenSession={() => undefined}
+      />,
+    )
+
+    const viewAll = screen.getByRole('button', { name: 'View all 3 sessions' })
+    expect(viewAll.closest('li')?.className).toContain('sm:hidden')
+    expect(viewAll.textContent).toContain('+1')
+    expect(screen.getByRole('button', { name: 'x3 running' }).closest('li')?.className)
+      .toContain('hidden sm:list-item')
   })
 })

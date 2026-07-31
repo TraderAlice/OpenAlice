@@ -25,15 +25,12 @@ import {
   rememberRecentChatWorkspace,
 } from '@/core/preferences.js';
 
-import { claudeAdapter } from './adapters/claude.js';
-import { codexAdapter } from './adapters/codex.js';
-import { opencodeAdapter } from './adapters/opencode.js';
+import { createBuiltinAdapterRegistry } from './adapters/index.js';
 import { piAdapter } from './adapters/pi.js';
-import { shellAdapter } from './adapters/shell.js';
 import {
-  AdapterRegistry,
   isAgentRuntime,
   prepareAgentRuntimeWorkspace,
+  type AdapterRegistry,
   type CliAdapter,
   type HeadlessRunOverrides,
 } from './cli-adapter.js';
@@ -129,8 +126,11 @@ import {
   resolveInjectionModel,
 } from './credential-injection.js';
 import {
+  AUTO_QUANT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
+  TemplateWorkspaceResolver,
   type ChatWorkspaceResolution,
+  type TemplateWorkspaceResolution,
 } from './chat-workspace-resolver.js';
 
 /** Resolve only the operational facts automation health needs. Product APIs do
@@ -304,7 +304,12 @@ export function launchEnvironmentDisclosure(
 }
 import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
-import { SessionRegistry, type SessionRecord } from './session-registry.js';
+import {
+  SessionRegistry,
+  sessionPreferredTitle,
+  type SessionRecord,
+} from './session-registry.js';
+import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
 import { TemplateUpgradeManager } from './template-upgrade.js';
@@ -323,6 +328,7 @@ import {
 } from './workspace-runtime-activity.js';
 import { WebPiSessionHost, type WebPiSnapshot } from './webpi-session-host.js';
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
+import { readHarnessSource } from './harness-source.js';
 import {
   createManagerWorkspaceMeta,
 } from './manager-workspace.js';
@@ -373,7 +379,12 @@ export interface WorkspaceService {
   workspaceRuntimeActivity(workspaceId: string): WorkspaceRuntimeActivity;
   /** Resolve the preferred/recent durable Chat Workspace, creating one starter when absent. */
   resolveOrCreateChatWorkspace(preferredWorkspaceId?: string | null): Promise<ChatWorkspaceResolution>;
-  /** Resolve the configured Workspace runtime, then fall back to its first enabled runtime. */
+  /** Resolve the latest durable AutoQuant desk, creating a pinned starter when absent. */
+  resolveOrCreateAutoQuantWorkspace(
+    preferredWorkspaceId?: string | null,
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution>;
+  /** Resolve the Workspace default, installation fallback, then first registered runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
   /** Open the same persisted Pi Session through Pi RPC instead of its PTY. */
@@ -386,6 +397,8 @@ export interface WorkspaceService {
       approveProject?: boolean;
     },
   ): Promise<WebPiSnapshot>;
+  /** Best-effort background reconciliation of native runtime Session titles. */
+  refreshSessionTitles?(meta: WorkspaceMeta): Promise<void>;
   publicMeta(w: WorkspaceMeta): Promise<unknown>;
   /**
    * Probe the host PATH for each registered adapter's CLI binary. Keyed by
@@ -430,7 +443,7 @@ export interface WorkspaceService {
     meta: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
   ): Promise<HeadlessTaskResult>;
   /** Cached install/ready snapshot for global first-run runtime gating. */
   getAgentRuntimeReadiness(): AgentRuntimeReadinessSnapshot;
@@ -457,7 +470,7 @@ export interface WorkspaceService {
     meta: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     /** Business source of the dispatch. Its Workspace may differ from `meta`
      * when an Issue explicitly resumes a signed Session across Workspaces. */
     trigger?: HeadlessTaskTrigger,
@@ -745,16 +758,16 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     });
   }
 
-  const adapters = new AdapterRegistry();
-  adapters.register(claudeAdapter, { default: true });
-  adapters.register(codexAdapter);
-  adapters.register(opencodeAdapter);
-  adapters.register(piAdapter);
-  adapters.register(shellAdapter);
-  const managerWorkspace = createManagerWorkspaceMeta(
-    config.launcherRoot,
-    adapters.list().filter(isAgentRuntime).map((adapter) => adapter.id),
-  );
+  const adapters = createBuiltinAdapterRegistry();
+  const sessionTitleResolver = new NativeSessionTitleResolver({
+    sessionRegistry,
+    resumeRegistry,
+    adapters,
+    logger: launcherLogger.child({ scope: 'session-title' }),
+  });
+  const refreshSessionTitles = (meta: WorkspaceMeta): Promise<void> =>
+    sessionTitleResolver.refreshWorkspace(meta);
+  const managerWorkspace = createManagerWorkspaceMeta(config.launcherRoot);
   await mkdir(managerWorkspace.dir, { recursive: true });
   const resolveRuntimeWorkspace = (workspaceId: string): WorkspaceMeta | undefined =>
     workspaceId === managerWorkspace.id ? managerWorkspace : registry.get(workspaceId);
@@ -779,6 +792,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     sessionRegistry,
     creator,
   });
+  const autoQuantWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry, sessionRegistry, creator },
+    AUTO_QUANT_WORKSPACE_TEMPLATE,
+    'auto-quant',
+  );
 
   const transcriptWatcher = new TranscriptWatcher(
     launcherLogger.child({ scope: 'transcript-watch' }),
@@ -794,45 +812,41 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
   );
 
-  const resolveAdapter = (wsMeta: WorkspaceMeta, agentId?: string): CliAdapter => {
+  const resolveAdapter = (_wsMeta: WorkspaceMeta, agentId?: string): CliAdapter => {
     if (agentId) {
       const a = adapters.get(agentId);
-      if (a) return a;
-    }
-    const fromWorkspace = wsMeta.agents.find((id) => {
-      const a = adapters.get(id);
-      return a ? isAgentRuntime(a) : false;
-    });
-    if (fromWorkspace) {
-      const a = adapters.get(fromWorkspace);
       if (a) return a;
     }
     return adapters.resolve(null);
   };
 
-  const firstWorkspaceRuntime = (wsMeta: WorkspaceMeta): string | undefined =>
-    wsMeta.agents.find((id) => {
-      const adapter = adapters.get(id);
-      return adapter ? isAgentRuntime(adapter) : false;
-    });
+  const firstRegisteredRuntime = (): string | undefined =>
+    adapters.list().find(isAgentRuntime)?.id;
 
-  const validRuntimeForWorkspace = (wsMeta: WorkspaceMeta, agentId: string | null): string | undefined => {
-    if (!agentId || !wsMeta.agents.includes(agentId)) return undefined;
+  const validRegisteredRuntime = (agentId: string | null): string | undefined => {
+    if (!agentId) return undefined;
     const adapter = adapters.get(agentId);
     return adapter && isAgentRuntime(adapter) ? agentId : undefined;
   };
 
+  /** Default for fresh interactive Sessions without an explicit runtime. */
+  const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
+    const metadata = await readWorkspaceMetadata(wsMeta.dir);
+    const workspaceDefault = metadata.ok
+      ? validRegisteredRuntime(metadata.metadata.defaultAgent ?? null)
+      : undefined;
+    return workspaceDefault ??
+      validRegisteredRuntime(await readWorkspaceDefaultAgent().catch(() => null)) ??
+      firstRegisteredRuntime();
+  };
+
   /**
    * Default for scheduled issues with no frontmatter `agent`: issue-specific
-   * setting first, then the interactive workspace default for backwards
-   * continuity, then the workspace's first enabled runtime.
+   * setting first, then the target Workspace Session default, installation
+   * fallback, and finally the first registered runtime.
    */
-  const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
-    validRuntimeForWorkspace(wsMeta, await readWorkspaceDefaultAgent().catch(() => null)) ??
-    firstWorkspaceRuntime(wsMeta);
-
   const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
-    validRuntimeForWorkspace(wsMeta, await readIssueDefaultAgent().catch(() => null)) ??
+    validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
     await resolveDefaultAgentId(wsMeta);
 
   /**
@@ -955,7 +969,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     availability?: AgentAvailability,
   ): AgentRuntimeReadinessSource => {
-    if (adapter.id === 'claude' || adapter.id === 'codex') return 'global-login';
+    if (adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace') {
+      return 'global-login';
+    }
     const binaryPath = availability?.path ?? '';
     if (
       adapter.id === 'pi' &&
@@ -970,6 +986,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     preferredWorkspaceId?: string | null,
   ): Promise<ChatWorkspaceResolution> =>
     chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId);
+  const resolveOrCreateAutoQuantWorkspaceMethod = (
+    preferredWorkspaceId?: string | null,
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution> =>
+    autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
 
   let runtimeReadinessWorkspaceInFlight: Promise<WorkspaceMeta> | null = null;
 
@@ -1017,13 +1038,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   ): Promise<boolean> => {
     if (!adapter.writeAiConfig) return false;
     const credentials = await readCredentials();
-    const [, credential] = compatibleCredentials(credentials, adapter.id)[0] ?? [];
+    const [, credential] = compatibleCredentials(credentials, adapter)[0] ?? [];
     if (!credential) return false;
 
     const model = resolveInjectionModel(credential);
     const workspaceCredential = credentialToWorkspaceAiCred(
       credential,
-      adapter.id,
+      adapter,
       model ? { model } : {},
     );
     if (!workspaceCredential) return false;
@@ -1315,7 +1336,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     ws: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     // Dispatch-path extras: a taskId keys the on-disk task log; onSessionId
     // fires when the adapter's stdout scanner captures the agent's own session
     // id (recorded WHILE running, so the panel can offer "open as session").
@@ -1392,7 +1413,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           command,
           cwd,
           env,
-          timeoutMs,
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
           logger: launcherLogger.child({
             scope: 'headless',
             wsId: ws.id,
@@ -1441,7 +1462,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     ws: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     // Composite Issue source when dispatched by ScheduleScanner. Manual and
     // external runs leave it undefined.
     trigger?: HeadlessTaskTrigger,
@@ -2002,6 +2023,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const ws = registry.get(wsId);
     if (!ws) return null;
     await sessionRegistry.ensureLoaded(wsId);
+    void refreshSessionTitles(ws);
     return buildWorkspaceSessionDirectory({
       workspace: { id: ws.id, tag: ws.tag },
       identities: resumeRegistry.list({ wsId, limit }),
@@ -2297,7 +2319,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   const publicMeta = async (w: WorkspaceMeta): Promise<unknown> => {
     const metadata = await readWorkspaceMetadata(w.dir);
+    const harnessSource = await readHarnessSource(w.dir);
     await sessionRegistry.ensureLoaded(w.id).catch(() => undefined);
+    void refreshSessionTitles(w);
     const sessions = sessionRegistry.listFor(w.id).map((r) => {
       const terminal = pool.get(r.id);
       const browser = webPi.get(r.id);
@@ -2313,7 +2337,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         resumeId: r.resumeId,
         pid: terminal?.pid ?? browser?.pid ?? null,
         startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-        title: r.title ?? null,
+        title: sessionPreferredTitle(r) ?? null,
         sourceRunId: r.sourceRunId ?? null,
       };
     });
@@ -2348,6 +2372,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...w,
       ...(metadata.ok ? metadata.metadata : {}),
       ...(!metadata.ok && metadata.reason === 'invalid' ? { metadataError: metadata.error } : {}),
+      ...(harnessSource ? { harnessSource } : {}),
       sessions,
       agentOverride,
       ...(currentVersion !== undefined ? { currentVersion } : {}),
@@ -2385,9 +2410,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     transcriptWatcher,
     workspaceRuntimeActivity: workspaceRuntimeActivityMethod,
     resolveOrCreateChatWorkspace: resolveOrCreateChatWorkspaceMethod,
+    resolveOrCreateAutoQuantWorkspace: resolveOrCreateAutoQuantWorkspaceMethod,
     resolveDefaultAgentId,
     resolveAdapter,
     startWebPiSession,
+    refreshSessionTitles,
     publicMeta,
     detectAgents,
     getAgentRuntimeReadiness: getAgentRuntimeReadinessMethod,
