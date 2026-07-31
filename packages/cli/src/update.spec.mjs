@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
+import { readFileSync } from 'node:fs'
 
 import { describe, expect, it, vi } from 'vitest'
 
@@ -12,10 +13,16 @@ import {
   runUpdateCommand,
 } from './update.mjs'
 
+const currentCliVersion = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+).version
+const [currentMajor = '0', currentMinor = '0'] = currentCliVersion.split('.')
+const newerCliVersion = `${currentMajor}.${Number(currentMinor) + 1}.0-beta`
+
 const stableSource = {
   schemaVersion: 1,
   repository: 'TraderAlice/OpenAlice',
-  cliVersion: '0.87.0-beta',
+  cliVersion: currentCliVersion,
   selector: { kind: 'branch', value: 'master' },
   installerUrl: 'https://openalice.ai/install',
 }
@@ -43,13 +50,13 @@ describe('OpenAlice CLI updates', () => {
       currentVersion: '0.87.0-beta',
       installSource: stableSource,
     }, {
-      fetchImpl: manifestFetch('0.88.0-beta'),
+      fetchImpl: manifestFetch(newerCliVersion),
       env: {},
     })
     expect(result).toMatchObject({
       status: 'available',
       currentVersion: '0.87.0-beta',
-      latestVersion: '0.88.0-beta',
+      latestVersion: newerCliVersion,
       channel: 'stable',
     })
   })
@@ -80,14 +87,14 @@ describe('OpenAlice CLI updates', () => {
     const stdout = { write: vi.fn() }
     await expect(runUpdateCommand(['--yes'], {
       applyUpdate,
-      fetchImpl: manifestFetch('0.88.0-beta'),
+      fetchImpl: manifestFetch(newerCliVersion),
       layout: { installRoot: '/tmp/.openalice' },
       readInstallSourceImpl: async () => stableSource,
       stdout,
       env: {},
     })).resolves.toBe(0)
     expect(applyUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ latestVersion: '0.88.0-beta' }),
+      expect.objectContaining({ latestVersion: newerCliVersion }),
       expect.objectContaining({
         layout: { installRoot: '/tmp/.openalice' },
         yes: true,
@@ -173,7 +180,7 @@ describe('OpenAlice CLI updates', () => {
       },
       writeFileImpl: async (_path, value) => { cache = value },
       readInstallSourceImpl: async () => stableSource,
-      fetchImpl: manifestFetch('0.88.0-beta'),
+      fetchImpl: manifestFetch(newerCliVersion),
       stderr,
       env: {},
       now: () => Date.parse('2026-07-29T00:00:00.000Z'),

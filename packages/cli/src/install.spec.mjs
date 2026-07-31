@@ -13,6 +13,9 @@ const execFileAsync = promisify(execFile)
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const fakeNpm = join(repositoryRoot, 'scripts/install-smoke/fake-npm.sh')
 const piAssets = join(repositoryRoot, 'scripts/install-smoke/pi-assets')
+const productVersion = JSON.parse(
+  await readFile(join(repositoryRoot, 'package.json'), 'utf8'),
+).version
 const temporaryPaths = []
 
 afterEach(async () => {
@@ -134,15 +137,15 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     await expect(access(join(installRoot, 'bin', 'pi.cmd'))).resolves.toBeUndefined()
 
     const result = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['--version'])
-    expect(result.stdout.trim()).toBe('0.87.0-beta')
+    expect(result.stdout.trim()).toBe(productVersion)
     const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
     expect(JSON.parse(versionInfo.stdout)).toEqual({
-      version: '0.87.0-beta',
+      version: productVersion,
       contentIdentity: releases[0].slice(-16),
       installSource: {
         schemaVersion: 1,
         repository: 'TraderAlice/OpenAlice',
-        cliVersion: '0.87.0-beta',
+        cliVersion: productVersion,
         selector: { kind: 'version', value: 'test/ref' },
         installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/test/ref/install',
       },
