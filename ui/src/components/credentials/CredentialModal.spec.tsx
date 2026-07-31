@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -180,6 +182,38 @@ afterEach(() => {
 })
 
 describe('CredentialModal', () => {
+  it('uses the shared long-form dialog contract and restores the opener', () => {
+    const opener = document.createElement('button')
+    opener.textContent = 'Open credentials'
+    document.body.append(opener)
+    opener.focus()
+    const onClose = vi.fn()
+
+    const { unmount } = render(
+      <CredentialModal
+        mode="add"
+        presets={[openAiPreset]}
+        agents={agents}
+        onClose={onClose}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: 'Add credential' })
+    const scrollArea = screen.getByTestId('credential-modal-scroll')
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(dialog.className).toContain('h-full')
+    expect(scrollArea.className).toContain('min-h-0')
+    expect(scrollArea.className).toContain('overflow-y-auto')
+    expect(document.activeElement).toBe(screen.getByPlaceholderText('Search providers…'))
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(document.activeElement).toBe(opener)
+    opener.remove()
+  })
+
   it('explains provider-specific key, runtime, and model behavior before testing', () => {
     render(
       <CredentialModal

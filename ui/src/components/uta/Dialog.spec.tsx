@@ -47,4 +47,19 @@ describe('Dialog modal behavior', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(opener)
   })
+
+  it('offers a full mobile work area only when a long-form dialog opts in', () => {
+    render(
+      <Dialog ariaLabel="Long form" mobileFullscreen onClose={() => {}}>
+        <button type="button">Action</button>
+      </Dialog>,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: 'Long form' })
+    expect(dialog.className).toContain('h-full')
+    expect(dialog.className).toContain('sm:max-h-[85vh]')
+    expect(dialog.className).toContain('sm:rounded-xl')
+    expect(dialog.parentElement?.className).toContain('items-stretch')
+    expect(dialog.parentElement?.className).toContain('sm:items-center')
+  })
 })

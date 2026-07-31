@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { api, type Preset, type WireShape } from '../../api'
@@ -19,6 +19,7 @@ import {
   vendorPreset,
 } from '../../lib/presetHelpers'
 import { useTestGate } from '../../lib/useTestGate'
+import { Dialog } from '../uta/Dialog'
 import { ModelCombobox } from './PresetFields'
 
 const SHAPE_ORDER: WireShape[] = ['anthropic', 'google-generative-ai', 'openai-chat', 'openai-responses']
@@ -83,6 +84,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const [model, setModel] = useState(cred?.lastModel ?? presetDefaultModel(initialPreset))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const gate = useTestGate()
 
   const regions = presetRegions(preset)
@@ -220,22 +222,36 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-backdrop backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-background border border-border rounded-xl shadow-2xl w-[calc(100vw-24px)] max-w-xl max-h-[88vh] flex flex-col" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div>
-            <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{t('aiProvider.credentialModal.subtitle')}</p>
-          </div>
-          <button onClick={onClose} aria-label={t('aiProvider.credentialModal.close')} className="text-muted-foreground hover:text-foreground transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
+    <Dialog
+      ariaLabel={title}
+      initialFocusRef={searchInputRef}
+      mobileFullscreen
+      onClose={onClose}
+      width="w-full sm:w-[576px]"
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-5 sm:py-4">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{t('aiProvider.credentialModal.subtitle')}</p>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('aiProvider.credentialModal.close')}
+          className="ml-3 shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {!preset ? (
-            <div className="space-y-3">
+      <div
+        data-testid="credential-modal-scroll"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-3 [scrollbar-gutter:stable] sm:px-5 sm:py-4"
+      >
+        {!preset ? (
+          <div className="space-y-3">
               <input
+                ref={searchInputRef}
                 className={inputClass}
                 value={presetQuery}
                 onChange={(event) => setPresetQuery(event.target.value)}
@@ -273,9 +289,9 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   </p>
                 )}
               </div>
-            </div>
-          ) : (
-            <>
+          </div>
+        ) : (
+          <>
               <div className="flex items-center justify-between">
                 <div className="flex items-baseline gap-2">
                   <span className="text-[13px] font-semibold text-foreground">{preset.label}</span>
@@ -438,47 +454,53 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
               {staleResult && (
                 <p className="text-[11px] text-warning/90">{t('aiProvider.credentialModal.formChanged')}</p>
               )}
-            </>
-          )}
-        </div>
-
-        {preset && (
-          <div className="flex flex-col gap-3 px-5 py-3 border-t border-border bg-secondary/30 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 text-[12px] text-muted-foreground">
-              {tested ? (
-                <span className="inline-flex items-center gap-2 text-success">
-                  <span className="h-2 w-2 rounded-full bg-success" />
-                  {t('aiProvider.credentialModal.connectionVerified')}
-                </span>
-              ) : staleResult ? (
-                <span className="inline-flex items-center gap-2 text-warning/90">
-                  <span className="h-2 w-2 rounded-full bg-warning/80" />
-                  {t('aiProvider.credentialModal.formChangedShort')}
-                </span>
-              ) : gate.result && !gate.result.ok ? (
-                <span className="inline-flex items-center gap-2 text-destructive">
-                  <span className="h-2 w-2 rounded-full bg-destructive" />
-                  {t('aiProvider.credentialModal.fixAndRetry')}
-                </span>
-              ) : (
-                <span>{t('aiProvider.credentialModal.testBeforeSave')}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground">{t('common.cancel')}</button>
-              <button
-                data-testid="credential-modal-primary"
-                onClick={handlePrimaryAction}
-                disabled={primaryDisabled}
-                title={needsConnectionTest && !canTest ? formProblem : undefined}
-                className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {gate.testing ? t('common.testing') : needsConnectionTest ? t('common.testConnection') : saving ? t('common.saving') : t('common.save')}
-              </button>
-            </div>
-          </div>
+          </>
         )}
       </div>
-    </div>
+
+      {preset && (
+        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-border bg-secondary/30 px-4 py-2.5 sm:px-5 sm:py-3">
+          <div className="min-w-0 text-[11px] leading-snug text-muted-foreground sm:text-[12px]">
+            {tested ? (
+              <span className="inline-flex items-center gap-2 text-success">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-success" />
+                {t('aiProvider.credentialModal.connectionVerified')}
+              </span>
+            ) : staleResult ? (
+              <span className="inline-flex items-center gap-2 text-warning/90">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-warning/80" />
+                {t('aiProvider.credentialModal.formChangedShort')}
+              </span>
+            ) : gate.result && !gate.result.ok ? (
+              <span className="inline-flex items-center gap-2 text-destructive">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-destructive" />
+                {t('aiProvider.credentialModal.fixAndRetry')}
+              </span>
+            ) : (
+              <span>{t('aiProvider.credentialModal.testBeforeSave')}</span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:text-foreground sm:px-3"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              data-testid="credential-modal-primary"
+              type="button"
+              onClick={handlePrimaryAction}
+              disabled={primaryDisabled}
+              title={needsConnectionTest && !canTest ? formProblem : undefined}
+              className="btn-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {gate.testing ? t('common.testing') : needsConnectionTest ? t('common.testConnection') : saving ? t('common.saving') : t('common.save')}
+            </button>
+          </div>
+        </div>
+      )}
+    </Dialog>
   )
 }
