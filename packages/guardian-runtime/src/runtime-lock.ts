@@ -13,6 +13,7 @@ import {
 
 const OWNER_FILE = 'owner.json'
 const RECLAIM_DIR = 'reclaiming'
+const WINDOWS_RENAME_RETRY_DELAYS_MS = [10, 25, 50, 100] as const
 
 export const DEFAULT_HEARTBEAT_MS = 30_000
 export const DEFAULT_STALE_HEARTBEAT_MS = 90_000
@@ -203,7 +204,7 @@ export async function acquireRuntimeLock(
   for (let attempt = 0; attempt < 40; attempt++) {
     try {
       await mkdir(lockDir)
-      await writeOwnerAtomic(lockDir, owner)
+      await writeOwnerAtomic(lockDir, owner, controller)
       return makeLock(lockDir, owner, opts)
     } catch (err) {
       if (!isErrno(err, 'EEXIST')) throw err
@@ -339,7 +340,7 @@ function makeLock(lockDir: string, initialOwner: RuntimeLockOwner, opts: Runtime
       const current = await readOwner(lockDir)
       if (current.token !== owner.token) throw new Error(`runtime lock ownership changed at ${lockDir}`)
       owner = { ...owner, heartbeatAt: new Date().toISOString() }
-      await writeOwnerAtomic(lockDir, owner)
+      await writeOwnerAtomic(lockDir, owner, opts.processController ?? defaultProcessController)
     } catch (err) {
       loseOwnership(err)
     } finally {
@@ -395,15 +396,36 @@ async function claimAndRemove(current: RuntimeLockInspection): Promise<boolean> 
   }
 }
 
-async function writeOwnerAtomic(lockDir: string, owner: RuntimeLockOwner): Promise<void> {
+async function writeOwnerAtomic(
+  lockDir: string,
+  owner: RuntimeLockOwner,
+  controller: ProcessController,
+): Promise<void> {
   const ownerPath = join(lockDir, OWNER_FILE)
   const tempPath = join(lockDir, `.${OWNER_FILE}.${owner.token}.${randomUUID()}.tmp`)
   try {
     await writeFile(tempPath, JSON.stringify(owner, null, 2) + '\n', 'utf8')
-    await rename(tempPath, ownerPath)
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rename(tempPath, ownerPath)
+        break
+      } catch (error) {
+        const retryDelay = WINDOWS_RENAME_RETRY_DELAYS_MS[attempt]
+        if (
+          process.platform !== 'win32' ||
+          retryDelay === undefined ||
+          !isTransientWindowsRenameError(error)
+        ) throw error
+        await controller.sleep(retryDelay)
+      }
+    }
   } finally {
     await rm(tempPath, { force: true }).catch(() => undefined)
   }
+}
+
+function isTransientWindowsRenameError(error: unknown): boolean {
+  return isErrno(error, 'EPERM') || isErrno(error, 'EACCES') || isErrno(error, 'EBUSY')
 }
 
 async function readOwner(lockDir: string): Promise<RuntimeLockOwner> {
