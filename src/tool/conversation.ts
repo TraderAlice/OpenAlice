@@ -12,8 +12,7 @@ import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
 import type { HeadlessMessageBlock } from '../workspaces/headless-output.js'
 import type { HeadlessInquirySubject } from '../workspaces/headless-task-registry.js'
 
-const DEFAULT_TIMEOUT_MS = 300_000
-const MAX_TIMEOUT_MS = 1_800_000
+const MAX_TIMEOUT_MS = 2_147_478_647
 const MAX_PROMPT_CHARS = 16_000
 const AWAIT_POLL_MS = 250
 
@@ -23,7 +22,7 @@ export const conversationAskCommonShape = {
   agent: z.string().min(1).optional()
     .describe('Optional runtime for reconstructed/fresh work only; exact Session runtime cannot be overridden.'),
   timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
-    .describe(`Headless watchdog in milliseconds (default ${DEFAULT_TIMEOUT_MS}).`),
+    .describe('Optional headless watchdog in milliseconds. Omit to allow the Session to run without a time limit.'),
   await: z.boolean().optional().default(false)
     .describe('Wait server-side for a reply needed now; omit for asynchronous delegation and use the returned taskId later.'),
   reconstruct: z.boolean().optional().default(false)
@@ -60,12 +59,12 @@ function taskProjection(task: WorkspaceConversationTask, mode: 'summary' | 'deta
 async function awaitConversationTask(
   conversation: WorkspaceConversationControl,
   taskId: string,
-  timeoutMs: number,
+  timeoutMs?: number,
 ): Promise<WorkspaceConversationTask | null> {
-  const deadline = Date.now() + timeoutMs
+  const deadline = timeoutMs === undefined ? null : Date.now() + timeoutMs
   let task = await conversation.read(taskId)
   while (task?.status === 'running') {
-    const remaining = deadline - Date.now()
+    const remaining = deadline === null ? AWAIT_POLL_MS : deadline - Date.now()
     if (remaining <= 0) return task
     await new Promise((resolve) => setTimeout(resolve, Math.min(AWAIT_POLL_MS, remaining)))
     task = await conversation.read(taskId)
@@ -89,11 +88,10 @@ export async function askWorkspaceConversation(
     return { ok: false as const, error: 'workspace conversation control is unavailable' }
   }
   try {
-    const effectiveTimeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS
     const result = await ctx.conversation.ask({
       prompt: input.prompt,
       target: input.target,
-      timeoutMs: effectiveTimeoutMs,
+      ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       source: sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin) ?? {
         kind: 'workspace',
         workspaceId: ctx.workspaceId,
@@ -122,7 +120,7 @@ export async function askWorkspaceConversation(
         : { mode: result.resolution.mode },
     }
     if (!input.await) return dispatched
-    const task = await awaitConversationTask(ctx.conversation, result.taskId, effectiveTimeoutMs)
+    const task = await awaitConversationTask(ctx.conversation, result.taskId, input.timeoutMs)
     if (!task) {
       return {
         ok: false as const,
@@ -244,7 +242,7 @@ export const conversationAskFactory: WorkspaceToolFactory = {
           target,
           ...(inboxAddress ? { subject: inboxAddress.subject } : {}),
           ...(agent ? { agent } : {}),
-          ...(timeoutMs ? { timeoutMs } : {}),
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
           await: shouldAwait,
           reconstruct,
         })
@@ -264,24 +262,21 @@ export const conversationAwaitFactory: WorkspaceToolFactory = {
         'Wait server-side for one conversation task to finish.',
         '',
         'Use after dispatching several conversation_ask calls so their headless runs execute',
-        'concurrently. This replaces hand-written sleep loops. If the wait budget expires,',
-        'the task remains running and can be awaited again or inspected with conversation_read.',
+        'concurrently. This replaces hand-written sleep loops. With an explicit wait budget,',
+        'an expired wait returns while the task keeps running; without one, this waits until',
+        'the task reaches a terminal state.',
       ].join('\n'),
       inputSchema: z.object({
         taskId: z.string().min(1).describe('Short taskId returned by conversation_ask.'),
         timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
-          .describe(`Server-side wait budget in milliseconds (default ${DEFAULT_TIMEOUT_MS}).`),
+          .describe('Optional server-side wait budget in milliseconds. Omit to wait until the task finishes.'),
       }),
       execute: async ({ taskId, timeoutMs }) => {
         if (!ctx.conversation) {
           return { ok: false as const, error: 'workspace conversation control is unavailable' }
         }
         try {
-          const task = await awaitConversationTask(
-            ctx.conversation,
-            taskId,
-            timeoutMs ?? DEFAULT_TIMEOUT_MS,
-          )
+          const task = await awaitConversationTask(ctx.conversation, taskId, timeoutMs)
           if (!task) return { ok: false as const, error: `conversation task not found: ${taskId}` }
           return {
             ok: true as const,
@@ -314,7 +309,7 @@ export const conversationCollectFactory: WorkspaceToolFactory = {
         taskId: z.array(z.string().min(1)).min(1).max(32)
           .describe('Task id to collect. Repeat --task-id for multiple concurrent peers.'),
         timeoutMs: z.coerce.number().int().positive().max(MAX_TIMEOUT_MS).optional()
-          .describe(`Server-side wait budget per task in milliseconds (default ${DEFAULT_TIMEOUT_MS}).`),
+          .describe('Optional server-side wait budget per task in milliseconds. Omit to wait until every task finishes.'),
       }),
       execute: async ({ taskId, timeoutMs }) => {
         if (!ctx.conversation) {
@@ -325,7 +320,7 @@ export const conversationCollectFactory: WorkspaceToolFactory = {
           const tasks = await Promise.all(ids.map((id) => awaitConversationTask(
             ctx.conversation!,
             id,
-            timeoutMs ?? DEFAULT_TIMEOUT_MS,
+            timeoutMs,
           )))
           const results = tasks.map((task, index) => task
             ? {

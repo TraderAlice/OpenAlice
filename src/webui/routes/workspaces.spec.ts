@@ -611,12 +611,12 @@ describe('POST /:id/headless', () => {
     expect((await post(app, '/ws-1/headless', { prompt: 'x', agent: 'shell' })).body.error).toBe('no_headless');
   });
 
-  it('clamps timeoutMs to <= 1_800_000 and defaults to 300_000', async () => {
+  it('enables the watchdog only for an explicit timeoutMs', async () => {
     const { app, dispatchHeadlessTask } = build();
-    await post(app, '/ws-1/headless', { prompt: 'x', timeoutMs: 9e9 });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 1_800_000);
+    await post(app, '/ws-1/headless', { prompt: 'x', timeoutMs: 42_000 });
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 42_000);
     await post(app, '/ws-1/headless', { prompt: 'x' });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 300_000);
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', undefined);
   });
 
   it('continues a headless conversation by product resumeId only', async () => {
@@ -629,7 +629,7 @@ describe('POST /:id/headless', () => {
     expect(response.status).toBe(202);
     expect(response.body).toMatchObject({ taskId: 'task-1', resumeId: 'resume-1' });
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), 'follow up', 300_000, undefined, 'resume-1',
+      expect.anything(), expect.anything(), 'follow up', undefined, undefined, 'resume-1',
     );
   });
 

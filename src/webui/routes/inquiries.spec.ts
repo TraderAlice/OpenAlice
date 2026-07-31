@@ -69,7 +69,7 @@ describe('business inquiry routes', () => {
     expect(response.status).toBe(202)
     expect((await json(response)).resolution.mode).toBe('exact')
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), 'Why?', 300_000, undefined, 'resume-author',
+      expect.anything(), expect.anything(), 'Why?', undefined, undefined, 'resume-author',
       expect.objectContaining({
         subject: { kind: 'inbox', entryId: entry.id },
         question: 'Why?',

@@ -1998,7 +1998,7 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
     let prompt: string;
-    let timeoutMs: number;
+    let timeoutMs: number | undefined;
     let agentId: string | undefined;
     let resumeId: string | undefined;
     let wait = false;
@@ -2016,8 +2016,9 @@ export function createWorkspaceRoutes(
       }
       prompt = rawPrompt;
       const rawTimeout = fields['timeoutMs'];
-      timeoutMs =
-        typeof rawTimeout === 'number' && rawTimeout > 0 ? Math.min(rawTimeout, 1_800_000) : 300_000;
+      timeoutMs = typeof rawTimeout === 'number' && rawTimeout > 0
+        ? Math.min(rawTimeout, 2_147_478_647)
+        : undefined;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       const rawResumeId = fields['resumeId'];
@@ -2051,7 +2052,7 @@ export function createWorkspaceRoutes(
       id,
       agent: adapter.id,
       promptLen: prompt.length,
-      timeoutMs,
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       wait,
     });
     // `wait:true` → run synchronously and return the full result (curl/tests).

@@ -556,18 +556,23 @@ does not change whom OpenAlice addresses.
 Choose waiting behavior from the work rather than treating every ask as a
 blocking follow-up:
 
-- use `--await` for a bounded consultation whose answer is required in the
-  current turn;
+- use `--await` when the answer is required in the current turn; without an
+  explicit timeout it waits until the task reaches a terminal state;
 - omit it for delegation, retain the returned `taskId`/`resumeId`, and retrieve
   the reply later with `read` or `await`;
 - dispatch multiple independent asks before one ordered `collect`;
 - ask a long-running peer to manage its own local Issue/schedule and `inbox
   push` the finished report when the human should be notified.
 
+Conversation dispatch has no implicit execution deadline. `--timeout-ms` is an
+explicit opt-in watchdog on `conversation ask`; omitting it lets the native
+one-shot Agent run to its natural exit. The same option is only a server-side
+wait budget on standalone `await` and `collect`. A bounded wait preserves every
+task, so callers can use a later collect/read snapshot instead of scripting
+arbitrary sleeps.
+
 Inbox is human-facing delivery. OpenAlice does not yet inject an unsolicited
-completion message into another Agent's active transcript. A timed-out collect
-preserves every task; callers fall back to a later collect/read snapshot instead
-of scripting arbitrary sleeps.
+completion message into another Agent's active transcript.
 
 The first fresh reconstruction appends a `reconstructed` occurrence to the
 artifact. Later questions about that same otherwise-unattributed artifact

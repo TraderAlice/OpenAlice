@@ -160,7 +160,6 @@ describe('Workspace conversation control', () => {
     }).ask({
       target: { kind: 'harness', harness: 'chat' },
       prompt: 'Start fresh.',
-      timeoutMs: 300_000,
     })
 
     expect(result).toMatchObject({
@@ -174,7 +173,7 @@ describe('Workspace conversation control', () => {
       workspace,
       expect.anything(),
       'Start fresh.',
-      300_000,
+      undefined,
       undefined,
       undefined,
       undefined,
