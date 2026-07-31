@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot,
   ChevronDown,
@@ -105,6 +105,7 @@ function ToolBlock({ block }: { block: Extract<HeadlessMessageBlock, { type: 'to
 function RunOutput({ task }: { task: HeadlessTaskRecord }) {
   const [output, setOutput] = useState<HeadlessOutput | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [retryKey, setRetryKey] = useState(0)
   const running = task.status === 'running'
 
   useEffect(() => {
@@ -127,9 +128,22 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
       cancelled = true
       clearInterval(id)
     }
-  }, [task.taskId, running])
+  }, [task.taskId, retryKey, running])
 
-  if (error) return <div className="text-xs text-destructive">Output unavailable: {error}</div>
+  if (error && !output) {
+    return (
+      <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-l-2 border-destructive/60 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <span>Output unavailable: {error}</span>
+        <button
+          type="button"
+          className="min-h-10 rounded-md border border-destructive/30 px-2.5 py-1 font-medium hover:bg-destructive/10 sm:min-h-0"
+          onClick={() => setRetryKey((key) => key + 1)}
+        >
+          Retry output
+        </button>
+      </div>
+    )
+  }
   if (!output) return <div className="text-xs text-muted-foreground">Loading structured output…</div>
 
   const tools = output.structured.blocks.filter(
@@ -141,7 +155,19 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
 
   return (
     <div className="space-y-3">
-      <section className="rounded-lg border border-border/70 bg-secondary/25 p-3">
+      {error && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-l-2 border-warning/60 bg-warning/5 px-3 py-2 text-xs text-warning">
+          <span>Live update paused: {error}. Showing the last available output.</span>
+          <button
+            type="button"
+            className="min-h-10 rounded-md border border-warning/30 px-2.5 py-1 font-medium hover:bg-warning/10 sm:min-h-0"
+            onClick={() => setRetryKey((key) => key + 1)}
+          >
+            Retry now
+          </button>
+        </div>
+      )}
+      <section className="border-l-2 border-primary/30 pl-3">
         <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           <MessageSquareText size={14} />
           Reply
@@ -176,7 +202,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
         </section>
       )}
 
-      <details className="rounded-lg border border-border/60">
+      <details className="border-y border-border/60">
         <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground sm:min-h-0">
           <TerminalSquare size={13} />
           Runtime diagnostics
@@ -201,7 +227,7 @@ function RunOutput({ task }: { task: HeadlessTaskRecord }) {
   )
 }
 
-function SummaryCard({
+function SummaryMetric({
   label,
   mobileLabel = label,
   value,
@@ -215,12 +241,12 @@ function SummaryCard({
   mobileDetail?: string
 }) {
   return (
-    <div className="min-w-0 rounded-lg border border-border/60 bg-secondary/25 px-2 py-2 sm:px-3">
+    <div className="min-w-0 flex-1 px-2.5 py-2.5 first:pl-0 last:pr-0 sm:px-4">
       <div className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 sm:tracking-[0.1em]">
         <span className="sm:hidden">{mobileLabel}</span>
         <span className="hidden sm:inline">{label}</span>
       </div>
-      <div className="mt-0.5 text-lg font-semibold text-foreground">{value}</div>
+      <div className="mt-0.5 text-base font-semibold tabular-nums text-foreground sm:text-lg">{value}</div>
       <div className="truncate text-[10px] text-muted-foreground sm:overflow-visible sm:text-clip sm:whitespace-normal sm:text-[11px]">
         <span className="sm:hidden">{mobileDetail}</span>
         <span className="hidden sm:inline">{detail}</span>
@@ -307,9 +333,13 @@ function AutomationRunTitle({
 /** Cross-workspace control plane for concurrent native-agent runs. */
 export function AutomationRunsSection() {
   const [snapshot, setSnapshot] = useState<HeadlessListSnapshot | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [opening, setOpening] = useState<Set<string>>(new Set())
+  const [openErrors, setOpenErrors] = useState<Record<string, string>>({})
+  const openingRef = useRef(new Set<string>())
   const { openHeadlessRun, workspaces } = useWorkspaces()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const { data: issueSnapshot } = useIssues()
@@ -372,9 +402,9 @@ export function AutomationRunsSection() {
           },
         }
       })
-      setError(null)
+      setListError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setListError(e instanceof Error ? e.message : String(e))
     }
   }, [])
 
@@ -388,6 +418,7 @@ export function AutomationRunsSection() {
     const cursor = snapshot?.page.nextCursor
     if (!snapshot || !cursor || loadingMore) return
     setLoadingMore(true)
+    setLoadMoreError(null)
     try {
       const older = await api.headless.snapshot({ limit: RUNS_PAGE_SIZE, cursor })
       setSnapshot((previous) => {
@@ -404,43 +435,70 @@ export function AutomationRunsSection() {
           },
         }
       })
-      setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setLoadMoreError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoadingMore(false)
     }
   }
 
-  if (error && !snapshot) return <div className="text-sm text-destructive">Failed to load runs: {error}</div>
+  const openAsSession = async (task: HeadlessTaskRecord) => {
+    if (openingRef.current.has(task.taskId)) return
+    openingRef.current.add(task.taskId)
+    setOpening((previous) => new Set(previous).add(task.taskId))
+    setOpenErrors((previous) => {
+      const next = { ...previous }
+      delete next[task.taskId]
+      return next
+    })
+    try {
+      await openHeadlessRun(task.wsId, task.resumeId, { title: task.prompt })
+    } catch (e) {
+      setOpenErrors((previous) => ({
+        ...previous,
+        [task.taskId]: e instanceof Error ? e.message : String(e),
+      }))
+    } finally {
+      openingRef.current.delete(task.taskId)
+      setOpening((previous) => {
+        const next = new Set(previous)
+        next.delete(task.taskId)
+        return next
+      })
+    }
+  }
+
+  if (listError && !snapshot) return <div className="text-sm text-destructive">Failed to load runs: {listError}</div>
   if (!snapshot) {
     return (
       <div className="space-y-3" aria-hidden="true">
-        <div className="grid grid-cols-3 gap-2">
-          {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-lg" />)}
+        <div className="flex divide-x divide-border/60 border-y border-border/70">
+          {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="mx-3 my-3 h-12 flex-1 rounded" />)}
         </div>
-        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-lg" />)}
+        <div className="divide-y divide-border/60 border-y border-border/70">
+          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="my-3 h-14 rounded" />)}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div data-testid="runs-summary" className="grid grid-cols-3 gap-2">
-        <SummaryCard
+    <div className="max-w-6xl space-y-5">
+      <div data-testid="runs-summary" className="flex divide-x divide-border/60 border-y border-border/70">
+        <SummaryMetric
           label="Concurrency"
           mobileLabel="Workers"
           value={`${snapshot.capacity.running} / ${snapshot.capacity.limit}`}
           detail={snapshot.capacity.running === 0 ? 'No workers active' : 'Native agent workers active'}
           mobileDetail={snapshot.capacity.running === 0 ? 'Idle' : `${snapshot.capacity.running} active`}
         />
-        <SummaryCard
+        <SummaryMetric
           label="Runs"
           value={String(snapshot.page.total)}
           detail={`Showing ${snapshot.tasks.length} · ${snapshot.summary.done} completed · ${snapshot.summary.needsAttention} need attention`}
           mobileDetail={snapshot.summary.needsAttention === 0 ? 'All clear' : `${snapshot.summary.needsAttention} attention`}
         />
-        <SummaryCard
+        <SummaryMetric
           label="Runtime parsers"
           mobileLabel="Parsers"
           value="4"
@@ -454,122 +512,129 @@ export function AutomationRunsSection() {
           No headless runs yet. Dispatch one with <code className="text-xs">POST /api/workspaces/:id/headless</code>.
         </div>
       ) : (
-        <div className="space-y-2">
-          {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-              Refresh failed: {error}
+        <div className="space-y-3">
+          {listError && (
+            <div role="status" className="border-l-2 border-warning/60 bg-warning/5 px-3 py-2 text-xs text-warning">
+              Live updates paused: {listError}. Showing the last available run list.
             </div>
           )}
-          {snapshot.tasks.map((task) => {
-            const isExpanded = expanded.has(task.taskId)
-            const openable = task.status !== 'running' && task.resumable
-            const workspaceLabel = workspaceLabels.get(task.wsId)
-            const issueSource = issueRunSource(task)
-            const issueIdentity = issueSource
-              ? issueIdentities.get(issueIdentityKey(issueSource.workspaceId, issueSource.issueId))
-              : undefined
-            const workspaceName = workspaceLabel?.label ?? task.wsId
-            const runSubject = issueIdentity?.title
-              ?? issueSource?.issueId
-              ?? summarizeRunPrompt(task.prompt)
-            const runLabel = `Run details, ${task.status}: ${runSubject}. ${task.agent} in ${workspaceName}.`
-            const toolSummary = task.output?.toolCalls
-              ? `${task.output.toolCalls} tool${task.output.toolCalls === 1 ? '' : 's'}`
-              : task.output
-                ? 'No tools used'
-                : 'Parse on open'
-            return (
-              <article
-                key={task.taskId}
-                data-task-id={task.taskId}
-                className="overflow-hidden rounded-xl border border-border/70 bg-secondary/15"
-              >
-                <button
-                  type="button"
-                  onClick={() => toggle(task.taskId)}
-                  className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-muted/35"
-                  aria-expanded={isExpanded}
-                  aria-label={runLabel}
+          <div data-testid="runs-list" className="divide-y divide-border/60 border-y border-border/70">
+            {snapshot.tasks.map((task) => {
+              const isExpanded = expanded.has(task.taskId)
+              const openable = task.status !== 'running' && task.resumable
+              const isOpening = opening.has(task.taskId)
+              const openError = openErrors[task.taskId]
+              const workspaceLabel = workspaceLabels.get(task.wsId)
+              const issueSource = issueRunSource(task)
+              const issueIdentity = issueSource
+                ? issueIdentities.get(issueIdentityKey(issueSource.workspaceId, issueSource.issueId))
+                : undefined
+              const workspaceName = workspaceLabel?.label ?? task.wsId
+              const runSubject = issueIdentity?.title
+                ?? issueSource?.issueId
+                ?? summarizeRunPrompt(task.prompt)
+              const runLabel = `Run details, ${task.status}: ${runSubject}. ${task.agent} in ${workspaceName}.`
+              const toolSummary = task.output?.toolCalls
+                ? `${task.output.toolCalls} tool${task.output.toolCalls === 1 ? '' : 's'}`
+                : task.output
+                  ? 'No tools used'
+                  : 'Parse on open'
+              return (
+                <article
+                  key={task.taskId}
+                  data-task-id={task.taskId}
+                  className={isExpanded ? 'bg-secondary/20' : 'bg-transparent'}
                 >
-                  <span className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_STYLE[task.status]}`}>
-                    {task.status}
-                  </span>
-                  <Bot size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1">
-                    <AutomationRunTitle task={task} source={issueSource} issue={issueIdentity} />
-                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                      <span>{task.agent}</span>
-                      <span
-                        className={workspaceLabel ? undefined : 'font-mono'}
-                        title={workspaceLabel?.title ?? task.wsId}
-                      >
-                        {workspaceLabel?.label ?? task.wsId}
-                      </span>
-                      <span>{formatRelativeTime(task.startedAt)}</span>
-                      <span>{fmtDuration(task.durationMs)}</span>
-                      <span>{toolSummary}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggle(task.taskId)}
+                    className="group flex w-full items-start gap-3 px-1 py-3 text-left hover:bg-muted/30 sm:px-2"
+                    aria-expanded={isExpanded}
+                    aria-label={runLabel}
+                  >
+                    <span className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${STATUS_STYLE[task.status]}`}>
+                      {task.status}
                     </span>
-                  </span>
-                  {isExpanded ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-muted-foreground" />}
-                </button>
+                    <Bot size={14} className="mt-1 shrink-0 text-muted-foreground/70" />
+                    <span className="min-w-0 flex-1">
+                      <AutomationRunTitle task={task} source={issueSource} issue={issueIdentity} />
+                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                        <span>{task.agent}</span>
+                        <span
+                          className={workspaceLabel ? undefined : 'font-mono'}
+                          title={workspaceLabel?.title ?? task.wsId}
+                        >
+                          {workspaceLabel?.label ?? task.wsId}
+                        </span>
+                        <span>{formatRelativeTime(task.startedAt)}</span>
+                        <span>{fmtDuration(task.durationMs)}</span>
+                        <span>{toolSummary}</span>
+                      </span>
+                    </span>
+                    {isExpanded ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-muted-foreground" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-muted-foreground" />}
+                  </button>
 
-                {isExpanded && (
-                  <div className="space-y-3 border-t border-border/60 px-3 py-3">
-                    <details className="rounded-lg border border-border/60 bg-secondary/25">
-                      <summary className="flex min-h-10 cursor-pointer items-center px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground sm:min-h-0">
-                        Task instructions
-                      </summary>
-                      <pre className="max-h-64 overflow-auto border-t border-border/50 px-3 py-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
-                        {task.prompt}
-                      </pre>
-                    </details>
-                    {task.error && (
-                      <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                        <CircleAlert size={13} className="mt-0.5 shrink-0" />
-                        {task.error}
-                      </div>
-                    )}
-                    {(issueSource || openable) && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {issueSource && (
-                          <button
-                            type="button"
-                            className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-primary hover:bg-primary/10 sm:min-h-0"
-                            onClick={() => openOrFocus({
-                              kind: 'issue-detail',
-                              params: {
-                                wsId: issueSource.workspaceId,
-                                id: issueSource.issueId,
-                              },
-                            })}
-                          >
-                            <ListChecks size={12} />
-                            Open Issue
-                          </button>
-                        )}
-                        {openable && (
-                          <button
-                            type="button"
-                            className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10 sm:min-h-0"
-                            title="Resume this run's conversation in an interactive session"
-                            onClick={() => {
-                              void openHeadlessRun(task.wsId, task.resumeId, {
-                                title: task.prompt,
-                              }).catch((e) => setError(e instanceof Error ? e.message : String(e)))
-                            }}
-                          >
-                            <ExternalLink size={12} />
-                            Open as session
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    <RunOutput task={task} />
-                  </div>
-                )}
-              </article>
-            )
-          })}
+                  {isExpanded && (
+                    <div className="space-y-3 border-t border-border/50 px-1 py-3 sm:px-2">
+                      <details className="border-b border-border/60">
+                        <summary className="flex min-h-10 cursor-pointer items-center px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground sm:min-h-0">
+                          Task instructions
+                        </summary>
+                        <pre className="max-h-64 overflow-auto border-t border-border/50 px-3 py-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
+                          {task.prompt}
+                        </pre>
+                      </details>
+                      {task.error && (
+                        <div className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                          <CircleAlert size={13} className="mt-0.5 shrink-0" />
+                          {task.error}
+                        </div>
+                      )}
+                      {(issueSource || openable) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {issueSource && (
+                            <button
+                              type="button"
+                              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-primary hover:bg-primary/10 sm:min-h-0"
+                              onClick={() => openOrFocus({
+                                kind: 'issue-detail',
+                                params: {
+                                  wsId: issueSource.workspaceId,
+                                  id: issueSource.issueId,
+                                },
+                              })}
+                            >
+                              <ListChecks size={12} />
+                              Open Issue
+                            </button>
+                          )}
+                          {openable && (
+                            <button
+                              type="button"
+                              disabled={isOpening}
+                              aria-busy={isOpening}
+                              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-success hover:bg-success/10 disabled:cursor-wait disabled:opacity-60 sm:min-h-0"
+                              title="Resume this run's conversation in an interactive session"
+                              onClick={() => void openAsSession(task)}
+                            >
+                              <ExternalLink size={12} />
+                              {isOpening ? 'Opening…' : 'Open as session'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {openError && (
+                        <div role="alert" className="border-l-2 border-destructive/60 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                          Could not open this run as a session: {openError}
+                        </div>
+                      )}
+                      <RunOutput task={task} />
+                    </div>
+                  )}
+                </article>
+              )
+            })}
+          </div>
           {snapshot.page.hasMore && (
             <div className="flex flex-col items-center gap-1 pt-2">
               <button
@@ -584,6 +649,11 @@ export function AutomationRunsSection() {
               <span className="text-[11px] text-muted-foreground">
                 {snapshot.tasks.length} of {snapshot.page.total} loaded
               </span>
+              {loadMoreError && (
+                <span role="alert" className="text-[11px] text-destructive">
+                  Could not load older runs: {loadMoreError}
+                </span>
+              )}
             </div>
           )}
         </div>
