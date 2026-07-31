@@ -179,7 +179,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
     expect(inspectRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         instance: 'research',
-        homeRoot: '/srv/openalice-research',
+        homeRoot: resolve('/srv/openalice-research'),
       }),
       expect.any(Object),
     )
@@ -202,7 +202,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
     expect(automaticStart).toHaveBeenCalledWith(
       expect.objectContaining({
         appDir: null,
-        homeRoot: '/home/alice/.openalice',
+        homeRoot: resolve('/home/alice/.openalice'),
         port: undefined,
         checkUpdates: true,
       }),
@@ -236,8 +236,8 @@ describe('OpenAlice top-level lifecycle commands', () => {
     )).resolves.toBe(0)
     expect(configuredStart).toHaveBeenCalledWith(
       expect.objectContaining({
-        appDir: '/srv/OpenAlice',
-        homeRoot: '/srv/openalice-research',
+        appDir: resolve('/srv/OpenAlice'),
+        homeRoot: resolve('/srv/openalice-research'),
         port: 49_001,
         checkUpdates: false,
       }),

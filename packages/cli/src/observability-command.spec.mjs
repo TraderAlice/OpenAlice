@@ -132,7 +132,7 @@ describe('observability command presenter', () => {
     expect(readLogs).toHaveBeenCalledWith(
       expect.objectContaining({
         instance: 'research',
-        homeRoot: '/srv/openalice-research',
+        homeRoot: resolve('/srv/openalice-research'),
       }),
       expect.any(Object),
     )
