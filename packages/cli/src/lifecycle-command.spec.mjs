@@ -202,7 +202,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
     expect(automaticStart).toHaveBeenCalledWith(
       expect.objectContaining({
         appDir: null,
-        homeRoot: resolve('/home/alice/.openalice'),
+        homeRoot: join('/home/alice', '.openalice'),
         port: undefined,
         checkUpdates: true,
       }),
