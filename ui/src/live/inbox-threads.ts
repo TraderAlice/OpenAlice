@@ -50,9 +50,9 @@ export function groupThreads(entries: readonly InboxEntry[]): InboxThread[] {
 }
 
 /**
- * Second-line preview text for a sidebar row — the latest push's comment
- * first line, else its first doc path. Mirrors the per-entry preview the
- * flat list used.
+ * Human scan label for one push — its first non-empty comment line, otherwise
+ * the first attached document. The Inbox time view treats this as the primary
+ * row identity; Workspace and timestamp remain supporting provenance.
  */
 export function previewForEntry(entry: InboxEntry): string {
   const c = (entry.comments ?? '').trim()

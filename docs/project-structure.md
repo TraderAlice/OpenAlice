@@ -113,6 +113,13 @@ and git repository plus PTY sessions, scrollback, issues, schedules, and agent
 configuration. The launcher supplies reusable infrastructure; the work itself
 lives in templates, skills, files, and satellite repositories.
 
+Coding-agent adapters are installation capabilities, not Workspace identity.
+Every registered adapter is eligible in every active Workspace; install and
+credential readiness are checked when a runtime is selected. Workspace registry
+and lifecycle rows do not persist adapter allowlists. A future user choice for
+the default enabled adapter set belongs in installation preferences, never in
+historical Workspace metadata.
+
 Chat uses that boundary deliberately:
 
 - **New conversation** creates a Session inside the recent Chat Workspace.

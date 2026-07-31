@@ -129,6 +129,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     expect(releases[0]).toMatch(/^test_ref-[a-f0-9]{16}$/)
     await expect(access(join(installRoot, 'cli-versions', releases[0], 'bin', 'openalice.ts'))).resolves.toBeUndefined()
     await expect(access(join(installRoot, 'cli-versions', releases[0], 'managed', 'pi', 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js'))).resolves.toBeUndefined()
+    await expect(access(join(installRoot, 'cli-versions', releases[0], 'managed', 'pi', 'node_modules', '@earendil-works', 'pi-tui', 'package.json'))).resolves.toBeUndefined()
     await expect(access(join(installRoot, 'bin', 'openalice.cmd'))).resolves.toBeUndefined()
     await expect(access(join(installRoot, 'bin', 'pi.cmd'))).resolves.toBeUndefined()
 
@@ -145,6 +146,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
         selector: { kind: 'version', value: 'test/ref' },
         installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/test/ref/install',
       },
+      managedRuntime: null,
     })
     await expect(access(join(installRoot, 'cli-versions', releases[0], 'install-source.json'))).resolves.toBeUndefined()
     const pi = await execFileAsync(join(installRoot, 'bin', 'pi'), ['--version'])
@@ -242,7 +244,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     expect(result.exitCode).toBe(0)
     expect(result.output).toContain('Continue with this install?')
     expect(result.output).toContain('OpenAlice and Pi are ready')
-    expect(result.output).toContain('Start OpenAlice now?')
+    expect(result.output).toContain('Open the OpenAlice Supervisor now?')
     expect(result.output).toContain('Start it when you are ready')
     await expect(access(join(installRoot, 'bin', 'openalice'))).resolves.toBeUndefined()
   })
@@ -296,7 +298,7 @@ function runInstallerInPty(args, { home, reply }) {
         replied = true
         terminal.write(reply)
       }
-      if (!declinedStart && output.includes('Start OpenAlice now?')) {
+      if (!declinedStart && output.includes('Open the OpenAlice Supervisor now?')) {
         declinedStart = true
         terminal.write('n\r')
       }

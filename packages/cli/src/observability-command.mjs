@@ -1,9 +1,9 @@
 import { diagnoseRuntime } from './doctor.mjs'
 import {
   buildManagedPiEnv,
-  resolveLaunchContext,
 } from './launch-context.ts'
 import { readRuntimeLogs } from './logs.mjs'
+import { resolveStoredLaunchContext } from './supervisor-config.ts'
 
 export function parseObservabilityArgs(action, argv) {
   if (!['logs', 'doctor'].includes(action)) throw usageError(`Unknown observability command: ${String(action)}`)
@@ -48,9 +48,13 @@ export async function runObservabilityCommand(action, options, dependencies = {}
   try {
     const context = await (
       dependencies.resolveContext
-      ?? ((flags) => resolveLaunchContext({
-        flags,
+      ?? ((flags) => resolveStoredLaunchContext(flags, {
         env: dependencies.env,
+        cwd: dependencies.cwd,
+        homeDir: dependencies.homeDir,
+        platform: dependencies.platform,
+        readConfig: dependencies.readSupervisorConfig,
+        checkStoredHome: dependencies.checkStoredHome,
       }))
     )({
       instance: options.instance ?? undefined,

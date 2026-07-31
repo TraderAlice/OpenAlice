@@ -1,9 +1,9 @@
 /**
  * End-to-end check of the create flow, exercising the real moving parts in
  * order: bootstrap.mjs (run on the bundled Node + dugite's bundled git) →
- * launcher context injection → launcher initial commit. Proves the workspace
- * is a fresh-git repo with exactly one clean commit (the "Harness rule"), and
- * — via the PATH-stripped case — that creation needs NO system git or bash.
+ * launcher context injection → launcher commit. Proves Chat starts a clean
+ * local repository, AutoQuant retains its verified upstream ancestry, and —
+ * via the PATH-stripped case — creation needs NO system git or bash.
  */
 
 import { spawn } from 'node:child_process';
@@ -138,8 +138,8 @@ describe('chat workspace create: bootstrap → inject → commit', () => {
   });
 });
 
-describe('auto-quant workspace create: clone → scrub → commit', () => {
-  it('scrubs cloned history + remote into a fresh-git workspace with one launcher commit', async () => {
+describe('auto-quant workspace create: clone → branch → commit', () => {
+  it('retains verified upstream ancestry and origin under the local research branch', async () => {
     // fake upstream: history + an origin pointing at the public repo
     const src = join(parent, 'fake-auto-quant');
     await run('git', ['init', '-q', '-b', 'main', src]);
@@ -174,9 +174,15 @@ describe('auto-quant workspace create: clone → scrub → commit', () => {
       version: 'v0.8.27',
       commit: sourceCommit,
     });
-    // ...but history + remote are scrubbed (the Harness rule)
-    expect((await run('git', ['-C', aqDir, 'remote', '-v'])).trim()).toBe('');
-    expect((await run('git', ['-C', aqDir, 'log', '--pretty=%s'])).trim()).toBe('auto-quant-v2: aqtag');
+    // The launcher commit sits directly on the verified upstream commit, and
+    // origin remains the canonical repository for later Agent-managed updates.
+    expect((await run('git', ['-C', aqDir, 'rev-parse', 'HEAD^'])).trim()).toBe(sourceCommit);
+    expect((await run('git', ['-C', aqDir, 'remote', 'get-url', 'origin'])).trim()).toBe(
+      'https://github.com/TraderAlice/Auto-Quant-V2.git',
+    );
+    expect((await run('git', ['-C', aqDir, 'log', '--pretty=%s'])).trim()).toBe(
+      'auto-quant-v2: aqtag\nupstream history',
+    );
     expect((await run('git', ['-C', aqDir, 'status', '--porcelain'])).trim()).toBe('');
     expect((await run('git', ['-C', aqDir, 'rev-parse', '--abbrev-ref', 'HEAD'])).trim()).toBe('research/aqtag');
   });

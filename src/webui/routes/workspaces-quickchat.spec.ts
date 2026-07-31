@@ -22,6 +22,7 @@ import {
   ChatWorkspaceResolver,
   TemplateWorkspaceResolver,
 } from '../../workspaces/chat-workspace-resolver.js';
+import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -50,10 +51,10 @@ function build(opts: {
   opencodeRuntimeSource?: 'global-config' | 'global-login' | 'managed-runtime';
   runtimeWorkspace?: any;
 } = {}) {
+  const builtinAdapters = createBuiltinAdapterRegistry();
   const META = {
     id: 'ws-1',
     dir: '/w',
-    agents: ['claude', 'opencode'],
     template: 'chat',
     tag: 'chat-x',
     createdAt: '2026-07-01T00:00:00.000Z',
@@ -61,16 +62,23 @@ function build(opts: {
   const opencode = {
     id: 'opencode',
     namePrefix: 'o',
+    capabilities: builtinAdapters.get('opencode')!.capabilities,
     writeAiConfig: vi.fn(async () => {}),
     readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
   const claude = {
     id: 'claude',
     namePrefix: 'c',
+    capabilities: builtinAdapters.get('claude')!.capabilities,
     readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
     readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
   };
-  const shell = { id: 'shell', kind: 'utility', namePrefix: 'sh' };
+  const shell = {
+    id: 'shell',
+    kind: 'utility',
+    namePrefix: 'sh',
+    capabilities: builtinAdapters.get('shell')!.capabilities,
+  };
   const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn((_wsId: string, ctx: any) => ({
     recordId: ctx.recordId,
@@ -132,7 +140,10 @@ function build(opts: {
     resolveOrCreateAutoQuantWorkspace: (preferredWorkspaceId?: string | null, sourceVersion?: string) =>
       autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion),
     resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
-    adapters: { get: (id: string) => adapters[id] },
+    adapters: {
+      get: (id: string) => adapters[id],
+      list: () => [claude, opencode, shell],
+    },
     sessionRegistry,
     resumeRegistry,
     pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
@@ -417,7 +428,6 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       runtimeWorkspace: {
         id: 'workspace-manager',
         dir: '/manager',
-        agents: ['opencode'],
         template: 'workspace-manager',
         tag: 'Workspace Manager',
         createdAt: '2026-07-16T00:00:00.000Z',
@@ -459,7 +469,6 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
       runtimeWorkspace: {
         id: 'workspace-manager',
         dir: '/manager',
-        agents: ['opencode'],
         template: 'workspace-manager',
         tag: 'Workspace Manager',
         createdAt: '2026-07-16T00:00:00.000Z',
@@ -577,7 +586,6 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const recent = {
       id: 'ws-recent',
       dir: '/recent',
-      agents: ['claude'],
       template: 'chat',
       tag: 'long-running-chat',
       createdAt: '2026-06-01T00:00:00.000Z',
@@ -595,11 +603,11 @@ describe('POST /quick-chat — loginless credential injection', () => {
 
   it('falls back to the most recently active Chat workspace and remembers it', async () => {
     const older = {
-      id: 'ws-older', dir: '/older', agents: ['claude'], template: 'chat', tag: 'older',
+      id: 'ws-older', dir: '/older', template: 'chat', tag: 'older',
       createdAt: '2026-07-09T00:00:00.000Z',
     };
     const active = {
-      id: 'ws-active', dir: '/active', agents: ['claude'], template: 'chat', tag: 'active',
+      id: 'ws-active', dir: '/active', template: 'chat', tag: 'active',
       createdAt: '2026-07-01T00:00:00.000Z',
     };
     const { app, creator, spawn, rememberRecentChatWorkspace } = build({
@@ -656,7 +664,6 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const existing = {
       id: 'aq-existing',
       dir: '/aq',
-      agents: ['claude'],
       template: 'auto-quant-v2',
       tag: 'auto-quant',
       createdAt: '2026-07-01T00:00:00.000Z',
@@ -675,7 +682,6 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const existing = {
       id: 'aq-existing',
       dir: '/aq',
-      agents: ['claude'],
       template: 'auto-quant-v2',
       tag: 'auto-quant',
       createdAt: '2026-07-01T00:00:00.000Z',
@@ -699,7 +705,6 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const defaultWorkspace = {
       id: 'aq-default',
       dir: '/aq-default',
-      agents: ['claude'],
       template: 'auto-quant-v2',
       tag: 'auto-quant',
       createdAt: '2026-07-01T00:00:00.000Z',
@@ -730,7 +735,7 @@ describe('POST /quick-chat — loginless credential injection', () => {
   // workspace, not today's (so no creator.create).
   it('targetWsId spawns into the given workspace, skipping find-or-create', async () => {
     const { app, spawn, creator } = build({
-      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['claude'], template: 'chat', tag: 'chat-x' }],
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
     });
     const r = await quickChat(app, { prompt: 'hi', agent: 'claude', targetWsId: 'ws-1' });
     expect(r.status).toBe(201);
@@ -739,9 +744,9 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect((spawn.mock.calls[0] as any[])[0]).toBe('ws-1'); // spawned into the target
   });
 
-  it('omitted agent ignores shell at agents[0] and uses the first agent runtime', async () => {
+  it('omitted agent ignores utility adapters and uses the first registered agent runtime', async () => {
     const { app, spawn } = build({
-      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['shell', 'claude'], template: 'chat', tag: 'chat-x' }],
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
     });
     const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
     expect(r.status).toBe(201);
@@ -749,11 +754,11 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('claude');
   });
 
-  it('omitted agent honors a configured default runtime when enabled', async () => {
+  it('omitted agent honors a configured default runtime when registered', async () => {
     vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('opencode');
     vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
     const { app, spawn } = build({
-      workspaces: [{ id: 'ws-1', dir: '/w', agents: ['shell', 'claude', 'opencode'], template: 'chat', tag: 'chat-x' }],
+      workspaces: [{ id: 'ws-1', dir: '/w', template: 'chat', tag: 'chat-x' }],
     });
     const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
     expect(r.status).toBe(201);

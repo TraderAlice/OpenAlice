@@ -30,10 +30,12 @@ export async function main(argv = process.argv.slice(2)) {
     return 0
   }
   if (command === 'version' && args[0] === '--json') {
+    const version = readVersion()
     process.stdout.write(`${JSON.stringify({
-      version: readVersion(),
+      version,
       installSource: await readInstallSource(),
       contentIdentity: installedContentIdentity(),
+      managedRuntime: installedRuntimeInfo(version),
     })}\n`)
     return 0
   }
@@ -127,6 +129,21 @@ Prints a completion script to stdout without modifying shell configuration.
   error.code = 'EUSAGE'
   error.exitCode = 2
   throw error
+}
+
+function installedRuntimeInfo(productVersion) {
+  const path = process.env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
+  const contentIdentity = process.env[
+    'OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY'
+  ]?.trim()
+  if (!path || !contentIdentity) return null
+  return {
+    productVersion,
+    platform: process.platform,
+    arch: process.arch,
+    path,
+    contentIdentity,
+  }
 }
 
 function readVersion() {

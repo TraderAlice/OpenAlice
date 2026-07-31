@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import '../i18n'
@@ -38,9 +39,13 @@ vi.mock('../tabs/store', () => ({
 }))
 
 vi.mock('../components/workspace/WorkspaceView', () => ({
-  WorkspaceView: (props: { label?: string }) => {
+  WorkspaceView: (props: { label?: string; terminalHeaderActions?: ReactNode }) => {
     mocks.workspaceViewProps(props)
-    return <div data-testid="workspace-view" data-label={props.label} />
+    return (
+      <div data-testid="workspace-view" data-label={props.label}>
+        {props.terminalHeaderActions}
+      </div>
+    )
   },
 }))
 
@@ -54,7 +59,6 @@ function workspace(overrides: Partial<Workspace> = {}): Workspace {
     tag: 'chat-jun30',
     dir: '/tmp/chat-jun30',
     createdAt: '2026-06-30T00:00:00.000Z',
-    agents: ['codex'],
     sessions: [],
     ...overrides,
   }
@@ -97,5 +101,39 @@ describe('WorkspacePage identity', () => {
 
     expect(screen.getByTitle('chat-jun30').textContent).toBe('chat-jun30')
     expect(screen.getByTestId('workspace-view').getAttribute('data-label')).toBe('chat-jun30')
+  })
+
+  it('promotes Workspace actions into the running terminal canvas', () => {
+    mocks.workspaces = [workspace({
+      sessions: [{
+        id: 'shell-session',
+        resumeId: 'resume-shell',
+        wsId: 'chat-1',
+        agent: 'shell',
+        name: 'sh1',
+        createdAt: '2026-07-31T00:00:00.000Z',
+        lastActiveAt: '2026-07-31T00:00:00.000Z',
+        state: 'running',
+        surface: 'terminal',
+        pid: 42,
+        startedAt: 42,
+        title: null,
+      }],
+    })]
+
+    const { container } = render(
+      <WorkspacePage
+        spec={{ kind: 'workspace', params: { wsId: 'chat-1', sessionId: 'shell-session' } }}
+        visible
+      />,
+    )
+
+    expect(container.querySelector('.workspace-page-shell')?.classList.contains('is-terminal-canvas'))
+      .toBe(true)
+    expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
+    expect(mocks.workspaceViewProps).toHaveBeenCalledWith(expect.objectContaining({
+      terminalHeaderActions: expect.anything(),
+    }))
   })
 })

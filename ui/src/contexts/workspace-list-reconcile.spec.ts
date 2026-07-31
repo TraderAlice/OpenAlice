@@ -10,7 +10,6 @@ function workspace(id: string, title: string): Workspace {
     dir: `/tmp/${id}`,
     createdAt: '2026-07-16T00:00:00.000Z',
     template: 'chat',
-    agents: ['pi'],
     sessions: [{
       id: `${id}-session`,
       resumeId: `${id}-resume`,

@@ -40,7 +40,6 @@ function fakeService(opts: {
     tag: 'peer-desk',
     dir: '/tmp/peer-desk',
     createdAt: '2026-07-11T00:00:00.000Z',
-    agents: ['pi'],
   }
   const dispatchHeadlessTask = vi.fn(async () => ({
     taskId: 'task-follow-up',

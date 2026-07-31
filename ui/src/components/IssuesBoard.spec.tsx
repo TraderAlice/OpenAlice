@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { IssueListItem, IssueSnapshot } from '../api/issues'
@@ -25,7 +26,7 @@ vi.mock('../contexts/workspaces-context', () => ({
     ],
     defaultAgent: 'pi',
     issueDefaultAgent: null,
-    workspaces: [{ id: 'ws-1', agents: ['pi', 'claude'] }],
+    workspaces: [{ id: 'ws-1' }],
   }),
 }))
 
@@ -172,13 +173,97 @@ describe('IssuesBoard', () => {
     render(<IssuesBoard />)
 
     expect(screen.getByText('进行中')).toBeTruthy()
-    expect(screen.getAllByText('运行中')).toHaveLength(2)
-    expect(screen.getAllByText('每工作日 08:30')).toHaveLength(2)
+    expect(screen.getAllByText('运行中')).toHaveLength(1)
+    expect(screen.getAllByText('每工作日 08:30')).toHaveLength(1)
     expect(screen.getByText('首次运行时指派')).toBeTruthy()
     expect(screen.getByText('claude 覆盖')).toBeTruthy()
     expect(screen.getByLabelText('高优先级')).toBeTruthy()
     expect(screen.getByLabelText('折叠“进行中”议题')).toBeTruthy()
     expect(screen.getByTitle('打开 weekday-scan')).toBeTruthy()
     expect(screen.getByTitle('工作区：market-desk（ws-1）')).toBeTruthy()
+  })
+
+  it('uses one flat ledger and renders automation metadata only once per Issue', () => {
+    mocks.useIssues.mockReturnValue({
+      data: snapshot([
+        issue({
+          id: 'scan-once',
+          title: 'Render one operational summary',
+          priority: 'high',
+          when: { kind: 'every', every: '1h' },
+          nextDueAtMs: Date.now() + 60_000,
+          automationHealth: { state: 'healthy', message: 'Latest scheduled run completed.' },
+        }),
+      ]),
+      error: null,
+      loading: false,
+    })
+
+    render(<IssuesBoard />)
+
+    const board = screen.getByTestId('issues-board')
+    const group = screen.getByTestId('issue-status-group-todo')
+    expect(board.className).toContain('max-w-[1240px]')
+    expect(group.className).toContain('border-y')
+    expect(group.className).not.toContain('rounded-lg')
+    expect(screen.getAllByTestId('issue-automation-summary')).toHaveLength(1)
+    expect(screen.getAllByText('Healthy')).toHaveLength(1)
+    expect(screen.getAllByText('Every 1h')).toHaveLength(1)
+
+    const priority = screen.getByLabelText('High priority')
+    expect(priority.querySelectorAll('.bg-muted-foreground\\/80')).toHaveLength(3)
+  })
+
+  it('keeps status disclosure and whole-row keyboard navigation intact', async () => {
+    const user = userEvent.setup()
+    mocks.useIssues.mockReturnValue({
+      data: snapshot([issue({ id: 'keyboard-issue', title: 'Keyboard issue' })]),
+      error: null,
+      loading: false,
+    })
+
+    render(<IssuesBoard />)
+
+    const groupToggle = screen.getByRole('button', { name: 'Collapse Todo issues' })
+    expect(groupToggle.getAttribute('aria-controls')).toBe('issues-status-todo')
+    expect(groupToggle.getAttribute('aria-expanded')).toBe('true')
+
+    await user.click(groupToggle)
+    expect(groupToggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('Keyboard issue')).toBeNull()
+
+    await user.click(groupToggle)
+    const row = screen.getByTitle('Open keyboard-issue')
+    row.focus()
+    await user.keyboard('{Enter}')
+
+    expect(mocks.setSidebar).toHaveBeenCalledWith('issue')
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'issue-detail',
+      params: { wsId: 'ws-1', id: 'keyboard-issue' },
+    })
+  })
+
+  it('keeps terminal Issues readable and openable without fading the whole row', async () => {
+    const user = userEvent.setup()
+    mocks.useIssues.mockReturnValue({
+      data: snapshot([issue({
+        id: 'completed-issue',
+        title: 'Completed issue',
+        status: 'done',
+      })]),
+      error: null,
+      loading: false,
+    })
+
+    render(<IssuesBoard />)
+
+    const row = screen.getByTitle('Open completed-issue')
+    expect(row.className).not.toContain('opacity-60')
+    await user.click(row)
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'issue-detail',
+      params: { wsId: 'ws-1', id: 'completed-issue' },
+    })
   })
 })

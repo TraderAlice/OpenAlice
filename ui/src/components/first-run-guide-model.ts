@@ -1,16 +1,7 @@
 import type { TradingServiceStatus } from '../api/trading'
-import type { UTAConfig, WireShape } from '../api/types'
+import type { UTAConfig } from '../api/types'
 import type { CredentialSummary } from '../api/config'
 import type { AgentInfo, AgentRuntimeReadinessSnapshot } from './workspace/api'
-
-const AGENT_WIRE_PREFERENCE: Record<string, WireShape[]> = {
-  claude: ['anthropic'],
-  codex: ['openai-responses'],
-  opencode: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
-  pi: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
-}
-
-const LOGIN_RUNTIME_AGENTS = new Set(['claude', 'codex'])
 
 export const FIRST_RUN_STEP_KEYS = ['language', 'lite', 'ai', 'broker', 'finish'] as const
 export type FirstRunStepKey = typeof FIRST_RUN_STEP_KEYS[number]
@@ -53,7 +44,10 @@ export function buildFirstRunGuideAccess(input: {
 }
 
 export function buildFirstRunGuideModel(input: {
-  agents: readonly Pick<AgentInfo, 'id' | 'displayName' | 'kind' | 'installed'>[]
+  agents: readonly (
+    Pick<AgentInfo, 'id' | 'displayName' | 'kind' | 'installed'>
+    & Partial<Pick<AgentInfo, 'capabilities'>>
+  )[]
   runtimeReadiness: AgentRuntimeReadinessSnapshot | null
   credentials: readonly Pick<CredentialSummary, 'wires'>[]
   tradingStatus: TradingServiceStatus | null
@@ -72,11 +66,13 @@ export function buildFirstRunGuideModel(input: {
   const runtimeRows = agentRuntimes.map((agent) => {
     const readiness = input.runtimeReadiness?.agents[agent.id] ?? null
     const installed = readiness?.installed ?? agent.installed !== false
-    const compatibleCredentialCount = input.credentials.filter((credential) =>
-      (AGENT_WIRE_PREFERENCE[agent.id] ?? ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'])
-        .some((shape) => shape in credential.wires),
-    ).length
-    const loginRuntime = LOGIN_RUNTIME_AGENTS.has(agent.id)
+    const providerCapabilities = agent.capabilities?.aiProvider
+    const compatibleCredentialCount = providerCapabilities
+      ? input.credentials.filter((credential) =>
+          providerCapabilities.wirePreference.some((shape) => shape in credential.wires),
+        ).length
+      : 0
+    const loginRuntime = providerCapabilities?.credentialSource === 'runtime-or-workspace'
     const status = readiness?.status ?? (installed ? 'unknown' : 'not_installed')
     const chainReady = readiness?.ready === true
     const accessLabel = status === 'ready'

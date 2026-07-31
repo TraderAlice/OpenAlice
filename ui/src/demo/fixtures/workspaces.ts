@@ -33,7 +33,6 @@ export const demoWorkspace: Workspace = {
   spawnedFromVersion: '0.1.0',
   currentVersion: '0.1.0',
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
-  agents: ['pi'],
   sessions: [demoSession],
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
@@ -116,7 +115,6 @@ export const demoChatWorkspace: Workspace = {
   spawnedFromVersion: '0.1.0',
   currentVersion: '0.1.0',
   upgradeAvailable: null,
-  agents: ['claude', 'codex', 'opencode', 'pi'],
   sessions: demoChatSessions,
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
@@ -133,10 +131,9 @@ const demoIssueWorkspaces: Workspace[] = [
       schemaVersion: 1,
       template: 'auto-quant-v2',
       repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      version: 'v0.8.30',
-      commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f',
+      version: 'v0.8.31',
+      commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
     },
-    agents: ['codex'],
     sessions: [],
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
   },
@@ -146,7 +143,6 @@ const demoIssueWorkspaces: Workspace[] = [
     displayName: 'Macro Research',
     dir: '/demo/workspaces/macro-research',
     createdAt: new Date().toISOString(),
-    agents: ['codex'],
     sessions: [],
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
   },
@@ -182,8 +178,12 @@ export const autoQuantTemplate: TemplateInfo = {
   hasReadme: true,
   source: {
     repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-    defaultVersion: 'v0.8.30',
+    defaultVersion: 'v0.8.31',
     versions: [
+      {
+        version: 'v0.8.31',
+        commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
+      },
       {
         version: 'v0.8.30',
         commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f',

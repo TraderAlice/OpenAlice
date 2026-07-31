@@ -1,8 +1,8 @@
 # Local Runtime and CLI Bootstrap
 
 This guide owns the browser-local OpenAlice entry after CLI installation and
-the boundary between dependency bootstrap, source-backed Runtime startup,
-Electron distribution, and later downloadable Runtime bundles. Installer
+the boundary between the installed headless Runtime, explicit source-backed
+development, and Electron distribution. Installer
 consent, installed layout, PATH integration, updates, and installer release
 checks belong to [[docs/cli-installer.md]].
 
@@ -18,9 +18,9 @@ The local browser path is a first-class OpenAlice distribution surface:
 
 ```text
 installed openalice CLI
-  └── local OpenAlice source checkout
-        └── built-runtime Guardian
-              ├── Alice + normal Web UI on 127.0.0.1:47331
+  └── platform-specific headless Runtime bundle
+        └── Guardian
+              ├── Alice + normal Web UI on an available 127.0.0.1 port
               ├── optional UTA on local internal ports
               └── optional Connector Service on local internal ports
 ```
@@ -44,17 +44,13 @@ curl -fsSL https://openalice.ai/install | bash
 ```
 
 Development dogfooding can opt into `dev` explicitly with `--branch dev`. The
-installer requires Node.js 22.19.0 or newer and always installs the small CLI
-plus OpenAlice's pinned Pi runtime inside the same immutable install release;
-the two visible commands are `openalice` and `pi`. The installed CLI reports
-the same version as the OpenAlice product release; there is no independent CLI
-version sequence.
-When explicitly selected,
-it can also install missing Linux Git/Python/make/C++ tools needed to build the
-source Runtime. It does not clone OpenAlice, write application state, install
-Electron, configure a provider credential, or start a service without separate
-consent. Managed `openalice remote` can separately plan and clone a private
-remote checkout after installation; that orchestration belongs to
+installer requires Node.js 22.19.0 or newer and installs the CLI, pinned Pi,
+and matching macOS/Linux headless Runtime inside one immutable release. The two
+visible commands are `openalice` and `pi`; CLI and Runtime report the same
+OpenAlice product version. It does not clone OpenAlice, write application
+state, install Electron, configure a provider credential, or start a service
+without separate consent. Managed `openalice remote` installs or reuses the
+same platform Runtime on the SSH host; that orchestration belongs to
 [[docs/remote-access.md]]. The curl entry targets macOS, Linux, WSL, and Git Bash; native Windows
 desktop distribution remains the signed Electron installer. The complete
 consent, update, filesystem, PATH, authenticity, and test contract lives in
@@ -64,33 +60,37 @@ Installer flags, non-interactive consent, development seams, the clean Docker
 fixture, and the manual prompt playground are documented only in
 [[docs/cli-installer.md]].
 
-Until release assets include a standalone headless Runtime, users keep an
-OpenAlice source checkout and run the CLI from inside it:
+After installation, startup is independent of the current directory:
 
 ```bash
-git clone https://github.com/TraderAlice/OpenAlice.git
-cd OpenAlice
+openalice
 openalice up
 openalice open
 ```
 
-`openalice up` finds the checkout, installs the locked workspace dependencies
-without `@traderalice/desktop`, runs `pnpm build:server`, starts
-`scripts/guardian/prod.mjs` on `127.0.0.1`, and leaves it running after the
-shell exits. `openalice open` verifies and opens the normal Web UI. Bare
-`openalice` enters the Supervisor TUI; `openalice start` preserves the legacy
-foreground-and-browser path. If `pnpm` is absent but Corepack is available,
-preparation uses Corepack with the pnpm version pinned by the repository.
+`openalice up` selects the installed bundle, starts
+`scripts/guardian/prod.mjs` on loopback, and leaves it running after the shell
+exits. `openalice open` verifies and opens the normal Web UI. Bare `openalice`
+enters the Supervisor TUI; `openalice run` is the foreground form. A source
+checkout remains an advanced override through instance configuration,
+`OPENALICE_APP_HOME`, or `--app-dir`; missing source artifacts may then use the
+locked pnpm preparation path.
 
 Live broker engines are still activated through the Trading UI and
 `<OPENALICE_HOME>/runtime/broker-packs/`. The source checkout contains their
 adapter workspaces for development, but `build:server` excludes those wrappers
 from UTA Core and no live SDK is evaluated at startup.
 
-When an interactive install is run from inside an OpenAlice checkout, the
-installer presents a separate, default-no `Start OpenAlice now?` prompt after
-the CLI is complete. Installation consent never implies service-start consent,
-and `--yes` remains installation-only for automation.
+When an interactive stable install completes, the
+installer presents a separate, default-no `Open the OpenAlice Supervisor now?`
+prompt after the CLI is complete. The Supervisor can open from any directory
+but does not start the Runtime until the user chooses Start inside the TUI.
+Installation consent never implies service-start consent, and `--yes` remains
+installation-only for automation.
+
+The stopped Supervisor offers `s Start` for the installed Runtime. `m Managed`
+and `c Source` remain advanced source-development controls and are hidden from
+the ordinary stopped action bar when a bundle is available.
 
 `openalice run` and compatibility `openalice start` stay in the foreground and
 own the Guardian lifetime; `Ctrl+C` stops their self-owned local Runtime. The

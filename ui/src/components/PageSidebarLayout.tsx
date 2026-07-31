@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as R
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Sidebar } from './Sidebar'
+import { useRegisterMobilePageNavigation } from '../contexts/MobilePageNavigationContext'
 
 const MIN_WIDTH = 200
 const MAX_WIDTH = 420
@@ -103,6 +104,7 @@ export function PageSidebarLayout({
 }: PageSidebarLayoutProps) {
   const { t } = useTranslation()
   const isDesktop = useIsDesktop(desktopMinWidth)
+  const isAppDesktop = useIsDesktop(768)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
   const mobileDrawerRef = useRef<HTMLDialogElement | null>(null)
@@ -118,9 +120,18 @@ export function PageSidebarLayout({
   const maxWidth = responsiveMaxWidth(containerWidth)
   const width = Math.min(preferredWidth, maxWidth)
   const closeMobileDrawer = useCallback(() => setDrawerOpen(false), [])
+  const openMobileDrawer = useCallback(() => setDrawerOpen(true), [])
   const sidebarContent = typeof sidebar === 'function'
     ? sidebar({ closeMobileDrawer })
     : sidebar
+  const usesAppContextBar = useRegisterMobilePageNavigation({
+    title,
+    controlsId: mobileDrawerId,
+    expanded: drawerOpen,
+    triggerRef: mobileTriggerRef,
+    open: openMobileDrawer,
+    close: closeMobileDrawer,
+  }, !isAppDesktop && !isDesktop)
 
   const persistWidth = useCallback((next: number) => {
     window.localStorage.setItem(storageName(storageKey), String(next))
@@ -344,22 +355,24 @@ export function PageSidebarLayout({
         inert={drawerOpen ? true : undefined}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-secondary/40 px-3">
-          <button
-            ref={mobileTriggerRef}
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="oa-icon-action flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label={t('common.openPanel', { title })}
-            aria-expanded={drawerOpen}
-            aria-controls={mobileDrawerId}
-            aria-haspopup="dialog"
-            title={title}
-          >
-            <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
-          </button>
-          <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">{title}</span>
-        </div>
+        {!usesAppContextBar && (
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-secondary/40 px-3">
+            <button
+              ref={mobileTriggerRef}
+              type="button"
+              onClick={openMobileDrawer}
+              className="oa-icon-action flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label={t('common.openPanel', { title })}
+              aria-expanded={drawerOpen}
+              aria-controls={mobileDrawerId}
+              aria-haspopup="dialog"
+              title={title}
+            >
+              <PanelLeftOpen size={17} strokeWidth={1.75} aria-hidden />
+            </button>
+            <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">{title}</span>
+          </div>
+        )}
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
 

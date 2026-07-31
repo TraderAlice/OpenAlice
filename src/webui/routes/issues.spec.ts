@@ -71,7 +71,7 @@ function build(inboxReports: InboxEntry[] = []) {
     registry: {
       get: (id: string) => (
         id === 'ws-1'
-          ? { id: 'ws-1', dir: wsDir, tag: 'ws-1', agents: ['claude', 'codex', 'pi', 'shell'] }
+          ? { id: 'ws-1', dir: wsDir, tag: 'ws-1' }
           : undefined
       ),
     },

@@ -75,6 +75,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
   const [templatesLoaded, setTemplatesLoaded] = useState(false)
+  const [templatesError, setTemplatesError] = useState<string | null>(null)
   const [autoQuantDefaultWorkspaceId, setAutoQuantDefaultWorkspaceId] = useState<string | null>(null)
   const [autoQuantPreferenceLoaded, setAutoQuantPreferenceLoaded] = useState(false)
   const [autoQuantPreferenceError, setAutoQuantPreferenceError] = useState<string | null>(null)
@@ -140,6 +141,29 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const refreshTemplates = useCallback(async (): Promise<void> => {
+    try {
+      setTemplates(await listTemplates())
+      setTemplatesError(null)
+    } catch (error) {
+      setTemplatesError((error as Error).message)
+    } finally {
+      setTemplatesLoaded(true)
+    }
+  }, [])
+
+  const refreshAutoQuantPreference = useCallback(async (): Promise<void> => {
+    try {
+      const status = await getAutoQuantDefaultWorkspace()
+      setAutoQuantDefaultWorkspaceId(status.defaultWorkspaceId)
+      setAutoQuantPreferenceError(null)
+    } catch (error) {
+      setAutoQuantPreferenceError((error as Error).message)
+    } finally {
+      setAutoQuantPreferenceLoaded(true)
+    }
+  }, [])
+
   useEffect(() => {
     void ensureTerminalAppearancePublished()
   }, [ensureTerminalAppearancePublished])
@@ -157,24 +181,12 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   }, [refreshWorkspaceManager])
 
   useEffect(() => {
-    void listTemplates()
-      .then(setTemplates)
-      .catch(() => setTemplates([]))
-      .finally(() => setTemplatesLoaded(true))
+    void refreshTemplates()
     void listAgents().then(setAgents).catch(() => setAgents([]))
     void getWorkspaceDefaultAgent().then(setDefaultAgentState).catch(() => setDefaultAgentState(null))
     void getIssueDefaultAgent().then(setIssueDefaultAgentState).catch(() => setIssueDefaultAgentState(null))
-    void getAutoQuantDefaultWorkspace()
-      .then((status) => {
-        setAutoQuantDefaultWorkspaceId(status.defaultWorkspaceId)
-        setAutoQuantPreferenceError(null)
-      })
-      .catch((error) => {
-        setAutoQuantDefaultWorkspaceId(null)
-        setAutoQuantPreferenceError((error as Error).message)
-      })
-      .finally(() => setAutoQuantPreferenceLoaded(true))
-  }, [])
+    void refreshAutoQuantPreference()
+  }, [refreshAutoQuantPreference, refreshTemplates])
 
   // Reconcile tabs against the workspaces list. If a workspace or session
   // disappeared (deleted on disk / on the server), close any tabs that
@@ -599,10 +611,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         workspaceManagerError,
         hasLoaded,
         templatesLoaded,
+        templatesError,
         autoQuantDefaultWorkspaceId,
         autoQuantPreferenceLoaded,
         autoQuantPreferenceError,
         refresh,
+        refreshTemplates,
+        refreshAutoQuantPreference,
         refreshWorkspaceManager,
         quickStartWorkspaceManager,
         spawn,

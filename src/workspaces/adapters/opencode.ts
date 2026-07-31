@@ -34,6 +34,52 @@ const OPENCODE_OWNED_PATHS = [
 ] as const;
 const DEFAULT_OUTPUT_TOKENS = 16_384;
 
+const openCodeSessionRowsInFlight = new Map<string, Promise<readonly Record<string, unknown>[]>>();
+
+function readOpenCodeSessionRows(cwd: string): Promise<readonly Record<string, unknown>[]> {
+  const existing = openCodeSessionRowsInFlight.get(cwd);
+  if (existing) return existing;
+  const read = (async () => {
+    let stdout: string;
+    try {
+      const res = await execFileAsync('opencode', ['session', 'list', '--format', 'json'], {
+        cwd,
+        env: {
+          ...process.env,
+          OPENCODE_DISABLE_MODELS_FETCH: '1',
+          OPENCODE_DISABLE_AUTOUPDATE: '1',
+          OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
+        },
+        timeout: 10_000,
+        maxBuffer: 8 * 1024 * 1024,
+      });
+      stdout = res.stdout;
+    } catch {
+      return [];
+    }
+    try {
+      const rows: unknown = JSON.parse(stdout);
+      return Array.isArray(rows)
+        ? rows.filter((row): row is Record<string, unknown> =>
+            typeof row === 'object' && row !== null && !Array.isArray(row))
+        : [];
+    } catch {
+      return [];
+    }
+  })().finally(() => openCodeSessionRowsInFlight.delete(cwd));
+  openCodeSessionRowsInFlight.set(cwd, read);
+  return read;
+}
+
+export function openCodeSessionTitle(
+  rows: readonly Record<string, unknown>[],
+  sessionId: string,
+): string | null {
+  const row = rows.find((candidate) => candidate['id'] === sessionId);
+  const title = typeof row?.['title'] === 'string' ? row['title'].trim() : '';
+  return title || null;
+}
+
 function opencodeRunModel(cwd: string, model: string): string {
   if (model.includes('/')) return model;
   try {
@@ -280,6 +326,22 @@ export const opencodeAdapter: CliAdapter = {
     // `opencode --session <id>` (composeCommand) resumes by id.
     transcriptDiscovery: 'subprocess',
     headless: true,
+    aiProvider: {
+      credentialSource: 'workspace-required',
+      wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
+      defaultWire: 'openai-chat',
+      vendorPolicies: {
+        minimax: {
+          wirePreference: ['anthropic'],
+          legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' },
+        },
+      },
+      modelRegistration: {
+        contextWindow: true,
+        reasoning: true,
+        effortVariants: true,
+      },
+    },
   },
 
   lifecycle: {
@@ -569,32 +631,8 @@ export const opencodeAdapter: CliAdapter = {
    * `--continue`.
    */
   async listOnDisk(cwd: string): Promise<readonly OnDiskSession[]> {
-    let stdout: string;
-    try {
-      const res = await execFileAsync('opencode', ['session', 'list', '--format', 'json'], {
-        cwd,
-        env: {
-          ...process.env,
-          OPENCODE_DISABLE_MODELS_FETCH: '1',
-          OPENCODE_DISABLE_AUTOUPDATE: '1',
-          OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
-        },
-        timeout: 10_000,
-        maxBuffer: 8 * 1024 * 1024,
-      });
-      stdout = res.stdout;
-    } catch {
-      return [];
-    }
-    let rows: unknown;
-    try {
-      rows = JSON.parse(stdout);
-    } catch {
-      return [];
-    }
-    if (!Array.isArray(rows)) return [];
     const out: OnDiskSession[] = [];
-    for (const r of rows as Array<Record<string, unknown>>) {
+    for (const r of await readOpenCodeSessionRows(cwd)) {
       const id = r['id'];
       if (typeof id !== 'string') continue;
       const ts = r['updated'] ?? r['created'];
@@ -602,5 +640,9 @@ export const opencodeAdapter: CliAdapter = {
       out.push({ sessionId: id, file: '', mtime, sizeBytes: 0 });
     }
     return out;
+  },
+
+  async readSessionTitle(cwd: string, sessionId: string): Promise<string | null> {
+    return openCodeSessionTitle(await readOpenCodeSessionRows(cwd), sessionId);
   },
 };

@@ -24,7 +24,11 @@ import { listDir, PathTraversal, readWorkspaceFile } from '../../workspaces/file
 import { gitLog, gitStatus } from '../../workspaces/git-service.js';
 import { logger as launcherLogger } from '../../workspaces/logger.js';
 import { readWorkspaceMetadata, workspaceMetadataSchema, writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
-import type { SessionRecord } from '../../workspaces/session-registry.js';
+import {
+  normalizeSessionTitle,
+  sessionPreferredTitle,
+  type SessionRecord,
+} from '../../workspaces/session-registry.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import {
@@ -148,9 +152,6 @@ function redactLaunchCommand(argv: readonly string[]): readonly string[] {
   return out;
 }
 
-/** Max stored length of a session title (the seed message); the row truncates further. */
-const MAX_SESSION_TITLE = 200;
-
 /** The 201 body both `/:id/sessions/spawn` and `/quick-chat` return. */
 interface SpawnedSessionBody {
   readonly sessionId: string;
@@ -160,7 +161,7 @@ interface SpawnedSessionBody {
   readonly agent: string;
   readonly resumeId: string;
   readonly startedAt: number;
-  /** The seed message, when the session was seeded — its sidebar title. */
+  /** Native Session title, falling back to the launch-time prompt. */
   readonly title: string | null;
 }
 
@@ -217,16 +218,13 @@ export function createWorkspaceRoutes(
     return c.json({ ok: true, changed: svc.pool.setTerminalViewAttributes(attributes) });
   });
 
-  const resolveDefaultAgentId = async (meta: WorkspaceMeta): Promise<string | undefined> => {
+  const resolveDefaultAgentId = async (_meta: WorkspaceMeta): Promise<string | undefined> => {
     const configured = await readWorkspaceDefaultAgent().catch(() => null);
-    if (configured && meta.agents.includes(configured)) {
+    if (configured) {
       const adapter = svc.adapters.get(configured);
       if (adapter && isAgentRuntime(adapter)) return configured;
     }
-    return meta.agents.find((id) => {
-      const adapter = svc.adapters.get(id);
-      return adapter ? isAgentRuntime(adapter) : false;
-    });
+    return svc.adapters.list().find(isAgentRuntime)?.id;
   };
 
   /**
@@ -284,7 +282,7 @@ export function createWorkspaceRoutes(
     if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
     const agentId = opts.agentId ?? requestedIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!agentId) {
-      return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' } };
+      return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'no agent runtime is registered' } };
     }
     if (!svc.adapters.get(agentId)) {
       return { ok: false, status: 400, body: { error: 'unknown_agent', message: `no adapter: ${agentId}` } };
@@ -339,8 +337,7 @@ export function createWorkspaceRoutes(
     });
     const recordName = svc.sessionRegistry.nextName(id, adapter.id, prefix);
     const nowIso = new Date().toISOString();
-    const titleSource = opts.title?.trim() || initialPrompt;
-    const title = titleSource ? titleSource.slice(0, MAX_SESSION_TITLE) : undefined;
+    const fallbackTitle = normalizeSessionTitle(opts.title) ?? normalizeSessionTitle(initialPrompt);
     const claimedResume = opts.resumeId
       ? (svc.claimResume?.(opts.resumeId) ?? true)
       : false;
@@ -372,7 +369,7 @@ export function createWorkspaceRoutes(
       lastActiveAt: nowIso,
       state: 'running',
       surface: 'terminal',
-      ...(title !== undefined ? { title } : {}),
+      ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(resume && resume !== 'last'
         ? { resumeHint: { kind: 'agent-session-id' as const, value: resume.sessionId } }
@@ -414,7 +411,7 @@ export function createWorkspaceRoutes(
           agent: adapter.id,
           resumeId: identity.resumeId,
           startedAt: session.startedAt,
-          title: title ?? null,
+          title: sessionPreferredTitle(record) ?? null,
         },
       };
     } catch (err) {
@@ -443,7 +440,7 @@ export function createWorkspaceRoutes(
       resumeId: record.resumeId,
       pid: terminal?.pid ?? browser?.pid ?? null,
       startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-      title: record.title ?? null,
+      title: sessionPreferredTitle(record) ?? null,
       sourceRunId: record.sourceRunId ?? null,
     };
   };
@@ -537,6 +534,7 @@ export function createWorkspaceRoutes(
   const publicManager = async () => {
     const meta = svc.managerWorkspace;
     await svc.sessionRegistry.ensureLoaded(meta.id);
+    void svc.refreshSessionTitles?.(meta);
     return {
       id: meta.id,
       tag: meta.tag,
@@ -579,12 +577,16 @@ export function createWorkspaceRoutes(
     const meta = svc.managerWorkspace;
     const resolvedAgentId = agentId ?? await resolveDefaultAgentId(meta);
     if (!resolvedAgentId) {
-      return c.json({ error: 'no_agent_runtime', message: 'Workspace Manager has no agent runtime enabled' }, 400);
+      return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
     }
-    if (!meta.agents.includes(resolvedAgentId)) {
+    const resolvedAdapter = svc.adapters.get(resolvedAgentId);
+    if (!resolvedAdapter) {
+      return c.json({ error: 'unknown_agent', message: `no adapter: ${resolvedAgentId}` }, 400);
+    }
+    if (!isAgentRuntime(resolvedAdapter)) {
       return c.json({
         error: 'unsupported_agent_runtime',
-        message: `${resolvedAgentId} is not an enabled Workspace Manager agent runtime`,
+        message: `${resolvedAgentId} is not an agent runtime`,
       }, 400);
     }
     const spawned = await spawnInteractiveSession(meta, {
@@ -738,12 +740,6 @@ export function createWorkspaceRoutes(
     }
     const adapter = svc.adapters.get(agentId);
     if (!adapter) return c.json({ error: 'unknown_agent' }, 400);
-    if (isAgentRuntime(adapter) && !meta.agents.includes(agentId)) {
-      return c.json({
-        error: 'agent_not_enabled',
-        message: `agent "${agentId}" not enabled on this workspace`,
-      }, 400);
-    }
 
     const availability = svc.detectAgents()[agentId];
     const plan = svc.computeSpawnPlan(meta, adapter, undefined);
@@ -906,7 +902,6 @@ export function createWorkspaceRoutes(
           : result.code === 'unknown_template' ? 400
           : result.code === 'unknown_source_version' ? 400
           : result.code === 'invalid_tag' ? 400
-          : result.code === 'unknown_agent' ? 400
           : 500;
         return c.json({ error: result.code, message: result.message }, status as 400 | 409 | 500);
       }
@@ -939,10 +934,6 @@ export function createWorkspaceRoutes(
       }
       templateName = def;
     }
-    const rawAgents = fields['agents'];
-    const agentsRequested = Array.isArray(rawAgents)
-      ? rawAgents.filter((a): a is string => typeof a === 'string' && a.length > 0)
-      : undefined;
     const rawSourceVersion = fields['sourceVersion'];
     const sourceVersion = typeof rawSourceVersion === 'string' && rawSourceVersion.length > 0
       ? rawSourceVersion
@@ -950,7 +941,6 @@ export function createWorkspaceRoutes(
     const result = await svc.creator.create(
       tag,
       templateName,
-      agentsRequested && agentsRequested.length > 0 ? agentsRequested : undefined,
       sourceVersion,
     );
     if (!result.ok) {
@@ -958,7 +948,6 @@ export function createWorkspaceRoutes(
         result.code === 'invalid_tag' ? 400
         : result.code === 'unknown_template' ? 400
         : result.code === 'unknown_source_version' ? 400
-        : result.code === 'unknown_agent' ? 400
         : result.code === 'tag_in_use' ? 409
         : result.code === 'insufficient_storage' ? 507
         : 500;
@@ -1465,7 +1454,6 @@ export function createWorkspaceRoutes(
           : target.code === 'unknown_template' ? 400
           : target.code === 'unknown_source_version' ? 400
           : target.code === 'invalid_tag' ? 400
-          : target.code === 'unknown_agent' ? 400
           : target.code === 'auto_quant_not_initialized' ? 409
           : 500;
         launcherLogger.error('quick_chat.create_failed', {
@@ -1702,7 +1690,7 @@ export function createWorkspaceRoutes(
           pid: session.pid,
           agent: adapter.id,
           startedAt: session.startedAt,
-          title: record.title ?? null,
+          title: sessionPreferredTitle(record) ?? null,
         });
       } catch (err) {
         launcherLogger.error('workspace.session_resume_failed', { id, token, err });
@@ -1870,7 +1858,6 @@ export function createWorkspaceRoutes(
       workspace: {
         id: meta.id,
         dir: meta.dir,
-        agents: meta.agents,
       },
       record: {
         id: record.id,
@@ -2052,17 +2039,9 @@ export function createWorkspaceRoutes(
     if (agentId && !svc.adapters.get(agentId)) {
       return c.json({ error: 'unknown_agent', message: `no adapter: ${agentId}` }, 400);
     }
-    // An explicit agent must be one ENABLED on this workspace — else
-    // resolveAdapter would honor it and spawn a CLI with no provider config
-    // injected (silent fallback to the user's global config). Omitting `agent`
-    // resolves through the user default / first enabled agent runtime, never
-    // through utility adapters such as shell.
-    if (agentId && !meta.agents.includes(agentId)) {
-      return c.json({ error: 'agent_not_enabled', message: `agent "${agentId}" not enabled on this workspace` }, 400);
-    }
     const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
-      return c.json({ error: 'no_agent_runtime', message: 'workspace has no agent runtime enabled' }, 400);
+      return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
     }
     const adapter = svc.resolveAdapter(meta, effectiveAgentId);
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
@@ -2157,11 +2136,14 @@ export function createWorkspaceRoutes(
       // mode; the dropdown receives only presentation/injection metadata, while
       // the unfiltered Workspace modal keeps the key-bearing response.
       const agent = c.req.query('agent');
-      const entries = agent ? compatibleCredentials(credentials, agent) : Object.entries(credentials);
+      const adapter = agent ? svc.adapters.get(agent) : undefined;
+      const entries = agent
+        ? adapter ? compatibleCredentials(credentials, adapter) : []
+        : Object.entries(credentials);
       const list = entries.map(([slug, cred]) => {
         const resolvedModel = resolveInjectionModel(cred);
-        const projected = agent && resolvedModel
-          ? credentialToWorkspaceAiCred(cred, agent, { model: resolvedModel })
+        const projected = adapter && resolvedModel
+          ? credentialToWorkspaceAiCred(cred, adapter, { model: resolvedModel })
           : null;
         const reasoningMode = resolveModelSemantics(cred.vendor, resolvedModel)?.reasoning?.mode;
         return {
@@ -2231,13 +2213,14 @@ export function createWorkspaceRoutes(
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
     if (!meta) return c.json({ error: 'not_found' }, 404);
     try {
-      const [claude, codex, opencode, pi] = await Promise.all([
-        svc.adapters.get('claude')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('codex')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('opencode')?.readAiConfig?.(meta.dir) ?? null,
-        svc.adapters.get('pi')?.readAiConfig?.(meta.dir) ?? null,
-      ]);
-      return c.json({ claude, codex, opencode, pi });
+      const configurable = svc.adapters.list().filter(
+        (adapter) => adapter.capabilities.aiProvider && adapter.readAiConfig,
+      );
+      const entries = await Promise.all(configurable.map(async (adapter) => [
+        adapter.id,
+        await adapter.readAiConfig!(meta.dir),
+      ] as const));
+      return c.json(Object.fromEntries(entries));
     } catch (err) {
       if (err instanceof PathTraversal) return c.json({ error: 'invalid_path' }, 400);
       launcherLogger.warn('agent_config.read_failed', { id, err });
@@ -2291,9 +2274,9 @@ export function createWorkspaceRoutes(
     try {
       const credentials = await readCredentials();
       const rows = await Promise.all(
-        meta.agents
-          .map((agentId) => ({ agentId, adapter: svc.adapters.get(agentId) }))
-          .filter(({ adapter }) => adapter !== undefined && isAgentRuntime(adapter))
+        svc.adapters.list()
+          .filter(isAgentRuntime)
+          .map((adapter) => ({ agentId: adapter.id, adapter }))
           .map(({ agentId, adapter }) =>
             getAgentCredentialReadiness({ meta, agentId, adapter, credentials }),
           ),
@@ -2330,7 +2313,8 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
-    if (agent !== 'claude' && agent !== 'codex' && agent !== 'opencode' && agent !== 'pi') {
+    const adapter = svc.adapters.get(agent);
+    if (!adapter?.capabilities.aiProvider || !adapter.writeAiConfig) {
       return c.json({ error: 'unknown_agent' }, 400);
     }
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
@@ -2339,8 +2323,6 @@ export function createWorkspaceRoutes(
     const body = (await safeJson(c)) as WorkspaceAiCred | null;
     const cfg = body && typeof body === 'object' ? body : {};
     try {
-      const adapter = svc.adapters.get(agent);
-      if (!adapter?.writeAiConfig) return c.json({ error: 'unknown_agent' }, 400);
       const credentials = cfg.apiKey ? await readCredentials() : {};
       const slug = matchCredentialByApiKey(credentials, cfg.apiKey);
       const vendor = slug
@@ -2350,7 +2332,11 @@ export function createWorkspaceRoutes(
             baseUrl: cfg.baseUrl ?? undefined,
             wireShape: cfg.wireShape ?? undefined,
           });
-      const projected = applyRegisteredModelSemantics(cfg, agent, vendor);
+      const projected = applyRegisteredModelSemantics(
+        cfg,
+        adapter.capabilities.aiProvider,
+        vendor,
+      );
       await adapter.writeAiConfig(meta.dir, projected);
       // Remember an explicit model choice on the originating vault credential
       // (matched by apiKey) so quick-chat can reuse it without re-prompting.
@@ -2378,7 +2364,7 @@ export function createWorkspaceRoutes(
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ ok: false, error: 'invalid_id' }, 400);
-    if (agent !== 'claude' && agent !== 'codex' && agent !== 'opencode' && agent !== 'pi') {
+    if (!svc.adapters.get(agent)?.capabilities.aiProvider) {
       return c.json({ ok: false, error: 'unknown_agent' }, 400);
     }
 

@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -75,8 +77,10 @@ describe('AuthProvider backend recovery', () => {
     )
     await flushEffects()
 
-    expect(screen.getByRole('alertdialog')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Retry now' })).toBe(document.activeElement)
+    const recoveryDialog = screen.getByRole('alertdialog')
+    expect(recoveryDialog).toBeTruthy()
+    expect(recoveryDialog).toBe(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Retry now' })).toBeTruthy()
     expect(screen.queryByText('workspace-app')).toBeNull()
     expect(document.querySelector('input[type="password"]')).toBeNull()
 

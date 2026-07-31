@@ -29,9 +29,16 @@ import type { WireShape } from '../../ai-providers/preset-catalog.js'
 import { resolveModelSemantics } from '../../ai-providers/model-semantics.js'
 import { resolveAnthropicAuthMode } from '../../core/credential-inference.js'
 import { probeByWireShape } from '../../workspaces/agent-probe.js'
+import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js'
+import {
+  isAgentRuntime,
+  type AdapterRegistry,
+  type CliAdapter,
+} from '../../workspaces/cli-adapter.js'
 
 interface ConfigRouteOpts {
   ctx?: EngineContext
+  adapterRegistry?: AdapterRegistry
 }
 
 export const ONBOARDING_TEST_CREDENTIAL = {
@@ -75,6 +82,15 @@ function maybeHandleOnboardingMockCredentialTest(body: {
 /** Config routes: GET /, PUT /:section, profile CRUD, presets, test */
 export function createConfigRoutes(opts?: ConfigRouteOpts) {
   const app = new Hono()
+  const adapters = opts?.adapterRegistry ?? createBuiltinAdapterRegistry()
+  const runtimeAdapters = adapters.list().filter(isAgentRuntime)
+  const providerAdapters = runtimeAdapters.filter(
+    (adapter): adapter is CliAdapter & {
+      capabilities: CliAdapter['capabilities'] & {
+        aiProvider: NonNullable<CliAdapter['capabilities']['aiProvider']>
+      }
+    } => adapter.capabilities.aiProvider !== undefined,
+  )
 
   app.get('/', async (c) => {
     try {
@@ -170,7 +186,9 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const defaults = await readWorkspaceCredentialDefaults()
       for (const [agentId, def] of Object.entries(defaults)) {
         if (def.credentialSlug !== slug) continue
-        if (!pickAgentWire(credentialWires(cred), agentId, def.wireShape)) {
+        const adapter = adapters.get(agentId)
+        const capabilities = adapter?.capabilities.aiProvider
+        if (!capabilities || !pickAgentWire(credentialWires(cred), capabilities, def.wireShape)) {
           return c.json({
             error: `This credential is the ${agentId} Workspace default. Choose a compatible default protocol before removing its current wire.`,
           }, 400)
@@ -229,8 +247,6 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   // into each new workspace's file-based AI config at create time — sparing the
   // user the per-workspace AI-config modal. References the vault above.
 
-  const DEFAULTABLE_AGENTS = ['claude', 'codex', 'opencode', 'pi'] as const
-
   /**
    * GET /workspace-credential-defaults — the current per-agent defaults plus,
    * for the picker, the vault slugs each agent can actually be driven by (the
@@ -243,8 +259,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
         readCredentials(),
       ])
       const compatibleByAgent: Record<string, string[]> = {}
-      for (const agent of DEFAULTABLE_AGENTS) {
-        compatibleByAgent[agent] = compatibleCredentials(creds, agent).map(([slug]) => slug)
+      for (const adapter of providerAdapters) {
+        compatibleByAgent[adapter.id] = compatibleCredentials(creds, adapter).map(([slug]) => slug)
       }
       return c.json({ defaults, compatibleByAgent })
     } catch (err) {
@@ -265,7 +281,10 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const credentials = await readCredentials()
       const incoming = body.defaults ?? {}
       const next: Record<string, WorkspaceCredentialDefault> = {}
-      for (const agent of DEFAULTABLE_AGENTS) {
+      for (const adapter of providerAdapters) {
+        const agent = adapter.id
+        const capabilities = adapter.capabilities.aiProvider
+        const registration = capabilities.modelRegistration
         const def = incoming[agent]
         if (def && typeof def.credentialSlug === 'string' && def.credentialSlug) {
           const parsedWire = credentialWireShapeEnum.safeParse(def.wireShape)
@@ -274,7 +293,10 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
           }
           if (parsedWire.success) {
             const credential = credentials[def.credentialSlug]
-            if (credential && !pickAgentWire(credentialWires(credential), agent, parsedWire.data)) {
+            if (
+              credential &&
+              !pickAgentWire(credentialWires(credential), capabilities, parsedWire.data)
+            ) {
               return c.json({ error: `${agent} cannot use ${parsedWire.data} from ${def.credentialSlug}` }, 400)
             }
           }
@@ -297,10 +319,10 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
             credentialSlug: def.credentialSlug,
             ...(typeof def.model === 'string' && def.model ? { model: def.model } : {}),
             ...(parsedWire.success ? { wireShape: parsedWire.data } : {}),
-            ...((agent === 'pi' || agent === 'opencode') && def.contextWindow !== undefined
+            ...(registration?.contextWindow && def.contextWindow !== undefined
               ? { contextWindow: def.contextWindow }
               : {}),
-            ...((agent === 'pi' || agent === 'opencode') &&
+            ...(registration?.reasoning &&
               !reasoningIsRegistered &&
               typeof selectedModel === 'string' &&
               typeof def.reasoning === 'boolean'
@@ -327,9 +349,10 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   app.put('/workspace-default-agent', async (c) => {
     try {
       const body = await c.req.json<{ agent?: string | null }>()
-      const agent = typeof body.agent === 'string' && DEFAULTABLE_AGENTS.includes(body.agent as typeof DEFAULTABLE_AGENTS[number])
-        ? body.agent
-        : null
+      const agent = typeof body.agent === 'string' &&
+        runtimeAdapters.some((adapter) => adapter.id === body.agent)
+          ? body.agent
+          : null
       await writeWorkspaceDefaultAgent(agent)
       return c.json({ agent })
     } catch (err) {
@@ -348,9 +371,10 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   app.put('/issue-default-agent', async (c) => {
     try {
       const body = await c.req.json<{ agent?: string | null }>()
-      const agent = typeof body.agent === 'string' && DEFAULTABLE_AGENTS.includes(body.agent as typeof DEFAULTABLE_AGENTS[number])
-        ? body.agent
-        : null
+      const agent = typeof body.agent === 'string' &&
+        runtimeAdapters.some((adapter) => adapter.id === body.agent)
+          ? body.agent
+          : null
       await writeIssueDefaultAgent(agent)
       return c.json({ agent })
     } catch (err) {

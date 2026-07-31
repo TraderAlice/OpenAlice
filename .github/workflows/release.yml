@@ -248,6 +248,82 @@ jobs:
       - name: Exercise candidate installer through managed SSH remote
         run: node scripts/remote-ssh-smoke.mjs
 
+  build-headless-runtime:
+    name: Build headless Runtime (${{ matrix.platform }}-${{ matrix.arch }})
+    needs: release
+    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+          - os: macos-15-intel
+            platform: darwin
+            arch: x64
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build platform headless Runtime
+        run: pnpm build:headless-runtime
+
+      - name: Install and boot the candidate outside the checkout
+        shell: bash
+        run: |
+          metadata=$(find dist/headless -maxdepth 1 -name 'openalice-runtime-*.json' -print -quit)
+          archive=$(node -p "require('./${metadata}').archive.file")
+          sha256=$(node -p "require('./${metadata}').archive.sha256")
+          ./install \
+            --source "$GITHUB_WORKSPACE" \
+            --runtime-archive "$GITHUB_WORKSPACE/dist/headless/$archive" \
+            --runtime-sha256 "$sha256" \
+            --install-dir "$RUNNER_TEMP/openalice-cli" \
+            --no-modify-path \
+            --yes
+          "$RUNNER_TEMP/openalice-cli/bin/openalice" up \
+            --home "$RUNNER_TEMP/openalice-home" \
+            --no-update-check \
+            --wait 120 \
+            --json
+          "$RUNNER_TEMP/openalice-cli/bin/openalice" doctor \
+            --home "$RUNNER_TEMP/openalice-home" \
+            --json
+          "$RUNNER_TEMP/openalice-cli/bin/openalice" down \
+            --home "$RUNNER_TEMP/openalice-home" \
+            --json
+
+      - name: Preserve accepted headless Runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-runtime-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/headless/*.json
+            dist/headless/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
   build-linux-broker-packs:
     name: Build Linux Broker Packs
     needs: release
@@ -287,8 +363,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, build-linux-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.build-linux-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, build-desktop, build-headless-runtime, build-linux-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.build-headless-runtime.result == 'success' && needs.build-linux-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -312,6 +388,12 @@ jobs:
           path: dist/release-broker-packs
           merge-multiple: true
 
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: headless-runtime-*
+          path: dist/release-headless-runtime
+          merge-multiple: true
+
       - name: Create tag and GitHub Release from accepted candidates
         uses: softprops/action-gh-release@v2
         with:
@@ -330,6 +412,8 @@ jobs:
             dist/release-assets/*.exe
             dist/release-broker-packs/*.json
             dist/release-broker-packs/*.tgz
+            dist/release-headless-runtime/*.json
+            dist/release-headless-runtime/*.tar.gz
 
   mirror-release-assets:
     needs: [release, publish-release]
@@ -369,6 +453,16 @@ jobs:
           test "$CLI_PACKAGE_VERSION" = "$VERSION"
           bash -n install
           cp install "dist/r2-upload/OpenAlice-${VERSION}-install"
+          node - "$VERSION" "dist/r2-upload/OpenAlice-${VERSION}-install" <<'NODE'
+          const { readFileSync, writeFileSync } = require('node:fs')
+          const [version, path] = process.argv.slice(2)
+          const source = 'OPENALICE_INSTALLER_RELEASE_VERSION="${OPENALICE_INSTALLER_RELEASE_VERSION:-}"'
+          const target = `OPENALICE_INSTALLER_RELEASE_VERSION="\${OPENALICE_INSTALLER_RELEASE_VERSION:-${version}}"`
+          const input = readFileSync(path, 'utf8')
+          if (!input.includes(source)) throw new Error('installer release-version placeholder is missing')
+          writeFileSync(path, input.replace(source, target))
+          NODE
+          bash -n "dist/r2-upload/OpenAlice-${VERSION}-install"
 
       - name: Prepare CDN download aliases
         env:

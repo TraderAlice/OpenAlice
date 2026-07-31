@@ -38,6 +38,11 @@ import {
   takeoverRequested,
 } from '@traderalice/guardian-runtime'
 import { startGuardianControlServer } from './control-server.mjs'
+import {
+  planProdPorts,
+  readProdPortsFile,
+  resolveProdPortConfig,
+} from './prod-ports.mjs'
 
 const DATA_HOME = process.env.OPENALICE_HOME
   ?? process.env.OPENALICE_USER_DATA_HOME // deprecated alias, one-release courtesy
@@ -57,18 +62,6 @@ const RUNTIME_CONTENT_IDENTITY = normalizeContentIdentity(
 )
 if (!process.env.OPENALICE_HOME && process.env.OPENALICE_USER_DATA_HOME) {
   console.warn('[guardian/prod] OPENALICE_USER_DATA_HOME is deprecated — set OPENALICE_HOME instead')
-}
-
-// Port precedence: env (OPENALICE_*_PORT) > data/config/ports.json > default.
-// Mirrors scripts/guardian/shared.ts (kept inline — the runtime image ships
-// no TS tooling). Broken explicit config fails loud rather than silently
-// falling back; an in-use port fails at bind, also loud.
-function parsePort(raw, origin) {
-  const n = typeof raw === 'number' ? raw : Number(raw)
-  if (!Number.isInteger(n) || n < 1 || n > 65535) {
-    throw new Error(`[guardian/prod] invalid port ${JSON.stringify(raw)} from ${origin} — expected an integer in 1..65535`)
-  }
-  return n
 }
 
 function truthyEnv(raw) {
@@ -160,47 +153,23 @@ async function resolveTradingMode(env, userDataHome) {
   return { mode: hasUTAConfig ? 'pro' : 'lite', source: 'auto', envLocked: false, hasUTAConfig }
 }
 
-async function readPortsFile(userDataHome) {
-  const filePath = resolve(userDataHome, 'data', 'config', 'ports.json')
-  let raw
-  try {
-    raw = await readFile(filePath, 'utf8')
-  } catch {
-    return {}
-  }
-  let parsed
-  try {
-    parsed = JSON.parse(raw)
-  } catch (err) {
-    throw new Error(`[guardian/prod] ${filePath} is not valid JSON: ${err?.message ?? err}`)
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`[guardian/prod] ${filePath} must be a JSON object like {"web":47331,"mcp":47332,"uta":47333,"connector":47334}`)
-  }
-  const out = {}
-  for (const name of ['web', 'mcp', 'uta', 'connector']) {
-    if (parsed[name] !== undefined) out[name] = parsePort(parsed[name], `${filePath} ("${name}")`)
-  }
-  return out
-}
-
-const portsFile = await readPortsFile(DATA_HOME)
-const pickPort = (envKey, fileValue, fallback) => {
-  const envRaw = process.env[envKey]
-  if (envRaw !== undefined && envRaw !== '') return parsePort(envRaw, envKey)
-  return fileValue ?? fallback
-}
-const WEB_PORT = pickPort('OPENALICE_WEB_PORT', portsFile.web, 47331)
-const MCP_PORT = pickPort('OPENALICE_MCP_PORT', portsFile.mcp, 47332)
-const UTA_PORT = pickPort('OPENALICE_UTA_PORT', portsFile.uta, 47333)
-const CONNECTOR_PORT = pickPort('OPENALICE_CONNECTOR_PORT', portsFile.connector, 47334)
+// Port precedence and collision behavior mirror scripts/guardian/shared.ts:
+// explicit env/file values fail if occupied, while defaults probe upward.
+// The built Guardian keeps this logic in runnable ESM because source-backed
+// and Docker production paths do not ship a TypeScript loader.
+const portsFile = await readProdPortsFile(DATA_HOME)
+const portConfig = resolveProdPortConfig(process.env, portsFile)
+let TRADING_MODE = await resolveTradingMode(process.env, DATA_HOME)
+const LITE_MODE = TRADING_MODE.mode === 'lite'
+const plannedPorts = await planProdPorts(portConfig, { skipUta: LITE_MODE })
+const WEB_PORT = plannedPorts.web
+const MCP_PORT = plannedPorts.mcp
+const UTA_PORT = plannedPorts.uta
+const CONNECTOR_PORT = plannedPorts.connector
 const FLAG_PATH = resolve(DATA_HOME, 'data/control/restart-uta.flag')
 const CONNECTOR_FLAG_PATH = resolve(DATA_HOME, 'data/control/restart-connector.flag')
 const UTA_URL = `http://127.0.0.1:${UTA_PORT}`
 const CONNECTOR_URL = `http://127.0.0.1:${CONNECTOR_PORT}`
-let TRADING_MODE = await resolveTradingMode(process.env, DATA_HOME)
-const LITE_MODE = TRADING_MODE.mode === 'lite'
-
 let stopping = false
 let shutdownExitCode = 0
 let utaChild = null

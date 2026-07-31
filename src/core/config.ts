@@ -214,9 +214,9 @@ export const aiProviderSchema = z.object({
   workspaceCredentialDefaults: z.record(z.string(), workspaceCredentialDefaultSchema).default({}),
   /**
    * User-level default runtime for new interactive workspace sessions. This is
-   * intentionally separate from workspace identity (`agents[]`) and from
-   * credential defaults: it answers "which agent TUI should a plain New Session
-   * start?" Shell is a utility adapter, not a valid stored default.
+   * intentionally separate from Workspace identity and credential defaults: it
+   * answers "which agent TUI should a plain New Session start?" Shell is a
+   * utility adapter, not a valid stored default.
    */
   workspaceDefaultAgent: z.string().nullable().default(null),
   /**

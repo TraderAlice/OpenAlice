@@ -39,8 +39,6 @@ export interface Workspace {
     readonly version: string;
     readonly commit: string;
   };
-  /** Adapter ids enabled for this workspace. Default runtime lives in user config. */
-  readonly agents: readonly string[];
   /**
    * Single ordered list of all session records (running + paused) the
    * launcher tracks for this workspace. Source of truth for sidebar + main
@@ -70,7 +68,6 @@ export interface CreateError {
     | 'bootstrap_failed'
     | 'unknown_template'
     | 'unknown_source_version'
-    | 'unknown_agent'
     | 'no_templates_configured';
   readonly message?: string;
   readonly stderr?: string;
@@ -323,19 +320,13 @@ export async function listWorkspaces(): Promise<Workspace[]> {
   return body.workspaces;
 }
 
-/**
- * Create a workspace. `agents` is optional and normally omitted — the backend
- * owns the "every registered adapter, template-headed" policy (see
- * `WorkspaceCreator.create`). Pass an explicit set only to pin a subset.
- */
+/** Create a Workspace from a template, optionally pinned to a source version. */
 export async function createWorkspace(
   tag: string,
   template: string,
-  agents?: readonly string[],
   sourceVersion?: string,
 ): Promise<CreateResult> {
   const body: Record<string, unknown> = { tag, template };
-  if (agents && agents.length > 0) body['agents'] = agents;
   if (sourceVersion !== undefined) body['sourceVersion'] = sourceVersion;
   const res = await fetch('/api/workspaces', {
     method: 'POST',
@@ -423,6 +414,22 @@ export interface AgentCapabilities {
   readonly transcriptDiscovery: 'fs-watch' | 'subprocess' | 'none';
   readonly assignsSessionId?: boolean;
   readonly headless?: boolean;
+  readonly aiProvider?: AgentProviderCapabilities;
+}
+
+export interface AgentProviderCapabilities {
+  readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
+  readonly wirePreference: readonly WireShape[];
+  readonly defaultWire?: WireShape;
+  readonly vendorPolicies?: Readonly<Record<string, {
+    readonly wirePreference: readonly WireShape[];
+    readonly legacyRequestedWireFallbacks?: Readonly<Partial<Record<WireShape, WireShape>>>;
+  }>>;
+  readonly modelRegistration?: {
+    readonly contextWindow?: boolean;
+    readonly reasoning?: boolean;
+    readonly effortVariants?: boolean;
+  };
 }
 
 export interface AgentInfo {
@@ -642,7 +649,7 @@ export interface SessionRecord {
   readonly surface?: 'terminal' | 'webpi';
   readonly pid: number | null;
   readonly startedAt: number | null;
-  /** First message (seeded sessions) — the sidebar title; null → fall back to `name`. */
+  /** Resolved native/fallback sidebar title; null for an unseeded, unnamed Session. */
   readonly title: string | null;
   /** Headless run this stable Alice Session was materialized from. */
   readonly sourceRunId?: string | null;
@@ -1284,8 +1291,7 @@ export type AgentCredentialSource =
   | 'workspace-config'
   | 'launcher-vault'
   | 'missing'
-  | 'unknown-agent'
-  | 'disabled-agent';
+  | 'unknown-agent';
 
 export interface AgentCredentialReadiness {
   readonly agent: string;

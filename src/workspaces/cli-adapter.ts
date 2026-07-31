@@ -75,6 +75,39 @@ export interface AgentRuntimeWorkspaceContext {
   readonly launcherRepoRoot: string;
 }
 
+export interface AgentProviderVendorPolicy {
+  /** Vendor-specific narrowing of the runtime's normal wire preference. */
+  readonly wirePreference: readonly WireShape[];
+  /**
+   * Narrow compatibility repair for a previously valid saved selection.
+   * The target still has to be present (or provider-inferable) on the credential.
+   */
+  readonly legacyRequestedWireFallbacks?: Readonly<Partial<Record<WireShape, WireShape>>>;
+}
+
+export interface AgentProviderCapabilities {
+  /**
+   * Whether the runtime can start from its own native/global login, or needs a
+   * concrete Workspace provider binding before OpenAlice launches it.
+   */
+  readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
+  /** Wire protocols this runtime can consume, in native preference order. */
+  readonly wirePreference: readonly WireShape[];
+  /** Protocol preselected for a blank manual binding form. */
+  readonly defaultWire?: WireShape;
+  /** Provider-specific compatibility constraints and legacy repairs. */
+  readonly vendorPolicies?: Readonly<Record<string, AgentProviderVendorPolicy>>;
+  /**
+   * Custom-model facts this runtime registers in provider metadata. Runtimes
+   * that only select a model id leave this absent and preserve native fallback.
+   */
+  readonly modelRegistration?: {
+    readonly contextWindow?: boolean;
+    readonly reasoning?: boolean;
+    readonly effortVariants?: boolean;
+  };
+}
+
 /**
  * Shared lifecycle surface for native agent runtimes. Hooks are invoked by the
  * launcher rather than by individual HTTP/headless/Web adapters, so every
@@ -200,6 +233,12 @@ export interface CliAdapter {
      * set this; `shell` does not (no agent-turn concept).
      */
     readonly headless?: boolean;
+    /**
+     * Native AI-provider projection contract. Shared credential/model logic
+     * consumes this declaration instead of branching on adapter ids. Omit for
+     * utility adapters that cannot accept a Workspace AI binding.
+     */
+    readonly aiProvider?: AgentProviderCapabilities;
   };
 
   /** Runtime-specific hooks executed through the shared launcher lifecycle. */
@@ -334,6 +373,13 @@ export interface CliAdapter {
 
   /** Subprocess discovery (capabilities.transcriptDiscovery === 'subprocess'). */
   listOnDisk?(cwd: string): Promise<readonly OnDiskSession[]>;
+
+  /**
+   * Read the runtime's current human-facing title for one native Session.
+   * This is best-effort presentation metadata: callers keep the launch prompt
+   * as a fallback when the runtime has not named the Session yet.
+   */
+  readSessionTitle?(cwd: string, sessionId: string): Promise<string | null>;
 }
 
 /** Execute the common pre-use lifecycle without coupling callers to an

@@ -9,6 +9,7 @@ import { WorkspaceView } from './WorkspaceView'
 
 const viewMocks = vi.hoisted(() => ({
   isDesktop: true,
+  terminalProps: vi.fn(),
   sidePrefs: {
     files: false,
     autoHideMobile: true,
@@ -21,7 +22,12 @@ vi.mock('../../live/workspace-side-panels', () => ({
   useWorkspaceSidePanels: () => viewMocks.sidePrefs,
 }))
 vi.mock('./FilesPanel', () => ({ FilesPanel: () => <div data-testid="files-panel" /> }))
-vi.mock('./Terminal', () => ({ TerminalView: () => null }))
+vi.mock('./Terminal', () => ({
+  TerminalView: (props: unknown) => {
+    viewMocks.terminalProps(props)
+    return <div data-testid="terminal-view" />
+  },
+}))
 vi.mock('./WebPiView', () => ({ WebPiView: () => null }))
 
 function session(index: number, state: SessionRecord['state']): SessionRecord {
@@ -42,6 +48,7 @@ function session(index: number, state: SessionRecord['state']): SessionRecord {
 }
 
 beforeEach(async () => {
+  vi.clearAllMocks()
   viewMocks.isDesktop = true
   viewMocks.sidePrefs.files = false
   viewMocks.sidePrefs.autoHideMobile = true
@@ -147,12 +154,43 @@ describe('WorkspaceView Files panel', () => {
     expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(false)
   })
 
-  it('continues to follow the persisted Files preference on desktop', () => {
+  it('follows the runtime Files disclosure state on desktop', () => {
     viewMocks.sidePrefs.files = true
 
     const { container } = renderWorkspace()
 
     expect(screen.getByTestId('files-panel')).toBeTruthy()
     expect(container.querySelector('.workspace-view')?.classList.contains('has-no-side')).toBe(false)
+  })
+})
+
+describe('WorkspaceView terminal canvas', () => {
+  it('gives a pinned terminal one shared Workspace and Session titlebar', () => {
+    const activeRecord = session(2, 'running')
+    const headerActions = <button type="button">Files</button>
+
+    render(
+      <WorkspaceView
+        wsId="auto-quant"
+        sessionId={activeRecord.id}
+        activeRecord={activeRecord}
+        sessions={[activeRecord]}
+        label="AutoQuant"
+        terminalHeaderActions={headerActions}
+        onSpawnFresh={vi.fn()}
+        onResume={vi.fn()}
+        onOpenWebPi={vi.fn()}
+        onSelectSession={vi.fn()}
+        onSessionLost={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('terminal-view')).toBeTruthy()
+    expect(viewMocks.terminalProps).toHaveBeenCalledWith(expect.objectContaining({
+      label: 'AutoQuant',
+      sessionLabel: 'Conversation 2',
+      headerActions,
+      chrome: 'canvas',
+    }))
   })
 })

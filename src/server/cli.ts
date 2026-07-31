@@ -33,6 +33,7 @@ import {
   makeWorkspaceResolver,
 } from '../core/workspace-tool-center.js'
 import type { IInboxStore, InboxOrigin } from '../core/inbox-store.js'
+import { sessionDisplayTitle } from '../workspaces/session-registry.js'
 import type { IEntityStore } from '../core/entity-store.js'
 import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
@@ -102,13 +103,13 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
         ...(svc ? {
           workspaceInventory: async () => Promise.all(svc.registry.list().map(async (meta) => {
             await svc.sessionRegistry.ensureLoaded(meta.id)
+            void svc.refreshSessionTitles?.(meta)
             const sessions = svc.sessionRegistry.listFor(meta.id)
             const activity = svc.workspaceRuntimeActivity(meta.id)
             return {
               id: meta.id,
               tag: meta.tag,
               ...(meta.template ? { template: meta.template } : {}),
-              agents: meta.agents,
               createdAt: meta.createdAt,
               sessions: {
                 total: sessions.length,
@@ -120,7 +121,7 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
                   .map((session) => ({
                     resumeId: session.resumeId,
                     agent: session.agent,
-                    title: session.title?.trim() || session.name,
+                    title: sessionDisplayTitle(session),
                     state: session.state,
                     lastActiveAt: session.lastActiveAt,
                   })),

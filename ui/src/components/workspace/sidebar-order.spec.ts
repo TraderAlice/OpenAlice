@@ -34,7 +34,6 @@ function workspace(
     dir: `/tmp/${id}`,
     createdAt,
     template: 'chat',
-    agents: ['pi'],
     sessions: sessions.map((record) => ({ ...record, wsId: id })),
   }
 }

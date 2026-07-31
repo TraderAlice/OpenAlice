@@ -22,7 +22,6 @@ const workspace: Workspace = {
   template: 'chat',
   spawnedFromVersion: '0.1.0',
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
-  agents: ['codex'],
   agentOverride: {
     claude: false,
     codex: true,

@@ -109,7 +109,7 @@ async function makeWs(id: string, issues: IssueSpec[]): Promise<WorkspaceMeta> {
   for (const issue of issues) {
     await writeFile(join(issuesDir, `${issue.id}.md`), issueMd(issue), 'utf8')
   }
-  return { id, tag: id, dir, createdAt: new Date(NOW).toISOString(), agents: ['claude'] }
+  return { id, tag: id, dir, createdAt: new Date(NOW).toISOString() }
 }
 
 function scannerFor(
@@ -434,7 +434,7 @@ describe('ScheduleScanner', () => {
   it('ignores a workspace with no issues dir', async () => {
     const dir = join(root, 'empty')
     await mkdir(dir, { recursive: true })
-    const ws: WorkspaceMeta = { id: 'empty', tag: 'empty', dir, createdAt: new Date(NOW).toISOString(), agents: ['claude'] }
+    const ws: WorkspaceMeta = { id: 'empty', tag: 'empty', dir, createdAt: new Date(NOW).toISOString() }
     const { scanner, dispatch } = scannerFor([ws])
     await scanner.scan()
     expect(dispatch).not.toHaveBeenCalled()
@@ -445,7 +445,7 @@ describe('ScheduleScanner', () => {
     const dir = join(root, 'legacy')
     await mkdir(join(dir, '.alice'), { recursive: true })
     await writeFile(join(dir, '.alice', 'issue.json'), JSON.stringify({ issues: [] }), 'utf8')
-    const ws: WorkspaceMeta = { id: 'legacy', tag: 'legacy', dir, createdAt: new Date(NOW).toISOString(), agents: ['claude'] }
+    const ws: WorkspaceMeta = { id: 'legacy', tag: 'legacy', dir, createdAt: new Date(NOW).toISOString() }
     const { scanner, dispatch } = scannerFor([ws])
     await scanner.scan()
     expect(dispatch).not.toHaveBeenCalled()
