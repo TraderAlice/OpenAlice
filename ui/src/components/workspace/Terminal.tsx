@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -175,6 +175,12 @@ export interface TerminalViewProps {
   readonly sessionId: string;
   /** Human-facing label shown in the terminal header. Falls back to wsId. */
   readonly label?: string;
+  /** Session-facing label shown after the Workspace identity. */
+  readonly sessionLabel?: string;
+  /** Product actions that share the titlebar when the terminal is the primary canvas. */
+  readonly headerActions?: ReactNode;
+  /** Removes card chrome when the terminal itself is the page's primary canvas. */
+  readonly chrome?: 'card' | 'canvas';
   /** WebSocket URL base. Defaults to `${ws/wss}://${location.host}/pty`. */
   readonly wsUrl?: string;
   /** OpenTUI currently corrupts to an all-black canvas in xterm's WebGL addon. */
@@ -649,10 +655,16 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
   }, [wsId, sessionId, wsUrl, props.renderer]);
 
   return (
-    <div className="terminal-shell">
+    <div className={`terminal-shell${props.chrome === 'canvas' ? ' is-canvas' : ''}`}>
       <header className="terminal-header">
         <StatusDot status={status} />
         <span className="terminal-title">{props.label ?? wsId}</span>
+        {props.sessionLabel && (
+          <>
+            <span className="terminal-title-separator" aria-hidden>·</span>
+            <span className="terminal-session-title">{props.sessionLabel}</span>
+          </>
+        )}
         <span className="terminal-meta">
           {pid !== null ? `pid ${pid}` : ''}
           {childExited ? ' · child exited' : ''}
@@ -676,6 +688,11 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
           >
             take over
           </button>
+        )}
+        {props.headerActions && (
+          <span className="terminal-header-actions">
+            {props.headerActions}
+          </span>
         )}
       </header>
       {/* FitAddon reads the computed size of xterm's direct parent. Keep that

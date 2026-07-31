@@ -136,32 +136,44 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   }
 
   if (sessionId && session) {
+    const terminalCanvas =
+      session.state === 'running' &&
+      (session.surface ?? 'terminal') === 'terminal'
+    const backButton = (
+      <button
+        type="button"
+        onClick={() => openOrFocus({ kind: 'workspace-manager', params: {} })}
+        className="oa-icon-action rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        title={t('workspaceManager.back')}
+        aria-label={t('workspaceManager.back')}
+      >
+        <ArrowLeft size={15} />
+      </button>
+    )
+    const runtimeBadge = (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
+        <Bot size={11} /> {runtimeLabel(session.agent, agents)} · {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
+      </span>
+    )
+
     return (
-      <div className="workspaces-root flex h-full min-h-0 flex-col bg-background">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-secondary/35 px-3 py-2 md:px-4">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => openOrFocus({ kind: 'workspace-manager', params: {} })}
-              className="oa-icon-action rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title={t('workspaceManager.back')}
-              aria-label={t('workspaceManager.back')}
-            >
-              <ArrowLeft size={15} />
-            </button>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
-              <Network size={15} />
-            </span>
-            <div className="min-w-0">
-              <div className="truncate text-[12px] font-semibold text-foreground">{t('workspaceManager.title')}</div>
-              <div className="truncate text-[10px] text-muted-foreground">{session.title ?? session.name}</div>
+      <div className={`workspaces-root flex h-full min-h-0 flex-col bg-background${terminalCanvas ? ' workspace-manager-terminal-canvas' : ''}`}>
+        {!terminalCanvas && (
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-secondary/35 px-3 py-2 md:px-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              {backButton}
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                <Network size={15} />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-[12px] font-semibold text-foreground">{t('workspaceManager.title')}</div>
+                <div className="truncate text-[10px] text-muted-foreground">{session.title ?? session.name}</div>
+              </div>
             </div>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
-            <Bot size={11} /> {runtimeLabel(session.agent, agents)} · {session.surface === 'webpi' ? 'WebPi' : 'TUI'}
-          </span>
-        </header>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
+            {runtimeBadge}
+          </header>
+        )}
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? '' : ' p-2 md:p-3'}`}>
           {session.state === 'paused' ? (
             <ResumeCta
               record={session}
@@ -180,7 +192,12 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
               wsId={MANAGER_WORKSPACE_ID}
               sessionId={sessionId}
               renderer={session.agent === 'opencode' ? 'dom' : 'auto'}
-              label={`${t('workspaceManager.title')} · ${session.name}`}
+              label={terminalCanvas ? t('workspaceManager.title') : `${t('workspaceManager.title')} · ${session.name}`}
+              {...(terminalCanvas ? {
+                sessionLabel: session.title?.trim() || session.name,
+                headerActions: <>{backButton}{runtimeBadge}</>,
+                chrome: 'canvas' as const,
+              } : {})}
               onSessionLost={() => void refreshWorkspaceManager()}
             />
           )}
