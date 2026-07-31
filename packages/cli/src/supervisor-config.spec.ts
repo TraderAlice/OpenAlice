@@ -67,9 +67,9 @@ describe('Supervisor configuration', () => {
 
     expect(context).toMatchObject({
       instance: 'research',
-      home: '/env-home',
+      home: resolve('/env-home'),
       port: 44_000,
-      appDir: '/instance-app',
+      appDir: resolve('/instance-app'),
       provenance: {
         instance: { source: 'machine-config' },
         home: { source: 'environment' },

@@ -110,7 +110,7 @@ describe('ResolvedLaunchContext', () => {
       },
     })
 
-    expect(installed.appDir).toBe('/installed/runtime')
+    expect(installed.appDir).toBe(resolve('/installed/runtime'))
     expect(installed.runtimeProvider).toEqual({
       kind: 'bundle',
       contentIdentity: '0123456789abcdef',
@@ -130,7 +130,7 @@ describe('ResolvedLaunchContext', () => {
         OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY: '0123456789abcdef',
       },
     })
-    expect(configured.appDir).toBe('/configured/source')
+    expect(configured.appDir).toBe(resolve('/configured/source'))
     expect(configured.runtimeProvider).toEqual({
       kind: 'source',
       contentIdentity: null,
