@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useMobilePageNavigation, MobilePageNavigationProvider } from '../contexts/MobilePageNavigationContext'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
@@ -34,6 +35,54 @@ afterEach(() => {
 })
 
 describe('PageSidebarLayout', () => {
+  it('registers its phone navigator into the app context bar without rendering a second bar', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({
+      matches: false,
+      media: '',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })))
+
+    function ContextTrigger() {
+      const navigation = useMobilePageNavigation()
+      if (!navigation) return null
+      return (
+        <button
+          ref={navigation.triggerRef}
+          type="button"
+          onClick={navigation.open}
+          aria-controls={navigation.controlsId}
+        >
+          Context {navigation.title}
+        </button>
+      )
+    }
+
+    render(
+      <MobilePageNavigationProvider>
+        <ContextTrigger />
+        <PageSidebarLayout storageKey="inbox" title="Inbox" sidebar={<div>Inbox navigation</div>}>
+          <div>Inbox message</div>
+        </PageSidebarLayout>
+      </MobilePageNavigationProvider>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
+    const contextTrigger = screen.getByRole('button', { name: 'Context Inbox' })
+    const drawer = screen.getByTestId('page-sidebar-drawer')
+    expect(contextTrigger.getAttribute('aria-controls')).toBe(drawer.id)
+
+    fireEvent.click(contextTrigger)
+    expect(drawer.getAttribute('data-state')).toBe('open')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(drawer.getAttribute('data-state')).toBe('closed')
+    expect(document.activeElement).toBe(contextTrigger)
+  })
+
   it('persists the desktop focus mode and restores the full sidebar', () => {
     const view = render(
       <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>

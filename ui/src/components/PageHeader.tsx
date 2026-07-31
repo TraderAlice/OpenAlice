@@ -29,7 +29,7 @@ export function PageHeader({
       style={stackActionsOnNarrow ? { containerType: 'inline-size' } : undefined}
     >
       <div
-        className={`px-4 md:px-6 py-5 flex items-center justify-between gap-4 ${
+        className={`flex items-center justify-between gap-3 px-4 py-3 md:gap-4 md:px-6 md:py-5 ${
           stackActionsOnNarrow ? 'oa-page-header-stack-actions' : ''
         }`}
       >
