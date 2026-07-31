@@ -748,48 +748,132 @@ function GlobalMacroBoardView() {
           <div className="text-[13px] text-destructive border border-destructive/30 rounded-md px-3 py-2 bg-destructive/5">{error}</div>
         )}
         {data && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px] border-collapse">
-              <thead>
-                <tr className="text-muted-foreground/70 text-left border-b border-border">
-                  <th className="py-1.5 pr-3 font-medium">{t('market.colCountry')}</th>
-                  <th className="py-1.5 px-3 font-medium text-right">{t('market.colCpiYoy')}</th>
-                  <th className="py-1.5 px-3 font-medium text-right">{t('market.colShortRate')}</th>
-                  <th className="py-1.5 px-3 font-medium text-right">{t('market.colCli')}</th>
-                  <th className="py-1.5 px-3 font-medium text-right">{t('market.colHousePrice')}</th>
-                  <th className="py-1.5 pl-3 font-medium text-right">{t('market.colSharePrice')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((r) => (
-                  <tr key={r.country} className="border-b border-border/50 hover:bg-secondary/40">
-                    <td className="py-1.5 pr-3 text-foreground font-medium">{r.label}</td>
-                    <GlobalCell cell={r.cpiYoy} fmt={(v) => `${v.toFixed(2)}%`} colorBy="cpi" />
-                    <GlobalCell cell={r.shortRate} fmt={(v) => `${v.toFixed(2)}%`} />
-                    <GlobalCell cell={r.cli} fmt={(v) => v.toFixed(1)} colorBy="cli" />
-                    <GlobalCell cell={r.housePrice} fmt={(v) => v.toFixed(1)} />
-                    <GlobalCell cell={r.sharePrice} fmt={(v) => v.toFixed(1)} />
+          <>
+            <div
+              data-testid="global-macro-mobile"
+              className="divide-y divide-border/60 border-y border-border/70 md:hidden"
+            >
+              {data.rows.map((r) => (
+                <article key={r.country} className="py-3">
+                  <h3 className="truncate text-[13px] font-semibold text-foreground">{r.label}</h3>
+                  <dl className="mt-2 grid grid-cols-3 gap-x-3">
+                    <GlobalMetric
+                      label={t('market.colCpiYoy')}
+                      cell={r.cpiYoy}
+                      fmt={(v) => `${v.toFixed(2)}%`}
+                      colorBy="cpi"
+                    />
+                    <GlobalMetric
+                      label={t('market.colShortRate')}
+                      cell={r.shortRate}
+                      fmt={(v) => `${v.toFixed(2)}%`}
+                    />
+                    <GlobalMetric
+                      label={t('market.colCli')}
+                      cell={r.cli}
+                      fmt={(v) => v.toFixed(1)}
+                      colorBy="cli"
+                    />
+                  </dl>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-3 border-t border-border/40 pt-2">
+                    <GlobalMetric
+                      label={t('market.colHousePrice')}
+                      cell={r.housePrice}
+                      fmt={(v) => v.toFixed(1)}
+                    />
+                    <GlobalMetric
+                      label={t('market.colSharePrice')}
+                      cell={r.sharePrice}
+                      fmt={(v) => v.toFixed(1)}
+                    />
+                  </dl>
+                </article>
+              ))}
+            </div>
+
+            <div data-testid="global-macro-desktop" className="hidden overflow-x-auto md:block">
+              <table className="w-full text-[12px] border-collapse">
+                <thead>
+                  <tr className="text-muted-foreground/70 text-left border-b border-border">
+                    <th className="py-1.5 pr-3 font-medium">{t('market.colCountry')}</th>
+                    <th className="py-1.5 px-3 font-medium text-right">{t('market.colCpiYoy')}</th>
+                    <th className="py-1.5 px-3 font-medium text-right">{t('market.colShortRate')}</th>
+                    <th className="py-1.5 px-3 font-medium text-right">{t('market.colCli')}</th>
+                    <th className="py-1.5 px-3 font-medium text-right">{t('market.colHousePrice')}</th>
+                    <th className="py-1.5 pl-3 font-medium text-right">{t('market.colSharePrice')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.rows.map((r) => (
+                    <tr key={r.country} className="border-b border-border/50 hover:bg-secondary/40">
+                      <td className="py-1.5 pr-3 text-foreground font-medium">{r.label}</td>
+                      <GlobalCell cell={r.cpiYoy} fmt={(v) => `${v.toFixed(2)}%`} colorBy="cpi" />
+                      <GlobalCell cell={r.shortRate} fmt={(v) => `${v.toFixed(2)}%`} />
+                      <GlobalCell cell={r.cli} fmt={(v) => v.toFixed(1)} colorBy="cli" />
+                      <GlobalCell cell={r.housePrice} fmt={(v) => v.toFixed(1)} />
+                      <GlobalCell cell={r.sharePrice} fmt={(v) => v.toFixed(1)} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <p className="mt-2 text-[10px] text-muted-foreground/60">{t('market.globalMacroNote')}</p>
-          </div>
+          </>
         )}
       </div>
     </div>
   )
 }
 
-function GlobalCell({ cell, fmt, colorBy }: { cell: GlobalMacroCell; fmt: (v: number) => string; colorBy?: 'cpi' | 'cli' }) {
-  if (cell.value == null) {
-    return <td className="py-1.5 px-3 text-right text-muted-foreground/50" title={cell.error ?? 'no data'}>—</td>
+type GlobalCellColor = 'cpi' | 'cli'
+
+function globalCellColor(cell: GlobalMacroCell, colorBy?: GlobalCellColor): string {
+  if (cell.value == null) return 'text-muted-foreground/50'
+  if (colorBy === 'cpi') {
+    return cell.value >= 4 ? 'text-destructive' : cell.value <= 1 ? 'text-muted-foreground' : 'text-foreground'
   }
-  let color = 'text-foreground'
-  if (colorBy === 'cpi') color = cell.value >= 4 ? 'text-destructive' : cell.value <= 1 ? 'text-muted-foreground' : 'text-foreground'
-  if (colorBy === 'cli') color = cell.value >= 100 ? 'text-success' : 'text-destructive'
+  if (colorBy === 'cli') return cell.value >= 100 ? 'text-success' : 'text-destructive'
+  return 'text-foreground'
+}
+
+function globalCellTitle(cell: GlobalMacroCell): string {
+  return cell.value == null ? cell.error ?? 'no data' : cell.date ?? ''
+}
+
+function GlobalMetric({
+  label,
+  cell,
+  fmt,
+  colorBy,
+}: {
+  label: string
+  cell: GlobalMacroCell
+  fmt: (v: number) => string
+  colorBy?: GlobalCellColor
+}) {
+  const value = cell.value == null ? '—' : fmt(cell.value)
+  const title = globalCellTitle(cell)
   return (
-    <td className={`py-1.5 px-3 text-right font-mono ${color}`} title={cell.date ?? ''}>{fmt(cell.value)}</td>
+    <div className="min-w-0" title={title}>
+      <dt className="min-h-8 text-[10px] leading-4 text-muted-foreground">{label}</dt>
+      <dd
+        className={`truncate font-mono text-[13px] font-medium tabular-nums ${globalCellColor(cell, colorBy)}`}
+        aria-label={`${label}: ${value}${title ? ` · ${title}` : ''}`}
+      >
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+function GlobalCell({ cell, fmt, colorBy }: { cell: GlobalMacroCell; fmt: (v: number) => string; colorBy?: GlobalCellColor }) {
+  if (cell.value == null) {
+    return <td className="py-1.5 px-3 text-right text-muted-foreground/50" title={globalCellTitle(cell)}>—</td>
+  }
+  return (
+    <td className={`py-1.5 px-3 text-right font-mono ${globalCellColor(cell, colorBy)}`} title={globalCellTitle(cell)}>
+      {fmt(cell.value)}
+    </td>
   )
 }
 
