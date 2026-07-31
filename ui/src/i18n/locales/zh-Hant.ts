@@ -1431,6 +1431,9 @@ export const zhHant: Resources = {
     articleCount_other: '{{count}} 篇文章',
     noArticles: '無文章',
     noArticlesDescription: '此時間範圍內找不到新聞。',
+    loadErrorTitle: '無法載入新聞',
+    loadErrorDescription: 'OpenAlice 暫時無法重新整理新聞動態。請檢查與 OpenAlice 後端的連線，然後重試。',
+    stale: '即時重新整理失敗——目前顯示這些篩選條件下上次成功載入的新聞。',
     openOriginal: '檢視原文',
   },
   tracked: {

@@ -1424,6 +1424,9 @@ export const ja: Resources = {
     articleCount_other: '{{count}} 件',
     noArticles: '記事なし',
     noArticlesDescription: 'この期間のニュース記事は見つかりませんでした。',
+    loadErrorTitle: 'ニュースを読み込めませんでした',
+    loadErrorDescription: 'OpenAlice はニュースフィードを更新できませんでした。OpenAlice バックエンドへの接続を確認して、再試行してください。',
+    stale: 'ライブ更新に失敗しました。この条件で最後に取得できたニュースを表示しています。',
     openOriginal: '元記事を開く',
   },
   tracked: {

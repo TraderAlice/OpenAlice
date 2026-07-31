@@ -1435,6 +1435,9 @@ export const en = {
     articleCount_other: '{{count}} articles',
     noArticles: 'No articles',
     noArticlesDescription: 'No news articles found for this time range.',
+    loadErrorTitle: 'Couldn’t load News',
+    loadErrorDescription: 'OpenAlice could not refresh the news feed. Check the connection to the OpenAlice backend, then retry.',
+    stale: 'Live refresh failed — showing the last news received for these filters.',
     openOriginal: 'Open original',
   },
   tracked: {
