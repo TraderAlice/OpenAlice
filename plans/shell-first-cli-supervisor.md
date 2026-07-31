@@ -352,7 +352,7 @@ and verification before the next dependent branch starts from updated `dev`.
   parsing, transcripts, and timeouts.
 - [ ] Test normal exit, Ctrl+C, SIGTERM, renderer failure, disconnect, resize,
   Unicode, no-color, and Git Bash.
-- [ ] Salvage the independent Windows Guardian atomic-owner replacement fix
+- [x] Salvage the independent Windows Guardian atomic-owner replacement fix
   from #857 and close that superseded PR.
 
 ### 4. Supervisor TUI application
