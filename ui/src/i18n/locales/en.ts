@@ -295,6 +295,8 @@ export const en = {
       followsSystem: 'follows system',
       themePair: 'Theme pair',
       themePairDescription: 'Auto switches between these slots. Select one to edit its palette.',
+      customizePalettes: 'Customize palettes',
+      hidePaletteEditor: 'Hide palette editor',
       resetPair: 'Reset pair',
       activeSlot: 'Active',
       editingSlot: 'Editing',

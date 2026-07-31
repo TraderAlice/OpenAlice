@@ -283,6 +283,8 @@ export const zh: Resources = {
       followsSystem: '跟随系统',
       themePair: '主题组合',
       themePairDescription: '自动模式会在这两个槽位间切换。选择一个槽位来编辑它的色卡。',
+      customizePalettes: '自定义配色',
+      hidePaletteEditor: '收起配色编辑器',
       resetPair: '重置组合',
       activeSlot: '当前生效',
       editingSlot: '正在编辑',

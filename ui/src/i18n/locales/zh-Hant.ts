@@ -291,6 +291,8 @@ export const zhHant: Resources = {
       followsSystem: '跟隨系統',
       themePair: '主題組合',
       themePairDescription: '自動模式會在這兩個槽位間切換。選擇一個槽位來編輯它的色卡。',
+      customizePalettes: '自訂配色',
+      hidePaletteEditor: '收合配色編輯器',
       resetPair: '重設組合',
       activeSlot: '目前生效',
       editingSlot: '正在編輯',
