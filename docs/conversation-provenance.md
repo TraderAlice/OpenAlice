@@ -509,8 +509,11 @@ The embedded generic entry point is:
 
 ```bash
 alice-workspace conversation ask --resume-id <resumeId> --prompt '<question>'
+alice-workspace conversation ask --inbox-id <entryId> --prompt '<question>'
 alice-workspace conversation ask --issue-id <issueId> [--ws-id <workspaceId>] --prompt '<question>'
 alice-workspace conversation ask --ws-id <workspaceId> --prompt '<question>'
+alice-workspace conversation ask --harness chat --prompt '<new assignment>'
+alice-workspace conversation ask --harness autoquant --prompt '<new assignment>'
 alice-workspace conversation ask --ws-id <workspaceId> --prompt '<reconstruction request>' --reconstruct
 alice-workspace conversation await --task-id <taskId>
 alice-workspace conversation collect --task-id <taskA> --task-id <taskB>
@@ -527,12 +530,22 @@ alice-workspace issue ask --id <issueName> --run-id <taskId> --prompt '<question
 ```
 
 The public CLI accepts only flat identity flags. `resumeId` addresses one exact
-Session, `issueId` consults the Phase 1 index, and `wsId` recruits a fresh worker
-when there is no known owner. Rich Inbox/report/trade target structures stay
-inside the resolver and future business-specific convenience commands; agents
-never serialize them into `conversation ask`. The ask result reports a compact
-`resolution.mode`; read returns runtime status and the latest assistant text by
-default. Full tool/message blocks are diagnostic data behind `--mode detailed`.
+Session, `inboxId` resolves the sender of one immutable delivery, `issueId`
+consults the Phase 1 creation index, and `wsId` recruits a fresh worker in one
+exact desk. `harness=chat|autoquant` resolves the corresponding default desk
+before recruiting a fresh Session, so callers do not need to discover its
+Workspace id. Rich report/trade target structures stay inside business-specific
+commands; agents never serialize them into `conversation ask`. The ask result
+reports a compact `resolution.mode`; read returns runtime status and the latest
+assistant text by default. Full tool/message blocks are diagnostic data behind
+`--mode detailed`.
+
+Harness resolution preserves each product's initialization contract. Chat uses
+the recent/default durable Chat Workspace policy and creates one stable starter
+only when no Chat desk exists. AutoQuant requires the explicit
+`autoQuant.defaultWorkspaceId`; Conversation never guesses, switches, or creates
+an AutoQuant Workspace as a side effect. In either case the resolved desk starts
+a new product Session and returns its new `resumeId`.
 
 Provenance resolution and prompt semantics are separate. A fallback worker is
 still labeled `reconstructed` so it cannot impersonate a missing author, but

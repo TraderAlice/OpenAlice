@@ -2,7 +2,6 @@ import { tool } from 'ai'
 import { z } from 'zod'
 
 import {
-  toSafeInboxOrigin,
   type WorkspaceToolContext,
   type WorkspaceToolFactory,
 } from '../core/workspace-tool-center.js'
@@ -10,6 +9,7 @@ import { issueAssigneeResumeId } from '../workspaces/issues/declaration.js'
 import {
   askWorkspaceConversation,
   conversationAskCommonShape,
+  resolveInboxConversationAddress,
 } from './conversation.js'
 
 function withSubject<T extends object>(subject: Record<string, unknown>, result: T) {
@@ -43,26 +43,18 @@ export const inboxAskFactory: WorkspaceToolFactory = {
         reconstruct = false,
       }) => {
         try {
-          const entry = await ctx.inboxStore.get(id)
-          if (!entry) return { ok: false as const, error: `inbox entry not found: ${id}` }
-          const origin = toSafeInboxOrigin(ctx.resolveInboxOrigin?.(entry) ?? entry.origin)
-          const target = origin?.resumeId
-            ? { kind: 'resume' as const, resumeId: origin.resumeId }
-            : {
-                kind: 'inbox' as const,
-                inboxEntryId: entry.id,
-                workspaceId: entry.workspaceId,
-              }
+          const address = await resolveInboxConversationAddress(ctx, id)
+          if ('error' in address) return { ok: false as const, error: address.error }
           const result = await askWorkspaceConversation(ctx, {
             prompt,
-            target,
-            subject: { kind: 'inbox', entryId: entry.id },
+            target: address.target,
+            subject: address.subject,
             ...(agent ? { agent } : {}),
             ...(timeoutMs ? { timeoutMs } : {}),
             await: shouldAwait,
             reconstruct,
           })
-          return withSubject({ kind: 'inbox', id: entry.id }, result)
+          return withSubject({ kind: 'inbox', id: address.subject.entryId }, result)
         } catch (err) {
           return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
         }

@@ -45,6 +45,7 @@ import type {
 export type WorkspaceConversationTarget =
   | { kind: 'resume'; resumeId: string }
   | { kind: 'workspace'; workspaceId: string }
+  | { kind: 'harness'; harness: 'chat' | 'autoquant' }
   | { kind: 'inbox'; inboxEntryId: string; workspaceId?: string }
   | {
       kind: 'issue'
@@ -83,7 +84,7 @@ export type WorkspaceConversationResolution =
   | {
       mode: 'reconstructed'
       workspaceId: string
-      reason: 'explicit-workspace' | 'missing-origin' | 'non-session-origin' | 'prior-reconstruction' | 'unavailable-reconstruction'
+      reason: 'explicit-workspace' | 'harness-default' | 'missing-origin' | 'non-session-origin' | 'prior-reconstruction' | 'unavailable-reconstruction'
       /** Present when continuing a previously recruited reconstruction worker. */
       origin?: SessionOrigin
       artifact?: ArtifactRef
@@ -98,6 +99,8 @@ export type WorkspaceConversationResolution =
         | 'purged-workspace'
         | 'deleted-workspace'
         | 'missing-workspace'
+        | 'chat-workspace-unavailable'
+        | 'autoquant-not-initialized'
       attributedOrigin?: SessionOrigin
       artifact?: ArtifactRef
     }

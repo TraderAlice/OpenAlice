@@ -136,6 +136,8 @@ describe('injectWorkspaceContext — skills', () => {
     expect(skill).toContain('There is deliberately no Workspace-level file-read command');
     expect(skill).toContain('alice-workspace peer path --id <workspaceId>');
     expect(skill).toContain("Coding Agent's native Read/Search/Glob/Git capabilities");
+    expect(skill).toContain('alice-workspace conversation ask --inbox-id <entryId>');
+    expect(skill).toContain('alice-workspace conversation ask --harness autoquant');
     expect(skill).not.toContain('peer file-read');
   });
 

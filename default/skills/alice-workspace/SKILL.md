@@ -49,7 +49,21 @@ alice-workspace conversation ask --ws-id <workspaceId> \
 # Continue one exact attributable product Session.
 alice-workspace conversation ask --resume-id <resumeId> \
   --prompt 'Explain the missing context.' --await
+
+# Ask the attributable sender of one Inbox delivery.
+alice-workspace conversation ask --inbox-id <entryId> \
+  --prompt 'What did you send, and what should I inspect first?' --await
+
+# Recruit a fresh Session in a Harness default Workspace.
+alice-workspace conversation ask --harness autoquant \
+  --prompt 'Start a new quantitative research assignment.'
 ```
+
+`--harness chat` follows the recent/default Chat desk policy and creates the
+stable starter Chat Workspace only when none exists. `--harness autoquant`
+requires the explicitly initialized AutoQuant default Workspace and never
+creates or guesses one. Both launch a fresh product Session in the resolved
+desk; use the returned `resumeId` for later continuation.
 
 Prompts are ordinary coworker messages. Add `--reconstruct` only when the task
 explicitly requires a fresh worker to reconstruct missing historical intent.

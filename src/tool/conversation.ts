@@ -143,17 +143,40 @@ export async function askWorkspaceConversation(
   }
 }
 
+export async function resolveInboxConversationAddress(
+  ctx: WorkspaceToolContext,
+  inboxEntryId: string,
+): Promise<{
+  target: WorkspaceConversationTarget
+  subject: Extract<HeadlessInquirySubject, { kind: 'inbox' }>
+} | { error: string }> {
+  const entry = await ctx.inboxStore.get(inboxEntryId)
+  if (!entry) return { error: `inbox entry not found: ${inboxEntryId}` }
+  const origin = ctx.resolveInboxOrigin?.(entry) ?? entry.origin
+  const sessionOrigin = sessionOriginFromInboxOrigin(entry.workspaceId, origin)
+  return {
+    target: sessionOrigin
+      ? { kind: 'resume', resumeId: sessionOrigin.resumeId }
+      : {
+          kind: 'inbox',
+          inboxEntryId: entry.id,
+          workspaceId: entry.workspaceId,
+        },
+    subject: { kind: 'inbox', entryId: entry.id },
+  }
+}
+
 export const conversationAskFactory: WorkspaceToolFactory = {
   name: 'conversation_ask',
   build(ctx) {
     return tool({
       description: [
-        "Ask a known product Session, an Issue's attributable creator, or a fresh worker in one Workspace.",
+        "Ask a known product Session, an Inbox sender, an Issue's attributable creator, or a fresh worker.",
         '',
-        'Use exactly one addressing form: resumeId for an exact Session; issueId (optionally',
-        'scoped by wsId) for Issue provenance; or wsId alone to recruit a fresh worker.',
-        'The CLI exposes these as --resume-id, --issue-id, and --ws-id. It never requires',
-        'callers to construct an internal target object.',
+        'Use exactly one addressing form: resumeId for an exact Session; inboxId for the',
+        'sender of one delivery; issueId (optionally scoped by wsId) for Issue creation',
+        'provenance; wsId for a fresh worker in an exact desk; or harness for a fresh',
+        'worker in the current default Chat/AutoQuant desk.',
         '',
         'Use --await when this turn needs the reply. Without it, the call returns a',
         'short taskId immediately for delegated work or several concurrent questions;',
@@ -165,17 +188,23 @@ export const conversationAskFactory: WorkspaceToolFactory = {
       inputSchema: z.object({
         ...conversationAskCommonShape,
         resumeId: z.string().min(1).optional()
-          .describe('Exact product Session to continue. Cannot be combined with wsId or issueId.'),
+          .describe('Exact product Session to continue. Cannot be combined with another target flag.'),
+        inboxId: z.string().min(1).optional()
+          .describe('Inbox entry whose attributable sender should answer; unattributed entries fall back only to their source Workspace.'),
         wsId: z.string().min(1).optional()
           .describe('Workspace for a fresh worker, or optional scope for issueId.'),
         issueId: z.string().min(1).optional()
           .describe("Issue whose attributable creator should answer. Defaults to the current Workspace; use `issue ask --owner` for the declared owner."),
+        harness: z.enum(['chat', 'autoquant']).optional()
+          .describe('Create a fresh Session in the default `chat` or `autoquant` Workspace.'),
       }),
       execute: async ({
         prompt,
         resumeId,
+        inboxId,
         wsId,
         issueId,
+        harness,
         agent,
         timeoutMs,
         await: shouldAwait = false,
@@ -184,31 +213,44 @@ export const conversationAskFactory: WorkspaceToolFactory = {
         if (!ctx.conversation) {
           return { ok: false as const, error: 'workspace conversation control is unavailable' }
         }
-        if (resumeId && (wsId || issueId)) {
+        const targetCount = Number(Boolean(resumeId))
+          + Number(Boolean(inboxId))
+          + Number(Boolean(issueId))
+          + Number(Boolean(harness))
+          + Number(Boolean(wsId && !issueId))
+        if (targetCount !== 1) {
           return {
             ok: false as const,
-            error: 'choose one target: --resume-id, --issue-id [--ws-id], or --ws-id',
+            error: 'choose exactly one target: --resume-id, --inbox-id, --issue-id [--ws-id], --ws-id, or --harness',
           }
         }
-        if (!resumeId && !issueId && !wsId) {
-          return {
-            ok: false as const,
-            error: 'provide --resume-id, --issue-id [--ws-id], or --ws-id',
-          }
+        const inboxAddress = inboxId
+          ? await resolveInboxConversationAddress(ctx, inboxId)
+          : null
+        if (inboxAddress && 'error' in inboxAddress) {
+          return { ok: false as const, error: inboxAddress.error }
         }
-        const target = resumeId
+        const target = inboxAddress
+          ? inboxAddress.target
+          : resumeId
           ? { kind: 'resume' as const, resumeId }
           : issueId
             ? { kind: 'issue' as const, workspaceId: wsId ?? ctx.workspaceId, issueId }
-            : { kind: 'workspace' as const, workspaceId: wsId! }
-        return askWorkspaceConversation(ctx, {
+            : harness
+              ? { kind: 'harness' as const, harness }
+              : { kind: 'workspace' as const, workspaceId: wsId! }
+        const result = await askWorkspaceConversation(ctx, {
           prompt,
           target,
+          ...(inboxAddress ? { subject: inboxAddress.subject } : {}),
           ...(agent ? { agent } : {}),
           ...(timeoutMs ? { timeoutMs } : {}),
           await: shouldAwait,
           reconstruct,
         })
+        return inboxAddress
+          ? { subject: { kind: 'inbox' as const, id: inboxAddress.subject.entryId }, ...result }
+          : result
       },
     })
   },
