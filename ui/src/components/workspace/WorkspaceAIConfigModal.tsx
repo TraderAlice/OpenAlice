@@ -295,6 +295,7 @@ export function WorkspaceAIConfigModal({
   const {
     workspaces,
     agents = [],
+    defaultAgent,
     refresh,
     saveWorkspaceMetadata,
   } = useWorkspaces()
@@ -1377,7 +1378,10 @@ export function WorkspaceAIConfigModal({
               <WorkspaceLaunchConfigurationPanel
                 wsId={wsId}
                 agents={agents.map((agent) => agent.id)}
-                initialAgent={initialAgent}
+                workspaceDefaultAgent={workspace?.defaultAgent}
+                installationDefaultAgent={defaultAgent}
+                initialAgent={workspace?.defaultAgent ?? initialAgent}
+                onSaveDefaultAgent={(agent) => saveWorkspaceMetadata(wsId, { defaultAgent: agent })}
               />
             )}
 

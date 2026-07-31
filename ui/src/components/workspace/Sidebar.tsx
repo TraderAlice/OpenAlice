@@ -62,7 +62,6 @@ export interface SidebarProps {
     resumeId: string,
     opts: { title?: string },
   ) => void;
-  readonly onSetDefaultAgent: (agent: string | null) => void;
   readonly onPauseSession: (wsId: string, sessionId: string) => void;
   readonly onResumeSession: (wsId: string, sessionId: string) => void;
   readonly onDeleteSession: (wsId: string, sessionId: string) => void;
@@ -209,14 +208,13 @@ export function Sidebar(props: SidebarProps): ReactElement {
             reorderId={w.id}
             workspace={w}
             agents={props.agents}
-            defaultAgent={props.defaultAgent}
+            defaultAgent={w.defaultAgent ?? props.defaultAgent}
             selection={props.selection}
             headlessTasks={headlessByWs.get(w.id) ?? []}
             onSelectWorkspace={props.onSelectWorkspace}
             onSelectSession={props.onSelectSession}
             onSpawn={props.onSpawn}
             onOpenHeadlessRun={props.onOpenHeadlessRun}
-            onSetDefaultAgent={props.onSetDefaultAgent}
             onPauseSession={props.onPauseSession}
             onResumeSession={props.onResumeSession}
             onDeleteSession={props.onDeleteSession}
@@ -269,7 +267,6 @@ export interface WorkspaceRowProps {
   readonly onSelectSession: (wsId: string, sessionId: string) => void;
   readonly onSpawn: (wsId: string, opts?: SpawnOpts) => void;
   readonly onOpenHeadlessRun: SidebarProps['onOpenHeadlessRun'];
-  readonly onSetDefaultAgent: (agent: string | null) => void;
   readonly onPauseSession: (wsId: string, sessionId: string) => void;
   readonly onResumeSession: (wsId: string, sessionId: string) => void;
   readonly onDeleteSession: (wsId: string, sessionId: string) => void;
@@ -370,8 +367,6 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
 
   const onMenuPick = (agentId: string): void => {
     setSpawnMenuOpen(false);
-    const agent = props.agents.find((a) => a.id === agentId);
-    if (agent && agent.kind !== 'utility') props.onSetDefaultAgent(agentId);
     props.onSpawn(w.id, { agent: agentId });
   };
 

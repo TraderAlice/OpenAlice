@@ -384,7 +384,7 @@ export interface WorkspaceService {
     preferredWorkspaceId?: string | null,
     sourceVersion?: string,
   ): Promise<TemplateWorkspaceResolution>;
-  /** Resolve the installation default, then fall back to the first registered agent runtime. */
+  /** Resolve the Workspace default, installation fallback, then first registered runtime. */
   resolveDefaultAgentId(meta: WorkspaceMeta): Promise<string | undefined>;
   resolveAdapter(meta: WorkspaceMeta, agentId?: string): CliAdapter;
   /** Open the same persisted Pi Session through Pi RPC instead of its PTY. */
@@ -829,15 +829,22 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return adapter && isAgentRuntime(adapter) ? agentId : undefined;
   };
 
+  /** Default for fresh interactive Sessions without an explicit runtime. */
+  const resolveDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
+    const metadata = await readWorkspaceMetadata(wsMeta.dir);
+    const workspaceDefault = metadata.ok
+      ? validRegisteredRuntime(metadata.metadata.defaultAgent ?? null)
+      : undefined;
+    return workspaceDefault ??
+      validRegisteredRuntime(await readWorkspaceDefaultAgent().catch(() => null)) ??
+      firstRegisteredRuntime();
+  };
+
   /**
    * Default for scheduled issues with no frontmatter `agent`: issue-specific
-   * setting first, then the interactive workspace default for backwards
-   * continuity, then the first registered runtime.
+   * setting first, then the target Workspace Session default, installation
+   * fallback, and finally the first registered runtime.
    */
-  const resolveDefaultAgentId = async (_wsMeta: WorkspaceMeta): Promise<string | undefined> =>
-    validRegisteredRuntime(await readWorkspaceDefaultAgent().catch(() => null)) ??
-    firstRegisteredRuntime();
-
   const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
     validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
     await resolveDefaultAgentId(wsMeta);

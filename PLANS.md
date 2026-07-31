@@ -47,8 +47,9 @@ the durable truth after it changes.
 - [[plans/broker-pack-release-safety.md]] — Repaired the v0.85 existing-user
   Broker Pack upgrade gap, shipped v0.86.0-beta, and made N-1→N reconciliation
   a blocking release contract.
-- [[plans/workspace-launch-configuration.md]] — Made the next Workspace runtime
-  launch plan inspectable from the existing Workspace settings panel.
+- [[plans/workspace-launch-configuration.md]] — Adds a Workspace-local default
+  Session runtime and makes the resolved launch plan inspectable from the
+  existing Workspace settings panel.
 - [[plans/windows-headless-launch.md]] — Safely launches Windows npm Agent
   runtimes for scheduled work and makes pre-process failures observable.
 - [[plans/issue-model-effort-overrides.md]] — Separated login-backed Workspace

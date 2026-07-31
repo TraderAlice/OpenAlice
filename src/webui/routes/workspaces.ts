@@ -218,7 +218,12 @@ export function createWorkspaceRoutes(
     return c.json({ ok: true, changed: svc.pool.setTerminalViewAttributes(attributes) });
   });
 
-  const resolveDefaultAgentId = async (_meta: WorkspaceMeta): Promise<string | undefined> => {
+  const resolveDefaultAgentId = async (meta: WorkspaceMeta): Promise<string | undefined> => {
+    const metadata = await readWorkspaceMetadata(meta.dir);
+    if (metadata.ok && metadata.metadata.defaultAgent) {
+      const adapter = svc.adapters.get(metadata.metadata.defaultAgent);
+      if (adapter && isAgentRuntime(adapter)) return metadata.metadata.defaultAgent;
+    }
     const configured = await readWorkspaceDefaultAgent().catch(() => null);
     if (configured) {
       const adapter = svc.adapters.get(configured);
@@ -979,6 +984,20 @@ export function createWorkspaceRoutes(
       const v = fields['description'];
       if (v === null) delete nextObj['description'];
       else nextObj['description'] = v;
+    }
+    if ('defaultAgent' in fields) {
+      const v = fields['defaultAgent'];
+      if (v === null) {
+        delete nextObj['defaultAgent'];
+      } else if (typeof v === 'string') {
+        const adapter = svc.adapters.get(v);
+        if (!adapter || !isAgentRuntime(adapter)) {
+          return c.json({ error: 'invalid_agent', message: `unknown agent runtime: ${v}` }, 400);
+        }
+        nextObj['defaultAgent'] = v;
+      } else {
+        return c.json({ error: 'invalid_agent', message: 'defaultAgent must be a runtime id or null' }, 400);
+      }
     }
     const next = workspaceMetadataSchema.safeParse(nextObj);
     if (!next.success) {

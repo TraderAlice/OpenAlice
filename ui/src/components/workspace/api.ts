@@ -15,6 +15,8 @@ export interface Workspace {
   readonly description?: string;
   /** Validation/read error for `.alice/workspace.json`, when present. */
   readonly metadataError?: string;
+  /** Workspace-local runtime used for fresh Sessions when no launch overrides it. */
+  readonly defaultAgent?: string;
   readonly dir: string;
   readonly createdAt: string;
   readonly template?: string;
@@ -1123,7 +1125,11 @@ export async function purgeDepartedWorkspace(id: string): Promise<void> {
   }
 }
 
-export type WorkspaceMetadataPatch = { displayName?: string | null; description?: string | null };
+export type WorkspaceMetadataPatch = {
+  displayName?: string | null;
+  description?: string | null;
+  defaultAgent?: string | null;
+};
 
 export async function updateWorkspaceMetadata(
   id: string,

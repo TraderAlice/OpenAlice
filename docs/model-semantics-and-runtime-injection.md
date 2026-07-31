@@ -105,6 +105,13 @@ Workspace defaults and headless run selection are different configuration
 layers. A Workspace-local file expresses the durable preference; an explicit
 CLI argument selects one Issue run and wins without rewriting that file:
 
+Fresh Session runtime selection follows the same ownership rule. The optional
+`.alice/workspace.json` `defaultAgent` is the durable default for one Workspace.
+It wins over the legacy installation-wide `workspaceDefaultAgent`; an explicit
+Quick Chat, sidebar, CLI, or API runtime choice wins for that one Session without
+rewriting either default. If neither default resolves to a registered agent
+runtime, Alice falls back to the first registered runtime.
+
 | Runtime | Workspace-local preference | One-run headless override |
 |---|---|---|
 | Claude Code | `.claude/settings.local.json`: `model`, `effortLevel` | `--model`, `--effort` |

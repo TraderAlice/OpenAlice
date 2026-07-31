@@ -527,6 +527,48 @@ describe('PATCH /:id/metadata', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('persists a registered Workspace default agent runtime', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-runtime-'));
+    try {
+      const codex = { id: 'codex', capabilities: { headless: true } };
+      const { app } = build({
+        meta: { id: 'ws-1', tag: 'stable-tag', dir },
+        adapters: { codex },
+      });
+
+      const saved = await patch(app, '/ws-1/metadata', { defaultAgent: 'codex' });
+      expect(saved.status).toBe(200);
+      expect(saved.body.workspace.defaultAgent).toBe('codex');
+      expect(await readWorkspaceMetadata(dir)).toEqual({
+        ok: true,
+        metadata: { defaultAgent: 'codex' },
+      });
+
+      const cleared = await patch(app, '/ws-1/metadata', { defaultAgent: null });
+      expect(cleared.status).toBe(200);
+      expect(cleared.body.workspace.defaultAgent).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects utility and unknown adapters as a Workspace default runtime', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-runtime-'));
+    try {
+      const shell = { id: 'shell', kind: 'utility', capabilities: {} };
+      const { app } = build({
+        meta: { id: 'ws-1', tag: 'stable-tag', dir },
+        adapters: { shell },
+      });
+
+      expect((await patch(app, '/ws-1/metadata', { defaultAgent: 'shell' })).status).toBe(400);
+      expect((await patch(app, '/ws-1/metadata', { defaultAgent: 'future-runtime' })).status).toBe(400);
+      expect(await readWorkspaceMetadata(dir)).toEqual({ ok: false, reason: 'absent' });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('agent runtime readiness routes', () => {

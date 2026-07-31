@@ -278,7 +278,6 @@ export function useAgentLaunchPreferences(): AgentLaunchPreferencesState {
 export interface UseAgentLaunchConfigOptions {
   readonly agents: readonly AgentInfo[]
   readonly defaultAgent: string | null
-  readonly setDefaultAgent: (agent: string | null) => Promise<void>
   readonly preferences: AgentLaunchPreferencesState
   readonly workspaceId: string | null
   readonly hasWorkspace: boolean
@@ -318,7 +317,6 @@ export interface AgentLaunchConfigState {
 export function useAgentLaunchConfig({
   agents,
   defaultAgent,
-  setDefaultAgent,
   preferences,
   workspaceId,
   hasWorkspace,
@@ -501,8 +499,7 @@ export function useAgentLaunchConfig({
   const selectAgent = useCallback((agent: string) => {
     setSelectedAgentId(agent)
     setPickedCredential(null)
-    void setDefaultAgent(agent)
-  }, [setDefaultAgent])
+  }, [])
 
   const selectCredential = useCallback((credentialSlug: string) => {
     if (!needsCredential || effectiveAgent === null) return

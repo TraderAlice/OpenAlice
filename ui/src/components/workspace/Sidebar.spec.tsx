@@ -39,7 +39,6 @@ afterEach(() => {
 describe('WorkspaceRow session launcher', () => {
   it('keeps the default runtime one click away while the full runtime menu remains discoverable', () => {
     const onSpawn = vi.fn()
-    const onSetDefaultAgent = vi.fn()
     render(
       <WorkspaceRow
         workspace={workspace}
@@ -50,7 +49,6 @@ describe('WorkspaceRow session launcher', () => {
         onSelectSession={vi.fn()}
         onSpawn={onSpawn}
         onOpenHeadlessRun={vi.fn()}
-        onSetDefaultAgent={onSetDefaultAgent}
         onPauseSession={vi.fn()}
         onResumeSession={vi.fn()}
         onDeleteSession={vi.fn()}
@@ -66,7 +64,6 @@ describe('WorkspaceRow session launcher', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Shell (sh)' }))
 
     expect(onSpawn).toHaveBeenLastCalledWith(workspace.id, { agent: 'shell' })
-    expect(onSetDefaultAgent).not.toHaveBeenCalled()
   })
 
   it('uses the primary plus button as the chooser when no default runtime exists', () => {
@@ -80,7 +77,6 @@ describe('WorkspaceRow session launcher', () => {
         onSelectSession={vi.fn()}
         onSpawn={vi.fn()}
         onOpenHeadlessRun={vi.fn()}
-        onSetDefaultAgent={vi.fn()}
         onPauseSession={vi.fn()}
         onResumeSession={vi.fn()}
         onDeleteSession={vi.fn()}
@@ -108,7 +104,6 @@ describe('WorkspaceRow session launcher', () => {
         onSelectSession={vi.fn()}
         onSpawn={vi.fn()}
         onOpenHeadlessRun={vi.fn()}
-        onSetDefaultAgent={vi.fn()}
         onPauseSession={vi.fn()}
         onResumeSession={vi.fn()}
         onDeleteSession={vi.fn()}

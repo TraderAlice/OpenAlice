@@ -94,7 +94,6 @@ function HarnessLandingPage({
     agents,
     workspaces,
     defaultAgent,
-    setDefaultAgent,
     openAgentConfig,
     hasLoaded,
     listError,
@@ -146,8 +145,7 @@ function HarnessLandingPage({
   const credentialWorkspace = workspaceTarget
   const launchConfig = useAgentLaunchConfig({
     agents: cliAgents,
-    defaultAgent,
-    setDefaultAgent,
+    defaultAgent: workspaceTarget?.defaultAgent ?? defaultAgent,
     preferences: launchPreferences,
     workspaceId: credentialWorkspace?.id ?? null,
     hasWorkspace: credentialWorkspace !== null && credentialWorkspace !== undefined,

@@ -41,7 +41,6 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const {
     agents,
     defaultAgent,
-    setDefaultAgent,
     openAgentConfig,
     workspaceManager: manager,
     workspaceManagerLoaded,
@@ -63,7 +62,6 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const launchConfig = useAgentLaunchConfig({
     agents: runtimeAgents,
     defaultAgent,
-    setDefaultAgent,
     preferences: launchPreferences,
     workspaceId: MANAGER_WORKSPACE_ID,
     hasWorkspace: true,

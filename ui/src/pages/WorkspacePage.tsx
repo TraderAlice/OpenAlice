@@ -46,13 +46,15 @@ export function WorkspacePage({ spec, visible }: Props) {
   const activeRecord = sessionId
     ? sessions.find((s) => s.id === sessionId) ?? null
     : null
+  const effectiveDefaultAgent = workspace?.defaultAgent ?? ctx.defaultAgent
   const defaultAgentEnabled =
-    ctx.defaultAgent !== null &&
-    ctx.agents.some((a) => a.id === ctx.defaultAgent && a.kind !== 'utility')
+    effectiveDefaultAgent !== null &&
+    effectiveDefaultAgent !== undefined &&
+    ctx.agents.some((a) => a.id === effectiveDefaultAgent && a.kind !== 'utility')
 
   const spawnDefault = (): void => {
-    if (defaultAgentEnabled && ctx.defaultAgent) {
-      void ctx.spawn(wsId, { agent: ctx.defaultAgent }, source)
+    if (defaultAgentEnabled && effectiveDefaultAgent) {
+      void ctx.spawn(wsId, { agent: effectiveDefaultAgent }, source)
       return
     }
     // The old header dropdown duplicated the global New chat flow and left a
@@ -81,7 +83,7 @@ export function WorkspacePage({ spec, visible }: Props) {
     }
     document.addEventListener('keydown', handler, { capture: true })
     return () => document.removeEventListener('keydown', handler, { capture: true })
-  }, [visible, ctx, wsId, defaultAgentEnabled])
+  }, [visible, ctx, wsId, defaultAgentEnabled, effectiveDefaultAgent])
 
   if (!workspace) {
     return (
