@@ -1488,6 +1488,7 @@ export const zh: Resources = {
   inbox: {
     noMessages: '收件箱为空。',
     emptyHint: '工作区会把状态更新推送到这里。',
+    untitledUpdate: '没有摘要的更新',
     dateToday: '今天',
     dateYesterday: '昨天',
     dateThisWeek: '本周',
@@ -1517,6 +1518,8 @@ export const zh: Resources = {
     workspaceNotExists: '工作区已不存在',
     fromSender: '来自 {{sender}}',
     senderIdentityTitle: '发送者身份：{{sender}}',
+    showSenderDetails: '查看 {{sender}} 的发送者信息',
+    senderSession: 'Session',
     fromIssue: '来自 {{issue}}',
     fromIssueTitle: '来自 Issue {{issue}}',
     followUpSender: '继续和发送者沟通',

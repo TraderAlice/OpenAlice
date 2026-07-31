@@ -1489,6 +1489,7 @@ export const ja: Resources = {
   inbox: {
     noMessages: '受信トレイにメッセージがありません。',
     emptyHint: 'ワークスペースがステータス更新をここに送ります。',
+    untitledUpdate: '要約のない更新',
     dateToday: '今日',
     dateYesterday: '昨日',
     dateThisWeek: '今週',
@@ -1518,6 +1519,8 @@ export const ja: Resources = {
     workspaceNotExists: 'ワークスペースは存在しません',
     fromSender: '{{sender}} から',
     senderIdentityTitle: '送信者 ID: {{sender}}',
+    showSenderDetails: '{{sender}} の送信者情報を表示',
+    senderSession: 'セッション',
     fromIssue: '{{issue}} から',
     fromIssueTitle: 'Issue {{issue}} から',
     followUpSender: '送信者と続ける',

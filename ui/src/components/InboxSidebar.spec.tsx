@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   loading: false,
   selectedEntryId: 'inbox-1' as string | null,
   mode: 'workspace' as 'workspace' | 'time',
-  workspaces: [] as Array<{ id: string; tag: string }>,
+  workspaces: [] as Array<{ id: string; tag: string; displayName?: string }>,
   markRead: vi.fn(),
   select: vi.fn(),
   setMode: vi.fn(),
@@ -68,7 +68,7 @@ beforeEach(async () => {
   mocks.loading = false
   mocks.selectedEntryId = 'inbox-1'
   mocks.mode = 'workspace'
-  mocks.workspaces = [{ id: 'workspace-1', tag: 'renamed-desk' }]
+  mocks.workspaces = [{ id: 'workspace-1', tag: 'renamed-desk', displayName: 'Research desk' }]
 })
 
 afterEach(() => {
@@ -78,13 +78,14 @@ afterEach(() => {
 
 describe('InboxSidebar Workspace labels', () => {
   it.each(['workspace', 'time'] as const)(
-    'uses the current Workspace tag in %s view',
+    'uses the current Workspace display name in %s view',
     (mode) => {
       mocks.mode = mode
 
       render(<InboxSidebar />)
 
-      expect(screen.getByText('renamed-desk')).toBeTruthy()
+      expect(screen.getByText('Research desk')).toBeTruthy()
+      expect(screen.queryByText('renamed-desk')).toBeNull()
       expect(screen.queryByText('old-desk')).toBeNull()
     },
   )
@@ -95,6 +96,27 @@ describe('InboxSidebar Workspace labels', () => {
     render(<InboxSidebar />)
 
     expect(screen.getByText('old-desk')).toBeTruthy()
+  })
+
+  it('makes the update primary and keeps Workspace provenance secondary in time view', () => {
+    mocks.mode = 'time'
+
+    render(<InboxSidebar />)
+
+    const update = screen.getByText('Research is ready.')
+    const workspace = screen.getByText('Research desk')
+    expect(update.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(update.className).toMatch(/font-(medium|semibold)/)
+    expect(workspace.className).toContain('text-muted-foreground')
+  })
+
+  it('keeps entries without comments or attachments scannable', () => {
+    mocks.mode = 'time'
+    mocks.entries = [{ ...mocks.entries[0]!, comments: '', docs: [] }]
+
+    render(<InboxSidebar />)
+
+    expect(screen.getByText('Update without a summary')).toBeTruthy()
   })
 })
 

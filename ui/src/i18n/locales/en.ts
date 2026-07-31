@@ -1500,6 +1500,7 @@ export const en = {
   inbox: {
     noMessages: 'No inbox messages.',
     emptyHint: 'Workspaces will push status updates here.',
+    untitledUpdate: 'Update without a summary',
     dateToday: 'Today',
     dateYesterday: 'Yesterday',
     dateThisWeek: 'This week',
@@ -1529,6 +1530,8 @@ export const en = {
     workspaceNotExists: 'Workspace no longer exists',
     fromSender: 'from {{sender}}',
     senderIdentityTitle: 'Sender identity: {{sender}}',
+    showSenderDetails: 'Show sender details for {{sender}}',
+    senderSession: 'Session',
     fromIssue: 'from {{issue}}',
     fromIssueTitle: 'From Issue {{issue}}',
     followUpSender: 'Continue with the sender',

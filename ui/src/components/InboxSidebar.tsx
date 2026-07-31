@@ -8,6 +8,7 @@ import { useInboxRead } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
 import { groupThreads, previewForEntry } from '../live/inbox-threads'
+import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
 import type { InboxEntry } from '../api/inbox'
 
@@ -36,15 +37,19 @@ export function InboxSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const [query, setQuery] = useState('')
 
   const workspaceLabels = useMemo(
+    () => new Map(workspaces.map((workspace) => [workspace.id, workspaceDisplayName(workspace)])),
+    [workspaces],
+  )
+  const workspaceTags = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspace.tag])),
     [workspaces],
   )
   const normalizedQuery = normalizeSearch(query)
   const filteredEntries = useMemo(
     () => normalizedQuery
-      ? entries.filter((entry) => inboxSearchText(entry, workspaceLabels).includes(normalizedQuery))
+      ? entries.filter((entry) => inboxSearchText(entry, workspaceLabels, workspaceTags).includes(normalizedQuery))
       : entries,
-    [entries, normalizedQuery, workspaceLabels],
+    [entries, normalizedQuery, workspaceLabels, workspaceTags],
   )
   const threads = useMemo(() => groupThreads(filteredEntries), [filteredEntries])
   const readIds = useMemo(() => {
@@ -193,9 +198,11 @@ function normalizeSearch(value: string): string {
 function inboxSearchText(
   entry: InboxEntry,
   workspaceLabels: ReadonlyMap<string, string>,
+  workspaceTags: ReadonlyMap<string, string>,
 ): string {
   return normalizeSearch([
     workspaceLabels.get(entry.workspaceId),
+    workspaceTags.get(entry.workspaceId),
     entry.workspaceLabel,
     entry.workspaceId,
     entry.comments,
@@ -322,6 +329,8 @@ function ClusterRow({
   unread: boolean
   onClick: () => void
 }) {
+  const { t } = useTranslation()
+  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
   return (
     <div
       role="button"
@@ -345,7 +354,7 @@ function ClusterRow({
         className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
       />
       <span className={`min-w-0 truncate text-[11px] leading-5 ${unread ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
-        {previewForEntry(entry)}
+        {preview}
       </span>
       <span className="col-start-2 text-[10px] text-muted-foreground/50 tabular-nums">
         {formatRelativeTime(entry.ts)}
@@ -404,6 +413,9 @@ function TimeRow({
   workspaceLabel?: string
   onClick: () => void
 }) {
+  const { t } = useTranslation()
+  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
+  const source = workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId
   return (
     <div
       role="button"
@@ -415,7 +427,7 @@ function TimeRow({
           onClick()
         }
       }}
-      className={`group relative flex min-h-14 flex-col gap-0.5 px-3 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
+      className={`group relative flex min-h-14 flex-col justify-center gap-1 px-3 py-2 cursor-pointer transition-colors outline-none focus-visible:bg-muted/70 ${
         active ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
@@ -423,23 +435,30 @@ function TimeRow({
         <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
       )}
 
-      {/* Line 1: unread dot · workspace · time */}
-      <div className="flex items-center gap-1.5">
+      {/* Line 1: the update itself is the object users are scanning. */}
+      <div className="flex min-w-0 items-center gap-1.5">
         <span
           aria-hidden
           className={`shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
         />
-        <span className={`flex-1 truncate text-[12px] ${unread ? 'font-medium text-foreground' : 'text-foreground'}`}>
-          {workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId}
+        <span
+          className={`min-w-0 flex-1 truncate text-[12px] ${
+            unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+          }`}
+          title={preview}
+        >
+          {preview}
+        </span>
+      </div>
+
+      {/* Line 2: source and time are supporting provenance. */}
+      <div className="flex min-w-0 items-center gap-2 pl-3">
+        <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground/60">
+          {source}
         </span>
         <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
           {formatRelativeTime(entry.ts)}
         </span>
-      </div>
-
-      {/* Line 2: preview */}
-      <div className={`pl-3 text-[11px] truncate ${unread ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
-        {previewForEntry(entry)}
       </div>
     </div>
   )
