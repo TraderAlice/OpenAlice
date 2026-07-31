@@ -95,13 +95,17 @@ alice-workspace inbox read --limit 5
 alice-workspace inbox read --self
 ```
 
-For your own entries, document paths are relative to the current cwd. For a
-peer entry, use its `workspaceId` only to resolve the peer root:
+Each attachment is returned in `files[]` with a directly usable `absolutePath`,
+its original `relativePath`, and the published `revision` when available. The
+legacy `docs` relative-path list remains for compatibility.
+
+If `absolutePath` is null because the Workspace is unavailable or the stored
+path is unsafe, do not guess it. For broader inspection of an available peer
+desk, resolve its root explicitly:
 
 ```bash
 alice-workspace peer path --id <workspaceId>
-# Combine the returned absolute path with the Inbox document's relative path,
-# then use the Coding Agent's native Read/Search/Glob/Git capabilities.
+# Then use the Coding Agent's native Read/Search/Glob/Git capabilities.
 ```
 
 There is deliberately no Workspace-level file-read command. `peer path` owns
