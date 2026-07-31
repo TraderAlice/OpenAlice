@@ -48,7 +48,9 @@ Ask before proceeding if a missing caller-owned fact would materially change the
 Add `--await` when the current turn needs the answer. For longer delegation,
 omit it, retain the returned `taskId`, and use `conversation await`, `read`, or
 `collect` as described by the `alice-workspace` skill. There is no unsolicited
-Agent-to-Agent completion notification bus.
+Agent-to-Agent completion notification bus. AutoQuant assignments deliberately
+have no default runtime deadline; add `--timeout-ms` only when the caller has
+chosen a real hard stop for that particular study.
 
 If AutoQuant is not initialized, report that boundary and direct the user to
 initialize the Quant desk. Do not silently perform the research in Chat or

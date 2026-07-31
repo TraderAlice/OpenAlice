@@ -443,7 +443,7 @@ export interface WorkspaceService {
     meta: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
   ): Promise<HeadlessTaskResult>;
   /** Cached install/ready snapshot for global first-run runtime gating. */
   getAgentRuntimeReadiness(): AgentRuntimeReadinessSnapshot;
@@ -470,7 +470,7 @@ export interface WorkspaceService {
     meta: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     /** Business source of the dispatch. Its Workspace may differ from `meta`
      * when an Issue explicitly resumes a signed Session across Workspaces. */
     trigger?: HeadlessTaskTrigger,
@@ -1329,7 +1329,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     ws: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     // Dispatch-path extras: a taskId keys the on-disk task log; onSessionId
     // fires when the adapter's stdout scanner captures the agent's own session
     // id (recorded WHILE running, so the panel can offer "open as session").
@@ -1406,7 +1406,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           command,
           cwd,
           env,
-          timeoutMs,
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
           logger: launcherLogger.child({
             scope: 'headless',
             wsId: ws.id,
@@ -1455,7 +1455,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     ws: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     // Composite Issue source when dispatched by ScheduleScanner. Manual and
     // external runs leave it undefined.
     trigger?: HeadlessTaskTrigger,

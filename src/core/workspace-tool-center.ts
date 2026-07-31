@@ -138,7 +138,8 @@ export type WorkspaceConversationAskResult =
 export interface WorkspaceConversationControl {
   ask(input: {
     readonly prompt: string
-    readonly timeoutMs: number
+    /** Optional execution watchdog. Omit to let the Session run to completion. */
+    readonly timeoutMs?: number
     readonly target: WorkspaceConversationTarget
     readonly agent?: string
     /** Add the artifact-reconstruction preamble when a fresh fallback worker is

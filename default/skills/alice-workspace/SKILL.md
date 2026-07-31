@@ -82,6 +82,13 @@ alice-workspace conversation read --task-id <taskId>
 alice-workspace conversation collect --task-id <taskA> --task-id <taskB>
 ```
 
+Conversation work has no implicit execution deadline. `--await`, `conversation
+await`, and `conversation collect` also wait for terminal task state when no
+limit is supplied. Add `--timeout-ms <milliseconds>` only when the caller
+deliberately wants a hard execution watchdog (for `conversation ask`) or a
+bounded server-side wait (for `await`/`collect`). A bounded wait returning does
+not stop a task unless that same explicit timeout was attached at dispatch.
+
 There is no unsolicited Agent-to-Agent completion notification bus. Inbox
 notifies the human; `await`, `read`, and `collect` retrieve direct Agent replies.
 Do not build shell sleep loops.

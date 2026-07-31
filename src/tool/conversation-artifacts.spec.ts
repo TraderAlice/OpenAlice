@@ -65,7 +65,6 @@ describe('inbox_ask', () => {
       prompt: 'why?',
       target: { kind: 'resume', resumeId: 'resume-peer' },
       subject: { kind: 'inbox', entryId: entry.id },
-      timeoutMs: 300_000,
       source: { kind: 'workspace', workspaceId: 'ws-caller' },
     })
   })

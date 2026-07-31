@@ -62,9 +62,22 @@ describe('conversation_ask', () => {
     expect(ask).toHaveBeenCalledWith({
       prompt: 'why?',
       target,
-      timeoutMs: 300_000,
       source: { kind: 'workspace', workspaceId: 'ws-caller' },
     })
+  })
+
+  it('installs an execution watchdog only when timeoutMs is explicit', async () => {
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'task-1', resumeId: 'resume-1', workspaceId: 'ws-peer',
+      workspace: 'peer', agent: 'pi',
+      resolution: { mode: 'reconstructed' as const, workspaceId: 'ws-peer', reason: 'explicit-workspace' as const },
+    }))
+    const tool = conversationAskFactory.build(context({ conversation: { ask, read: vi.fn() } }))
+
+    await run(tool, { prompt: 'why?', wsId: 'ws-peer', timeoutMs: 42_000 })
+
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 42_000 }))
   })
 
   it('surfaces unavailable attribution without starting another worker', async () => {
