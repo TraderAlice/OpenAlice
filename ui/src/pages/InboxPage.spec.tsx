@@ -9,6 +9,11 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { readWorkspaceFile } from '../components/workspace/api'
 import { InboxAttachment, InboxPage } from './InboxPage'
 
+const workspaceMocks = vi.hoisted(() => ({
+  openHeadlessRun: vi.fn(),
+  resumeSession: vi.fn(),
+}))
+
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
     workspaces: [{
@@ -16,8 +21,8 @@ vi.mock('../contexts/workspaces-context', () => ({
       tag: 'research',
       sessions: [],
     }],
-    openHeadlessRun: vi.fn(),
-    resumeSession: vi.fn(),
+    openHeadlessRun: workspaceMocks.openHeadlessRun,
+    resumeSession: workspaceMocks.resumeSession,
   }),
 }))
 
@@ -177,7 +182,7 @@ describe('InboxPage deletion', () => {
 })
 
 describe('InboxPage responsive detail header', () => {
-  it('keeps long provenance readable and mobile actions touch-sized', async () => {
+  it('keeps machine provenance on demand and mobile actions touch-sized', async () => {
     const entry = {
       id: 'inbox-mobile-header',
       ts: Date.now(),
@@ -200,9 +205,13 @@ describe('InboxPage responsive detail header', () => {
 
     render(<InboxPage visible />)
 
-    const sender = await screen.findByText('from pi · @resume-plain-linen-river-2218b6')
-    expect(sender.className).toContain('break-all')
-    expect(sender.className).toContain('sm:truncate')
+    const sender = await screen.findByRole('button', { name: 'Show sender details for pi' })
+    expect(sender.textContent).toContain('from pi')
+    expect(sender.textContent).not.toContain('resume-plain-linen-river-2218b6')
+    expect(sender.className).toContain('min-h-10')
+    expect(sender.className).toContain('sm:min-h-0')
+    expect(screen.queryByText('@resume-plain-linen-river-2218b6')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open conversation' })).toBeNull()
 
     const issue = screen.getByRole('button', {
       name: 'from daily-us-market-close-with-a-long-name',
@@ -210,9 +219,30 @@ describe('InboxPage responsive detail header', () => {
     expect(issue.className).toContain('min-h-10')
     expect(issue.className).toContain('sm:min-h-0')
 
+    fireEvent.click(sender)
+    expect(screen.getByRole('dialog', {
+      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+    })).toBeTruthy()
+    expect(screen.getByText('@resume-plain-linen-river-2218b6').className).toContain('break-all')
     const openConversation = screen.getByRole('button', { name: 'Open conversation' })
-    expect(openConversation.className).toContain('h-10')
-    expect(openConversation.className).toContain('sm:h-8')
+    expect(openConversation.className).toContain('min-h-10')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', {
+      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+    })).toBeNull()
+    expect(document.activeElement).toBe(sender)
+
+    fireEvent.click(sender)
+    fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))
+    await waitFor(() => expect(workspaceMocks.openHeadlessRun).toHaveBeenCalledWith(
+      'ws-1',
+      'resume-plain-linen-river-2218b6',
+      { title: 'A durable research update.' },
+    ))
+    expect(screen.queryByRole('dialog', {
+      name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
+    })).toBeNull()
 
     const deleteEntry = screen.getByRole('button', { name: 'Delete this inbox entry' })
     expect(deleteEntry.className).toContain('h-10')
