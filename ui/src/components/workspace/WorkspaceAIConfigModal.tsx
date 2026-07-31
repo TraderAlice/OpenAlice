@@ -1084,6 +1084,8 @@ export function WorkspaceAIConfigModal({
                 reasoningEffort: v === form.model ? form.reasoningEffort : null,
               })}
               placeholder={tab === 'claude' ? 'claude-opus-4-8' : tab === 'opencode' || tab === 'pi' ? 'deepseek-chat' : 'gpt-5.5'}
+              ariaLabel={t('workspaceSettings.ai.model')}
+              suggestionsLabel={t('workspaceSettings.ai.modelSuggestions')}
             />
             {modelSuggestions.length > 0 && (
               <p className="text-[11px] text-muted-foreground/70 mt-1">{t('workspaceSettings.ai.modelSuggestions')}</p>

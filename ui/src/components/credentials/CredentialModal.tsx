@@ -402,7 +402,14 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 label={t('aiProvider.credentialModal.defaultModel')}
                 description={preset.setup?.modelHelp ?? t('aiProvider.credentialModal.defaultModelHelp')}
               >
-                <ModelCombobox value={model} suggestions={models} onChange={setModel} placeholder={t('aiProvider.credentialModal.modelPlaceholder')} />
+                <ModelCombobox
+                  value={model}
+                  suggestions={models}
+                  onChange={setModel}
+                  placeholder={t('aiProvider.credentialModal.modelPlaceholder')}
+                  ariaLabel={t('aiProvider.credentialModal.defaultModel')}
+                  suggestionsLabel={t('aiProvider.credentialModal.defaultModelHelp')}
+                />
               </Field>
 
               <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
