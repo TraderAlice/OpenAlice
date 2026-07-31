@@ -121,9 +121,16 @@ describe('CLI gateway — export scope isolation', () => {
   it('the workspace export manifest resolves (its own scope)', async () => {
     const res = await app.request('/cli/ws1/workspace/manifest')
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { export: string; groups: Record<string, unknown> }
+    const body = (await res.json()) as {
+      export: string
+      groupDescriptions: Record<string, string>
+      groups: Record<string, unknown>
+    }
     expect(body.export).toBe('workspace')
     expect(typeof body.groups).toBe('object')
+    expect(body.groupDescriptions['peer']).toContain('absolute filesystem locations')
+    expect(body.groupDescriptions['conversation']).toContain('Agent-to-Agent')
+    expect(body.groupDescriptions['inbox']).toContain('human Inbox')
   })
 })
 

@@ -176,11 +176,11 @@ export interface WorkspaceToolContext {
   /** Durable Session -> artifact occurrence trail. Optional for older/tests. */
   provenanceStore?: IProvenanceStore
   /** Resolve ANY workspace's location by id (not just this one) — the backing
-   *  for cross-workspace collaboration: an inbox entry from a peer carries its
+   *  for cross-workspace collaboration: an Inbox entry from a peer carries its
    *  workspaceId, and `workspace_path` turns that into the peer's absolute dir
-   *  so the agent can read/edit its files with native tools. Optional because
-   *  it needs the live WorkspaceService (created after this center); the two
-   *  build sites (cli.ts, mcp.ts) inject a lazy closure, tests may omit it. */
+   *  for native file/search/Git tools. Optional because it needs the live
+   *  WorkspaceService (created after this center); the two build sites (cli.ts,
+   *  mcp.ts) inject a lazy closure, tests may omit it. */
   resolveWorkspace?: (id: string) => { id: string; dir: string; tag: string } | null
   /** Active-desk inventory for manager and peer-discovery flows. */
   workspaceInventory?: () => Promise<readonly {
