@@ -356,7 +356,7 @@ export const DEEPSEEK: PresetDef = {
   description: 'DeepSeek models via Claude Agent SDK (Anthropic-compatible)',
   category: 'third-party',
   defaultName: 'DeepSeek',
-  hint: 'Get your API key at platform.deepseek.com. Single platform — no regional split. Cached prompt input is heavily discounted ($0.03/M).',
+  hint: 'Get your API key at platform.deepseek.com. Single platform — no regional split. V4 Flash costs $0.0028/M cache-hit input, $0.14/M cache-miss input, and $0.28/M output.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
@@ -371,6 +371,7 @@ export const DEEPSEEK: PresetDef = {
   ],
   models: withModelSemantics('deepseek', [
     { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (flagship)' },
+    { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash (fast / economical)' },
   ]),
   setup: {
     apiKeyLabel: 'DeepSeek API key',

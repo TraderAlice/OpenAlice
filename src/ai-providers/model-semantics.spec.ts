@@ -33,6 +33,19 @@ describe('model semantics registry', () => {
       .toBe('Reasoning optional · default effort high · interleaved thinking · 1M context')
   })
 
+  it('records the V4 Flash 0731 API contract under its stable model id', () => {
+    expect(resolveModelSemantics('deepseek', 'deepseek-v4-flash')).toEqual({
+      contextWindow: 1_000_000,
+      maxOutputTokens: 384_000,
+      reasoning: {
+        mode: 'optional',
+        efforts: ['low', 'high', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    })
+  })
+
   it('keeps LongCat\'s documented thinking default separate from effort tiers', () => {
     const semantics = resolveModelSemantics('longcat', 'LongCat-2.0')
     expect(semantics?.reasoning).toEqual({ mode: 'optional', defaultEnabled: true })
