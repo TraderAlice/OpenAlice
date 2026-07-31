@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { ArrowUpRight, MessageSquarePlus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,6 +29,8 @@ export interface WorkspaceViewProps {
    */
   readonly sessions: readonly SessionRecord[];
   readonly label?: string;
+  /** Actions promoted into the live terminal's shared titlebar. */
+  readonly terminalHeaderActions?: ReactNode;
   readonly onSpawnFresh: () => void;
   readonly onResume: (sessionId: string) => void;
   readonly onOpenWebPi: (sessionId: string) => void;
@@ -120,7 +122,10 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     wsId={props.wsId}
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
-                    {...(props.label !== undefined ? { label: `${props.label} · ${s.name}` } : {})}
+                    {...(props.label !== undefined ? { label: props.label } : {})}
+                    sessionLabel={s.title?.trim() || s.name}
+                    headerActions={props.terminalHeaderActions}
+                    chrome="canvas"
                     onSessionLost={props.onSessionLost}
                   />
                 )}

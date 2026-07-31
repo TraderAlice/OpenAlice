@@ -17,6 +17,7 @@ import { Skeleton } from '../StateViews';
 import { workspaceDisplayName, workspaceDisplayTitle } from './display';
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
 import { useReorderMotion } from './useReorderMotion';
+import { SidebarActionMenu } from './SidebarActionMenu';
 
 /**
  * Workspace launcher sidebar.
@@ -310,11 +311,9 @@ function AgentBadgeGlyph({ agentId }: { agentId: string }): ReactElement {
   return <span className="text-[10px] font-mono" aria-hidden="true">{agentPrefix(agentId)}</span>;
 }
 
-/** Hover-revealed square action button used for the per-row controls. */
-function rowAction(danger = false): string {
-  return `oa-icon-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-muted-foreground/70 transition-colors ${
-    danger ? 'hover:text-destructive hover:bg-destructive/10' : 'hover:text-foreground hover:bg-secondary'
-  }`;
+/** Compact high-frequency action used beside a Workspace or Session row. */
+function rowAction(): string {
+  return 'oa-icon-action oa-workspace-row-action shrink-0 w-5 h-5 rounded flex items-center justify-center text-muted-foreground/70 transition-colors hover:text-foreground hover:bg-secondary';
 }
 
 export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
@@ -400,6 +399,7 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
           type="button"
           onClick={() => props.onSelectWorkspace(w.id)}
           title={workspaceDisplayTitle(w)}
+          aria-current={isSelected ? 'page' : undefined}
           className="flex-1 min-w-0 flex items-center gap-2 text-left"
         >
           <span
@@ -409,22 +409,6 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
           <span className="truncate font-medium">{label}</span>
           <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
         </button>
-        {props.onRenameWorkspace && (
-          <button
-            type="button"
-            className={`${rowAction()} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
-            title={t('workspace.rename')}
-            onClick={() => {
-              const next = window.prompt(t('workspace.displayNamePrompt'), label);
-              if (next === null) return;
-              const trimmed = next.trim();
-              if (trimmed.length === 0 || trimmed === label) return;
-              props.onRenameWorkspace?.(w.id, trimmed);
-            }}
-          >
-            <Pencil size={12} strokeWidth={2} />
-          </button>
-        )}
         {props.agents.length > 0 && (
           <div ref={spawnControlsRef} className="relative flex shrink-0 items-center">
             <button
@@ -494,24 +478,33 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
             )}
           </div>
         )}
-        {props.onConfigureWorkspace && (
-          <button
-            type="button"
-            className={`${rowAction()} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
-            title={t('workspace.configure')}
-            onClick={() => props.onConfigureWorkspace?.(w.id)}
-          >
-            <SettingsIcon size={12} strokeWidth={2} />
-          </button>
-        )}
-        <button
-          type="button"
-          className={`${rowAction(true)} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
-          title={t('workspace.deleteWorkspace')}
-          onClick={() => void props.onDelete(w.id)}
-        >
-          <X size={12} strokeWidth={2.5} />
-        </button>
+        <SidebarActionMenu
+          label={t('common.moreActions', { target: label })}
+          items={[
+            ...(props.onRenameWorkspace ? [{
+              label: t('workspace.rename'),
+              icon: <Pencil size={13} strokeWidth={2} />,
+              onSelect: () => {
+                const next = window.prompt(t('workspace.displayNamePrompt'), label);
+                if (next === null) return;
+                const trimmed = next.trim();
+                if (trimmed.length === 0 || trimmed === label) return;
+                props.onRenameWorkspace?.(w.id, trimmed);
+              },
+            }] : []),
+            ...(props.onConfigureWorkspace ? [{
+              label: t('workspace.configure'),
+              icon: <SettingsIcon size={13} strokeWidth={2} />,
+              onSelect: () => props.onConfigureWorkspace?.(w.id),
+            }] : []),
+            {
+              label: t('workspace.deleteWorkspace'),
+              icon: <X size={13} strokeWidth={2.5} />,
+              onSelect: () => void props.onDelete(w.id),
+              danger: true,
+            },
+          ]}
+        />
       </div>
 
       {orderedSessions.length > 0 && (
@@ -621,8 +614,9 @@ function HeadlessTaskRow(props: {
       {openable && (
         <button
           type="button"
-          className={`${rowAction()} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
+          className={rowAction()}
           title={t('workspace.openRun')}
+          aria-label={t('workspace.openRun')}
           onClick={(e) => {
             e.stopPropagation();
             props.onOpenAsSession(task);
@@ -675,6 +669,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
         onClick={props.onSelect}
         title={tooltip}
+        aria-current={props.isActive ? 'page' : undefined}
       >
         <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused ? 'text-muted-foreground/40' : 'text-muted-foreground/70'}`}>
           <AgentBadgeGlyph agentId={s.agent} />
@@ -711,18 +706,16 @@ export function SessionRow(props: SessionRowProps): ReactElement {
           <Square size={10} strokeWidth={0} fill="currentColor" />
         </button>
       )}
-      <button
-        type="button"
-        className={`${rowAction(true)} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
-        title={deleteLabel}
-        aria-label={deleteLabel}
-        onClick={(e) => {
-          e.stopPropagation();
-          props.onDelete();
-        }}
-      >
-        <X size={12} strokeWidth={2.5} />
-      </button>
+      <SidebarActionMenu
+        label={t('common.moreActions', { target: display })}
+        items={[{
+          label: t('workspace.deleteSessionAction'),
+          ariaLabel: deleteLabel,
+          icon: <X size={13} strokeWidth={2.5} />,
+          onSelect: props.onDelete,
+          danger: true,
+        }]}
+      />
     </div>
   );
 }
