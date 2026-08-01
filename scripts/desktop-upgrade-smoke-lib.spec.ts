@@ -1,3 +1,5 @@
+import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -33,7 +35,7 @@ describe('desktop upgrade smoke planning', () => {
   it('keeps package and final-artifact candidate modes exclusive', () => {
     const defaultPlan = buildDesktopUpgradeSmokePlan([], { cwd: '/repo' })
     expect(defaultPlan.errors).toEqual([])
-    expect(defaultPlan.candidatePackageRoot).toBe('/repo/dist/electron-app')
+    expect(defaultPlan.candidatePackageRoot).toBe(resolve('/repo', 'dist/electron-app'))
 
     const invalid = buildDesktopUpgradeSmokePlan([
       '--candidate-package-root', 'dist/package',
