@@ -166,16 +166,48 @@ async function spawnDetached(command, args) {
     child.once('spawn', resolveSpawn)
     child.once('error', rejectSpawn)
   })
-  child.unref()
+  return child
+}
+
+async function waitForInstallerExit(child, installRoot, timeoutMs = 10 * 60_000) {
+  const startedAt = Date.now()
+  const deadline = startedAt + timeoutMs
+  let lastProgressAt = 0
+  while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
+    const now = Date.now()
+    if (now - lastProgressAt >= 30_000) {
+      console.log(
+        `[desktop-upgrade] waiting for detached installer pid=${child.pid ?? '<unknown>'}: ` +
+        `elapsed=${Math.round((now - startedAt) / 1000)}s`,
+      )
+      if (process.platform === 'win32') logWindowsUpgradeProcesses(installRoot)
+      lastProgressAt = now
+    }
+    await sleep(500)
+  }
+  if (child.exitCode === null && child.signalCode === null) {
+    terminateTree(child)
+    throw new Error(`timed out waiting for detached installer pid=${child.pid ?? '<unknown>'}`)
+  }
+  if (child.exitCode !== 0) {
+    throw new Error(
+      `detached installer exited ${child.exitCode ?? 'unknown'}` +
+      `${child.signalCode ? ` (${child.signalCode})` : ''}`,
+    )
+  }
+  console.log(`[desktop-upgrade] detached installer exited 0`)
 }
 
 async function installWindows(archive, installRoot, isUpdate = false) {
   mkdirSync(dirname(installRoot), { recursive: true })
   const args = windowsInstallerArgs(installRoot, isUpdate)
   if (isUpdate) {
-    // NsisUpdater starts the installer detached, then quits Electron. Waiting for
-    // the detached NSIS process itself can hang after its files are installed.
-    await spawnDetached(archive, args)
+    // NsisUpdater starts the installer detached, then quits Electron. The app
+    // tree can expose its new package.json before NSIS finishes writing files,
+    // shortcuts, and uninstall metadata, so do not launch the candidate until
+    // the detached installer has actually completed.
+    const installer = await spawnDetached(archive, args)
+    await waitForInstallerExit(installer, installRoot)
     await waitForInstalledVersion(installRoot, candidateVersion)
   } else {
     run(archive, args)
