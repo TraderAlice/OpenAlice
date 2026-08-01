@@ -52,6 +52,11 @@ interface Window {
         | { phase: 'available'; version?: string; releaseUrl?: string }
         | { phase: 'downloading'; version?: string; percent?: number }
         | { phase: 'downloaded'; version: string; releaseUrl: string }
+        | {
+            phase: 'installing'
+            version: string
+            stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
+          }
         | { phase: 'error'; message: string }
         | null
       >
@@ -63,6 +68,11 @@ interface Window {
         | { phase: 'available'; version?: string; releaseUrl?: string }
         | { phase: 'downloading'; version?: string; percent?: number }
         | { phase: 'downloaded'; version: string; releaseUrl: string }
+        | {
+            phase: 'installing'
+            version: string
+            stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
+          }
         | { phase: 'error'; message: string }
       ) => void): () => void
       installAndRestart(): Promise<unknown>

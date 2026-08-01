@@ -25,6 +25,11 @@ type UpdaterStatus =
   | { phase: 'available'; version?: string; releaseUrl?: string }
   | { phase: 'downloading'; version?: string; percent?: number }
   | { phase: 'downloaded'; version: string; releaseUrl: string }
+  | {
+      phase: 'installing'
+      version: string
+      stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
+    }
   | { phase: 'error'; message: string }
 
 const ptyListeners = new Map<string, PtyListeners>()
@@ -84,6 +89,19 @@ ipcRenderer.on('openalice:updater:status', (_event, raw: unknown) => {
   if (phase === 'error') {
     const message = typeof rec['message'] === 'string' ? rec['message'] : 'Update check failed.'
     for (const cb of updaterListeners) cb({ phase, message })
+    return
+  }
+  if (phase === 'installing') {
+    const version = typeof rec['version'] === 'string' ? rec['version'] : ''
+    const stage = rec['stage']
+    if (
+      !version ||
+      (stage !== 'preparing' &&
+        stage !== 'stopping-services' &&
+        stage !== 'releasing-runtime' &&
+        stage !== 'handing-off')
+    ) return
+    for (const cb of updaterListeners) cb({ phase, version, stage })
     return
   }
   if (phase === 'available') {
