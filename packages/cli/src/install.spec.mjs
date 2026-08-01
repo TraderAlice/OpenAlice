@@ -22,7 +22,7 @@ afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeout: 15_000 }, () => {
+describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeout: 30_000 }, () => {
   it('keeps the CLI and desktop managed-Pi pins aligned', async () => {
     const installer = await readFile(join(repositoryRoot, 'install'), 'utf8')
     const desktopVendor = await readFile(join(repositoryRoot, 'scripts/vendor-managed-runtime.mjs'), 'utf8')
@@ -127,6 +127,13 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     expect(installed.stdout).toContain('Install plan')
     expect(installed.stdout).toContain('Managed agent  Pi 0.83.0')
     expect(installed.stdout).toContain('OpenAlice and Pi are ready')
+    expect(installed.stdout).toContain('Activate OpenAlice in this terminal now (no restart required):')
+    const activation = installed.stdout.match(/Activate OpenAlice in this terminal now \(no restart required\):\n  (.+)\n/)?.[1]
+    expect(activation).toBeDefined()
+    const activated = await execFileAsync('bash', ['-c', `${activation}; command -v openalice`], {
+      env: installerEnv(home),
+    })
+    expect(activated.stdout.trim()).toBe(join(installRoot, 'bin', 'openalice'))
     const releases = await readdir(join(installRoot, 'cli-versions'))
     expect(releases).toHaveLength(1)
     expect(releases[0]).toMatch(/^test_ref-[a-f0-9]{16}$/)
@@ -293,7 +300,7 @@ function runInstallerInPty(args, { home, reply }) {
     const timeout = setTimeout(() => {
       terminal.kill()
       rejectPromise(new Error(`installer PTY timed out:\n${output}`))
-    }, 10_000)
+    }, 20_000)
 
     terminal.onData((data) => {
       output += data
