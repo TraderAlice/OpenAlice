@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process'
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -328,7 +337,15 @@ async function main() {
     throw new Error(`previous ${fromTag} must differ from candidate ${candidateVersion}`)
   }
 
-  const smokeRoot = mkdtempSync(join(tmpdir(), 'openalice-desktop-upgrade-'))
+  const createdSmokeRoot = mkdtempSync(join(tmpdir(), 'openalice-desktop-upgrade-'))
+  // GitHub's Windows runners expose TEMP through an 8.3 path such as
+  // C:\Users\RUNNER~1\.... NSIS records /D verbatim, while its process check
+  // compares that install root with the long paths returned by CIM. Expanding
+  // the existing directory first keeps the upgrade fixture representative and
+  // lets the candidate installer close every process under the old app root.
+  const smokeRoot = process.platform === 'win32'
+    ? realpathSync.native(createdSmokeRoot)
+    : createdSmokeRoot
   const smokeHome = join(smokeRoot, 'home')
   const smokeWorkspaces = join(smokeRoot, 'workspaces')
   const smokeGlobal = join(smokeRoot, 'global')
