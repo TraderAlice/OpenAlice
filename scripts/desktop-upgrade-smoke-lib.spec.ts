@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
@@ -12,6 +13,14 @@ import {
 } from './desktop-upgrade-smoke-lib.mjs'
 
 describe('desktop upgrade smoke planning', () => {
+  it('keeps the Windows builder filename aligned with the upgrade contract', () => {
+    const packageJson = JSON.parse(
+      readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+    ) as { build: { nsis: { artifactName: string } } }
+
+    expect(packageJson.build.nsis.artifactName).toBe('OpenAlice.Setup.${version}.${ext}')
+  })
+
   it('selects the newest published version different from the candidate', () => {
     expect(selectPreviousDesktopTag(
       ['v0.88.0-beta', 'v0.87.0-beta', 'v0.86.0-beta'],
