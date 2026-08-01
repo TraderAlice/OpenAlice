@@ -146,7 +146,8 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "OpenAlice.Setup.${version}.${ext}"
     },
     "publish": [
       {
