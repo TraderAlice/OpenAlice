@@ -201,6 +201,36 @@ jobs:
             --version "$VERSION"
           rm -f dist/electron-app/builder-debug.yml
 
+      - name: Verify candidate update metadata and referenced bytes
+        shell: bash
+        env:
+          RELEASE_PLATFORM: ${{ runner.os }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          pnpm electron:verify-update-assets -- \
+            --out-dir dist/electron-app \
+            --platform "$RELEASE_PLATFORM" \
+            --arch "$RELEASE_ARCH" \
+            --version "$VERSION"
+
+      - name: Prove final desktop artifact upgrades previous release state
+        run: >-
+          pnpm electron:smoke:upgrade --
+          --from "${{ needs.release.outputs.previous_tag }}"
+          --candidate-artifact-dir dist/electron-app
+          --receipt "${{ runner.temp }}/openalice-desktop-upgrade.json"
+        timeout-minutes: 15
+
+      - name: Preserve desktop upgrade acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-upgrade-acceptance-${{ runner.os }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/openalice-desktop-upgrade.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Preserve accepted release assets
         uses: actions/upload-artifact@v4
         with:
