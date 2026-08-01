@@ -10,6 +10,7 @@ import {
   candidateDesktopAssetName,
   previousDesktopAssetName,
   selectPreviousDesktopTag,
+  windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 
 describe('desktop upgrade smoke planning', () => {
@@ -39,6 +40,17 @@ describe('desktop upgrade smoke planning', () => {
     expect(() => previousDesktopAssetName('1.0.0', 'linux', 'x64')).toThrow(
       'unsupported desktop upgrade host',
     )
+  })
+
+  it('matches electron-updater arguments for an in-place Windows update', () => {
+    const installRoot = 'C:\\OpenAlice'
+
+    expect(windowsInstallerArgs(installRoot)).toEqual(['/S', '/D=C:\\OpenAlice'])
+    expect(windowsInstallerArgs(installRoot, true)).toEqual([
+      '--updated',
+      '/S',
+      '/D=C:\\OpenAlice',
+    ])
   })
 
   it('keeps package and final-artifact candidate modes exclusive', () => {

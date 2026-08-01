@@ -26,6 +26,15 @@ export function candidateDesktopAssetName(version, platform, arch) {
   return previousDesktopAssetName(version, platform, arch)
 }
 
+export function windowsInstallerArgs(installRoot, isUpdate = false) {
+  // Keep the replacement path identical to electron-updater's NsisUpdater.
+  return [
+    ...(isUpdate ? ['--updated'] : []),
+    '/S',
+    `/D=${installRoot}`,
+  ]
+}
+
 export function buildDesktopUpgradeSmokePlan(argv, options = {}) {
   const cwd = options.cwd ?? process.cwd()
   const args = argv[0] === '--' ? argv.slice(1) : [...argv]

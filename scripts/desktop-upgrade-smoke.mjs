@@ -18,6 +18,7 @@ import {
   previousDesktopAssetName,
   selectPreviousDesktopTag,
   versionFromTag,
+  windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 
@@ -82,9 +83,9 @@ async function waitForPath(path, timeoutMs = 30_000) {
   throw new Error(`timed out waiting for ${path}`)
 }
 
-async function installWindows(archive, installRoot) {
+async function installWindows(archive, installRoot, isUpdate = false) {
   mkdirSync(dirname(installRoot), { recursive: true })
-  run(archive, ['/S', `/D=${installRoot}`])
+  run(archive, windowsInstallerArgs(installRoot, isUpdate))
   const executable = join(installRoot, 'OpenAlice.exe')
   await waitForPath(executable)
   return executable
@@ -351,7 +352,7 @@ async function main() {
       candidateSource = 'final-artifact'
       candidateExecutable = process.platform === 'darwin'
         ? extractMacZip(asset, join(smokeRoot, 'candidate'))
-        : await installWindows(asset, join(smokeRoot, 'installed', 'OpenAlice'))
+        : await installWindows(asset, join(smokeRoot, 'installed', 'OpenAlice'), true)
     } else {
       candidateSource = 'unpacked-package'
       candidateExecutable = await candidateExecutableFromPackage(plan.candidatePackageRoot)
