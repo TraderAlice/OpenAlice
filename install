@@ -1131,7 +1131,7 @@ if [[ "$path_updated" -eq 1 ]]; then
   printf '  %-12s %s\n' "Shell" "Future terminals will load the managed block in $profile"
 fi
 if [[ "$path_present" -eq 0 ]]; then
-  printf '\nFor this terminal, run:\n  %s\n' "$current_path_command"
+  printf '\nActivate OpenAlice in this terminal now (no restart required):\n  %s\n' "$current_path_command"
 fi
 if [[ -n "$existing_command" && "$existing_command" != "$BIN_DIR/openalice" ]]; then
   printf '\n%bPATH note:%b this terminal still resolves %s first.\n' "$YELLOW" "$RESET" "$existing_command"

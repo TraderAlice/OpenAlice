@@ -55,7 +55,9 @@ not install Node.js or configure SSH keys for you.
 curl -fsSL https://openalice.ai/install | bash
 ```
 
-Open a new terminal and verify the installed commands:
+Run the shell-specific activation command printed after installation; it makes
+the commands available in this terminal immediately, with no restart. Then
+verify the installed commands:
 
 ```bash
 openalice --version

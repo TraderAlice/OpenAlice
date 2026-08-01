@@ -43,6 +43,10 @@ The public installer distributes the TypeScript CLI application from the stable
 curl -fsSL https://openalice.ai/install | bash
 ```
 
+The installer prints one shell-specific activation command after success. Run
+it to use `openalice` immediately in the current terminal without restarting;
+the managed shell-profile block makes future terminals work automatically.
+
 Development dogfooding can opt into `dev` explicitly with `--branch dev`. The
 installer requires Node.js 22.19.0 or newer and installs the CLI, pinned Pi,
 and matching macOS/Linux headless Runtime inside one immutable release. The two

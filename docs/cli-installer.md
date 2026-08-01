@@ -472,6 +472,14 @@ The migration also removes the exact unmarked PATH line written by the earlier
 preview installer. A symlinked profile is updated through the symlink instead
 of replacing the symlink itself.
 
+The installer cannot mutate the environment of the parent shell that invoked
+`curl | bash`. When the installed bin directory is not already active, the
+success output therefore labels and prints the exact shell-specific command as
+`Activate OpenAlice in this terminal now (no restart required)`. Running that
+one line makes `openalice` and `pi` immediately available; the managed profile
+block covers future terminals. The printed path reflects `--install-dir`, and
+fish receives `fish_add_path` rather than POSIX `export` syntax.
+
 PATH integration is non-critical. If profile editing fails, the validated CLI
 remains installed and the user receives the command needed for the current
 shell. The installer never uninstalls a conflicting npm, Homebrew, or other
