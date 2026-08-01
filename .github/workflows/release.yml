@@ -220,7 +220,7 @@ jobs:
           --from "${{ needs.release.outputs.previous_tag }}"
           --candidate-artifact-dir dist/electron-app
           --receipt "${{ runner.temp }}/openalice-desktop-upgrade.json"
-        timeout-minutes: 15
+        timeout-minutes: 30
 
       - name: Preserve desktop upgrade acceptance receipt
         if: always()

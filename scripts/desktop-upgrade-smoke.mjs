@@ -83,15 +83,29 @@ async function waitForPath(path, timeoutMs = 30_000) {
   throw new Error(`timed out waiting for ${path}`)
 }
 
-async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs = 8 * 60_000) {
+async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs = 20 * 60_000) {
   const packageJson = join(installRoot, 'resources', 'app', 'package.json')
+  const startedAt = Date.now()
   const deadline = Date.now() + timeoutMs
+  let lastObservedVersion = null
+  let lastProgressAt = 0
   while (Date.now() < deadline) {
+    let observedVersion = '<replacing>'
     try {
-      const installedVersion = JSON.parse(readFileSync(packageJson, 'utf8')).version
-      if (installedVersion === expectedVersion) return
+      observedVersion = JSON.parse(readFileSync(packageJson, 'utf8')).version ?? '<missing>'
+      if (observedVersion === expectedVersion) return
     } catch {
       // NSIS replaces the package tree in place; partial reads are expected while it runs.
+    }
+    const now = Date.now()
+    if (observedVersion !== lastObservedVersion || now - lastProgressAt >= 30_000) {
+      const elapsedSeconds = Math.round((now - startedAt) / 1000)
+      console.log(
+        `[desktop-upgrade] waiting for installed ${expectedVersion}: ` +
+        `observed=${observedVersion} elapsed=${elapsedSeconds}s`,
+      )
+      lastObservedVersion = observedVersion
+      lastProgressAt = now
     }
     await sleep(500)
   }
