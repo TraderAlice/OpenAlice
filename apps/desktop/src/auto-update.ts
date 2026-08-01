@@ -112,7 +112,9 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
       })
       sendStatus({ phase: 'installing', version, stage: 'handing-off' })
       await hooks.onInstallHandoff?.(version)
-      autoUpdater.quitAndInstall(false, true)
+      // Assisted NSIS updates must be silent or they stop on the installer UI
+      // after Electron exits. Force-run restarts the updated app on success.
+      autoUpdater.quitAndInstall(true, true)
       return { ok: true }
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error))

@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process'
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { createServer as createNetServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -18,6 +27,7 @@ import {
   previousDesktopAssetName,
   selectPreviousDesktopTag,
   versionFromTag,
+  windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 
@@ -82,9 +92,126 @@ async function waitForPath(path, timeoutMs = 30_000) {
   throw new Error(`timed out waiting for ${path}`)
 }
 
-async function installWindows(archive, installRoot) {
+async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs = 20 * 60_000) {
+  const packageJson = join(installRoot, 'resources', 'app', 'package.json')
+  const startedAt = Date.now()
+  const deadline = Date.now() + timeoutMs
+  let lastObservedVersion = null
+  let lastProgressAt = 0
+  while (Date.now() < deadline) {
+    let observedVersion = '<replacing>'
+    try {
+      observedVersion = JSON.parse(readFileSync(packageJson, 'utf8')).version ?? '<missing>'
+      if (observedVersion === expectedVersion) return
+    } catch {
+      // NSIS replaces the package tree in place; partial reads are expected while it runs.
+    }
+    const now = Date.now()
+    if (observedVersion !== lastObservedVersion || now - lastProgressAt >= 30_000) {
+      const elapsedSeconds = Math.round((now - startedAt) / 1000)
+      console.log(
+        `[desktop-upgrade] waiting for installed ${expectedVersion}: ` +
+        `observed=${observedVersion} elapsed=${elapsedSeconds}s`,
+      )
+      lastObservedVersion = observedVersion
+      lastProgressAt = now
+      if (process.platform === 'win32') logWindowsUpgradeProcesses(installRoot)
+    }
+    await sleep(500)
+  }
+  throw new Error(`timed out waiting for installed OpenAlice ${expectedVersion} under ${installRoot}`)
+}
+
+function logWindowsUpgradeProcesses(installRoot) {
+  const powershell = join(
+    process.env['SystemRoot'] || 'C:\\Windows',
+    'System32',
+    'WindowsPowerShell',
+    'v1.0',
+    'powershell.exe',
+  )
+  const script = [
+    "$root = [IO.Path]::GetFullPath($env:OPENALICE_UPGRADE_INSTALL_ROOT);",
+    'Get-CimInstance -ClassName Win32_Process',
+    '| Where-Object {',
+    "  ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase))",
+    "  -or $_.Name -like 'OpenAlice*'",
+    "  -or $_.Name -eq 'old-uninstaller.exe'",
+    '}',
+    '| Select-Object ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine',
+    '| ConvertTo-Json -Compress',
+  ].join(' ')
+  const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
+    encoding: 'utf8',
+    timeout: 15_000,
+    windowsHide: true,
+    env: {
+      ...process.env,
+      OPENALICE_UPGRADE_INSTALL_ROOT: installRoot,
+    },
+  })
+  const output = result.stdout?.trim()
+  if (result.status === 0) {
+    console.log(`[desktop-upgrade] Windows process snapshot: ${output || '[]'}`)
+  } else {
+    const detail = result.error?.message || result.stderr?.trim() || `exit ${result.status ?? 'unknown'}`
+    console.log(`[desktop-upgrade] Windows process snapshot unavailable: ${detail}`)
+  }
+}
+
+async function spawnDetached(command, args) {
+  console.log(`[desktop-upgrade] ${command} ${args.join(' ')}`)
+  const child = spawn(command, args, { detached: true, stdio: 'ignore' })
+  await new Promise((resolveSpawn, rejectSpawn) => {
+    child.once('spawn', resolveSpawn)
+    child.once('error', rejectSpawn)
+  })
+  return child
+}
+
+async function waitForInstallerExit(child, installRoot, timeoutMs = 10 * 60_000) {
+  const startedAt = Date.now()
+  const deadline = startedAt + timeoutMs
+  let lastProgressAt = 0
+  while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) {
+    const now = Date.now()
+    if (now - lastProgressAt >= 30_000) {
+      console.log(
+        `[desktop-upgrade] waiting for detached installer pid=${child.pid ?? '<unknown>'}: ` +
+        `elapsed=${Math.round((now - startedAt) / 1000)}s`,
+      )
+      if (process.platform === 'win32') logWindowsUpgradeProcesses(installRoot)
+      lastProgressAt = now
+    }
+    await sleep(500)
+  }
+  if (child.exitCode === null && child.signalCode === null) {
+    terminateTree(child)
+    throw new Error(`timed out waiting for detached installer pid=${child.pid ?? '<unknown>'}`)
+  }
+  if (child.exitCode !== 0) {
+    throw new Error(
+      `detached installer exited ${child.exitCode ?? 'unknown'}` +
+      `${child.signalCode ? ` (${child.signalCode})` : ''}`,
+    )
+  }
+  console.log(`[desktop-upgrade] detached installer exited 0`)
+}
+
+async function installWindows(archive, installRoot, isUpdate = false) {
   mkdirSync(dirname(installRoot), { recursive: true })
-  run(archive, ['/S', `/D=${installRoot}`])
+  const args = windowsInstallerArgs(installRoot, isUpdate)
+  if (isUpdate) {
+    // NsisUpdater starts the installer detached, then quits Electron. The app
+    // tree can expose its new package.json before NSIS finishes writing files,
+    // shortcuts, and uninstall metadata, so do not launch the candidate until
+    // the detached installer has actually completed.
+    const installer = await spawnDetached(archive, args)
+    await waitForInstallerExit(installer, installRoot)
+    await waitForInstalledVersion(installRoot, candidateVersion)
+  } else {
+    run(archive, args)
+  }
   const executable = join(installRoot, 'OpenAlice.exe')
   await waitForPath(executable)
   return executable
@@ -280,7 +407,15 @@ async function main() {
     throw new Error(`previous ${fromTag} must differ from candidate ${candidateVersion}`)
   }
 
-  const smokeRoot = mkdtempSync(join(tmpdir(), 'openalice-desktop-upgrade-'))
+  const createdSmokeRoot = mkdtempSync(join(tmpdir(), 'openalice-desktop-upgrade-'))
+  // GitHub's Windows runners expose TEMP through an 8.3 path such as
+  // C:\Users\RUNNER~1\.... NSIS records /D verbatim, while its process check
+  // compares that install root with the long paths returned by CIM. Expanding
+  // the existing directory first keeps the upgrade fixture representative and
+  // lets the candidate installer close every process under the old app root.
+  const smokeRoot = process.platform === 'win32'
+    ? realpathSync.native(createdSmokeRoot)
+    : createdSmokeRoot
   const smokeHome = join(smokeRoot, 'home')
   const smokeWorkspaces = join(smokeRoot, 'workspaces')
   const smokeGlobal = join(smokeRoot, 'global')
@@ -351,7 +486,7 @@ async function main() {
       candidateSource = 'final-artifact'
       candidateExecutable = process.platform === 'darwin'
         ? extractMacZip(asset, join(smokeRoot, 'candidate'))
-        : await installWindows(asset, join(smokeRoot, 'installed', 'OpenAlice'))
+        : await installWindows(asset, join(smokeRoot, 'installed', 'OpenAlice'), true)
     } else {
       candidateSource = 'unpacked-package'
       candidateExecutable = await candidateExecutableFromPackage(plan.candidatePackageRoot)

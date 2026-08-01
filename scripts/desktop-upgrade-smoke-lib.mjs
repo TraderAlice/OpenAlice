@@ -26,6 +26,19 @@ export function candidateDesktopAssetName(version, platform, arch) {
   return previousDesktopAssetName(version, platform, arch)
 }
 
+export function windowsInstallerArgs(installRoot, isUpdate = false) {
+  if (isUpdate) {
+    // Mirror the silent NsisUpdater path. The production handoff additionally
+    // uses --force-run; the smoke owns the candidate launch so it can inject
+    // isolated state and verify both the first launch and a restart.
+    return ['--updated', '/S']
+  }
+  return [
+    '/S',
+    `/D=${installRoot}`,
+  ]
+}
+
 export function buildDesktopUpgradeSmokePlan(argv, options = {}) {
   const cwd = options.cwd ?? process.cwd()
   const args = argv[0] === '--' ? argv.slice(1) : [...argv]

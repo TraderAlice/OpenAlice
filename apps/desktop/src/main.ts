@@ -57,6 +57,7 @@ import {
   type ResolvedDesktopDataHome,
 } from './data-home-desktop.js'
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
+import { childIsRunning, stopChild } from './child-shutdown.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -1281,20 +1282,17 @@ async function startFlagWatcher(
 /** Cascade tree-kill every managed child. */
 async function stopChildren(): Promise<void> {
   appQuitting = true
-  const children = [uta, connector, alice].filter((c): c is ChildProcess => c != null && c.exitCode === null && !c.killed)
+  const children = [uta, connector, alice].filter((c): c is ChildProcess => c != null && childIsRunning(c))
   if (children.length === 0) return
   console.log(`[guardian] shutting down — SIGTERM → ${children.length} child(ren)`)
   await Promise.all(
-    children.map(async (c) => {
-      const exited = new Promise<void>((r) => c.once('exit', () => r()))
-      killTree(c, 'SIGTERM')
-      await Promise.race([exited, new Promise((r) => setTimeout(r, SIGTERM_GRACE_MS))])
-      if (c.exitCode === null && !c.killed) {
+    children.map((c) => stopChild(c, {
+      graceMs: SIGTERM_GRACE_MS,
+      sendSignal: (signal) => killTree(c, signal),
+      onForce: () => {
         console.warn(`[guardian] child pid=${c.pid} did not exit after ${SIGTERM_GRACE_MS}ms → SIGKILL`)
-        killTree(c, 'SIGKILL')
-        await exited
-      }
-    }),
+      },
+    })),
   )
 }
 

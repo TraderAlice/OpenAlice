@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
@@ -9,9 +10,30 @@ import {
   candidateDesktopAssetName,
   previousDesktopAssetName,
   selectPreviousDesktopTag,
+  windowsInstallerArgs,
 } from './desktop-upgrade-smoke-lib.mjs'
 
 describe('desktop upgrade smoke planning', () => {
+  it('keeps the Windows builder and legacy takeover aligned with the upgrade contract', () => {
+    const packageJson = JSON.parse(
+      readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+    ) as { build: { nsis: { artifactName: string; include: string } } }
+    const installerInclude = readFileSync(
+      new URL('../apps/desktop/build/installer.nsh', import.meta.url),
+      'utf8',
+    )
+
+    expect(packageJson.build.nsis.artifactName).toBe('OpenAlice.Setup.${version}.${ext}')
+    expect(packageJson.build.nsis.include).toBe('apps/desktop/build/installer.nsh')
+    expect(installerInclude).toContain('${if} ${isUpdated}')
+    expect(installerInclude).toContain('/T /F /IM "${APP_EXECUTABLE_FILENAME}"')
+    expect(installerInclude).toContain("ExecutablePath.StartsWith('$INSTDIR'")
+    expect(installerInclude).toContain('Stop-Process -Id')
+    expect(installerInclude).toContain('SetOutPath "$TEMP"')
+    expect(installerInclude).toContain('/D /C RD /S /Q "\\\\?\\$INSTDIR"')
+    expect(installerInclude).toContain('DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "UninstallString"')
+  })
+
   it('selects the newest published version different from the candidate', () => {
     expect(selectPreviousDesktopTag(
       ['v0.88.0-beta', 'v0.87.0-beta', 'v0.86.0-beta'],
@@ -30,6 +52,16 @@ describe('desktop upgrade smoke planning', () => {
     expect(() => previousDesktopAssetName('1.0.0', 'linux', 'x64')).toThrow(
       'unsupported desktop upgrade host',
     )
+  })
+
+  it('matches electron-updater arguments for an in-place Windows update', () => {
+    const installRoot = 'C:\\OpenAlice'
+
+    expect(windowsInstallerArgs(installRoot)).toEqual(['/S', '/D=C:\\OpenAlice'])
+    expect(windowsInstallerArgs(installRoot, true)).toEqual([
+      '--updated',
+      '/S',
+    ])
   })
 
   it('keeps package and final-artifact candidate modes exclusive', () => {
