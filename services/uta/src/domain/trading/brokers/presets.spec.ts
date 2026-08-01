@@ -39,7 +39,7 @@ const SAMPLE_CONFIGS: Record<string, Record<string, unknown>> = {
   okx:             { mode: 'live', apiKey: 'k', secret: 's', password: 'p' },
   bybit:           { mode: 'live', apiKey: 'k', secret: 's' },
   hyperliquid:     { mode: 'live', walletAddress: '0xabc', privateKey: 'pk' },
-  bitget:          { mode: 'live', apiKey: 'k', secret: 's', password: 'p' },
+  bitget:          { mode: 'live', accountType: 'classic', apiKey: 'k', secret: 's', password: 'p' },
   alpaca:          { mode: 'paper', apiKey: 'k', apiSecret: 's' },
   'ibkr-tws':      { host: '127.0.0.1', port: 7497, clientId: 0 },
   longbridge:      { mode: 'live', appKey: 'k', appSecret: 's', accessToken: 't' },
@@ -132,8 +132,21 @@ describe('preset → engine config translation', () => {
   })
 
   it('Bitget mode=demo sets demoTrading=true', () => {
-    const cfg = BITGET_PRESET.toEngineConfig({ mode: 'demo', apiKey: 'k', secret: 's', password: 'p' })
+    const cfg = BITGET_PRESET.toEngineConfig({ mode: 'demo', accountType: 'classic', apiKey: 'k', secret: 's', password: 'p' })
     expect(cfg.demoTrading).toBe(true)
+  })
+
+  it('Bitget defaults legacy configs to classic account routing', () => {
+    const parsed = BITGET_PRESET.zodSchema.parse({ mode: 'live', apiKey: 'k', secret: 's', password: 'p' }) as Record<string, unknown>
+    const cfg = BITGET_PRESET.toEngineConfig(parsed)
+    expect(parsed.accountType).toBe('classic')
+    expect(cfg.options).toEqual({ uta: false })
+  })
+
+  it('Bitget unified accounts enable CCXT UTA routing', () => {
+    const parsed = BITGET_PRESET.zodSchema.parse({ mode: 'live', accountType: 'unified', apiKey: 'k', secret: 's', password: 'p' }) as Record<string, unknown>
+    const cfg = BITGET_PRESET.toEngineConfig(parsed)
+    expect(cfg.options).toEqual({ uta: true })
   })
 
   it('Alpaca mode=paper sets paper=true', () => {

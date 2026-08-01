@@ -24,6 +24,7 @@
  */
 
 import type { Exchange, Order as CcxtOrder, Position as CcxtPosition } from 'ccxt'
+import { bitgetOverrides } from './exchanges/bitget.js'
 import { bybitOverrides } from './exchanges/bybit.js'
 import { hyperliquidOverrides } from './exchanges/hyperliquid.js'
 
@@ -33,6 +34,23 @@ import { hyperliquidOverrides } from './exchanges/hyperliquid.js'
 type DefaultImpl<TArgs extends unknown[], TResult> = (...args: TArgs) => Promise<TResult>
 
 export interface CcxtExchangeOverrides {
+  /** Fail account reads when any declared wallet or position namespace is
+   *  unreadable. Use where a partial response would look valid while omitting
+   *  material funds or risk (Bitget Classic/UTA account-family routing). */
+  strictPrivateReads?: boolean
+
+  /** Resolve wallet/sub-account topology from exchange configuration. Use for
+   *  venues whose account family changes the topology (Bitget Classic vs UTA). */
+  resolveSubAccounts?(exchange: Exchange): CcxtSubAccountDef[]
+
+  /** Fetch one normalized balance wallet. Override for venue parser gaps
+   *  (Bitget UTA exposes per-asset equity but CCXT 4.5.38 uses balance). */
+  fetchBalance?(
+    exchange: Exchange,
+    params: Record<string, unknown> | undefined,
+    defaultImpl: DefaultImpl<[Exchange, Record<string, unknown> | undefined], Record<string, unknown>>,
+  ): Promise<Record<string, unknown>>
+
   /** Fetch a single order by ID (regular + conditional). */
   fetchOrderById?(
     exchange: Exchange,
@@ -126,6 +144,16 @@ export interface CcxtSubAccountDef {
 
 // ==================== Default implementations ====================
 
+/** Default: fetch one wallet balance, preserving an actually-unscoped call. */
+export async function defaultFetchBalance(
+  exchange: Exchange,
+  params?: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return await (params === undefined
+    ? exchange.fetchBalance()
+    : exchange.fetchBalance(params)) as unknown as Record<string, unknown>
+}
+
 /** Default: fetchOrder + { stop: true } fallback. Works for binance, okx, bitget, etc. */
 export async function defaultFetchOrderById(exchange: Exchange, orderId: string, symbol: string): Promise<CcxtOrder> {
   try {
@@ -199,6 +227,7 @@ const binanceOverrides: CcxtExchangeOverrides = {
 
 export const exchangeOverrides: Record<string, CcxtExchangeOverrides> = {
   binance: binanceOverrides,
+  bitget: bitgetOverrides,
   bybit: bybitOverrides,
   hyperliquid: hyperliquidOverrides,
 }
