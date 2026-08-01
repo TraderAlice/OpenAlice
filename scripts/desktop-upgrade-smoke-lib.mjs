@@ -27,9 +27,13 @@ export function candidateDesktopAssetName(version, platform, arch) {
 }
 
 export function windowsInstallerArgs(installRoot, isUpdate = false) {
-  // Keep the replacement path identical to electron-updater's NsisUpdater.
+  if (isUpdate) {
+    // Mirror the silent NsisUpdater path. The production handoff additionally
+    // uses --force-run; the smoke owns the candidate launch so it can inject
+    // isolated state and verify both the first launch and a restart.
+    return ['--updated', '/S']
+  }
   return [
-    ...(isUpdate ? ['--updated'] : []),
     '/S',
     `/D=${installRoot}`,
   ]

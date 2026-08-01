@@ -148,7 +148,7 @@ describe('configureAutoUpdate', () => {
 
     expect(beforeInstall).toHaveBeenCalledWith('0.88.0-beta', expect.any(Function))
     expect(onInstallHandoff).toHaveBeenCalledWith('0.88.0-beta')
-    expect(mocks.autoUpdater.quitAndInstall).toHaveBeenCalledWith(false, true)
+    expect(mocks.autoUpdater.quitAndInstall).toHaveBeenCalledWith(true, true)
     expect(setProgressBar).toHaveBeenCalledWith(0.424)
     expect(setProgressBar).toHaveBeenCalledWith(2)
     expect(send.mock.calls.map(([, status]) => status)).toContainEqual({
