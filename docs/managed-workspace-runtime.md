@@ -491,6 +491,27 @@ that it is unsupported and the shared version route remains the non-installing
 fallback. The top-level update banner and downloaded-update prompt remain
 secondary notifications over the same backend and updater state.
 
+The update UI must distinguish determinate download progress from the native
+installer handoff. Before closing, the old app reports `preparing`,
+`stopping-services`, `releasing-runtime`, and `handing-off` stages, releases
+the Guardian runtime lock, and emits a native notification that OpenAlice may
+remain closed for up to a minute. Do not invent an install percentage: the
+platform installer does not expose one to the old Electron process.
+
+Before the handoff, Electron atomically records
+`openalice-update-attempt.json` in its machine-local `userData` directory. The
+new version clears that marker on first launch. If the initiating version is
+still running after the bounded installer window, the marker is archived as
+`.failed` and a native error names the target version and desktop diagnostic
+log. This marker is updater evidence, not user-owned OpenAlice state, and does
+not belong under `OPENALICE_HOME`.
+
+Alice startup stderr is tee'd to the terminal and the bounded `desktop.log`
+under Electron's platform log directory. If Alice exits before the renderer is
+ready—or later exits unexpectedly—the desktop shows a native error with the
+last diagnostic lines and log path before cascading shutdown. A failed local
+backend must never present as an unexplained desktop flash-and-exit.
+
 Keep these true together:
 
 - `vendor/**` remains in the Electron builder file list.

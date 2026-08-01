@@ -64,11 +64,10 @@ describe('AboutOpenAliceSection', () => {
   })
 
   it('uses the packaged updater and offers restart after a download completes', async () => {
-    let listener: ((status: {
-      phase: 'downloaded'
-      version: string
-      releaseUrl: string
-    }) => void) | null = null
+    type TestUpdateStatus =
+      | { phase: 'downloaded'; version: string; releaseUrl: string }
+      | { phase: 'installing'; version: string; stage: 'stopping-services' }
+    let listener: ((status: TestUpdateStatus) => void) | null = null
     const updater = {
       getStatus: vi.fn().mockResolvedValue(null),
       checkForUpdates: vi.fn().mockImplementation(async () => {
@@ -83,7 +82,14 @@ describe('AboutOpenAliceSection', () => {
         listener = callback
         return () => { listener = null }
       }),
-      installAndRestart: vi.fn().mockResolvedValue({ ok: true }),
+      installAndRestart: vi.fn().mockImplementation(async () => {
+        listener?.({
+          phase: 'installing',
+          version: '0.83.0-beta',
+          stage: 'stopping-services',
+        })
+        return { ok: true }
+      }),
       openRelease: vi.fn().mockResolvedValue({ ok: true }),
     }
     Object.defineProperty(window, 'openAlice', {
@@ -110,5 +116,8 @@ describe('AboutOpenAliceSection', () => {
     expect(await screen.findByText('OpenAlice v0.83.0-beta is ready to install.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Restart and update' }))
     await waitFor(() => expect(updater.installAndRestart).toHaveBeenCalledOnce())
+    expect(await screen.findByText('Safely stopping OpenAlice services…')).toBeTruthy()
+    expect(screen.getByRole('progressbar')).toBeTruthy()
+    expect(screen.getByText(/OpenAlice will close while the system installs/)).toBeTruthy()
   })
 })
