@@ -49,7 +49,6 @@ describe('desktop upgrade smoke planning', () => {
     expect(windowsInstallerArgs(installRoot, true)).toEqual([
       '--updated',
       '/S',
-      '/D=C:\\OpenAlice',
     ])
   })
 
