@@ -27,6 +27,8 @@ describe('desktop upgrade smoke planning', () => {
     expect(packageJson.build.nsis.include).toBe('apps/desktop/build/installer.nsh')
     expect(installerInclude).toContain('${if} ${isUpdated}')
     expect(installerInclude).toContain('/T /F /IM "${APP_EXECUTABLE_FILENAME}"')
+    expect(installerInclude).toContain("ExecutablePath.StartsWith('$INSTDIR'")
+    expect(installerInclude).toContain('Stop-Process -Id')
   })
 
   it('selects the newest published version different from the candidate', () => {

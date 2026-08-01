@@ -115,10 +115,48 @@ async function waitForInstalledVersion(installRoot, expectedVersion, timeoutMs =
       )
       lastObservedVersion = observedVersion
       lastProgressAt = now
+      if (process.platform === 'win32') logWindowsUpgradeProcesses(installRoot)
     }
     await sleep(500)
   }
   throw new Error(`timed out waiting for installed OpenAlice ${expectedVersion} under ${installRoot}`)
+}
+
+function logWindowsUpgradeProcesses(installRoot) {
+  const powershell = join(
+    process.env['SystemRoot'] || 'C:\\Windows',
+    'System32',
+    'WindowsPowerShell',
+    'v1.0',
+    'powershell.exe',
+  )
+  const script = [
+    "$root = [IO.Path]::GetFullPath($env:OPENALICE_UPGRADE_INSTALL_ROOT);",
+    'Get-CimInstance -ClassName Win32_Process',
+    '| Where-Object {',
+    "  ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($root, [StringComparison]::OrdinalIgnoreCase))",
+    "  -or $_.Name -like 'OpenAlice*'",
+    "  -or $_.Name -eq 'old-uninstaller.exe'",
+    '}',
+    '| Select-Object ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine',
+    '| ConvertTo-Json -Compress',
+  ].join(' ')
+  const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
+    encoding: 'utf8',
+    timeout: 15_000,
+    windowsHide: true,
+    env: {
+      ...process.env,
+      OPENALICE_UPGRADE_INSTALL_ROOT: installRoot,
+    },
+  })
+  const output = result.stdout?.trim()
+  if (result.status === 0) {
+    console.log(`[desktop-upgrade] Windows process snapshot: ${output || '[]'}`)
+  } else {
+    const detail = result.error?.message || result.stderr?.trim() || `exit ${result.status ?? 'unknown'}`
+    console.log(`[desktop-upgrade] Windows process snapshot unavailable: ${detail}`)
+  }
 }
 
 async function spawnDetached(command, args) {
