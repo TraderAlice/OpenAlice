@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.88.0-beta",
+  "version": "0.89.0-beta",
   "description": "File-based trading agent engine",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -28,6 +28,7 @@
     "electron:dev": "pnpm electron:build && pnpm -F @traderalice/desktop dev",
     "electron:pack": "pnpm electron:build && pnpm vendor:runtime && pnpm -F @traderalice/desktop run pack",
     "electron:assert-package": "node scripts/assert-desktop-package.mjs",
+    "electron:verify-update-assets": "node scripts/verify-desktop-update-assets.mjs",
     "electron:smoke-toolchain": "node scripts/smoke-packaged-toolchain.mjs",
     "electron:smoke:packaged": "node scripts/desktop-packaged-smoke.mjs",
     "electron:smoke:onboarding": "node scripts/desktop-packaged-smoke.mjs --onboarding",
@@ -35,6 +36,7 @@
     "electron:smoke:workspace": "node scripts/desktop-packaged-smoke.mjs --workspace-acceptance",
     "electron:smoke:pty": "node scripts/desktop-pty-smoke.mjs",
     "electron:smoke:guardian-recovery": "node scripts/desktop-pty-smoke.mjs --guardian-recovery",
+    "electron:smoke:upgrade": "node scripts/desktop-upgrade-smoke.mjs",
     "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

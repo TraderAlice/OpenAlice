@@ -100,6 +100,12 @@ grep -Fq "Press Enter inside the Supervisor to prepare, start, and open OpenAlic
 grep -Fq "Use c only if you want to select an existing checkout instead." \
   <<<"$first_install_output" \
   || fail "source-only install did not keep manual checkout selection secondary"
+grep -Fq "Activate OpenAlice in this terminal now (no restart required):" \
+  <<<"$first_install_output" \
+  || fail "installer did not offer immediate current-shell activation"
+grep -Fq "export PATH=$HOME/.openalice/bin:\$PATH" \
+  <<<"$first_install_output" \
+  || fail "installer did not print the current-shell PATH command"
 
 bin_dir="$HOME/.openalice/bin"
 versions_dir="$HOME/.openalice/cli-versions"

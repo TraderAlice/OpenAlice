@@ -11,6 +11,11 @@ type NativeUpdaterStatus =
   | { phase: 'available'; version?: string; releaseUrl?: string }
   | { phase: 'downloading'; version?: string; percent?: number }
   | { phase: 'downloaded'; version: string; releaseUrl: string }
+  | {
+      phase: 'installing'
+      version: string
+      stage: 'preparing' | 'stopping-services' | 'releasing-runtime' | 'handing-off'
+    }
   | { phase: 'error'; message: string }
 
 const RELEASES_URL = 'https://github.com/TraderAlice/OpenAlice/releases'
@@ -78,6 +83,12 @@ export function AboutOpenAliceSection() {
       return {
         kind: 'ready' as const,
         text: t('settings.about.status.ready', { version: nativeStatus.version }),
+      }
+    }
+    if (nativeStatus?.phase === 'installing') {
+      return {
+        kind: 'checking' as const,
+        text: t(`settings.about.status.installing.${nativeStatus.stage}`),
       }
     }
     if (nativeStatus?.phase === 'downloading') {
@@ -191,20 +202,50 @@ export function AboutOpenAliceSection() {
           <span className="font-medium">{status.text}</span>
         </div>
 
+        {(nativeStatus?.phase === 'downloading' || nativeStatus?.phase === 'installing') && (
+          <div
+            className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/15"
+            role="progressbar"
+            aria-label={status.text}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            {...(nativeStatus.phase === 'downloading' && typeof nativeStatus.percent === 'number'
+              ? { 'aria-valuenow': Math.round(nativeStatus.percent) }
+              : {})}
+          >
+            <div
+              className={`h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none ${nativeStatus.phase === 'installing' ? 'animate-pulse motion-reduce:animate-none' : ''}`}
+              style={{
+                width: nativeStatus.phase === 'downloading' && typeof nativeStatus.percent === 'number'
+                  ? `${Math.max(2, Math.min(100, nativeStatus.percent))}%`
+                  : '100%',
+              }}
+            />
+          </div>
+        )}
+
+        {nativeStatus?.phase === 'installing' && (
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            {t('settings.about.installHandoffNote')}
+          </p>
+        )}
+
         {error && (
           <p className="mt-2 text-[11px] leading-relaxed text-destructive">{error}</p>
         )}
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {nativeStatus?.phase === 'downloaded' ? (
+          {nativeStatus?.phase === 'downloaded' || nativeStatus?.phase === 'installing' ? (
             <button
               type="button"
               onClick={() => void installAndRestart()}
-              disabled={installing}
+              disabled={installing || nativeStatus.phase === 'installing'}
               className="btn-primary-sm inline-flex min-h-10 items-center gap-1.5 sm:min-h-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${installing ? 'animate-spin motion-reduce:animate-none' : ''}`} />
-              {installing ? t('settings.about.installing') : t('settings.about.installAndRestart')}
+              {installing || nativeStatus.phase === 'installing'
+                ? t('settings.about.installing')
+                : t('settings.about.installAndRestart')}
             </button>
           ) : (
             <button

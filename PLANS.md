@@ -28,6 +28,12 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/desktop-upgrade-release-gate.md]] — Adds a real N-1 desktop-state
+  upgrade journey to the native package matrix and validates final updater
+  metadata and artifacts before a release can be published.
+- [[plans/desktop-update-reliability.md]] — Makes packaged desktop updates
+  visibly progress through shutdown and installer handoff, records update
+  attempts, and surfaces backend startup failures instead of silently exiting.
 - [[plans/retire-workspace-adapter-pins.md]] — Retires the legacy per-Workspace
   adapter allowlist so runtime availability comes from the live installation
   registry and future default-enabled choices can live in global preferences.
