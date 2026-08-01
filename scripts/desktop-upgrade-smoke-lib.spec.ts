@@ -29,6 +29,9 @@ describe('desktop upgrade smoke planning', () => {
     expect(installerInclude).toContain('/T /F /IM "${APP_EXECUTABLE_FILENAME}"')
     expect(installerInclude).toContain("ExecutablePath.StartsWith('$INSTDIR'")
     expect(installerInclude).toContain('Stop-Process -Id')
+    expect(installerInclude).toContain('SetOutPath "$TEMP"')
+    expect(installerInclude).toContain('/D /C RD /S /Q "\\\\?\\$INSTDIR"')
+    expect(installerInclude).toContain('DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "UninstallString"')
   })
 
   it('selects the newest published version different from the candidate', () => {
