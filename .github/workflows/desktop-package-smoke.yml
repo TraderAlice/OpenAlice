@@ -16,12 +16,15 @@ on:
       - "scripts/desktop-package-artifact.mjs"
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
+      - "scripts/desktop-upgrade-smoke.mjs"
+      - "scripts/desktop-upgrade-smoke-lib.mjs"
       - "scripts/build-broker-packs.ts"
       - "scripts/broker-pack-upgrade-smoke.ts"
       - "scripts/guardian/**"
       - "scripts/pnpm-command.mjs"
       - "scripts/pnpm-command.spec.ts"
       - "scripts/prepare-desktop-release-assets.mjs"
+      - "scripts/verify-desktop-update-assets.mjs"
       - "scripts/smoke-packaged-toolchain.mjs"
       - "scripts/verify-broker-packs.ts"
       - "scripts/workspace-acceptance-ai-mock.mjs"
@@ -56,12 +59,15 @@ on:
       - "scripts/desktop-package-artifact.mjs"
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
+      - "scripts/desktop-upgrade-smoke.mjs"
+      - "scripts/desktop-upgrade-smoke-lib.mjs"
       - "scripts/build-broker-packs.ts"
       - "scripts/broker-pack-upgrade-smoke.ts"
       - "scripts/guardian/**"
       - "scripts/pnpm-command.mjs"
       - "scripts/pnpm-command.spec.ts"
       - "scripts/prepare-desktop-release-assets.mjs"
+      - "scripts/verify-desktop-update-assets.mjs"
       - "scripts/smoke-packaged-toolchain.mjs"
       - "scripts/verify-broker-packs.ts"
       - "scripts/workspace-acceptance-ai-mock.mjs"
@@ -183,3 +189,18 @@ jobs:
           name: workspace-acceptance-${{ matrix.os }}
           path: ${{ runner.temp }}/openalice-workspace-acceptance.json
           if-no-files-found: warn
+
+      - name: Prove previous desktop release state upgrades to the candidate
+        run: >-
+          pnpm electron:smoke:upgrade --
+          --candidate-package-root dist/electron-app
+          --receipt "${{ runner.temp }}/openalice-desktop-upgrade.json"
+        timeout-minutes: 15
+
+      - name: Upload desktop upgrade acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-upgrade-acceptance-${{ matrix.os }}
+          path: ${{ runner.temp }}/openalice-desktop-upgrade.json
+          if-no-files-found: error

@@ -330,6 +330,15 @@ and verifies both CDN objects. A manual `mirror_tag` run is recovery-only: it
 checks out that existing tag and may reproduce its bytes, but must never source
 an installer from current `master`.
 
+Desktop promotion evidence includes a real N-1 state journey on Apple Silicon,
+Intel macOS, and Windows. PR package jobs seed state with the previous published
+app and verify the unpacked candidate can migrate, write, and restart. The
+versioned release repeats that journey against the final signed macOS ZIP or
+Windows NSIS installer and byte-verifies each updater YAML reference, size,
+SHA-512, and blockmap before `publish-release`. These are blocking release
+requirements, not trailing observations; missing receipts or mismatched update
+metadata must prevent the tag and public assets from being created.
+
 Do not delete `dev` after promotion. After a master hotfix, propagate the fix
 back to `dev` immediately so a later promotion cannot revert it.
 

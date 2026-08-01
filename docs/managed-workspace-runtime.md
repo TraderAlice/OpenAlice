@@ -572,6 +572,40 @@ Smoke matrix preserves these receipts as CI artifacts. Release candidates run
 the same acceptance on all three platform/architecture builds before any tag or
 GitHub Release is created; only accepted installers are then published.
 
+### N-1 desktop upgrade acceptance
+
+Fresh-package startup is not upgrade evidence. Every native Desktop Package
+Smoke job also downloads the newest published desktop release whose product
+version differs from the candidate, runs that real app against an isolated
+home, creates a Chat Workspace plus persisted metadata and browser state, then
+opens the same home with the unpacked candidate. Acceptance requires:
+
+- the candidate reports its expected version;
+- the N-1 Workspace id, display metadata, and renderer sentinel survive;
+- the candidate can create a new Workspace after migrations;
+- a second candidate launch reads both old and new state; and
+- every check is recorded in a versioned JSON receipt.
+
+The runner uses explicit temporary `OPENALICE_HOME`, `AQ_LAUNCHER_ROOT`,
+`OPENALICE_GLOBAL_DIR`, and Electron `userData` roots. It never reads normal
+desktop data, credentials, or preferences. The previous renderer is driven
+through a short-lived loopback DevTools endpoint so the test uses its real API
+and bootstrap code without adding a production smoke route.
+
+Release candidates repeat the journey against publication bytes. macOS expands
+the final signed architecture-specific ZIP; Windows silently installs N-1 and
+then runs the final NSIS installer over the same isolated install directory.
+Before either artifact is accepted, the release job parses the platform update
+YAML and recomputes the referenced file size and SHA-512, requires its blockmap,
+and verifies the candidate version. A failed upgrade receipt or byte mismatch
+blocks `publish-release`, so no tag, GitHub Release, or CDN mirror is created.
+
+This gate proves N-1 state compatibility and the shipped ZIP/NSIS bytes. macOS
+ShipIt replacement and signing/notarization remain native release mechanics;
+the updater status/handoff contract stays covered by desktop unit/UI tests and
+signed release rehearsal. Do not describe an unpacked-package PR smoke as proof
+that ShipIt itself replaced the application.
+
 Do not replace the actual shims with direct tool-function calls in this smoke:
 that would stop covering argv parsing, manifest discovery, managed Node,
 Workspace identity headers, and the Electron-only socket transport.
