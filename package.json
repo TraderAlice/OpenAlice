@@ -147,6 +147,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "include": "apps/desktop/build/installer.nsh",
       "artifactName": "OpenAlice.Setup.${version}.${ext}"
     },
     "publish": [

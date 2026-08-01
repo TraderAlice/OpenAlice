@@ -14,12 +14,19 @@ import {
 } from './desktop-upgrade-smoke-lib.mjs'
 
 describe('desktop upgrade smoke planning', () => {
-  it('keeps the Windows builder filename aligned with the upgrade contract', () => {
+  it('keeps the Windows builder and legacy takeover aligned with the upgrade contract', () => {
     const packageJson = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-    ) as { build: { nsis: { artifactName: string } } }
+    ) as { build: { nsis: { artifactName: string; include: string } } }
+    const installerInclude = readFileSync(
+      new URL('../apps/desktop/build/installer.nsh', import.meta.url),
+      'utf8',
+    )
 
     expect(packageJson.build.nsis.artifactName).toBe('OpenAlice.Setup.${version}.${ext}')
+    expect(packageJson.build.nsis.include).toBe('apps/desktop/build/installer.nsh')
+    expect(installerInclude).toContain('${if} ${isUpdated}')
+    expect(installerInclude).toContain('/T /F /IM "${APP_EXECUTABLE_FILENAME}"')
   })
 
   it('selects the newest published version different from the candidate', () => {
