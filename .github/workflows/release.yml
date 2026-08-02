@@ -87,10 +87,10 @@ jobs:
           path: notes.md
           if-no-files-found: error
 
-  # Per-platform desktop installers are built and acceptance-tested before any
-  # tag or GitHub Release exists. Each runner builds only its own platform/arch.
-  # Optional broker SDKs are emitted as separate version/platform-specific
-  # Broker Packs and are rejected if they leak back into the desktop app. macOS
+  # Per-platform desktop installers are built before any tag or GitHub Release
+  # exists. Each runner builds only its own platform/arch, preserves the candidate
+  # immediately after fast package acceptance, and leaves the slower N-1 upgrade
+  # journey to a downstream job that can be retried without rebuilding it. macOS
   # builds are signed and notarized through Developer ID secrets; Windows remains
   # unsigned until a Windows code-signing certificate exists.
   build-desktop:
@@ -118,15 +118,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build optional Broker Packs
-        run: pnpm broker-packs:build
-
-      - name: Prove previous-release Broker Pack upgrade
-        run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
       # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
       # wrapper and routes it to managed PortableGit in the packaged smoke.
@@ -214,6 +209,61 @@ jobs:
             --arch "$RELEASE_ARCH" \
             --version "$VERSION"
 
+      - name: Preserve desktop release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ runner.os }}-${{ matrix.arch }}
+          path: |
+            dist/electron-app/*.dmg
+            dist/electron-app/*.zip
+            dist/electron-app/*.yml
+            dist/electron-app/*.blockmap
+            dist/electron-app/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  # The final-artifact upgrade journey is intentionally downstream from the
+  # build. A failed platform can be retried from its preserved installer without
+  # repeating Electron packaging, macOS signing, or notarization.
+  accept-desktop-upgrade:
+    name: Accept desktop upgrade (${{ matrix.os }}, ${{ matrix.arch }})
+    needs: [release, build-desktop]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && !github.event.inputs.mirror_tag
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore desktop release candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets-${{ runner.os }}-${{ matrix.arch }}
+          path: dist/electron-app
+
       - name: Prove final desktop artifact upgrades previous release state
         run: >-
           pnpm electron:smoke:upgrade --
@@ -230,31 +280,6 @@ jobs:
           path: ${{ runner.temp }}/openalice-desktop-upgrade.json
           if-no-files-found: error
           retention-days: 7
-
-      - name: Preserve accepted release assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-assets-${{ runner.os }}-${{ matrix.arch }}
-          path: |
-            dist/electron-app/*.dmg
-            dist/electron-app/*.zip
-            dist/electron-app/*.yml
-            dist/electron-app/*.blockmap
-            dist/electron-app/*.exe
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 1
-
-      - name: Preserve optional Broker Packs
-        uses: actions/upload-artifact@v4
-        with:
-          name: broker-packs-${{ runner.os }}-${{ matrix.arch }}
-          path: |
-            dist/broker-packs/*.json
-            dist/broker-packs/*.tgz
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 1
 
   cli-installer-acceptance:
     name: Accept CLI installer candidate
@@ -311,6 +336,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22.19.0
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -354,11 +380,26 @@ jobs:
           compression-level: 0
           retention-days: 1
 
-  build-linux-broker-packs:
-    name: Build Linux Broker Packs
+  # Broker Packs are release artifacts, not inputs to the desktop package. Build
+  # and validate them on their native platforms in parallel with desktop and
+  # headless Runtime candidates instead of serializing them in desktop jobs.
+  build-broker-packs:
+    name: Build Broker Packs (${{ matrix.os }}, ${{ matrix.arch }})
     needs: release
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-latest
+            arch: x64
+          - os: ubuntu-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
 
@@ -370,6 +411,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -380,10 +422,10 @@ jobs:
       - name: Prove previous-release Broker Pack upgrade
         run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
-      - name: Preserve Linux Broker Packs
+      - name: Preserve Broker Packs
         uses: actions/upload-artifact@v4
         with:
-          name: broker-packs-Linux-x64
+          name: broker-packs-${{ runner.os }}-${{ matrix.arch }}
           path: |
             dist/broker-packs/*.json
             dist/broker-packs/*.tgz
@@ -393,8 +435,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, build-headless-runtime, build-linux-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.build-headless-runtime.result == 'success' && needs.build-linux-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, build-desktop, accept-desktop-upgrade, build-headless-runtime, build-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-headless-runtime.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read
