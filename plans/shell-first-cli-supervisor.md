@@ -504,6 +504,9 @@ source-tool planning.
 
 ### 9. Atomic Runtime update, activation, and rollback
 
+- [x] Separate immutable install provenance from update-channel policy so a
+  release-owned exact-tag install remains on stable while explicit
+  `--version` installs stay pinned.
 - [ ] Stage matching CLI, Pi, and Runtime as one product release.
 - [ ] Plan compatibility and active-work impact for running instances.
 - [ ] Keep compatible old processes alive with pending activation.
@@ -787,3 +790,10 @@ This plan is complete only when:
   acceptance deletes only that dependency from an otherwise healthy release,
   verifies that the installer preserves the damaged evidence, replaces the
   release atomically, and confirms the repaired closure before continuing.
+- 2026-08-02: Dogfood found that release-owned installers recorded their
+  embedded tag as an explicit pin, disabling both startup notices and the TUI
+  update action. Install provenance v2 now keeps the immutable tag for exact
+  SSH/source reproduction and records update policy separately. Release
+  generation embeds `stable`, human `--version` remains pinned, legacy v1
+  metadata remains readable, and the release-installer transformation plus
+  stable-ref install/check path have dedicated regression coverage.

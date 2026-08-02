@@ -483,15 +483,9 @@ jobs:
           test "$CLI_PACKAGE_VERSION" = "$VERSION"
           bash -n install
           cp install "dist/r2-upload/OpenAlice-${VERSION}-install"
-          node - "$VERSION" "dist/r2-upload/OpenAlice-${VERSION}-install" <<'NODE'
-          const { readFileSync, writeFileSync } = require('node:fs')
-          const [version, path] = process.argv.slice(2)
-          const source = 'OPENALICE_INSTALLER_RELEASE_VERSION="${OPENALICE_INSTALLER_RELEASE_VERSION:-}"'
-          const target = `OPENALICE_INSTALLER_RELEASE_VERSION="\${OPENALICE_INSTALLER_RELEASE_VERSION:-${version}}"`
-          const input = readFileSync(path, 'utf8')
-          if (!input.includes(source)) throw new Error('installer release-version placeholder is missing')
-          writeFileSync(path, input.replace(source, target))
-          NODE
+          node scripts/prepare-cli-release-installer.mjs \
+            "$VERSION" \
+            "dist/r2-upload/OpenAlice-${VERSION}-install"
           bash -n "dist/r2-upload/OpenAlice-${VERSION}-install"
 
       - name: Prepare CDN download aliases
@@ -661,6 +655,7 @@ jobs:
           bash -n /tmp/openalice-install
           bash /tmp/openalice-install --plan | tee /tmp/openalice-install-plan
           grep -Fq "GitHub ref: TraderAlice/OpenAlice@${TAG}" /tmp/openalice-install-plan
+          grep -Fq "Updates        stable" /tmp/openalice-install-plan
           INSTALLER_PATH=/tmp/openalice-install MANIFEST_URL="${BASE_URL}/manifest.json" node -e '
             const { createHash } = require("node:crypto");
             const { readFileSync } = require("node:fs");
