@@ -125,6 +125,30 @@ not ordinary operator-entered configuration.
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
 
+### Proxy inheritance and bounded startup
+
+Connector Service inherits the launcher's conventional `HTTPS_PROXY`,
+`HTTP_PROXY`, `ALL_PROXY`, and `NO_PROXY` environment (upper- or lower-case).
+Connector SDK proxy endpoints must use HTTP or HTTPS; SOCKS-only proxy rules
+remain unsupported.
+When no explicit environment proxy exists, Electron resolves the host system
+proxy through Chromium and forwards the concrete HTTP(S) rule to every Node
+child. Loopback addresses remain in `NO_PROXY` so local Alice, UTA, and
+Connector health traffic never leaves the machine.
+
+The service installs one shared transport for Node HTTP(S), WebSocket SDKs,
+Undici, and adapters that replace the global agent. Telegram therefore passes
+the shared Node agent into grammY/node-fetch and bridges grammY's bundled abort
+signal into Node's native signal; Discord passes the shared Undici
+dispatcher into both command publication and the client's REST manager, while
+its gateway WebSocket inherits the process Node agent. New adapters must reuse
+this transport instead of reading a connector-specific proxy setting.
+
+The loopback health server binds while adapters are still starting. Each
+adapter gets a 30-second total startup deadline and reports the concrete
+failure through adapter health; a platform outage must never leave the whole
+Connector Service indefinitely unavailable or stuck at `starting`.
+
 ### Setup lifecycle and UI ownership
 
 Connector setup is a lifecycle, not a single `enabled` checkbox. Keep these

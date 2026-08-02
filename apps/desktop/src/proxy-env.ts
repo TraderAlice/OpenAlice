@@ -15,9 +15,14 @@ export function proxyEnvFromRules(
   rules: string,
   env: EnvLike = process.env,
 ): Record<string, string> {
-  const explicit = PROXY_KEYS.some((key) => !!env[key]?.trim())
-  if (explicit) {
+  const allProxy = envValue(env, 'ALL_PROXY')
+  const httpProxy = envValue(env, 'HTTP_PROXY') ?? allProxy
+  const httpsProxy = envValue(env, 'HTTPS_PROXY') ?? httpProxy
+  if (httpProxy || httpsProxy) {
     return {
+      ...(httpProxy ? { HTTP_PROXY: httpProxy } : {}),
+      ...(httpsProxy ? { HTTPS_PROXY: httpsProxy } : {}),
+      ...(allProxy ? { ALL_PROXY: allProxy } : {}),
       ...(!env['NODE_USE_ENV_PROXY'] ? { NODE_USE_ENV_PROXY: '1' } : {}),
       ...localBypassEnv(env),
     }
@@ -39,6 +44,11 @@ export function proxyEnvFromRules(
     NODE_USE_ENV_PROXY: '1',
     ...localBypassEnv(env),
   }
+}
+
+function envValue(env: EnvLike, key: typeof PROXY_KEYS[number]): string | undefined {
+  const value = env[key]?.trim() || env[key.toLowerCase()]?.trim()
+  return value || undefined
 }
 
 function localBypassEnv(env: EnvLike): { NO_PROXY?: string } {

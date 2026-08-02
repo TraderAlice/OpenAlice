@@ -35,7 +35,9 @@ export interface DeliveryManagerOptions {
 export class DeliveryManager {
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
+  private readonly startFailures = new Map<string, string>()
   private readonly startedAt: string
+  private starting = false
   private stopped = false
 
   constructor(private readonly options: DeliveryManagerOptions) {
@@ -43,11 +45,17 @@ export class DeliveryManager {
   }
 
   async start(): Promise<void> {
-    for (const [id, config] of Object.entries(this.options.config.adapters)) {
-      if (!config.enabled || !this.options.registry.has(id)) continue
-      await this.startAdapter(id, config).catch((error) => {
-        console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
-      })
+    this.starting = true
+    try {
+      for (const [id, config] of Object.entries(this.options.config.adapters)) {
+        if (this.stopped) break
+        if (!config.enabled || !this.options.registry.has(id)) continue
+        await this.startAdapter(id, config).catch((error) => {
+          console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
+        })
+      }
+    } finally {
+      this.starting = false
     }
   }
 
@@ -119,12 +127,19 @@ export class DeliveryManager {
     const adapters: ConnectorAdapterHealth[] = []
     for (const [id, config] of Object.entries(this.options.config.adapters)) {
       const adapter = this.adapters.get(id)
-      adapters.push(adapter?.health() ?? {
+      const startFailure = this.startFailures.get(id)
+      adapters.push(adapter?.health() ?? (startFailure ? {
         id,
         enabled: config.enabled,
-        status: config.enabled ? 'degraded' : 'disabled',
-        detail: config.enabled ? 'Adapter is configured but not running.' : undefined,
-      })
+        status: 'degraded',
+        detail: 'External connector failed to start.',
+        lastError: startFailure,
+      } : {
+        id,
+        enabled: config.enabled,
+        status: config.enabled ? (this.starting ? 'starting' : 'degraded') : 'disabled',
+        detail: config.enabled && !this.starting ? 'Adapter is configured but not running.' : undefined,
+      }))
     }
     return {
       status: adapters.some((adapter) => adapter.status === 'degraded') ? 'degraded' : 'healthy',
@@ -149,9 +164,24 @@ export class DeliveryManager {
       getServiceStatus: () => this.health().status,
       sendTest: (connectorId) => this.sendTest(connectorId),
     }
-    await adapter.start(config, context)
     this.adapters.set(id, adapter)
     this.commands.set(id, commands)
+    this.startFailures.delete(id)
+    try {
+      await adapter.start(config, context)
+      if (this.stopped) {
+        await adapter.stop().catch(() => undefined)
+        this.adapters.delete(id)
+        this.commands.delete(id)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.startFailures.set(id, message)
+      await adapter.stop().catch(() => undefined)
+      if (this.adapters.get(id) === adapter) this.adapters.delete(id)
+      this.commands.delete(id)
+      throw error
+    }
   }
 
   private get recorder(): ConnectorIORecorder {

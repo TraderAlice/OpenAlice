@@ -20,11 +20,31 @@ describe('proxyEnvFromRules', () => {
 
   it('never overwrites explicit proxy env but enables Node consumption', () => {
     expect(proxyEnvFromRules('PROXY system:8080', { HTTPS_PROXY: 'http://explicit:9000' }))
-      .toEqual({ NODE_USE_ENV_PROXY: '1', NO_PROXY: '127.0.0.1,localhost,::1' })
+      .toEqual({
+        HTTPS_PROXY: 'http://explicit:9000',
+        NODE_USE_ENV_PROXY: '1',
+        NO_PROXY: '127.0.0.1,localhost,::1',
+      })
     expect(proxyEnvFromRules('PROXY system:8080', {
       HTTPS_PROXY: 'http://explicit:9000',
       NODE_USE_ENV_PROXY: '1',
       NO_PROXY: 'internal.example,localhost',
-    })).toEqual({ NO_PROXY: 'internal.example,localhost,127.0.0.1,::1' })
+    })).toEqual({
+      HTTPS_PROXY: 'http://explicit:9000',
+      NO_PROXY: 'internal.example,localhost,127.0.0.1,::1',
+    })
+  })
+
+  it('normalizes lowercase and ALL_PROXY values for child processes', () => {
+    expect(proxyEnvFromRules('DIRECT', {
+      all_proxy: 'http://127.0.0.1:7890',
+      no_proxy: 'private.example',
+    })).toEqual({
+      HTTP_PROXY: 'http://127.0.0.1:7890',
+      HTTPS_PROXY: 'http://127.0.0.1:7890',
+      ALL_PROXY: 'http://127.0.0.1:7890',
+      NODE_USE_ENV_PROXY: '1',
+      NO_PROXY: 'private.example,127.0.0.1,localhost,::1',
+    })
   })
 })

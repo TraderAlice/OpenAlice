@@ -15,12 +15,18 @@
     "@grammyjs/auto-retry": "^2.0.2",
     "@hono/node-server": "^2.0.12",
     "@traderalice/connector-protocol": "workspace:*",
+    "agent-base": "^7.1.2",
     "discord.js": "14.26.5",
     "grammy": "^1.40.0",
     "hono": "^4.12.32",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "node-fetch": "2.7.0",
+    "undici": "^6.27.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/node-fetch": "^2.6.13",
     "@types/node": "^22.13.4",
     "tsup": "^8.4.0",
     "tsx": "^4.19.3",

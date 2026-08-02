@@ -1,5 +1,6 @@
 import { Bot, InputFile } from 'grammy'
 import { autoRetry } from '@grammyjs/auto-retry'
+import nodeFetch from 'node-fetch'
 import type {
   ConnectorAdapterConfig,
   ConnectorAdapterHealth,
@@ -11,6 +12,14 @@ import type {
   ConnectorAdapterContext,
   ConnectorAdapterRegistration,
 } from '../core/adapter.js'
+import {
+  DIRECT_CONNECTOR_PROXY_TRANSPORT,
+  type ConnectorProxyTransport,
+} from '../core/proxy.js'
+import {
+  CONNECTOR_ADAPTER_STARTUP_TIMEOUT_MS,
+  withStartupDeadline,
+} from '../core/startup.js'
 import {
   AdapterHealthTracker,
   decodeInboxAttachments,
@@ -24,12 +33,24 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private ownerUserId?: string
   private chatId?: string
 
+  constructor(
+    private readonly proxy: ConnectorProxyTransport = DIRECT_CONNECTOR_PROXY_TRANSPORT,
+    private readonly startupTimeoutMs = CONNECTOR_ADAPTER_STARTUP_TIMEOUT_MS,
+  ) {}
+
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
     const token = requiredString(config, 'botToken')
     this.ownerUserId = optionalString(config, 'ownerUserId')
     this.chatId = optionalString(config, 'chatId')
-    const bot = new Bot(token)
-    bot.api.config.use(autoRetry())
+    const bot = new Bot(token, {
+      client: {
+        // Telegram long polling holds a request for up to 30 seconds. Keep
+        // ordinary calls finite while leaving enough headroom for that poll.
+        timeoutSeconds: 45,
+        ...(this.proxy.nodeAgent ? { baseFetchConfig: { agent: this.proxy.nodeAgent } } : {}),
+        fetch: createTelegramFetch(),
+      },
+    })
     this.bot = bot
 
     for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
@@ -50,11 +71,30 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       })
     }
     this.registerCommands(context)
-    await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
-      command: name,
-      description,
-    })))
-    await bot.init()
+    try {
+      await withStartupDeadline('Telegram', this.startupTimeoutMs, async (signal) => {
+        // grammY exposes abort-controller's structural type while Node 22
+        // supplies the runtime-compatible native AbortSignal.
+        const telegramSignal = signal as unknown as Parameters<typeof bot.init>[0]
+        await bot.init(telegramSignal)
+        console.log('[connector] Telegram identity verified')
+        await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
+          command: name,
+          description,
+        })), undefined, telegramSignal)
+        console.log('[connector] Telegram commands published')
+      })
+    } catch (error) {
+      this.bot = undefined
+      this.tracker.degraded(error)
+      throw error
+    }
+    // Startup should fail fast. Runtime polling and delivery get a small,
+    // finite retry budget only after credentials and reachability are proven.
+    bot.api.config.use(autoRetry({
+      maxRetryAttempts: 2,
+      maxDelaySeconds: 10,
+    }))
     if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
     else this.tracker.awaitingLink()
     void bot.start({ drop_pending_updates: true }).catch((error) => {
@@ -121,8 +161,37 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   }
 }
 
-export function telegramConnectorRegistration(): ConnectorAdapterRegistration {
-  return { definition: TELEGRAM_CONNECTOR_DEFINITION, create: () => new TelegramConnectorAdapter() }
+/**
+ * grammY creates signals with `abort-controller`. Once both grammY and
+ * node-fetch are bundled into one CJS deployable, node-fetch rejects that
+ * shimmed signal before opening a socket. Mirror it into Node's native signal
+ * so packaged requests retain cancellation, timeouts, and proxy agents.
+ */
+export function createTelegramFetch(
+  fetchImplementation: typeof nodeFetch = nodeFetch,
+): typeof nodeFetch {
+  return ((url, init = {}) => {
+    const sourceSignal = init.signal
+    if (!sourceSignal) return fetchImplementation(url, init)
+
+    const controller = new AbortController()
+    const abort = (): void => controller.abort()
+    if (sourceSignal.aborted) abort()
+    else sourceSignal.addEventListener('abort', abort, { once: true })
+    try {
+      return fetchImplementation(url, { ...init, signal: controller.signal })
+        .finally(() => sourceSignal.removeEventListener('abort', abort))
+    } catch (error) {
+      sourceSignal.removeEventListener('abort', abort)
+      throw error
+    }
+  }) as typeof nodeFetch
+}
+
+export function telegramConnectorRegistration(
+  proxy: ConnectorProxyTransport = DIRECT_CONNECTOR_PROXY_TRANSPORT,
+): ConnectorAdapterRegistration {
+  return { definition: TELEGRAM_CONNECTOR_DEFINITION, create: () => new TelegramConnectorAdapter(proxy) }
 }
 
 function requiredString(config: ConnectorAdapterConfig, key: string): string {
