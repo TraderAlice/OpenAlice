@@ -20,7 +20,7 @@ const DEFAULT_REPOSITORY_URL = 'https://github.com/TraderAlice/OpenAlice.git'
 const MAX_GIT_ERROR_OUTPUT_BYTES = 64 * 1024
 
 interface InstallSource {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   repository: string
   cliVersion: string
   selector: {
@@ -28,6 +28,7 @@ interface InstallSource {
     value: string
   }
   installerUrl: string
+  updateChannel?: 'stable' | 'pinned' | 'development' | 'custom'
 }
 
 interface InstalledLayout {

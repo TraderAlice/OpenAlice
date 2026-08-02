@@ -82,9 +82,23 @@ describe('OpenAlice managed remote connector', () => {
   it('builds a remote installer command from local provenance, not remote flags', () => {
     const command = buildRemoteInstallCommand(masterInstallSource)
     expect(command).toContain('OPENALICE_INSTALL_URL=')
+    expect(command).toContain("OPENALICE_INSTALL_UPDATE_CHANNEL='stable'")
     expect(command).toContain('OPENALICE_INSTALL_CONTEXT=remote')
     expect(command).toContain("--branch 'master'")
     expect(command).not.toContain('--version')
+  })
+
+  it('reproduces a stable release from its exact ref without pinning the remote channel', () => {
+    const command = buildRemoteInstallCommand({
+      schemaVersion: 2,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.89.0-beta',
+      selector: { kind: 'version', value: 'v0.89.0-beta' },
+      installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/v0.89.0-beta/install',
+      updateChannel: 'stable',
+    })
+    expect(command).toContain("OPENALICE_INSTALL_UPDATE_CHANNEL='stable'")
+    expect(command).toContain("--version 'v0.89.0-beta'")
   })
 
   it('plans install and start separately, with no implicit takeover', () => {

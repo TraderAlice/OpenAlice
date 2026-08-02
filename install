@@ -4,6 +4,7 @@ set -euo pipefail
 REPOSITORY="TraderAlice/OpenAlice"
 DEFAULT_BRANCH="master"
 OPENALICE_INSTALLER_RELEASE_VERSION="${OPENALICE_INSTALLER_RELEASE_VERSION:-}"
+OPENALICE_INSTALLER_UPDATE_CHANNEL="${OPENALICE_INSTALLER_UPDATE_CHANNEL:-}"
 PUBLIC_INSTALLER_URL="https://openalice.ai/install"
 VERSION=""
 REF_KIND=""
@@ -468,6 +469,34 @@ if [[ "$REF_KIND" == "branch" && "$VERSION" == "$DEFAULT_BRANCH" ]]; then
 fi
 INSTALLER_URL="${OPENALICE_INSTALL_URL:-$DEFAULT_INSTALLER_URL}"
 
+if [[ -n "${OPENALICE_INSTALL_UPDATE_CHANNEL:-}" ]]; then
+  UPDATE_CHANNEL="$OPENALICE_INSTALL_UPDATE_CHANNEL"
+elif [[ -n "$REF_OPTION" ]]; then
+  if [[ "$REF_KIND" == "version" ]]; then
+    UPDATE_CHANNEL="pinned"
+  elif [[ "$VERSION" == "$DEFAULT_BRANCH" && "$INSTALLER_URL" == "$PUBLIC_INSTALLER_URL" ]]; then
+    UPDATE_CHANNEL="stable"
+  elif [[ "$VERSION" == "$DEFAULT_BRANCH" ]]; then
+    UPDATE_CHANNEL="custom"
+  else
+    UPDATE_CHANNEL="development"
+  fi
+elif [[ -n "$OPENALICE_INSTALLER_UPDATE_CHANNEL" ]]; then
+  UPDATE_CHANNEL="$OPENALICE_INSTALLER_UPDATE_CHANNEL"
+elif [[ "$REF_KIND" == "version" ]]; then
+  UPDATE_CHANNEL="pinned"
+elif [[ "$VERSION" == "$DEFAULT_BRANCH" && "$INSTALLER_URL" == "$PUBLIC_INSTALLER_URL" ]]; then
+  UPDATE_CHANNEL="stable"
+elif [[ "$VERSION" == "$DEFAULT_BRANCH" ]]; then
+  UPDATE_CHANNEL="custom"
+else
+  UPDATE_CHANNEL="development"
+fi
+case "$UPDATE_CHANNEL" in
+  stable|pinned|development|custom) ;;
+  *) die "Unsupported OpenAlice update channel: $UPDATE_CHANNEL" ;;
+esac
+
 INSTALL_ROOT="${INSTALL_ROOT/#\~/$HOME}"
 BIN_DIR="$INSTALL_ROOT/bin"
 VERSIONS_DIR="$INSTALL_ROOT/cli-versions"
@@ -716,6 +745,7 @@ if [[ "$REF_KIND" == "branch" ]]; then
 else
   printf '  %-14s %s\n' "Version" "$VERSION"
 fi
+printf '  %-14s %s\n' "Updates" "$UPDATE_CHANNEL"
 printf '  %-14s %s\n' "Install root" "$INSTALL_ROOT"
 printf '  %-14s %s\n' "Command" "$BIN_DIR/openalice"
 printf '  %-14s %s\n' "Managed agent" "Pi $PI_VERSION -> $BIN_DIR/pi"
@@ -967,29 +997,32 @@ STAGED_VERSION="$(node "$STAGING/bin/openalice.ts" --version)"
 [[ "$STAGED_VERSION" == "$CLI_VERSION" ]] || die "The downloaded CLI did not report its package version"
 node -e '
   const { writeFileSync } = require("node:fs");
-  const [path, repository, cliVersion, kind, value, installerUrl] = process.argv.slice(1);
+  const [path, repository, cliVersion, kind, value, installerUrl, updateChannel] = process.argv.slice(1);
   writeFileSync(path, `${JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     repository,
     cliVersion,
     selector: { kind, value },
     installerUrl,
+    updateChannel,
   }, null, 2)}\n`, { mode: 0o644 });
-' "$STAGING/install-source.json" "$REPOSITORY" "$CLI_VERSION" "$REF_KIND" "$VERSION" "$INSTALLER_URL"
+' "$STAGING/install-source.json" "$REPOSITORY" "$CLI_VERSION" "$REF_KIND" "$VERSION" "$INSTALLER_URL" "$UPDATE_CHANNEL"
 node "$STAGING/bin/openalice.ts" version --json | node -e '
   let input = "";
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", (chunk) => { input += chunk; });
   process.stdin.on("end", () => {
-    const [kind, value, installerUrl, cliVersion] = process.argv.slice(1);
+    const [kind, value, installerUrl, cliVersion, updateChannel] = process.argv.slice(1);
     const info = JSON.parse(input);
     if (info.version !== cliVersion
+      || info.installSource?.schemaVersion !== 2
       || info.installSource?.cliVersion !== cliVersion
       || info.installSource?.selector?.kind !== kind
       || info.installSource?.selector?.value !== value
-      || info.installSource?.installerUrl !== installerUrl) process.exit(1);
+      || info.installSource?.installerUrl !== installerUrl
+      || info.installSource?.updateChannel !== updateChannel) process.exit(1);
   });
-' "$REF_KIND" "$VERSION" "$INSTALLER_URL" "$CLI_VERSION" \
+' "$REF_KIND" "$VERSION" "$INSTALLER_URL" "$CLI_VERSION" "$UPDATE_CHANNEL" \
   || die "The downloaded CLI did not preserve its installation source"
 CONTENT_FILES=("${FILES[@]}" "install-source.json" "managed/pi/package.json" "managed/pi/package-lock.json")
 # Keep the CLI identity stable across operating systems. The platform-specific
