@@ -8,7 +8,20 @@ import { CHAT_DISPLAY_MODE_STORAGE_KEY } from '../components/workspace/chat-disp
 import { ChatPageShell } from './ChatPageShell'
 
 vi.mock('../components/ChatChannelListContainer', () => ({
-  ChatChannelListContainer: () => <div>Chat navigation</div>,
+  ChatChannelListContainer: ({
+    displayMode,
+    onRequestDisplayMode,
+  }: {
+    displayMode: 'focused' | 'recent' | 'multi'
+    onRequestDisplayMode: (mode: 'focused' | 'recent' | 'multi') => void
+  }) => (
+    <div>
+      <span data-testid="display-mode">{displayMode}</span>
+      <button type="button" onClick={() => onRequestDisplayMode('focused')}>Request current</button>
+      <button type="button" onClick={() => onRequestDisplayMode('recent')}>Request recent</button>
+      <button type="button" onClick={() => onRequestDisplayMode('multi')}>Request tree</button>
+    </div>
+  ),
 }))
 
 class ResizeObserverStub {
@@ -39,24 +52,28 @@ afterEach(() => {
 })
 
 describe('ChatPageShell display mode', () => {
-  it('defaults to Focused, confirms the dense view, and persists both choices', () => {
+  it('keeps mode controls out of the title bar and persists all three views', () => {
     render(<ChatPageShell><div>Chat content</div></ChatPageShell>)
 
-    const focused = screen.getByRole('button', { name: 'Focused' })
-    const multi = screen.getByRole('button', { name: 'Multi Workspace' })
-    expect(focused.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('display-mode').textContent).toBe('focused')
+    expect(screen.getByRole('button', { name: 'Collapse Ask Alice' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Workspace display mode' })).toBeNull()
 
-    fireEvent.click(multi)
-    expect(screen.getByRole('dialog', { name: 'Switch to the multi-Workspace view?' })).toBeTruthy()
-    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Request recent' }))
+    expect(screen.getByTestId('display-mode').textContent).toBe('recent')
+    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('recent')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request tree' }))
+    expect(screen.getByRole('dialog', { name: 'Switch to the Workspace tree?' })).toBeTruthy()
+    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('recent')
 
     fireEvent.click(screen.getByRole('button', { name: 'Show all Workspaces' }))
-    expect(multi.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('display-mode').textContent).toBe('multi')
     expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('multi')
 
-    fireEvent.click(focused)
+    fireEvent.click(screen.getByRole('button', { name: 'Request current' }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(focused.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('display-mode').textContent).toBe('focused')
     expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('focused')
   })
 })

@@ -111,8 +111,8 @@ function renderSection(
   workspaces: readonly Workspace[] = [chatWorkspace],
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
   onNavigate?: () => void,
-  displayMode: 'focused' | 'multi' = 'multi',
-  onRequestDisplayMode: (mode: 'focused' | 'multi') => void = () => undefined,
+  displayMode: 'focused' | 'recent' | 'multi' = 'multi',
+  onRequestDisplayMode: (mode: 'focused' | 'recent' | 'multi') => void = () => undefined,
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
@@ -143,7 +143,7 @@ describe('ChatWorkspaceSection actions', () => {
 
     expect(screen.getByText('Recent conversations')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Current Workspace: chat-jul11' })).toBeTruthy()
-    expect(screen.queryByText('Workspaces', { selector: 'span' })).toBeNull()
+    expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(openOrFocus).toHaveBeenCalledWith({
@@ -160,6 +160,46 @@ describe('ChatWorkspaceSection actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Current Workspace: chat-jul11' }))
     fireEvent.click(screen.getByRole('button', { name: 'Show all Workspaces' }))
     expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
+  })
+
+  it('offers an explicit recent view and orders sessions across Workspaces with ownership visible', () => {
+    const olderWorkspace = {
+      ...chatWorkspace,
+      sessions: [{ ...chatSession(1), lastActiveAt: '2026-07-01T12:00:00.000Z' }],
+    }
+    const newerWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+      sessions: [{
+        ...chatSession(2),
+        id: 'newest-session',
+        wsId: 'chat-2',
+        lastActiveAt: '2026-08-03T12:00:00.000Z',
+      }],
+    }
+    const onRequestDisplayMode = vi.fn()
+
+    const { unmount } = renderSection(
+      [olderWorkspace, newerWorkspace],
+      null,
+      undefined,
+      'focused',
+      onRequestDisplayMode,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Recent across Workspaces' }))
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('recent')
+    unmount()
+
+    renderSection([olderWorkspace, newerWorkspace], null, undefined, 'recent')
+    const newer = screen.getByRole('button', { name: 'Conversation 2' })
+    const older = screen.getByRole('button', { name: 'Conversation 1' })
+    expect(newer.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('chat-aug3')).toBeTruthy()
+    expect(screen.getByText('chat-jul11')).toBeTruthy()
+    expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
   })
 
   it('switches the focused Workspace without expanding the whole tree', () => {
@@ -189,7 +229,7 @@ describe('ChatWorkspaceSection actions', () => {
 
     const newChat = screen.getByRole('button', { name: 'New chat' })
     const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
-    const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
+    const workspaceHeading = screen.getByText('Workspaces', { selector: 'span.uppercase' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
     const newSession = screen.getByRole('button', { name: 'New conversation in chat-jul11' })
     const moreWorkspaceActions = screen.getByRole('button', { name: 'More actions for chat-jul11' })
