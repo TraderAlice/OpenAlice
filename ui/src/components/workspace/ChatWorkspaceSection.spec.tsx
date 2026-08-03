@@ -111,22 +111,78 @@ function renderSection(
   workspaces: readonly Workspace[] = [chatWorkspace],
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
   onNavigate?: () => void,
+  displayMode: 'focused' | 'multi' = 'multi',
+  onRequestDisplayMode: (mode: 'focused' | 'multi') => void = () => undefined,
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
-      <ChatWorkspaceSection onNavigate={onNavigate} />
+      <ChatWorkspaceSection
+        onNavigate={onNavigate}
+        displayMode={displayMode}
+        onRequestDisplayMode={onRequestDisplayMode}
+      />
     </WorkspacesContext.Provider>,
   )
 }
 
 beforeEach(async () => {
   for (const mock of Object.values(actions)) mock.mockClear()
+  window.localStorage.clear()
   await i18n.changeLanguage('en')
 })
 
 afterEach(cleanup)
 
 describe('ChatWorkspaceSection actions', () => {
+  it('keeps one durable Workspace focused and starts new conversations inside it', () => {
+    const sessions = [chatSession(1), chatSession(2)]
+    const focusedWorkspace = { ...chatWorkspace, sessions }
+    const onNavigate = vi.fn()
+
+    renderSection([focusedWorkspace], null, onNavigate, 'focused')
+
+    expect(screen.getByText('Recent conversations')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Current Workspace: chat-jul11' })).toBeTruthy()
+    expect(screen.queryByText('Workspaces', { selector: 'span' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'chat-landing',
+      params: { targetWsId: chatWorkspace.id },
+    })
+    expect(onNavigate).toHaveBeenCalledOnce()
+  })
+
+  it('routes the focused Workspace menu into the multi-Workspace request boundary', () => {
+    const onRequestDisplayMode = vi.fn()
+    renderSection([chatWorkspace], null, undefined, 'focused', onRequestDisplayMode)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Current Workspace: chat-jul11' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show all Workspaces' }))
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
+  })
+
+  it('switches the focused Workspace without expanding the whole tree', () => {
+    const alternative = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+    }
+    renderSection([chatWorkspace, alternative], null, undefined, 'focused')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Current Workspace: chat-aug3' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Switch Workspace' }), {
+      target: { value: chatWorkspace.id },
+    })
+
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'chat-landing',
+      params: { targetWsId: chatWorkspace.id },
+    })
+  })
+
   it('keeps conversation creation primary and scopes workspace creation to the workspace list', () => {
     const onNavigate = vi.fn()
     renderSection([chatWorkspace], null, onNavigate)

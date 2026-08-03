@@ -75,7 +75,7 @@ function useIsDesktop(minWidth: number): boolean {
 interface PageSidebarLayoutProps {
   storageKey: string
   title: string
-  actions?: ReactNode
+  actions?: ReactNode | ((controls: PageSidebarControls) => ReactNode)
   sidebar: ReactNode | ((controls: PageSidebarControls) => ReactNode)
   children: ReactNode
   defaultWidth?: number
@@ -121,8 +121,10 @@ export function PageSidebarLayout({
   const width = Math.min(preferredWidth, maxWidth)
   const closeMobileDrawer = useCallback(() => setDrawerOpen(false), [])
   const openMobileDrawer = useCallback(() => setDrawerOpen(true), [])
+  const controls = { closeMobileDrawer }
+  const actionContent = typeof actions === 'function' ? actions(controls) : actions
   const sidebarContent = typeof sidebar === 'function'
-    ? sidebar({ closeMobileDrawer })
+    ? sidebar(controls)
     : sidebar
   const usesAppContextBar = useRegisterMobilePageNavigation({
     title,
@@ -266,7 +268,7 @@ export function PageSidebarLayout({
 
   const desktopActions = (
     <>
-      {actions}
+      {actionContent}
       <button
         type="button"
         onClick={() => updateCollapsed(true)}
@@ -401,7 +403,7 @@ export function PageSidebarLayout({
       >
         <Sidebar
           title={title}
-          actions={actions}
+          actions={actionContent}
           leading={
             <button
               type="button"
