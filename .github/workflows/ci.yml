@@ -72,7 +72,7 @@ jobs:
             }
             core.setOutput("cross_platform", String(runCrossPlatform));
 
-  build-and-test:
+  build:
     # A dev push is the already-tested result of merging a PR. It gets the
     # focused post-merge smoke below instead of repeating the whole PR suite.
     if: github.event_name != 'push' || github.ref == 'refs/heads/master'
@@ -94,7 +94,46 @@ jobs:
 
       - run: pnpm build
 
+  test:
+    # Build and Vitest do not consume each other's output. Keep them on
+    # separate runners so either failure becomes actionable immediately.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
       - run: pnpm test
+
+  # Preserve the established check name for branch protection and external
+  # consumers while the two independent validations report failures earlier.
+  build-and-test:
+    if: always() && (github.event_name != 'push' || github.ref == 'refs/heads/master')
+    needs: [build, test]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require successful build and test lanes
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          if [[ "$BUILD_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
+            echo "Build result: $BUILD_RESULT"
+            echo "Test result: $TEST_RESULT"
+            exit 1
+          fi
 
   # The full Vitest suite includes path, port-binding, process-launch, and
   # packaged-toolchain behavior whose semantics differ materially by host OS.

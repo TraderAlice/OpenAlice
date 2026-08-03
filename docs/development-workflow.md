@@ -194,11 +194,16 @@ CI provides both change-level confidence and post-merge integration feedback.
 Its execution stays the same, but its blocking authority depends on the
 delivery lane:
 
-- Every PR to `dev` or `master` runs the Ubuntu build and test gate.
+- Every PR to `dev` or `master` runs independent Ubuntu build and unit-test
+  lanes so either failure is visible without waiting for the other. The stable
+  `build-and-test` aggregate check requires both lanes to pass.
 - PRs whose complete diff is limited to `ui/`, `docs/`, or root documentation
   skip the macOS/Windows runtime matrix. Any other path keeps the full matrix.
 - Superseded runs for the same PR are cancelled. Only the latest-head result is
   actionable evidence.
+- Desktop Package Smoke runs its workflow-contract and root-typecheck preflight
+  before allocating the expensive host package matrix and Windows Broker Pack
+  lane. The native package lanes still start together after that fast gate.
 - In serial mode, a `dev` PR may merge after proportional local verification
   while its remote checks are pending. Before the next serial PR is published,
   inspect both that PR's checks and the resulting `dev` push run. A completed

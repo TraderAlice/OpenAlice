@@ -92,8 +92,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    name: fast preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify CI workflow contracts
+        run: >-
+          pnpm exec vitest run
+          scripts/ci-workflow.spec.ts
+          scripts/desktop-package-workflow.spec.ts
+          scripts/release-workflow.spec.ts
+
+      - name: Typecheck root workspace
+        run: npx tsc --noEmit
+        timeout-minutes: 5
+
   broker-packs-windows:
     name: broker-packs windows-latest
+    needs: preflight
     runs-on: windows-latest
     timeout-minutes: 25
 
@@ -122,6 +152,7 @@ jobs:
 
   package:
     name: package ${{ matrix.os }}
+    needs: preflight
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
