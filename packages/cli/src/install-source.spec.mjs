@@ -8,7 +8,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_INSTALL_SOURCE,
   installedContentIdentity,
+  installSourceUpdateChannel,
   installSourcesMatch,
+  parseInstallSource,
   readInstallSource,
 } from './install-source.mjs'
 
@@ -25,8 +27,10 @@ describe('OpenAlice install source', () => {
     await expect(readInstallSource({ metadataUrl: join(root, 'missing.json') }))
       .resolves.toEqual(DEFAULT_INSTALL_SOURCE)
     expect(DEFAULT_INSTALL_SOURCE).toMatchObject({
+      schemaVersion: 2,
       selector: { kind: 'branch', value: 'master' },
       installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'stable',
     })
   })
 
@@ -46,6 +50,40 @@ describe('OpenAlice install source', () => {
     }
     expect(installSourcesMatch(DEFAULT_INSTALL_SOURCE, { ...DEFAULT_INSTALL_SOURCE })).toBe(true)
     expect(installSourcesMatch(DEFAULT_INSTALL_SOURCE, dev)).toBe(false)
+  })
+
+  it('reads legacy metadata without changing its inferred channel', () => {
+    const legacyStable = {
+      schemaVersion: 1,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.88.0-beta',
+      selector: { kind: 'branch', value: 'master' },
+      installerUrl: 'https://openalice.ai/install',
+    }
+    const legacyPinned = {
+      ...legacyStable,
+      selector: { kind: 'version', value: 'v0.88.0-beta' },
+      installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/v0.88.0-beta/install',
+    }
+
+    expect(parseInstallSource(legacyStable)).toEqual(legacyStable)
+    expect(installSourceUpdateChannel(legacyStable)).toBe('stable')
+    expect(installSourceUpdateChannel(legacyPinned)).toBe('pinned')
+  })
+
+  it('keeps an immutable release ref distinct from its stable update policy', () => {
+    const stableRelease = {
+      schemaVersion: 2,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: '0.89.0-beta',
+      selector: { kind: 'version', value: 'v0.89.0-beta' },
+      installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/v0.89.0-beta/install',
+      updateChannel: 'stable',
+    }
+    const explicitPin = { ...stableRelease, updateChannel: 'pinned' }
+
+    expect(installSourceUpdateChannel(stableRelease)).toBe('stable')
+    expect(installSourcesMatch(stableRelease, explicitPin)).toBe(false)
   })
 
   it('derives installed content identity only from an immutable release directory', () => {

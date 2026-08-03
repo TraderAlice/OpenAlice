@@ -20,11 +20,12 @@ const [currentMajor = '0', currentMinor = '0'] = currentCliVersion.split('.')
 const newerCliVersion = `${currentMajor}.${Number(currentMinor) + 1}.0-beta`
 
 const stableSource = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   repository: 'TraderAlice/OpenAlice',
   cliVersion: currentCliVersion,
-  selector: { kind: 'branch', value: 'master' },
-  installerUrl: 'https://openalice.ai/install',
+  selector: { kind: 'version', value: `v${currentCliVersion}` },
+  installerUrl: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${currentCliVersion}/install`,
+  updateChannel: 'stable',
 }
 
 describe('OpenAlice CLI updates', () => {
@@ -66,20 +67,40 @@ describe('OpenAlice CLI updates', () => {
       installSource: {
         ...stableSource,
         selector: { kind: 'version', value: 'v0.87.0-beta' },
+        updateChannel: 'pinned',
       },
     })).resolves.toMatchObject({ status: 'unsupported', channel: 'pinned' })
     await expect(checkForUpdate({
       installSource: {
         ...stableSource,
         selector: { kind: 'branch', value: 'dev' },
+        updateChannel: 'development',
       },
     })).resolves.toMatchObject({ status: 'unsupported', channel: 'development' })
     await expect(checkForUpdate({
       installSource: {
         ...stableSource,
+        selector: { kind: 'branch', value: 'master' },
         installerUrl: 'https://mirror.example.test/install',
+        updateChannel: 'custom',
       },
     })).resolves.toMatchObject({ status: 'unsupported', channel: 'custom' })
+  })
+
+  it('continues to recognize legacy public-master metadata as stable', async () => {
+    await expect(checkForUpdate({
+      currentVersion: '0.87.0-beta',
+      installSource: {
+        schemaVersion: 1,
+        repository: 'TraderAlice/OpenAlice',
+        cliVersion: '0.87.0-beta',
+        selector: { kind: 'branch', value: 'master' },
+        installerUrl: 'https://openalice.ai/install',
+      },
+    }, {
+      fetchImpl: manifestFetch(newerCliVersion),
+      env: {},
+    })).resolves.toMatchObject({ status: 'available', channel: 'stable' })
   })
 
   it('uses the ordinary installer only after an explicit update command', async () => {

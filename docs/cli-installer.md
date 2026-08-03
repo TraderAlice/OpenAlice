@@ -290,8 +290,8 @@ Before a release becomes visible, the installer:
    managed Pi closure;
 5. verifies and expands the matching headless Runtime when the selected release
    supplies one, then requires its product version to equal the CLI version;
-6. writes `install-source.json` with the CLI version, selected branch/tag/commit,
-   and installer URL that produced this CLI;
+6. writes `install-source.json` with the CLI version, selected
+   branch/tag/commit, installer URL, and independent update-channel policy;
 7. hashes the ordered OpenAlice CLI payload, install-source metadata, and both
    Pi install files with SHA-256 and uses the first 16 hex characters as the
    cross-platform CLI install content identity.
@@ -356,8 +356,10 @@ An installed stable-channel CLI checks
 `https://download.openalice.ai/manifest.json` before an interactive
 `openalice start`:
 
-- only a recorded public `branch master` installation from
-  `https://openalice.ai/install` participates;
+- public release installers record two independent facts: the immutable
+  release tag used for the installed payload and `updateChannel: stable`;
+- legacy metadata from a public `branch master` installation at
+  `https://openalice.ai/install` remains compatible with the stable channel;
 - exact tag/commit installations remain pinned;
 - `dev` and other branch installations keep their selected development channel;
 - custom installer/mirror installations do not cross into the public trust
@@ -367,6 +369,13 @@ An installed stable-channel CLI checks
 - `--no-update-check` or `OPENALICE_NO_UPDATE_CHECK=1` disables the start check;
 - discovery only prints a notice. It never mutates files or makes startup
   depend on a successful network request.
+
+Release installers published before provenance v2 recorded their embedded tag
+in the same shape as a deliberate `--version` pin. The CLI cannot safely guess
+which intent produced that old metadata. An affected install therefore remains
+pinned until the public stable installer is run once again; that ordinary
+atomic reinstall preserves application state and writes the unambiguous v2
+stable-channel provenance.
 
 Explicit controls are:
 
@@ -520,9 +529,11 @@ Environment inputs:
 | `OPENALICE_PI_SOURCE_DIR` | Read the exact Pi manifest/lock assets from a local fixture |
 | `OPENALICE_NPM_BIN` | Use a single alternate npm executable in installer tests |
 | `OPENALICE_INSTALL_CONTEXT` | Internal managed-remote context; returns control without local checkout/start guidance |
+| `OPENALICE_INSTALL_UPDATE_CHANNEL` | Internal exact-provenance reproduction seam used by managed SSH installs |
 | `OPENALICE_EXPECTED_CLI_VERSION` | Internal verified-update guard; rejects a payload whose CLI/product version differs from the release manifest |
 | `OPENALICE_RUNTIME_RELEASE_BASE_URL` | Release/test override for Runtime metadata and archive downloads |
 | `OPENALICE_INSTALLER_RELEASE_VERSION` | Embedded by the release workflow; binds the installer to one OpenAlice tag and Runtime set |
+| `OPENALICE_INSTALLER_UPDATE_CHANNEL` | Embedded as `stable` by the release workflow; keeps the exact tag independently updateable through the public release channel |
 | `OPENALICE_RUNTIME_ARCHIVE`, `OPENALICE_RUNTIME_ARCHIVE_SHA256` | Local/CI equivalents of the development Runtime archive flags |
 | `NO_COLOR` | Disable installer color output |
 | `HOME`, `SHELL`, `PATH`, `TERM` | Standard environment used for paths, profile detection, conflicts, and color |

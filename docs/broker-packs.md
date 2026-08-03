@@ -152,10 +152,12 @@ through `ComSpec` on Windows; the shared runner supplies the already-quoted
 command line verbatim so Node does not quote it a second time. Package scripts
 must not rely on POSIX quoting.
 
-The Desktop Package Smoke workflow builds every optional Broker Pack on its
-Windows runner before packaging. It also reruns the cached desktop build
-through the packaged-smoke wrapper, so both release-facing `pnpm.cmd` call
-sites fail during PR validation rather than after a release starts.
+After its fast contract/type preflight, the Desktop Package Smoke workflow runs
+a dedicated Windows Broker Pack job in parallel with desktop packaging. That
+job exercises the Pack deployment path, while the Windows desktop job reruns
+the cached desktop build through the packaged-smoke wrapper, so both
+release-facing `pnpm.cmd` call sites fail during PR validation rather than after
+a release starts.
 
 Desktop package acceptance rejects `ccxt`, `longbridge`, its native binding,
 and `@alpacahq/alpaca-trade-api` if they reappear under packaged

@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { createServer } from 'node:http'
 import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -34,6 +35,7 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
 
     expect(installer).toContain('DEFAULT_BRANCH="master"')
     expect(installer).toContain('PUBLIC_INSTALLER_URL="https://openalice.ai/install"')
+    expect(installer).toContain('OPENALICE_INSTALLER_UPDATE_CHANNEL="${OPENALICE_INSTALLER_UPDATE_CHANNEL:-}"')
     expect(installer).toContain('MINIMUM_NODE_VERSION="22.19.0"')
     expect(installer).toContain('PI_VERSION="0.83.0"')
     expect(desktopVendor).toContain("const PI_VERSION = '0.83.0'")
@@ -103,8 +105,10 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
 
     const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
     expect(JSON.parse(versionInfo.stdout).installSource).toMatchObject({
+      schemaVersion: 2,
       selector: { kind: 'branch', value: 'master' },
       installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'stable',
     })
   })
 
@@ -150,11 +154,12 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
       version: productVersion,
       contentIdentity: releases[0].slice(-16),
       installSource: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         repository: 'TraderAlice/OpenAlice',
         cliVersion: productVersion,
         selector: { kind: 'version', value: 'test/ref' },
         installerUrl: 'https://raw.githubusercontent.com/TraderAlice/OpenAlice/test/ref/install',
+        updateChannel: 'pinned',
       },
       managedRuntime: null,
     })
@@ -163,6 +168,88 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI installer', { timeo
     expect(pi.stdout.trim()).toBe('0.83.0')
     const launcher = await readFile(join(installRoot, 'bin', 'openalice'), 'utf8')
     expect(launcher).toContain('OPENALICE_MANAGED_PI_PATH=')
+  })
+
+  it('recovers a legacy pinned release install onto stable without losing its exact ref', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'openalice-install-stable-ref-'))
+    temporaryPaths.push(home)
+    const installRoot = join(home, '.openalice')
+    const installerArgs = [
+      '--source', repositoryRoot,
+      '--version', `v${productVersion}`,
+      '--install-dir', installRoot,
+      '--no-modify-path',
+      '--yes',
+    ]
+
+    await execFileAsync('bash', [join(repositoryRoot, 'install'), ...installerArgs], {
+      env: {
+        ...installerEnv(home),
+        OPENALICE_INSTALL_CONTEXT: 'remote',
+      },
+    })
+    const [legacyRelease] = await readdir(join(installRoot, 'cli-versions'))
+    await writeFile(join(installRoot, 'cli-versions', legacyRelease, 'install-source.json'), `${JSON.stringify({
+      schemaVersion: 1,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: productVersion,
+      selector: { kind: 'version', value: `v${productVersion}` },
+      installerUrl: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${productVersion}/install`,
+    }, null, 2)}\n`)
+    const pinnedCheck = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['update', '--check', '--json'])
+    expect(JSON.parse(pinnedCheck.stdout)).toMatchObject({ status: 'unsupported', channel: 'pinned' })
+
+    await execFileAsync('bash', [join(repositoryRoot, 'install'), ...installerArgs], {
+      env: {
+        ...installerEnv(home),
+        OPENALICE_INSTALL_CONTEXT: 'remote',
+        OPENALICE_INSTALL_UPDATE_CHANNEL: 'stable',
+      },
+    })
+
+    const versionInfo = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['version', '--json'])
+    expect(JSON.parse(versionInfo.stdout).installSource).toEqual({
+      schemaVersion: 2,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: productVersion,
+      selector: { kind: 'version', value: `v${productVersion}` },
+      installerUrl: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${productVersion}/install`,
+      updateChannel: 'stable',
+    })
+
+    const server = createServer((_request, response) => {
+      response.setHeader('content-type', 'application/json')
+      response.end(JSON.stringify({
+        version: productVersion,
+        releaseNotesUrl: `https://github.com/TraderAlice/OpenAlice/releases/tag/v${productVersion}`,
+        installer: {
+          url: 'https://download.openalice.ai/install',
+          versionedUrl: `https://download.openalice.ai/OpenAlice-${productVersion}-install`,
+          sha256: '0'.repeat(64),
+        },
+      }))
+    })
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const stableCheck = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['update', '--check', '--json'], {
+        env: {
+          ...process.env,
+          OPENALICE_UPDATE_MANIFEST_URL: `http://127.0.0.1:${address.port}/manifest.json`,
+        },
+      })
+      expect(JSON.parse(stableCheck.stdout)).toMatchObject({
+        status: 'current',
+        currentVersion: productVersion,
+        latestVersion: productVersion,
+        channel: 'stable',
+      })
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
   })
 
   it('can show the complete plan without creating the install root', async () => {

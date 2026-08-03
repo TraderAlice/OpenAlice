@@ -325,6 +325,54 @@ describe('ChatLandingPage keyboard submission', () => {
       'chat',
     ))
   })
+
+  it('shows the runtime provider error and does not create a chat session', async () => {
+    mocks.getAgentRuntimeReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          displayName: 'Pi',
+          installed: true,
+          binPath: '/tmp/pi',
+          status: 'unknown',
+          ready: false,
+          source: 'unknown',
+          checkedAt: null,
+          durationMs: null,
+        },
+      },
+      overallReady: false,
+      checkedAt: null,
+    })
+    mocks.probeAgentRuntimeReadiness.mockResolvedValue({
+      agents: {
+        pi: {
+          agent: 'pi',
+          displayName: 'Pi',
+          installed: true,
+          binPath: '/tmp/pi',
+          status: 'failed',
+          ready: false,
+          source: 'launcher-vault',
+          checkedAt: '2026-08-02T00:00:00.000Z',
+          durationMs: 10,
+          repairTarget: 'retry',
+          message: 'The runtime reported an error: 429: balance exhausted',
+        },
+      },
+      overallReady: false,
+      checkedAt: '2026-08-02T00:00:00.000Z',
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    await screen.findByLabelText('Model gemini-3.1-flash-lite')
+    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(await screen.findByText('The runtime reported an error: 429: balance exhausted')).toBeTruthy()
+    expect(mocks.quickChat).not.toHaveBeenCalled()
+  })
 })
 
 describe('ChatLandingPage AI source disclosure', () => {

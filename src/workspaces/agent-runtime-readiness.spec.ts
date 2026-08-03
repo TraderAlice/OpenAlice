@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyRuntimeReadinessFailure,
+  failedRuntimeReadinessRow,
   runtimeProbeSucceeded,
   snapshotRuntimeReadiness,
   type AgentRuntimeReadinessRow,
@@ -76,6 +77,36 @@ describe('agent runtime readiness helpers', () => {
       exitCode: 0,
       stdoutTail: '{"type":"future_event","message":"started"}',
     }))).toBe('output_unrecognized');
+  });
+
+  it('preserves an in-band provider error instead of calling it unrecognized output', () => {
+    const providerError = result({
+      exitCode: 0,
+      stdoutTail: '{"type":"message_end","message":{"stopReason":"error"}}',
+      structured: {
+        schemaVersion: 1,
+        assistantText: null,
+        blocks: [{
+          type: 'error',
+          message: '429: 余额不足或无可用资源包，请充值。',
+        }],
+        metrics: { textBlocks: 0, toolCalls: 0, toolFailures: 0 },
+        truncated: false,
+      },
+    });
+
+    expect(classifyRuntimeReadinessFailure(providerError)).toBe('failed');
+    expect(failedRuntimeReadinessRow({
+      adapter: piAdapter,
+      availability: { installed: true, path: '/usr/bin/pi' },
+      result: providerError,
+      source: 'launcher-vault',
+    })).toMatchObject({
+      status: 'failed',
+      ready: false,
+      repairTarget: 'retry',
+      message: 'The runtime reported an error: 429: 余额不足或无可用资源包，请充值。',
+    });
   });
 
   it('GET snapshot uses cached rows without inventing readiness', () => {
