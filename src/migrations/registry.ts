@@ -43,6 +43,7 @@ import { migration as migration_0028_auto_quant_default_workspace } from './0028
 import { migration as migration_0029_session_native_titles } from './0029_session_native_titles/index.js'
 import { migration as migration_0030_retire_workspace_agent_pins } from './0030_retire_workspace_agent_pins/index.js'
 import { migration as migration_0031_pi_local_workspace_provider } from './0031_pi_local_workspace_provider/index.js'
+import { migration as migration_0032_session_runtime_bindings } from './0032_session_runtime_bindings/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -69,4 +70,5 @@ export const REGISTRY: Migration[] = [
   migration_0029_session_native_titles,
   migration_0030_retire_workspace_agent_pins,
   migration_0031_pi_local_workspace_provider,
+  migration_0032_session_runtime_bindings,
 ]

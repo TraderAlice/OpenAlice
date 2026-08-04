@@ -938,6 +938,9 @@ export const workspacesHandlers = [
       agent?: unknown
       targetWsId?: unknown
       template?: unknown
+      credentialSlug?: unknown
+      model?: unknown
+      reasoningEffort?: unknown
     } | null
     const explicit = typeof body?.targetWsId === 'string'
       ? demoWorkspaces.find((workspace) => workspace.id === body.targetWsId)

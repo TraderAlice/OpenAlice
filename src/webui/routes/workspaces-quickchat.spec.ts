@@ -63,24 +63,19 @@ function build(opts: {
     createdAt: '2026-07-01T00:00:00.000Z',
   };
   const opencode = {
-    id: 'opencode',
-    namePrefix: 'o',
-    capabilities: builtinAdapters.get('opencode')!.capabilities,
+    ...builtinAdapters.get('opencode')!,
+    lifecycle: undefined,
     writeAiConfig: vi.fn(async () => {}),
     readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
   const claude = {
-    id: 'claude',
-    namePrefix: 'c',
-    capabilities: builtinAdapters.get('claude')!.capabilities,
+    ...builtinAdapters.get('claude')!,
+    lifecycle: undefined,
     readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
     readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
   };
   const shell = {
-    id: 'shell',
-    kind: 'utility',
-    namePrefix: 'sh',
-    capabilities: builtinAdapters.get('shell')!.capabilities,
+    ...builtinAdapters.get('shell')!,
   };
   const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn((_wsId: string, ctx: any) => ({
@@ -540,11 +535,15 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
       'openai-1': openaiKey,
       'openai-2': { ...openaiKey, apiKey: 'sk-second', lastModel: 'gpt-5.5-mini' },
     });
-    const { app, opencode } = build();
+    const { app, opencode, spawn } = build();
     await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
-    const cred = (opencode.writeAiConfig.mock.calls[0] as any[])[1];
-    expect(cred.apiKey).toBe('sk-second');
-    expect(cred.model).toBe('gpt-5.5-mini'); // remembered lastModel wins over flagship
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    const runtime = (spawn.mock.calls[0] as any[])[1].sessionRuntime;
+    expect(runtime.binding).toMatchObject({
+      credential: { source: 'vault', credentialSlug: 'openai-2' },
+      model: 'gpt-5.5-mini',
+    });
+    expect(runtime.ai.apiKey).toBe('sk-second');
   });
 
   it('explicit credential pick overrides a globally-ready opencode config', async () => {
@@ -560,10 +559,13 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     });
 
     expect(r.status).toBe(201);
-    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
-    expect((opencode.writeAiConfig.mock.calls[0] as any[])[1]).toMatchObject({
-      apiKey: 'sk-second',
-      model: 'gpt-5.5-mini',
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toMatchObject({
+      binding: {
+        credential: { source: 'vault', credentialSlug: 'openai-2' },
+        model: 'gpt-5.5-mini',
+      },
+      ai: { apiKey: 'sk-second' },
     });
     expect(spawn).toHaveBeenCalledOnce();
   });

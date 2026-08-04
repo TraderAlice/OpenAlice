@@ -32,6 +32,7 @@ export const BASE_REQUIRED_FILES = [
   'src/workspaces/cli/bin/traderhub.cmd',
   'src/workspaces/cli/bin/alice-uta',
   'src/workspaces/cli/bin/alice-uta.cmd',
+  'src/workspaces/cli/bin/pi-session-provider.ts',
   'src/workspaces/templates/_common.mjs',
   'src/workspaces/templates/chat/bootstrap.mjs',
   'node_modules/dugite/package.json',

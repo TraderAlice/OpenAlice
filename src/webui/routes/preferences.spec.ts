@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createPreferencesRoutes } from './preferences.js'
-import { AdapterRegistry, type CliAdapter } from '../../workspaces/cli-adapter.js'
+import { AdapterRegistry, emptyAgentSessionRuntime, type CliAdapter } from '../../workspaces/cli-adapter.js'
 
 const unusedShellStatus = vi.fn(async () => ({ supported: false as const }))
 const unusedShellSave = vi.fn(async () => ({ supported: false as const }))
@@ -59,6 +59,7 @@ describe('preferences routes', () => {
     const futureAdapter: CliAdapter = {
       id: 'future',
       displayName: 'Future Runtime',
+      sessionRuntime: emptyAgentSessionRuntime,
       capabilities: {
         parallelPerCwd: true,
         resumeLast: false,

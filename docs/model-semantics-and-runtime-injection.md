@@ -99,11 +99,14 @@ resolved value:
 - Claude Code: project `effortLevel` (only values Claude can persist);
 - Codex: project `model_reasoning_effort`.
 
-### Persistent defaults and one-run overrides
+### Workspace defaults and durable Session bindings
 
-Workspace defaults and headless run selection are different configuration
-layers. A Workspace-local file expresses the durable preference; an explicit
-CLI argument selects one Issue run and wins without rewriting that file:
+A Workspace-local file is a default for creating a product Session. A fresh
+Session resolves that default together with any explicit credential, model, or
+effort choice into one immutable, secret-free `SessionRuntimeBinding` owned by
+its `resumeId`. The binding is then projected on every launch of that Session:
+interactive TUI, structured Web surface, headless Issue turn, and exact resume.
+It is not a headless-only override.
 
 Fresh Session runtime selection follows the same ownership rule. The optional
 `.alice/workspace.json` `defaultAgent` is the durable default for one Workspace.
@@ -112,27 +115,29 @@ Quick Chat, sidebar, CLI, or API runtime choice wins for that one Session withou
 rewriting either default. If neither default resolves to a registered agent
 runtime, Alice falls back to the first registered runtime.
 
-| Runtime | Workspace-local preference | One-run headless override |
+| Runtime | Workspace-local preference | Per-process Session projection |
 |---|---|---|
 | Claude Code | `.claude/settings.local.json`: `model`, `effortLevel` | `--model`, `--effort` |
 | Codex | `.codex/config.toml`: `model`, `model_reasoning_effort` | `--model`, `-c model_reasoning_effort=...` |
 | opencode | `opencode.json` provider/model binding | `--model`, `--variant` |
 | Pi | project settings plus registered provider | `--model`, `--thinking` |
 
-An Issue may request only agent/model/effort. Endpoint, provider, key, auth, and
-wire shape always come from the selected Workspace/native login. Dispatch
-records the requested model/effort for provenance and translates them into CLI
-arguments; it never mutates persistent configuration.
+An Issue's agent/model/effort fields seed a new Session binding when its owner
+is `@new` or `workspace`. Once an exact `@resumeId` exists, those fields cannot
+replace its credential source, model, or effort. Follow-up turns replay the
+stored binding instead of consulting newly changed Workspace defaults.
 
-OpenAlice-managed opencode models register effort-named variants in the
-Workspace config up front, so `--variant` remains a genuine one-run selection.
-Dispatch rejects a custom-provider model or effort that is not registered
-instead of silently falling back or rewriting the provider during a run.
+The persisted credential component records only an ownership reference:
+native runtime state, an OpenAlice-vault slug plus wire shape, or a fingerprint
+of an explicitly configured Workspace provider. Vault secrets are resolved
+just in time and enter only the child environment. Workspace fingerprints make
+replacement visible instead of silently resuming through a different key.
 
-Exact Session ownership is intentionally stricter. An `@resumeId` already owns
-its runtime conversation, so an Issue cannot attach agent, model, or effort
-overrides to it. This avoids silently changing a resumed conversation's saved
-model semantics.
+Every Agent adapter must implement `sessionRuntime.project(...)`. Registration
+rejects an Agent adapter without that contract; utility adapters such as Shell
+explicitly opt out. The adapter maps the same resolved binding to its native
+arguments and environment for every supported surface. Adapter argv must never
+contain credential material.
 
 Codex project configuration must not be confused with `CODEX_HOME`; the latter
 owns global auth, sessions, skills, and user configuration. Provider definitions
@@ -261,9 +266,9 @@ Manager, Session spawn, and Session resume proceed through the selected native
 runtime without waiting for a probe. Onboarding, explicit Retry, and background
 health surfaces may probe and cache the result without becoming a launch gate.
 
-Choosing an OpenAlice credential is an explicit override. Only that choice, a
-saved new-Workspace default, or an existing OpenAlice-owned Workspace binding
-may project a key/provider into native project files. An absent choice means
+Choosing an OpenAlice credential is an explicit override. A fresh Session may
+bind that vault reference without writing it into the Workspace or changing the
+runtime's global state. An absent choice means
 “use the runtime default”; it does not mean “pick any compatible credential.”
 Existing Workspace bindings remain authoritative until the user resets or
 replaces them, and OpenAlice never imports a runtime-global secret into its
@@ -316,13 +321,15 @@ contain credentials.
 - `src/ai-providers/model-semantics.ts` — exact semantic resolution and runtime-neutral binding inputs.
 - `src/ai-providers/presets.ts` — backend-to-UI preset serialization.
 - `src/core/config.ts` — credential access and creation-time Workspace defaults.
-- `src/workspaces/cli-adapter.ts` — adapter capability and provider-projection contract.
+- `src/workspaces/cli-adapter.ts` — mandatory Agent Session projection contract and persisted binding shape.
+- `src/workspaces/session-runtime-binding.ts` — fresh binding creation and just-in-time resume resolution.
 - `src/workspaces/credential-injection.ts` — credential + selection + semantics composition.
 - `src/workspaces/adapters/index.ts` — built-in adapter registration.
 - `src/workspaces/adapters/` — declared runtime compatibility, native projection, and round-trip parsing.
 - `src/workspaces/adapters/owned-toml-config.ts` — reversible Codex project-scalar ownership.
-- `src/workspaces/schedule/scanner.ts` — Issue selection to one-run override dispatch.
-- `src/workspaces/headless-task-registry.ts` — durable requested model/effort provenance.
+- `src/workspaces/resume-registry.ts` — durable product Session identity and immutable runtime binding.
+- `src/workspaces/schedule/scanner.ts` — Issue selection to fresh Session creation.
+- `src/workspaces/headless-task-registry.ts` — per-turn execution provenance.
 - `ui/src/components/credentials/` — credential/account setup.
 - `ui/src/components/workspace/WorkspaceAIConfigModal.tsx` — per-Workspace selection and unknown-model overrides.
 

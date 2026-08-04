@@ -32,10 +32,16 @@ import {
   prepareAgentRuntimeWorkspace,
   type AdapterRegistry,
   type CliAdapter,
-  type HeadlessRunOverrides,
+  type AgentSessionRuntimeProjection,
+  type ResolvedSessionRuntimeBinding,
 } from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
 import { ensureAgentCredentialReady } from './agent-credential-readiness.js';
+import {
+  createSessionRuntimeBinding,
+  resolveSessionRuntimeBinding,
+  type SessionRuntimeSelection,
+} from './session-runtime-binding.js';
 import { logger as launcherLogger } from './logger.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
 import { headlessTaskStatus, runHeadlessTask, type HeadlessTaskResult } from './headless-task.js';
@@ -474,8 +480,8 @@ export interface WorkspaceService {
     resumeId?: string,
     /** Optional Inbox/Issue reverse link for a user-initiated inquiry. */
     inquiry?: HeadlessTaskInquiry,
-    /** Explicit one-run model/effort; authentication remains Workspace-owned. */
-    overrides?: HeadlessRunOverrides,
+    /** Fresh-Session runtime selection. Ignored on exact resume, which replays its binding. */
+    selection?: SessionRuntimeSelection,
     /** Cross-Agent message metadata for the independent conversation log. */
     conversation?: AgentConversationDispatch,
   ): Promise<{ taskId: string; resumeId: string }>;
@@ -868,6 +874,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // adapter.composeEnv() lets an MCP-config adapter (opencode) read it and emit
     // the matching out-of-band header.
     extraEnv?: Record<string, string>,
+    sessionRuntime?: ResolvedSessionRuntimeBinding,
   ): {
     command: readonly string[];
     resolvedCommand: readonly string[];
@@ -876,6 +883,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     env: Record<string, string>;
     environment: readonly SpawnEnvironmentDisclosure[];
     transcriptDir: string | null;
+    sessionRuntimeProjection?: AgentSessionRuntimeProjection;
   } => {
     const baseEnv = buildSpawnEnv(process.env, {
       AQ_WS_ID: ws.id,
@@ -909,17 +917,28 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       // to the spawned process's env (the `alice` shim reads it).
       ...(extraEnv ?? {}),
     }, ws.dir);
+    const projection = sessionRuntime
+      ? adapter.sessionRuntime?.project({ cwd: ws.dir, env: baseEnv }, sessionRuntime)
+      : undefined;
+    if (sessionRuntime && !projection) {
+      throw new Error(`agent adapter "${adapter.id}" has no Session runtime projection`);
+    }
     const baseCtx = {
       ...(resume !== undefined ? { resume } : {}),
       cwd: ws.dir,
       env: baseEnv,
+      ...(projection ? { sessionRuntime: projection } : {}),
     };
     // Adapter-contributed env (e.g. codex sets CODEX_HOME=<cwd>/.codex so
     // the CLI reads workspace-local config). Merged AFTER baseEnv so the
     // adapter wins on key collisions. (Independent of the seed below — every
     // adapter's composeEnv ignores initialPrompt.)
-    const adapterEnv = adapter.composeEnv?.(baseCtx) ?? {};
+    const adapterEnv = {
+      ...(adapter.composeEnv?.(baseCtx) ?? {}),
+      ...(projection?.env ?? {}),
+    };
     const env = { ...baseEnv, ...adapterEnv };
+    const commandCtx = { ...baseCtx, env };
 
     // Quick-chat seed — the caller (the pool factory) passes `initialPrompt` ONLY
     // on a genuinely fresh spawn, so we don't re-gate on `resume` (pi rewrites a
@@ -935,7 +954,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const compose = (withSeed: boolean): readonly string[] =>
       adapter.composeCommand(
         config.command,
-        withSeed && initialPrompt ? { ...baseCtx, initialPrompt } : baseCtx,
+        withSeed && initialPrompt ? { ...commandCtx, initialPrompt } : commandCtx,
       );
     let command = compose(true);
     if (initialPrompt && resolveLaunchCommand(command, { env, cwd: ws.dir }).viaShell) {
@@ -952,6 +971,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       env,
       environment: launchEnvironmentDisclosure(env, adapterEnv),
       transcriptDir,
+      ...(projection ? { sessionRuntimeProjection: projection } : {}),
     };
   };
 
@@ -1300,7 +1320,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       resumeId?: string;
       resume?: SessionFactoryContext['resume'];
       onSessionId?: (id: string) => void;
-      overrides?: HeadlessRunOverrides;
+      selection?: SessionRuntimeSelection;
+      sessionRuntime?: ResolvedSessionRuntimeBinding;
     } = {},
   ): Promise<HeadlessTaskResult> => {
     const operationLease = workspaceOperationGuard.acquire(ws.id, 'headless-run');
@@ -1318,11 +1339,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
         throw new Error(`adapter "${adapter.id}" has no headless mode`);
       }
-      await ensureAgentCredentialReady({
-        meta: ws,
-        agentId: adapter.id,
+      const sessionRuntime = opts.sessionRuntime ?? await createSessionRuntimeBinding({
         adapter,
-        logger: launcherLogger,
+        cwd: ws.dir,
+        selection: opts.selection,
       });
       await prepareAgentRuntimeWorkspace(adapter, {
         wsId: ws.id,
@@ -1338,7 +1358,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       // run server-side (via the `alice` shim header / opencode's MCP header) —
       // headless-only, agent never sees it. The taskId is the registry key the
       // route resolves issueId/agent from.
-      const { cwd, env } = composeSpawnInputs(
+      const { cwd, env, sessionRuntimeProjection } = composeSpawnInputs(
         ws,
         adapter,
         opts.resume,
@@ -1350,12 +1370,17 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             OPENALICE_SIGNATURE: `@${opts.resumeId}`,
           } : {}),
         } : undefined,
+        sessionRuntime,
       );
       const command = adapter.composeHeadlessCommand(
         config.command,
-        { cwd, env, ...(opts.resume !== undefined ? { resume: opts.resume } : {}) },
+        {
+          cwd,
+          env,
+          ...(sessionRuntimeProjection ? { sessionRuntime: sessionRuntimeProjection } : {}),
+          ...(opts.resume !== undefined ? { resume: opts.resume } : {}),
+        },
         prompt,
-        opts.overrides,
       );
       const logPaths = opts.taskId ? headlessLogPaths(headlessLogsDir, opts.taskId) : null;
       const activityLease = headlessActivity.begin({
@@ -1423,7 +1448,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     trigger?: HeadlessTaskTrigger,
     resumeId?: string,
     inquiry?: HeadlessTaskInquiry,
-    overrides?: HeadlessRunOverrides,
+    selection?: SessionRuntimeSelection,
     conversation?: AgentConversationDispatch,
   ): Promise<{ taskId: string; resumeId: string }> => {
     if (catalog.get(ws.id)?.lifecycle !== 'active') {
@@ -1432,17 +1457,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
       throw new Error(`adapter "${adapter.id}" has no headless mode`);
     }
-    await ensureAgentCredentialReady({
-      meta: ws,
-      agentId: adapter.id,
-      adapter,
-      logger: launcherLogger,
-    });
     if (headlessTasks.runningCount() >= MAX_CONCURRENT_HEADLESS) {
       throw new HeadlessCapacityError(MAX_CONCURRENT_HEADLESS);
     }
     let nativeResume: SessionFactoryContext['resume'];
     let parentTaskId: string | undefined;
+    let sessionRuntime: ResolvedSessionRuntimeBinding;
     if (resumeId) {
       const identity = resumeRegistry.get(resumeId);
       if (!identity) throw new HeadlessResumeError('not_found', 'resume conversation not found');
@@ -1470,6 +1490,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       }
       nativeResume = { sessionId: identity.agentSessionId };
       parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
+      if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
+        throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted model and effort');
+      }
+      sessionRuntime = identity.runtimeBinding
+        ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
+        : await createSessionRuntimeBinding({ adapter, cwd: ws.dir });
+    } else {
+      sessionRuntime = await createSessionRuntimeBinding({
+        adapter,
+        cwd: ws.dir,
+        selection,
+      });
     }
     let rec: HeadlessTaskRecord;
     try {
@@ -1479,6 +1511,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         ...(resumeId ? { resumeId } : {}),
         wsId: ws.id,
         agent: adapter.id,
+        runtimeBinding: sessionRuntime.binding,
       });
       if (catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new Error(`workspace stopped accepting work during dispatch: ${ws.id}`);
@@ -1486,8 +1519,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       rec = await headlessTasks.create({
         wsId: ws.id,
         agent: adapter.id,
-        ...(overrides?.model ? { model: overrides.model } : {}),
-        ...(overrides?.reasoningEffort ? { effort: overrides.reasoningEffort } : {}),
+        ...(sessionRuntime.binding.model ? { model: sessionRuntime.binding.model } : {}),
+        ...(sessionRuntime.binding.reasoningEffort ? { effort: sessionRuntime.binding.reasoningEffort } : {}),
         prompt,
         startedAt: Date.now(),
         resumeId: identity.resumeId,
@@ -1525,7 +1558,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       taskId: rec.taskId,
       resumeId: rec.resumeId,
       ...(nativeResume ? { resume: nativeResume } : {}),
-      ...(overrides ? { overrides } : {}),
+      sessionRuntime,
       onSessionId: (id) => {
         void Promise.all([
           headlessTasks.setAgentSessionId(rec.taskId, id),
@@ -2069,6 +2102,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             OPENALICE_SIGNATURE: `@${productSession.resumeId}`,
           } : {}),
         },
+        ctx.sessionRuntime,
       );
 
       // path.trace — single line capturing every path the spawn touches. The
@@ -2153,15 +2187,32 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ?? record.resumeHint?.value;
     if (!nativeSessionId) throw new Error('Pi Session has no resumable native session id');
     const resume = { sessionId: nativeSessionId } as const;
-    const { cwd, env } = composeSpawnInputs(meta, adapter, resume, undefined, {
+    const identity = resumeRegistry.get(record.resumeId);
+    const sessionRuntime = identity?.runtimeBinding
+      ? await resolveSessionRuntimeBinding({
+          adapter,
+          cwd: meta.dir,
+          binding: identity.runtimeBinding,
+        })
+      : await createSessionRuntimeBinding({ adapter, cwd: meta.dir });
+    if (!identity?.runtimeBinding) {
+      await resumeRegistry.ensure({
+        resumeId: record.resumeId,
+        wsId: record.wsId,
+        agent: record.agent,
+        runtimeBinding: sessionRuntime.binding,
+      });
+    }
+    const { cwd, env, sessionRuntimeProjection } = composeSpawnInputs(meta, adapter, resume, undefined, {
       AQ_SESSION_ID: record.id,
       OPENALICE_RESUME_ID: record.resumeId,
       OPENALICE_SIGNATURE: `@${record.resumeId}`,
-    });
+    }, sessionRuntime);
     const command = adapter.composeWebCommand(config.command, {
       cwd,
       env,
       resume,
+      ...(sessionRuntimeProjection ? { sessionRuntime: sessionRuntimeProjection } : {}),
       ...(opts.appendSystemPrompt ? { appendSystemPrompt: opts.appendSystemPrompt } : {}),
       ...(opts.skills ? { skills: opts.skills } : {}),
       ...(opts.approveProject ? { approveProject: true } : {}),

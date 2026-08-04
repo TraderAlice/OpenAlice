@@ -26,7 +26,8 @@
  */
 
 import { computeNextRun, type Schedule } from '../../core/schedule-expr.js'
-import type { CliAdapter, HeadlessRunOverrides } from '../cli-adapter.js'
+import type { CliAdapter } from '../cli-adapter.js'
+import type { SessionRuntimeSelection } from '../session-runtime-binding.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskTrigger } from '../headless-task-registry.js'
@@ -93,8 +94,8 @@ export interface ScheduleScannerDeps {
     resumeId?: string,
     /** Optional reverse-link metadata; scheduler leaves this absent. */
     inquiry?: undefined,
-    /** One-run model/effort selection inherited from Issue frontmatter. */
-    overrides?: HeadlessRunOverrides,
+    /** Fresh-Session model/effort selection inherited from Issue frontmatter. */
+    selection?: SessionRuntimeSelection,
   ) => Promise<{ taskId: string; resumeId: string }>
   /** Persist @new -> exact @resumeId after the first fresh dispatch. */
   claimFreshSession?: (input: {
@@ -294,7 +295,7 @@ export class ScheduleScanner {
     taskId: string,
     what: string,
     agentId: string | undefined,
-    overrides: HeadlessRunOverrides | undefined,
+    selection: SessionRuntimeSelection | undefined,
     resumeId: string | undefined,
     claimFreshSession: boolean,
     nowMs: number,
@@ -305,7 +306,7 @@ export class ScheduleScanner {
         taskId,
         what,
         agentId,
-        overrides,
+        selection,
         resumeId,
         claimFreshSession,
       )
@@ -333,7 +334,7 @@ export class ScheduleScanner {
     issueId: string,
     what: string,
     agentId?: string,
-    overrides?: HeadlessRunOverrides,
+    selection?: SessionRuntimeSelection,
     resumeId?: string,
     claimFreshSession = false,
     manual = false,
@@ -366,7 +367,7 @@ export class ScheduleScanner {
         issueId,
       }
       const result = resumeId
-        ? overrides
+        ? selection
           ? await this.deps.dispatch(
               executionWorkspace,
               adapter,
@@ -375,7 +376,7 @@ export class ScheduleScanner {
               trigger,
               resumeId,
               undefined,
-              overrides,
+              selection,
             )
           : await this.deps.dispatch(
               executionWorkspace,
@@ -385,7 +386,7 @@ export class ScheduleScanner {
               trigger,
               resumeId,
             )
-        : overrides
+        : selection
           ? await this.deps.dispatch(
               executionWorkspace,
               adapter,
@@ -394,7 +395,7 @@ export class ScheduleScanner {
               trigger,
               undefined,
               undefined,
-              overrides,
+              selection,
             )
           : await this.deps.dispatch(
               executionWorkspace,
@@ -447,7 +448,7 @@ export class ScheduleScanner {
   }
 }
 
-function issueRunOverrides(issue: IssueRecord): HeadlessRunOverrides | undefined {
+function issueRunOverrides(issue: IssueRecord): SessionRuntimeSelection | undefined {
   if (!issue.model && !issue.effort) return undefined
   return {
     ...(issue.model ? { model: issue.model } : {}),

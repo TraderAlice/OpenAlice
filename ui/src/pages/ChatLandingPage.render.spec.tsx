@@ -323,6 +323,8 @@ describe('ChatLandingPage keyboard submission', () => {
       'google-1',
       'chat-1',
       'chat',
+      'gemini-3.1-flash-lite',
+      'minimal',
     ))
   })
 
@@ -398,6 +400,8 @@ describe('ChatLandingPage keyboard submission', () => {
       undefined,
       'chat-1',
       'chat',
+      undefined,
+      undefined,
     ))
     expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
     expect(screen.queryByText('The runtime reported an error: 429: balance exhausted')).toBeNull()

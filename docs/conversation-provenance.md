@@ -107,8 +107,12 @@ support activity feeds and auditing, but do not change the forward semantics.
 | PID/live PTY | Ephemeral process incarnation | No |
 
 `ResumeRegistry` must bind a `resumeId` immutably to one `workspaceId` and one
-runtime kind. It may learn or refresh the native locator, but it must never
-reassign the product Session to another Workspace or runtime.
+runtime kind. It also owns that Session's immutable, secret-free runtime
+binding: credential source reference, model, and effort. It may learn or
+refresh the native locator and re-resolve a referenced vault secret at launch,
+but it must never reassign the product Session to another Workspace/runtime or
+silently replace its launch selection. Native ids, API keys, and provider
+payloads remain backend-only.
 
 ## Standard Provenance Envelope
 
