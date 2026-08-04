@@ -23,6 +23,7 @@ export const shellAdapter: CliAdapter = {
     resumeById: false,
     transcriptDiscovery: 'none',
   },
+  sessionRuntime: null,
 
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     return composeShellCommand(ctx.env);

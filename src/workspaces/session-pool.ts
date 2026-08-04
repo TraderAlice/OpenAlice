@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
 
-import type { CliAdapter } from './cli-adapter.js';
+import type { CliAdapter, ResolvedSessionRuntimeBinding } from './cli-adapter.js';
 import type { Logger } from './logger.js';
 import {
   PersistentSession,
@@ -27,6 +27,8 @@ export interface SessionFactoryContext {
   readonly recordId: string;
   /** Sticky display name (`c1` / `x2` / `sh1`). */
   readonly recordName: string;
+  /** Just-in-time resolution of the durable product Session binding. */
+  readonly sessionRuntime?: ResolvedSessionRuntimeBinding;
   /** Shell-resume preamble: bytes prepended to the new PTY's ReplayBuffer. */
   readonly initialReplayBytes?: Buffer;
   /**

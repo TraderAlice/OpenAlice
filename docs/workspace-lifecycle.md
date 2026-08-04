@@ -64,7 +64,9 @@ active -> retired
 `SessionRecord` is only an interactive seat. Removing or pausing one does not
 retire the coworker. `resumeId` is the coworker identity; retirement is stored
 on `ResumeIdentityRecord` and retains the native runtime mapping, run history,
-Inbox links, and provenance. A retired Session is not schedulable or resumable.
+secret-free runtime binding, Inbox links, and provenance. Restore recalls the
+same binding; it does not re-resolve changed Workspace defaults as a new
+Session choice. A retired Session is not schedulable or resumable.
 It may carry `successorResumeId` for explicit handoff. OpenAlice never silently
 pretends a successor authored the predecessor's work.
 

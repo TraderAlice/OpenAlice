@@ -57,6 +57,8 @@ export interface WorkspacesContextValue {
     credentialSlug?: string,
     targetWsId?: string,
     template?: 'chat' | 'auto-quant-v2',
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
   ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>

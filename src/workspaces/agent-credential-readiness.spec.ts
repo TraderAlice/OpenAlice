@@ -5,7 +5,7 @@ import {
   setCredentialLastModel,
   type Credential,
 } from '@/core/config.js';
-import type { CliAdapter, WorkspaceAiCred } from './cli-adapter.js';
+import { emptyAgentSessionRuntime, type CliAdapter, type WorkspaceAiCred } from './cli-adapter.js';
 import {
   AgentCredentialError,
   ensureAgentCredentialReady,
@@ -45,6 +45,7 @@ function adapter(
   return {
     id,
     displayName: id,
+    sessionRuntime: emptyAgentSessionRuntime,
     capabilities: {
       parallelPerCwd: true,
       resumeLast: true,

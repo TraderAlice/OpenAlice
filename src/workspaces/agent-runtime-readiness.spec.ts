@@ -7,12 +7,13 @@ import {
   snapshotRuntimeReadiness,
   type AgentRuntimeReadinessRow,
 } from './agent-runtime-readiness.js';
-import type { CliAdapter } from './cli-adapter.js';
+import { emptyAgentSessionRuntime, type CliAdapter } from './cli-adapter.js';
 import type { HeadlessTaskResult } from './headless-task.js';
 
 const piAdapter: CliAdapter = {
   id: 'pi',
   displayName: 'Pi',
+  sessionRuntime: emptyAgentSessionRuntime,
   kind: 'agent',
   binary: 'pi',
   capabilities: {

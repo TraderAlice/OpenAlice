@@ -356,6 +356,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       credentialSlug?: string,
       targetWsId?: string,
       template?: 'chat' | 'auto-quant-v2',
+      model?: string | null,
+      reasoningEffort?: import('../api').ModelReasoningEffort,
     ): Promise<string> => {
       await ensureTerminalAppearancePublished()
       const { workspace, session } = await apiQuickChat(
@@ -364,6 +366,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         credentialSlug,
         targetWsId,
         template,
+        model,
+        reasoningEffort,
       )
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {

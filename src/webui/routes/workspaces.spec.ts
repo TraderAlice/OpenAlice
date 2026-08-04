@@ -13,6 +13,7 @@ import { HeadlessCapacityError, type WorkspaceService } from '../../workspaces/s
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import { readWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
+import { emptyAgentSessionRuntime } from '../../workspaces/cli-adapter.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -726,6 +727,7 @@ describe('POST /:id/headless/:taskId/session', () => {
       namePrefix: 'x',
       capabilities: { resumeById: true, resumeLast: true },
       lifecycle: { prepareWorkspace: vi.fn(async () => {}) },
+      sessionRuntime: emptyAgentSessionRuntime,
     };
     const task = opts.task ?? {
       taskId: 'run-1',
@@ -768,6 +770,7 @@ describe('POST /:id/headless/:taskId/session', () => {
         agent: task.agent ?? 'codex',
         agentSessionId: task.agentSessionId ?? '019eb75e-0b1b-7fa2',
         latestTaskId: task.taskId,
+        runtimeBinding: { version: 1, credential: { source: 'native' } },
       });
     }
     const svc = {
@@ -877,6 +880,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     const adapter = adapterOverride ?? {
       id: 'claude',
       capabilities: { resumeById: true, resumeLast: false },
+      sessionRuntime: emptyAgentSessionRuntime,
     };
     const record = {
       id: TOKEN,
@@ -889,7 +893,13 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     };
     const svc = {
       sessionRegistry: { get: () => record, update: vi.fn(async () => {}) },
-      resumeRegistry: { get: () => ({ agentSessionId: 'aid' }) },
+      resumeRegistry: {
+        get: () => ({
+          agentSessionId: 'aid',
+          runtimeBinding: { version: 1, credential: { source: 'native' } },
+        }),
+        ensure: vi.fn(async (input: any) => input),
+      },
       pool: { get: () => live, spawn, disposeToken: vi.fn() },
       registry: { get: () => resolverOnly ? undefined : ({ id: workspaceId, dir: '/w' }) },
       resolveRuntimeWorkspace: resolverOnly
@@ -943,6 +953,7 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
       },
       readAiConfig: vi.fn(async () => null),
       writeAiConfig: vi.fn(async () => {}),
+      sessionRuntime: emptyAgentSessionRuntime,
     };
     const { app, spawn } = buildResume('ws-1', false, opencode);
 
@@ -950,9 +961,14 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
 
     expect(result.status).toBe(200);
     expect(result.body.ok).toBe(true);
-    expect(opencode.readAiConfig).toHaveBeenCalledOnce();
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
+    expect(spawn).toHaveBeenCalledWith('ws-1', expect.objectContaining({
+      sessionRuntime: expect.objectContaining({
+        binding: { version: 1, credential: { source: 'native' } },
+      }),
+    }));
   });
 });
 
@@ -1134,6 +1150,7 @@ describe('Workspace manager surface routes', () => {
       namePrefix: 'p',
       capabilities: { resumeById: true },
       lifecycle: { prepareWorkspace: vi.fn(async () => undefined) },
+      sessionRuntime: emptyAgentSessionRuntime,
     };
     const snapshot = {
       recordId: 'pi-manager-test',
@@ -1238,6 +1255,7 @@ describe('Workspace manager surface routes', () => {
       namePrefix: 'x',
       capabilities: { resumeById: true },
       lifecycle: { prepareWorkspace: vi.fn(async () => undefined) },
+      sessionRuntime: emptyAgentSessionRuntime,
     };
     let spawnedContext: any = null;
     let liveSession: any = null;

@@ -209,9 +209,9 @@ function HarnessLandingPage({
     setLaunching(true)
     try {
       // A global OpenCode/Pi config is only a fallback when the user has not
-      // selected a vault credential for this launch. The provider pill is an
-      // explicit per-Workspace choice: always send it so the backend can write
-      // the selected provider/model before spawning the runtime.
+      // selected a vault credential for this launch. The provider/model choice
+      // seeds this new product Session; the backend persists a secret-free
+      // binding and never rewrites the Workspace merely to start it.
       // On success this focuses the new session's terminal tab; the landing tab
       // stays open in the background, so clear it for next time.
       const workspaceId = await quickChat(
@@ -220,6 +220,8 @@ function HarnessLandingPage({
         launchConfig.launchCredentialSlug,
         effectiveTargetWorkspaceId,
         templateName,
+        launchConfig.aiDetails?.model,
+        launchConfig.aiDetails?.reasoningEffort,
       )
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')

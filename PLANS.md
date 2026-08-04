@@ -28,6 +28,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/session-runtime-bindings.md]] — Made credential source, model, and
+  effort a durable product-Session binding projected by every Agent adapter
+  across interactive, Web, and headless launch/resume.
 - [[plans/native-runtime-auth-fallback.md]] — Makes OpenCode and Pi honor their
   native global login/config by default, keeps OpenAlice-managed credentials as
   an explicit Workspace override, and makes launch/resume authentication

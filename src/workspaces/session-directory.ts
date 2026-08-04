@@ -1,6 +1,7 @@
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from './headless-task-registry.js'
 import type { ResumeIdentityRecord } from './resume-registry.js'
 import { sessionPreferredTitle, type SessionRecord } from './session-registry.js'
+import type { ModelReasoningEffort } from '@/ai-providers/model-semantics.js'
 
 export interface WorkspaceSessionDirectoryEntry {
   resumeId: string
@@ -11,6 +12,11 @@ export interface WorkspaceSessionDirectoryEntry {
   successorResumeId?: string
   resumable: boolean
   active: boolean
+  runtime?: {
+    credentialSource: 'native' | 'vault' | 'workspace'
+    model?: string
+    reasoningEffort?: ModelReasoningEffort
+  }
   latestExecution?: {
     taskId: string
     status: HeadlessTaskStatus
@@ -58,6 +64,17 @@ export function buildWorkspaceSessionDirectory(input: {
         ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
         resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
         active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
+        ...(identity.runtimeBinding
+          ? {
+              runtime: {
+                credentialSource: identity.runtimeBinding.credential.source,
+                ...(identity.runtimeBinding.model ? { model: identity.runtimeBinding.model } : {}),
+                ...(identity.runtimeBinding.reasoningEffort
+                  ? { reasoningEffort: identity.runtimeBinding.reasoningEffort }
+                  : {}),
+              },
+            }
+          : {}),
         ...(execution
           ? {
               latestExecution: {

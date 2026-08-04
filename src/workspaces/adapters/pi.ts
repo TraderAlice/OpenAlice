@@ -1,24 +1,24 @@
-import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { runtimeProfileFromEnv } from '@/core/runtime-profile.js';
 import { resolveBashPath } from '@/core/shell-resolver.js';
+import { cliBinPath } from '@/core/paths.js';
 
 import type {
   CliAdapter,
-  HeadlessRunOverrides,
+  ResolvedSessionRuntimeBinding,
   SpawnContext,
   WorkspaceAiCred,
 } from '../cli-adapter.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
 import {
+  buildPiProvider,
   migrateLegacyPiAgentDir,
   localizePiWorkspaceProvider,
   PI_BINDING_STATE_PATH,
-  PI_PROJECT_SETTINGS_PATH,
-  PI_PROVIDER_PREFIX,
   readPiWorkspaceConfig,
   resolvePiAgentDir,
   syncPiWorkspaceTheme,
@@ -27,6 +27,8 @@ import {
 } from './pi-config.js';
 
 const PI_TRUST_FILENAME = 'trust.json';
+const PI_SESSION_PROVIDER_ID = 'openalice-session';
+const PI_SESSION_PROVIDER_ENV = 'OPENALICE_PI_SESSION_PROVIDER';
 
 let piTrustWriteQueue: Promise<void> = Promise.resolve();
 
@@ -61,28 +63,6 @@ function piSessionDir(cwd: string): string {
   }
   const safeCwd = resolve(cwd).replace(/^[/\\]/, '').replace(/[/\\:]/g, '-');
   return join(resolvePiAgentDir(process.env), 'sessions', `--${safeCwd}--`);
-}
-
-function piRunModel(cwd: string, model: string): string {
-  try {
-    const settings = JSON.parse(
-      readFileSync(join(cwd, PI_PROJECT_SETTINGS_PATH), 'utf8'),
-    ) as Record<string, unknown>;
-    const provider = settings['defaultProvider'];
-    const registeredModel = settings['defaultModel'];
-    if (
-      typeof provider === 'string' &&
-      provider.startsWith(PI_PROVIDER_PREFIX) &&
-      registeredModel !== model
-    ) {
-      throw new Error(
-        `Pi model override "${model}" is not registered by this Workspace provider; save that model in Workspace AI settings first`,
-      );
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Pi model override')) throw err;
-  }
-  return model;
 }
 
 function piCommandHead(env: Readonly<Record<string, string | undefined>>): readonly string[] {
@@ -268,6 +248,35 @@ export const piAdapter: CliAdapter = {
     },
   },
 
+  sessionRuntime: {
+    project(ctx, runtime: ResolvedSessionRuntimeBinding) {
+      const ai = runtime.ai;
+      const customProvider = !!ai && !!(ai.apiKey || ai.baseUrl);
+      const model = runtime.binding.model;
+      const args = [
+        ...(customProvider
+          ? [
+              '--extension',
+              join(cliBinPath(), 'pi-session-provider.ts'),
+              '--provider', PI_SESSION_PROVIDER_ID,
+            ]
+          : []),
+        ...(model ? ['--model', model] : []),
+        ...(runtime.binding.reasoningEffort
+          ? ['--thinking', runtime.binding.reasoningEffort === 'none' ? 'off' : runtime.binding.reasoningEffort]
+          : []),
+      ];
+      const env: Record<string, string> = {};
+      if (customProvider && ai) {
+        env[PI_SESSION_PROVIDER_ENV] = JSON.stringify({
+          providerId: PI_SESSION_PROVIDER_ID,
+          provider: buildPiProvider(ctx.cwd, ai),
+        });
+      }
+      return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
+    },
+  },
+
   lifecycle: {
     // Reconcile launcher-managed Pi project defaults before every surface
     // starts. Each operation is idempotent and preserves explicit Pi-owned
@@ -288,7 +297,7 @@ export const piAdapter: CliAdapter = {
     // The runtime lifecycle records trust for this OpenAlice-managed Workspace
     // before every launch. Keeping argv free of `--approve` preserves
     // compatibility with external Pi 0.78.x runtimes that predate the flag.
-    const head = [...piCommandHead(ctx.env)];
+    const head = [...piCommandHead(ctx.env), ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
     // Quick-chat seed: `pi [--session-id <id>] <messages…>` opens the
     // interactive TUI seeded with that first message. UNLIKE the other adapters,
     // pi appends the seed REGARDLESS of the resume branch: pi assigns its own id
@@ -329,6 +338,7 @@ export const piAdapter: CliAdapter = {
     }
     return [
       ...piCommandHead(ctx.env),
+      ...(ctx.sessionRuntime?.webArgs ?? ctx.sessionRuntime?.interactiveArgs ?? []),
       ...(ctx.approveProject ? ['--approve'] : piHeadlessApproveArgs(ctx.env)),
       ...(ctx.appendSystemPrompt ? ['--append-system-prompt', ctx.appendSystemPrompt] : []),
       ...(ctx.skills ?? []).flatMap((path) => ['--skill', path]),
@@ -351,15 +361,11 @@ export const piAdapter: CliAdapter = {
     _base: readonly string[],
     _ctx: SpawnContext,
     prompt: string,
-    overrides?: HeadlessRunOverrides,
   ): readonly string[] {
     return [
       ...piCommandHead(_ctx.env),
       ...piHeadlessApproveArgs(_ctx.env),
-      ...(overrides?.model ? ['--model', piRunModel(_ctx.cwd, overrides.model)] : []),
-      ...(overrides?.reasoningEffort
-        ? ['--thinking', overrides.reasoningEffort === 'none' ? 'off' : overrides.reasoningEffort]
-        : []),
+      ...(_ctx.sessionRuntime?.headlessArgs ?? []),
       ...(_ctx.resume === 'last'
         ? ['--continue']
         : _ctx.resume

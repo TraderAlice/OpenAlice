@@ -10,11 +10,15 @@ import { dirname } from 'node:path'
 
 import type { Logger } from './logger.js'
 import { generateResumeId } from './resume-id.js'
+import type { SessionRuntimeBinding } from './cli-adapter.js'
+import { parseSessionRuntimeBinding } from './session-runtime-binding.js'
 
 export interface ResumeIdentityRecord {
   readonly resumeId: string
   readonly wsId: string
   readonly agent: string
+  /** Immutable, secret-free launch semantics for this product Session. */
+  runtimeBinding?: SessionRuntimeBinding
   agentSessionId?: string
   latestTaskId?: string
   readonly createdAt: number
@@ -44,7 +48,7 @@ export class ResumeRegistry {
   private async read(): Promise<void> {
     try {
       const parsed = JSON.parse(await readFile(this.path, 'utf8')) as { version?: unknown; records?: unknown }
-      if (parsed.version !== 1 || !Array.isArray(parsed.records)) {
+      if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.records)) {
         throw new Error('resume-identities.json has an unsupported shape')
       }
       for (const value of parsed.records) {
@@ -57,6 +61,10 @@ export class ResumeRegistry {
           typeof record['createdAt'] !== 'number' ||
           typeof record['updatedAt'] !== 'number'
         ) throw new Error('resume-identities.json contains an invalid record')
+        const runtimeBinding = parseSessionRuntimeBinding(record['runtimeBinding'])
+        if (record['runtimeBinding'] !== undefined && !runtimeBinding) {
+          throw new Error('resume-identities.json contains an invalid Session runtime binding')
+        }
         this.records.set(record['resumeId'], {
           resumeId: record['resumeId'],
           wsId: record['wsId'],
@@ -70,6 +78,7 @@ export class ResumeRegistry {
           ...(typeof record['latestTaskId'] === 'string'
             ? { latestTaskId: record['latestTaskId'] }
             : {}),
+          ...(runtimeBinding ? { runtimeBinding } : {}),
           ...(typeof record['retiredAt'] === 'number'
             ? { retiredAt: record['retiredAt'] }
             : {}),
@@ -112,6 +121,7 @@ export class ResumeRegistry {
     agent: string
     agentSessionId?: string
     latestTaskId?: string
+    runtimeBinding?: SessionRuntimeBinding
     now?: number
   }): Promise<ResumeIdentityRecord> {
     const resumeId = input.resumeId ?? generateResumeId({
@@ -125,6 +135,14 @@ export class ResumeRegistry {
       if (existing.lifecycle === 'retired') {
         throw new Error(`resume identity ${resumeId} is retired`)
       }
+      if (
+        input.runtimeBinding
+        && existing.runtimeBinding
+        && JSON.stringify(input.runtimeBinding) !== JSON.stringify(existing.runtimeBinding)
+      ) {
+        throw new Error(`resume identity ${resumeId} already owns a different runtime binding`)
+      }
+      if (input.runtimeBinding && !existing.runtimeBinding) existing.runtimeBinding = input.runtimeBinding
       if (input.agentSessionId) existing.agentSessionId = input.agentSessionId
       if (input.latestTaskId) existing.latestTaskId = input.latestTaskId
       existing.updatedAt = input.now ?? Date.now()
@@ -141,6 +159,7 @@ export class ResumeRegistry {
       lifecycle: 'active',
       ...(input.agentSessionId ? { agentSessionId: input.agentSessionId } : {}),
       ...(input.latestTaskId ? { latestTaskId: input.latestTaskId } : {}),
+      ...(input.runtimeBinding ? { runtimeBinding: input.runtimeBinding } : {}),
     }
     this.records.set(resumeId, record)
     await this.flush()
@@ -201,7 +220,7 @@ export class ResumeRegistry {
     try {
       await mkdir(dirname(this.path), { recursive: true })
       const tmp = `${this.path}.tmp`
-      await writeFile(tmp, JSON.stringify({ version: 1, records: [...this.records.values()] }, null, 2), 'utf8')
+      await writeFile(tmp, JSON.stringify({ version: 2, records: [...this.records.values()] }, null, 2), 'utf8')
       await rename(tmp, this.path)
     } catch (err) {
       this.logger.warn('resume_registry.flush_failed', { err })

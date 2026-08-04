@@ -705,6 +705,11 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly updatedAt: number;
   readonly resumable: boolean;
   readonly active: boolean;
+  readonly runtime?: {
+    readonly credentialSource: 'native' | 'vault' | 'workspace';
+    readonly model?: string;
+    readonly reasoningEffort?: ModelReasoningEffort;
+  };
   readonly latestExecution?: {
     readonly taskId: string;
     readonly status: 'running' | 'done' | 'failed' | 'interrupted';
@@ -911,12 +916,16 @@ export async function quickChat(
   credentialSlug?: string,
   targetWsId?: string,
   template?: 'chat' | 'auto-quant-v2',
+  model?: string | null,
+  reasoningEffort?: ModelReasoningEffort,
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;
   if (template !== undefined) body['template'] = template;
+  if (model) body['model'] = model;
+  if (reasoningEffort) body['reasoningEffort'] = reasoningEffort;
   const res = await fetch('/api/workspaces/quick-chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

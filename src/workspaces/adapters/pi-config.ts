@@ -167,7 +167,7 @@ function wireShapeFromApi(api: unknown): NonNullable<WorkspaceAiCred['wireShape'
   return 'openai-chat';
 }
 
-function buildProvider(cwd: string, cred: WorkspaceAiCred): Record<string, unknown> {
+export function buildPiProvider(cwd: string, cred: WorkspaceAiCred): Record<string, unknown> {
   const provider: Record<string, unknown> = {
     name: `${PI_PROVIDER_NAME_PREFIX} (${basename(cwd)})`,
     api: providerApi(cred),
@@ -604,7 +604,7 @@ export async function writePiWorkspaceConfig(
   await writeProjectBinding(
     cwd,
     providerId,
-    buildProvider(cwd, cred),
+    buildPiProvider(cwd, cred),
     cred,
     options.shellPath ?? null,
   );
@@ -797,7 +797,7 @@ export async function migrateLegacyPiAgentDir(cwd: string, env: EnvLike = proces
     const cred = legacyProviderCred(workspaceProvider);
     const providerId = piWorkspaceProviderId(cwd);
     const shellPath = (await readJsonRecord(join(legacyDir, PI_GLOBAL_SETTINGS_FILENAME), 'Legacy Pi settings.json'))?.['shellPath'];
-    const provider = buildProvider(cwd, cred);
+    const provider = buildPiProvider(cwd, cred);
     await writeProjectBinding(
       cwd,
       providerId,
