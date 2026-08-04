@@ -142,7 +142,7 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([focusedWorkspace], null, onNavigate, 'focused')
 
     expect(screen.getByText('Recent conversations')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Current Workspace: chat-jul11' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Chat context: chat-jul11' })).toBeTruthy()
     expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
@@ -153,12 +153,13 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledOnce()
   })
 
-  it('routes the focused Workspace menu into the multi-Workspace request boundary', () => {
+  it('routes the bottom Workspace context menu into the Workspace tree', () => {
     const onRequestDisplayMode = vi.fn()
     renderSection([chatWorkspace], null, undefined, 'focused', onRequestDisplayMode)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Current Workspace: chat-jul11' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Show all Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
+    expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace tree' }))
     expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
   })
 
@@ -189,6 +190,7 @@ describe('ChatWorkspaceSection actions', () => {
       'focused',
       onRequestDisplayMode,
     )
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
     fireEvent.click(screen.getByRole('button', { name: 'Recent across Workspaces' }))
     expect(onRequestDisplayMode).toHaveBeenCalledWith('recent')
     unmount()
@@ -210,9 +212,10 @@ describe('ChatWorkspaceSection actions', () => {
       dir: '/tmp/chat-aug3',
       createdAt: '2026-08-03T00:00:00.000Z',
     }
-    renderSection([chatWorkspace, alternative], null, undefined, 'focused')
+    const onRequestDisplayMode = vi.fn()
+    renderSection([chatWorkspace, alternative], null, undefined, 'focused', onRequestDisplayMode)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Current Workspace: chat-aug3' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
     fireEvent.change(screen.getByRole('combobox', { name: 'Switch Workspace' }), {
       target: { value: chatWorkspace.id },
     })
@@ -221,6 +224,7 @@ describe('ChatWorkspaceSection actions', () => {
       kind: 'chat-landing',
       params: { targetWsId: chatWorkspace.id },
     })
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('focused')
   })
 
   it('keeps conversation creation primary and scopes workspace creation to the workspace list', () => {
@@ -228,7 +232,6 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([chatWorkspace], null, onNavigate)
 
     const newChat = screen.getByRole('button', { name: 'New chat' })
-    const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
     const workspaceHeading = screen.getByText('Workspaces', { selector: 'span.uppercase' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
     const newSession = screen.getByRole('button', { name: 'New conversation in chat-jul11' })
@@ -237,10 +240,8 @@ describe('ChatWorkspaceSection actions', () => {
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
     expect(newChat.querySelector('.lucide-message-square-plus')).toBeTruthy()
-    expect(workspaceHeading.parentElement?.nextElementSibling?.contains(newWorkspace)).toBe(true)
-    expect(newWorkspace.className).toContain('w-full')
-    expect(newWorkspace.textContent).toBe('New workspace')
-    expect(newWorkspace.querySelector('.lucide-panels-top-left')).toBeTruthy()
+    expect(workspaceHeading.parentElement?.nextElementSibling?.tagName).toBe('UL')
+    expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
     fireEvent.click(moreWorkspaceActions)
@@ -264,6 +265,9 @@ describe('ChatWorkspaceSection actions', () => {
       params: { targetWsId: chatWorkspace.id },
     })
     expect(onNavigate).toHaveBeenCalledTimes(3)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    expect(screen.getByRole('button', { name: 'New workspace' })).toBeTruthy()
   })
 
   it('keeps named Workspace identity compact and scopes every row action to it', () => {
@@ -310,7 +314,9 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([])
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    expect(screen.getByRole('button', { name: 'New workspace' })).toBeTruthy()
   })
 
   it('reports a failed Workspace inventory without pretending the list is empty', () => {

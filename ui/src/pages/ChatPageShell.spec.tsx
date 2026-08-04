@@ -64,10 +64,6 @@ describe('ChatPageShell display mode', () => {
     expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('recent')
 
     fireEvent.click(screen.getByRole('button', { name: 'Request tree' }))
-    expect(screen.getByRole('dialog', { name: 'Switch to the Workspace tree?' })).toBeTruthy()
-    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('recent')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show all Workspaces' }))
     expect(screen.getByTestId('display-mode').textContent).toBe('multi')
     expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('multi')
 

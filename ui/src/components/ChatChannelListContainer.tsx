@@ -24,14 +24,12 @@ export function ChatChannelListContainer({
   onRequestDisplayMode: (mode: ChatDisplayMode) => void
 }) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <ChatWorkspaceSection
-          onNavigate={onNavigate}
-          displayMode={displayMode}
-          onRequestDisplayMode={onRequestDisplayMode}
-        />
-      </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <ChatWorkspaceSection
+        onNavigate={onNavigate}
+        displayMode={displayMode}
+        onRequestDisplayMode={onRequestDisplayMode}
+      />
     </div>
   )
 }
