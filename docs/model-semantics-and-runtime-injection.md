@@ -254,8 +254,11 @@ Agent configuration files may also contain user- or runtime-owned settings.
 Injectors must update only OpenAlice-owned keys/nodes, preserve unknown data,
 and restore the prior value on reset where a shared scalar is overridden.
 
-Pi uses a namespaced global provider plus project binding/rollback state.
-Claude Code and opencode use the same lifecycle rule with
+Pi uses one generic OpenAlice-managed project extension plus local provider and
+binding/rollback state. The extension registers only the provider stored in
+that Workspace's sensitive `.pi/openalice-provider.json`; Pi's global
+`models.json` remains user-owned. Claude Code and opencode use the same
+lifecycle rule with
 `.claude/openalice-provider.json` and `.opencode/openalice-provider.json`:
 the first write snapshots only the nodes OpenAlice will replace, later writes
 retain that original snapshot, and reset restores a node only if it still equals

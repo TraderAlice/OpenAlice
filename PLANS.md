@@ -28,6 +28,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/pi-local-workspace-provider.md]] — Moved OpenAlice-managed Pi
+  provider registration from the user-global model registry into reversible,
+  Workspace-local extension state. Delivered in serial PR #981.
 - [[plans/runtime-ui-style-profiles.md]] — Added independent runtime-selectable
   component appearance profiles for Default, Windows 98, and Broker Classic
   while preserving palette choice and shared shadcn/Base UI behavior. Delivered

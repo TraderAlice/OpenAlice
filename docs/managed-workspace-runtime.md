@@ -398,10 +398,10 @@ pinning and upgrading the bundled Pi with the OpenAlice release.
 
 Source development and user-installed Pi update trust in Pi's normal user
 agent directory (or an explicit user-provided `PI_CODING_AGENT_DIR`). Provider
-overrides do not change that directory: OpenAlice adds a namespaced provider to
-its `models.json` and uses the native Workspace `.pi/settings.json` layer to
-select it. This keeps the user's global settings, packages, auth, resources,
-trust, and sessions visible.
+overrides do not change or write that directory: a generic managed extension
+under the Workspace's `.pi/extensions/` registers the local provider, and the
+native Workspace `.pi/settings.json` layer selects it. This keeps the user's
+global models, settings, packages, auth, resources, trust, and sessions visible.
 
 An installer-owned OpenAlice Runtime is a separate managed boundary. A launcher
 carrying `OPENALICE_MANAGED_PI_PATH` causes the selected complete home to set
@@ -458,9 +458,11 @@ OpenAlice copies Workspace skills into two canonical project paths:
 - `.claude/skills/` for Claude Code;
 - `.agents/skills/` for Codex, current Pi, and compatible shared-skill readers.
 
-Pi's provider definition lives in its normal user `models.json`; the Workspace
-stores provider/model selection, the automatic terminal theme default, and
-OpenAlice rollback metadata under `.pi/`. Do not restore a duplicate
+Pi's provider definition and reversible ownership state live in the sensitive
+Workspace-local `.pi/openalice-provider.json`. The generic managed
+`.pi/extensions/openalice-provider.ts` registers it in-process, while project
+settings store provider/model selection and the automatic terminal theme
+default. Both managed files are excluded from git. Do not restore a duplicate
 `.pi/skills/` copy: current Pi discovers the shared `.agents/skills/` tree from
 the Workspace working directory.
 
