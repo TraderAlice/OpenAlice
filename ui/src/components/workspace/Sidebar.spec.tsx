@@ -206,6 +206,10 @@ describe('SessionRow actions', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Review AAPL earnings' }).getAttribute('aria-current')).toBe('page')
+    const main = screen.getByRole('button', { name: 'Review AAPL earnings' })
+    expect(main.getAttribute('aria-current')).toBe('page')
+    expect(main.className).toContain('oa-session-row-main')
+    expect(main.parentElement?.className).toContain('oa-session-row')
+    expect(main.parentElement?.getAttribute('data-active')).toBe('true')
   })
 })

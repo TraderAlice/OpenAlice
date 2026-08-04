@@ -656,14 +656,15 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   return (
     <div
       data-reorder-id={props.reorderId}
-      className={`group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
+      data-active={props.isActive}
+      className={`oa-session-row group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
         props.isActive ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
       {props.isActive && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
       <button
         type="button"
-        className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
+        className="oa-session-row-main flex-1 min-w-0 flex items-center gap-1.5 text-left"
         onClick={props.onSelect}
         title={tooltip}
         aria-label={display}
