@@ -20,7 +20,11 @@ import {
   type ThemePreferenceSlot,
 } from '../theme/palettes'
 import { useThemeStore, type AppTheme } from '../theme/store'
-import { UI_STYLE_PROFILES, type UiStyleProfileId } from '../theme/styleProfiles'
+import {
+  UI_STYLE_PROFILES,
+  type UiStyleProfileDefinition,
+  type UiStyleProfileId,
+} from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
 
@@ -50,6 +54,13 @@ export function AppearanceSection() {
   const modes: readonly AppTheme[] = ['auto', 'day', 'night']
   const activePalette = effectiveSlot === 'day' ? dayPalette : nightPalette
   const activePaletteDefinition = paletteDefinition(activePalette)
+  const activeStyleDefinition: UiStyleProfileDefinition = UI_STYLE_PROFILES.find(
+    (profile) => profile.id === uiStyle,
+  )!
+  const recommendedPalettePair = activeStyleDefinition.recommendedPalettePair
+  const recommendedPaletteApplied = recommendedPalettePair != null
+    && dayPalette === recommendedPalettePair.day
+    && nightPalette === recommendedPalettePair.night
   const editingPalette = editingSlot === 'day' ? dayPalette : nightPalette
   const recommendedAppearance = editingSlot === 'day' ? 'light' : 'dark'
   const visiblePalettes = paletteFilter === 'recommended'
@@ -82,6 +93,12 @@ export function AppearanceSection() {
     setPaletteFilter('recommended')
   }
 
+  const applyRecommendedPalette = () => {
+    if (!recommendedPalettePair) return
+    setDayPalette(recommendedPalettePair.day)
+    setNightPalette(recommendedPalettePair.night)
+  }
+
   return (
     <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
       <div className="border-b border-border/60 pb-5">
@@ -109,6 +126,45 @@ export function AppearanceSection() {
             />
           ))}
         </div>
+        {recommendedPalettePair && (
+          <div
+            data-palette-preview={recommendedPalettePair.day}
+            className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
+          >
+            <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
+              <span className="oa-palette-preview-sidebar flex w-6 shrink-0 items-center justify-center border-r">
+                <span className="oa-palette-preview-sidebar-dot h-2 w-2 rounded-full" />
+              </span>
+              <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
+                <span className="oa-palette-preview-primary-line h-1.5 w-3/5 rounded-full" />
+                <span className="oa-palette-preview-muted-line h-1 w-full rounded-full" />
+                <span className="oa-palette-preview-muted-line h-1 w-3/4 rounded-full" />
+              </span>
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-[12px] font-semibold text-foreground">
+                {t('settings.appearance.recommendedPalette', {
+                  style: t(activeStyleDefinition.labelKey),
+                })}
+              </span>
+              <p className="mt-0.5 text-[10.5px] leading-snug text-muted-foreground">
+                {t('settings.appearance.recommendedPaletteDescription', {
+                  palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                })}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={applyRecommendedPalette}
+              disabled={recommendedPaletteApplied}
+              className="oa-pressable min-h-10 shrink-0 rounded-md border border-border bg-background px-3 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/35 hover:text-primary disabled:cursor-default disabled:opacity-55 sm:min-h-8"
+            >
+              {t(recommendedPaletteApplied
+                ? 'settings.appearance.recommendedPaletteApplied'
+                : 'settings.appearance.applyRecommendedPalette')}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="border-b border-border/60 py-5">

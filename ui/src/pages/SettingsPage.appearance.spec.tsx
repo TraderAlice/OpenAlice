@@ -52,6 +52,22 @@ describe('AppearanceSection palette pair editor', () => {
     expect(useThemeStore.getState().dayPalette).toBe('paper')
     expect(useThemeStore.getState().nightPalette).toBe('graphite')
     expect(screen.getByRole('radio', { name: 'Windows 98' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Use recommended colors' })).toBeTruthy()
+  })
+
+  it('applies the selected style recommended palette only after explicit confirmation', () => {
+    render(<AppearanceSection />)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
+    expect(useThemeStore.getState().dayPalette).toBe('paper')
+    expect(useThemeStore.getState().nightPalette).toBe('graphite')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use recommended colors' }))
+
+    expect(useThemeStore.getState().theme).toBe('auto')
+    expect(useThemeStore.getState().dayPalette).toBe('windows-classic')
+    expect(useThemeStore.getState().nightPalette).toBe('windows-classic')
+    expect(screen.getByRole('button', { name: 'Recommended colors applied' }).hasAttribute('disabled')).toBe(true)
   })
 
   it('does not expose the retired editor tab strip preference', () => {

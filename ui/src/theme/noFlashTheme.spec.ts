@@ -64,4 +64,20 @@ describe('no-flash theme bootstrap', () => {
     expect(applyNoFlashTheme({ uiStyle: 'win98' }, false).uiStyle).toBe('win98')
     expect(applyNoFlashTheme({ uiStyle: 'aqua' }, false).uiStyle).toBe('default')
   })
+
+  it('restores the Windows Classic palette before first paint', () => {
+    const state = {
+      theme: 'auto',
+      dayPalette: 'windows-classic',
+      nightPalette: 'windows-classic',
+      uiStyle: 'win98',
+    }
+    expect(applyNoFlashTheme(state, false)).toEqual({
+      theme: 'auto',
+      dayPalette: 'windows-classic',
+      nightPalette: 'windows-classic',
+      uiStyle: 'win98',
+      palette: 'windows-classic',
+    })
+  })
 })
