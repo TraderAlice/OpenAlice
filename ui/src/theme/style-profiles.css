@@ -116,6 +116,34 @@
     inset 2px 2px var(--oa-win-shadow);
 }
 
+/* Session entries are list rows, not three adjacent command buttons. Keep the
+   title surface flat and reserve the classic raised chrome for its compact
+   lifecycle/menu actions. The row itself owns hover and selected state. */
+:root[data-ui-style="win98"] .oa-session-row {
+  gap: 2px;
+  min-height: 28px;
+  padding-block: 2px;
+}
+
+:root[data-ui-style="win98"] .oa-session-row-main {
+  align-self: stretch;
+  min-height: 24px;
+  padding-inline: 4px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-ui-style="win98"] .oa-session-row-main:active {
+  transform: none;
+  box-shadow: none;
+}
+
+:root[data-ui-style="win98"] .oa-session-row > .oa-workspace-row-action {
+  height: 24px;
+  width: 24px;
+}
+
 :root[data-ui-style="win98"] :where(
   [data-slot="dialog-content"],
   [data-slot="alert-dialog-content"],
