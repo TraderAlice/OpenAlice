@@ -860,7 +860,7 @@ describe('POST /:id/headless/:taskId/session', () => {
 describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', () => {
   const TOKEN = 'claude-calm-amber-river';
 
-  function buildResume(workspaceId = 'ws-1', resolverOnly = false) {
+  function buildResume(workspaceId = 'ws-1', resolverOnly = false, adapterOverride?: any) {
     const session = {
       recordId: TOKEN,
       wsId: workspaceId,
@@ -874,16 +874,19 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
       live = session;
       return session;
     });
+    const adapter = adapterOverride ?? {
+      id: 'claude',
+      capabilities: { resumeById: true, resumeLast: false },
+    };
     const record = {
       id: TOKEN,
       resumeId: 'resume-aid',
       wsId: workspaceId,
-      agent: 'claude',
+      agent: adapter.id,
       name: 'c1',
       state: 'paused',
       resumeHint: { kind: 'agent-session-id', value: 'aid' },
     };
-    const adapter = { id: 'claude', capabilities: { resumeById: true, resumeLast: false } };
     const svc = {
       sessionRegistry: { get: () => record, update: vi.fn(async () => {}) },
       resumeRegistry: { get: () => ({ agentSessionId: 'aid' }) },
@@ -924,6 +927,31 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
     const result = await post(app, `/workspace-manager/sessions/${TOKEN}/resume`);
 
     expect(result.body.ok).toBe(true);
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('resumes a native-login runtime with an empty Workspace config without injecting a vault credential', async () => {
+    const opencode = {
+      id: 'opencode',
+      capabilities: {
+        resumeById: true,
+        resumeLast: false,
+        aiProvider: {
+          credentialSource: 'runtime-or-workspace',
+          wirePreference: ['openai-chat'],
+        },
+      },
+      readAiConfig: vi.fn(async () => null),
+      writeAiConfig: vi.fn(async () => {}),
+    };
+    const { app, spawn } = buildResume('ws-1', false, opencode);
+
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/resume`);
+
+    expect(result.status).toBe(200);
+    expect(result.body.ok).toBe(true);
+    expect(opencode.readAiConfig).toHaveBeenCalledOnce();
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
   });
 });

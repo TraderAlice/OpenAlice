@@ -264,6 +264,40 @@ describe('WorkspaceManagerPage runtime selection', () => {
     ))
   })
 
+  it('starts the Manager without synchronously probing diagnostic readiness', async () => {
+    mocks.getAgentRuntimeReadiness.mockResolvedValue({
+      agents: {
+        codex: {
+          agent: 'codex',
+          displayName: 'Codex',
+          installed: true,
+          binPath: '/tmp/codex',
+          status: 'unknown',
+          ready: false,
+          source: 'unknown',
+          checkedAt: null,
+          durationMs: null,
+        },
+      },
+      overallReady: false,
+      checkedAt: null,
+    })
+    mocks.probeAgentRuntimeReadiness.mockRejectedValue(new Error('readiness timed out'))
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    await screen.findByRole('button', { name: 'Select agent' })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Inspect without a preflight.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start manager' }))
+
+    await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
+      'Inspect without a preflight.',
+      'codex',
+      undefined,
+    ))
+    expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
+  })
+
   it('offers a retry when the manager snapshot cannot load', async () => {
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context('codex'),

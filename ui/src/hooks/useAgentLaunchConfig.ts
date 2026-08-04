@@ -8,7 +8,6 @@ import {
   getAgentReadiness,
   getAgentRuntimeReadiness,
   listAgentCredentials,
-  probeAgentRuntimeReadiness,
   type AgentCredentialReadiness,
   type AgentInfo,
   type AgentRuntimeReadinessRow,
@@ -311,7 +310,6 @@ export interface AgentLaunchConfigState {
   selectCredential(credentialSlug: string): void
   selectRuntimeDefault(): void
   resetCredentialSelection(): void
-  checkSelectedRuntime(): Promise<AgentRuntimeReadinessRow | null>
 }
 
 /** Canonical launch-state hook for Quick Chat, Workspace Manager, and future
@@ -527,15 +525,6 @@ export function useAgentLaunchConfig({
 
   const resetCredentialSelection = useCallback(() => setPickedCredential(null), [])
 
-  const checkSelectedRuntime = useCallback(async (): Promise<AgentRuntimeReadinessRow | null> => {
-    if (!effectiveAgent) return null
-    const current = runtimeReadiness?.agents[effectiveAgent] ?? null
-    if (current?.ready === true) return current
-    const snapshot = await probeAgentRuntimeReadiness(effectiveAgent)
-    setRuntimeReadiness(snapshot)
-    return snapshot.agents[effectiveAgent] ?? null
-  }, [effectiveAgent, runtimeReadiness])
-
   return useMemo(() => ({
     agents,
     effectiveAgent,
@@ -567,11 +556,9 @@ export function useAgentLaunchConfig({
     selectCredential,
     selectRuntimeDefault,
     resetCredentialSelection,
-    checkSelectedRuntime,
   }), [
     agents,
     aiDetails,
-    checkSelectedRuntime,
     canSelectCredential,
     credentials,
     credential,

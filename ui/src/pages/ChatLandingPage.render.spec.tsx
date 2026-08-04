@@ -326,7 +326,29 @@ describe('ChatLandingPage keyboard submission', () => {
     ))
   })
 
-  it('shows the runtime provider error and does not create a chat session', async () => {
+  it('does not let a diagnostic readiness failure block a native chat launch', async () => {
+    const nativePiAgent: AgentInfo = {
+      ...piAgent,
+      capabilities: {
+        ...piAgent.capabilities,
+        aiProvider: {
+          ...piAgent.capabilities.aiProvider!,
+          credentialSource: 'runtime-or-workspace',
+        },
+      },
+    }
+    mocks.useWorkspaces.mockImplementation(() => ({
+      ...context(workspaces),
+      agents: [nativePiAgent],
+    }))
+    mocks.listAgentCredentials.mockResolvedValue([])
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: false,
+      slug: null,
+      model: null,
+      contextWindow: null,
+      wireShape: null,
+    })
     mocks.getAgentRuntimeReadiness.mockResolvedValue({
       agents: {
         pi: {
@@ -366,12 +388,19 @@ describe('ChatLandingPage keyboard submission', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await screen.findByLabelText('Model gemini-3.1-flash-lite')
+    await screen.findByText('Model, reasoning, and context are managed by Pi')
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'hello' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(await screen.findByText('The runtime reported an error: 429: balance exhausted')).toBeTruthy()
-    expect(mocks.quickChat).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'hello',
+      'pi',
+      undefined,
+      'chat-1',
+      'chat',
+    ))
+    expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
+    expect(screen.queryByText('The runtime reported an error: 429: balance exhausted')).toBeNull()
   })
 })
 

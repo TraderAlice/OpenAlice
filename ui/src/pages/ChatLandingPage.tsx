@@ -201,18 +201,13 @@ function HarnessLandingPage({
       launchSelectorsRef.current?.openAgentMenu()
       return
     }
+    if (launchConfig.needsProviderSetup) {
+      goConfigureProvider()
+      return
+    }
     setError(null)
     setLaunching(true)
     try {
-      const runtimeRow = await launchConfig.checkSelectedRuntime()
-      if (runtimeRow?.ready !== true) {
-        if (runtimeRow?.repairTarget === 'ai-provider' || launchConfig.needsProviderSetup) {
-          goConfigureProvider()
-          return
-        }
-        setError(runtimeRow?.message ?? t('chatLanding.runtimeNotReady'))
-        return
-      }
       // A global OpenCode/Pi config is only a fallback when the user has not
       // selected a vault credential for this launch. The provider pill is an
       // explicit per-Workspace choice: always send it so the backend can write

@@ -256,6 +256,10 @@ OpenAlice-vault credential merely because a Workspace has no managed provider
 binding. Runtime readiness probes exercise the effective native or existing
 Workspace configuration; they never inject the first compatible vault entry as
 a fallback and never mutate provider ownership while diagnosing readiness.
+Readiness is diagnostic rather than a synchronous preflight: ordinary Chat,
+Manager, Session spawn, and Session resume proceed through the selected native
+runtime without waiting for a probe. Onboarding, explicit Retry, and background
+health surfaces may probe and cache the result without becoming a launch gate.
 
 Choosing an OpenAlice credential is an explicit override. Only that choice, a
 saved new-Workspace default, or an existing OpenAlice-owned Workspace binding
@@ -341,6 +345,7 @@ Tests for this subsystem must cover:
 - credential secrets never appear in logs, docs, committed fixtures, or test snapshots;
 - sensitive rollback sidecars remain excluded from git alongside native provider config.
 - readiness probes never create or replace a Workspace provider binding;
+- diagnostic readiness failures never block an ordinary native launch or resume;
 - missing OpenAlice credentials never block a native-login-capable runtime;
 - failed interactive resumes return a visible error and remain retryable.
 

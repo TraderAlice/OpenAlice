@@ -1,8 +1,7 @@
 /**
- * POST /quick-chat — the loginless-runtime credential injection (opencode/pi).
- * claude/codex carry their own CLI login and must NOT be injected; opencode/pi
- * are seeded from the vault before spawn, and dead-end (no compatible cred) with
- * a 400 the composer turns into a "configure a provider" bounce.
+ * POST /quick-chat — native runtime authentication plus explicit Workspace
+ * overrides. Every agent CLI owns its normal login/provider state; a selected
+ * OpenAlice credential is the only path that writes a Workspace configuration.
  *
  * core/config is partial-mocked so we can drive the vault per-test without
  * touching the real ai-provider-manager.json.

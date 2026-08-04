@@ -81,7 +81,6 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     selectCredential: vi.fn(),
     selectRuntimeDefault: vi.fn(),
     resetCredentialSelection: vi.fn(),
-    checkSelectedRuntime: vi.fn(async () => null),
     ...overrides,
   }
 }
