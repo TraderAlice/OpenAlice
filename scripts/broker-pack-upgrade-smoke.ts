@@ -56,9 +56,11 @@ async function main(): Promise<void> {
   const candidateCatalog = await readCatalog(
     resolve(candidateRoot, brokerPackCatalogFileName(currentVersion)),
   )
-  const previousCatalog = await fetchJson<BrokerPackReleaseCatalog>(
-    releaseAssetUrl(previousTag, brokerPackCatalogFileName(previousVersion)),
-  )
+  // A platform that is new in this release (e.g. Linux arm64) has no
+  // previous-release catalog to upgrade from. Treat that as a first-release
+  // skip rather than a failure; any other HTTP error is still fatal.
+  const previousCatalog = await fetchPreviousCatalog(previousTag, previousVersion)
+  if (!previousCatalog) return
   assertCatalog(previousCatalog, previousVersion)
   assertCatalog(candidateCatalog, currentVersion)
 
@@ -225,6 +227,24 @@ async function readCatalog(path: string): Promise<BrokerPackReleaseCatalog> {
 
 async function fetchJson<T>(url: string): Promise<T> {
   return JSON.parse((await fetchBytes(url)).toString('utf8')) as T
+}
+
+async function fetchPreviousCatalog(
+  tag: string,
+  version: string,
+): Promise<BrokerPackReleaseCatalog | null> {
+  const url = releaseAssetUrl(tag, brokerPackCatalogFileName(version))
+  const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(120_000) })
+  if (response.status === 404) {
+    console.log(
+      `[broker-pack-upgrade-smoke] previous release ${tag} has no ` +
+        `${process.platform}-${process.arch} catalog; platform is new in this release — ` +
+        'skipping previous-release upgrade smoke',
+    )
+    return null
+  }
+  if (!response.ok) throw new Error(`GET ${url} failed: HTTP ${response.status}`)
+  return JSON.parse(await response.text()) as BrokerPackReleaseCatalog
 }
 
 async function fetchBytes(url: string): Promise<Buffer> {

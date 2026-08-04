@@ -125,9 +125,10 @@ OpenAlice-Broker-Packs-<version>-<platform>-<arch>.json
 OpenAlice-Broker-<engine>-<version>-<platform>-<arch>.tgz
 ```
 
-The release workflow runs this on macOS arm64, macOS x64, Windows x64, and
-Linux x64; publishes the files with the desktop release; mirrors them to the
-download CDN; and verifies every catalog and referenced archive.
+The release workflow runs this on macOS arm64, macOS x64, Windows x64, Linux
+x64, and Linux arm64 (emulated via QEMU on an x64 runner); publishes the files
+with the desktop release; mirrors them to the download CDN; and verifies every
+catalog and referenced archive.
 
 Before a candidate can publish, each platform runner downloads the real Broker
 Packs from the previous GitHub Release, activates them in an isolated
