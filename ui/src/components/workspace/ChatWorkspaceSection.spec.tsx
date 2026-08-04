@@ -163,6 +163,20 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
   })
 
+  it('keeps Escape scoped to the open Workspace context menu', () => {
+    renderSection([chatWorkspace], null, undefined, 'focused')
+
+    const trigger = screen.getByRole('button', { name: 'Chat context: chat-jul11' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
+
+    const allowed = fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(allowed).toBe(false)
+    expect(screen.queryByRole('dialog', { name: 'Chat Workspace options' })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('offers an explicit recent view and orders sessions across Workspaces with ownership visible', () => {
     const olderWorkspace = {
       ...chatWorkspace,

@@ -412,14 +412,16 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
       setOpen(false)
       triggerRef.current?.focus({ preventScroll: true })
     }
     document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keydown', onKeyDown, true)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keydown', onKeyDown, true)
     }
   }, [open])
 
