@@ -14,6 +14,7 @@ describe('theme preference persistence', () => {
       theme: 'night',
       dayPalette: 'porcelain',
       nightPalette: 'midnight',
+      uiStyle: 'default',
     })
   })
 
@@ -22,10 +23,12 @@ describe('theme preference persistence', () => {
       theme: 'day',
       dayPalette: 'moss',
       nightPalette: 'linen',
+      uiStyle: 'default',
     })).toEqual({
       theme: 'day',
       dayPalette: 'moss',
       nightPalette: 'linen',
+      uiStyle: 'default',
     })
   })
 
@@ -38,10 +41,23 @@ describe('theme preference persistence', () => {
       theme: 'auto',
       dayPalette: 'porcelain',
       nightPalette: 'midnight',
+      uiStyle: 'win98',
     })).toEqual({
       theme: 'auto',
       dayPalette: 'porcelain',
       nightPalette: 'graphite',
+      uiStyle: 'win98',
     })
+  })
+
+  it('persists known styles and repairs an unknown style independently', () => {
+    expect(normalizeThemePreferences({
+      theme: 'auto',
+      dayPalette: 'paper',
+      nightPalette: 'graphite',
+      uiStyle: 'broker-classic',
+    }).uiStyle).toBe('broker-classic')
+
+    expect(normalizeThemePreferences({ uiStyle: 'aqua' }).uiStyle).toBe('default')
   })
 })

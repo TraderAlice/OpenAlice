@@ -273,6 +273,8 @@ export const zh: Resources = {
     appearance: {
       title: '外观',
       description: '色彩与布局偏好，仅保存在本设备。',
+      interfaceStyle: '界面样式',
+      interfaceStyleDescription: '调整组件外形、密度、字体与动效，不会改变你选择的色卡。',
       colorMode: '色彩模式',
       colorModeDescription: '自动模式跟随系统在日间和暗夜槽位间切换；日间和暗夜模式会固定对应槽位。',
       dayPalette: '日间色卡',
@@ -1198,6 +1200,16 @@ export const zh: Resources = {
   theme: {
     mode: { auto: '自动', day: '日间', night: '暗夜' },
     switchTo: '切换到{{mode}}',
+    uiStyle: {
+      default: '默认',
+      win98: 'Windows 98',
+      'broker-classic': '经典交易台',
+    },
+    uiStyleDescription: {
+      default: '安静克制的 OpenAlice 工作台',
+      win98: '直角、浮雕，以及鲜明的经典手感',
+      'broker-classic': '受 TWS 启发的高密度交易工作台',
+    },
     palette: {
       paper: '纸张', porcelain: '白瓷', linen: '亚麻',
       graphite: '石墨', midnight: '午夜', moss: '苔色', iris: '鸢尾',

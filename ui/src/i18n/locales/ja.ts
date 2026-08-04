@@ -274,6 +274,8 @@ export const ja: Resources = {
     appearance: {
       title: '外観',
       description: '色とレイアウトの設定。この端末にのみ保存されます。',
+      interfaceStyle: 'インターフェーススタイル',
+      interfaceStyleDescription: '選択中の色を変えずに、形状、密度、書体、モーションを変更します。',
       colorMode: 'カラーモード',
       colorModeDescription: '自動はシステムに追従して昼と夜のスロットを切り替え、昼と夜は対応するスロットに固定します。',
       dayPalette: '昼用パレット',
@@ -1199,6 +1201,16 @@ export const ja: Resources = {
   theme: {
     mode: { auto: '自動', day: '昼', night: '夜' },
     switchTo: '{{mode}}に切り替え',
+    uiStyle: {
+      default: 'デフォルト',
+      win98: 'Windows 98',
+      'broker-classic': 'Broker Classic',
+    },
+    uiStyleDescription: {
+      default: '落ち着いた OpenAlice ワークステーション',
+      win98: '角張った立体感のあるクラシックスタイル',
+      'broker-classic': 'TWS に着想を得た高密度な取引画面',
+    },
     palette: {
       paper: 'ペーパー', porcelain: 'ポーセリン', linen: 'リネン',
       graphite: 'グラファイト', midnight: 'ミッドナイト', moss: 'モス', iris: 'アイリス',

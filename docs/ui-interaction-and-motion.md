@@ -120,6 +120,13 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 - Treat `data-slot` as the stable styling seam. Future selectable UI styles
   may vary geometry, elevation, density, typography, and motion through that
   seam; `data-palette` remains the color axis.
+- Runtime-selectable component appearance is published as `data-ui-style` on
+  the document root. Profiles may restyle owned `data-slot` primitives and
+  shared `oa-*` shell/form seams, but must not branch product behavior, fork a
+  primitive, hard-code a second color system, or recolor terminal ANSI output.
+  Keep the current workstation as the compatibility default and gate compact
+  desktop density behind both sufficient width and a fine pointer so a visual
+  profile never reduces touch usability.
 - Delete superseded event plumbing during migration. A component is not
   migrated if its old global Escape/outside-click/focus-loop implementation is
   still running beside the primitive.

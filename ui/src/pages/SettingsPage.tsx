@@ -20,6 +20,7 @@ import {
   type ThemePreferenceSlot,
 } from '../theme/palettes'
 import { useThemeStore, type AppTheme } from '../theme/store'
+import { UI_STYLE_PROFILES, type UiStyleProfileId } from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
 
@@ -36,9 +37,11 @@ export function AppearanceSection() {
   const theme = useThemeStore((s) => s.theme)
   const dayPalette = useThemeStore((s) => s.dayPalette)
   const nightPalette = useThemeStore((s) => s.nightPalette)
+  const uiStyle = useThemeStore((s) => s.uiStyle)
   const setTheme = useThemeStore((s) => s.setTheme)
   const setDayPalette = useThemeStore((s) => s.setDayPalette)
   const setNightPalette = useThemeStore((s) => s.setNightPalette)
+  const setUiStyle = useThemeStore((s) => s.setUiStyle)
   const effectiveSlot = useEffectivePreferenceSlot()
   const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
@@ -82,6 +85,33 @@ export function AppearanceSection() {
   return (
     <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
       <div className="border-b border-border/60 pb-5">
+        <div>
+          <span className="text-sm font-medium text-foreground">
+            {t('settings.appearance.interfaceStyle')}
+          </span>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+            {t('settings.appearance.interfaceStyleDescription')}
+          </p>
+        </div>
+        <div
+          className="mt-3 grid gap-2.5 sm:grid-cols-3"
+          role="radiogroup"
+          aria-label={t('settings.appearance.interfaceStyle')}
+        >
+          {UI_STYLE_PROFILES.map((profile) => (
+            <StyleProfileCard
+              key={profile.id}
+              profile={profile.id}
+              label={t(profile.labelKey)}
+              description={t(profile.descriptionKey)}
+              selected={uiStyle === profile.id}
+              onSelect={setUiStyle}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="border-b border-border/60 py-5">
         <div>
           <span className="text-sm font-medium text-foreground">
             {t('settings.appearance.colorMode')}
@@ -234,6 +264,44 @@ export function AppearanceSection() {
       </div>
 
     </ConfigSection>
+  )
+}
+
+function StyleProfileCard({
+  profile,
+  label,
+  description,
+  selected,
+  onSelect,
+}: {
+  profile: UiStyleProfileId
+  label: string
+  description: string
+  selected: boolean
+  onSelect: (profile: UiStyleProfileId) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={label}
+      data-ui-style-preview={profile}
+      data-selected={selected}
+      onClick={() => onSelect(profile)}
+      className="oa-style-profile-card oa-pressable min-h-24 min-w-0 border border-border bg-background p-2.5 text-left"
+    >
+      <span className="oa-style-profile-preview flex h-10 overflow-hidden border border-border bg-card" aria-hidden>
+        <span className="oa-style-profile-rail w-3.5 shrink-0 border-r border-border bg-sidebar" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1 p-1.5">
+          <span className="oa-style-profile-toolbar h-1.5 w-full bg-muted" />
+          <span className="oa-style-profile-row h-2 w-4/5 border border-border bg-background" />
+          <span className="oa-style-profile-row h-2 w-3/5 border border-border bg-background" />
+        </span>
+      </span>
+      <span className="mt-2 block text-[12px] font-semibold text-foreground">{label}</span>
+      <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground">{description}</span>
+    </button>
   )
 }
 

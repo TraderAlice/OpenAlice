@@ -9,6 +9,11 @@ import {
   type ThemePaletteId,
   type ThemePreferenceMode,
 } from './palettes'
+import {
+  DEFAULT_UI_STYLE_PROFILE,
+  isUiStyleProfileId,
+  type UiStyleProfileId,
+} from './styleProfiles'
 
 /**
  * Color-mode and palette-pairing store.
@@ -37,15 +42,18 @@ export interface ThemePreferences {
   theme: AppTheme
   dayPalette: ThemePaletteId
   nightPalette: ThemePaletteId
+  uiStyle: UiStyleProfileId
 }
 
 interface ThemeStore {
   theme: AppTheme
   dayPalette: ThemePaletteId
   nightPalette: ThemePaletteId
+  uiStyle: UiStyleProfileId
   setTheme: (theme: AppTheme) => void
   setDayPalette: (palette: ThemePaletteId) => void
   setNightPalette: (palette: ThemePaletteId) => void
+  setUiStyle: (profile: UiStyleProfileId) => void
   /** Advance to the next mode (drives the ActivityBar toggle). */
   cycleTheme: () => void
 }
@@ -54,6 +62,7 @@ const DEFAULT_PREFERENCES: ThemePreferences = {
   theme: 'auto',
   dayPalette: DEFAULT_DAY_PALETTE,
   nightPalette: DEFAULT_NIGHT_PALETTE,
+  uiStyle: DEFAULT_UI_STYLE_PROFILE,
 }
 
 /** Normalize both the universal-slot shape and the legacy v1 light/dark shape. */
@@ -70,6 +79,7 @@ export function normalizeThemePreferences(
     theme: normalizeThemePreferenceMode(stored.theme) ?? fallback.theme,
     dayPalette: isThemePaletteId(dayPalette) ? dayPalette : fallback.dayPalette,
     nightPalette: isThemePaletteId(nightPalette) ? nightPalette : fallback.nightPalette,
+    uiStyle: isUiStyleProfileId(stored.uiStyle) ? stored.uiStyle : fallback.uiStyle,
   }
 }
 
@@ -79,9 +89,11 @@ export const useThemeStore = create<ThemeStore>()(
       theme: 'auto',
       dayPalette: DEFAULT_DAY_PALETTE,
       nightPalette: DEFAULT_NIGHT_PALETTE,
+      uiStyle: DEFAULT_UI_STYLE_PROFILE,
       setTheme: (theme) => set({ theme }),
       setDayPalette: (dayPalette) => set({ dayPalette }),
       setNightPalette: (nightPalette) => set({ nightPalette }),
+      setUiStyle: (uiStyle) => set({ uiStyle }),
       cycleTheme: () => {
         const i = CYCLE.indexOf(get().theme)
         set({ theme: CYCLE[(i + 1) % CYCLE.length]! })
@@ -107,6 +119,6 @@ export const useThemeStore = create<ThemeStore>()(
 
 /** Persisted preferences at boot (zustand persist rehydrates localStorage sync). */
 export function readInitialThemePreferences(): ThemePreferences {
-  const { theme, dayPalette, nightPalette } = useThemeStore.getState()
-  return { theme, dayPalette, nightPalette }
+  const { theme, dayPalette, nightPalette, uiStyle } = useThemeStore.getState()
+  return { theme, dayPalette, nightPalette, uiStyle }
 }
