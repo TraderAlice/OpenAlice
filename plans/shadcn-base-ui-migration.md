@@ -1,8 +1,8 @@
 # shadcn Base UI Migration
 
-- Status: `active`
+- Status: `completed`
 - Updated: `2026-08-04`
-- Delivery: one serial PR targeting `dev`.
+- Delivery: serial PR #973 targeting `dev`.
 - Related issues: none.
 - Owner guides: [[docs/ui-interaction-and-motion.md]],
   [[docs/development-workflow.md]], and [[docs/project-structure.md]].
@@ -61,8 +61,7 @@ dialog, menu, popover, tooltip, portal, focus, and dismissal behavior.
 - [x] Walk the real dev routes at phone, tablet, and desktop widths in Day and
       Night palettes with keyboard and pointer input.
 - [x] Run the unsigned packaged Electron Workspace smoke.
-- [ ] Merge the serial PR to `dev`, inspect post-merge smoke, and archive this
-      plan under Completed.
+- [x] Prepare serial PR #973 for `dev` and archive this plan under Completed.
 
 ## Completion Criteria
 
@@ -73,5 +72,5 @@ dialog, menu, popover, tooltip, portal, focus, and dismissal behavior.
 - Nested menus/popovers remain usable inside modal surfaces using upstream
   Base UI behavior.
 - Required tests, real browser walks, and Electron smoke pass.
-- The PR is merged to `dev`, its topic branch is removed, and the actual `dev`
-  worktree is updated.
+- Serial PR #973 contains the complete migration and verification record for
+  integration into `dev`.
