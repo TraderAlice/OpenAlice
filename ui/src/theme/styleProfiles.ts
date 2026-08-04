@@ -1,6 +1,7 @@
 import type { ThemePaletteId } from './palettes'
 
 export type UiStyleProfileId = 'default' | 'win98' | 'broker-classic'
+export type UiStylePaletteMode = 'saved' | 'recommended'
 
 export interface UiStyleProfileDefinition {
   readonly id: UiStyleProfileId
@@ -38,4 +39,8 @@ export const UI_STYLE_PROFILES = [
 
 export function isUiStyleProfileId(value: unknown): value is UiStyleProfileId {
   return UI_STYLE_PROFILES.some(({ id }) => id === value)
+}
+
+export function isUiStylePaletteMode(value: unknown): value is UiStylePaletteMode {
+  return value === 'saved' || value === 'recommended'
 }

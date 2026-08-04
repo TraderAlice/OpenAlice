@@ -42,25 +42,28 @@ export function AppearanceSection() {
   const dayPalette = useThemeStore((s) => s.dayPalette)
   const nightPalette = useThemeStore((s) => s.nightPalette)
   const uiStyle = useThemeStore((s) => s.uiStyle)
+  const stylePaletteMode = useThemeStore((s) => s.stylePaletteMode)
   const setTheme = useThemeStore((s) => s.setTheme)
   const setDayPalette = useThemeStore((s) => s.setDayPalette)
   const setNightPalette = useThemeStore((s) => s.setNightPalette)
   const setUiStyle = useThemeStore((s) => s.setUiStyle)
+  const setStylePaletteMode = useThemeStore((s) => s.setStylePaletteMode)
   const effectiveSlot = useEffectivePreferenceSlot()
   const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
   const [customizingPalettes, setCustomizingPalettes] = useState(false)
   const paletteEditorId = useId()
   const modes: readonly AppTheme[] = ['auto', 'day', 'night']
-  const activePalette = effectiveSlot === 'day' ? dayPalette : nightPalette
-  const activePaletteDefinition = paletteDefinition(activePalette)
   const activeStyleDefinition: UiStyleProfileDefinition = UI_STYLE_PROFILES.find(
     (profile) => profile.id === uiStyle,
   )!
   const recommendedPalettePair = activeStyleDefinition.recommendedPalettePair
-  const recommendedPaletteApplied = recommendedPalettePair != null
-    && dayPalette === recommendedPalettePair.day
-    && nightPalette === recommendedPalettePair.night
+  const recommendedPaletteApplied = recommendedPalettePair != null && stylePaletteMode === 'recommended'
+  const effectivePalettePair = recommendedPaletteApplied ? recommendedPalettePair : undefined
+  const activePalette = effectiveSlot === 'day'
+    ? effectivePalettePair?.day ?? dayPalette
+    : effectivePalettePair?.night ?? nightPalette
+  const activePaletteDefinition = paletteDefinition(activePalette)
   const editingPalette = editingSlot === 'day' ? dayPalette : nightPalette
   const recommendedAppearance = editingSlot === 'day' ? 'light' : 'dark'
   const visiblePalettes = paletteFilter === 'recommended'
@@ -83,11 +86,13 @@ export function AppearanceSection() {
   }
 
   const choosePalette = (palette: ThemePaletteId) => {
+    if (recommendedPaletteApplied) setStylePaletteMode('saved')
     if (editingSlot === 'day') setDayPalette(palette)
     else setNightPalette(palette)
   }
 
   const resetPair = () => {
+    if (recommendedPaletteApplied) setStylePaletteMode('saved')
     setDayPalette(DEFAULT_DAY_PALETTE)
     setNightPalette(DEFAULT_NIGHT_PALETTE)
     setPaletteFilter('recommended')
@@ -95,8 +100,7 @@ export function AppearanceSection() {
 
   const applyRecommendedPalette = () => {
     if (!recommendedPalettePair) return
-    setDayPalette(recommendedPalettePair.day)
-    setNightPalette(recommendedPalettePair.night)
+    setStylePaletteMode(recommendedPaletteApplied ? 'saved' : 'recommended')
   }
 
   return (
@@ -156,11 +160,15 @@ export function AppearanceSection() {
             <button
               type="button"
               onClick={applyRecommendedPalette}
-              disabled={recommendedPaletteApplied}
-              className="oa-pressable min-h-10 shrink-0 rounded-md border border-border bg-background px-3 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/35 hover:text-primary disabled:cursor-default disabled:opacity-55 sm:min-h-8"
+              aria-pressed={recommendedPaletteApplied}
+              className={`oa-pressable min-h-10 shrink-0 rounded-md border px-3 py-1.5 text-[11px] font-medium sm:min-h-8 ${
+                recommendedPaletteApplied
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-foreground hover:border-primary/35 hover:text-primary'
+              }`}
             >
               {t(recommendedPaletteApplied
-                ? 'settings.appearance.recommendedPaletteApplied'
+                ? 'settings.appearance.useSavedPalettes'
                 : 'settings.appearance.applyRecommendedPalette')}
             </button>
           </div>
