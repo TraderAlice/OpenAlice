@@ -260,8 +260,9 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
-    await user.click(moreWorkspaceActions)
-    await user.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
+    moreWorkspaceActions.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
     expect(onNavigate).not.toHaveBeenCalled()
 
     fireEvent.click(newChat)
@@ -309,7 +310,8 @@ describe('ChatWorkspaceSection actions', () => {
     const more = screen.getByRole('button', {
       name: 'More actions for Optical Networking Follow-up (chat-jun30)',
     })
-    await user.click(more)
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     const configure = screen.getByRole('menuitem', {
       name: 'Configure Optical Networking Follow-up (chat-jun30)',
     })
@@ -463,8 +465,10 @@ describe('ChatWorkspaceSection actions', () => {
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
-    await user.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Delete Coordinate owners' }))
+    const managerMore = within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' })
+    managerMore.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
     expect(onNavigate).toHaveBeenCalledTimes(2)
 

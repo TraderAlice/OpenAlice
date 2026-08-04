@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/shadcn-base-ui-migration.md]] — Replaces the initial Radix-backed
+  shadcn primitives and custom overlay patches with the current official Base
+  UI + Nova source while preserving OpenAlice's product hierarchy and palette.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY

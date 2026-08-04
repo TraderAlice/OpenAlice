@@ -148,18 +148,17 @@ describe('ActivityBar mobile drawer state', () => {
     const backdrop = document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')
 
     expect(drawer.getAttribute('aria-modal')).toBe('true')
-    expect(document.activeElement).toBe(currentDestination)
+    await waitFor(() => expect(document.activeElement).toBe(currentDestination))
     expect(drawer.className).toContain('motion-reduce:transition-none')
     expect(backdrop?.getAttribute('aria-hidden')).toBe('true')
-    expect(backdrop?.className).toContain('motion-reduce:animate-none')
 
     lastAction.focus()
     await user.tab()
-    expect(document.activeElement).toBe(firstAction)
+    await waitFor(() => expect(document.activeElement).toBe(firstAction))
 
     firstAction.focus()
     await user.tab({ shift: true })
-    expect(document.activeElement).toBe(lastAction)
+    await waitFor(() => expect(document.activeElement).toBe(lastAction))
 
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useMobilePageNavigation, MobilePageNavigationProvider } from '../contexts/MobilePageNavigationContext'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -81,7 +81,7 @@ describe('PageSidebarLayout', () => {
     await user.click(contextTrigger)
     const drawer = screen.getByTestId('page-sidebar-drawer')
     expect(contextTrigger.getAttribute('aria-controls')).toBe(drawer.id)
-    expect(drawer.getAttribute('data-state')).toBe('open')
+    expect(drawer.hasAttribute('data-open')).toBe(true)
     await user.keyboard('{Escape}')
     expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
     expect(document.activeElement).toBe(contextTrigger)
@@ -160,12 +160,12 @@ describe('PageSidebarLayout', () => {
 
     await user.click(opener)
     const drawer = screen.getByTestId('page-sidebar-drawer')
-    expect(drawer.getAttribute('data-state')).toBe('open')
+    expect(drawer.hasAttribute('data-open')).toBe(true)
     expect(opener.getAttribute('aria-controls')).toBe(drawer.id)
     expect(drawer.getAttribute('role')).toBe('dialog')
     expect(drawer.getAttribute('aria-modal')).toBe('true')
     expect(opener.getAttribute('aria-expanded')).toBe('true')
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close Inbox' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close Inbox' })))
     expect(screen.getByText('Inbox message').closest('[inert]')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Select message' }))
@@ -210,15 +210,15 @@ describe('PageSidebarLayout', () => {
     const close = screen.getByRole('button', { name: 'Close Tracked' })
     const current = screen.getByRole('button', { name: 'Current item' })
     const last = screen.getByRole('button', { name: 'Last item' })
-    expect(document.activeElement).toBe(current)
+    await waitFor(() => expect(document.activeElement).toBe(current))
 
     last.focus()
     await user.tab()
-    expect(document.activeElement).toBe(close)
+    await waitFor(() => expect(document.activeElement).toBe(close))
 
     close.focus()
     await user.tab({ shift: true })
-    expect(document.activeElement).toBe(last)
+    await waitFor(() => expect(document.activeElement).toBe(last))
 
     await user.keyboard('{Escape}')
     expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
@@ -245,7 +245,7 @@ describe('PageSidebarLayout', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open Settings' }))
     const drawer = screen.getByTestId('page-sidebar-drawer')
-    expect(drawer.getAttribute('data-state')).toBe('open')
+    expect(drawer.hasAttribute('data-open')).toBe(true)
 
     await user.click(screen.getByRole('button', { name: 'Select General' }))
     expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()

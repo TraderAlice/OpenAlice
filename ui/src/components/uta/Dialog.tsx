@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
+import { useRef, type ReactNode, type RefObject } from 'react'
 
 import {
   Dialog as DialogPrimitive,
@@ -29,11 +29,6 @@ export function Dialog({
       : null,
   )
 
-  useEffect(() => () => {
-    const previousFocus = restoreFocusRef.current
-    if (previousFocus?.isConnected) previousFocus.focus()
-  }, [])
-
   return (
     <DialogPrimitive
       open
@@ -45,17 +40,8 @@ export function Dialog({
         aria-modal="true"
         aria-describedby={undefined}
         showCloseButton={false}
-        onOpenAutoFocus={initialFocusRef
-          ? (event) => {
-            event.preventDefault()
-            initialFocusRef.current?.focus()
-          }
-          : undefined}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault()
-          const previousFocus = restoreFocusRef.current
-          if (previousFocus?.isConnected) previousFocus.focus()
-        }}
+        initialFocus={initialFocusRef}
+        finalFocus={restoreFocusRef}
         className={cn(
           'flex flex-col gap-0 overflow-hidden p-0',
           width || 'w-full sm:w-[560px]',

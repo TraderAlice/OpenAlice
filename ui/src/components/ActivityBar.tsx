@@ -287,19 +287,13 @@ export function ActivityBar({
         aria-describedby={undefined}
         showCloseButton={false}
         className={`${railClassName} max-w-[85vw] gap-0 p-0 shadow-none motion-reduce:animate-none motion-reduce:transition-none data-[side=left]:w-[280px] data-[side=left]:max-w-[85vw] sm:max-w-[85vw]`}
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
+        initialFocus={() => {
           const drawer = mobileDrawerRef.current
           const current = drawer?.querySelector<HTMLElement>('[aria-current="page"]')
           const firstAction = drawer?.querySelector<HTMLElement>('button:not([disabled])')
-          ;(current ?? firstAction ?? drawer)?.focus({ preventScroll: true })
+          return current ?? firstAction ?? drawer
         }}
-        onCloseAutoFocus={returnFocusRef
-          ? (event) => {
-            event.preventDefault()
-            returnFocusRef.current?.focus({ preventScroll: true })
-          }
-          : undefined}
+        finalFocus={returnFocusRef ?? undefined}
       >
         <SheetTitle className="sr-only">{t('nav.primaryNavigation')}</SheetTitle>
         {railContent}

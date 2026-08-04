@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { useState } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -49,11 +49,11 @@ describe('ConfirmDialog', () => {
     await user.click(opener)
 
     expect(screen.getByRole('alertdialog', { name: 'Remove workspace?' })).toBeTruthy()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' })))
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(document.activeElement).toBe(opener)
+    await waitFor(() => expect(document.activeElement).toBe(opener))
   })
 
   it('keeps the dialog open and disables actions while confirmation is pending', async () => {

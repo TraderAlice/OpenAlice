@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "shadcn/tailwind.css";
 @import "./theme/palette.css";
 
 /* Tailwind aliases for the semantic color card. The core names intentionally

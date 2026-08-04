@@ -99,7 +99,7 @@ away from the pointer.
 ### Component primitive ownership
 
 Behavioral UI primitives live as source under `ui/src/components/ui/`. They are
-initialized from shadcn's Radix recipes through `ui/components.json`, then
+initialized from shadcn's Base UI recipes through `ui/components.json`, then
 owned and reviewed as OpenAlice code. Product components such as
 `PageSidebarLayout`, `ConfirmDialog`, and the UTA `Dialog` wrapper retain their
 domain API and composition; the lower layer owns portals, focus containment,
@@ -107,16 +107,16 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 
 - Use an existing owned primitive before adding document-level listeners or a
   new focus trap for a dialog, sheet, popover, menu, or tooltip.
-- Modal Dialog, AlertDialog, and Sheet content establishes the portal boundary
-  for descendant non-modal overlays. Dropdown menus, popovers, and tooltips
-  must use the nearest boundary instead of escaping to `body`, where the owning
-  modal would make them inert or place them below its backdrop.
+- Keep the shared primitives aligned with the official `base-nova` registry
+  output. Base UI owns modal and nested-overlay coordination; do not add an
+  OpenAlice portal-boundary context or manually move descendant overlays into
+  Dialog, AlertDialog, or Sheet content.
 - Keep generated primitives bound to semantic tokens. Running the shadcn CLI
   must not replace `ui/src/index.css`, palette definitions, typography, or the
   current default visual hierarchy.
-- Prefer the smallest official Radix package required by the checked-in
-  primitives. Do not add a third-party registry or generic shadcn block when a
-  product composition already exists.
+- Prefer the official Base UI package required by the checked-in primitives.
+  Do not add a second primitive base, third-party registry, or generic shadcn
+  block when a product composition already exists.
 - Treat `data-slot` as the stable styling seam. Future selectable UI styles
   may vary geometry, elevation, density, typography, and motion through that
   seam; `data-palette` remains the color axis.

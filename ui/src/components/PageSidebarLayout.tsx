@@ -314,19 +314,15 @@ export function PageSidebarLayout({
           aria-describedby={undefined}
           showCloseButton={false}
           className="oa-page-sidebar-dialog h-dvh max-h-none w-[280px] max-w-[85vw] gap-0 overflow-hidden border-0 bg-transparent p-0 text-foreground"
-          onOpenAutoFocus={(event) => {
-            event.preventDefault()
+          initialFocus={() => {
             const drawer = mobileDrawerRef.current
             const current = drawer?.querySelector<HTMLElement>('[aria-current="page"]')
             const firstFocusable = drawer?.querySelector<HTMLElement>(
               'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
             )
-            ;(current ?? firstFocusable ?? drawer)?.focus({ preventScroll: true })
+            return current ?? firstFocusable ?? drawer
           }}
-          onCloseAutoFocus={(event) => {
-            event.preventDefault()
-            mobileTriggerRef.current?.focus({ preventScroll: true })
-          }}
+          finalFocus={mobileTriggerRef}
         >
           <SheetTitle className="sr-only">{title}</SheetTitle>
           <Sidebar

@@ -1075,15 +1075,15 @@ export function IssueActivity({
                         open={identityPopoverId === record.id}
                         onOpenChange={(open) => setIdentityPopoverId(open ? record.id : null)}
                       >
-                        <PopoverTrigger asChild>
-                          <button
+                        <PopoverTrigger
+                          render={<button
                             type="button"
                             aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
                             disabled={openingId !== null}
                             className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
-                          >
+                          />}
+                        >
                             {originLabel}
-                          </button>
                         </PopoverTrigger>
                         <PopoverContent
                             id={`issue-session-${record.id}`}
@@ -1091,7 +1091,7 @@ export function IssueActivity({
                             aria-label={t('issues.detail.sessionDialog', { resumeId: origin.resumeId })}
                             align="start"
                             sideOffset={8}
-                            onOpenAutoFocus={(event) => event.preventDefault()}
+                            initialFocus={false}
                             className="z-30 w-72 max-w-[calc(100vw-3rem)] gap-0 rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg ring-0"
                           >
                             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
