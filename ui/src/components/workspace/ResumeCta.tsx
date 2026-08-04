@@ -7,8 +7,8 @@ import type { SessionRecord } from './api';
 
 export interface ResumeCtaProps {
   readonly record: SessionRecord;
-  readonly onResume: () => void;
-  readonly onOpenWebPi?: () => void;
+  readonly onResume: () => Promise<void>;
+  readonly onOpenWebPi?: () => Promise<void>;
 }
 
 /**
@@ -34,14 +34,20 @@ export interface ResumeCtaProps {
  */
 export function ResumeCta(props: ResumeCtaProps): ReactElement {
   const [resuming, setResuming] = useState<'terminal' | 'webpi' | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const r = props.record;
 
-  const onClick = (): void => {
+  const run = async (surface: 'terminal' | 'webpi'): Promise<void> => {
     if (resuming) return;
-    setResuming('terminal');
-    props.onResume();
-    // No setResuming(false) — the parent re-renders once state flips to
-    // 'running' which unmounts this component entirely.
+    setError(null);
+    setResuming(surface);
+    try {
+      if (surface === 'webpi') await props.onOpenWebPi?.();
+      else await props.onResume();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setResuming(null);
+    }
   };
 
   return (
@@ -63,7 +69,7 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             <button
               type="button"
               className="resume-cta-btn"
-              onClick={onClick}
+              onClick={() => void run('terminal')}
               disabled={resuming !== null}
               aria-label={resuming ? 'Resuming conversation…' : 'Continue in terminal'}
             >
@@ -74,11 +80,7 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
               <button
                 type="button"
                 className="resume-cta-btn is-webpi"
-                onClick={() => {
-                  if (resuming) return
-                  setResuming('webpi')
-                  props.onOpenWebPi?.()
-                }}
+                onClick={() => void run('webpi')}
                 disabled={resuming !== null}
               >
                 <Bot size={14} strokeWidth={2.25} aria-hidden="true" />
@@ -87,6 +89,12 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
               </button>
             )}
           </div>
+
+          {error && (
+            <p role="alert" className="resume-cta-error">
+              {error}
+            </p>
+          )}
 
           <dl className="resume-cta-meta">
             <dt>Agent</dt>

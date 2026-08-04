@@ -500,32 +500,23 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
   });
 });
 
-describe('POST /quick-chat — loginless credential injection', () => {
-  it('opencode + empty vault → 400 no_ai_credential, no inject, no spawn', async () => {
+describe('POST /quick-chat — native auth and explicit credential overrides', () => {
+  it('opencode + empty vault → native launch without injection', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app, opencode, spawn } = build();
     const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
-    expect(r.status).toBe(400);
-    expect(r.body.error).toBe('no_ai_credential');
-    expect(r.body.settingsTarget).toBe('ai-provider'); // the composer's bounce target
+    expect(r.status).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
-    expect(spawn).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('opencode + compatible cred → injects the current vendor recommendation then spawns', async () => {
+  it('opencode + compatible cred → keeps native auth until the credential is explicitly selected', async () => {
     vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
     const { app, opencode, spawn } = build();
     const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
     expect(r.status).toBe(201);
-    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
-    const cred = (opencode.writeAiConfig.mock.calls[0] as any[])[1];
-    expect(cred.apiKey).toBe('sk-oa');
-    expect(cred.wireShape).toBe('openai-chat');
-    expect(cred.model).toBe('gpt-5.6'); // current vendor recommendation — no lastModel yet
-    expect(cred.contextWindow).toBe(1_050_000);
-    expect(cred.reasoning).toBe(true);
-    // model remembered on the cred for next time
-    expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.6');
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(vi.mocked(setCredentialLastModel)).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
   });
 
@@ -795,30 +786,29 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(spawn).not.toHaveBeenCalled();
   });
 
-  it('normal opencode spawn + empty vault/config → 400 no_ai_credential', async () => {
+  it('normal opencode spawn + empty vault/config → native launch', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app, opencode, spawn } = build();
 
     const r = await spawnSession(app, { agent: 'opencode' });
 
-    expect(r.status).toBe(400);
-    expect(r.body.error).toBe('no_ai_credential');
+    expect(r.status).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
-    expect(spawn).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('normal opencode spawn + compatible cred → injects and spawns', async () => {
+  it('normal opencode spawn + compatible cred → does not infer an override', async () => {
     vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
     const { app, opencode, spawn } = build();
 
     const r = await spawnSession(app, { agent: 'opencode' });
 
     expect(r.status).toBe(201);
-    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('agent-readiness reports missing credential for loginless runtimes', async () => {
+  it('agent-readiness delegates authentication to the native runtime', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app } = build();
 
@@ -828,10 +818,9 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(res.status).toBe(200);
     expect(body).toMatchObject({
       agent: 'opencode',
-      ready: false,
-      requiresCredential: true,
-      source: 'missing',
-      settingsTarget: 'ai-provider',
+      ready: true,
+      requiresCredential: false,
+      source: 'runtime-login',
     });
   });
 });

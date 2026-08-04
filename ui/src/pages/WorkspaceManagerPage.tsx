@@ -175,8 +175,8 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
           {session.state === 'paused' ? (
             <ResumeCta
               record={session}
-              onResume={() => void resumeSession(MANAGER_WORKSPACE_ID, session.id)}
-              onOpenWebPi={() => void openWebPiSession(MANAGER_WORKSPACE_ID, session.id)}
+              onResume={() => resumeSession(MANAGER_WORKSPACE_ID, session.id)}
+              onOpenWebPi={() => openWebPiSession(MANAGER_WORKSPACE_ID, session.id)}
             />
           ) : session.agent === 'pi' && session.surface === 'webpi' ? (
             <WebPiView

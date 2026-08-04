@@ -211,11 +211,11 @@ describe('resolveAgentCredential', () => {
 })
 
 describe('resolveAgentLaunchCredentialSlug', () => {
-  it('passes a resolved OpenCode/Pi credential even when runtime readiness came from global config', () => {
+  it('passes an explicitly resolved provider override for any provider-capable runtime', () => {
     expect(resolveAgentLaunchCredentialSlug(true, 'meituan-longcat')).toBe('meituan-longcat')
   })
 
-  it('does not send credentials to login-backed runtimes', () => {
+  it('does not send credentials to runtimes without provider overrides', () => {
     expect(resolveAgentLaunchCredentialSlug(false, 'meituan-longcat')).toBeUndefined()
   })
 })

@@ -178,8 +178,8 @@ export function WorkspacePage({ spec, visible }: Props) {
           label={workspaceName}
           terminalHeaderActions={terminalCanvas ? workspaceActions : undefined}
           onSpawnFresh={spawnDefault}
-          onResume={(id) => void ctx.resumeSession(wsId, id, source)}
-          onOpenWebPi={(id) => void ctx.openWebPiSession(wsId, id, source)}
+          onResume={(id) => ctx.resumeSession(wsId, id, source)}
+          onOpenWebPi={(id) => ctx.openWebPiSession(wsId, id, source)}
           onSelectSession={(id) => {
             // Running session — already alive on the server, just
             // navigate. Mirrors the sidebar's onSelectSession path.
