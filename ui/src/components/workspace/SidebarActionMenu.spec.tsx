@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
+import { useState } from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Pencil, Trash2 } from 'lucide-react'
 
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { ConfirmDialog } from '../ConfirmDialog'
 import { SidebarActionMenu } from './SidebarActionMenu'
 
 afterEach(cleanup)
@@ -94,5 +96,46 @@ describe('SidebarActionMenu', () => {
     expect(menu.hasAttribute('data-open')).toBe(true)
     expect(menu.closest('[inert]')).toBeNull()
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete Session' }))
+  })
+
+  it('hands focus to a follow-up dialog and restores the durable menu trigger', async () => {
+    const user = userEvent.setup()
+
+    function Harness() {
+      const [confirming, setConfirming] = useState(false)
+      return (
+        <>
+          <SidebarActionMenu
+            label="More actions for Session"
+            items={[{
+              label: 'Delete Session',
+              icon: <Trash2 />,
+              onSelect: () => setConfirming(true),
+              danger: true,
+            }]}
+          />
+          {confirming && (
+            <ConfirmDialog
+              title="Delete Session?"
+              message="This cannot be undone."
+              onConfirm={() => {}}
+              onClose={() => setConfirming(false)}
+            />
+          )}
+        </>
+      )
+    }
+
+    render(<Harness />)
+    const trigger = screen.getByRole('button', { name: 'More actions for Session' })
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(screen.getByRole('alertdialog', { name: 'Delete Session?' })).toBeTruthy())
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' })))
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
 })
