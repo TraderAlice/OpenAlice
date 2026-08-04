@@ -127,6 +127,10 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   Keep the current workstation as the compatibility default and gate compact
   desktop density behind both sufficient width and a fine pointer so a visual
   profile never reduces touch usability.
+- A style profile may declare an optional recommended day/night palette pair.
+  Selecting the style must never apply that pair automatically: Settings shows
+  it as an explicit preview and action so users can adopt the complete look
+  without silently losing their existing color choices.
 - Delete superseded event plumbing during migration. A component is not
   migrated if its old global Escape/outside-click/focus-loop implementation is
   still running beside the primitive.

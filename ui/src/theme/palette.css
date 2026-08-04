@@ -284,6 +284,97 @@
   );
 }
 
+/* Windows 98's application chrome: system silver, navy selection, white
+   document fields, and a black console. The paired Win98 style profile owns
+   bevels and square geometry; this card remains independently selectable. */
+:root[data-palette="windows-classic"],
+[data-palette-preview="windows-classic"] {
+  color-scheme: light;
+
+  --background: #c0c0c0;
+  --foreground: #000000;
+  --card: #c0c0c0;
+  --card-foreground: #000000;
+  --popover: #c0c0c0;
+  --popover-foreground: #000000;
+  --primary: #000080;
+  --primary-foreground: #ffffff;
+  --secondary: #d4d0c8;
+  --secondary-foreground: #000000;
+  --muted: #a0a0a0;
+  --muted-foreground: #3f3f3f;
+  --accent: rgba(0, 0, 128, 0.12);
+  --accent-foreground: #000000;
+  --destructive: #800000;
+  --destructive-foreground: #ffffff;
+  --border: #808080;
+  --input: #808080;
+  --ring: #000080;
+
+  --accent-strong: rgba(0, 0, 128, 0.2);
+  --primary-muted: rgba(0, 0, 128, 0.18);
+  --success: #006400;
+  --success-foreground: #ffffff;
+  --warning: #7f4f00;
+  --warning-foreground: #ffffff;
+  --warning-background: #ffffe1;
+  --warning-border: #808000;
+  --info: #000080;
+  --info-foreground: #ffffff;
+  --ai-action: #800080;
+  --ai-action-foreground: #ffffff;
+  --backdrop: rgba(0, 0, 0, 0.48);
+  --code-background: rgba(255, 255, 255, 0.42);
+  --report-canvas: #ffffff;
+  --shadow-color: #000000;
+
+  --terminal-background: #000000;
+  --terminal-foreground: #c0c0c0;
+  --terminal-cursor: #ffffff;
+  --terminal-cursor-accent: #000000;
+  --terminal-selection-background: #000080;
+  --terminal-selection-foreground: #ffffff;
+  --terminal-black: #000000;
+  --terminal-red: #ff5f5f;
+  --terminal-green: #00aa00;
+  --terminal-yellow: #ffff00;
+  --terminal-blue: #6f6fff;
+  --terminal-magenta: #ff5fff;
+  --terminal-cyan: #00aaaa;
+  --terminal-white: #c0c0c0;
+  --terminal-bright-black: #808080;
+  --terminal-bright-red: #ff0000;
+  --terminal-bright-green: #00ff00;
+  --terminal-bright-yellow: #ffff00;
+  --terminal-bright-blue: #8080ff;
+  --terminal-bright-magenta: #ff00ff;
+  --terminal-bright-cyan: #00ffff;
+  --terminal-bright-white: #ffffff;
+
+  --chart-1: #000080;
+  --chart-2: #006400;
+  --chart-3: #7f4f00;
+  --chart-4: #800080;
+  --chart-5: #008080;
+  --chart-positive: #006400;
+  --chart-negative: #800000;
+  --chart-positive-muted: rgba(0, 100, 0, 0.32);
+  --chart-negative-muted: rgba(128, 0, 0, 0.32);
+  --chart-axis: #3f3f3f;
+  --chart-grid: #808080;
+
+  --sidebar: #c0c0c0;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #000080;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #000080;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #808080;
+  --sidebar-ring: #000080;
+
+  --app-background-wash: none;
+}
+
 :root[data-palette="graphite"],
 [data-palette-preview="graphite"] {
   color-scheme: dark;

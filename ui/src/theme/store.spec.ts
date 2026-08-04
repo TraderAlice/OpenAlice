@@ -60,4 +60,18 @@ describe('theme preference persistence', () => {
 
     expect(normalizeThemePreferences({ uiStyle: 'aqua' }).uiStyle).toBe('default')
   })
+
+  it('accepts Windows Classic in either palette slot', () => {
+    expect(normalizeThemePreferences({
+      theme: 'auto',
+      dayPalette: 'windows-classic',
+      nightPalette: 'windows-classic',
+      uiStyle: 'win98',
+    })).toEqual({
+      theme: 'auto',
+      dayPalette: 'windows-classic',
+      nightPalette: 'windows-classic',
+      uiStyle: 'win98',
+    })
+  })
 })

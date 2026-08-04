@@ -2,6 +2,7 @@ export type ThemePaletteId =
   | 'paper'
   | 'porcelain'
   | 'linen'
+  | 'windows-classic'
   | 'graphite'
   | 'midnight'
   | 'moss'
@@ -29,6 +30,7 @@ export const THEME_PALETTES = [
   { id: 'paper', appearance: 'light', labelKey: 'theme.palette.paper', descriptionKey: 'theme.paletteDescription.paper' },
   { id: 'porcelain', appearance: 'light', labelKey: 'theme.palette.porcelain', descriptionKey: 'theme.paletteDescription.porcelain' },
   { id: 'linen', appearance: 'light', labelKey: 'theme.palette.linen', descriptionKey: 'theme.paletteDescription.linen' },
+  { id: 'windows-classic', appearance: 'light', labelKey: 'theme.palette.windows-classic', descriptionKey: 'theme.paletteDescription.windows-classic' },
   { id: 'graphite', appearance: 'dark', labelKey: 'theme.palette.graphite', descriptionKey: 'theme.paletteDescription.graphite' },
   { id: 'midnight', appearance: 'dark', labelKey: 'theme.palette.midnight', descriptionKey: 'theme.paletteDescription.midnight' },
   { id: 'moss', appearance: 'dark', labelKey: 'theme.palette.moss', descriptionKey: 'theme.paletteDescription.moss' },
