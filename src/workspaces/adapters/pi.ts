@@ -15,6 +15,7 @@ import type {
 import type { HeadlessOutputEvent } from '../headless-output.js';
 import {
   migrateLegacyPiAgentDir,
+  localizePiWorkspaceProvider,
   PI_BINDING_STATE_PATH,
   PI_PROJECT_SETTINGS_PATH,
   PI_PROVIDER_PREFIX,
@@ -218,12 +219,12 @@ function piHeadlessApproveArgs(env: Readonly<Record<string, string | undefined>>
  * `.pi/extensions/openalice-bridge.ts` MCP bridge was removed when the launcher
  * went CLI-only. See memory feedback_cli_injection_over_mcp_bridge.
  *
- * PROVIDER override: Pi has no project-local `models.json`, so OpenAlice adds a
- * namespaced provider to Pi's real user agent directory and selects it through
- * the native `<cwd>/.pi/settings.json` project layer. This preserves Pi's own
- * global settings, packages, auth, resources, sessions, and fallback behavior.
- * Reset restores the pre-injection project defaults and removes only the
- * OpenAlice-owned provider node.
+ * PROVIDER override: Pi has no project-local `models.json`, so OpenAlice writes
+ * one generic managed extension under `<cwd>/.pi/extensions/`. It registers the
+ * provider stored in the sensitive local binding sidecar, while native project
+ * settings select the model. Pi's global models/auth/settings/packages/sessions
+ * remain untouched. Reset restores the prior project defaults and removes only
+ * the unchanged OpenAlice-owned extension and sidecar.
  *
  * RESUME is first-class by-id (claude-level), via launcher-ASSIGNED id rather
  * than disk harvesting: `--session-id <id>` is create-or-reopen
@@ -273,6 +274,7 @@ export const piAdapter: CliAdapter = {
     // project choices.
     async prepareWorkspace({ cwd }): Promise<void> {
       await migrateLegacyPiAgentDir(cwd);
+      await localizePiWorkspaceProvider(cwd);
       await syncPiWorkspaceTheme(cwd);
       await syncPiWindowsShellPath(cwd);
       await syncPiProjectTrust(cwd);

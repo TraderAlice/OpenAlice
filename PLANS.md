@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/pi-local-workspace-provider.md]] — Moves OpenAlice-managed Pi
+  provider registration from the user-global model registry into reversible,
+  Workspace-local extension state.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY

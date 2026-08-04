@@ -267,7 +267,7 @@ function positiveNumber(value: number | null | undefined): number | null {
  *
  * MUST run AFTER the launcher's initial commit: `writeAiConfig` writes the
  * secret into `.claude/settings.local.json` / `.codex/env.json` / `opencode.json`
- * / Pi's global models plus `.pi/settings.json`, which `_common.sh`'s
+ * / Pi's local provider extension plus `.pi/settings.json`, which `_common.mjs`'s
  * `setup_git_excludes` keeps out of git —
  * but only post-commit are we certain the key never lands in the initial commit.
  *
