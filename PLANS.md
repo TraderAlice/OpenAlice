@@ -21,9 +21,6 @@ the durable truth after it changes.
 
 ## Active
 
-- [[plans/runtime-ui-style-profiles.md]] — Adds independent runtime-selectable
-  component appearance profiles for Default, Windows 98, and Broker Classic
-  while preserving palette choice and shared shadcn/Base UI behavior.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
@@ -31,6 +28,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/runtime-ui-style-profiles.md]] — Added independent runtime-selectable
+  component appearance profiles for Default, Windows 98, and Broker Classic
+  while preserving palette choice and shared shadcn/Base UI behavior. Delivered
+  in serial PR #976.
 - [[plans/shadcn-systematic-ui-audit.md]] — Exercised every installed
   shadcn/Base UI primitive through real product entries, repaired the
   menu-to-dialog focus handoff, and passed browser, full-suite, build, and

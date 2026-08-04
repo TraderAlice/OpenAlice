@@ -1,8 +1,8 @@
 # Runtime UI Style Profiles
 
-- Status: `active`
+- Status: `completed`
 - Updated: `2026-08-04`
-- Delivery: one serial PR targeting `dev`.
+- Delivery: serial PR #976 merged to `dev`.
 - Owner guides: [[docs/ui-interaction-and-motion.md]],
   [[docs/development-workflow.md]], and [[docs/project-structure.md]].
 
@@ -42,7 +42,7 @@ than forking components or introducing profile-specific product logic.
       desktop, tablet, and phone widths.
 - [x] Run root/UI typechecks, the full Vitest suite, production UI build, and
       unsigned packaged Electron Workspace smoke.
-- [ ] Merge the serial PR to `dev`, run a post-merge smoke, and archive this
+- [x] Merge the serial PR to `dev`, run a post-merge smoke, and archive this
       plan under Completed.
 
 ## Verification Record
@@ -59,6 +59,9 @@ than forking components or introducing profile-specific product logic.
   touch-size floor.
 - Passed root and UI TypeScript, 3,907 Vitest tests (plus 9 skipped), the
   production UI build, and unsigned packaged Electron Workspace acceptance.
+- Serial PR #976 merged to `dev`; the merge commit passed the focused 23-test
+  theme suite and a real Default → Windows 98 → Default runtime switch while
+  preserving the user's Auto + Iris preference.
 
 ## Completion Criteria
 
