@@ -1,10 +1,9 @@
 # Mobile Activity Sheet
 
-- Status: `active`
+- Status: `complete`
 - Updated: `2026-08-04`
-- Delivery: serial PR targeting `dev` after Draft PR #970 is explicitly
-  accepted and merged; the implementation branch is currently stacked on
-  #970 and is not published as a second concurrent PR.
+- Delivery: serial PR #971 targeting `dev`, after the shared overlay foundation
+  was explicitly accepted and merged in PR #970.
 - Related issues: none.
 - Owner guides: [[docs/ui-interaction-and-motion.md]] and
   [[docs/development-workflow.md]].
@@ -43,8 +42,9 @@ information hierarchy, density, collapse behavior, and lifetime.
    normal mounted `aside`.
 2. The App keeps its explicit background `inert` contract while the phone rail
    is open. Sheet owns generic modal behavior; App owns the shell hierarchy.
-3. This is a serial follow-on, not extra scope added to autonomous Draft PR
-   #970 and not a second simultaneously published contribution.
+3. This shipped as serial follow-on PR #971 after autonomous foundation PR
+   #970 was accepted and merged, rather than as extra foundation scope or a
+   simultaneous contribution.
 
 ## Work
 
@@ -58,7 +58,7 @@ information hierarchy, density, collapse behavior, and lifetime.
 - [x] Walk the real `pnpm dev` Inbox and Settings routes at phone and desktop
       widths with keyboard and pointer input in Day and Night palettes.
 - [x] Run the unsigned packaged Electron Workspace smoke.
-- [ ] After #970 is explicitly accepted, update from `dev`, replay this atomic
+- [x] After #970 is explicitly accepted, update from `dev`, replay this atomic
       commit on a fresh serial branch, rerun affected checks, and open/merge a
       dev-targeted PR.
 

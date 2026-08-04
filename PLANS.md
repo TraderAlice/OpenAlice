@@ -21,10 +21,6 @@ the durable truth after it changes.
 
 ## Active
 
-- [[plans/mobile-activity-sheet.md]] — Moves the phone ActivityBar onto the
-  shared Sheet behavior while preserving the static desktop rail; it is a
-  serial follow-on to Draft PR #970 and remains local until that foundation is
-  explicitly accepted.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
@@ -32,6 +28,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/mobile-activity-sheet.md]] — Moved the phone ActivityBar onto the
+  shared Sheet behavior while preserving the static desktop rail. Delivered as
+  serial PR #971 after the foundation in PR #970 was accepted and merged.
 - [[plans/shadcn-overlay-foundation.md]] — Established an OpenAlice-owned
   shadcn/Radix primitive layer, retired representative hand-written overlay
   behavior, and preserved the current product hierarchy and visual language as
