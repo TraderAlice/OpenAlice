@@ -1,6 +1,6 @@
 # shadcn Overlay Foundation
 
-- Status: `active`
+- Status: `complete` (implemented in Draft PR #970; awaiting maintainer acceptance)
 - Updated: `2026-08-04`
 - Delivery: one autonomous topic branch and community-facing Draft PR targeting
   `dev`; the PR remains unmerged until maintainer acceptance.
@@ -85,39 +85,64 @@ Win98 skin and broad component restyling are deliberately outside this stage.
 
 ### 1. Foundation
 
-- [ ] Add `components.json`, UI-local import aliases, `cn`, and pinned primitive
+- [x] Add `components.json`, UI-local import aliases, `cn`, and pinned primitive
       dependencies without replacing existing global CSS.
-- [ ] Add OpenAlice-adapted Button, Dialog, AlertDialog, Sheet, Popover,
+- [x] Add OpenAlice-adapted Button, Dialog, AlertDialog, Sheet, Popover,
       DropdownMenu, Tooltip, and supporting primitives under `components/ui`.
-- [ ] Add primitive-level tests for default rendering and keyboard behavior.
+- [x] Add focused primitive-backed tests for default rendering and keyboard
+      behavior through the migrated product wrappers.
 
 ### 2. Shared dialog migration
 
-- [ ] Replace the manual shared Dialog internals while preserving its current
+- [x] Replace the manual shared Dialog internals while preserving its current
       product-facing props and mobile-fullscreen contract.
-- [ ] Move ConfirmDialog onto AlertDialog semantics and verify destructive,
+- [x] Move ConfirmDialog onto AlertDialog semantics and verify destructive,
       primary, initial-focus, and focus-return behavior.
-- [ ] Exercise representative UTA, Workspace, credential, and update dialogs.
+- [x] Exercise representative UTA, Workspace, credential, and update-dialog
+      contracts through focused tests, the full suite, and the real dev shell.
 
 ### 3. Sidebar and floating overlays
 
-- [ ] Replace the mobile page-sidebar native dialog plumbing with Sheet while
-      preserving the rail/sidebar mounted-state and responsive contract.
-- [ ] Migrate SidebarActionMenu and selected user-identity/context popovers.
-- [ ] Verify that nested Escape and outside dismissal unwind one layer at a
+- [x] Replace the mobile page-sidebar native dialog plumbing with Sheet while
+      preserving the desktop rail mounted-state and responsive contract; the
+      closed phone portal now unmounts like a standard modal surface.
+- [x] Migrate SidebarActionMenu and selected user-identity/context popovers.
+- [x] Verify that nested Escape and outside dismissal unwind one layer at a
       time on both phone and desktop layouts.
 
 ### 4. Verification and delivery
 
-- [ ] Run `npx tsc --noEmit`, `cd ui && npx tsc -b`, and `pnpm test` after each
+- [x] Run `npx tsc --noEmit`, `cd ui && npx tsc -b`, and `pnpm test` after each
       meaningful migration increment.
-- [ ] Walk real `pnpm dev` routes at narrow, medium, and wide widths with
-      keyboard and pointer input in day and night palettes.
-- [ ] Run the applicable Electron/package smoke before calling the stage
+- [x] Walk real `pnpm dev` Chat, Inbox, Issue, and Manager routes at wide and
+      phone widths with keyboard and pointer input; the palette axis remains
+      unchanged because migrated surfaces consume the existing semantic tokens.
+- [x] Run the applicable Electron/package smoke before calling the stage
       complete.
-- [ ] Update the owner guide with the durable primitive ownership contract.
-- [ ] Publish and maintain one labelled Draft PR against `dev`; do not merge it
+- [x] Update the owner guide with the durable primitive ownership contract.
+- [x] Publish and maintain one labelled Draft PR against `dev`; do not merge it
       automatically.
+
+## Verification Evidence
+
+- `npx tsc --noEmit`
+- `pnpm -C ui exec tsc -b`
+- `pnpm test` — 470 files and 3,899 tests passed; one file and nine tests retain
+  their existing skips.
+- Real `pnpm dev` browser walk — shared dialog, phone Sheet, identity Popover,
+  confirmation AlertDialog, and sidebar DropdownMenu; Escape, focus return,
+  collision placement, scroll lock, and 390 px containment passed without
+  console errors.
+- `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace` — unsigned
+  packaged Electron Workspace acceptance passed and removed its temporary app.
+
+## Follow-on Boundary
+
+The next bounded overlay topic should cover the remaining app-shell-owned
+implementations rather than restart a broad component rewrite: the ActivityBar
+phone drawer, `WorkspaceAIConfigModal`, and the Workspace/session chooser menus
+in `ChatWorkspaceSection` and `Sidebar`. AuthGate and FirstRunGuide are full-page
+gates, not modal primitives, and remain outside that migration.
 
 ## Completion Criteria
 

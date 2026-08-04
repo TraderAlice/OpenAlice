@@ -47,6 +47,7 @@ import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { CenteredLoading } from './StateViews'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
 // Issue's independent operational history stays consistent with Automation.
@@ -988,25 +989,6 @@ export function IssueActivity({
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [openError, setOpenError] = useState<string | null>(null)
   const [identityPopoverId, setIdentityPopoverId] = useState<string | null>(null)
-  const identityPopoverRef = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (!identityPopoverId) return
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!identityPopoverRef.current?.contains(event.target as Node)) {
-        setIdentityPopoverId(null)
-      }
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIdentityPopoverId(null)
-    }
-    document.addEventListener('mousedown', closeOnOutsideClick)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [identityPopoverId])
 
   const openSession = async (record: IssueProvenanceRecord) => {
     setIdentityPopoverId(null)
@@ -1089,28 +1071,28 @@ export function IssueActivity({
                 <div className="min-w-0 flex-1">
                   <div className="text-[12px] text-muted-foreground">
                     {isSession ? (
-                      <span
-                        ref={identityPopoverId === record.id ? identityPopoverRef : undefined}
-                        className="relative inline-block"
+                      <Popover
+                        open={identityPopoverId === record.id}
+                        onOpenChange={(open) => setIdentityPopoverId(open ? record.id : null)}
                       >
-                        <button
-                          type="button"
-                          aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
-                          aria-haspopup="dialog"
-                          aria-expanded={identityPopoverId === record.id}
-                          aria-controls={`issue-session-${record.id}`}
-                          onClick={() => setIdentityPopoverId((open) => open === record.id ? null : record.id)}
-                          disabled={openingId !== null}
-                          className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
-                        >
-                          {originLabel}
-                        </button>
-                        {identityPopoverId === record.id && (
-                          <div
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
+                            disabled={openingId !== null}
+                            className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
+                          >
+                            {originLabel}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
                             id={`issue-session-${record.id}`}
                             role="dialog"
                             aria-label={t('issues.detail.sessionDialog', { resumeId: origin.resumeId })}
-                            className="oa-popover-enter absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg"
+                            align="start"
+                            sideOffset={8}
+                            onOpenAutoFocus={(event) => event.preventDefault()}
+                            className="z-30 w-72 max-w-[calc(100vw-3rem)] gap-0 rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg ring-0"
                           >
                             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
                               {t('issues.detail.session')}
@@ -1129,9 +1111,8 @@ export function IssueActivity({
                                 ? t('issues.detail.opening')
                                 : t('issues.detail.openConversation')}
                             </button>
-                          </div>
-                        )}
-                      </span>
+                        </PopoverContent>
+                      </Popover>
                     ) : (
                       <span className="font-medium text-foreground/80">{originLabel}</span>
                     )}{' '}

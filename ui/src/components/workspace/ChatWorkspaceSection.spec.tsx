@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkspacesContext, type WorkspacesContextValue } from '../../contexts/workspaces-context'
@@ -241,7 +242,8 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onRequestDisplayMode).toHaveBeenCalledWith('focused')
   })
 
-  it('keeps conversation creation primary and scopes workspace creation to the workspace list', () => {
+  it('keeps conversation creation primary and scopes workspace creation to the workspace list', async () => {
+    const user = userEvent.setup()
     const onNavigate = vi.fn()
     renderSection([chatWorkspace], null, onNavigate)
 
@@ -258,8 +260,8 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
-    fireEvent.click(moreWorkspaceActions)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
+    await user.click(moreWorkspaceActions)
+    await user.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
     expect(onNavigate).not.toHaveBeenCalled()
 
     fireEvent.click(newChat)
@@ -284,7 +286,8 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.getByRole('button', { name: 'New workspace' })).toBeTruthy()
   })
 
-  it('keeps named Workspace identity compact and scopes every row action to it', () => {
+  it('keeps named Workspace identity compact and scopes every row action to it', async () => {
+    const user = userEvent.setup()
     const namedWorkspace: Workspace = {
       ...chatWorkspace,
       id: 'chat-optical',
@@ -306,7 +309,7 @@ describe('ChatWorkspaceSection actions', () => {
     const more = screen.getByRole('button', {
       name: 'More actions for Optical Networking Follow-up (chat-jun30)',
     })
-    fireEvent.click(more)
+    await user.click(more)
     const configure = screen.getByRole('menuitem', {
       name: 'Configure Optical Networking Follow-up (chat-jun30)',
     })
@@ -391,7 +394,8 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledTimes(1)
   })
 
-  it('owns Manager Session navigation and lifecycle actions under the Manager entry', () => {
+  it('owns Manager Session navigation and lifecycle actions under the Manager entry', async () => {
+    const user = userEvent.setup()
     const onNavigate = vi.fn()
     const manager: ManagerWorkspaceSnapshot = {
       id: MANAGER_WORKSPACE_ID,
@@ -459,8 +463,8 @@ describe('ChatWorkspaceSection actions', () => {
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' }))
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('menuitem', { name: 'Delete Coordinate owners' }))
+    await user.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
     expect(onNavigate).toHaveBeenCalledTimes(2)
 

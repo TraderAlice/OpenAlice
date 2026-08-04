@@ -74,7 +74,7 @@ describe('CreateUTADialog', () => {
   it('uses broker-facing setup labels instead of internal UTA labels', () => {
     setup()
 
-    expect(screen.getByText('Connect Broker · Pick Platform')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 3, name: 'Connect Broker · Pick Platform' })).toBeTruthy()
     expect(screen.getByLabelText('Close broker setup')).toBeTruthy()
   })
 

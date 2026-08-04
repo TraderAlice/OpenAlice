@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Pencil, Trash2 } from 'lucide-react'
 
@@ -10,6 +11,7 @@ afterEach(cleanup)
 
 describe('SidebarActionMenu', () => {
   it('supports edge focus, arrow navigation, Escape, and focus return', async () => {
+    const user = userEvent.setup()
     const triggerLabel = 'More actions for Research desk'
     render(
       <SidebarActionMenu
@@ -29,23 +31,25 @@ describe('SidebarActionMenu', () => {
 
     const trigger = screen.getByRole('button', { name: triggerLabel })
     expect(trigger.className).toContain('oa-workspace-row-action')
-    fireEvent.keyDown(trigger, { key: 'ArrowUp' })
+    trigger.focus()
+    await user.keyboard('{ArrowUp}')
 
     const rename = screen.getByRole('menuitem', { name: 'Rename' })
     const offboard = screen.getByRole('menuitem', { name: 'Offboard Research desk' })
     expect(offboard.textContent).toBe('Offboard workspace')
     expect(document.activeElement).toBe(offboard)
 
-    fireEvent.keyDown(offboard, { key: 'ArrowDown' })
+    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(rename)
 
-    fireEvent.keyDown(rename, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     await waitFor(() => expect(document.activeElement).toBe(trigger))
     expect(screen.queryByRole('menu')).toBeNull()
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('closes on an outside pointer without invoking an action', () => {
+  it('closes on an outside pointer without invoking an action', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     render(
       <>
@@ -57,9 +61,9 @@ describe('SidebarActionMenu', () => {
       </>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'More actions for Session' }))
+    await user.click(screen.getByRole('button', { name: 'More actions for Session' }))
     expect(screen.getByRole('menuitem', { name: 'Delete Session' })).toBeTruthy()
-    fireEvent.mouseDown(screen.getByRole('button', { name: 'Outside' }))
+    await user.click(screen.getByRole('button', { name: 'Outside' }))
 
     expect(screen.queryByRole('menu')).toBeNull()
     expect(onSelect).not.toHaveBeenCalled()
