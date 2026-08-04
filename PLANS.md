@@ -21,6 +21,10 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/shadcn-systematic-ui-audit.md]] — Systematically walks every
+  installed shadcn/Base UI primitive through its real OpenAlice feature entry,
+  responsive modes, palettes, and keyboard/pointer behavior, repairing any
+  migration regressions before serial integration.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
