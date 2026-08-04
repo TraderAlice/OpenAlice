@@ -1,6 +1,6 @@
 # Native Runtime Authentication Fallback
 
-Status: Active
+Status: Complete — delivered in serial PR #983
 
 Owner guides:
 
@@ -42,7 +42,7 @@ indefinite opening state without a useful repair target.
 - [x] Repair resume failure propagation and opening-state cleanup.
 - [x] Update UI copy, demo capabilities, tests, and durable owner guidance.
 - [x] Verify source types/tests, real browser behavior, and packaged Electron.
-- [ ] Deliver through the serial `dev` PR flow.
+- [x] Deliver through the serial `dev` PR flow.
 
 ## Verification
 

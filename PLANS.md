@@ -21,10 +21,6 @@ the durable truth after it changes.
 
 ## Active
 
-- [[plans/native-runtime-auth-fallback.md]] — Makes OpenCode and Pi honor their
-  native global login/config by default, keeps OpenAlice-managed credentials as
-  an explicit Workspace override, and makes launch/resume authentication
-  failures visible instead of leaving Sessions stuck opening.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
@@ -32,6 +28,11 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/native-runtime-auth-fallback.md]] — Makes OpenCode and Pi honor their
+  native global login/config by default, keeps OpenAlice-managed credentials as
+  an explicit Workspace override, and makes launch/resume authentication
+  failures visible instead of leaving Sessions stuck opening. Delivered in
+  serial PR #983.
 - [[plans/pi-local-workspace-provider.md]] — Moved OpenAlice-managed Pi
   provider registration from the user-global model registry into reversible,
   Workspace-local extension state. Delivered in serial PR #981.
