@@ -94,17 +94,6 @@ function AppShellContent() {
     if (isDesktop) setSidebarOpen(false)
   }, [isDesktop])
 
-  // Lock body scroll while a drawer is open so the page behind doesn't drift
-  // under the backdrop. Restores the previous value on close/unmount.
-  useEffect(() => {
-    if (!sidebarOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [sidebarOpen])
-
   const mainContent = (
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">
       {/* Mobile header — visible only below md */}
