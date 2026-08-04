@@ -21,10 +21,6 @@ the durable truth after it changes.
 
 ## Active
 
-- [[plans/shadcn-systematic-ui-audit.md]] — Systematically walks every
-  installed shadcn/Base UI primitive through its real OpenAlice feature entry,
-  responsive modes, palettes, and keyboard/pointer behavior, repairing any
-  migration regressions before serial integration.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
@@ -32,6 +28,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/shadcn-systematic-ui-audit.md]] — Exercised every installed
+  shadcn/Base UI primitive through real product entries, repaired the
+  menu-to-dialog focus handoff, and passed browser, full-suite, build, and
+  packaged Electron acceptance. Delivered in serial PR #974.
 - [[plans/shadcn-base-ui-migration.md]] — Replaced the initial Radix-backed
   shadcn primitives and custom overlay patches with the official Base UI + Nova
   source while preserving OpenAlice's product hierarchy and palette. Delivered

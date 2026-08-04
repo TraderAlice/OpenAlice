@@ -1,6 +1,6 @@
 # shadcn Systematic UI Audit
 
-- Status: `active`
+- Status: `completed`
 - Updated: `2026-08-04`
 - Delivery: one serial PR targeting `dev` if the audit finds changes.
 - Related PR: #973.
@@ -40,7 +40,7 @@ desktop and one constrained-width pass run in both Paper and Iris palettes.
       would have caught it.
 - [x] Run root/UI typechecks, the full Vitest suite, production UI build, and
       unsigned packaged Electron Workspace smoke.
-- [ ] Prepare and merge one serial PR to `dev`, then inspect the post-merge
+- [x] Prepare and merge one serial PR to `dev`, then inspect the post-merge
       smoke and archive this plan under Completed.
 
 ## Audit Record
@@ -64,6 +64,9 @@ desktop and one constrained-width pass run in both Paper and Iris palettes.
   acceptance. One UTA registry test exceeded its 5-second timeout only while
   running concurrently with the first production build; its isolated rerun and
   the subsequent independent full suite passed.
+- Serial PR #974 merged to `dev`; the updated integration checkout passed the
+  focused six-test overlay suite and the real mobile
+  Sheet-to-menu-to-AlertDialog Escape/focus-return flow.
 
 ## Completion Criteria
 
