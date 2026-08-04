@@ -99,6 +99,26 @@ describe('agent credential readiness', () => {
     expect(a.writeAiConfig).not.toHaveBeenCalled();
   });
 
+  it('does not let an unreadable Alice vault block a native Workspace config', async () => {
+    const a = adapter('pi', {
+      baseUrl: null,
+      apiKey: 'native-project-key',
+      model: 'project-model',
+      wireShape: 'openai-chat',
+    });
+    vi.mocked(readCredentials).mockRejectedValue(new Error('vault unavailable'));
+
+    const row = await getAgentCredentialReadiness({ meta, agentId: 'pi', adapter: a });
+
+    expect(row).toMatchObject({
+      ready: true,
+      requiresCredential: false,
+      source: 'workspace-config',
+      hasWorkspaceConfig: true,
+    });
+    expect(a.writeAiConfig).not.toHaveBeenCalled();
+  });
+
   it('does not overwrite an explicit Workspace wire when Quick Chat repeats the same credential', async () => {
     const a = adapter('pi', {
       baseUrl: 'https://api.minimax.io/anthropic',

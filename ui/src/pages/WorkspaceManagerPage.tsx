@@ -88,18 +88,13 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
       launchSelectorsRef.current?.openAgentMenu()
       return
     }
+    if (launchConfig.needsProviderSetup) {
+      openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+      return
+    }
     setLaunching(true)
     setError(null)
     try {
-      const runtimeRow = await launchConfig.checkSelectedRuntime()
-      if (runtimeRow?.ready !== true) {
-        if (runtimeRow?.repairTarget === 'ai-provider' || launchConfig.needsProviderSetup) {
-          openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
-          return
-        }
-        setError(runtimeRow?.message ?? t('chatLanding.runtimeNotReady'))
-        return
-      }
       const result = await quickStartWorkspaceManager(
         prompt,
         effectiveAgent,
