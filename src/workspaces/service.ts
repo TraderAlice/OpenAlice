@@ -14,7 +14,7 @@ import { mkdir } from 'node:fs/promises';
 import { basename, delimiter, join } from 'node:path';
 
 import { cliBinPath } from '@/core/paths.js';
-import { readCredentials, readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
+import { readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
 import {
   ACTIVITY_UPDATE_COALESCE_MS,
   ArtifactProvenanceStore,
@@ -120,11 +120,6 @@ import {
   type HeadlessTaskTrigger,
 } from './headless-task-registry.js';
 import { ResumeRegistry } from './resume-registry.js';
-import {
-  compatibleCredentials,
-  credentialToWorkspaceAiCred,
-  resolveInjectionModel,
-} from './credential-injection.js';
 import {
   AUTO_QUANT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
@@ -969,15 +964,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     adapter: CliAdapter,
     availability?: AgentAvailability,
   ): AgentRuntimeReadinessSource => {
-    if (adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace') {
-      return 'global-login';
-    }
     const binaryPath = availability?.path ?? '';
     if (
       adapter.id === 'pi' &&
       (binaryPath.includes('/vendor/pi/') || binaryPath.includes('\\vendor\\pi\\'))
     ) {
       return 'managed-runtime';
+    }
+    if (adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace') {
+      return 'global-login';
     }
     return 'global-config';
   };
@@ -1032,34 +1027,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     return workspace;
   };
 
-  const writeFirstCompatibleRuntimeCredential = async (
-    adapter: CliAdapter,
-    dir: string,
-  ): Promise<boolean> => {
-    if (!adapter.writeAiConfig) return false;
-    const credentials = await readCredentials();
-    const [, credential] = compatibleCredentials(credentials, adapter)[0] ?? [];
-    if (!credential) return false;
-
-    const model = resolveInjectionModel(credential);
-    const workspaceCredential = credentialToWorkspaceAiCred(
-      credential,
-      adapter,
-      model ? { model } : {},
-    );
-    if (!workspaceCredential) return false;
-    await adapter.writeAiConfig(dir, workspaceCredential);
-    return true;
-  };
-
   const runRuntimeReadinessProbeAttempt = async (
     adapter: CliAdapter,
     source: AgentRuntimeReadinessSource,
-    options: { injectCredential?: boolean } = {},
   ) => {
     const ws = await prepareRuntimeReadinessWorkspace(adapter);
     let effectiveSource = source;
-    if (!options.injectCredential && adapter.readAiConfig) {
+    if (adapter.readAiConfig) {
       try {
         if (await adapter.readAiConfig(ws.dir)) effectiveSource = 'workspace-override';
       } catch (error) {
@@ -1068,10 +1042,6 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           error,
         });
       }
-    }
-    if (options.injectCredential) {
-      const wroteCredential = await writeFirstCompatibleRuntimeCredential(adapter, ws.dir);
-      if (!wroteCredential) return null;
     }
     const { cwd, env } = composeSpawnInputs(ws, adapter, undefined);
     const command = adapter.composeHeadlessCommand?.(
@@ -1167,27 +1137,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         return row;
       }
 
-      const launcherAttempt = await runRuntimeReadinessProbeAttempt(adapter, 'launcher-vault', {
-        injectCredential: true,
-      });
-      if (launcherAttempt) lastAttempt = launcherAttempt;
-      if (launcherAttempt && runtimeProbeSucceeded(launcherAttempt.result)) {
-        const row = readyRuntimeReadinessRow({
-          adapter,
-          availability,
-          source: 'launcher-vault',
-          durationMs: launcherAttempt.result.durationMs,
-        });
-        runtimeReadinessCache.set(adapter.id, row);
-        return row;
-      }
-
       const row = failedRuntimeReadinessRow({
         adapter,
         availability,
         result:
           lastAttempt?.result ??
-          syntheticRuntimeReadinessFailure('No compatible credential or runtime config was found.'),
+          syntheticRuntimeReadinessFailure('The native runtime login or Workspace provider config is not ready.'),
         source: lastAttempt?.source ?? globalSource,
       });
       runtimeReadinessCache.set(adapter.id, row);

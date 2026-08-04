@@ -202,7 +202,11 @@ function repairTargetForStatus(
       ? 'cli-login'
       : 'ai-provider';
   }
-  if (status === 'provider_required') return 'ai-provider';
+  if (status === 'provider_required') {
+    return adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace'
+      ? 'cli-login'
+      : 'ai-provider';
+  }
   if (status === 'not_installed') return 'runtime-install';
   return 'retry';
 }
@@ -224,7 +228,7 @@ function summarizeRuntimeReadinessFailure(
     return `The runtime appears to need CLI login or authentication.${detail}`;
   }
   if (status === 'provider_required') {
-    return `The runtime appears to need provider or API-key configuration.${detail}`;
+    return `The runtime appears to need native CLI login or provider configuration.${detail}`;
   }
   if (structuredError) {
     return `The runtime reported an error:${detail}`;

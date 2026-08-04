@@ -103,13 +103,13 @@ export function resolveExplicitLoginBackedCredential(
     : null
 }
 
-/** Login-backed CLIs own their provider state. Loginless runtimes receive the
- * exact credential shown by the shared selector, including global-config fallbacks. */
+/** Only an explicit visible credential choice crosses the launch boundary.
+ * A null choice leaves the native runtime login/provider state untouched. */
 export function resolveAgentLaunchCredentialSlug(
-  needsCredential: boolean,
+  canSelectCredential: boolean,
   effectiveCredential: string | null,
 ): string | undefined {
-  return needsCredential ? (effectiveCredential ?? undefined) : undefined
+  return canSelectCredential ? (effectiveCredential ?? undefined) : undefined
 }
 
 /** Describe the exact model/context that the next launch will use. Existing
@@ -125,11 +125,11 @@ export function resolveAgentLaunchAiDetails(
   creationDefault: WorkspaceCredentialDefault | undefined,
   hasWorkspace: boolean,
 ): AgentLaunchAiDetails | null {
-  // Claude/Codex retain native login fallback and never receive an ad-hoc
-  // credential on launch. Show only config that is already on disk, or a
-  // creation default that will actually be seeded into a brand-new Workspace.
-  // Their project files do not declare context limits, so keep that fact
-  // unknown instead of borrowing the Pi/opencode injection default.
+  // Native runtimes retain their own login fallback. Show only config that is
+  // already on disk, or a creation default that will actually be seeded into a
+  // brand-new Workspace. Their project files do not consistently declare
+  // context limits, so keep that fact unknown instead of borrowing a provider
+  // default.
   if (!needsCredential) {
     if (hasWorkspace && detected?.configured === true) {
       return {
@@ -290,6 +290,8 @@ export interface AgentLaunchConfigState {
   readonly runtimeReadiness: AgentRuntimeReadinessSnapshot | null
   readonly selectedRuntimeReadiness: AgentRuntimeReadinessRow | null
   readonly needsCredential: boolean
+  /** The runtime can accept an explicit OpenAlice-managed Workspace override. */
+  readonly canSelectCredential: boolean
   readonly credentials: readonly SavedCredential[] | null
   readonly effectiveCredential: string | null
   readonly credential: SavedCredential | null
@@ -307,6 +309,7 @@ export interface AgentLaunchConfigState {
   readonly launchCredentialSlug: string | undefined
   selectAgent(agent: string): void
   selectCredential(credentialSlug: string): void
+  selectRuntimeDefault(): void
   resetCredentialSelection(): void
   checkSelectedRuntime(): Promise<AgentRuntimeReadinessRow | null>
 }
@@ -330,7 +333,7 @@ export function useAgentLaunchConfig({
   const [pickedCredential, setPickedCredential] = useState<{
     agent: string
     workspaceId: string | null
-    slug: string
+    slug: string | null
   } | null>(null)
   const [workspaceConfigDetection, setWorkspaceConfigDetection] = useState<{
     agent: string
@@ -351,6 +354,7 @@ export function useAgentLaunchConfig({
     selectedRuntimeReadiness.source === 'global-login'
   )
   const needsCredential = requiresWorkspaceCredential(selectedAgent)
+  const canSelectCredential = Boolean(selectedAgent?.capabilities.aiProvider)
   const credentials = credentialList?.agent === effectiveAgent
     ? credentialList.credentials
     : null
@@ -458,17 +462,25 @@ export function useAgentLaunchConfig({
   const scopedPickedCredential = pickedCredential?.agent === effectiveAgent &&
     pickedCredential.workspaceId === workspaceId
     ? pickedCredential.slug
-    : null
+    : undefined
   const loginBackedCreationDefault = !hasWorkspace && effectiveAgent
     ? workspaceCredentialDefaults[effectiveAgent]?.credentialSlug ?? null
     : null
-  const explicitLoginBackedCredential = hasWorkspace
-    ? detectedCredential?.slug ?? null
-    : loginBackedCreationDefault
+  const explicitLoginBackedCredential = scopedPickedCredential !== undefined
+    ? scopedPickedCredential
+    : hasWorkspace
+      ? !workspaceConfigResolved
+        ? null
+        : detectedCredential?.configured === true
+          ? detectedCredential.slug
+          : effectiveAgent ? preferences.lastCredentialByAgent[effectiveAgent] ?? null : null
+      : loginBackedCreationDefault ?? (
+          effectiveAgent ? preferences.lastCredentialByAgent[effectiveAgent] ?? null : null
+        )
   const effectiveCredential = needsCredential
     ? resolveAgentCredential(
         credentials,
-        scopedPickedCredential,
+        scopedPickedCredential ?? null,
         detectedCredential?.slug ?? null,
         workspaceCredentialReady,
         effectiveAgent ? workspaceCredentialDefaults[effectiveAgent]?.credentialSlug ?? null : null,
@@ -502,10 +514,16 @@ export function useAgentLaunchConfig({
   }, [])
 
   const selectCredential = useCallback((credentialSlug: string) => {
-    if (!needsCredential || effectiveAgent === null) return
+    if (!canSelectCredential || effectiveAgent === null) return
     setPickedCredential({ agent: effectiveAgent, workspaceId, slug: credentialSlug })
     void preferences.rememberCredential(effectiveAgent, credentialSlug)
-  }, [effectiveAgent, needsCredential, preferences, workspaceId])
+  }, [canSelectCredential, effectiveAgent, preferences, workspaceId])
+
+  const selectRuntimeDefault = useCallback(() => {
+    if (!canSelectCredential || effectiveAgent === null) return
+    setPickedCredential({ agent: effectiveAgent, workspaceId, slug: null })
+    void preferences.rememberCredential(effectiveAgent, null)
+  }, [canSelectCredential, effectiveAgent, preferences, workspaceId])
 
   const resetCredentialSelection = useCallback(() => setPickedCredential(null), [])
 
@@ -525,6 +543,7 @@ export function useAgentLaunchConfig({
     runtimeReadiness,
     selectedRuntimeReadiness,
     needsCredential,
+    canSelectCredential,
     credentials,
     effectiveCredential,
     credential,
@@ -535,7 +554,7 @@ export function useAgentLaunchConfig({
     credentialSelectionReady,
     noCredentials,
     needsProviderSetup: noCredentials,
-    willOverwriteCredential: needsCredential &&
+    willOverwriteCredential: canSelectCredential &&
       detectedCredential?.slug !== null &&
       detectedCredential?.slug !== undefined &&
       effectiveCredential !== null &&
@@ -543,15 +562,17 @@ export function useAgentLaunchConfig({
     selectedMissing: selectedAgent?.installed === false,
     anyInstalled: agents.some((agent) => agent.installed !== false),
     agentsKnown: agents.length > 0,
-    launchCredentialSlug: resolveAgentLaunchCredentialSlug(needsCredential, effectiveCredential),
+    launchCredentialSlug: resolveAgentLaunchCredentialSlug(canSelectCredential, effectiveCredential),
     selectAgent,
     selectCredential,
+    selectRuntimeDefault,
     resetCredentialSelection,
     checkSelectedRuntime,
   }), [
     agents,
     aiDetails,
     checkSelectedRuntime,
+    canSelectCredential,
     credentials,
     credential,
     credentialSelectionReady,
@@ -563,6 +584,7 @@ export function useAgentLaunchConfig({
     runtimeReadiness,
     selectAgent,
     selectCredential,
+    selectRuntimeDefault,
     selectedAgent,
     selectedRuntimeReadiness,
     selectedRuntimeUsesGlobalConfig,

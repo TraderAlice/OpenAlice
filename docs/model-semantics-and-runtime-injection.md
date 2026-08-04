@@ -248,6 +248,31 @@ Official endpoints may be omitted because the probe resolves their default from
 the wire shape. Both automatic creation-default saves and explicit Workspace
 saves must acknowledge completion in the UI.
 
+## Native Authentication and Explicit Overrides
+
+Claude Code, Codex, OpenCode, and Pi all own native login or provider state.
+OpenAlice launches them against that state by default and must not require an
+OpenAlice-vault credential merely because a Workspace has no managed provider
+binding. Runtime readiness probes exercise the effective native or existing
+Workspace configuration; they never inject the first compatible vault entry as
+a fallback and never mutate provider ownership while diagnosing readiness.
+
+Choosing an OpenAlice credential is an explicit override. Only that choice, a
+saved new-Workspace default, or an existing OpenAlice-owned Workspace binding
+may project a key/provider into native project files. An absent choice means
+“use the runtime default”; it does not mean “pick any compatible credential.”
+Existing Workspace bindings remain authoritative until the user resets or
+replaces them, and OpenAlice never imports a runtime-global secret into its
+vault or a Workspace.
+
+Native “global” state follows the runtime actually launched. A source or
+user-installed Pi uses its own normal global agent directory. Packaged managed
+Pi uses the instance-scoped `PI_CODING_AGENT_DIR` under the complete OpenAlice
+home, so `/login` persists for that managed runtime without reading or changing
+a separately installed shell Pi. Authentication/provider failures from either
+path must settle launch UI state and point users to native CLI login first;
+OpenAlice provider setup remains an optional explicit alternative.
+
 ## Configuration Ownership and Reset
 
 Agent configuration files may also contain user- or runtime-owned settings.
@@ -315,6 +340,9 @@ Tests for this subsystem must cover:
 - reset removes only OpenAlice-owned configuration and restores prior values;
 - credential secrets never appear in logs, docs, committed fixtures, or test snapshots;
 - sensitive rollback sidecars remain excluded from git alongside native provider config.
+- readiness probes never create or replace a Workspace provider binding;
+- missing OpenAlice credentials never block a native-login-capable runtime;
+- failed interactive resumes return a visible error and remain retryable.
 
 ## Registry Maintenance
 

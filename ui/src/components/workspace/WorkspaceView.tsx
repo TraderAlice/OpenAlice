@@ -32,8 +32,8 @@ export interface WorkspaceViewProps {
   /** Actions promoted into the live terminal's shared titlebar. */
   readonly terminalHeaderActions?: ReactNode;
   readonly onSpawnFresh: () => void;
-  readonly onResume: (sessionId: string) => void;
-  readonly onOpenWebPi: (sessionId: string) => void;
+  readonly onResume: (sessionId: string) => Promise<void>;
+  readonly onOpenWebPi: (sessionId: string) => Promise<void>;
   /** Navigate to an already-running session without re-spawning it. Library
    *  rows call this for running entries; paused entries go through `onResume`. */
   readonly onSelectSession: (sessionId: string) => void;

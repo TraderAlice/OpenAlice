@@ -946,12 +946,15 @@ export async function pauseSession(wsId: string, sessionId: string): Promise<boo
 export async function resumeSession(
   wsId: string,
   sessionId: string,
-): Promise<SpawnedSession | null> {
+): Promise<SpawnedSession> {
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/resume`,
     { method: 'POST' },
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    throw new Error(body?.message ?? body?.error ?? `resume session failed: ${res.status}`);
+  }
   return (await res.json()) as SpawnedSession;
 }
 

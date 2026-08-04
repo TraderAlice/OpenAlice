@@ -252,7 +252,7 @@ export const piAdapter: CliAdapter = {
     assignsSessionId: true,
     headless: true,
     aiProvider: {
-      credentialSource: 'workspace-required',
+      credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
       defaultWire: 'openai-chat',
       vendorPolicies: {

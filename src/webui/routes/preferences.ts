@@ -70,7 +70,7 @@ export function createPreferencesRoutes(
       return c.json({ error: 'invalid_quick_chat_preference' }, 400)
     }
     const adapter = adapterRegistry.get(parsed.data.agent)
-    if (adapter?.capabilities.aiProvider?.credentialSource !== 'workspace-required') {
+    if (!adapter?.capabilities.aiProvider) {
       return c.json({ error: 'invalid_quick_chat_preference' }, 400)
     }
     try {

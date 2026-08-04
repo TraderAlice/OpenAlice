@@ -17,7 +17,7 @@ describe('built-in adapter provider capabilities', () => {
       wirePreference: ['openai-responses'],
     });
     expect(registry.get('opencode')?.capabilities.aiProvider).toMatchObject({
-      credentialSource: 'workspace-required',
+      credentialSource: 'runtime-or-workspace',
       defaultWire: 'openai-chat',
       modelRegistration: {
         contextWindow: true,
@@ -26,7 +26,7 @@ describe('built-in adapter provider capabilities', () => {
       },
     });
     expect(registry.get('pi')?.capabilities.aiProvider).toMatchObject({
-      credentialSource: 'workspace-required',
+      credentialSource: 'runtime-or-workspace',
       defaultWire: 'openai-chat',
       modelRegistration: {
         contextWindow: true,

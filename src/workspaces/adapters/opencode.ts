@@ -327,7 +327,7 @@ export const opencodeAdapter: CliAdapter = {
     transcriptDiscovery: 'subprocess',
     headless: true,
     aiProvider: {
-      credentialSource: 'workspace-required',
+      credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
       defaultWire: 'openai-chat',
       vendorPolicies: {

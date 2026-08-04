@@ -433,7 +433,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
     await waitFor(() => expect(mocks.listAgentCredentials).toHaveBeenCalled())
-    expect(screen.getByRole('button', { name: 'AI provider' }).textContent).toContain('AI provider')
+    expect(screen.getByRole('button', { name: 'AI provider' }).textContent).toContain('Runtime default model')
     expect(screen.queryByText('Gemini')).toBeNull()
     expect(screen.queryByLabelText('Model gemini-3.1-flash-lite')).toBeNull()
 
