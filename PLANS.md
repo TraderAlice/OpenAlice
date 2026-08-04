@@ -21,6 +21,10 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/shadcn-overlay-foundation.md]] — Establishes an OpenAlice-owned
+  shadcn/Radix primitive layer, retires hand-written overlay behavior in
+  bounded increments, and preserves the current product hierarchy and visual
+  language before runtime-selectable style profiles are introduced.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
