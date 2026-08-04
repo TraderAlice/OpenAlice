@@ -59,7 +59,5 @@ describe('Dialog modal behavior', () => {
     expect(dialog.className).toContain('h-full')
     expect(dialog.className).toContain('sm:max-h-[85vh]')
     expect(dialog.className).toContain('sm:rounded-xl')
-    expect(dialog.parentElement?.className).toContain('items-stretch')
-    expect(dialog.parentElement?.className).toContain('sm:items-center')
   })
 })

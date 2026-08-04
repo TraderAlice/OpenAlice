@@ -1,11 +1,18 @@
-import { useState } from 'react'
-import { Dialog } from './uta/Dialog'
+import { useRef, useState, type ReactNode } from 'react'
+
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface ConfirmDialogProps {
   /** Modal title — short, action-oriented (e.g. "Delete channel"). */
   title: string
   /** Body text. ReactNode so callers can embed the affected entity name in bold. */
-  message: React.ReactNode
+  message: ReactNode
   /** Confirm button label. Defaults to 'Delete' for the destructive case. */
   confirmLabel?: string
   /** Cancel button label. Defaults to 'Cancel'. */
@@ -21,15 +28,9 @@ interface ConfirmDialogProps {
 }
 
 /**
- * Generic confirmation modal — intended for destructive or otherwise
- * irreversible actions (delete channel, delete UTA, drop watchlist, …).
- * Wraps the existing Dialog primitive with a fixed two-button layout.
- *
- * Async-aware: if `onConfirm` returns a promise, the confirm button
- * disables and shows "Working…" until the promise settles. The dialog
- * stays open during the call so callers don't have to coordinate close
- * timing — they just `onClose()` from their resolve / reject path
- * (typically by clearing the controlling state in the parent).
+ * Generic confirmation modal for destructive or otherwise irreversible work.
+ * AlertDialog owns focus containment, Escape handling, scroll locking, and
+ * focus return; this product wrapper owns wording, busy state, and button tone.
  */
 export function ConfirmDialog({
   title,
@@ -42,6 +43,11 @@ export function ConfirmDialog({
   onClose,
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
+  const restoreFocusRef = useRef<HTMLElement | null>(
+    typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  )
 
   const handleConfirm = async () => {
     setBusy(true)
@@ -55,36 +61,44 @@ export function ConfirmDialog({
   const confirmClass = variant === 'danger' ? 'btn-danger' : 'btn-primary'
 
   return (
-    <Dialog
-      ariaLabel={title}
-      onClose={busy ? () => {} : onClose}
-      width="w-[440px]"
+    <AlertDialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !busy) onClose()
+      }}
     >
-      <div className="px-5 py-4 border-b border-border">
-        <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
-      </div>
-      <div className="px-5 py-4 text-[13px] text-foreground leading-relaxed">
-        {message}
-      </div>
-      <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
-        <button
-          type="button"
-          autoFocus
-          onClick={onClose}
-          disabled={busy}
-          className="btn-secondary"
-        >
-          {cancelLabel}
-        </button>
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={busy}
-          className={confirmClass}
-        >
-          {busy ? workingLabel : confirmLabel}
-        </button>
-      </div>
-    </Dialog>
+      <AlertDialogContent
+        className="w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          const previousFocus = restoreFocusRef.current
+          if (previousFocus?.isConnected) previousFocus.focus()
+        }}
+      >
+        <div className="border-b border-border px-5 py-4">
+          <AlertDialogTitle className="text-[15px] font-semibold">
+            {title}
+          </AlertDialogTitle>
+        </div>
+        <AlertDialogDescription asChild>
+          <div className="px-5 py-4 text-[13px] leading-relaxed text-foreground">
+            {message}
+          </div>
+        </AlertDialogDescription>
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+          <AlertDialogCancel className="btn-secondary" disabled={busy}>
+            {cancelLabel}
+          </AlertDialogCancel>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={busy}
+            className={confirmClass}
+          >
+            {busy ? workingLabel : confirmLabel}
+          </button>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

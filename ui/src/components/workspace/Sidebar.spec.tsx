@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../../i18n'
@@ -89,7 +90,8 @@ describe('WorkspaceRow session launcher', () => {
     expect(screen.getByRole('menuitem', { name: 'Shell (sh)' })).toBeTruthy()
   })
 
-  it('groups secondary workspace actions behind a target-scoped More menu', () => {
+  it('groups secondary workspace actions behind a target-scoped More menu', async () => {
+    const user = userEvent.setup()
     const onRenameWorkspace = vi.fn()
     const onConfigureWorkspace = vi.fn()
     const onDelete = vi.fn(async () => undefined)
@@ -117,16 +119,16 @@ describe('WorkspaceRow session launcher', () => {
     const more = screen.getByRole('button', { name: 'More actions for chat' })
     expect(more.className).not.toContain('opacity-0')
 
-    fireEvent.click(more)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename workspace' }))
+    await user.click(more)
+    await user.click(screen.getByRole('menuitem', { name: 'Rename workspace' }))
     expect(onRenameWorkspace).toHaveBeenCalledWith(workspace.id, 'Research desk')
 
-    fireEvent.click(more)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Configure this workspace' }))
+    await user.click(more)
+    await user.click(screen.getByRole('menuitem', { name: 'Configure this workspace' }))
     expect(onConfigureWorkspace).toHaveBeenCalledWith(workspace.id)
 
-    fireEvent.click(more)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Offboard workspace' }))
+    await user.click(more)
+    await user.click(screen.getByRole('menuitem', { name: 'Offboard workspace' }))
     expect(onDelete).toHaveBeenCalledWith(workspace.id)
   })
 })
@@ -146,7 +148,8 @@ describe('SessionRow actions', () => {
     title: 'Review AAPL earnings',
   }
 
-  it('names destructive and lifecycle actions for their target session', () => {
+  it('names destructive and lifecycle actions for their target session', async () => {
+    const user = userEvent.setup()
     const onPause = vi.fn()
     const onDelete = vi.fn()
     const { rerender } = render(
@@ -163,10 +166,10 @@ describe('SessionRow actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop Review AAPL earnings' }))
     const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
     expect(more.getAttribute('aria-haspopup')).toBe('menu')
-    fireEvent.click(more)
+    await user.click(more)
     const deleteItem = screen.getByRole('menuitem', { name: 'Delete Review AAPL earnings' })
     expect(document.activeElement).toBe(deleteItem)
-    fireEvent.click(deleteItem)
+    await user.click(deleteItem)
     expect(onPause).toHaveBeenCalledOnce()
     expect(onDelete).toHaveBeenCalledOnce()
 

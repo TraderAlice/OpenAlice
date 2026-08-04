@@ -96,6 +96,33 @@ away from the pointer.
 
 ## Shared Vocabulary
 
+### Component primitive ownership
+
+Behavioral UI primitives live as source under `ui/src/components/ui/`. They are
+initialized from shadcn's Radix recipes through `ui/components.json`, then
+owned and reviewed as OpenAlice code. Product components such as
+`PageSidebarLayout`, `ConfirmDialog`, and the UTA `Dialog` wrapper retain their
+domain API and composition; the lower layer owns portals, focus containment,
+keyboard navigation, outside dismissal, scroll locking, and focus return.
+
+- Use an existing owned primitive before adding document-level listeners or a
+  new focus trap for a dialog, sheet, popover, menu, or tooltip.
+- Keep generated primitives bound to semantic tokens. Running the shadcn CLI
+  must not replace `ui/src/index.css`, palette definitions, typography, or the
+  current default visual hierarchy.
+- Prefer the smallest official Radix package required by the checked-in
+  primitives. Do not add a third-party registry or generic shadcn block when a
+  product composition already exists.
+- Treat `data-slot` as the stable styling seam. Future selectable UI styles
+  may vary geometry, elevation, density, typography, and motion through that
+  seam; `data-palette` remains the color axis.
+- Delete superseded event plumbing during migration. A component is not
+  migrated if its old global Escape/outside-click/focus-loop implementation is
+  still running beside the primitive.
+
+The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
+project. Backend tests keep their existing root `@` alias.
+
 Motion tokens and primitives live in `ui/src/index.css`:
 
 | Primitive | Intended use |

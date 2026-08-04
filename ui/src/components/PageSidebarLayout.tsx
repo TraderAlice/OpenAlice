@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Sidebar } from './Sidebar'
 import { useRegisterMobilePageNavigation } from '../contexts/MobilePageNavigationContext'
 
@@ -9,16 +10,6 @@ const MAX_WIDTH = 420
 const MAIN_PANE_MIN_WIDTH = 500
 const COLLAPSED_WIDTH = 44
 const RESIZE_HANDLE_WIDTH = 10
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-  '[contenteditable="true"]',
-].join(',')
-
 function clampWidth(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(value)))
@@ -107,7 +98,7 @@ export function PageSidebarLayout({
   const isAppDesktop = useIsDesktop(768)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const mobileDrawerRef = useRef<HTMLDialogElement | null>(null)
+  const mobileDrawerRef = useRef<HTMLDivElement | null>(null)
   const mobileDrawerId = useId()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => readStoredCollapsed(storageKey))
@@ -176,75 +167,6 @@ export function PageSidebarLayout({
   useEffect(() => {
     if (isDesktop) setDrawerOpen(false)
   }, [isDesktop])
-
-  useEffect(() => {
-    if (isDesktop) return
-    const drawer = mobileDrawerRef.current
-    if (!drawer) return
-
-    if (drawerOpen && !drawer.open) {
-      if (typeof drawer.showModal === 'function') {
-        drawer.showModal()
-      } else {
-        drawer.setAttribute('open', '')
-      }
-    } else if (!drawerOpen && drawer.open) {
-      if (typeof drawer.close === 'function') {
-        drawer.close()
-      } else {
-        drawer.removeAttribute('open')
-      }
-    }
-  }, [drawerOpen, isDesktop])
-
-  useEffect(() => {
-    if (isDesktop || !drawerOpen) return
-    const drawer = mobileDrawerRef.current
-    if (!drawer) return
-
-    const focusableElements = () =>
-      Array.from(drawer.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-        .filter((element) => element.getAttribute('aria-hidden') !== 'true')
-
-    const current = drawer.querySelector<HTMLElement>('[aria-current="page"]')
-    const initialFocus = current?.matches(FOCUSABLE_SELECTOR)
-      ? current
-      : focusableElements()[0] ?? drawer
-    initialFocus.focus({ preventScroll: true })
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setDrawerOpen(false)
-        return
-      }
-      if (event.key !== 'Tab') return
-
-      const focusables = focusableElements()
-      if (focusables.length === 0) {
-        event.preventDefault()
-        drawer.focus({ preventScroll: true })
-        return
-      }
-
-      const first = focusables[0]
-      const last = focusables[focusables.length - 1]
-      const active = document.activeElement
-      if (event.shiftKey && (active === first || !drawer.contains(active))) {
-        event.preventDefault()
-        last.focus({ preventScroll: true })
-      } else if (!event.shiftKey && (active === last || !drawer.contains(active))) {
-        event.preventDefault()
-        first.focus({ preventScroll: true })
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      mobileTriggerRef.current?.focus({ preventScroll: true })
-    }
-  }, [drawerOpen, isDesktop])
 
   useEffect(() => {
     if (!isDesktop) return
@@ -378,46 +300,53 @@ export function PageSidebarLayout({
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
 
-      <dialog
-        ref={mobileDrawerRef}
-        id={mobileDrawerId}
-        data-testid="page-sidebar-drawer"
-        data-state={drawerOpen ? 'open' : 'closed'}
-        role="dialog"
-        aria-label={title}
-        aria-modal={drawerOpen ? true : undefined}
-        aria-hidden={!drawerOpen}
-        inert={!drawerOpen ? true : undefined}
-        tabIndex={-1}
-        className="oa-page-sidebar-dialog fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[280px] max-w-[85vw] overflow-hidden border-0 bg-transparent p-0 text-foreground outline-none"
-        onCancel={(event) => {
-          event.preventDefault()
-          setDrawerOpen(false)
-        }}
-        onClose={() => {
-          if (drawerOpen) setDrawerOpen(false)
-        }}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) setDrawerOpen(false)
-        }}
+      <Sheet
+        open={drawerOpen}
+        onOpenChange={(open) => setDrawerOpen(open)}
       >
-        <Sidebar
-          title={title}
-          actions={actionContent}
-          leading={
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(false)}
-              className="oa-icon-action -ml-2 flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              aria-label={t('common.closePanel', { title })}
-            >
-              <X size={15} strokeWidth={1.75} aria-hidden />
-            </button>
-          }
+        <SheetContent
+          ref={mobileDrawerRef}
+          id={mobileDrawerId}
+          data-testid="page-sidebar-drawer"
+          side="left"
+          role="dialog"
+          aria-modal="true"
+          aria-describedby={undefined}
+          showCloseButton={false}
+          className="oa-page-sidebar-dialog h-dvh max-h-none w-[280px] max-w-[85vw] gap-0 overflow-hidden border-0 bg-transparent p-0 text-foreground"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            const drawer = mobileDrawerRef.current
+            const current = drawer?.querySelector<HTMLElement>('[aria-current="page"]')
+            const firstFocusable = drawer?.querySelector<HTMLElement>(
+              'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            )
+            ;(current ?? firstFocusable ?? drawer)?.focus({ preventScroll: true })
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            mobileTriggerRef.current?.focus({ preventScroll: true })
+          }}
         >
-          {sidebarContent}
-        </Sidebar>
-      </dialog>
+          <SheetTitle className="sr-only">{title}</SheetTitle>
+          <Sidebar
+            title={title}
+            actions={actionContent}
+            leading={
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="oa-icon-action -ml-2 flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={t('common.closePanel', { title })}
+              >
+                <X size={15} strokeWidth={1.75} aria-hidden />
+              </button>
+            }
+          >
+            {sidebarContent}
+          </Sidebar>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
