@@ -126,8 +126,10 @@ describe('AutoQuantWorkspaceSection session actions', () => {
       params: { wsId: workspace.id, sessionId: session.id, source: 'auto-quant' },
     })
 
-    await user.click(screen.getByRole('button', { name: `More actions for ${sessionTitle}` }))
-    await user.click(screen.getByRole('menuitem', { name: `Delete ${sessionTitle}` }))
+    const more = screen.getByRole('button', { name: `More actions for ${sessionTitle}` })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: `Delete ${sessionTitle}` }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(workspace.id, session.id)
   })
 })

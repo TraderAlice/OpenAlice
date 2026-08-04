@@ -349,18 +349,18 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 <span className="inline-flex min-w-0 items-center">
                   <ChevronRight size={11} className="mr-1 shrink-0 text-muted-foreground/35" aria-hidden />
                   <Popover open={senderPopoverOpen} onOpenChange={setSenderPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <button
+                    <PopoverTrigger
+                      render={<button
                         ref={senderTriggerRef}
                         type="button"
                         aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
                         className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[11px] font-medium text-muted-foreground/75 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-0"
-                      >
+                      />}
+                    >
                         {origin?.kind === 'interactive'
                           ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
                           : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
                         <span>{t('inbox.fromSender', { sender: senderDisplay })}</span>
-                      </button>
                     </PopoverTrigger>
                     <PopoverContent
                       id={`inbox-sender-${entry.id}`}
@@ -368,11 +368,8 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                       aria-label={t('inbox.senderIdentityTitle', { sender: senderLabel })}
                       align="start"
                       sideOffset={8}
-                      onOpenAutoFocus={(event) => event.preventDefault()}
-                      onCloseAutoFocus={(event) => {
-                        event.preventDefault()
-                        senderTriggerRef.current?.focus({ preventScroll: true })
-                      }}
+                      initialFocus={false}
+                      finalFocus={senderTriggerRef}
                       className="z-30 w-72 max-w-[calc(100vw-3rem)] gap-0 rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg ring-0"
                     >
                       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">

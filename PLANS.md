@@ -28,6 +28,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/shadcn-base-ui-migration.md]] — Replaced the initial Radix-backed
+  shadcn primitives and custom overlay patches with the official Base UI + Nova
+  source while preserving OpenAlice's product hierarchy and palette. Delivered
+  for integration in serial PR #973.
 - [[plans/mobile-activity-sheet.md]] — Moved the phone ActivityBar onto the
   shared Sheet behavior while preserving the static desktop rail. Delivered as
   serial PR #971 after the foundation in PR #970 was accepted and merged.

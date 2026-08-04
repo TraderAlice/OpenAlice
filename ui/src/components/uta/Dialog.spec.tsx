@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { useState } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -36,16 +36,16 @@ describe('Dialog modal behavior', () => {
     const first = screen.getByRole('button', { name: 'First action' })
     const last = screen.getByRole('button', { name: 'Last action' })
     expect(dialog.getAttribute('aria-modal')).toBe('true')
-    expect(document.activeElement).toBe(first)
+    await waitFor(() => expect(document.activeElement).toBe(first))
 
     await user.tab({ shift: true })
-    expect(document.activeElement).toBe(last)
+    await waitFor(() => expect(document.activeElement).toBe(last))
     await user.tab()
-    expect(document.activeElement).toBe(first)
+    await waitFor(() => expect(document.activeElement).toBe(first))
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(document.activeElement).toBe(opener)
+    await waitFor(() => expect(document.activeElement).toBe(opener))
   })
 
   it('offers a full mobile work area only when a long-form dialog opts in', () => {

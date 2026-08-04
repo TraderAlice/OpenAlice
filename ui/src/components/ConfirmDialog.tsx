@@ -43,6 +43,7 @@ export function ConfirmDialog({
   onClose,
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
+  const cancelRef = useRef<HTMLButtonElement | null>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(
     typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
       ? document.activeElement
@@ -69,24 +70,21 @@ export function ConfirmDialog({
     >
       <AlertDialogContent
         className="w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0"
-        onCloseAutoFocus={(event) => {
-          event.preventDefault()
-          const previousFocus = restoreFocusRef.current
-          if (previousFocus?.isConnected) previousFocus.focus()
-        }}
+        initialFocus={cancelRef}
+        finalFocus={restoreFocusRef}
       >
         <div className="border-b border-border px-5 py-4">
           <AlertDialogTitle className="text-[15px] font-semibold">
             {title}
           </AlertDialogTitle>
         </div>
-        <AlertDialogDescription asChild>
-          <div className="px-5 py-4 text-[13px] leading-relaxed text-foreground">
-            {message}
-          </div>
+        <AlertDialogDescription
+          render={<div className="px-5 py-4 text-[13px] leading-relaxed text-foreground" />}
+        >
+          {message}
         </AlertDialogDescription>
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <AlertDialogCancel className="btn-secondary" disabled={busy}>
+          <AlertDialogCancel ref={cancelRef} className="btn-secondary" disabled={busy}>
             {cancelLabel}
           </AlertDialogCancel>
           <button

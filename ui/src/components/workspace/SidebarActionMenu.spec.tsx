@@ -40,7 +40,7 @@ describe('SidebarActionMenu', () => {
     expect(offboard.textContent).toBe('Offboard workspace')
     expect(document.activeElement).toBe(offboard)
 
-    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{ArrowUp}')
     expect(document.activeElement).toBe(rename)
 
     await user.keyboard('{Escape}')
@@ -62,7 +62,9 @@ describe('SidebarActionMenu', () => {
       </>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'More actions for Session' }))
+    const trigger = screen.getByRole('button', { name: 'More actions for Session' })
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
     expect(screen.getByRole('menuitem', { name: 'Delete Session' })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Outside' }))
 
@@ -70,7 +72,7 @@ describe('SidebarActionMenu', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('keeps its portal inside a modal Sheet boundary', async () => {
+  it('keeps a portalled menu interactive inside a modal Sheet', async () => {
     const user = userEvent.setup()
     render(
       <Sheet open>
@@ -84,11 +86,13 @@ describe('SidebarActionMenu', () => {
       </Sheet>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'More actions for Session' }))
+    const trigger = screen.getByRole('button', { name: 'More actions for Session' })
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
 
-    const sheet = screen.getByRole('dialog', { name: 'Ask Alice' })
     const menu = screen.getByRole('menu', { name: 'More actions for Session' })
-    expect(sheet.contains(menu)).toBe(true)
-    expect(menu.closest('[data-radix-popper-content-wrapper]')?.parentElement).toBe(sheet)
+    expect(menu.hasAttribute('data-open')).toBe(true)
+    expect(menu.closest('[inert]')).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete Session' }))
   })
 })

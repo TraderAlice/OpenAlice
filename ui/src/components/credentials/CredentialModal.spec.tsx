@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -182,22 +183,31 @@ afterEach(() => {
 })
 
 describe('CredentialModal', () => {
-  it('uses the shared long-form dialog contract and restores the opener', () => {
+  it('uses the shared long-form dialog contract and restores the opener', async () => {
     const opener = document.createElement('button')
     opener.textContent = 'Open credentials'
     document.body.append(opener)
     opener.focus()
     const onClose = vi.fn()
 
-    const { unmount } = render(
-      <CredentialModal
-        mode="add"
-        presets={[openAiPreset]}
-        agents={agents}
-        onClose={onClose}
-        onSaved={vi.fn()}
-      />,
-    )
+    function Harness() {
+      const [open, setOpen] = useState(true)
+      if (!open) return null
+      return (
+        <CredentialModal
+          mode="add"
+          presets={[openAiPreset]}
+          agents={agents}
+          onClose={() => {
+            onClose()
+            setOpen(false)
+          }}
+          onSaved={vi.fn()}
+        />
+      )
+    }
+
+    render(<Harness />)
 
     const dialog = screen.getByRole('dialog', { name: 'Add credential' })
     const scrollArea = screen.getByTestId('credential-modal-scroll')
@@ -208,9 +218,8 @@ describe('CredentialModal', () => {
     expect(document.activeElement).toBe(screen.getByPlaceholderText('Search providers…'))
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(onClose).toHaveBeenCalledTimes(1)
-    unmount()
-    expect(document.activeElement).toBe(opener)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(document.activeElement).toBe(opener))
     opener.remove()
   })
 
