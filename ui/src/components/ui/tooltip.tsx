@@ -1,6 +1,7 @@
 import * as React from "react"
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 
+import { useOverlayPortalContainer } from '@/components/ui/overlay-portal-boundary'
 import { cn } from "@/lib/utils"
 
 function TooltipProvider({
@@ -34,8 +35,10 @@ function TooltipContent({
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+  const container = useOverlayPortalContainer()
+
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={container ?? undefined}>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}

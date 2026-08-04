@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Pencil, Trash2 } from 'lucide-react'
 
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { SidebarActionMenu } from './SidebarActionMenu'
 
 afterEach(cleanup)
@@ -67,5 +68,27 @@ describe('SidebarActionMenu', () => {
 
     expect(screen.queryByRole('menu')).toBeNull()
     expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('keeps its portal inside a modal Sheet boundary', async () => {
+    const user = userEvent.setup()
+    render(
+      <Sheet open>
+        <SheetContent aria-describedby={undefined}>
+          <SheetTitle>Ask Alice</SheetTitle>
+          <SidebarActionMenu
+            label="More actions for Session"
+            items={[{ label: 'Delete Session', icon: <Trash2 />, onSelect: vi.fn(), danger: true }]}
+          />
+        </SheetContent>
+      </Sheet>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Session' }))
+
+    const sheet = screen.getByRole('dialog', { name: 'Ask Alice' })
+    const menu = screen.getByRole('menu', { name: 'More actions for Session' })
+    expect(sheet.contains(menu)).toBe(true)
+    expect(menu.closest('[data-radix-popper-content-wrapper]')?.parentElement).toBe(sheet)
   })
 })
