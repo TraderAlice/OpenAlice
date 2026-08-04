@@ -286,7 +286,7 @@ export function ActivityBar({
         aria-modal="true"
         aria-describedby={undefined}
         showCloseButton={false}
-        className={`${railClassName} max-w-[85vw] gap-0 p-0 shadow-none motion-reduce:animate-none motion-reduce:transition-none sm:max-w-[85vw]`}
+        className={`${railClassName} max-w-[85vw] gap-0 p-0 shadow-none motion-reduce:animate-none motion-reduce:transition-none data-[side=left]:w-[280px] data-[side=left]:max-w-[85vw] sm:max-w-[85vw]`}
         onOpenAutoFocus={(event) => {
           event.preventDefault()
           const drawer = mobileDrawerRef.current

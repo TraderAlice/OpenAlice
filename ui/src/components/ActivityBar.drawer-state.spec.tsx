@@ -82,6 +82,7 @@ describe('ActivityBar mobile drawer state', () => {
     expect(mobileActivityBar.getAttribute('data-slot')).toBe('sheet-content')
     expect(mobileActivityBar.getAttribute('role')).toBe('dialog')
     expect(mobileActivityBar.getAttribute('aria-modal')).toBe('true')
+    expect(mobileActivityBar.className).toContain('data-[side=left]:w-[280px]')
 
     rerender(<ActivityBar open={false} onClose={onClose} desktopStatic={false} />)
     expect(screen.queryByTestId('activity-bar')).toBeNull()

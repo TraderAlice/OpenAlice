@@ -55,10 +55,8 @@ information hierarchy, density, collapse behavior, and lifetime.
       containment, Escape, focus return, desktop persistence, and touch sizes
       in focused tests.
 - [x] Run root and UI type checks plus the full Vitest suite.
-- [ ] Walk the real `pnpm dev` Inbox route at phone and desktop widths with
-      keyboard and pointer input. The controlled in-app browser is currently
-      on a Chromium connection-error page and its URL policy rejected agent
-      navigation after the development server recovered.
+- [x] Walk the real `pnpm dev` Inbox and Settings routes at phone and desktop
+      widths with keyboard and pointer input in Day and Night palettes.
 - [x] Run the unsigned packaged Electron Workspace smoke.
 - [ ] After #970 is explicitly accepted, update from `dev`, replay this atomic
       commit on a fresh serial branch, rerun affected checks, and open/merge a
@@ -72,8 +70,14 @@ information hierarchy, density, collapse behavior, and lifetime.
   their existing skips.
 - `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace` — unsigned
   packaged Workspace acceptance passed and cleaned its temporary app.
-- Browser/dev — not yet accepted; a running Vite server alone is not visual or
-  interaction evidence.
+- Browser/dev — at 390 × 844, verified a 280 px Sheet, current-destination
+  initial focus, body scroll lock, inert/hidden background, Escape, visible
+  overlay dismissal, trigger focus return, and navigation-driven close. At
+  1280 × 900, verified the normal 188 px `aside` with no Sheet/overlay portal.
+  Day and Night palettes rendered cleanly and the console had no warnings or
+  errors. This walk found and repaired a side-variant width conflict that had
+  expanded the first render to 292.5 px; the theme preference was restored to
+  Auto afterward.
 
 ## Completion Criteria
 
