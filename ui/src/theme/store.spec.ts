@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { normalizeThemePreferences } from './store'
+import { migrateThemePreferences, normalizeThemePreferences } from './store'
 
 describe('theme preference persistence', () => {
   it('migrates the legacy light/dark shape into day/night slots', () => {
@@ -15,6 +15,7 @@ describe('theme preference persistence', () => {
       dayPalette: 'porcelain',
       nightPalette: 'midnight',
       uiStyle: 'default',
+      stylePaletteMode: 'saved',
     })
   })
 
@@ -24,11 +25,13 @@ describe('theme preference persistence', () => {
       dayPalette: 'moss',
       nightPalette: 'linen',
       uiStyle: 'default',
+      stylePaletteMode: 'saved',
     })).toEqual({
       theme: 'day',
       dayPalette: 'moss',
       nightPalette: 'linen',
       uiStyle: 'default',
+      stylePaletteMode: 'saved',
     })
   })
 
@@ -42,11 +45,13 @@ describe('theme preference persistence', () => {
       dayPalette: 'porcelain',
       nightPalette: 'midnight',
       uiStyle: 'win98',
+      stylePaletteMode: 'recommended',
     })).toEqual({
       theme: 'auto',
       dayPalette: 'porcelain',
       nightPalette: 'graphite',
       uiStyle: 'win98',
+      stylePaletteMode: 'recommended',
     })
   })
 
@@ -59,6 +64,8 @@ describe('theme preference persistence', () => {
     }).uiStyle).toBe('broker-classic')
 
     expect(normalizeThemePreferences({ uiStyle: 'aqua' }).uiStyle).toBe('default')
+    expect(normalizeThemePreferences({ stylePaletteMode: 'recommended' }).stylePaletteMode)
+      .toBe('recommended')
   })
 
   it('accepts Windows Classic in either palette slot', () => {
@@ -67,11 +74,28 @@ describe('theme preference persistence', () => {
       dayPalette: 'windows-classic',
       nightPalette: 'windows-classic',
       uiStyle: 'win98',
+      stylePaletteMode: 'saved',
     })).toEqual({
       theme: 'auto',
       dayPalette: 'windows-classic',
       nightPalette: 'windows-classic',
       uiStyle: 'win98',
+      stylePaletteMode: 'saved',
+    })
+  })
+
+  it('migrates the briefly global Win98 pair into a scoped recommendation', () => {
+    expect(migrateThemePreferences({
+      theme: 'day',
+      dayPalette: 'windows-classic',
+      nightPalette: 'windows-classic',
+      uiStyle: 'default',
+    }, 1)).toEqual({
+      theme: 'day',
+      dayPalette: 'paper',
+      nightPalette: 'graphite',
+      uiStyle: 'default',
+      stylePaletteMode: 'recommended',
     })
   })
 })
