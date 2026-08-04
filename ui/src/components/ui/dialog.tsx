@@ -3,6 +3,10 @@ import { XIcon } from 'lucide-react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 
 import { Button } from '@/components/ui/button'
+import {
+  OverlayPortalBoundary,
+  useOverlayPortalBoundary,
+} from '@/components/ui/overlay-portal-boundary'
 import { cn } from '@/lib/utils'
 
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -43,16 +47,20 @@ function DialogContent({
   overlayClassName,
   showCloseButton = false,
   closeLabel = 'Close',
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   overlayClassName?: string
   showCloseButton?: boolean
   closeLabel?: string
 }) {
+  const { boundaryRef, container } = useOverlayPortalBoundary<HTMLDivElement>(forwardedRef)
+
   return (
     <DialogPortal>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
+        ref={boundaryRef}
         data-slot="dialog-content"
         className={cn(
           'oa-dialog-surface fixed left-1/2 top-1/2 z-[60] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-background p-4 text-sm text-foreground shadow-2xl outline-none duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 sm:max-w-sm',
@@ -60,19 +68,21 @@ function DialogContent({
         )}
         {...props}
       >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute right-2 top-2"
-              size="icon-sm"
-            >
-              <XIcon />
-              <span className="sr-only">{closeLabel}</span>
-            </Button>
-          </DialogPrimitive.Close>
-        )}
+        <OverlayPortalBoundary container={container}>
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close data-slot="dialog-close" asChild>
+              <Button
+                variant="ghost"
+                className="absolute right-2 top-2"
+                size="icon-sm"
+              >
+                <XIcon />
+                <span className="sr-only">{closeLabel}</span>
+              </Button>
+            </DialogPrimitive.Close>
+          )}
+        </OverlayPortalBoundary>
       </DialogPrimitive.Content>
     </DialogPortal>
   )

@@ -107,6 +107,10 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 
 - Use an existing owned primitive before adding document-level listeners or a
   new focus trap for a dialog, sheet, popover, menu, or tooltip.
+- Modal Dialog, AlertDialog, and Sheet content establishes the portal boundary
+  for descendant non-modal overlays. Dropdown menus, popovers, and tooltips
+  must use the nearest boundary instead of escaping to `body`, where the owning
+  modal would make them inert or place them below its backdrop.
 - Keep generated primitives bound to semantic tokens. Running the shadcn CLI
   must not replace `ui/src/index.css`, palette definitions, typography, or the
   current default visual hierarchy.

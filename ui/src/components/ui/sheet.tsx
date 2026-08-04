@@ -3,6 +3,10 @@ import { XIcon } from 'lucide-react'
 import * as SheetPrimitive from '@radix-ui/react-dialog'
 
 import { Button } from '@/components/ui/button'
+import {
+  OverlayPortalBoundary,
+  useOverlayPortalBoundary,
+} from '@/components/ui/overlay-portal-boundary'
 import { cn } from '@/lib/utils'
 
 function Sheet(props: React.ComponentProps<typeof SheetPrimitive.Root>) {
@@ -44,16 +48,20 @@ function SheetContent({
   showCloseButton = false,
   closeLabel = 'Close',
   forceMount,
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
   showCloseButton?: boolean
   closeLabel?: string
 }) {
+  const { boundaryRef, container } = useOverlayPortalBoundary<HTMLDivElement>(forwardedRef)
+
   return (
     <SheetPortal forceMount={forceMount}>
       <SheetOverlay forceMount={forceMount} />
       <SheetPrimitive.Content
+        ref={boundaryRef}
         forceMount={forceMount}
         data-slot="sheet-content"
         data-side={side}
@@ -63,19 +71,21 @@ function SheetContent({
         )}
         {...props}
       >
-        {children}
-        {showCloseButton && (
-          <SheetPrimitive.Close data-slot="sheet-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute right-3 top-3"
-              size="icon-sm"
-            >
-              <XIcon />
-              <span className="sr-only">{closeLabel}</span>
-            </Button>
-          </SheetPrimitive.Close>
-        )}
+        <OverlayPortalBoundary container={container}>
+          {children}
+          {showCloseButton && (
+            <SheetPrimitive.Close data-slot="sheet-close" asChild>
+              <Button
+                variant="ghost"
+                className="absolute right-3 top-3"
+                size="icon-sm"
+              >
+                <XIcon />
+                <span className="sr-only">{closeLabel}</span>
+              </Button>
+            </SheetPrimitive.Close>
+          )}
+        </OverlayPortalBoundary>
       </SheetPrimitive.Content>
     </SheetPortal>
   )
