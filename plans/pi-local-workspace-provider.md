@@ -1,8 +1,8 @@
 # Pi Workspace-Local Provider Injection
 
-Status: In progress
+Status: Completed
 
-Related issues: none; maintainer-directed runtime debt repair
+Related issues: none; maintainer-directed runtime debt repair; serial PR #981
 
 Owner guides: [[docs/model-semantics-and-runtime-injection.md]],
 [[docs/managed-workspace-runtime.md]], [[docs/workspace-issues-and-scheduling.md]]
@@ -37,7 +37,7 @@ Pi can discover and call the localized provider.
 - [x] Add focused adapter, conflict, concurrency, and migration coverage.
 - [x] Verify real Pi model discovery and an authenticated mock request.
 - [x] Pass repository, runtime-profile, and packaged Electron verification.
-- [ ] Deliver through the serial `dev` PR workflow.
+- [x] Deliver through the serial `dev` PR workflow.
 
 ## Completion Criteria
 
