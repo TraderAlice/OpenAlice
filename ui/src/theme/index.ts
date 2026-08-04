@@ -22,6 +22,7 @@ function applyTheme(state: ReturnType<typeof readInitialThemePreferences>): void
   root.dataset.theme = state.theme
   root.dataset.dayPalette = state.dayPalette
   root.dataset.nightPalette = state.nightPalette
+  root.dataset.uiStyle = state.uiStyle
   root.dataset.palette = resolveEffectivePalette(
     state.theme,
     systemTheme.matches,
@@ -37,6 +38,7 @@ useThemeStore.subscribe((state, prev) => {
     state.theme !== prev.theme
     || state.dayPalette !== prev.dayPalette
     || state.nightPalette !== prev.nightPalette
+    || state.uiStyle !== prev.uiStyle
   ) applyTheme(state)
 })
 

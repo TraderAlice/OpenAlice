@@ -285,6 +285,8 @@ export const en = {
     appearance: {
       title: 'Appearance',
       description: 'Color and layout preferences. Stored locally on this device.',
+      interfaceStyle: 'Interface style',
+      interfaceStyleDescription: 'Changes component shape, density, typography, and motion without changing your colors.',
       colorMode: 'Color mode',
       colorModeDescription: 'Auto follows the system between Day and Night slots; Day and Night pin one slot.',
       dayPalette: 'Day palette',
@@ -1210,6 +1212,16 @@ export const en = {
   theme: {
     mode: { auto: 'Auto', day: 'Day', night: 'Night' },
     switchTo: 'Switch to {{mode}}',
+    uiStyle: {
+      default: 'Default',
+      win98: 'Windows 98',
+      'broker-classic': 'Broker Classic',
+    },
+    uiStyleDescription: {
+      default: 'The calm OpenAlice workstation',
+      win98: 'Square, beveled, and unmistakably classic',
+      'broker-classic': 'Dense TWS-inspired trading workstation',
+    },
     palette: {
       paper: 'Paper', porcelain: 'Porcelain', linen: 'Linen',
       graphite: 'Graphite', midnight: 'Midnight', moss: 'Moss', iris: 'Iris',

@@ -29,6 +29,7 @@ describe('no-flash theme bootstrap', () => {
       theme: 'night',
       dayPalette: 'porcelain',
       nightPalette: 'midnight',
+      uiStyle: 'default',
       palette: 'midnight',
     })
   })
@@ -42,6 +43,7 @@ describe('no-flash theme bootstrap', () => {
       theme: 'day',
       dayPalette: 'midnight',
       nightPalette: 'paper',
+      uiStyle: 'default',
       palette: 'midnight',
     })
 
@@ -56,5 +58,10 @@ describe('no-flash theme bootstrap', () => {
     const state = { theme: 'auto', dayPalette: 'linen', nightPalette: 'iris' }
     expect(applyNoFlashTheme(state, false).palette).toBe('linen')
     expect(applyNoFlashTheme(state, true).palette).toBe('iris')
+  })
+
+  it('applies a valid style profile before first paint and repairs invalid values', () => {
+    expect(applyNoFlashTheme({ uiStyle: 'win98' }, false).uiStyle).toBe('win98')
+    expect(applyNoFlashTheme({ uiStyle: 'aqua' }, false).uiStyle).toBe('default')
   })
 })

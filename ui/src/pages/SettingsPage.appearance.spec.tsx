@@ -30,6 +30,7 @@ beforeEach(() => {
     theme: 'auto',
     dayPalette: 'paper',
     nightPalette: 'graphite',
+    uiStyle: 'default',
   })
 })
 
@@ -41,6 +42,18 @@ afterEach(() => {
 })
 
 describe('AppearanceSection palette pair editor', () => {
+  it('switches component style immediately without changing the palette pair', () => {
+    render(<AppearanceSection />)
+
+    expect(screen.getByRole('radio', { name: 'Default' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
+
+    expect(useThemeStore.getState().uiStyle).toBe('win98')
+    expect(useThemeStore.getState().dayPalette).toBe('paper')
+    expect(useThemeStore.getState().nightPalette).toBe('graphite')
+    expect(screen.getByRole('radio', { name: 'Windows 98' }).getAttribute('aria-checked')).toBe('true')
+  })
+
   it('does not expose the retired editor tab strip preference', () => {
     localStorage.setItem('openalice.editor-tabs.v1', JSON.stringify({
       state: { showEditorTabs: true },
