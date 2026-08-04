@@ -21,6 +21,10 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/mobile-activity-sheet.md]] — Moves the phone ActivityBar onto the
+  shared Sheet behavior while preserving the static desktop rail; it is a
+  serial follow-on to Draft PR #970 and remains local until that foundation is
+  explicitly accepted.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
