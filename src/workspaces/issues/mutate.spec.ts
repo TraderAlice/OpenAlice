@@ -134,6 +134,7 @@ describe('updateIssueFields', () => {
       priority: 'urgent',
       assignee: '@workspace',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'medium',
     })
@@ -143,6 +144,7 @@ describe('updateIssueFields', () => {
       expect(res.issue.priority).toBe('urgent')
       expect(res.issue.assignee).toBe('@workspace')
       expect(res.issue.agent).toBe('pi')
+      expect(res.issue.credential).toBe('gemini-primary')
     }
     const { issue } = await readBack('task-1')
     expect(issue).toMatchObject({
@@ -151,6 +153,7 @@ describe('updateIssueFields', () => {
       assignee: '@workspace',
       what: 'keep the fire prompt',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'medium',
     })
@@ -173,6 +176,7 @@ describe('updateIssueFields', () => {
       when: { kind: 'every', every: '15m' },
       assignee: '@workspace',
       agent: 'codex',
+      credential: 'openai-primary',
       model: 'gpt-5.6',
       effort: 'high',
     })
@@ -183,6 +187,7 @@ describe('updateIssueFields', () => {
     const { issue } = await readBack('owned')
     expect(issue?.assignee).toBe('@resume-kind-owl-abc123')
     expect(issue?.agent).toBeUndefined()
+    expect(issue?.credential).toBeUndefined()
     expect(issue?.model).toBeUndefined()
     expect(issue?.effort).toBeUndefined()
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })

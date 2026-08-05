@@ -122,10 +122,12 @@ runtime, Alice falls back to the first registered runtime.
 | opencode | `opencode.json` provider/model binding | `--model`, `--variant` |
 | Pi | project settings plus registered provider | `--model`, `--thinking` |
 
-An Issue's agent/model/effort fields seed a new Session binding when its owner
-is `@new` or `workspace`. Once an exact `@resumeId` exists, those fields cannot
-replace its credential source, model, or effort. Follow-up turns replay the
-stored binding instead of consulting newly changed Workspace defaults.
+An Issue's agent/credential/model/effort fields seed a new Session binding when
+its owner is `@new` or `@workspace`. The credential field is only an
+OpenAlice-vault slug; it never contains a key or endpoint. Once an exact
+`@resumeId` exists, those fields cannot replace its credential source, model, or
+effort. Follow-up turns replay the stored binding instead of consulting newly
+changed Workspace defaults.
 
 The persisted credential component records only an ownership reference:
 native runtime state, an OpenAlice-vault slug plus wire shape, or a fingerprint
@@ -224,6 +226,13 @@ For an unknown free-typed model, the runtime fallback is the default. Advanced
 overrides remain available for facts OpenAlice cannot discover. An override is
 bound to the selected model id (`reasoningModel` in creation defaults); changing
 models must not carry an old model's capability assertion forward invisibly.
+
+Issue launch controls follow the same ownership chain as Session creation. The
+user first chooses Workspace/native auth or one compatible vault credential,
+then sees model suggestions from that credential's provider catalog, then sees
+only the registered effort tiers for the selected model. Free-typed model ids
+remain available; because their semantics are unknown, their effort picker
+falls back to the selected Agent runtime's native range.
 
 Connection probes verify that a key, endpoint, wire shape, and model can answer.
 They do not prove the complete capability set. Error-guided retries (for

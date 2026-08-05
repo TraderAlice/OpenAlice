@@ -28,6 +28,7 @@ export interface IssueAuditSnapshot {
   assignee: string
   schedule?: string
   agent?: string
+  credential?: string
   model?: string
   effort?: string
   whatHash: string
@@ -54,6 +55,7 @@ export function issueAuditSnapshot(issue: IssueRecord): IssueAuditSnapshot {
     assignee: issue.assignee,
     ...(issue.when ? { schedule: JSON.stringify(issue.when) } : {}),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.credential ? { credential: issue.credential } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     whatHash: digest(issue.what),
@@ -85,6 +87,7 @@ export function issueMutation(
   valueField('assignee', left.assignee, right.assignee)
   valueField('schedule', left.schedule, right.schedule)
   valueField('runtime', left.agent, right.agent)
+  valueField('credential', left.credential, right.credential)
   valueField('model', left.model, right.model)
   valueField('effort', left.effort, right.effort)
   if (left.whatHash !== right.whatHash) fields.push({ field: 'what' })

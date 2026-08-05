@@ -97,6 +97,7 @@ describe('readWorkspaceIssues', () => {
           'when: { kind: every, every: 30m }',
           'what: run the research routine',
           'agent: codex',
+          'credential: openai-primary',
           'model: gpt-5.6',
           'effort: high',
         ].join('\n'),
@@ -116,6 +117,7 @@ describe('readWorkspaceIssues', () => {
         assignee: '@workspace',
         what: 'run the research routine\n\n## Context\n\nScan overnight movers and summarize.',
         agent: 'codex',
+        credential: 'openai-primary',
         model: 'gpt-5.6',
         effort: 'high',
       })
@@ -146,13 +148,14 @@ describe('readWorkspaceIssues', () => {
       'when: { kind: every, every: 30m }',
       'assignee: "@resume-kind-owl-abc123"',
       'agent: codex',
+      'credential: openai-primary',
       'model: gpt-5.6',
       'effort: high',
     ].join('\n')))
     const result = await readWorkspaceIssues(dir)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.invalid[0]?.error).toMatch(/agent.*model.*effort/)
+    expect(result.invalid[0]?.error).toMatch(/agent.*credential.*model.*effort/)
   })
 
   it('rejects retired execution declarations instead of silently keeping two owner models', async () => {

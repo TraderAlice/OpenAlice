@@ -69,6 +69,7 @@ interface IssueSpec {
   status?: string
   priority?: string
   agent?: string
+  credential?: string
   model?: string
   effort?: string
   assignee?: string
@@ -82,6 +83,7 @@ function issueMd(spec: IssueSpec): string {
   if (spec.priority) lines.push(`priority: ${spec.priority}`)
   if (spec.what) lines.push(`what: ${spec.what}`)
   if (spec.agent) lines.push(`agent: ${spec.agent}`)
+  if (spec.credential) lines.push(`credential: ${spec.credential}`)
   if (spec.model) lines.push(`model: ${spec.model}`)
   if (spec.effort) lines.push(`effort: ${spec.effort}`)
   // Scanner tests exercise dispatch policy, not declaration defaults. Keep the
@@ -216,13 +218,14 @@ describe('ScheduleScanner', () => {
     expect(markers.get('w1', 't1')).toBe(NOW)
   })
 
-  it('passes Issue model and effort as one-run dispatch overrides', async () => {
+  it('passes Issue credential, model, and effort as one fresh-Session selection', async () => {
     const ws = await makeWs('w1', [{
       id: 'tuned',
       title: 'tuned run',
       when: { kind: 'every', every: '30m' },
       what: 'go',
       agent: 'claude',
+      credential: 'anthropic-primary',
       model: 'claude-opus-4-8',
       effort: 'high',
     }])
@@ -236,7 +239,7 @@ describe('ScheduleScanner', () => {
       { kind: 'issue', workspaceId: 'w1', issueId: 'tuned' },
       undefined,
       undefined,
-      { model: 'claude-opus-4-8', reasoningEffort: 'high' },
+      { credentialSlug: 'anthropic-primary', model: 'claude-opus-4-8', reasoningEffort: 'high' },
     )
   })
 

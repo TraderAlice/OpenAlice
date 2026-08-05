@@ -144,6 +144,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       priority?: IssuePriority
       assignee?: string
       agent?: string | null
+      credential?: string | null
       model?: string | null
       effort?: ModelReasoningEffort | null
       what?: string
@@ -207,6 +208,16 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         patch.agent = agent
       }
     }
+    if ('credential' in fields) {
+      const raw = fields['credential']
+      if (raw === null || raw === '') {
+        patch.credential = null
+      } else if (typeof raw !== 'string' || !raw.trim()) {
+        return c.json({ error: 'invalid_credential', message: 'credential must be a vault slug or null' }, 400)
+      } else {
+        patch.credential = raw.trim()
+      }
+    }
     if ('model' in fields) {
       const raw = fields['model']
       if (raw === null || raw === '') {
@@ -243,7 +254,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
     if (Object.keys(patch).length === 0) {
       return c.json({
         error: 'no_fields',
-        message: 'provide at least one of status, priority, assignee, agent, model, effort, what',
+        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, what',
       }, 400)
     }
 

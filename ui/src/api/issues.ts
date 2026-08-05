@@ -114,6 +114,8 @@ export interface IssueListItem {
   assignee: string
   /** Adapter id for the scheduled fire override, if set. */
   agent?: string
+  /** Secret-free OpenAlice vault slug for a fresh scheduled Session. */
+  credential?: string
   /** Native model id for the scheduled fire override, if set. */
   model?: string
   /** Native reasoning effort for the scheduled fire override, if set. */
@@ -208,6 +210,8 @@ export interface IssueDetailIssue {
   when?: ScheduleWhen
   /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
   agent?: string
+  /** Vault slug selected for Session creation (frontmatter `credential`). */
+  credential?: string
   /** Native model id for the scheduled fire (frontmatter `model`), if set. */
   model?: string
   /** Native reasoning effort for the scheduled fire (frontmatter `effort`), if set. */
@@ -246,6 +250,7 @@ export interface IssuePatch {
   priority?: IssuePriority
   assignee?: string
   agent?: string | null
+  credential?: string | null
   model?: string | null
   effort?: ModelReasoningEffort | null
   what?: string
@@ -277,9 +282,10 @@ export const issuesApi = {
 
   /**
    * Human write path: patch one issue's editable fields (any subset of
-   * status / priority / assignee / agent / model / effort / what). Null runtime
-   * fields clear their one-run overrides so Workspace/native defaults apply. Returns the SAME detail
-   * shape as `getDetail` so the caller can apply it directly (refetch-free).
+   * status / priority / assignee / agent / credential / model / effort / what).
+   * Null runtime fields clear their one-run overrides so Workspace/native
+   * defaults apply. Returns the SAME detail shape as `getDetail` so the caller
+   * can apply it directly (refetch-free).
    * Working-tree write on the server, no commit.
    */
   async update(

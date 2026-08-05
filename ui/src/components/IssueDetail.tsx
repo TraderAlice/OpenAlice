@@ -19,12 +19,16 @@ import type {
   WikilinkResolution,
 } from '../api/issues'
 import type { ModelReasoningEffort } from '../api/types'
+import type { ModelSemantics, Preset, PresetModel } from '../api/types'
+import { configApi } from '../api/config'
 import {
   detectWorkspaceCredential,
   getAgentReadiness,
   getWorkspaceSessionDirectory,
+  listAgentCredentials,
   type AgentCredentialReadiness,
   type AgentId,
+  type SavedCredential,
   type WorkspaceCredentialDetection,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
@@ -48,6 +52,11 @@ import { MarkdownContent } from './MarkdownContent'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { CenteredLoading } from './StateViews'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  issueEffortOptions,
+  issueModelOptions,
+  issueModelSemantics,
+} from './issue-runtime-options'
 
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
 // Issue's independent operational history stays consistent with Automation.
@@ -69,17 +78,9 @@ const railControl =
   'min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
-const ALL_RUN_EFFORTS: readonly ModelReasoningEffort[] = [
-  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
-]
 
 function isConfigurableAgent(agent: string | null | undefined): agent is AgentId {
   return CONFIGURABLE_AGENTS.includes(agent as AgentId)
-}
-
-function runEffortsForAgent(agent: string | null): readonly ModelReasoningEffort[] {
-  if (agent === 'claude') return ['low', 'medium', 'high', 'max']
-  return ALL_RUN_EFFORTS
 }
 
 function fmtDuration(ms?: number): string {
@@ -258,14 +259,16 @@ function AgentEditor({
 
 function ModelEditor({
   value,
-  workspaceModel,
-  loadingWorkspaceDefault,
+  defaultModel,
+  models,
+  loadingDefault,
   disabled,
   onChange,
 }: {
   value?: string
-  workspaceModel: string | null
-  loadingWorkspaceDefault: boolean
+  defaultModel: string | null
+  models: readonly PresetModel[]
+  loadingDefault: boolean
   disabled?: boolean
   onChange: (next: string | null) => void
 }) {
@@ -282,36 +285,46 @@ function ModelEditor({
     if (next !== (value ?? '')) onChange(next || null)
     if (!next) setCustomMode(false)
   }
-  const workspaceLabel = loadingWorkspaceDefault
+  const defaultLabel = loadingDefault
     ? t('issues.detail.defaultLoading')
-    : workspaceModel
-      ? t('issues.detail.defaultValue', { value: workspaceModel })
+    : defaultModel
+      ? t('issues.detail.defaultValue', { value: defaultModel })
       : t('issues.detail.defaultRuntimeDecides')
+  const knownValue = value && models.some((model) => model.id === value)
 
   return (
     <div className="min-w-0 flex-1">
       <select
         className={`${railControl} w-full`}
-        value={customMode ? 'custom' : 'workspace'}
+        value={customMode ? (knownValue ? value : 'custom') : 'default'}
         disabled={disabled}
         aria-label={t('issues.detail.runModel')}
         onChange={(event) => {
-          if (event.target.value === 'workspace') {
+          if (event.target.value === 'default') {
             setCustomMode(false)
             setDraft('')
             if (value) onChange(null)
+            return
+          }
+          if (event.target.value !== 'custom') {
+            setCustomMode(true)
+            setDraft(event.target.value)
+            onChange(event.target.value)
             return
           }
           setCustomMode(true)
           queueMicrotask(() => inputRef.current?.focus())
         }}
       >
-        <option value="workspace">{workspaceLabel}</option>
+        <option value="default">{defaultLabel}</option>
+        {models.map((model) => (
+          <option key={model.id} value={model.id}>{model.label}</option>
+        ))}
         <option value="custom">
           {value ? t('issues.detail.overrideValue', { value }) : t('issues.detail.customModel')}
         </option>
       </select>
-      {customMode && (
+      {customMode && !knownValue && (
         <input
           ref={inputRef}
           className={`${railControl} mt-1 w-full`}
@@ -336,6 +349,48 @@ function ModelEditor({
   )
 }
 
+function CredentialEditor({
+  value,
+  credentials,
+  loading,
+  workspaceCredential,
+  disabled,
+  onChange,
+}: {
+  value?: string
+  credentials: readonly SavedCredential[]
+  loading: boolean
+  workspaceCredential: SavedCredential | null
+  disabled?: boolean
+  onChange: (next: string | null) => void
+}) {
+  const { t } = useTranslation()
+  const defaultLabel = workspaceCredential
+    ? t('issues.detail.defaultCredentialValue', {
+        credential: workspaceCredential.label?.trim() || workspaceCredential.slug,
+      })
+    : t('issues.detail.defaultCredential')
+  return (
+    <select
+      className={railControl}
+      value={value ?? ''}
+      disabled={disabled || loading}
+      aria-label={t('issues.detail.runCredential')}
+      onChange={(event) => onChange(event.target.value || null)}
+    >
+      <option value="">{loading ? t('issues.detail.defaultLoading') : defaultLabel}</option>
+      {credentials.map((credential) => (
+        <option key={credential.slug} value={credential.slug}>
+          {credential.label?.trim() || credential.slug} · {credential.vendor}
+        </option>
+      ))}
+      {value && !credentials.some((credential) => credential.slug === value) && (
+        <option value={value}>{t('issues.detail.missingCredentialValue', { credential: value })}</option>
+      )}
+    </select>
+  )
+}
+
 function workspaceEffortLabel(
   detected: WorkspaceCredentialDetection | null,
   loading: boolean,
@@ -347,6 +402,22 @@ function workspaceEffortLabel(
   if (detected?.reasoningMode === 'required') return t('issues.detail.defaultValue', { value: t('issues.detail.required') })
   if (detected?.reasoningDefaultEnabled === true) return t('issues.detail.defaultThinkingOn')
   if (detected?.reasoningDefaultEnabled === false) return t('issues.detail.defaultThinkingOff')
+  return t('issues.detail.defaultRuntimeDecides')
+}
+
+function modelEffortLabel(
+  semantics: ModelSemantics | null,
+  fallback: WorkspaceCredentialDetection | null,
+  loading: boolean,
+  t: TFunction,
+): string {
+  const reasoning = semantics?.reasoning
+  if (!reasoning) return workspaceEffortLabel(fallback, loading, t)
+  if (reasoning.defaultEffort) return t('issues.detail.defaultValue', { value: reasoning.defaultEffort })
+  if (reasoning.mode === 'none') return t('issues.detail.defaultValue', { value: t('issues.detail.none') })
+  if (reasoning.mode === 'required') return t('issues.detail.defaultValue', { value: t('issues.detail.required') })
+  if (reasoning.defaultEnabled === true) return t('issues.detail.defaultThinkingOn')
+  if (reasoning.defaultEnabled === false) return t('issues.detail.defaultThinkingOff')
   return t('issues.detail.defaultRuntimeDecides')
 }
 
@@ -411,14 +482,52 @@ function PropertiesRail({
     : undefined
   const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
-  const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
-  const effortOptions = runEffortsForAgent(effectiveAgent)
+  const [credentialOptions, setCredentialOptions] = useState<{
+    agent: string
+    loading: boolean
+    credentials: SavedCredential[]
+  } | null>(null)
+  const [presets, setPresets] = useState<readonly Preset[]>([])
   const [workspaceDefaults, setWorkspaceDefaults] = useState<{
     agent: string
     loading: boolean
     detected: WorkspaceCredentialDetection | null
   } | null>(null)
   const [workspaceDefaultsRevision, setWorkspaceDefaultsRevision] = useState(0)
+
+  useEffect(() => {
+    let live = true
+    void configApi.getPresets()
+      .then(({ presets: next }) => { if (live) setPresets(next) })
+      .catch(() => { if (live) setPresets([]) })
+    return () => { live = false }
+  }, [])
+
+  useEffect(() => {
+    if (!effectiveAgent) {
+      setCredentialOptions(null)
+      return
+    }
+    let live = true
+    const refresh = () => {
+      setCredentialOptions((current) => current?.agent === effectiveAgent
+        ? { ...current, loading: true }
+        : { agent: effectiveAgent, loading: true, credentials: [] })
+      void listAgentCredentials(effectiveAgent)
+        .then((credentials) => {
+          if (live) setCredentialOptions({ agent: effectiveAgent, loading: false, credentials })
+        })
+        .catch(() => {
+          if (live) setCredentialOptions({ agent: effectiveAgent, loading: false, credentials: [] })
+        })
+    }
+    refresh()
+    window.addEventListener('openalice:credentials-changed', refresh)
+    return () => {
+      live = false
+      window.removeEventListener('openalice:credentials-changed', refresh)
+    }
+  }, [effectiveAgent])
 
   useEffect(() => {
     const handleWorkspaceAgentConfigChanged = (event: Event) => {
@@ -459,6 +568,40 @@ function PropertiesRail({
   const selectedWorkspaceDefaults = workspaceDefaults?.agent === effectiveAgent
     ? workspaceDefaults
     : null
+  const availableCredentials = credentialOptions?.agent === effectiveAgent
+    ? credentialOptions.credentials
+    : []
+  const credentialsLoading = credentialOptions?.agent === effectiveAgent
+    ? credentialOptions.loading
+    : Boolean(effectiveAgent)
+  const selectedCredential = issue.credential
+    ? availableCredentials.find((credential) => credential.slug === issue.credential) ?? null
+    : null
+  const workspaceCredential = selectedWorkspaceDefaults?.detected?.slug
+    ? availableCredentials.find((credential) => credential.slug === selectedWorkspaceDefaults.detected?.slug) ?? null
+    : null
+  const effectiveCredential = selectedCredential ?? workspaceCredential
+  const workspaceModel = selectedWorkspaceDefaults?.detected?.model ?? null
+  const defaultModel = selectedCredential?.resolvedModel
+    ?? workspaceModel
+    ?? workspaceCredential?.resolvedModel
+    ?? null
+  const modelOptions = issueModelOptions({
+    agent: effectiveAgent,
+    credential: effectiveCredential,
+    defaultModel,
+    presets,
+  })
+  const effectiveModel = issue.model ?? defaultModel
+  const selectedModelSemantics = issueModelSemantics(effectiveModel, modelOptions)
+  const effortOptions = issueEffortOptions({
+    agent: effectiveAgent,
+    semantics: selectedModelSemantics,
+    modelKnown: selectedModelSemantics !== null,
+  })
+  const agentNeedsCredential = selectedReadiness?.requiresCredential === true
+    && !selectedReadiness.ready
+    && !issue.credential
   const automationHealthMessage = useMemo<string | null>(() => {
     const health = issue.automationHealth
     if (!health) return null
@@ -556,12 +699,11 @@ function PropertiesRail({
                 readiness={agentReadiness}
                 disabled={saving}
                 onChange={(agent) => {
-                  const nextAgent = agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
                   onPatch({
                     agent,
-                    ...(issue.effort && !runEffortsForAgent(nextAgent).includes(issue.effort)
-                      ? { effort: null }
-                      : {}),
+                    credential: null,
+                    model: null,
+                    effort: null,
                   })
                 }}
                 onConfigure={onConfigureAgent}
@@ -570,13 +712,40 @@ function PropertiesRail({
           )}
           {!ownerResumeId && (
             <>
+              <EditRow label={t('issues.detail.credential')}>
+                <CredentialEditor
+                  value={issue.credential}
+                  credentials={availableCredentials}
+                  loading={credentialsLoading}
+                  workspaceCredential={workspaceCredential}
+                  disabled={saving}
+                  onChange={(credential) => onPatch({
+                    credential,
+                    model: null,
+                    effort: null,
+                  })}
+                />
+              </EditRow>
               <EditRow label={t('issues.detail.model')}>
                 <ModelEditor
                   value={issue.model}
-                  workspaceModel={selectedWorkspaceDefaults?.detected?.model ?? null}
-                  loadingWorkspaceDefault={selectedWorkspaceDefaults?.loading ?? false}
+                  defaultModel={defaultModel}
+                  models={modelOptions}
+                  loadingDefault={selectedWorkspaceDefaults?.loading ?? credentialsLoading}
                   disabled={saving}
-                  onChange={(model) => onPatch({ model })}
+                  onChange={(model) => {
+                    const nextEffectiveModel = model ?? defaultModel
+                    const nextSemantics = issueModelSemantics(nextEffectiveModel, modelOptions)
+                    const nextEfforts = issueEffortOptions({
+                      agent: effectiveAgent,
+                      semantics: nextSemantics,
+                      modelKnown: nextSemantics !== null,
+                    })
+                    onPatch({
+                      model,
+                      ...(issue.effort && !nextEfforts.includes(issue.effort) ? { effort: null } : {}),
+                    })
+                  }}
                 />
               </EditRow>
               <EditRow label={t('issues.detail.effort')}>
@@ -592,9 +761,10 @@ function PropertiesRail({
                   })}
                 >
                   <option value="">
-                    {workspaceEffortLabel(
-                      selectedWorkspaceDefaults?.detected ?? null,
-                      selectedWorkspaceDefaults?.loading ?? false,
+                    {modelEffortLabel(
+                      selectedModelSemantics,
+                      selectedCredential ? null : selectedWorkspaceDefaults?.detected ?? null,
+                      selectedWorkspaceDefaults?.loading ?? credentialsLoading,
                       t,
                     )}
                   </option>
@@ -903,6 +1073,7 @@ function mutationFieldLabel(field: string, t: TFunction): string {
     case 'assignee': return t('issues.detail.mutationField.assignee')
     case 'schedule': return t('issues.detail.mutationField.schedule')
     case 'runtime': return t('issues.detail.mutationField.runtime')
+    case 'credential': return t('issues.detail.mutationField.credential')
     case 'model': return t('issues.detail.mutationField.model')
     case 'effort': return t('issues.detail.mutationField.effort')
     case 'what': return t('issues.detail.mutationField.what')

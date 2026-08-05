@@ -71,6 +71,7 @@ export const issuesHandlers = [
       priority?: unknown
       assignee?: unknown
       agent?: unknown
+      credential?: unknown
       model?: unknown
       effort?: unknown
       what?: unknown
@@ -84,6 +85,7 @@ export const issuesHandlers = [
       priority?: IssuePriority
       assignee?: string
       agent?: string | null
+      credential?: string | null
       model?: string | null
       effort?: ModelReasoningEffort | null
       what?: string
@@ -119,6 +121,15 @@ export const issuesHandlers = [
         patch.agent = agent
       }
     }
+    if (body.credential !== undefined) {
+      if (body.credential === null || body.credential === '') {
+        patch.credential = null
+      } else if (typeof body.credential !== 'string' || !body.credential.trim()) {
+        return HttpResponse.json({ error: 'invalid_credential' }, { status: 400 })
+      } else {
+        patch.credential = body.credential.trim()
+      }
+    }
     if (body.model !== undefined) {
       if (body.model === null || body.model === '') {
         patch.model = null
@@ -148,6 +159,7 @@ export const issuesHandlers = [
       patch.priority === undefined &&
       patch.assignee === undefined &&
       patch.agent === undefined
+      && patch.credential === undefined
       && patch.model === undefined
       && patch.effort === undefined
       && patch.what === undefined

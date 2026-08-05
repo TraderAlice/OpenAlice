@@ -50,6 +50,8 @@ export interface IssueFieldPatch {
   assignee?: string
   /** Runtime override for scheduled fires; null removes the override. */
   agent?: string | null
+  /** Secret-free vault slug for a fresh scheduled Session; null inherits. */
+  credential?: string | null
   /** Native model id for one scheduled fire; null inherits Workspace/runtime. */
   model?: string | null
   /** Reasoning effort for one scheduled fire; null inherits Workspace/runtime. */
@@ -69,6 +71,7 @@ export interface CreateIssueInput {
   when?: unknown
   what?: string
   agent?: string
+  credential?: string
   model?: string
   effort?: ModelReasoningEffort
   /** @deprecated Compatibility alias for callers written before What became the
@@ -165,6 +168,7 @@ export async function updateIssueFields(
     data.assignee = assignee.data
     if (issueAssigneeResumeId(assignee.data)) {
       delete data.agent
+      delete data.credential
       delete data.model
       delete data.effort
     }
@@ -176,6 +180,15 @@ export async function updateIssueFields(
       const a = patch.agent.trim()
       if (a.length === 0) return { ok: false, reason: 'invalid', error: 'agent must be a non-empty string or null' }
       data.agent = a
+    }
+  }
+  if (patch.credential !== undefined) {
+    if (patch.credential === null) {
+      delete data.credential
+    } else {
+      const credential = patch.credential.trim()
+      if (!credential) return { ok: false, reason: 'invalid', error: 'credential must be a non-empty vault slug or null' }
+      data.credential = credential
     }
   }
   if (patch.model !== undefined) {
@@ -240,6 +253,7 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
   if (input.assignee !== undefined) data.assignee = input.assignee
   if (input.when !== undefined) data.when = input.when
   if (input.agent !== undefined) data.agent = input.agent
+  if (input.credential !== undefined) data.credential = input.credential
   if (input.model !== undefined) data.model = input.model
   if (input.effort !== undefined) data.effort = input.effort
 
