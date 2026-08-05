@@ -38,6 +38,7 @@ import {
 import { loadConfig, type ServerConfig } from './config.js';
 import { ensureAgentCredentialReady } from './agent-credential-readiness.js';
 import {
+  createNativeSessionRuntimeBinding,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
   type SessionRuntimeSelection,
@@ -1495,7 +1496,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       }
       sessionRuntime = identity.runtimeBinding
         ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
-        : await createSessionRuntimeBinding({ adapter, cwd: ws.dir });
+        : createNativeSessionRuntimeBinding({ adapter });
     } else {
       sessionRuntime = await createSessionRuntimeBinding({
         adapter,
@@ -2194,7 +2195,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           cwd: meta.dir,
           binding: identity.runtimeBinding,
         })
-      : await createSessionRuntimeBinding({ adapter, cwd: meta.dir });
+      : createNativeSessionRuntimeBinding({ adapter });
     if (!identity?.runtimeBinding) {
       await resumeRegistry.ensure({
         resumeId: record.resumeId,

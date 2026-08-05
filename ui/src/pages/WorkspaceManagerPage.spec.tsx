@@ -261,6 +261,8 @@ describe('WorkspaceManagerPage runtime selection', () => {
       '检查工作区',
       'codex',
       undefined,
+      undefined,
+      undefined,
     ))
   })
 
@@ -293,6 +295,8 @@ describe('WorkspaceManagerPage runtime selection', () => {
     await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
       'Inspect without a preflight.',
       'codex',
+      undefined,
+      undefined,
       undefined,
     ))
     expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
@@ -335,6 +339,8 @@ describe('WorkspaceManagerPage runtime selection', () => {
     await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
       'Inspect the floor.',
       'claude',
+      undefined,
+      undefined,
       undefined,
     ))
     expect(mocks.setDefaultAgent).not.toHaveBeenCalled()
@@ -443,6 +449,8 @@ describe('WorkspaceManagerPage runtime selection', () => {
       'Audit issues.',
       'pi',
       'deepseek-1',
+      'deepseek-chat',
+      undefined,
     ))
   })
 

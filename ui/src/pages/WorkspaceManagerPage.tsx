@@ -99,6 +99,8 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         prompt,
         effectiveAgent,
         launchConfig.launchCredentialSlug,
+        launchConfig.aiDetails?.model,
+        launchConfig.aiDetails?.reasoningEffort,
       )
       setDraft('')
       openOrFocus({ kind: 'workspace-manager', params: { sessionId: result.session.id } })

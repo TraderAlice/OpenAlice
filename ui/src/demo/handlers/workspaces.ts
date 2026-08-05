@@ -364,7 +364,13 @@ export const workspacesHandlers = [
     },
   })),
   http.post('/api/workspaces/manager/quick-start', async ({ request }) => {
-    const body = await request.json().catch(() => ({})) as { prompt?: string }
+    const body = await request.json().catch(() => ({})) as {
+      prompt?: string
+      agent?: string
+      credentialSlug?: string
+      model?: string
+      reasoningEffort?: string
+    }
     demoManagerMessages = [
       { role: 'user', content: body.prompt ?? 'Audit the active Workspace floor.' },
       { role: 'assistant', content: 'Demo manager: active desks are inventoried and ready for coordination.' },

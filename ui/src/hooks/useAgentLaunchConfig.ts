@@ -130,6 +130,21 @@ export function resolveAgentLaunchAiDetails(
   // context limits, so keep that fact unknown instead of borrowing a provider
   // default.
   if (!needsCredential) {
+    if (
+      effectiveCredential &&
+      credential?.slug === effectiveCredential &&
+      (!hasWorkspace || detected?.slug !== effectiveCredential)
+    ) {
+      const creationModel = !hasWorkspace && creationDefault?.credentialSlug === effectiveCredential
+        ? creationDefault.model
+        : undefined
+      return {
+        model: creationModel ?? credential.resolvedModel ?? null,
+        contextWindow: null,
+        ...injectedReasoningDetails(credential),
+        source: 'new-injection',
+      }
+    }
     if (hasWorkspace && detected?.configured === true) {
       return {
         model: detected.model ?? (
@@ -162,7 +177,7 @@ export function resolveAgentLaunchAiDetails(
   // on-disk config, so keep its real model/context visible instead of falling
   // back to an empty summary.
   if (hasWorkspace && detected?.configured === true && (
-    !effectiveCredential || detected.slug === null || detected.slug === effectiveCredential
+    !effectiveCredential || detected.slug === effectiveCredential
   )) {
     return {
       model: detected.model,

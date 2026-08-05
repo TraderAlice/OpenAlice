@@ -40,6 +40,8 @@ export interface WorkspacesContextValue {
     prompt: string,
     agent: string,
     credentialSlug?: string,
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
   ): Promise<ManagerQuickStartResult>
   spawn(wsId: string, opts?: SpawnOpts, source?: WorkspaceSource): Promise<void>
   openHeadlessRun(
