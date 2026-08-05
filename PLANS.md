@@ -28,6 +28,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/issue-runtime-choice.md]] — Made scheduled Issue launch selection a
+  credential-first flow, narrowed model and effort choices to that provider,
+  and froze the result in the new Session runtime binding.
 - [[plans/session-runtime-bindings.md]] — Made credential source, model, and
   effort a durable product-Session binding projected by every Agent adapter
   across interactive, Web, and headless launch/resume.

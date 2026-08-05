@@ -507,6 +507,7 @@ export function demoIssueUpdate(
     boardIssue.assignee = patch.assignee
     if (patch.assignee.startsWith('@resume-')) {
       delete boardIssue.agent
+      delete boardIssue.credential
       delete boardIssue.model
       delete boardIssue.effort
     }
@@ -536,6 +537,10 @@ export function demoIssueUpdate(
   if (patch.model !== undefined) {
     if (patch.model === null) delete boardIssue.model
     else boardIssue.model = patch.model
+  }
+  if (patch.credential !== undefined) {
+    if (patch.credential === null) delete boardIssue.credential
+    else boardIssue.credential = patch.credential
   }
   if (patch.effort !== undefined) {
     if (patch.effort === null) delete boardIssue.effort

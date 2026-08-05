@@ -94,7 +94,7 @@ export interface ScheduleScannerDeps {
     resumeId?: string,
     /** Optional reverse-link metadata; scheduler leaves this absent. */
     inquiry?: undefined,
-    /** Fresh-Session model/effort selection inherited from Issue frontmatter. */
+    /** Fresh-Session credential/model/effort selection inherited from Issue frontmatter. */
     selection?: SessionRuntimeSelection,
   ) => Promise<{ taskId: string; resumeId: string }>
   /** Persist @new -> exact @resumeId after the first fresh dispatch. */
@@ -449,8 +449,9 @@ export class ScheduleScanner {
 }
 
 function issueRunOverrides(issue: IssueRecord): SessionRuntimeSelection | undefined {
-  if (!issue.model && !issue.effort) return undefined
+  if (!issue.credential && !issue.model && !issue.effort) return undefined
   return {
+    ...(issue.credential ? { credentialSlug: issue.credential } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { reasoningEffort: issue.effort } : {}),
   }

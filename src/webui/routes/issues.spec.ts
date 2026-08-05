@@ -188,6 +188,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
       priority: 'high',
       assignee: '@human',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'high',
       what: 'new exact work',
@@ -199,6 +200,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
       priority: 'high',
       assignee: '@human',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'high',
       what: 'new exact work',
@@ -208,6 +210,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     const re = await readWorkspaceIssues(wsDir)
     expect(re.ok && re.issues[0].status).toBe('in_progress')
     expect(re.ok && re.issues[0].agent).toBe('pi')
+    expect(re.ok && re.issues[0].credential).toBe('gemini-primary')
     expect(re.ok && re.issues[0].model).toBe('gemini-3.5-pro')
     expect(re.ok && re.issues[0].effort).toBe('high')
     expect(re.ok && re.issues[0].what).toBe('new exact work')
@@ -221,6 +224,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
           { field: 'priority', before: 'none', after: 'high' },
           { field: 'assignee', before: '@workspace', after: '@human' },
           { field: 'runtime', after: 'pi' },
+          { field: 'credential', after: 'gemini-primary' },
           { field: 'model', after: 'gemini-3.5-pro' },
           { field: 'effort', after: 'high' },
           { field: 'what' },

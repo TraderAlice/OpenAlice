@@ -42,6 +42,8 @@ export interface IssuesSnapshotIssue {
   assignee: string
   /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
   agent?: string
+  /** Secret-free OpenAlice vault slug selected for a fresh Session. */
+  credential?: string
   model?: string
   effort?: ModelReasoningEffort
   /** Present iff the issue self-schedules. */
@@ -141,6 +143,7 @@ export interface BoardRow {
   assignee: string
   /** Adapter id for the scheduled fire override, if set. */
   agent?: string
+  credential?: string
   model?: string
   effort?: ModelReasoningEffort
   /** True iff the issue self-schedules (snapshot `when` present). */
@@ -183,6 +186,7 @@ export function flattenBoardRows(snapshot: IssuesSnapshot): {
         priority: issue.priority,
         assignee: issue.assignee,
         ...(issue.agent ? { agent: issue.agent } : {}),
+        ...(issue.credential ? { credential: issue.credential } : {}),
         ...(issue.model ? { model: issue.model } : {}),
         ...(issue.effort ? { effort: issue.effort } : {}),
         scheduled: issue.when !== undefined,
@@ -234,6 +238,7 @@ export interface IssueDetailIssue {
   when?: Schedule
   /** Adapter id for the scheduled fire (frontmatter `agent`), if set. */
   agent?: string
+  credential?: string
   /** When the scanner last fired this issue (epoch ms); only for scheduled issues. */
   lastFiredAtMs?: number | null
   /** When it is next due (epoch ms); only for scheduled issues. */
@@ -416,6 +421,7 @@ export function detailIssue(
     assignee: issue.assignee,
     ...(issue.when ? { when: issue.when } : {}),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.credential ? { credential: issue.credential } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(markers ? {
@@ -440,6 +446,7 @@ export function snapshotBoardIssue(
     priority: issue.priority,
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.credential ? { credential: issue.credential } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.when ? { when: issue.when } : {}),

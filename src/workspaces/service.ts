@@ -1492,7 +1492,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       nativeResume = { sessionId: identity.agentSessionId };
       parentTaskId = identity.latestTaskId ?? headlessTasks.latestForResumeId(resumeId)?.taskId;
       if (selection?.credentialSlug || selection?.model || selection?.reasoningEffort) {
-        throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted model and effort');
+        throw new HeadlessResumeError('not_ready', 'a resumed Session reuses its persisted credential, model, and effort');
       }
       sessionRuntime = identity.runtimeBinding
         ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })

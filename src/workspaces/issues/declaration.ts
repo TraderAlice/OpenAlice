@@ -26,6 +26,7 @@
  *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
  *   what: <legacy fire prompt; migrated into the markdown What body>
  *   agent: <optional adapter id for the scheduled run>
+ *   credential: <optional OpenAlice vault slug for one scheduled Session>
  *   model: <optional native model id for one scheduled run>
  *   effort: none | minimal | low | medium | high | xhigh | max
  *   ---
@@ -133,8 +134,9 @@ const issueFrontmatterObjectSchema = z.object({
   /** Runtime override for Workspace-owned scheduled work. A Session owner
    * already carries its runtime identity and therefore cannot set this. */
   agent: z.string().min(1).optional(),
-  /** One-run model selection. Provider routing and authentication remain
-   * inherited from the Workspace/native login. */
+  /** Secret-free vault reference frozen into a fresh Session binding. */
+  credential: z.string().min(1).optional(),
+  /** One-run model selection for the selected credential/runtime source. */
   model: z.string().min(1).optional(),
   /** One-run reasoning effort, projected through the selected native CLI. */
   effort: z.custom<ModelReasoningEffort>(isModelReasoningEffort, {
@@ -166,7 +168,7 @@ export const issueFrontmatterSchema = issueFrontmatterObjectSchema
       })
     }
     if (issueAssigneeResumeId(value.assignee)) {
-      for (const field of ['agent', 'model', 'effort'] as const) {
+      for (const field of ['agent', 'credential', 'model', 'effort'] as const) {
         if (!value[field]) continue
         ctx.addIssue({
           code: 'custom',
