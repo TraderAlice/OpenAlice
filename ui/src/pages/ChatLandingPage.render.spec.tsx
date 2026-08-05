@@ -406,6 +406,68 @@ describe('ChatLandingPage keyboard submission', () => {
     expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
     expect(screen.queryByText('The runtime reported an error: 429: balance exhausted')).toBeNull()
   })
+
+  it('submits an explicit login-backed credential with its own model instead of the Workspace model', async () => {
+    const nativePiAgent: AgentInfo = {
+      ...piAgent,
+      capabilities: {
+        ...piAgent.capabilities,
+        aiProvider: {
+          ...piAgent.capabilities.aiProvider!,
+          credentialSource: 'runtime-or-workspace',
+        },
+      },
+    }
+    mocks.useWorkspaces.mockImplementation(() => ({
+      ...context(workspaces),
+      agents: [nativePiAgent],
+    }))
+    mocks.listAgentCredentials.mockResolvedValue([
+      {
+        slug: 'glm-1',
+        vendor: 'glm',
+        authType: 'api-key',
+        wires: { 'openai-chat': 'https://open.bigmodel.cn/api/paas/v4' },
+        resolvedModel: 'glm-5.2',
+      },
+      {
+        slug: 'deepseek-1',
+        vendor: 'deepseek',
+        authType: 'api-key',
+        wires: { 'openai-chat': 'https://api.deepseek.com' },
+        resolvedModel: 'deepseek-v4-flash',
+        resolvedReasoningEffort: 'high',
+      },
+    ])
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: true,
+      slug: 'glm-1',
+      model: 'glm-5.2',
+      contextWindow: 256_000,
+      wireShape: 'openai-chat',
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect(await screen.findByLabelText('Model glm-5.2')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
+    expect(await screen.findByLabelText('Model deepseek-v4-flash')).toBeTruthy()
+    expect(screen.getByText('This provider applies only to the new Session; Workspace settings stay unchanged.')).toBeTruthy()
+
+    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use DeepSeek.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'Use DeepSeek.',
+      'pi',
+      'deepseek-1',
+      'chat-1',
+      'chat',
+      'deepseek-v4-flash',
+      'high',
+    ))
+  })
 })
 
 describe('ChatLandingPage AI source disclosure', () => {
@@ -445,7 +507,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByText('Sending will configure this workspace with the selected AI provider.')).toBeTruthy()
+    expect(await screen.findByText('This provider applies only to the new Session; Workspace settings stay unchanged.')).toBeTruthy()
     expect(screen.getByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Configure workspace AI' })).toBeTruthy()
     expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()

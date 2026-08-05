@@ -484,8 +484,9 @@ function HarnessLandingPage({
           </div>
         )}
 
-        {/* The selected cred differs from the one today's workspace already uses
-            — sending switches it. A notice, not a block (the user chose it). */}
+        {/* The selected credential differs from this Workspace's creation
+            default. It applies only to the new Session; make that divergence
+            visible without implying that Send rewrites Workspace files. */}
         {launchConfig.willOverwriteCredential && launchConfig.credential && (
           <div className="rounded-lg border border-border/60 bg-secondary/60 px-3 py-2 text-[12px] text-muted-foreground">
             {t('chatLanding.credOverwrite', {

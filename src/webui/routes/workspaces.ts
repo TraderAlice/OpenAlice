@@ -55,6 +55,7 @@ import {
   type ModelReasoningMode,
 } from '../../ai-providers/model-semantics.js';
 import {
+  createNativeSessionRuntimeBinding,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
   SessionRuntimeBindingError,
@@ -322,12 +323,14 @@ export function createWorkspaceRoutes(
     let sessionRuntime: ResolvedSessionRuntimeBinding | undefined;
     if (isAgentRuntime(adapter)) {
       try {
-        sessionRuntime = requestedIdentity?.runtimeBinding
-          ? await resolveSessionRuntimeBinding({
-              adapter,
-              cwd: meta.dir,
-              binding: requestedIdentity.runtimeBinding,
-            })
+        sessionRuntime = requestedIdentity
+          ? requestedIdentity.runtimeBinding
+            ? await resolveSessionRuntimeBinding({
+                adapter,
+                cwd: meta.dir,
+                binding: requestedIdentity.runtimeBinding,
+              })
+            : createNativeSessionRuntimeBinding({ adapter })
           : await createSessionRuntimeBinding({
               adapter,
               cwd: meta.dir,
@@ -589,6 +592,8 @@ export function createWorkspaceRoutes(
     let prompt: string;
     let agentId: string | undefined;
     let credentialSlug: string | undefined;
+    let model: string | undefined;
+    let reasoningEffort: ModelReasoningEffort | undefined;
     try {
       const body = await safeJson(c);
       const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
@@ -602,6 +607,10 @@ export function createWorkspaceRoutes(
       if (typeof fields['credentialSlug'] === 'string' && fields['credentialSlug'].length > 0) {
         credentialSlug = fields['credentialSlug'];
       }
+      const rawModel = fields['model'];
+      if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
+      const rawEffort = fields['reasoningEffort'];
+      if (isModelReasoningEffort(rawEffort)) reasoningEffort = rawEffort;
     } catch (error) {
       return c.json({ error: 'bad_request', message: (error as Error).message }, 400);
     }
@@ -624,6 +633,8 @@ export function createWorkspaceRoutes(
     const spawned = await spawnInteractiveSession(meta, {
       agentId: resolvedAgentId,
       ...(credentialSlug ? { credentialSlug } : {}),
+      ...(model ? { model } : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
       ...(resolvedAgentId === 'pi' ? {} : { initialPrompt: managerTerminalPrompt(prompt) }),
       title: prompt,
     });
@@ -1437,8 +1448,8 @@ export function createWorkspaceRoutes(
       prompt = seed.prompt;
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
-      // Optional: which vault credential to seed a loginless runtime with. Only
-      // consulted for opencode/pi; claude/codex ignore it (own login).
+      // Optional Session-only vault override. Every Agent adapter owns how it
+      // projects the selected credential; omission preserves native auth.
       const rawSlug = fields['credentialSlug'];
       if (typeof rawSlug === 'string' && rawSlug.length > 0) credentialSlug = rawSlug;
       const rawModel = fields['model'];
@@ -1646,7 +1657,7 @@ export function createWorkspaceRoutes(
                 cwd: meta.dir,
                 binding: identity.runtimeBinding,
               })
-            : await createSessionRuntimeBinding({ adapter, cwd: meta.dir });
+            : createNativeSessionRuntimeBinding({ adapter });
           if (!identity?.runtimeBinding) {
             await svc.resumeRegistry.ensure({
               resumeId: record.resumeId,

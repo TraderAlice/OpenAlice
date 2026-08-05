@@ -33,8 +33,10 @@ Agent runtime to implement one Session contract.
    records, logs, command arguments, or fixtures.
 5. Native runtime login is a first-class explicit source. A missing override
    does not cause OpenAlice to pick or inject an arbitrary vault credential.
-6. Legacy identities without a binding retain compatibility resolution once;
-   all newly-created Sessions persist an explicit binding before spawn.
+6. Legacy identities without a binding upgrade to explicit native-runtime
+   ownership on their next activation; they never adopt mutable Workspace
+   provider state that appeared after the Session was created. All newly-created
+   Sessions persist an explicit binding before spawn.
 7. Exact Session resumes replay their stored binding and reject conflicting
    runtime/model/effort/credential input instead of silently changing it.
 
@@ -64,6 +66,8 @@ Agent runtime to implement one Session contract.
 - [x] Preserve Issue declarations as Session-creation preferences and expose
       safe effective binding metadata on Session/run projections.
 - [x] Update UI/demo contracts where launch selection already exists.
+- [x] Keep credential, model, and effort independently optional; make both
+      Quick Chat and Workspace Manager submit the visible selection atomically.
 
 ### 4. Verification and delivery
 
@@ -80,7 +84,10 @@ Delivered one mandatory adapter contract across Claude Code, Codex, OpenCode,
 and Pi; persisted versioned bindings on `resumeId`; removed the headless-only
 override seam; and verified the same binding in browser/dev and an isolated
 packaged Electron scheduled-Pi run. Utility Shell Sessions remain explicitly
-outside the Agent runtime binding contract.
+outside the Agent runtime binding contract. A follow-up hardening pass made
+legacy binding absence mean native runtime ownership, fixed login-backed
+credential/model selection as one Session launch, and carried the same optional
+model/effort values through Workspace Manager.
 
 ## Completion Criteria
 

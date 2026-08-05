@@ -38,6 +38,35 @@ export interface SessionRuntimeSelection {
   readonly reasoningEffort?: SessionRuntimeBinding['reasoningEffort']
 }
 
+/**
+ * Freeze an explicit native-runtime binding without consulting Workspace files.
+ *
+ * This is intentionally separate from `createSessionRuntimeBinding()`: fresh
+ * Sessions may adopt a Workspace-local creation default, while an existing
+ * legacy Session whose identity predates runtime bindings must not silently
+ * adopt whatever provider happens to be in that Workspace today. Native auth,
+ * model, and provider discovery remain owned by the child runtime; OpenAlice
+ * may still project an independently persisted model or effort override.
+ */
+export function createNativeSessionRuntimeBinding(input: {
+  readonly adapter: CliAdapter
+  readonly selection?: Omit<SessionRuntimeSelection, 'credentialSlug'>
+}): ResolvedSessionRuntimeBinding {
+  assertedAgentContract(input.adapter)
+  const selection = input.selection ?? {}
+  const binding: SessionRuntimeBinding = {
+    version: 1,
+    credential: { source: 'native' },
+    ...modelFields(selection.model, selection.reasoningEffort),
+  }
+  return {
+    binding,
+    ai: binding.model || binding.reasoningEffort
+      ? { model: binding.model ?? null, reasoningEffort: binding.reasoningEffort ?? null }
+      : null,
+  }
+}
+
 function providerFingerprint(ai: WorkspaceAiCred): string {
   return createHash('sha256').update(JSON.stringify({
     baseUrl: ai.baseUrl ?? null,
@@ -134,17 +163,7 @@ export async function createSessionRuntimeBinding(input: {
 
   const workspace = await input.adapter.readAiConfig?.(input.cwd).catch(() => null) ?? null
   if (!workspace) {
-    const binding: SessionRuntimeBinding = {
-      version: 1,
-      credential: { source: 'native' },
-      ...modelFields(selection.model, selection.reasoningEffort),
-    }
-    return {
-      binding,
-      ai: binding.model || binding.reasoningEffort
-        ? { model: binding.model ?? null, reasoningEffort: binding.reasoningEffort ?? null }
-        : null,
-    }
+    return createNativeSessionRuntimeBinding({ adapter: input.adapter, selection })
   }
 
   const selectedModel = selection.model ?? workspace.model ?? undefined

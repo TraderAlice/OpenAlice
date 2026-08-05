@@ -133,6 +133,20 @@ of an explicitly configured Workspace provider. Vault secrets are resolved
 just in time and enter only the child environment. Workspace fingerprints make
 replacement visible instead of silently resuming through a different key.
 
+Credential, model, and effort are independent optional launch dimensions. A
+native credential binding means OpenAlice injects no managed key or endpoint;
+the Agent runtime owns authentication and provider discovery through its normal
+login/config chain. That native binding may still carry a process-level model
+or effort override. A native binding with neither override is also valid and
+must still traverse the adapter projection seam, even when the resulting
+projection is empty.
+
+Legacy resume identities that predate this binding contract are upgraded to an
+explicit native binding on their next activation. They must not inspect and
+adopt a provider that was added to the Workspace after the Session was created.
+Fresh Sessions may still resolve an existing Workspace-local provider as their
+creation default and persist that choice before the first process starts.
+
 Every Agent adapter must implement `sessionRuntime.project(...)`. Registration
 rejects an Agent adapter without that contract; utility adapters such as Shell
 explicitly opt out. The adapter maps the same resolved binding to its native
@@ -218,20 +232,21 @@ replace the curated registry.
 
 The UI must disclose configuration ownership instead of presenting every
 resolved launch value as if it were already on disk. A launch surface
-distinguishes a Workspace-local binding from a credential that will be written
-only when the next session starts. Creation defaults are also explicitly
-creation-time policy: changing one never rewrites an existing Workspace.
+distinguishes a Workspace-local default from a credential that will be bound
+only to the next Session. Selecting the latter must not rewrite the Workspace.
+Creation defaults are also explicitly creation-time policy: changing one never
+rewrites an existing Workspace.
 Stable Workspace ownership stays implicit so provenance does not displace the
-effective model, reasoning, and context values. When Send will write or replace
-runtime configuration, that pending side effect is disclosed on its own line;
-successful explicit saves use transient confirmation instead of a permanent
-success state.
+effective model, reasoning, and context values. When Send will apply a
+Session-only provider/model override, that ownership is disclosed on its own
+line; successful explicit Workspace saves use transient confirmation instead
+of a permanent success state.
 This disclosure applies to all four supported Agent runtimes. Claude Code and
 Codex use their native global login and global runtime configuration by default.
 Merely storing a compatible credential in Alice never selects or injects it;
-only an explicit Workspace binding or explicit new-Workspace creation default
-overrides the native fallback. When a Workspace-local override exists its real
-model must be shown instead of a generic “runtime managed” label. Their native
+only an explicit Session selection, Workspace binding, or new-Workspace
+creation default overrides the native fallback. When a Workspace-local override
+exists its real model must be shown instead of a generic “runtime managed” label. Their native
 project files do not declare a context limit, so the UI omits that field rather
 than borrowing the Pi/opencode injection default.
 

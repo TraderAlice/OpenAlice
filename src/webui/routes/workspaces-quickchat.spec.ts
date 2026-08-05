@@ -189,6 +189,7 @@ function build(opts: {
     app,
     opencode,
     spawn,
+    resumeRecords,
     creator,
     rememberRecentChatWorkspace,
     rememberAutoQuantDefaultWorkspace,
@@ -544,6 +545,39 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
       model: 'gpt-5.5-mini',
     });
     expect(runtime.ai.apiKey).toBe('sk-second');
+  });
+
+  it('upgrades a legacy resumed Session to native ownership without reading current Workspace credentials', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, resumeRecords, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'workspace-key-added-after-session-creation',
+        model: 'workspace-model-added-later',
+        wireShape: 'openai-chat',
+      },
+    });
+    resumeRecords.set('resume-legacy', {
+      resumeId: 'resume-legacy',
+      wsId: 'ws-1',
+      agent: 'opencode',
+      agentSessionId: 'native-session-1',
+    });
+
+    const result = await spawnSession(app, {
+      agent: 'opencode',
+      resumeId: 'resume-legacy',
+    });
+
+    expect(result.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toEqual({
+      binding: { version: 1, credential: { source: 'native' } },
+      ai: null,
+    });
+    expect(resumeRecords.get('resume-legacy').runtimeBinding).toEqual({
+      version: 1,
+      credential: { source: 'native' },
+    });
   });
 
   it('explicit credential pick overrides a globally-ready opencode config', async () => {

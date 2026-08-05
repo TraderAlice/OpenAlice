@@ -419,8 +419,16 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     prompt: string,
     agent: string,
     credentialSlug?: string,
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
   ): Promise<ManagerQuickStartResult> => {
-    const result = await apiQuickStartWorkspaceManager(prompt, agent, credentialSlug)
+    const result = await apiQuickStartWorkspaceManager(
+      prompt,
+      agent,
+      credentialSlug,
+      model,
+      reasoningEffort,
+    )
     setWorkspaceManager(result.manager)
     setWorkspaceManagerLoaded(true)
     setWorkspaceManagerError(null)

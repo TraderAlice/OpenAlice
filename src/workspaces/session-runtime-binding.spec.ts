@@ -13,6 +13,7 @@ import { codexAdapter } from './adapters/codex.js'
 import { opencodeAdapter } from './adapters/opencode.js'
 import { piAdapter } from './adapters/pi.js'
 import {
+  createNativeSessionRuntimeBinding,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
   SessionRuntimeBindingError,
@@ -47,6 +48,32 @@ function fakeAdapter(readAiConfig: () => Promise<WorkspaceAiCred | null>): CliAd
 }
 
 describe('durable Session runtime binding', () => {
+  it('represents native credentials as an explicit optional binding with independent model and effort', () => {
+    const readAiConfig = vi.fn(async (): Promise<WorkspaceAiCred> => ({
+      apiKey: 'workspace-secret-that-must-not-be-read',
+      model: 'workspace-model',
+      wireShape: 'openai-responses',
+    }))
+    const adapter = fakeAdapter(readAiConfig)
+
+    expect(createNativeSessionRuntimeBinding({
+      adapter,
+      selection: { model: 'native-model-override', reasoningEffort: 'low' },
+    })).toEqual({
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'native-model-override',
+        reasoningEffort: 'low',
+      },
+      ai: {
+        model: 'native-model-override',
+        reasoningEffort: 'low',
+      },
+    })
+    expect(readAiConfig).not.toHaveBeenCalled()
+  })
+
   it('persists a vault reference and resolved model without persisting its key', async () => {
     const resolved = await createSessionRuntimeBinding({
       adapter: codexAdapter,
@@ -169,6 +196,27 @@ describe('built-in Agent Session runtime projection', () => {
       expect(interactive.join(' ')).toContain('session-model')
       expect(headless.join(' ')).toContain('session-model')
       expect(Object.values(projected.env).join(' ')).toContain('must-not-enter-argv')
+    },
+  )
+
+  it.each([claudeAdapter, codexAdapter, opencodeAdapter, piAdapter])(
+    '$id accepts a credentialless native binding and still projects model/effort',
+    (adapter) => {
+      const native = createNativeSessionRuntimeBinding({
+        adapter,
+        selection: { model: 'native-model-override', reasoningEffort: 'medium' },
+      })
+      const projected = adapter.sessionRuntime!.project(ctx, native)
+      const serializedEnv = Object.values(projected.env).join(' ')
+      const serializedArgs = [
+        ...projected.interactiveArgs,
+        ...projected.headlessArgs,
+        ...(projected.webArgs ?? []),
+      ].join(' ')
+
+      expect(serializedArgs).toContain('native-model-override')
+      expect(serializedEnv).not.toContain('sk-')
+      expect(native.ai).not.toHaveProperty('apiKey')
     },
   )
 

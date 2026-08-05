@@ -1311,13 +1311,28 @@ describe('Workspace manager surface routes', () => {
     const result = await post(app, '/manager/quick-start', {
       prompt: 'Map ownership.',
       agent: 'codex',
+      model: 'gpt-5.6-terra',
+      reasoningEffort: 'high',
     });
     expect(result.status).toBe(201);
     expect(result.body).toMatchObject({
       session: { wsId: 'workspace-manager', agent: 'codex', surface: 'terminal' },
       snapshot: null,
     });
-    expect(spawnedContext).toMatchObject({ agentId: 'codex' });
+    expect(spawnedContext).toMatchObject({
+      agentId: 'codex',
+      sessionRuntime: {
+        binding: {
+          credential: { source: 'native' },
+          model: 'gpt-5.6-terra',
+          reasoningEffort: 'high',
+        },
+        ai: {
+          model: 'gpt-5.6-terra',
+          reasoningEffort: 'high',
+        },
+      },
+    });
     expect(result.body).toMatchObject({ session: { title: 'Map ownership.' } });
     expect(spawnedContext.initialPrompt).toContain('OpenAlice Workspace Manager');
     expect(spawnedContext.initialPrompt).toContain('User request:\nMap ownership.');

@@ -395,7 +395,55 @@ describe('resolveAgentLaunchAiDetails', () => {
     })
   })
 
-  it('keeps native login fallback visible when no login-backed Workspace override exists', () => {
+  it('uses an explicitly selected login-backed credential model instead of the old Workspace model', () => {
+    expect(resolveAgentLaunchAiDetails(
+      false,
+      'deepseek-1',
+      {
+        slug: 'deepseek-1',
+        resolvedModel: 'deepseek-v4-flash',
+        resolvedContextWindow: 128_000,
+        resolvedReasoningEffort: 'medium',
+      },
+      {
+        configured: true,
+        slug: 'glm-1',
+        model: 'glm-5.2',
+        contextWindow: 256_000,
+        wireShape: 'openai-chat',
+      },
+      undefined,
+      true,
+    )).toEqual({
+      model: 'deepseek-v4-flash',
+      contextWindow: null,
+      reasoningEffort: 'medium',
+      source: 'new-injection',
+    })
+  })
+
+  it('lets an explicit credential replace a hand-edited Workspace provider', () => {
+    expect(resolveAgentLaunchAiDetails(
+      true,
+      'google-1',
+      credential,
+      {
+        configured: true,
+        slug: null,
+        model: 'hand-edited-model',
+        contextWindow: 32_000,
+        wireShape: 'openai-chat',
+      },
+      undefined,
+      true,
+    )).toEqual({
+      model: 'gemini-3.5-flash',
+      contextWindow: 1_048_576,
+      source: 'new-injection',
+    })
+  })
+
+  it('shows the remembered login-backed override that the next Session will launch', () => {
     expect(resolveAgentLaunchAiDetails(
       false,
       'minimax-1',
@@ -409,7 +457,11 @@ describe('resolveAgentLaunchAiDetails', () => {
       },
       undefined,
       true,
-    )).toBeNull()
+    )).toEqual({
+      model: 'MiniMax-M2.5',
+      contextWindow: null,
+      source: 'new-injection',
+    })
   })
 
   it('previews a login-backed creation default without claiming a runtime context limit', () => {

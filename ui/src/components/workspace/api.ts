@@ -881,11 +881,17 @@ export async function quickStartWorkspaceManager(
   prompt: string,
   agent: string,
   credentialSlug?: string,
+  model?: string | null,
+  reasoningEffort?: ModelReasoningEffort,
 ): Promise<ManagerQuickStartResult> {
+  const request: Record<string, unknown> = { prompt, agent };
+  if (credentialSlug !== undefined) request['credentialSlug'] = credentialSlug;
+  if (model) request['model'] = model;
+  if (reasoningEffort) request['reasoningEffort'] = reasoningEffort;
   const res = await fetch('/api/workspaces/manager/quick-start', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt, agent, ...(credentialSlug ? { credentialSlug } : {}) }),
+    body: JSON.stringify(request),
   })
   const body = (await res.json().catch(() => null)) as (ManagerQuickStartResult & { message?: string; error?: string }) | null
   if (!res.ok || !body?.manager || !body.session || !('snapshot' in body)) {
@@ -907,8 +913,9 @@ export class QuickChatError extends Error {
  * Quick-chat launch — the "type a message → you're in" front door. One POST
  * reuses-or-creates the chat workspace and spawns a fresh session seeded with
  * `prompt`; the returned `session.sessionId` is what the caller attaches to.
- * `credentialSlug` seeds a loginless runtime (opencode/pi) — ignored for
- * claude/codex, which carry their own CLI login.
+ * Credential, model, and effort are independent optional Session overrides.
+ * Omitting a credential leaves authentication/provider discovery to the
+ * runtime; choosing one never rewrites the Workspace merely to launch.
  */
 export async function quickChat(
   prompt: string,
