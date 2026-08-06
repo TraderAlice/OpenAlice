@@ -426,7 +426,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
 export interface AgentLaunchDetailsProps {
   readonly config: AgentLaunchConfigState
   readonly hasWorkspaceTarget: boolean
-  readonly onAdjustAi: () => void
+  readonly onAdjustAi?: () => void
   readonly className?: string
 }
 
@@ -449,11 +449,13 @@ export function AgentLaunchDetails({
   } | null = null
   if (config.aiDetails) {
     const workspaceSaved = config.aiDetails.source === 'workspace'
-    const actionLabel = hasWorkspaceTarget
-      ? workspaceSaved
-        ? t('chatLanding.adjustWorkspaceAi')
-        : t('chatLanding.configureWorkspaceAi')
-      : t('chatLanding.providerSettings')
+    const actionLabel = onAdjustAi
+      ? hasWorkspaceTarget
+        ? workspaceSaved
+          ? t('chatLanding.adjustWorkspaceAi')
+          : t('chatLanding.configureWorkspaceAi')
+        : t('chatLanding.providerSettings')
+      : undefined
     scope = workspaceSaved
       ? {
           label: t('chatLanding.workspaceAiScope'),
@@ -475,7 +477,7 @@ export function AgentLaunchDetails({
     scope = {
       label: t('chatLanding.runtimeAiScope', { runtime: config.selectedAgent.displayName }),
       detail: t('chatLanding.runtimeManagedAi', { runtime: config.selectedAgent.displayName }),
-      ...(!config.needsCredential && hasWorkspaceTarget
+      ...(!config.needsCredential && hasWorkspaceTarget && onAdjustAi
         ? { actionLabel: t('chatLanding.configureWorkspaceAi') }
         : {}),
     }
@@ -502,7 +504,7 @@ export function AgentLaunchDetails({
               {scope.detail}
             </span>
           )}
-          {scope.actionLabel && (
+          {scope.actionLabel && onAdjustAi && (
             <button
               type="button"
               onClick={onAdjustAi}
