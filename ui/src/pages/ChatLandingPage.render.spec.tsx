@@ -320,6 +320,18 @@ describe('ChatLandingPage adapter inventory', () => {
     expect(screen.getByRole('menuitem', { name: /Pi/ })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /opencode/ })).toBeTruthy()
   })
+
+  it('separates Session context from the AI inference controls', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    const contextRow = screen.getByTestId('harness-landing-context')
+    const inferenceRow = screen.getByTestId('harness-landing-controls')
+    expect(contextRow.contains(await screen.findByRole('button', { name: 'Choose Chat workspace' }))).toBe(true)
+    expect(contextRow.contains(screen.getByRole('button', { name: 'Select agent' }))).toBe(true)
+    expect(inferenceRow.contains(await screen.findByRole('button', { name: 'AI access' }))).toBe(true)
+    expect(inferenceRow.contains(screen.getByRole('combobox', { name: 'AI model' }))).toBe(true)
+    expect(inferenceRow.contains(screen.getByRole('combobox', { name: 'Reasoning effort' }))).toBe(true)
+  })
 })
 
 describe('ChatLandingPage keyboard submission', () => {
@@ -340,6 +352,7 @@ describe('ChatLandingPage keyboard submission', () => {
       undefined,
       'chat-1',
       'chat',
+      undefined,
       undefined,
       undefined,
     ))
@@ -420,6 +433,7 @@ describe('ChatLandingPage keyboard submission', () => {
       'chat',
       undefined,
       undefined,
+      undefined,
     ))
     expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
     expect(screen.queryByText('The runtime reported an error: 429: balance exhausted')).toBeNull()
@@ -468,7 +482,7 @@ describe('ChatLandingPage keyboard submission', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     expect(await findModelEditor('glm-5.2')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
+    fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findModelEditor('deepseek-v4-flash')).toBeTruthy()
     expect(screen.queryByText('New Session only')).toBeNull()
@@ -486,6 +500,7 @@ describe('ChatLandingPage keyboard submission', () => {
       'chat',
       undefined,
       undefined,
+      undefined,
     ))
   })
 
@@ -501,6 +516,7 @@ describe('ChatLandingPage keyboard submission', () => {
 
     await waitFor(() => expect(mocks.rememberQuickChatLaunch).toHaveBeenLastCalledWith({
       agent: 'pi',
+      accessMode: 'auto',
       credentialSlug: null,
       model: 'gemini-3.1-pro-preview',
       reasoningEffort: 'high',
@@ -516,11 +532,70 @@ describe('ChatLandingPage keyboard submission', () => {
       'chat',
       'gemini-3.1-pro-preview',
       'high',
+      undefined,
     ))
   })
 })
 
 describe('ChatLandingPage AI source disclosure', () => {
+  it('can explicitly use the runtime account without reading the Workspace AI source', async () => {
+    const nativePiAgent: AgentInfo = {
+      ...piAgent,
+      capabilities: {
+        ...piAgent.capabilities,
+        aiProvider: {
+          ...piAgent.capabilities.aiProvider!,
+          credentialSource: 'runtime-or-workspace',
+        },
+      },
+    }
+    mocks.useWorkspaces.mockImplementation(() => ({
+      ...context(workspaces),
+      agents: [nativePiAgent],
+    }))
+    mocks.listAgentCredentials.mockResolvedValue([{
+      slug: 'deepseek-1',
+      vendor: 'deepseek',
+      authType: 'api-key',
+      wires: { 'openai-chat': 'https://api.deepseek.com' },
+      resolvedModel: 'deepseek-v4-flash',
+    }])
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: true,
+      slug: 'deepseek-1',
+      model: 'deepseek-v4-flash',
+      contextWindow: 128_000,
+      wireShape: 'openai-chat',
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'AI access' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Use Pi account/ }))
+    await waitFor(() => expect(mocks.rememberQuickChatLaunch).toHaveBeenCalledWith({
+      agent: 'pi',
+      accessMode: 'native',
+      credentialSlug: null,
+      model: null,
+      reasoningEffort: null,
+    }))
+    expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).placeholder)
+      .toBe('Runtime default model')
+
+    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use my account.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'Use my account.',
+      'pi',
+      undefined,
+      'chat-1',
+      'chat',
+      undefined,
+      undefined,
+      'native',
+    ))
+  })
+
   it('restores the complete recent launch tuple ahead of an unrelated Workspace default', async () => {
     mocks.listAgentCredentials.mockResolvedValue([
       {
@@ -544,6 +619,7 @@ describe('ChatLandingPage AI source disclosure', () => {
       recentChatWorkspaceId: 'chat-1',
       recentLaunch: {
         agent: 'pi',
+        accessMode: 'vault',
         credentialSlug: 'deepseek-1',
         model: 'deepseek-v4-flash',
         reasoningEffort: 'high',
@@ -552,7 +628,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect((await screen.findByRole('button', { name: 'AI provider' })).textContent).toContain('DeepSeek')
+    expect((await screen.findByRole('button', { name: 'AI access' })).textContent).toContain('DeepSeek')
     await waitFor(() => {
       expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).value)
         .toBe('deepseek-v4-flash')
@@ -570,6 +646,7 @@ describe('ChatLandingPage AI source disclosure', () => {
       'chat',
       'deepseek-v4-flash',
       'high',
+      undefined,
     ))
   })
 
@@ -676,7 +753,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
+    fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findModelEditor('deepseek-v3.2')).toBeTruthy()
 

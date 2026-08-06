@@ -883,8 +883,10 @@ export async function quickStartWorkspaceManager(
   credentialSlug?: string,
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
+  credentialSource?: 'native',
 ): Promise<ManagerQuickStartResult> {
   const request: Record<string, unknown> = { prompt, agent };
+  if (credentialSource !== undefined) request['credentialSource'] = credentialSource;
   if (credentialSlug !== undefined) request['credentialSlug'] = credentialSlug;
   if (model) request['model'] = model;
   if (reasoningEffort) request['reasoningEffort'] = reasoningEffort;
@@ -913,9 +915,10 @@ export class QuickChatError extends Error {
  * Quick-chat launch — the "type a message → you're in" front door. One POST
  * reuses-or-creates the chat workspace and spawns a fresh session seeded with
  * `prompt`; the returned `session.sessionId` is what the caller attaches to.
- * Credential, model, and effort are independent optional Session overrides.
- * Omitting a credential leaves authentication/provider discovery to the
- * runtime; choosing one never rewrites the Workspace merely to launch.
+ * AI access, model, and effort are independent optional Session overrides.
+ * Omitting access keeps normal Workspace/runtime resolution; an explicit
+ * native source bypasses Workspace provider files, while a selected vault
+ * credential never rewrites the Workspace merely to launch.
  */
 export async function quickChat(
   prompt: string,
@@ -925,8 +928,10 @@ export async function quickChat(
   template?: 'chat' | 'auto-quant-v2',
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
+  credentialSource?: 'native',
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
+  if (credentialSource !== undefined) body['credentialSource'] = credentialSource;
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;

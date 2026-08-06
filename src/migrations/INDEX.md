@@ -34,3 +34,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0032_session_runtime_bindings` | 0.90.0-beta | 2026-08-05 | workspaces/state/resume-identities.json | Version product Session identities for durable runtime, credential-reference, model, and effort bindings. |
 | `0033_semantic_issue_assignees` | 0.90.0-beta | 2026-08-06 | workspaces/<id>/.alice/issues/*.md | Replace deprecated @workspace/@new Issue aliases with behavior-named assignee tokens. |
 | `0034_quick_chat_recent_launch` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Remember Quick Start runtime, credential, model, and effort as one Session-only launch tuple. |
+| `0035_quick_chat_access_mode` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Distinguish Workspace AI, saved credentials, and native runtime accounts in Quick Start. |

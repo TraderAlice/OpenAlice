@@ -46,6 +46,7 @@ import { migration as migration_0031_pi_local_workspace_provider } from './0031_
 import { migration as migration_0032_session_runtime_bindings } from './0032_session_runtime_bindings/index.js'
 import { migration as migration_0033_semantic_issue_assignees } from './0033_semantic_issue_assignees/index.js'
 import { migration as migration_0034_quick_chat_recent_launch } from './0034_quick_chat_recent_launch/index.js'
+import { migration as migration_0035_quick_chat_access_mode } from './0035_quick_chat_access_mode/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -75,4 +76,5 @@ export const REGISTRY: Migration[] = [
   migration_0032_session_runtime_bindings,
   migration_0033_semantic_issue_assignees,
   migration_0034_quick_chat_recent_launch,
+  migration_0035_quick_chat_access_mode,
 ]

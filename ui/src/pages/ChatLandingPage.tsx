@@ -172,7 +172,7 @@ function HarnessLandingPage({
     return () => document.removeEventListener('mousedown', onDown)
   }, [workspaceMenuOpen])
 
-  // The picker opens upward from the composer. Keep the active option inside
+  // The picker opens below the session-context row. Keep the active option inside
   // its own scroll viewport so a long Workspace history cannot push recent or
   // currently selected targets beyond the top of the window.
   useEffect(() => {
@@ -198,8 +198,8 @@ function HarnessLandingPage({
     setError(null)
     setLaunching(true)
     try {
-      // A global OpenCode/Pi config is only a fallback when the user has not
-      // selected a vault credential for this launch. The provider/model choice
+      // Native runtime auth is an explicit access choice beside Workspace and
+      // vault sources. The provider/model choice
       // seeds this new product Session; the backend persists a secret-free
       // binding and never rewrites the Workspace merely to start it.
       // On success this focuses the new session's terminal tab; the landing tab
@@ -212,6 +212,7 @@ function HarnessLandingPage({
         templateName,
         launchConfig.launchModel,
         launchConfig.launchReasoningEffort,
+        launchConfig.accessMode === 'native' ? 'native' : undefined,
       )
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')
@@ -310,6 +311,76 @@ function HarnessLandingPage({
         </div>
 
         <div
+          data-testid="harness-landing-context"
+          className="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 px-1 text-[11px] text-muted-foreground"
+        >
+          {/* Session context stays outside the composer: it answers where the
+              Session will live and which native runtime will own it. */}
+          {mode === 'chat' && (
+            <>
+              <span className="shrink-0">{t('chatLanding.startIn')}</span>
+              <div ref={workspaceBoxRef} className="relative min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceMenuOpen((open) => !open)}
+                  disabled={chatWorkspaceOptions.length === 0 || targetWs !== undefined}
+                  aria-haspopup="menu"
+                  aria-expanded={workspaceMenuOpen}
+                  aria-label={t(`${copyKey}.selectWorkspace`)}
+                  className="oa-pressable inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-foreground hover:bg-muted/80 disabled:cursor-default"
+                >
+                  <MessageSquare className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate">
+                    {workspaceTarget
+                      ? workspaceDisplayTitle(workspaceTarget)
+                      : t(`${copyKey}.newWorkspaceTarget`)}
+                  </span>
+                  {chatWorkspaceOptions.length > 0 && targetWs === undefined && (
+                    <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+                  )}
+                </button>
+                {workspaceMenuOpen && targetWs === undefined && chatWorkspaceOptions.length > 0 && (
+                  <div
+                    role="menu"
+                    className="oa-popover-enter absolute left-0 top-full z-20 mt-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
+                  >
+                    {chatWorkspaceOptions.map((workspace) => {
+                      const active = workspace.id === workspaceTarget?.id
+                      return (
+                        <button
+                          key={workspace.id}
+                          ref={active ? activeWorkspaceOptionRef : undefined}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setSelectedWorkspaceId(workspace.id)
+                            launchConfig.resetCredentialSelection()
+                            setWorkspaceMenuOpen(false)
+                          }}
+                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : 'text-foreground'}`}
+                        >
+                          <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">{workspaceDisplayTitle(workspace)}</span>
+                          {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          <span className="shrink-0">{t('chatLanding.runWith')}</span>
+          <AgentLaunchSelectors
+            ref={launchSelectorsRef}
+            config={launchConfig}
+            onConfigureProvider={goConfigureProvider}
+            showAi={false}
+            menuPlacement="down"
+          />
+        </div>
+
+        <div
           className={`rounded-xl px-3 pb-2 pt-3 shadow-[0_18px_50px_-40px_var(--foreground)] transition-[border-color,box-shadow] md:rounded-2xl ${
             targetWs && mode === 'chat'
               ? 'bg-primary/[0.04] border border-primary/45 ring-1 ring-primary/15 focus-within:border-primary/70'
@@ -330,64 +401,12 @@ function HarnessLandingPage({
             data-testid="harness-landing-controls"
             className="flex items-end justify-between gap-2 px-1 pt-1"
           >
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {/* Workspace target — recent by default, explicit when selected.
-                  Visible but non-blocking: users can see where the new Session
-                  will live without answering a chooser on every send. */}
-              {mode === 'chat' && <div ref={workspaceBoxRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceMenuOpen((open) => !open)}
-                  disabled={chatWorkspaceOptions.length === 0 || targetWs !== undefined}
-                  aria-haspopup="menu"
-                  aria-expanded={workspaceMenuOpen}
-                  aria-label={t(`${copyKey}.selectWorkspace`)}
-                  className="oa-pressable inline-flex min-h-8 max-w-[220px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default"
-                >
-                  <MessageSquare className="w-3 h-3 shrink-0" />
-                  <span className="truncate">
-                    {workspaceTarget
-                      ? workspaceDisplayTitle(workspaceTarget)
-                      : t(`${copyKey}.newWorkspaceTarget`)}
-                  </span>
-                  {chatWorkspaceOptions.length > 0 && targetWs === undefined && (
-                    <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
-                  )}
-                </button>
-                {workspaceMenuOpen && targetWs === undefined && chatWorkspaceOptions.length > 0 && (
-                  <div
-                    role="menu"
-                    className="oa-popover-enter absolute bottom-full left-0 z-10 mb-1 max-h-[min(24rem,calc(100vh-8rem))] min-w-[220px] max-w-[320px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-secondary py-1 shadow-lg [scrollbar-gutter:stable]"
-                  >
-                    {chatWorkspaceOptions.map((workspace) => {
-                      const active = workspace.id === workspaceTarget?.id
-                      return (
-                        <button
-                          key={workspace.id}
-                          ref={active ? activeWorkspaceOptionRef : undefined}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setSelectedWorkspaceId(workspace.id)
-                            launchConfig.resetCredentialSelection()
-                            setWorkspaceMenuOpen(false)
-                          }}
-                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : 'text-foreground'}`}
-                        >
-                          <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">{workspaceDisplayTitle(workspace)}</span>
-                          {active && <Check className="w-3.5 h-3.5 shrink-0" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>}
-
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <AgentLaunchSelectors
-                ref={launchSelectorsRef}
                 config={launchConfig}
                 onConfigureProvider={goConfigureProvider}
+                showRuntime={false}
+                labeled
               />
             </div>
             <div className="flex shrink-0 items-center justify-end gap-1.5">

@@ -32,10 +32,17 @@ const modelReasoningEffortSchema = z.enum([
 
 const recentQuickChatLaunchUpdateSchema = z.object({
   agent: z.string().trim().min(1).max(128),
+  accessMode: z.enum(['auto', 'native', 'vault']).optional(),
   credentialSlug: z.string().trim().min(1).max(128).nullable(),
   model: z.string().trim().min(1).max(256).nullable(),
   reasoningEffort: modelReasoningEffortSchema.nullable(),
-})
+}).transform((value) => ({
+  ...value,
+  accessMode: value.accessMode ?? (value.credentialSlug === null ? 'auto' as const : 'vault' as const),
+})).refine(
+  (value) => value.accessMode === 'vault' ? value.credentialSlug !== null : value.credentialSlug === null,
+  { message: 'access mode and credential must agree' },
+)
 
 const workspaceShellPreferenceUpdateSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('auto'), customPath: z.null().optional() }),

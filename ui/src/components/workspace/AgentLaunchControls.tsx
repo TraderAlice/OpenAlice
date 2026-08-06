@@ -33,9 +33,39 @@ const AGENT_ICONS: Record<string, LucideIcon> = {
   pi: Bot,
 }
 
+const PROVIDER_ACCESS_LABELS: Readonly<Record<string, string>> = {
+  anthropic: 'Anthropic API',
+  openai: 'OpenAI API',
+  google: 'Google Gemini API',
+  minimax: 'MiniMax API',
+  glm: 'Z.AI GLM API',
+  kimi: 'Kimi API',
+  deepseek: 'DeepSeek API',
+  longcat: 'LongCat API',
+}
+
+function credentialAccessLabel(credential: AgentLaunchConfigState['credential']): string {
+  if (!credential) return ''
+  return PROVIDER_ACCESS_LABELS[credential.vendor.toLowerCase()]
+    || credential.label?.trim()
+    || credential.vendor
+}
+
+function credentialAccessDetail(credential: AgentLaunchConfigState['credential']): string {
+  if (!credential) return ''
+  const label = credential.label?.trim()
+  return label && label !== credentialAccessLabel(credential)
+    ? `${label} · ${credential.slug}`
+    : credential.slug
+}
+
 export interface AgentLaunchSelectorsProps {
   readonly config: AgentLaunchConfigState
   readonly onConfigureProvider: () => void
+  readonly showRuntime?: boolean
+  readonly showAi?: boolean
+  readonly menuPlacement?: 'up' | 'down'
+  readonly labeled?: boolean
 }
 
 export interface AgentLaunchSelectorsHandle {
@@ -83,7 +113,13 @@ function handleMenuKeyDown(
   items[nextIndex]?.focus()
 }
 
-function AgentLaunchModelEditor({ config }: { config: AgentLaunchConfigState }) {
+function AgentLaunchModelEditor({
+  config,
+  labeled = false,
+}: {
+  config: AgentLaunchConfigState
+  labeled?: boolean
+}) {
   const { t } = useTranslation()
   const listId = useId()
   const [draft, setDraft] = useState(config.launchModel ?? '')
@@ -104,8 +140,13 @@ function AgentLaunchModelEditor({ config }: { config: AgentLaunchConfigState }) 
     : undefined
 
   return (
-    <label className="relative inline-flex min-h-8 min-w-0 max-w-[220px] items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50">
-      <Cpu className="pointer-events-none absolute left-2.5 h-3 w-3 shrink-0" />
+    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
+      <Cpu className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
+      {labeled && (
+        <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
+          {t('chatLanding.modelField')}
+        </span>
+      )}
       <input
         list={listId}
         value={draft}
@@ -121,7 +162,7 @@ function AgentLaunchModelEditor({ config }: { config: AgentLaunchConfigState }) 
         aria-label={t('chatLanding.selectModel')}
         title={contextLabel}
         placeholder={defaultLabel}
-        className="min-w-0 w-[190px] bg-transparent py-1 pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground"
+        className={`min-w-0 bg-transparent pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground ${labeled ? 'w-full pb-1 pt-5 sm:w-[190px]' : 'w-[190px] py-1'}`}
       />
       <datalist id={listId}>
         {config.modelOptions.map((model) => (
@@ -132,7 +173,13 @@ function AgentLaunchModelEditor({ config }: { config: AgentLaunchConfigState }) 
   )
 }
 
-function AgentLaunchEffortEditor({ config }: { config: AgentLaunchConfigState }) {
+function AgentLaunchEffortEditor({
+  config,
+  labeled = false,
+}: {
+  config: AgentLaunchConfigState
+  labeled?: boolean
+}) {
   const { t } = useTranslation()
   const current = config.launchReasoningEffort
   const options = current && !config.effortOptions.includes(current)
@@ -156,8 +203,13 @@ function AgentLaunchEffortEditor({ config }: { config: AgentLaunchConfigState })
     ? t('chatLanding.defaultEffortValue', { effort: resolvedDefault })
     : t('chatLanding.defaultEffort')
   return (
-    <label className="relative inline-flex min-h-8 min-w-0 max-w-[190px] items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50">
-      <BrainCircuit className="pointer-events-none absolute left-2.5 h-3 w-3 shrink-0" />
+    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : 'min-h-8 max-w-[190px]'}`}>
+      <BrainCircuit className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
+      {labeled && (
+        <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
+          {t('chatLanding.effortField')}
+        </span>
+      )}
       <select
         value={current ?? ''}
         onChange={(event) => config.selectReasoningEffort(
@@ -166,7 +218,7 @@ function AgentLaunchEffortEditor({ config }: { config: AgentLaunchConfigState })
             : null,
         )}
         aria-label={t('chatLanding.selectEffort')}
-        className="min-w-0 max-w-[190px] appearance-none bg-transparent py-1 pl-7 pr-7 text-[11px] text-foreground outline-none"
+        className={`min-w-0 appearance-none bg-transparent pl-7 pr-7 text-[11px] text-foreground outline-none ${labeled ? 'w-full max-w-none pb-1 pt-5 sm:max-w-[190px]' : 'max-w-[190px] py-1'}`}
       >
         <option value="">{defaultLabel}</option>
         {options.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
@@ -176,10 +228,17 @@ function AgentLaunchEffortEditor({ config }: { config: AgentLaunchConfigState })
   )
 }
 
-/** The shared runtime + credential selector used by every chat-style launch
+/** Shared runtime and AI-access selectors used by every chat-style launch
  * surface. Selection behavior and presentation now evolve together. */
 export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, AgentLaunchSelectorsProps>(function AgentLaunchSelectors(
-  { config, onConfigureProvider },
+  {
+    config,
+    onConfigureProvider,
+    showRuntime = true,
+    showAi = true,
+    menuPlacement = 'up',
+    labeled = false,
+  },
   ref,
 ) {
   const { t } = useTranslation()
@@ -194,6 +253,23 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
   const agentFocusEdgeRef = useRef<'first' | 'last'>('first')
   const credentialFocusEdgeRef = useRef<'first' | 'last'>('first')
   const SelectedIcon = config.selectedAgent ? AGENT_ICONS[config.selectedAgent.id] : undefined
+  const runtimeName = config.selectedAgent?.displayName ?? t('chatLanding.runtimeFallback')
+  const workspaceAccess = config.accessMode === 'auto' && config.detectedCredential?.configured === true
+  const nativeAccess = config.accessMode === 'native' || (
+    config.accessMode === 'auto' && !workspaceAccess && config.effectiveCredential === null
+  )
+  const selectedAccessLabel = nativeAccess
+    ? t('chatLanding.runtimeAccount', { runtime: runtimeName })
+    : config.credential
+      ? credentialAccessLabel(config.credential)
+      : t('chatLanding.workspaceAiAccess')
+  const selectedAccessDetail = nativeAccess
+    ? t('chatLanding.runtimeAccountDetail')
+    : config.credential
+      ? workspaceAccess
+        ? t('chatLanding.workspaceAccessDetail', { credential: credentialAccessDetail(config.credential) })
+        : t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(config.credential) })
+      : config.detectedCredential?.model ?? t('chatLanding.workspaceAccessDetailFallback')
 
   useImperativeHandle(ref, () => ({
     openAgentMenu() {
@@ -232,7 +308,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
 
   return (
     <>
-      <div
+      {showRuntime && <div
         ref={agentBoxRef}
         className="relative"
         onBlur={(event) => {
@@ -275,7 +351,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
               () => setAgentMenuOpen(false),
               agentTriggerRef,
             )}
-            className="oa-popover-enter absolute bottom-full left-0 z-20 mb-1 min-w-[180px] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg"
+            className={`oa-popover-enter absolute left-0 z-20 min-w-[180px] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg ${menuPlacement === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
           >
             {config.agents.map((agent) => {
               const Icon = AGENT_ICONS[agent.id]
@@ -303,9 +379,9 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             })}
           </div>
         )}
-      </div>
+      </div>}
 
-      {config.needsCredential && config.noCredentials && (
+      {showAi && config.needsCredential && config.noCredentials && (
         <button
           type="button"
           onClick={onConfigureProvider}
@@ -316,10 +392,10 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         </button>
       )}
 
-      {config.canSelectCredential && !config.noCredentials && config.credentials && config.credentials.length > 0 && (
+      {showAi && config.canSelectCredential && !config.noCredentials && config.credentials && (
         <div
           ref={credentialBoxRef}
-          className="relative"
+          className={`relative ${labeled ? 'w-full sm:w-auto' : ''}`}
           onBlur={(event) => {
             const next = event.relatedTarget as Node | null
             if (!next || !event.currentTarget.contains(next)) setCredentialMenuOpen(false)
@@ -343,11 +419,19 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             aria-haspopup="menu"
             aria-expanded={credentialMenuOpen}
             aria-label={t('chatLanding.selectCredential')}
-            className="oa-pressable inline-flex min-h-8 max-w-[190px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+            className={`oa-pressable inline-flex items-center gap-2 rounded-md bg-muted px-2.5 text-left text-muted-foreground hover:text-foreground ${labeled ? 'min-h-12 w-full max-w-none py-1.5 sm:w-auto sm:max-w-[240px]' : 'min-h-8 max-w-[240px] py-1'}`}
           >
             <KeyRound className="h-3 w-3 shrink-0" />
-            <span className="truncate">
-              {config.credential?.label?.trim() || config.credential?.slug || t('chatLanding.runtimeDefaultModel')}
+            <span className="min-w-0 flex-1">
+              {labeled && (
+                <span className="block truncate text-[9.5px] font-medium text-muted-foreground">
+                  {t('chatLanding.aiAccess')}
+                </span>
+              )}
+              <span className="block truncate text-[11px] text-foreground">{selectedAccessLabel}</span>
+              {labeled && (
+                <span className="block truncate text-[9.5px] text-muted-foreground">{selectedAccessDetail}</span>
+              )}
             </span>
             <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
           </button>
@@ -361,9 +445,30 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                 () => setCredentialMenuOpen(false),
                 credentialTriggerRef,
               )}
-              className="oa-popover-enter absolute bottom-full left-0 z-20 mb-1 min-w-[200px] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg"
+              className={`oa-popover-enter absolute left-0 z-20 max-h-[min(24rem,calc(100vh-8rem))] min-w-[240px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-secondary py-1 shadow-lg [scrollbar-gutter:stable] ${menuPlacement === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
             >
-              {!config.needsCredential && config.detectedCredential?.configured !== true && (
+              {config.detectedCredential?.configured === true && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={() => {
+                    config.selectWorkspaceDefault()
+                    setCredentialMenuOpen(false)
+                    credentialTriggerRef.current?.focus()
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] transition-colors hover:bg-muted ${config.accessMode === 'auto' ? 'text-primary' : 'text-foreground'}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{t('chatLanding.workspaceAiAccess')}</span>
+                    {config.detectedCredential.model && (
+                      <span className="block truncate text-[10px] text-muted-foreground">{config.detectedCredential.model}</span>
+                    )}
+                  </span>
+                  {config.accessMode === 'auto' && <Check className="h-3.5 w-3.5 shrink-0" />}
+                </button>
+              )}
+              {!config.needsCredential && (
                 <button
                   type="button"
                   role="menuitem"
@@ -373,14 +478,17 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                     setCredentialMenuOpen(false)
                     credentialTriggerRef.current?.focus()
                   }}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${config.effectiveCredential === null ? 'text-primary' : 'text-foreground'}`}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] transition-colors hover:bg-muted ${config.accessMode === 'native' ? 'text-primary' : 'text-foreground'}`}
                 >
-                  <span className="min-w-0 flex-1 truncate">{t('chatLanding.runtimeDefaultModel')}</span>
-                  {config.effectiveCredential === null && <Check className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
+                    <span className="block truncate text-[10px] text-muted-foreground">{t('chatLanding.runtimeAccountDetail')}</span>
+                  </span>
+                  {config.accessMode === 'native' && <Check className="h-3.5 w-3.5 shrink-0" />}
                 </button>
               )}
               {config.credentials.map((credential) => {
-                const active = credential.slug === config.effectiveCredential
+                const active = config.accessMode === 'vault' && credential.slug === config.effectiveCredential
                 return (
                   <button
                     key={credential.slug}
@@ -392,15 +500,17 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                       setCredentialMenuOpen(false)
                       credentialTriggerRef.current?.focus()
                     }}
-                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : 'text-foreground'}`}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] transition-colors hover:bg-muted ${active ? 'text-primary' : 'text-foreground'}`}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate">{credential.label?.trim() || credential.slug}</span>
-                      {credential.resolvedModel && (
-                        <span className="block truncate text-[10px] text-muted-foreground">{credential.resolvedModel}</span>
-                      )}
+                      <span className="block truncate">{credentialAccessLabel(credential)}</span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
+                      </span>
                     </span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">{credential.vendor}</span>
+                    {credential.resolvedModel && (
+                      <span className="max-w-[100px] shrink-0 truncate text-[10px] text-muted-foreground">{credential.resolvedModel}</span>
+                    )}
                     {active && <Check className="h-3.5 w-3.5 shrink-0" />}
                   </button>
                 )
@@ -410,13 +520,13 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         </div>
       )}
 
-      {config.selectedAgent && (
+      {showAi && config.selectedAgent && (
         <div
           data-testid="agent-launch-inference-group"
           className="contents sm:flex sm:shrink-0 sm:items-center sm:gap-2"
         >
-          <AgentLaunchModelEditor config={config} />
-          <AgentLaunchEffortEditor config={config} />
+          <AgentLaunchModelEditor config={config} labeled={labeled} />
+          <AgentLaunchEffortEditor config={config} labeled={labeled} />
         </div>
       )}
     </>

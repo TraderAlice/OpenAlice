@@ -62,6 +62,7 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     selectedRuntimeReadiness: null,
     needsCredential: true,
     canSelectCredential: true,
+    accessMode: 'vault',
     credentials,
     effectiveCredential: 'primary',
     credential: credentials[0]!,
@@ -84,6 +85,7 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     selectAgent: vi.fn(),
     selectCredential: vi.fn(),
     selectRuntimeDefault: vi.fn(),
+    selectWorkspaceDefault: vi.fn(),
     selectModel: vi.fn(),
     selectReasoningEffort: vi.fn(),
     resetCredentialSelection: vi.fn(),
@@ -187,6 +189,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
       <AgentLaunchSelectors
         config={launchConfig({
           needsCredential: false,
+          accessMode: 'native',
           effectiveCredential: null,
           credential: null,
           launchCredentialSlug: undefined,
@@ -198,13 +201,41 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     )
 
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
-    expect(trigger.textContent).toContain(i18n.t('chatLanding.runtimeDefaultModel'))
+    expect(trigger.textContent).toContain(i18n.t('chatLanding.runtimeAccount', { runtime: 'OpenCode' }))
     await user.click(trigger)
     await user.click(screen.getByRole('menuitem', { name: /Primary/ }))
     expect(selectCredential).toHaveBeenCalledWith('primary')
 
     await user.click(trigger)
-    await user.click(screen.getByRole('menuitem', { name: i18n.t('chatLanding.runtimeDefaultModel') }))
+    await user.click(screen.getByRole('menuitem', {
+      name: new RegExp(i18n.t('chatLanding.runtimeAccount', { runtime: 'OpenCode' })),
+    }))
     expect(selectRuntimeDefault).toHaveBeenCalledOnce()
+  })
+
+  it('shows the provider as the saved access identity instead of exposing only its slug', () => {
+    const deepseek = {
+      ...credentials[0]!,
+      slug: 'deepseek-1',
+      vendor: 'deepseek',
+      label: 'deepseek-1',
+    }
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({
+          accessMode: 'vault',
+          credentials: [deepseek],
+          effectiveCredential: deepseek.slug,
+          credential: deepseek,
+          launchCredentialSlug: deepseek.slug,
+        })}
+        onConfigureProvider={vi.fn()}
+        labeled
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
+    expect(trigger.textContent).toContain('DeepSeek API')
+    expect(trigger.textContent).toContain('deepseek-1')
   })
 })

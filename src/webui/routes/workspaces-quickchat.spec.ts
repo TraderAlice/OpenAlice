@@ -531,6 +531,35 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     expect(spawn).toHaveBeenCalledOnce();
   });
 
+  it('explicit native access bypasses an existing Workspace provider', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, opencode, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'workspace-key',
+        model: 'workspace-model',
+        wireShape: 'openai-chat',
+      },
+    });
+
+    const result = await quickChat(app, {
+      prompt: 'use my opencode account',
+      agent: 'opencode',
+      credentialSource: 'native',
+      model: 'native-model',
+    });
+
+    expect(result.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toEqual({
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'native-model',
+      },
+      ai: { model: 'native-model', reasoningEffort: null },
+    });
+  });
+
   it('honors an explicit credentialSlug pick', async () => {
     vi.mocked(readCredentials).mockResolvedValue({
       'openai-1': openaiKey,

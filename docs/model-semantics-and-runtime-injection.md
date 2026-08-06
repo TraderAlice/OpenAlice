@@ -239,17 +239,15 @@ They do not prove the complete capability set. Error-guided retries (for
 example, a model that mandates thinking) are useful diagnostics but do not
 replace the curated registry.
 
-The UI must disclose configuration ownership instead of presenting every
-resolved launch value as if it were already on disk. A launch surface
-distinguishes a Workspace-local default from a credential that will be bound
-only to the next Session. Selecting the latter must not rewrite the Workspace.
-Creation defaults are also explicitly creation-time policy: changing one never
-rewrites an existing Workspace.
-Stable Workspace ownership stays implicit so provenance does not displace the
-effective model, reasoning, and context values. When Send will apply a
-Session-only provider/model override, that ownership is disclosed on its own
-line; successful explicit Workspace saves use transient confirmation instead
-of a permanent success state.
+The UI must not present resolved launch values as if every value were already
+written to the Workspace. Detailed persistence ownership belongs in explicit
+Workspace settings and documentation, not as permanent implementation prose in
+the primary send path. Quick Start separates Workspace and Agent runtime as the
+Session launch context from AI access, model, and effort inside the composer.
+The visible effective choices are sufficient disclosure there: selecting a
+vault credential must not rewrite the Workspace, and changing a creation
+default never rewrites an existing Workspace. Successful explicit Workspace
+saves use transient confirmation instead of a permanent success state.
 This disclosure applies to all four supported Agent runtimes. Claude Code and
 Codex use their native global login and global runtime configuration by default.
 Merely storing a compatible credential in Alice never selects or injects it;

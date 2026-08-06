@@ -33,6 +33,12 @@ import {
 
 const AGENT_LAUNCH_PREFERENCES_CHANGED_EVENT = 'openalice:agent-launch-preferences-changed'
 
+export type AgentLaunchAccessMode = 'auto' | 'native' | 'vault'
+
+function launchAccessMode(launch: QuickChatLaunchPreference | null): AgentLaunchAccessMode {
+  return launch?.accessMode ?? (launch?.credentialSlug ? 'vault' : 'auto')
+}
+
 export interface AgentLaunchAiDetails {
   readonly model: string | null
   /** Null when the native runtime owns the limit and its project config does not declare one. */
@@ -315,6 +321,7 @@ export interface AgentLaunchConfigState {
   readonly needsCredential: boolean
   /** The runtime can accept an explicit OpenAlice-managed Workspace override. */
   readonly canSelectCredential: boolean
+  readonly accessMode: AgentLaunchAccessMode
   readonly credentials: readonly SavedCredential[] | null
   readonly effectiveCredential: string | null
   readonly credential: SavedCredential | null
@@ -337,6 +344,7 @@ export interface AgentLaunchConfigState {
   selectAgent(agent: string): void
   selectCredential(credentialSlug: string): void
   selectRuntimeDefault(): void
+  selectWorkspaceDefault(): void
   selectModel(model: string | null): void
   selectReasoningEffort(effort: ModelReasoningEffort | null): void
   resetCredentialSelection(): void
@@ -361,6 +369,7 @@ export function useAgentLaunchConfig({
   const [pickedCredential, setPickedCredential] = useState<{
     agent: string
     workspaceId: string | null
+    accessMode: AgentLaunchAccessMode
     slug: string | null
   } | null>(null)
   const [workspaceConfigDetection, setWorkspaceConfigDetection] = useState<{
@@ -499,27 +508,39 @@ export function useAgentLaunchConfig({
     agentReadiness?.ready === true &&
     agentReadiness.requiresCredential === true &&
     agentReadiness.source === 'workspace-config'
-  const scopedPickedCredential = pickedCredential?.agent === effectiveAgent &&
+  const scopedPickedAccess = pickedCredential?.agent === effectiveAgent &&
     pickedCredential.workspaceId === workspaceId
-    ? pickedCredential.slug
-    : undefined
+    ? pickedCredential
+    : null
   const scopedRecentLaunch = preferences.loaded && preferences.recentLaunch?.agent === effectiveAgent
     ? preferences.recentLaunch
     : null
   const recentCredential = scopedRecentLaunch?.credentialSlug
   const recentCredentialAvailable = typeof recentCredential === 'string' &&
     credentials?.some((candidate) => candidate.slug === recentCredential) === true
-  const preferredCredential = scopedPickedCredential !== undefined
-    ? scopedPickedCredential
-    : recentCredentialAvailable
-      ? recentCredential
+  const requestedAccessMode = scopedPickedAccess?.accessMode ?? launchAccessMode(scopedRecentLaunch)
+  const accessMode: AgentLaunchAccessMode = requestedAccessMode === 'native' && needsCredential
+    ? 'auto'
+    : requestedAccessMode === 'vault' && !(
+        scopedPickedAccess?.slug
+          ? credentials?.some((candidate) => candidate.slug === scopedPickedAccess.slug) === true
+          : recentCredentialAvailable
+      )
+      ? 'auto'
+      : requestedAccessMode
+  const preferredCredential = accessMode === 'vault'
+    ? scopedPickedAccess?.slug ?? (recentCredentialAvailable ? recentCredential : undefined)
+    : accessMode === 'native'
+      ? null
       : undefined
   const loginBackedCreationDefault = !hasWorkspace && effectiveAgent
     ? workspaceCredentialDefaults[effectiveAgent]?.credentialSlug ?? null
     : null
-  const explicitLoginBackedCredential = preferredCredential !== undefined
-    ? preferredCredential
-    : hasWorkspace
+  const explicitLoginBackedCredential = accessMode === 'native'
+    ? null
+    : preferredCredential !== undefined
+      ? preferredCredential
+      : hasWorkspace
       ? !workspaceConfigResolved
         ? null
         : detectedCredential?.configured === true
@@ -546,6 +567,7 @@ export function useAgentLaunchConfig({
     ? preferredCredential
     : undefined
   const recentTupleMatchesCredential = scopedRecentLaunch !== null &&
+    launchAccessMode(scopedRecentLaunch) === accessMode &&
     scopedRecentLaunch.credentialSlug === (launchCredentialSlug ?? null)
   const launchModel = recentTupleMatchesCredential
     ? scopedRecentLaunch.model ?? undefined
@@ -553,14 +575,16 @@ export function useAgentLaunchConfig({
   const launchReasoningEffort = recentTupleMatchesCredential
     ? scopedRecentLaunch.reasoningEffort ?? undefined
     : undefined
-  const baseAiDetails = resolveAgentLaunchAiDetails(
-    needsCredential,
-    effectiveCredential,
-    credential,
-    detectedCredential,
-    effectiveAgent ? workspaceCredentialDefaults[effectiveAgent] : undefined,
-    hasWorkspace,
-  )
+  const baseAiDetails = accessMode === 'native'
+    ? null
+    : resolveAgentLaunchAiDetails(
+        needsCredential,
+        effectiveCredential,
+        credential,
+        detectedCredential,
+        effectiveAgent ? workspaceCredentialDefaults[effectiveAgent] : undefined,
+        hasWorkspace,
+      )
   const defaultModel = launchCredentialSlug
     ? credential?.resolvedModel ?? null
     : baseAiDetails?.model ?? null
@@ -607,6 +631,7 @@ export function useAgentLaunchConfig({
     setPickedCredential(null)
     const launch = {
       agent,
+      accessMode: preferences.lastCredentialByAgent[agent] ? 'vault' as const : 'auto' as const,
       credentialSlug: preferences.lastCredentialByAgent[agent] ?? null,
       model: null,
       reasoningEffort: null,
@@ -617,9 +642,10 @@ export function useAgentLaunchConfig({
 
   const selectCredential = useCallback((credentialSlug: string) => {
     if (!canSelectCredential || effectiveAgent === null) return
-    setPickedCredential({ agent: effectiveAgent, workspaceId, slug: credentialSlug })
+    setPickedCredential({ agent: effectiveAgent, workspaceId, accessMode: 'vault', slug: credentialSlug })
     const launch = {
       agent: effectiveAgent,
+      accessMode: 'vault' as const,
       credentialSlug,
       model: null,
       reasoningEffort: null,
@@ -629,46 +655,64 @@ export function useAgentLaunchConfig({
   }, [canSelectCredential, effectiveAgent, preferences, workspaceId])
 
   const selectRuntimeDefault = useCallback(() => {
-    if (!canSelectCredential || effectiveAgent === null) return
-    setPickedCredential({ agent: effectiveAgent, workspaceId, slug: null })
+    if (!canSelectCredential || needsCredential || effectiveAgent === null) return
+    setPickedCredential({ agent: effectiveAgent, workspaceId, accessMode: 'native', slug: null })
     const launch = {
       agent: effectiveAgent,
+      accessMode: 'native' as const,
       credentialSlug: null,
       model: null,
       reasoningEffort: null,
     }
     immediateLaunchRef.current = launch
     void preferences.rememberLaunch(launch)
-  }, [canSelectCredential, effectiveAgent, preferences, workspaceId])
+  }, [canSelectCredential, effectiveAgent, needsCredential, preferences, workspaceId])
+
+  const selectWorkspaceDefault = useCallback(() => {
+    if (effectiveAgent === null) return
+    setPickedCredential({ agent: effectiveAgent, workspaceId, accessMode: 'auto', slug: null })
+    const launch = {
+      agent: effectiveAgent,
+      accessMode: 'auto' as const,
+      credentialSlug: null,
+      model: null,
+      reasoningEffort: null,
+    }
+    immediateLaunchRef.current = launch
+    void preferences.rememberLaunch(launch)
+  }, [effectiveAgent, preferences, workspaceId])
 
   const selectModel = useCallback((model: string | null) => {
     if (effectiveAgent === null) return
     const launch = {
       agent: effectiveAgent,
+      accessMode,
       credentialSlug: launchCredentialSlug ?? null,
       model,
       reasoningEffort: null,
     }
     immediateLaunchRef.current = launch
     void preferences.rememberLaunch(launch)
-  }, [effectiveAgent, launchCredentialSlug, preferences])
+  }, [accessMode, effectiveAgent, launchCredentialSlug, preferences])
 
   const selectReasoningEffort = useCallback((reasoningEffort: ModelReasoningEffort | null) => {
     if (effectiveAgent === null) return
     const immediate = immediateLaunchRef.current
     const model = immediate?.agent === effectiveAgent &&
+      launchAccessMode(immediate) === accessMode &&
       immediate.credentialSlug === (launchCredentialSlug ?? null)
       ? immediate.model
       : launchModel ?? null
     const launch = {
       agent: effectiveAgent,
+      accessMode,
       credentialSlug: launchCredentialSlug ?? null,
       model,
       reasoningEffort,
     }
     immediateLaunchRef.current = launch
     void preferences.rememberLaunch(launch)
-  }, [effectiveAgent, launchCredentialSlug, launchModel, preferences])
+  }, [accessMode, effectiveAgent, launchCredentialSlug, launchModel, preferences])
 
   const resetCredentialSelection = useCallback(() => setPickedCredential(null), [])
 
@@ -680,6 +724,7 @@ export function useAgentLaunchConfig({
     selectedRuntimeReadiness,
     needsCredential,
     canSelectCredential,
+    accessMode,
     credentials,
     effectiveCredential,
     credential,
@@ -702,12 +747,14 @@ export function useAgentLaunchConfig({
     selectAgent,
     selectCredential,
     selectRuntimeDefault,
+    selectWorkspaceDefault,
     selectModel,
     selectReasoningEffort,
     resetCredentialSelection,
   }), [
     agents,
     aiDetails,
+    accessMode,
     canSelectCredential,
     credentials,
     credential,
@@ -727,6 +774,7 @@ export function useAgentLaunchConfig({
     selectAgent,
     selectCredential,
     selectRuntimeDefault,
+    selectWorkspaceDefault,
     selectModel,
     selectReasoningEffort,
     selectedAgent,
