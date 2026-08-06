@@ -427,6 +427,7 @@ export interface AgentLaunchDetailsProps {
   readonly config: AgentLaunchConfigState
   readonly hasWorkspaceTarget: boolean
   readonly onAdjustAi?: () => void
+  readonly showScopeDisclosure?: boolean
   readonly className?: string
 }
 
@@ -436,6 +437,7 @@ export function AgentLaunchDetails({
   config,
   hasWorkspaceTarget,
   onAdjustAi,
+  showScopeDisclosure = true,
   className = '',
 }: AgentLaunchDetailsProps) {
   const { t } = useTranslation()
@@ -447,7 +449,7 @@ export function AgentLaunchDetails({
     detail?: string
     actionLabel?: string
   } | null = null
-  if (config.aiDetails) {
+  if (showScopeDisclosure && config.aiDetails) {
     const workspaceSaved = config.aiDetails.source === 'workspace'
     const actionLabel = onAdjustAi
       ? hasWorkspaceTarget
@@ -465,7 +467,11 @@ export function AgentLaunchDetails({
           label: t('chatLanding.newSessionAiScope'),
           actionLabel,
         }
-  } else if (config.selectedAgent && (!config.needsCredential || config.selectedRuntimeUsesGlobalConfig)) {
+  } else if (
+    showScopeDisclosure &&
+    config.selectedAgent &&
+    (!config.needsCredential || config.selectedRuntimeUsesGlobalConfig)
+  ) {
     scope = {
       label: t('chatLanding.runtimeAiScope', { runtime: config.selectedAgent.displayName }),
       detail: t('chatLanding.runtimeManagedAi', { runtime: config.selectedAgent.displayName }),

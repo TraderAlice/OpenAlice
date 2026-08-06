@@ -415,6 +415,7 @@ function HarnessLandingPage({
           <AgentLaunchDetails
             config={launchConfig}
             hasWorkspaceTarget={credentialWorkspace !== null && credentialWorkspace !== undefined}
+            showScopeDisclosure={false}
             className="mx-1 mt-2 border-t border-border/50 px-1 pt-2"
           />
         </div>
