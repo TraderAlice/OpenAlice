@@ -1,0 +1,7 @@
+{
+  "name": "@traderalice/uta-broker-snaptrade", "version": "0.1.0", "private": true, "type": "module",
+  "exports": { ".": { "openalice-source": "./src/index.ts", "import": "./dist/index.js" } }, "files": ["dist"],
+  "scripts": { "build": "tsup", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@traderalice/ibkr": "workspace:*", "@traderalice/uta-protocol": "workspace:*", "decimal.js": "^10.6.0", "zod": "^4.3.6" },
+  "devDependencies": { "@types/node": "^22.13.4", "tsup": "^8.5.1", "typescript": "^5.9.3" }
+}
