@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
   type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,7 +17,6 @@ import {
   ChevronDown,
   Code2,
   Cpu,
-  Gauge,
   Info,
   KeyRound,
   Settings2,
@@ -99,6 +97,11 @@ function AgentLaunchModelEditor({ config }: { config: AgentLaunchConfigState }) 
   const defaultLabel = config.defaultModel
     ? t('chatLanding.defaultModelValue', { model: config.defaultModel })
     : t('chatLanding.runtimeDefaultModel')
+  const contextLabel = config.aiDetails?.contextWindow
+    ? t('chatLanding.contextSummary', {
+        limit: formatContextWindow(config.aiDetails.contextWindow),
+      })
+    : undefined
 
   return (
     <label className="relative inline-flex min-h-8 min-w-0 max-w-[220px] items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50">
@@ -116,6 +119,7 @@ function AgentLaunchModelEditor({ config }: { config: AgentLaunchConfigState }) 
           }
         }}
         aria-label={t('chatLanding.selectModel')}
+        title={contextLabel}
         placeholder={defaultLabel}
         className="min-w-0 w-[190px] bg-transparent py-1 pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground"
       />
@@ -134,6 +138,23 @@ function AgentLaunchEffortEditor({ config }: { config: AgentLaunchConfigState })
   const options = current && !config.effortOptions.includes(current)
     ? [current, ...config.effortOptions]
     : config.effortOptions
+  const details = config.aiDetails
+  const resolvedDefault = details?.reasoningEffort
+    ? t('chatLanding.reasoningEffortSummary', { effort: details.reasoningEffort })
+    : details?.reasoningMode === 'required'
+      ? t('chatLanding.reasoningRequiredSummary')
+      : details?.reasoningMode === 'adaptive'
+        ? t('chatLanding.reasoningAdaptiveSummary')
+        : details?.reasoningMode === 'none' || details?.reasoning === false
+          ? t('chatLanding.reasoningDisabledSummary')
+          : details?.reasoning === true
+            ? t('chatLanding.reasoningEnabledSummary')
+            : details?.reasoningMode === 'optional'
+              ? t('chatLanding.reasoningOptionalSummary')
+              : t('chatLanding.reasoningRuntimeSummary')
+  const defaultLabel = details
+    ? t('chatLanding.defaultEffortValue', { effort: resolvedDefault })
+    : t('chatLanding.defaultEffort')
   return (
     <label className="relative inline-flex min-h-8 min-w-0 max-w-[190px] items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50">
       <BrainCircuit className="pointer-events-none absolute left-2.5 h-3 w-3 shrink-0" />
@@ -147,7 +168,7 @@ function AgentLaunchEffortEditor({ config }: { config: AgentLaunchConfigState })
         aria-label={t('chatLanding.selectEffort')}
         className="min-w-0 max-w-[190px] appearance-none bg-transparent py-1 pl-7 pr-7 text-[11px] text-foreground outline-none"
       >
-        <option value="">{t('chatLanding.defaultEffort')}</option>
+        <option value="">{defaultLabel}</option>
         {options.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
       </select>
       <ChevronDown className="pointer-events-none absolute right-2 h-3 w-3 opacity-60" />
@@ -402,8 +423,8 @@ export interface AgentLaunchDetailsProps {
   readonly className?: string
 }
 
-/** Compact, truthful launch metadata. Workspace-local config always wins the
- * disclosure, while absent native fields remain unknown rather than inferred. */
+/** Compact launch scope. Model and effort belong in their editors above; this
+ * row only explains where the selected tuple applies and links to its owner. */
 export function AgentLaunchDetails({
   config,
   hasWorkspaceTarget,
@@ -414,111 +435,43 @@ export function AgentLaunchDetails({
 
   if (hasWorkspaceTarget && !config.workspaceConfigResolved) return null
 
-  let summary: ReactNode = null
-  let pendingWriteNotice: ReactNode = null
+  let scope: {
+    label: string
+    detail?: string
+    actionLabel?: string
+  } | null = null
   if (config.aiDetails) {
-    const model = config.aiDetails.model ?? t('chatLanding.runtimeDefaultModel')
     const workspaceSaved = config.aiDetails.source === 'workspace'
     const actionLabel = hasWorkspaceTarget
       ? workspaceSaved
         ? t('chatLanding.adjustWorkspaceAi')
         : t('chatLanding.configureWorkspaceAi')
       : t('chatLanding.providerSettings')
-    const reasoningLabel = config.aiDetails.reasoningEffort
-      ? t('chatLanding.reasoningEffortSummary', { effort: config.aiDetails.reasoningEffort })
-      : config.aiDetails.reasoningMode === 'required'
-        ? t('chatLanding.reasoningRequiredSummary')
-        : config.aiDetails.reasoningMode === 'adaptive'
-          ? t('chatLanding.reasoningAdaptiveSummary')
-          : config.aiDetails.reasoningMode === 'none' || config.aiDetails.reasoning === false
-            ? t('chatLanding.reasoningDisabledSummary')
-            : config.aiDetails.reasoning === true
-              ? t('chatLanding.reasoningEnabledSummary')
-              : config.aiDetails.reasoningMode === 'optional'
-                ? t('chatLanding.reasoningOptionalSummary')
-                : t('chatLanding.reasoningRuntimeSummary')
-    summary = (
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-muted-foreground">
-        <span
-          className="inline-flex min-w-0 max-w-full items-center gap-1"
-          aria-label={t('chatLanding.modelSummary', { model })}
-          title={model}
-        >
-          <Cpu className="h-3 w-3 shrink-0" />
-          <span className="truncate font-mono text-foreground/80">{model}</span>
-        </span>
-        <span aria-hidden className="text-muted-foreground/40">·</span>
-        <span
-          className="inline-flex shrink-0 items-center gap-1"
-          aria-label={reasoningLabel}
-        >
-          <BrainCircuit className="h-3 w-3" />
-          {reasoningLabel}
-        </span>
-        {config.aiDetails.contextWindow !== null && (
-          <>
-            <span aria-hidden className="text-muted-foreground/40">·</span>
-            <span
-              className="inline-flex shrink-0 items-center gap-1"
-              aria-label={t('chatLanding.contextSummary', {
-                limit: formatContextWindow(config.aiDetails.contextWindow),
-              })}
-            >
-              <Gauge className="h-3 w-3" />
-              {t('chatLanding.contextSummary', {
-                limit: formatContextWindow(config.aiDetails.contextWindow),
-              })}
-            </span>
-          </>
-        )}
-        <button
-          type="button"
-          onClick={onAdjustAi}
-          className="oa-pressable inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10 sm:ml-auto"
-          aria-label={actionLabel}
-          title={actionLabel}
-        >
-          <Settings2 className="h-3 w-3" />
-          {actionLabel}
-        </button>
-      </div>
-    )
-    if (!workspaceSaved) {
-      pendingWriteNotice = (
-        <div
-          role="status"
-          className="flex min-w-0 items-start gap-1.5 rounded-md bg-primary/[0.06] px-2 py-1.5 text-[10.5px] leading-relaxed text-primary"
-        >
-          <Info className="mt-0.5 h-3 w-3 shrink-0" />
-          <span>
-            {hasWorkspaceTarget
-              ? t('chatLanding.workspaceAiWillInject')
-              : t('chatLanding.newWorkspaceAiWillSeed')}
-          </span>
-        </div>
-      )
-    }
+    scope = workspaceSaved
+      ? {
+          label: t('chatLanding.workspaceAiScope'),
+          actionLabel,
+        }
+      : {
+          label: t('chatLanding.newSessionAiScope'),
+          detail: hasWorkspaceTarget
+            ? config.willOverwriteCredential && config.credential && config.detectedCredential?.slug
+              ? t('chatLanding.sessionCredentialOverride', {
+                  from: config.detectedCredential.slug,
+                  to: config.credential.slug,
+                })
+              : t('chatLanding.workspaceAiUnchanged')
+            : t('chatLanding.newSessionAiReady'),
+          actionLabel,
+        }
   } else if (config.selectedAgent && (!config.needsCredential || config.selectedRuntimeUsesGlobalConfig)) {
-    summary = (
-      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10.5px] text-muted-foreground">
-        <span className="inline-flex min-w-0 items-center gap-1.5">
-          <Bot className="h-3 w-3 shrink-0" />
-          <span>{t('chatLanding.runtimeManagedAi', { runtime: config.selectedAgent.displayName })}</span>
-        </span>
-        {!config.needsCredential && hasWorkspaceTarget && (
-          <button
-            type="button"
-            onClick={onAdjustAi}
-            className="oa-pressable inline-flex min-h-7 items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10 sm:ml-auto"
-            aria-label={t('chatLanding.configureWorkspaceAi')}
-            title={t('chatLanding.configureWorkspaceAi')}
-          >
-            <Settings2 className="h-3 w-3" />
-            {t('chatLanding.configureWorkspaceAi')}
-          </button>
-        )}
-      </div>
-    )
+    scope = {
+      label: t('chatLanding.runtimeAiScope', { runtime: config.selectedAgent.displayName }),
+      detail: t('chatLanding.runtimeManagedAi', { runtime: config.selectedAgent.displayName }),
+      ...(!config.needsCredential && hasWorkspaceTarget
+        ? { actionLabel: t('chatLanding.configureWorkspaceAi') }
+        : {}),
+    }
   }
 
   const setupStatus = config.detectedCredential?.interactiveSetupStatus
@@ -528,11 +481,34 @@ export function AgentLaunchDetails({
       ? t('chatLanding.claudeWorkspaceTrustRequired')
       : null
 
-  if (summary === null && pendingWriteNotice === null && setupNotice === null) return null
+  if (scope === null && setupNotice === null) return null
   return (
     <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
-      {summary}
-      {pendingWriteNotice}
+      {scope !== null && (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-muted-foreground">
+          <span className="inline-flex min-h-6 shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-muted/45 px-2 font-medium text-foreground/80">
+            <Info className="h-3 w-3 shrink-0" />
+            {scope.label}
+          </span>
+          {scope.detail && (
+            <span className="hidden min-w-0 flex-1 truncate sm:block" title={scope.detail}>
+              {scope.detail}
+            </span>
+          )}
+          {scope.actionLabel && (
+            <button
+              type="button"
+              onClick={onAdjustAi}
+              className="oa-pressable ml-auto inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md px-2 py-1 text-primary hover:bg-primary/10"
+              aria-label={scope.actionLabel}
+              title={scope.actionLabel}
+            >
+              <Settings2 className="h-3 w-3" />
+              {scope.actionLabel}
+            </button>
+          )}
+        </div>
+      )}
       {setupNotice !== null && (
         <div
           role="status"
