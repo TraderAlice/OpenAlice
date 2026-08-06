@@ -137,6 +137,20 @@ function context(
   }
 }
 
+async function findModelEditor(model: string): Promise<HTMLInputElement> {
+  const editor = await screen.findByRole('combobox', { name: 'AI model' }) as HTMLInputElement
+  await waitFor(() => {
+    const visibleModel = editor.value || editor.placeholder.replace(/^Default · /, '')
+    expect(visibleModel).toBe(model)
+  })
+  return editor
+}
+
+function expectDefaultEffort(label: string): void {
+  const editor = screen.getByRole('combobox', { name: 'Reasoning effort' }) as HTMLSelectElement
+  expect(editor.selectedOptions[0]?.textContent).toContain(label)
+}
+
 let workspaces: Workspace[]
 
 beforeEach(async () => {
@@ -312,7 +326,7 @@ describe('ChatLandingPage keyboard submission', () => {
   it('does not submit when Enter confirms an IME composition candidate', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await screen.findByLabelText('Model gemini-3.1-flash-lite')
+    await findModelEditor('gemini-3.1-flash-lite')
     const composer = screen.getByPlaceholderText('Ask Alice…')
     fireEvent.change(composer, { target: { value: '你好' } })
 
@@ -452,11 +466,12 @@ describe('ChatLandingPage keyboard submission', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByLabelText('Model glm-5.2')).toBeTruthy()
+    expect(await findModelEditor('glm-5.2')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
-    expect(await screen.findByLabelText('Model deepseek-v4-flash')).toBeTruthy()
-    expect(screen.getByText('This provider applies only to the new Session; Workspace settings stay unchanged.')).toBeTruthy()
+    expect(await findModelEditor('deepseek-v4-flash')).toBeTruthy()
+    expect(screen.getByText('New Session only')).toBeTruthy()
+    expect(screen.getByText('deepseek-1 instead of Workspace glm-1')).toBeTruthy()
 
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use DeepSeek.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -559,11 +574,11 @@ describe('ChatLandingPage AI source disclosure', () => {
   it('keeps an existing Workspace source implicit so the model leads the metadata row', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/Sending will configure this workspace/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Adjust workspace AI' })).toBeTruthy()
-    expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
+    expectDefaultEffort('minimal reasoning')
   })
 
   it('labels a vault fallback as a pending write instead of existing Workspace config', async () => {
@@ -592,10 +607,11 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByText('This provider applies only to the new Session; Workspace settings stay unchanged.')).toBeTruthy()
-    expect(screen.getByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await screen.findByText('New Session only')).toBeTruthy()
+    expect(screen.getByText('Workspace settings stay unchanged')).toBeTruthy()
+    expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Configure workspace AI' })).toBeTruthy()
-    expect(screen.getByLabelText('minimal reasoning')).toBeTruthy()
+    expectDefaultEffort('minimal reasoning')
   })
 
   it('shows a required reasoning policy when the provider has no effort tiers', async () => {
@@ -633,8 +649,8 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByLabelText('Reasoning always on')).toBeTruthy()
-    expect(screen.getByLabelText('Model kimi-k2.7-code')).toBeTruthy()
+    await findModelEditor('kimi-k2.7-code')
+    expectDefaultEffort('Reasoning always on')
   })
 
   it('keeps the recent provider choice independent when Workspace Settings changes', async () => {
@@ -657,10 +673,10 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
-    expect(await screen.findByLabelText('Model deepseek-v3.2')).toBeTruthy()
+    expect(await findModelEditor('deepseek-v3.2')).toBeTruthy()
 
     mocks.detectWorkspaceCredential.mockResolvedValue({
       configured: true,
@@ -674,7 +690,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     }))
 
     await waitFor(() => expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(2))
-    expect(await screen.findByLabelText('Model deepseek-v3.2')).toBeTruthy()
-    expect(screen.queryByLabelText('Model gemini-3.1-pro-preview')).toBeNull()
+    expect(await findModelEditor('deepseek-v3.2')).toBeTruthy()
+    expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).value).not.toBe('gemini-3.1-pro-preview')
   })
 })

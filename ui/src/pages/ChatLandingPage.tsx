@@ -484,18 +484,6 @@ function HarnessLandingPage({
           </div>
         )}
 
-        {/* The selected credential differs from this Workspace's creation
-            default. It applies only to the new Session; make that divergence
-            visible without implying that Send rewrites Workspace files. */}
-        {launchConfig.willOverwriteCredential && launchConfig.credential && (
-          <div className="rounded-lg border border-border/60 bg-secondary/60 px-3 py-2 text-[12px] text-muted-foreground">
-            {t('chatLanding.credOverwrite', {
-              from: launchConfig.detectedCredential?.slug ?? '',
-              to: launchConfig.credential.slug,
-            })}
-          </div>
-        )}
-
         <div className="relative -mx-4 md:mx-0">
           <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto px-4 pb-1 pr-14 md:flex-wrap md:overflow-visible md:px-1 md:pr-1 md:pb-0">
             <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t(`${copyKey}.examplesLabel`)}</span>
