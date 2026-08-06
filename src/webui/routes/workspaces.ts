@@ -262,6 +262,7 @@ export function createWorkspaceRoutes(
       readonly initialPrompt?: string;
       readonly title?: string;
       readonly sourceRunId?: string;
+      readonly credentialSource?: 'native';
       readonly credentialSlug?: string;
       readonly model?: string;
       readonly reasoningEffort?: ModelReasoningEffort;
@@ -310,7 +311,7 @@ export function createWorkspaceRoutes(
     if (requestedIdentity && requestedIdentity.agent !== adapter.id) {
       return { ok: false, status: 400, body: { error: 'resume_wrong_agent' } };
     }
-    if (requestedIdentity && (opts.credentialSlug || opts.model || opts.reasoningEffort)) {
+    if (requestedIdentity && (opts.credentialSource || opts.credentialSlug || opts.model || opts.reasoningEffort)) {
       return {
         ok: false,
         status: 400,
@@ -335,6 +336,7 @@ export function createWorkspaceRoutes(
               adapter,
               cwd: meta.dir,
               selection: {
+                ...(opts.credentialSource ? { credentialSource: opts.credentialSource } : {}),
                 ...(opts.credentialSlug ? { credentialSlug: opts.credentialSlug } : {}),
                 ...(opts.model ? { model: opts.model } : {}),
                 ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
@@ -347,7 +349,7 @@ export function createWorkspaceRoutes(
         launcherLogger.warn('session_runtime.resolve_failed', { id, agent: adapter.id, err });
         return { ok: false, status: 500, body: { error: 'session_runtime_failed', message: (err as Error).message } };
       }
-    } else if (opts.credentialSlug || opts.model || opts.reasoningEffort) {
+    } else if (opts.credentialSource || opts.credentialSlug || opts.model || opts.reasoningEffort) {
       return { ok: false, status: 400, body: { error: 'runtime_selection_unsupported' } };
     }
     try {
@@ -591,6 +593,7 @@ export function createWorkspaceRoutes(
   app.post('/manager/quick-start', async (c) => {
     let prompt: string;
     let agentId: string | undefined;
+    let credentialSource: 'native' | undefined;
     let credentialSlug: string | undefined;
     let model: string | undefined;
     let reasoningEffort: ModelReasoningEffort | undefined;
@@ -607,6 +610,7 @@ export function createWorkspaceRoutes(
       if (typeof fields['credentialSlug'] === 'string' && fields['credentialSlug'].length > 0) {
         credentialSlug = fields['credentialSlug'];
       }
+      if (fields['credentialSource'] === 'native') credentialSource = 'native';
       const rawModel = fields['model'];
       if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
       const rawEffort = fields['reasoningEffort'];
@@ -632,6 +636,7 @@ export function createWorkspaceRoutes(
     }
     const spawned = await spawnInteractiveSession(meta, {
       agentId: resolvedAgentId,
+      ...(credentialSource ? { credentialSource } : {}),
       ...(credentialSlug ? { credentialSlug } : {}),
       ...(model ? { model } : {}),
       ...(reasoningEffort ? { reasoningEffort } : {}),
@@ -1390,6 +1395,7 @@ export function createWorkspaceRoutes(
     let resumeId: string | undefined;
     let agentId: string | undefined;
     let initialPrompt: string | undefined;
+    let credentialSource: 'native' | undefined;
     let credentialSlug: string | undefined;
     let model: string | undefined;
     let reasoningEffort: ModelReasoningEffort | undefined;
@@ -1402,6 +1408,7 @@ export function createWorkspaceRoutes(
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       const rawSlug = fields['credentialSlug'];
       if (typeof rawSlug === 'string' && rawSlug.length > 0) credentialSlug = rawSlug;
+      if (fields['credentialSource'] === 'native') credentialSource = 'native';
       const rawModel = fields['model'];
       if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
       const rawEffort = fields['reasoningEffort'];
@@ -1419,6 +1426,7 @@ export function createWorkspaceRoutes(
       ...(agentId !== undefined ? { agentId } : {}),
       ...(resumeId !== undefined ? { resumeId } : {}),
       ...(initialPrompt !== undefined ? { initialPrompt } : {}),
+      ...(credentialSource !== undefined ? { credentialSource } : {}),
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
@@ -1434,6 +1442,7 @@ export function createWorkspaceRoutes(
   app.post('/quick-chat', async (c) => {
     let prompt: string;
     let agentId: string | undefined;
+    let credentialSource: 'native' | undefined;
     let credentialSlug: string | undefined;
     let model: string | undefined;
     let reasoningEffort: ModelReasoningEffort | undefined;
@@ -1449,9 +1458,11 @@ export function createWorkspaceRoutes(
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       // Optional Session-only vault override. Every Agent adapter owns how it
-      // projects the selected credential; omission preserves native auth.
+      // projects the selected credential. Omission keeps normal Workspace /
+      // runtime resolution; credentialSource=native explicitly bypasses it.
       const rawSlug = fields['credentialSlug'];
       if (typeof rawSlug === 'string' && rawSlug.length > 0) credentialSlug = rawSlug;
+      if (fields['credentialSource'] === 'native') credentialSource = 'native';
       const rawModel = fields['model'];
       if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
       const rawEffort = fields['reasoningEffort'];
@@ -1542,6 +1553,7 @@ export function createWorkspaceRoutes(
 
     const spawn = await spawnInteractiveSession(meta, {
       ...(agentId !== undefined ? { agentId } : {}),
+      ...(credentialSource !== undefined ? { credentialSource } : {}),
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),

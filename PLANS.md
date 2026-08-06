@@ -28,6 +28,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/quick-start-launch-context.md]] — Reframed Quick Start as a compact
+  launch context: Workspace and Agent runtime sit outside the composer, while
+  human-readable AI access, model, and effort choices remain inside it.
 - [[plans/semantic-issue-assignees.md]] — Replaced ambiguous scheduled-Issue
   assignee tokens with behavior-named canonical values, explicit deprecated
   aliases, and an idempotent Workspace-file migration. Delivered in serial PR

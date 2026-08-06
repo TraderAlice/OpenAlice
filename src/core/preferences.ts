@@ -19,10 +19,18 @@ const modelReasoningEffortSchema = z.enum([
 
 const quickChatLaunchSchema = z.object({
   agent: z.string().min(1),
+  /** How Quick Start resolves authentication before optional model/effort overrides. */
+  accessMode: z.enum(['auto', 'native', 'vault']).optional(),
   credentialSlug: z.string().min(1).nullable(),
   model: z.string().min(1).nullable(),
   reasoningEffort: modelReasoningEffortSchema.nullable(),
-})
+}).transform((value) => ({
+  ...value,
+  accessMode: value.accessMode ?? (value.credentialSlug === null ? 'auto' as const : 'vault' as const),
+})).refine(
+  (value) => value.accessMode === 'vault' ? value.credentialSlug !== null : value.credentialSlug === null,
+  { message: 'access mode and credential must agree' },
+)
 
 const quickChatPreferencesSchema = z.object({
   lastCredentialByAgent: z.record(z.string(), z.string()).default({}),

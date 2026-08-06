@@ -21,6 +21,7 @@ export class SessionRuntimeBindingError extends Error {
     readonly code:
       | 'credential_not_found'
       | 'credential_incompatible'
+      | 'credential_selection_conflict'
       | 'workspace_binding_missing'
       | 'workspace_binding_changed'
       | 'adapter_contract_missing',
@@ -33,6 +34,8 @@ export class SessionRuntimeBindingError extends Error {
 
 /** Optional choices captured exactly once when a product Session is created. */
 export interface SessionRuntimeSelection {
+  /** Explicitly bypass Workspace/provider files and use the runtime's own auth. */
+  readonly credentialSource?: 'native'
   readonly credentialSlug?: string
   readonly model?: string
   readonly reasoningEffort?: SessionRuntimeBinding['reasoningEffort']
@@ -50,7 +53,7 @@ export interface SessionRuntimeSelection {
  */
 export function createNativeSessionRuntimeBinding(input: {
   readonly adapter: CliAdapter
-  readonly selection?: Omit<SessionRuntimeSelection, 'credentialSlug'>
+  readonly selection?: Omit<SessionRuntimeSelection, 'credentialSlug' | 'credentialSource'>
 }): ResolvedSessionRuntimeBinding {
   assertedAgentContract(input.adapter)
   const selection = input.selection ?? {}
@@ -153,6 +156,21 @@ export async function createSessionRuntimeBinding(input: {
 }): Promise<ResolvedSessionRuntimeBinding> {
   assertedAgentContract(input.adapter)
   const selection = input.selection ?? {}
+  if (selection.credentialSource === 'native') {
+    if (selection.credentialSlug) {
+      throw new SessionRuntimeBindingError(
+        'credential_selection_conflict',
+        'Native runtime authentication cannot be combined with a vault credential',
+      )
+    }
+    return createNativeSessionRuntimeBinding({
+      adapter: input.adapter,
+      selection: {
+        ...(selection.model ? { model: selection.model } : {}),
+        ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+      },
+    })
+  }
   if (selection.credentialSlug) {
     const credentials = input.credentials ?? await readCredentials()
     return resolveVault(input.adapter, credentials, selection.credentialSlug, {

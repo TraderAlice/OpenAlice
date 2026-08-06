@@ -74,6 +74,44 @@ describe('durable Session runtime binding', () => {
     expect(readAiConfig).not.toHaveBeenCalled()
   })
 
+  it('explicit native access bypasses an existing Workspace provider', async () => {
+    const readAiConfig = vi.fn(async (): Promise<WorkspaceAiCred> => ({
+      apiKey: 'workspace-secret-that-must-not-be-read',
+      model: 'workspace-model',
+      wireShape: 'openai-responses',
+    }))
+    const adapter = fakeAdapter(readAiConfig)
+
+    await expect(createSessionRuntimeBinding({
+      adapter,
+      cwd: '/workspace',
+      selection: {
+        credentialSource: 'native',
+        model: 'native-model',
+        reasoningEffort: 'high',
+      },
+      credentials: { 'openai-1': openai },
+    })).resolves.toEqual({
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'native-model',
+        reasoningEffort: 'high',
+      },
+      ai: { model: 'native-model', reasoningEffort: 'high' },
+    })
+    expect(readAiConfig).not.toHaveBeenCalled()
+  })
+
+  it('rejects a conflicting native and vault credential selection', async () => {
+    await expect(createSessionRuntimeBinding({
+      adapter: fakeAdapter(vi.fn(async () => null)),
+      cwd: '/workspace',
+      selection: { credentialSource: 'native', credentialSlug: 'openai-1' },
+      credentials: { 'openai-1': openai },
+    })).rejects.toMatchObject({ code: 'credential_selection_conflict' })
+  })
+
   it('persists a vault reference and resolved model without persisting its key', async () => {
     const resolved = await createSessionRuntimeBinding({
       adapter: codexAdapter,

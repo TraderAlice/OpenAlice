@@ -358,6 +358,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       template?: 'chat' | 'auto-quant-v2',
       model?: string | null,
       reasoningEffort?: import('../api').ModelReasoningEffort,
+      credentialSource?: 'native',
     ): Promise<string> => {
       await ensureTerminalAppearancePublished()
       const { workspace, session } = await apiQuickChat(
@@ -368,6 +369,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         template,
         model,
         reasoningEffort,
+        credentialSource,
       )
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
@@ -421,6 +423,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     credentialSlug?: string,
     model?: string | null,
     reasoningEffort?: import('../api').ModelReasoningEffort,
+    credentialSource?: 'native',
   ): Promise<ManagerQuickStartResult> => {
     const result = await apiQuickStartWorkspaceManager(
       prompt,
@@ -428,6 +431,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       credentialSlug,
       model,
       reasoningEffort,
+      credentialSource,
     )
     setWorkspaceManager(result.manager)
     setWorkspaceManagerLoaded(true)

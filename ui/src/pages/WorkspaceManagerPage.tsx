@@ -101,6 +101,7 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
         launchConfig.launchCredentialSlug,
         launchConfig.launchModel,
         launchConfig.launchReasoningEffort,
+        launchConfig.accessMode === 'native' ? 'native' : undefined,
       )
       setDraft('')
       openOrFocus({ kind: 'workspace-manager', params: { sessionId: result.session.id } })

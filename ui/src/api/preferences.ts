@@ -3,6 +3,8 @@ import { fetchJson, headers } from './client'
 
 export interface QuickChatLaunchPreference {
   agent: string
+  /** Optional while older servers and test doubles coexist; absent means auto. */
+  accessMode?: 'auto' | 'native' | 'vault'
   credentialSlug: string | null
   model: string | null
   reasoningEffort: ModelReasoningEffort | null
