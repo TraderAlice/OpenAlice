@@ -24,6 +24,28 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatContextWindow, type AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
 
 const AGENT_ICONS: Record<string, LucideIcon> = {
@@ -118,11 +140,9 @@ function handleMenuKeyDown(
 function AgentLaunchModelEditor({
   config,
   labeled = false,
-  toolbar = false,
 }: {
   config: AgentLaunchConfigState
   labeled?: boolean
-  toolbar?: boolean
 }) {
   const { t } = useTranslation()
   const listId = useId()
@@ -144,7 +164,7 @@ function AgentLaunchModelEditor({
     : undefined
 
   return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md text-[11px] text-muted-foreground transition-colors focus-within:bg-muted/70 focus-within:ring-1 focus-within:ring-primary/50 ${toolbar ? 'bg-transparent hover:bg-muted/55' : 'bg-muted'} ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
+    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
       <Cpu className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
       {labeled && (
         <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
@@ -166,7 +186,7 @@ function AgentLaunchModelEditor({
         aria-label={t('chatLanding.selectModel')}
         title={contextLabel}
         placeholder={defaultLabel}
-        className={`min-w-0 bg-transparent pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground ${labeled ? 'w-full pb-1 pt-5 sm:w-[190px]' : toolbar ? 'w-[150px] py-1' : 'w-[190px] py-1'}`}
+        className={`min-w-0 bg-transparent pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground ${labeled ? 'w-full pb-1 pt-5 sm:w-[190px]' : 'w-[190px] py-1'}`}
       />
       <datalist id={listId}>
         {config.modelOptions.map((model) => (
@@ -180,11 +200,9 @@ function AgentLaunchModelEditor({
 function AgentLaunchEffortEditor({
   config,
   labeled = false,
-  toolbar = false,
 }: {
   config: AgentLaunchConfigState
   labeled?: boolean
-  toolbar?: boolean
 }) {
   const { t } = useTranslation()
   const current = config.launchReasoningEffort
@@ -206,12 +224,10 @@ function AgentLaunchEffortEditor({
               ? t('chatLanding.reasoningOptionalSummary')
               : t('chatLanding.reasoningRuntimeSummary')
   const defaultLabel = details
-    ? toolbar
-      ? resolvedDefault
-      : t('chatLanding.defaultEffortValue', { effort: resolvedDefault })
+    ? t('chatLanding.defaultEffortValue', { effort: resolvedDefault })
     : t('chatLanding.defaultEffort')
   return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md text-[11px] text-muted-foreground transition-colors focus-within:bg-muted/70 focus-within:ring-1 focus-within:ring-primary/50 ${toolbar ? 'bg-transparent hover:bg-muted/55' : 'bg-muted'} ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : toolbar ? 'min-h-8 max-w-[175px]' : 'min-h-8 max-w-[190px]'}`}>
+    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : 'min-h-8 max-w-[190px]'}`}>
       <BrainCircuit className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
       {labeled && (
         <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
@@ -226,13 +242,199 @@ function AgentLaunchEffortEditor({
             : null,
         )}
         aria-label={t('chatLanding.selectEffort')}
-        className={`min-w-0 appearance-none bg-transparent pl-7 pr-7 text-[11px] text-foreground outline-none ${labeled ? 'w-full max-w-none pb-1 pt-5 sm:max-w-[190px]' : toolbar ? 'max-w-[175px] py-1' : 'max-w-[190px] py-1'}`}
+        className={`min-w-0 appearance-none bg-transparent pl-7 pr-7 text-[11px] text-foreground outline-none ${labeled ? 'w-full max-w-none pb-1 pt-5 sm:max-w-[190px]' : 'max-w-[190px] py-1'}`}
       >
         <option value="">{defaultLabel}</option>
         {options.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
       </select>
       <ChevronDown className="pointer-events-none absolute right-2 h-3 w-3 opacity-60" />
     </label>
+  )
+}
+
+function AgentLaunchInferenceMenu({
+  config,
+  menuPlacement,
+}: {
+  config: AgentLaunchConfigState
+  menuPlacement: 'up' | 'down'
+}) {
+  const { t } = useTranslation()
+  const pendingCustomModelRef = useRef(false)
+  const [customModelOpen, setCustomModelOpen] = useState(false)
+  const [customModelDraft, setCustomModelDraft] = useState('')
+
+  const details = config.aiDetails
+  const resolvedEffort = config.launchReasoningEffort
+    ? t('chatLanding.reasoningEffortSummary', { effort: config.launchReasoningEffort })
+    : details?.reasoningEffort
+      ? t('chatLanding.reasoningEffortSummary', { effort: details.reasoningEffort })
+      : details?.reasoningMode === 'required'
+        ? t('chatLanding.reasoningRequiredSummary')
+        : details?.reasoningMode === 'adaptive'
+          ? t('chatLanding.reasoningAdaptiveSummary')
+          : details?.reasoningMode === 'none' || details?.reasoning === false
+            ? t('chatLanding.reasoningDisabledSummary')
+            : details?.reasoning === true
+              ? t('chatLanding.reasoningEnabledSummary')
+              : details?.reasoningMode === 'optional'
+                ? t('chatLanding.reasoningOptionalSummary')
+                : t('chatLanding.reasoningRuntimeSummary')
+  const resolvedModel = config.launchModel
+    ?? config.defaultModel
+    ?? t('chatLanding.runtimeDefaultModel')
+  const modelValue = config.launchModel ?? ''
+  const effortValue = config.launchReasoningEffort ?? ''
+  const effortOptions = config.launchReasoningEffort
+    && !config.effortOptions.includes(config.launchReasoningEffort)
+    ? [config.launchReasoningEffort, ...config.effortOptions]
+    : config.effortOptions
+  const knownModels = config.modelOptions.filter((model) => model.id !== config.defaultModel)
+  const customCurrentModel = config.launchModel
+    && !config.modelOptions.some((model) => model.id === config.launchModel)
+    ? config.launchModel
+    : null
+
+  const saveCustomModel = () => {
+    const model = customModelDraft.trim()
+    if (!model) return
+    config.selectModel(model)
+    setCustomModelOpen(false)
+  }
+
+  return (
+    <>
+      <DropdownMenu
+        onOpenChangeComplete={(open) => {
+          if (open || !pendingCustomModelRef.current) return
+          pendingCustomModelRef.current = false
+          setCustomModelOpen(true)
+        }}
+      >
+        <DropdownMenuTrigger
+          render={<button
+            type="button"
+            aria-label={t('chatLanding.selectModelAndEffort')}
+            className="oa-pressable inline-flex min-h-8 max-w-[280px] items-center gap-1.5 rounded-md bg-transparent px-1.5 py-1 text-[11px] text-foreground transition-colors hover:bg-muted/55"
+          />}
+        >
+          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 truncate">{resolvedModel}</span>
+          <span className="shrink-0 text-muted-foreground">· {resolvedEffort}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side={menuPlacement === 'down' ? 'bottom' : 'top'}
+          sideOffset={6}
+          aria-label={t('chatLanding.selectModelAndEffort')}
+          className="w-[280px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 bg-secondary p-1.5 shadow-lg ring-0"
+        >
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
+              <span className="font-medium">{t('chatLanding.modelField')}</span>
+              <span className="ml-auto max-w-[140px] truncate text-muted-foreground">{resolvedModel}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-[280px] max-w-[calc(100vw-2rem)] border border-border/70 bg-secondary p-1.5 shadow-lg ring-0">
+              <DropdownMenuRadioGroup
+                value={modelValue}
+                onValueChange={(value) => config.selectModel(value ? String(value) : null)}
+              >
+                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                  <span className="min-w-0 flex-1 truncate">
+                    {config.defaultModel
+                      ? t('chatLanding.defaultModelValue', { model: config.defaultModel })
+                      : t('chatLanding.runtimeDefaultModel')}
+                  </span>
+                </DropdownMenuRadioItem>
+                {customCurrentModel && (
+                  <DropdownMenuRadioItem value={customCurrentModel} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                    <span className="min-w-0 flex-1 truncate">{customCurrentModel}</span>
+                  </DropdownMenuRadioItem>
+                )}
+                {knownModels.map((model) => (
+                  <DropdownMenuRadioItem key={model.id} value={model.id} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{model.label}</span>
+                      {model.label !== model.id && (
+                        <span className="block truncate text-[10px] text-muted-foreground">{model.id}</span>
+                      )}
+                    </span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="min-h-9 px-2.5 text-[12px]"
+                onClick={() => {
+                  setCustomModelDraft(config.launchModel ?? config.defaultModel ?? '')
+                  pendingCustomModelRef.current = true
+                }}
+              >
+                {t('chatLanding.customModel')}
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="min-h-10 px-2.5 py-2 text-[12px]">
+              <span className="font-medium">{t('chatLanding.effortField')}</span>
+              <span className="ml-auto max-w-[140px] truncate text-muted-foreground">{resolvedEffort}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-[220px] max-w-[calc(100vw-2rem)] border border-border/70 bg-secondary p-1.5 shadow-lg ring-0">
+              <DropdownMenuRadioGroup
+                value={effortValue}
+                onValueChange={(value) => config.selectReasoningEffort(
+                  value ? String(value) as NonNullable<AgentLaunchConfigState['launchReasoningEffort']> : null,
+                )}
+              >
+                <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('chatLanding.defaultEffortValue', { effort: resolvedEffort })}
+                  </span>
+                </DropdownMenuRadioItem>
+                {effortOptions.map((effort) => (
+                  <DropdownMenuRadioItem key={effort} value={effort} closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
+                    {t('chatLanding.reasoningEffortSummary', { effort })}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={customModelOpen} onOpenChange={setCustomModelOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('chatLanding.customModelTitle')}</DialogTitle>
+            <DialogDescription>{t('chatLanding.customModelDescription')}</DialogDescription>
+          </DialogHeader>
+          <input
+            value={customModelDraft}
+            onChange={(event) => setCustomModelDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                saveCustomModel()
+              }
+            }}
+            aria-label={t('chatLanding.customModelId')}
+            placeholder={t('chatLanding.customModelId')}
+            autoFocus
+            className="min-h-9 w-full rounded-lg border border-border bg-background px-3 text-[12px] text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+          />
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              {t('common.cancel')}
+            </DialogClose>
+            <Button onClick={saveCustomModel} disabled={!customModelDraft.trim()}>
+              {t('common.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -534,8 +736,14 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
           data-testid="agent-launch-inference-group"
           className={`contents sm:flex sm:shrink-0 sm:items-center ${toolbar ? 'sm:gap-1' : 'sm:gap-2'}`}
         >
-          <AgentLaunchModelEditor config={config} labeled={labeled} toolbar={toolbar} />
-          <AgentLaunchEffortEditor config={config} labeled={labeled} toolbar={toolbar} />
+          {toolbar ? (
+            <AgentLaunchInferenceMenu config={config} menuPlacement={menuPlacement} />
+          ) : (
+            <>
+              <AgentLaunchModelEditor config={config} labeled={labeled} />
+              <AgentLaunchEffortEditor config={config} labeled={labeled} />
+            </>
+          )}
         </div>
       )}
     </>

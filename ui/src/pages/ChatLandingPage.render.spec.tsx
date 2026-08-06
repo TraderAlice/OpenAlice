@@ -137,18 +137,23 @@ function context(
   }
 }
 
-async function findModelEditor(model: string): Promise<HTMLInputElement> {
-  const editor = await screen.findByRole('combobox', { name: 'AI model' }) as HTMLInputElement
+async function findInferenceTrigger(model: string): Promise<HTMLButtonElement> {
+  const trigger = await screen.findByRole('button', { name: 'Model and reasoning' }) as HTMLButtonElement
   await waitFor(() => {
-    const visibleModel = editor.value || editor.placeholder.replace(/^Default · /, '')
-    expect(visibleModel).toBe(model)
+    expect(trigger.textContent).toContain(model)
   })
-  return editor
+  return trigger
 }
 
 function expectDefaultEffort(label: string): void {
-  const editor = screen.getByRole('combobox', { name: 'Reasoning effort' }) as HTMLSelectElement
-  expect(editor.selectedOptions[0]?.textContent).toContain(label)
+  expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent).toContain(label)
+}
+
+async function openInferenceSubmenu(label: 'Model' | 'Effort'): Promise<void> {
+  const trigger = await screen.findByRole('button', { name: 'Model and reasoning' })
+  trigger.focus()
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(label) }))
 }
 
 let workspaces: Workspace[]
@@ -329,10 +334,10 @@ describe('ChatLandingPage adapter inventory', () => {
     expect(contextRow.contains(await screen.findByRole('button', { name: 'Choose Chat workspace' }))).toBe(true)
     expect(contextRow.contains(screen.getByRole('button', { name: 'Select agent' }))).toBe(true)
     expect(inferenceRow.contains(await screen.findByRole('button', { name: 'AI access' }))).toBe(true)
-    expect(inferenceRow.contains(screen.getByRole('combobox', { name: 'AI model' }))).toBe(true)
-    expect(inferenceRow.contains(screen.getByRole('combobox', { name: 'Reasoning effort' }))).toBe(true)
-    expect(inferenceRow.textContent).not.toContain('Model')
-    expect(inferenceRow.textContent).not.toContain('Effort')
+    expect(inferenceRow.contains(screen.getByRole('button', { name: 'Model and reasoning' }))).toBe(true)
+    expect(inferenceRow.querySelectorAll('button').length).toBe(4)
+    expect(screen.queryByRole('combobox', { name: 'AI model' })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Reasoning effort' })).toBeNull()
   })
 })
 
@@ -340,7 +345,7 @@ describe('ChatLandingPage keyboard submission', () => {
   it('does not submit when Enter confirms an IME composition candidate', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await findModelEditor('gemini-3.1-flash-lite')
+    await findInferenceTrigger('gemini-3.1-flash-lite')
     const composer = screen.getByPlaceholderText('Ask Alice…')
     fireEvent.change(composer, { target: { value: '你好' } })
 
@@ -483,10 +488,10 @@ describe('ChatLandingPage keyboard submission', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await findModelEditor('glm-5.2')).toBeTruthy()
+    expect(await findInferenceTrigger('glm-5.2')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
-    expect(await findModelEditor('deepseek-v4-flash')).toBeTruthy()
+    expect(await findInferenceTrigger('deepseek-v4-flash')).toBeTruthy()
     expect(screen.queryByText('New Session only')).toBeNull()
     expect(screen.queryByText(/instead of Workspace/)).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
@@ -509,12 +514,14 @@ describe('ChatLandingPage keyboard submission', () => {
   it('persists and submits explicit model and effort choices as one recent launch tuple', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    const model = await screen.findByRole('combobox', { name: 'AI model' })
-    fireEvent.change(model, { target: { value: 'gemini-3.1-pro-preview' } })
-    fireEvent.blur(model)
-    fireEvent.change(screen.getByRole('combobox', { name: 'Reasoning effort' }), {
-      target: { value: 'high' },
-    })
+    await openInferenceSubmenu('Model')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Custom model…' }))
+    const customModel = await screen.findByRole('textbox', { name: 'Model ID' })
+    fireEvent.change(customModel, { target: { value: 'gemini-3.1-pro-preview' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await openInferenceSubmenu('Effort')
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'high reasoning' }))
 
     await waitFor(() => expect(mocks.rememberQuickChatLaunch).toHaveBeenLastCalledWith({
       agent: 'pi',
@@ -581,8 +588,8 @@ describe('ChatLandingPage AI source disclosure', () => {
       model: null,
       reasoningEffort: null,
     }))
-    expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).placeholder)
-      .toBe('Runtime default model')
+    expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent)
+      .toContain('Runtime default model')
 
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use my account.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -632,10 +639,9 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     expect((await screen.findByRole('button', { name: 'AI access' })).textContent).toContain('DeepSeek')
     await waitFor(() => {
-      expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).value)
-        .toBe('deepseek-v4-flash')
-      expect((screen.getByRole('combobox', { name: 'Reasoning effort' }) as HTMLSelectElement).value)
-        .toBe('high')
+      const summary = screen.getByRole('button', { name: 'Model and reasoning' }).textContent
+      expect(summary).toContain('deepseek-v4-flash')
+      expect(summary).toContain('high reasoning')
     })
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Continue.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -655,7 +661,7 @@ describe('ChatLandingPage AI source disclosure', () => {
   it('keeps an existing Workspace source implicit so the model leads the metadata row', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/Sending will configure this workspace/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Adjust workspace AI' })).toBeNull()
@@ -690,7 +696,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     expect(screen.queryByText('New Session only')).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
-    expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Configure workspace AI' })).toBeNull()
     expectDefaultEffort('minimal reasoning')
   })
@@ -730,7 +736,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await findModelEditor('kimi-k2.7-code')
+    await findInferenceTrigger('kimi-k2.7-code')
     expectDefaultEffort('Reasoning always on')
   })
 
@@ -754,10 +760,10 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
+    expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
-    expect(await findModelEditor('deepseek-v3.2')).toBeTruthy()
+    expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
 
     mocks.detectWorkspaceCredential.mockResolvedValue({
       configured: true,
@@ -771,7 +777,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     }))
 
     await waitFor(() => expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(2))
-    expect(await findModelEditor('deepseek-v3.2')).toBeTruthy()
-    expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).value).not.toBe('gemini-3.1-pro-preview')
+    expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent).not.toContain('gemini-3.1-pro-preview')
   })
 })

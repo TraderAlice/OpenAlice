@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -237,5 +237,77 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
     expect(trigger.textContent).toContain('DeepSeek API')
     expect(trigger.textContent).toContain('deepseek-1')
+  })
+
+  it('combines model and reasoning into a nested toolbar menu', async () => {
+    const user = userEvent.setup()
+    const selectModel = vi.fn()
+    const selectReasoningEffort = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({
+          defaultModel: 'gpt-5',
+          modelOptions: [
+            { id: 'gpt-5', label: 'GPT-5' },
+            { id: 'gpt-5.6', label: 'GPT-5.6' },
+          ],
+          aiDetails: {
+            model: 'gpt-5',
+            contextWindow: null,
+            reasoning: true,
+            reasoningEffort: 'high',
+            reasoningMode: 'adaptive',
+            source: 'new-injection',
+          },
+          selectModel,
+          selectReasoningEffort,
+        })}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+        toolbar
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
+    expect(trigger.textContent).toContain('gpt-5')
+    expect(trigger.textContent).toContain('high reasoning')
+
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.click(screen.getByRole('menuitem', { name: /Model/ }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /GPT-5.6/ }))
+    expect(selectModel).toHaveBeenCalledWith('gpt-5.6')
+
+    await user.keyboard('{Escape}{Escape}')
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.click(screen.getByRole('menuitem', { name: /Effort/ }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'low reasoning' }))
+    expect(selectReasoningEffort).toHaveBeenCalledWith('low')
+  })
+
+  it('keeps free-typed custom models available behind the model submenu', async () => {
+    const user = userEvent.setup()
+    const selectModel = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({ selectModel })}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+        toolbar
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.click(screen.getByRole('menuitem', { name: /Model/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.customModel') }))
+
+    const input = await screen.findByRole('textbox', { name: i18n.t('chatLanding.customModelId') })
+    await user.clear(input)
+    await user.type(input, 'private-model-1')
+    await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))
+    expect(selectModel).toHaveBeenCalledWith('private-model-1')
   })
 })

@@ -143,6 +143,11 @@ or effort override. A native binding with neither override is also valid and
 must still traverse the adapter projection seam, even when the resulting
 projection is empty.
 
+Compact launch surfaces may present model and effort through one disclosure,
+but the nested choices must remain independently selectable and preserve the
+credential-to-model-to-effort dependency order. Free-typed model ids remain
+available because registry suggestions are not an allowlist.
+
 Legacy resume identities that predate this binding contract are upgraded to an
 explicit native binding on their next activation. They must not inspect and
 adopt a provider that was added to the Workspace after the Session was created.
