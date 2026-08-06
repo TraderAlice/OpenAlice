@@ -324,7 +324,7 @@ export const KIMI: PresetDef = {
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
     baseUrl: z.string().default('https://api.moonshot.cn/anthropic').describe('API endpoint'),
-    model: z.string().default('kimi-k2.7-code').describe('Model'),
+    model: z.string().default('kimi-k3').describe('Model'),
     apiKey: z.string().min(1).describe('Moonshot API key'),
   }),
   regions: [
@@ -336,7 +336,9 @@ export const KIMI: PresetDef = {
     } },
   ],
   models: withModelSemantics('kimi', [
+    { id: 'kimi-k3', label: 'Kimi K3' },
     { id: 'kimi-k2.7-code', label: 'Kimi K2.7 Code' },
+    { id: 'kimi-k2.7-code-highspeed', label: 'Kimi K2.7 Code HighSpeed' },
     { id: 'kimi-k2.6', label: 'Kimi K2.6' },
   ]),
   setup: {
@@ -473,7 +475,7 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   google: 'gemini-3.1-flash-lite',
   minimax: 'MiniMax-M3',
   glm: 'glm-5.2',
-  kimi: 'kimi-k2.7-code',
+  kimi: 'kimi-k3',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',
 }

@@ -28,6 +28,18 @@ describe('model semantics registry', () => {
     expect(modelSupportsReasoning(null)).toBeNull()
   })
 
+  it('records Kimi K3 as an always-thinking 1M model with its native effort tiers', () => {
+    expect(resolveModelSemantics('kimi', 'kimi-k3')).toEqual({
+      contextWindow: 1_048_576,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'high', 'max'],
+        defaultEffort: 'max',
+        interleaved: true,
+      },
+    })
+  })
+
   it('describes registered runtime facts compactly', () => {
     expect(describeModelSemantics(resolveModelSemantics('deepseek', 'deepseek-v4-pro')))
       .toBe('Reasoning optional · default effort high · interleaved thinking · 1M context')
