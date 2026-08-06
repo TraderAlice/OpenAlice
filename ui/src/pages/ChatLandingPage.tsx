@@ -9,6 +9,7 @@ import {
   Loader2,
   MessageSquare,
   Paperclip,
+  Sparkles,
   X,
 } from 'lucide-react'
 
@@ -493,16 +494,23 @@ function HarnessLandingPage({
           </div>
         )}
 
-        <div className="relative -mx-4 md:mx-0">
-          <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto px-4 pb-1 pr-14 md:flex-wrap md:overflow-visible md:px-1 md:pr-1 md:pb-0">
-            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t(`${copyKey}.examplesLabel`)}</span>
-            {[t(`${copyKey}.ex1`), t(`${copyKey}.ex2`), t(`${copyKey}.ex3`)].map((ex) => (
+        <div data-testid="harness-landing-suggestions" className="relative -mx-4 md:mx-0">
+          <div className="flex items-center gap-2 px-4 pb-2 md:px-1">
+            <Sparkles aria-hidden className="h-3 w-3 shrink-0 text-primary/75" />
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {t(`${copyKey}.examplesLabel`)}
+            </span>
+            <span aria-hidden className="h-px min-w-4 flex-1 bg-border/45" />
+          </div>
+          <div className="scrollbar-hide flex gap-2 overflow-x-auto px-4 pb-1 pr-14 md:flex-wrap md:overflow-visible md:px-1 md:pr-1 md:pb-0">
+            {[t(`${copyKey}.ex1`), t(`${copyKey}.ex2`), t(`${copyKey}.ex3`)].map((ex, index) => (
               <button
                 key={ex}
                 type="button"
                 onClick={() => useExample(ex)}
                 disabled={launching}
-                className="min-h-8 shrink-0 rounded-full border border-border/70 bg-secondary/75 px-3 py-1 text-[12px] text-muted-foreground transition-colors hover:border-primary/50 hover:bg-secondary hover:text-foreground disabled:opacity-40"
+                style={{ animationDelay: `${index * 55}ms` }}
+                className="oa-pressable oa-suggestion-enter min-h-9 shrink-0 rounded-lg border border-border/45 bg-secondary/45 px-3.5 py-1.5 text-left text-[12px] text-muted-foreground hover:border-border hover:bg-muted/70 hover:text-foreground focus-visible:border-primary/60 disabled:opacity-40"
               >
                 {ex}
               </button>

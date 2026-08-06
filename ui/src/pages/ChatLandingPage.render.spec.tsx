@@ -341,6 +341,23 @@ describe('ChatLandingPage adapter inventory', () => {
   })
 })
 
+describe('ChatLandingPage suggestion strip', () => {
+  it('separates the label from the staggered prompt actions and fills the composer', () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    const strip = screen.getByTestId('harness-landing-suggestions')
+    expect(strip.textContent).toContain('Try asking')
+    const suggestions = strip.querySelectorAll('button')
+    expect(suggestions).toHaveLength(3)
+    expect(suggestions[0]?.className).toContain('oa-suggestion-enter')
+    expect(suggestions[1]?.style.animationDelay).toBe('55ms')
+
+    fireEvent.click(suggestions[0]!)
+    expect((screen.getByPlaceholderText('Ask Alice…') as HTMLTextAreaElement).value)
+      .toBe("What's moving in semiconductors today?")
+  })
+})
+
 describe('ChatLandingPage keyboard submission', () => {
   it('does not submit when Enter confirms an IME composition candidate', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
