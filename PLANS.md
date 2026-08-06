@@ -28,6 +28,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
+  local relationship graph derived from Tracked entities and authored Workspace
+  backlinks, with provenance-preserving material navigation.
 - [[plans/quick-start-launch-context.md]] — Reframed Quick Start as a compact
   launch context: Workspace and Agent runtime sit outside the composer, while
   human-readable AI access, model, and effort choices remain inside it.

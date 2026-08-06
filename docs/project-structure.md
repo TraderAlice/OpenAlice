@@ -137,6 +137,18 @@ Do not reintroduce date-based automatic Chat Workspaces. A date is not a
 context boundary, and new daily repositories strand files, issues, git history,
 and agent configuration in yesterday's Workspace.
 
+Tracked is a global, file-backed index over those durable Workspaces:
+
+- `EntityStore` persists only deliberately registered asset/topic anchors.
+- `entity-backlinks.ts` scans authored `[[name]]` links in Workspace Markdown
+  and Issue notes; prose is never inferred into an edge.
+- the relationship graph is a read-time projection of those two canonical
+  sources. Shared notes bridge every registered entity they reference, while
+  unlinked entities remain visible. The graph has no second persisted index or
+  layout state to migrate.
+- opening a graph material node keeps the same Tracked provenance and return
+  path as opening it from the backlink detail list.
+
 AutoQuant uses the same durable Workspace boundary with a stricter entry rule:
 
 - `autoQuant.defaultWorkspaceId` in `data/preferences.json` is the readiness
