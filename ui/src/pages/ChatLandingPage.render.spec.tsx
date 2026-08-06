@@ -577,7 +577,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/Sending will configure this workspace/)).toBeNull()
-    expect(screen.getByRole('button', { name: 'Adjust workspace AI' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Adjust workspace AI' })).toBeNull()
     expectDefaultEffort('minimal reasoning')
   })
 
@@ -610,7 +610,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect(await screen.findByText('New Session only')).toBeTruthy()
     expect(screen.getByText('Workspace settings stay unchanged')).toBeTruthy()
     expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Configure workspace AI' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Configure workspace AI' })).toBeNull()
     expectDefaultEffort('minimal reasoning')
   })
 

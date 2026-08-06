@@ -30,7 +30,6 @@ import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
-import { isWorkspaceAiAgent } from '../lib/agentRuntime'
 import { AutoQuantSetupPage } from './AutoQuantSetupPage'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
@@ -94,7 +93,6 @@ function HarnessLandingPage({
     agents,
     workspaces,
     defaultAgent,
-    openAgentConfig,
     hasLoaded,
     listError,
     refresh,
@@ -156,14 +154,6 @@ function HarnessLandingPage({
 
   const goConfigureProvider = () => {
     openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
-  }
-
-  const adjustQuickChatAi = () => {
-    if (credentialWorkspace && isWorkspaceAiAgent(effectiveAgent)) {
-      openAgentConfig(credentialWorkspace.id, effectiveAgent, 'ai')
-      return
-    }
-    goConfigureProvider()
   }
 
   // A missing runtime choice should open the picker, not leave a mysteriously
@@ -425,7 +415,6 @@ function HarnessLandingPage({
           <AgentLaunchDetails
             config={launchConfig}
             hasWorkspaceTarget={credentialWorkspace !== null && credentialWorkspace !== undefined}
-            onAdjustAi={adjustQuickChatAi}
             className="mx-1 mt-2 border-t border-border/50 px-1 pt-2"
           />
         </div>
