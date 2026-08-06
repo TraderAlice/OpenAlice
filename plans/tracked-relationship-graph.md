@@ -1,0 +1,59 @@
+# Tracked Relationship Graph
+
+Status: Completed
+
+Owner guides:
+
+- [[../docs/project-structure.md]]
+- [[../docs/ui-interaction-and-motion.md]]
+
+## Problem
+
+Tracked already uses deliberate entity anchors and Obsidian-style `[[name]]`
+links, but exposes only a flat entity navigator and one entity's backlink list.
+Users cannot see which research notes bridge several assets or topics, where
+clusters form, or which tracked anchors have no supporting material.
+
+## Decisions
+
+1. The graph is a read-time projection of `EntityStore` plus the canonical
+   backlink scan, never a second persisted relationship database.
+2. Registered entities and source materials are distinct node types. One note
+   that references multiple entities is one shared node and therefore a real
+   bridge between them.
+3. Tracked keeps one page shell with a persisted Detail/Graph view choice.
+4. The global view remains the default graph scope; a selected entity can be
+   reduced to its exact material neighborhood without traversing the entire
+   connected component.
+5. Source-node navigation reuses the existing Tracked file/Issue provenance.
+6. Narrow canvases prioritize a readable window around the selected entity;
+   the explicit Fit action retains a complete bird's-eye view.
+
+## Work
+
+- [x] Add a collision-safe graph HTTP contract derived from canonical entities
+      and backlinks.
+- [x] Add deterministic, theme-token-based SVG layout without persisted
+      coordinates or a canvas-only accessibility boundary.
+- [x] Add Detail/Graph switching, global/local scope, node filters, pan, zoom,
+      fit, entity selection, and source navigation.
+- [x] Mirror the contract in the demo surface and all shipped locales.
+- [x] Add core, route, layout, component, page, and demo regressions.
+- [x] Complete browser, full-suite, and packaged Electron verification.
+
+## Verification
+
+- `npx tsc --noEmit`
+- `cd ui && npx tsc -b`
+- focused core, route, layout, component, page, and demo suites (12 tests)
+- `pnpm test` (483 files passed, 1 skipped; 3985 tests passed, 9 skipped)
+- real `/tracked` route in Day and Auto color modes at desktop, tablet, and
+  phone widths, including scope, filters, zoom, detail, source, and Back flows
+- `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace`
+
+## Completion Criteria
+
+Tracked can reveal clusters, shared research materials, and isolated anchors
+without changing the underlying entity or backlink semantics; mouse, keyboard,
+and touch-sized controls can select and navigate nodes; and detail/list behavior
+remains available with the same provenance-preserving routes.

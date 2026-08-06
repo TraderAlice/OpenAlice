@@ -2,6 +2,7 @@
  * Entity HTTP route — the Tracked tab's read surface.
  *
  *   GET /          list all tracked entities, each with a backlink count
+ *   GET /relationships/graph  entity ↔ source-material relationship graph
  *   GET /:name     one entity + its backlinks (the notes that link `[[name]]`)
  *
  * Writes happen via the `entity_upsert` MCP tool, not here — creation is the
@@ -15,6 +16,7 @@ import { Hono } from 'hono'
 import type { IEntityStore } from '../../core/entity-store.js'
 import type { WorkspaceRegistry } from '../../workspaces/workspace-registry.js'
 import { scanBacklinks, warmBacklinks } from '../../core/entity-backlinks.js'
+import { buildEntityGraph } from '../../core/entity-graph.js'
 
 export interface EntityRoutesDeps {
   entityStore: IEntityStore
@@ -38,6 +40,14 @@ export function createEntityRoutes(deps: EntityRoutesDeps) {
       backlinkCount: backlinks.get(e.name.toLowerCase())?.length ?? 0,
     }))
     return c.json({ entities: items })
+  })
+
+  app.get('/relationships/graph', async (c) => {
+    const [entities, backlinks] = await Promise.all([
+      deps.entityStore.list(),
+      scanBacklinks(deps.registry),
+    ])
+    return c.json(buildEntityGraph(entities, backlinks))
   })
 
   app.get('/:name', async (c) => {

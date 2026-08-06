@@ -26,6 +26,8 @@ const detail: EntityDetail = {
 
 const mocks = vi.hoisted(() => ({
   getEntity: vi.fn(),
+  getGraph: vi.fn(),
+  selectTracked: vi.fn(),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
   refreshEntities: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('../api', () => ({
   api: {
     entities: {
       get: mocks.getEntity,
+      graph: mocks.getGraph,
     },
   },
 }))
@@ -58,7 +61,8 @@ vi.mock('../live/entities', () => ({
 vi.mock('../live/tracked-selection', () => ({
   useTrackedSelection: (selector: (state: {
     selectedName: string
-  }) => unknown) => selector({ selectedName: 'stock-vst' }),
+    select: typeof mocks.selectTracked
+  }) => unknown) => selector({ selectedName: 'stock-vst', select: mocks.selectTracked }),
 }))
 
 vi.mock('../tabs/store', () => ({
@@ -73,6 +77,7 @@ vi.mock('../tabs/store', () => ({
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  window.localStorage.clear()
   mocks.entitiesState.current = {
     entities: [trackedEntity],
     loading: false,
@@ -81,6 +86,7 @@ beforeEach(async () => {
   }
   await i18n.changeLanguage('en')
   mocks.getEntity.mockResolvedValue(detail)
+  mocks.getGraph.mockResolvedValue({ nodes: [], edges: [] })
 })
 
 afterEach(cleanup)

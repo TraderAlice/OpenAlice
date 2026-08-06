@@ -1,13 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TrendingUp, Hash, FileText, ListChecks, CircleAlert } from 'lucide-react'
+import { TrendingUp, Hash, FileText, ListChecks, CircleAlert, List, Network } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
+import { SegmentedControl } from '../components/SegmentedControl'
+import { TrackedGraphView } from '../components/TrackedGraphView'
 import { api } from '../api'
 import { entitiesLive, refreshEntities } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
-import type { EntityDetail, Backlink } from '../api/entities'
+import type { EntityDetail, Backlink, EntityGraph, EntityGraphArtifactNode } from '../api/entities'
+
+type TrackedViewMode = 'detail' | 'graph'
+
+const TRACKED_VIEW_MODE_KEY = 'openalice.tracked.view-mode.v1'
+
+function readTrackedViewMode(): TrackedViewMode {
+  try {
+    return window.localStorage.getItem(TRACKED_VIEW_MODE_KEY) === 'graph' ? 'graph' : 'detail'
+  } catch {
+    return 'detail'
+  }
+}
 
 /**
  * Tracked detail pane. Shows the selected entity's description (the
@@ -26,13 +40,27 @@ export function TrackedPage() {
   const listError = entitiesLive.useStore((s) => s.error)
   const refreshing = entitiesLive.useStore((s) => s.refreshing)
   const selectedName = useTrackedSelection((s) => s.selectedName)
+  const selectTracked = useTrackedSelection((s) => s.select)
+  const [viewMode, setViewModeState] = useState<TrackedViewMode>(readTrackedViewMode)
+  const [graph, setGraph] = useState<EntityGraph | null>(null)
+  const [graphLoading, setGraphLoading] = useState(false)
+  const [graphRequest, setGraphRequest] = useState(0)
+
+  const setViewMode = useCallback((mode: TrackedViewMode) => {
+    setViewModeState(mode)
+    try {
+      window.localStorage.setItem(TRACKED_VIEW_MODE_KEY, mode)
+    } catch {
+      // View preference persistence is best-effort.
+    }
+  }, [])
 
   const [detail, setDetail] = useState<EntityDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState(false)
   const [detailRequest, setDetailRequest] = useState(0)
   useEffect(() => {
-    if (!selectedName) {
+    if (viewMode !== 'detail' || !selectedName) {
       setDetail(null)
       setDetailLoading(false)
       setDetailError(false)
@@ -60,15 +88,49 @@ export function TrackedPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedName, detailRequest])
+  }, [selectedName, detailRequest, viewMode])
+
+  useEffect(() => {
+    if (viewMode !== 'graph') return
+    let cancelled = false
+    setGraphLoading(true)
+    api.entities
+      .graph()
+      .then((next) => {
+        if (cancelled) return
+        setGraph(next)
+        setGraphLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setGraphLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [graphRequest, viewMode])
+
+  const openArtifact = useOpenTrackedArtifact()
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('nav.item.tracked')}
         description={t('tracked.pageDescription', { count: entities.length })}
+        right={(
+          <SegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            ariaLabel={t('tracked.viewModeLabel')}
+            compact
+            options={[
+              { value: 'detail', label: <span className="inline-flex items-center gap-1"><List size={11} />{t('tracked.detailView')}</span> },
+              { value: 'graph', label: <span className="inline-flex items-center gap-1"><Network size={11} />{t('tracked.graphView')}</span> },
+            ]}
+          />
+        )}
       />
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className={`flex-1 min-h-0 ${viewMode === 'graph' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {listError && entities.length > 0 && (
           <StaleCollectionNotice refreshing={refreshing} onRetry={refreshEntities} />
         )}
@@ -78,6 +140,23 @@ export function TrackedPage() {
           <CollectionLoadError refreshing={refreshing} onRetry={refreshEntities} />
         ) : entities.length === 0 ? (
           <EmptyState />
+        ) : viewMode === 'graph' ? (
+          graphLoading && !graph ? (
+            <PageLoading />
+          ) : !graph ? (
+            <GraphLoadError onRetry={() => setGraphRequest((request) => request + 1)} />
+          ) : (
+            <TrackedGraphView
+              graph={graph}
+              selectedName={selectedName}
+              onSelectEntity={selectTracked}
+              onOpenEntity={(name) => {
+                selectTracked(name)
+                setViewMode('detail')
+              }}
+              onOpenArtifact={openArtifact}
+            />
+          )
         ) : !selectedName ? (
           <div className="px-6 py-8 text-muted-foreground text-sm">{t('tracked.selectFromSidebar')}</div>
         ) : detailLoading ? (
@@ -91,6 +170,24 @@ export function TrackedPage() {
           <Detail detail={detail} />
         )}
       </div>
+    </div>
+  )
+}
+
+function GraphLoadError({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <div role="alert" className="mx-auto flex max-w-[520px] flex-col items-center px-6 py-16 text-center">
+      <CircleAlert size={24} strokeWidth={1.75} className="text-destructive" aria-hidden />
+      <h2 className="mt-3 text-[15px] font-medium text-foreground">{t('tracked.graph.loadErrorTitle')}</h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t('tracked.graph.loadErrorDescription')}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="oa-pressable mt-4 rounded-md border border-border bg-secondary px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-muted"
+      >
+        {t('common.retry')}
+      </button>
     </div>
   )
 }
@@ -270,6 +367,31 @@ function issueIdFromPath(path: string): string | null {
   return id && !id.includes('/') ? id : null
 }
 
+function useOpenTrackedArtifact() {
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const setSidebar = useWorkspace((s) => s.setSidebar)
+  return useCallback((artifact: Backlink | EntityGraphArtifactNode, trackedName: string) => {
+    const issueId = issueIdFromPath(artifact.path)
+    setSidebar('tracked')
+    if (issueId) {
+      openOrFocus({
+        kind: 'tracked-issue-detail',
+        params: { wsId: artifact.workspaceId, id: issueId },
+      })
+      return
+    }
+    openOrFocus({
+      kind: 'file-viewer',
+      params: {
+        wsId: artifact.workspaceId,
+        path: artifact.path,
+        source: 'tracked',
+        returnTrackedName: trackedName,
+      },
+    })
+  }, [openOrFocus, setSidebar])
+}
+
 function BacklinkRow({
   backlink,
   trackedName,
@@ -277,34 +399,9 @@ function BacklinkRow({
   backlink: Backlink
   trackedName: string
 }) {
-  const openOrFocus = useWorkspace((s) => s.openOrFocus)
-  const setSidebar = useWorkspace((s) => s.setSidebar)
+  const openArtifact = useOpenTrackedArtifact()
   const issueId = issueIdFromPath(backlink.path)
-  const open = () => {
-    if (issueId) {
-      // Issue note opened from Tracked stays in the Tracked container: same
-      // detail component, but Back returns to the entity/backlink context.
-      setSidebar('tracked')
-      openOrFocus({
-        kind: 'tracked-issue-detail',
-        params: { wsId: backlink.workspaceId, id: issueId },
-      })
-      return
-    }
-    // Plain note stays owned by Tracked. Preserve the selected entity so both
-    // the page Back action and a copied/deep-linked URL return to the same
-    // entity/backlink context instead of falling into System → Workspaces.
-    setSidebar('tracked')
-    openOrFocus({
-      kind: 'file-viewer',
-      params: {
-        wsId: backlink.workspaceId,
-        path: backlink.path,
-        source: 'tracked',
-        returnTrackedName: trackedName,
-      },
-    })
-  }
+  const open = () => openArtifact(backlink, trackedName)
   const Icon = issueId ? ListChecks : FileText
   const label = issueId ?? backlink.path
   return (
