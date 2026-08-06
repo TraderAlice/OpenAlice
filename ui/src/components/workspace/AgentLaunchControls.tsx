@@ -410,8 +410,15 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         </div>
       )}
 
-      {config.selectedAgent && <AgentLaunchModelEditor config={config} />}
-      {config.selectedAgent && <AgentLaunchEffortEditor config={config} />}
+      {config.selectedAgent && (
+        <div
+          data-testid="agent-launch-inference-group"
+          className="contents sm:flex sm:shrink-0 sm:items-center sm:gap-2"
+        >
+          <AgentLaunchModelEditor config={config} />
+          <AgentLaunchEffortEditor config={config} />
+        </div>
+      )}
     </>
   )
 })
