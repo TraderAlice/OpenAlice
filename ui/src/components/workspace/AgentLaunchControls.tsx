@@ -463,14 +463,6 @@ export function AgentLaunchDetails({
         }
       : {
           label: t('chatLanding.newSessionAiScope'),
-          detail: hasWorkspaceTarget
-            ? config.willOverwriteCredential && config.credential && config.detectedCredential?.slug
-              ? t('chatLanding.sessionCredentialOverride', {
-                  from: config.detectedCredential.slug,
-                  to: config.credential.slug,
-                })
-              : t('chatLanding.workspaceAiUnchanged')
-            : t('chatLanding.newSessionAiReady'),
           actionLabel,
         }
   } else if (config.selectedAgent && (!config.needsCredential || config.selectedRuntimeUsesGlobalConfig)) {

@@ -471,7 +471,8 @@ describe('ChatLandingPage keyboard submission', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findModelEditor('deepseek-v4-flash')).toBeTruthy()
     expect(screen.getByText('New Session only')).toBeTruthy()
-    expect(screen.getByText('deepseek-1 instead of Workspace glm-1')).toBeTruthy()
+    expect(screen.queryByText(/instead of Workspace/)).toBeNull()
+    expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
 
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use DeepSeek.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -608,7 +609,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     expect(await screen.findByText('New Session only')).toBeTruthy()
-    expect(screen.getByText('Workspace settings stay unchanged')).toBeTruthy()
+    expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
     expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Configure workspace AI' })).toBeNull()
     expectDefaultEffort('minimal reasoning')
