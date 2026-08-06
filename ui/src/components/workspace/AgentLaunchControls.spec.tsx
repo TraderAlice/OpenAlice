@@ -99,6 +99,15 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('AgentLaunchSelectors keyboard menus', () => {
+  it('keeps model and effort together above the phone breakpoint', () => {
+    render(<AgentLaunchSelectors config={launchConfig()} onConfigureProvider={vi.fn()} />)
+
+    const group = screen.getByTestId('agent-launch-inference-group')
+    expect(group.className).toContain('contents')
+    expect(group.className).toContain('sm:flex')
+    expect(group.className).toContain('sm:shrink-0')
+  })
+
   it('moves through the agent menu and returns focus on Escape', async () => {
     const user = userEvent.setup()
     render(<AgentLaunchSelectors config={launchConfig()} onConfigureProvider={vi.fn()} />)
