@@ -658,6 +658,12 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
               )}
               className={`oa-popover-enter absolute left-0 z-20 max-h-[min(24rem,calc(100vh-8rem))] min-w-[240px] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-secondary py-1 shadow-lg [scrollbar-gutter:stable] ${menuPlacement === 'down' ? 'top-full mt-1' : 'bottom-full mb-1'}`}
             >
+              <div
+                role="presentation"
+                className="border-b border-border/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"
+              >
+                {t('chatLanding.credentialMenuTitle', { runtime: runtimeName })}
+              </div>
               {config.detectedCredential?.configured === true && (
                 <button
                   type="button"

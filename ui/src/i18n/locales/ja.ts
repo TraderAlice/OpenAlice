@@ -887,6 +887,7 @@ export const ja: Resources = {
     noAgentsBody: 'OpenAlice には通常、ワークスペースチャット用の Pi が同梱されます。パッケージ版でこの表示が出る場合は、ランタイム同梱を確認してください。確認中も Lite モードで続行できます。',
     selectCredential: 'AI アクセス',
     aiAccess: 'AI アクセス',
+    credentialMenuTitle: '{{runtime}} はどの方法で AI にアクセスしますか？',
     modelField: 'モデル',
     effortField: '推論強度',
     runtimeFallback: 'ランタイム',

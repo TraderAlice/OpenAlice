@@ -146,7 +146,9 @@ projection is empty.
 Compact launch surfaces may present model and effort through one disclosure,
 but the nested choices must remain independently selectable and preserve the
 credential-to-model-to-effort dependency order. Free-typed model ids remain
-available because registry suggestions are not an allowlist.
+available because registry suggestions are not an allowlist. Credential menus
+should state which runtime is receiving AI access before listing Workspace,
+native-login, and saved-vault choices.
 
 Legacy resume identities that predate this binding contract are upgraded to an
 explicit native binding on their next activation. They must not inspect and

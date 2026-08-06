@@ -894,6 +894,7 @@ export const zhHant: Resources = {
     noAgentsBody: 'OpenAlice 通常會自帶 Pi 用於工作區對話。如果打包版出現這個提示，表示執行環境包需要檢查；你仍然可以先以 Lite 模式繼續使用。',
     selectCredential: 'AI 存取',
     aiAccess: 'AI 存取',
+    credentialMenuTitle: '{{runtime}} 要如何存取 AI？',
     modelField: '模型',
     effortField: '推理強度',
     runtimeFallback: '執行環境',
