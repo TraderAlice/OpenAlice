@@ -141,7 +141,7 @@ describe('AutomationRunsSection workspace identity', () => {
           title: 'Daily portfolio risk scan',
           status: 'todo',
           priority: 'high',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
         }],
       }],
     }
@@ -206,7 +206,7 @@ describe('AutomationRunsSection workspace identity', () => {
           title: 'Daily portfolio risk scan',
           status: 'todo',
           priority: 'high',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
         }],
       }],
     }

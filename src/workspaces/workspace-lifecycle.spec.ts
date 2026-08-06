@@ -39,7 +39,7 @@ beforeEach(async () => {
     '---',
     'title: Handoff me',
     'status: todo',
-    'assignee: "@workspace"',
+    'assignee: "@new-each-run"',
     'when: { kind: every, every: "1h" }',
     '---',
     '',

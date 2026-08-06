@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/semantic-issue-assignees.md]] — Replaces ambiguous scheduled-Issue
+  assignee tokens with behavior-named canonical values, explicit deprecated
+  aliases, and an idempotent Workspace-file migration.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY

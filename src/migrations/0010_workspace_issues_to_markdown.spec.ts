@@ -63,7 +63,7 @@ describe('0010 workspace issues → markdown', () => {
     expect(byId['morning-scan'].agent).toBe('codex')
     expect(byId['morning-scan'].status).toBe('todo') // board default
     expect(byId['morning-scan'].priority).toBe('none')
-    expect(byId['morning-scan'].assignee).toBe('@workspace')
+    expect(byId['morning-scan'].assignee).toBe('@new-each-run')
 
     // enabled:false → terminal status so the schedule stops firing
     expect(byId['paused-one'].status).toBe('canceled')

@@ -209,7 +209,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
         const scheduledCommand = [
           'alice-workspace issue create --id ' + scheduledIssueId +
             ' --title "OpenAlice scheduled agent acceptance"' +
-            ' --assignee @workspace --agent pi --when ' + shellQuote(schedule) +
+            ' --assignee @new-each-run --agent pi --when ' + shellQuote(schedule) +
             ' --what ' + shellQuote(scheduledWhat) + ' >/dev/null',
           "printf '__OPENALICE_%s_OK__\\\\n' 'SCHEDULED_ISSUE'",
         ].join(' && ')

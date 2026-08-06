@@ -283,7 +283,7 @@ async function createSource(dir: string): Promise<void> {
   await writeFile(join(dir, 'research', 'same.md'), 'same copy\n')
   await writeFile(join(dir, 'research', 'conflict.md'), 'source copy\n')
   await writeFile(join(dir, '.alice', 'issues', 'scheduled.md'), [
-    '---', 'title: Scheduled', 'status: todo', 'assignee: "@workspace"',
+    '---', 'title: Scheduled', 'status: todo', 'assignee: "@new-each-run"',
     'when: { kind: every, every: "1h" }', '---', '', 'Run later.',
   ].join('\n'))
   await git(dir, ['init', '-q'])

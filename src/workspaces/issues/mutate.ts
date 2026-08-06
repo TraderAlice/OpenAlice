@@ -25,6 +25,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
 import { isModelReasoningEffort, type ModelReasoningEffort } from '../../ai-providers/model-semantics.js'
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js'
+import { deprecatedIssueAssigneeReplacement } from '../session-signature.js'
 import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
@@ -147,6 +148,12 @@ export async function updateIssueFields(
   const data = parseFrontmatterObject(split.frontmatter)
   if (!data) return { ok: false, reason: 'invalid', error: 'frontmatter is not a mapping' }
 
+  // Reading legacy aliases is intentionally compatible, but every write is an
+  // upgrade boundary. Never reserialize a deprecated token after migration 0033.
+  if (typeof data.assignee === 'string' && deprecatedIssueAssigneeReplacement(data.assignee)) {
+    data.assignee = current.issue.assignee
+  }
+
   if (patch.status !== undefined) {
     if (!ISSUE_STATUSES.includes(patch.status)) {
       return { ok: false, reason: 'invalid', error: `invalid status: ${patch.status}` }
@@ -161,9 +168,17 @@ export async function updateIssueFields(
   }
   if (patch.assignee !== undefined) {
     const a = patch.assignee.trim()
+    const replacement = deprecatedIssueAssigneeReplacement(a)
+    if (replacement) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: `${a} is deprecated; use ${replacement}`,
+      }
+    }
     const assignee = issueAssigneeSchema.safeParse(a)
     if (!assignee.success) {
-      return { ok: false, reason: 'invalid', error: 'assignee must be @workspace, @new, @human, @unassigned, or an exact @resumeId' }
+      return { ok: false, reason: 'invalid', error: 'assignee must be @new-each-run, @new-then-resume, @human, @unassigned, or an exact @resumeId' }
     }
     data.assignee = assignee.data
     if (issueAssigneeResumeId(assignee.data)) {
@@ -245,6 +260,23 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
 
   const existing = await readWorkspaceFile(wsDir, relFor(id))
   if (existing !== null) return { ok: false, reason: 'conflict', id }
+  if (input.assignee !== undefined) {
+    const replacement = deprecatedIssueAssigneeReplacement(input.assignee)
+    if (replacement) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: `${input.assignee} is deprecated; use ${replacement}`,
+      }
+    }
+    if (!issueAssigneeSchema.safeParse(input.assignee).success) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: 'assignee must be @new-each-run, @new-then-resume, @human, @unassigned, or an exact @resumeId',
+      }
+    }
+  }
   // Assemble frontmatter from only the provided keys (so we don't write default
   // noise), then validate the whole thing against the issue schema.
   const data: Record<string, unknown> = { title }

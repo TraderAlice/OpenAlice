@@ -58,7 +58,7 @@ model with another provider's endpoint at dispatch.
 
 ## Completion Criteria
 
-- A scheduled `@new` or `@workspace` Issue can choose a compatible vault
+- A scheduled `@new-then-resume` or `@new-each-run` Issue can choose a compatible vault
   credential, one of its suggested/custom models, and only valid effort levels.
 - The first dispatched Session persists exactly that credential/model/effort
   binding and resumes independently of later Workspace changes.

@@ -12,9 +12,9 @@ describe('AutomationApiSection', () => {
     const { container } = render(<AutomationApiSection />)
     const scheduledExample = container.querySelector('pre')
 
-    expect(scheduledExample?.textContent).toContain('assignee: "@new"')
-    expect(scheduledExample?.textContent).not.toContain('assignee: "@workspace"')
-    expect(screen.getByText(/scheduled work defaults to/).textContent).toContain('@new')
+    expect(scheduledExample?.textContent).toContain('assignee: "@new-then-resume"')
+    expect(scheduledExample?.textContent).not.toContain('assignee: "@new-each-run"')
+    expect(screen.getByText(/scheduled work defaults to/).textContent).toContain('@new-then-resume')
     expect(screen.getByText(/The markdown below the closing/).textContent).toContain('exact scheduled prompt')
     expect(container.textContent).not.toContain('what: a standalone prompt')
   })
