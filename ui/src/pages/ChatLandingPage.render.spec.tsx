@@ -407,7 +407,8 @@ describe('ChatLandingPage keyboard submission', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await screen.findByText('Model, reasoning, and context are managed by Pi')
+    expect((await screen.findByRole('button', { name: 'Select agent' })).textContent).toContain('Pi')
+    expect(screen.queryByText('Model, reasoning, and context are managed by Pi')).toBeNull()
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'hello' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
@@ -470,7 +471,7 @@ describe('ChatLandingPage keyboard submission', () => {
     fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findModelEditor('deepseek-v4-flash')).toBeTruthy()
-    expect(screen.getByText('New Session only')).toBeTruthy()
+    expect(screen.queryByText('New Session only')).toBeNull()
     expect(screen.queryByText(/instead of Workspace/)).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
 
@@ -608,7 +609,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await screen.findByText('New Session only')).toBeTruthy()
+    expect(screen.queryByText('New Session only')).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
     expect(await findModelEditor('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Configure workspace AI' })).toBeNull()
