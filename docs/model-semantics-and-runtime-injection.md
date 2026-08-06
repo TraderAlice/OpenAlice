@@ -123,7 +123,7 @@ runtime, Alice falls back to the first registered runtime.
 | Pi | project settings plus registered provider | `--model`, `--thinking` |
 
 An Issue's agent/credential/model/effort fields seed a new Session binding when
-its owner is `@new` or `@workspace`. The credential field is only an
+its owner is `@new-then-resume` or `@new-each-run`. The credential field is only an
 OpenAlice-vault slug; it never contains a key or endpoint. Once an exact
 `@resumeId` exists, those fields cannot replace its credential source, model, or
 effort. Follow-up turns replay the stored binding instead of consulting newly

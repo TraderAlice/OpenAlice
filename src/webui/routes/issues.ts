@@ -46,6 +46,7 @@ import {
   type IssueStatus,
 } from '../../workspaces/issues/declaration.js'
 import { appendIssueComment, updateIssueFields } from '../../workspaces/issues/mutate.js'
+import { deprecatedIssueAssigneeReplacement } from '../../workspaces/session-signature.js'
 import { isAgentRuntime } from '../../workspaces/cli-adapter.js'
 import { logger as launcherLogger } from '../../workspaces/logger.js'
 import {
@@ -165,9 +166,17 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
     }
     if ('assignee' in fields) {
       const a = fields['assignee']
-      const assignee = typeof a === 'string' ? issueAssigneeSchema.safeParse(a.trim()) : null
+      const rawAssignee = typeof a === 'string' ? a.trim() : ''
+      const replacement = deprecatedIssueAssigneeReplacement(rawAssignee)
+      if (replacement) {
+        return c.json({
+          error: 'deprecated_assignee',
+          message: `${rawAssignee} is deprecated; use ${replacement}`,
+        }, 400)
+      }
+      const assignee = typeof a === 'string' ? issueAssigneeSchema.safeParse(rawAssignee) : null
       if (!assignee?.success) {
-        return c.json({ error: 'invalid_assignee', message: 'assignee must be @workspace, @new, @human, @unassigned, or an exact @resumeId' }, 400)
+        return c.json({ error: 'invalid_assignee', message: 'assignee must be @new-each-run, @new-then-resume, @human, @unassigned, or an exact @resumeId' }, 400)
       }
       const resumeId = issueAssigneeResumeId(assignee.data)
       if (resumeId) {

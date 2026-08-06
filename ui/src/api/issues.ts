@@ -110,7 +110,7 @@ export interface IssueListItem {
   title: string
   status: IssueStatus
   priority: IssuePriority
-  /** @workspace | @new | @human | @unassigned | exact @resumeId Session signature. */
+  /** @new-each-run | @new-then-resume | @human | @unassigned | exact @resumeId. */
   assignee: string
   /** Adapter id for the scheduled fire override, if set. */
   agent?: string
@@ -204,7 +204,7 @@ export interface IssueDetailIssue {
   what: string
   status: IssueStatus
   priority: IssuePriority
-  /** @workspace | @new | @human | @unassigned | exact @resumeId Session signature. */
+  /** @new-each-run | @new-then-resume | @human | @unassigned | exact @resumeId. */
   assignee: string
   /** Present iff the issue self-schedules. */
   when?: ScheduleWhen

@@ -28,6 +28,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/semantic-issue-assignees.md]] — Replaced ambiguous scheduled-Issue
+  assignee tokens with behavior-named canonical values, explicit deprecated
+  aliases, and an idempotent Workspace-file migration. Delivered in serial PR
+  #990.
 - [[plans/issue-runtime-choice.md]] — Made scheduled Issue launch selection a
   credential-first flow, narrowed model and effort choices to that provider,
   and froze the result in the new Session runtime binding.

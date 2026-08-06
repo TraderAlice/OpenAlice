@@ -45,8 +45,9 @@ export interface ScheduleSnapshotTask {
   when: Schedule
   /** The prompt this fire hands to the headless run (resolved `what`/title+body). */
   what: string
-  /** Unified owner. `@new` recruits once, `@workspace` recruits every fire,
-   * and an exact `@resumeId` resumes one accountable Session. */
+  /** Unified owner. `@new-then-resume` recruits once,
+   * `@new-each-run` recruits every fire, and an exact `@resumeId` resumes one
+   * accountable Session. */
   assignee: string
   agent?: string
   credential?: string

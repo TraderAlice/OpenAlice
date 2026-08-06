@@ -110,7 +110,7 @@ Not in scope:
 
 - A logged-in Codex or Claude Code user can persist only model and/or effort
   for one Workspace without adding an API key or losing global login state.
-- A scheduled `@workspace` or `@new` Issue can inherit all runtime defaults or
+- A scheduled `@new-each-run` or `@new-then-resume` Issue can inherit all runtime defaults or
   explicitly select supported agent/model/effort values for that run.
 - One-run selection is visible in the durable task record and does not rewrite
   Workspace configuration.

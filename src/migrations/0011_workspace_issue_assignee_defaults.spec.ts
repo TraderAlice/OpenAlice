@@ -54,8 +54,8 @@ describe('0011 workspace issue assignee defaults', () => {
     const read = await readWorkspaceIssues(wsDir['chat-jul3'])
     expect(read.ok).toBe(true)
     if (!read.ok) return
-    expect(read.issues[0].assignee).toBe('@workspace')
-    expect(snapshotBoardIssue(read.issues[0], null).assignee).toBe('@workspace')
+    expect(read.issues[0].assignee).toBe('@new-each-run')
+    expect(snapshotBoardIssue(read.issues[0], null).assignee).toBe('@new-each-run')
   })
 
   it('leaves explicit non-default assignees untouched and is idempotent', async () => {

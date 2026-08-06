@@ -125,7 +125,7 @@ overnight headlines that move the thesis.
 title: Split the data fetcher into source + transform
 status: backlog
 priority: medium
-assignee: unassigned
+assignee: "@unassigned"
 ---
 
 `src/fetch.ts` mixes the HTTP call with the normalization step, which makes the
@@ -154,8 +154,8 @@ plain tracked item; add a `when` and it starts firing.
   `low`, `none`. Display/sort only.
 - **`assignee`** *(optional)* — the single owner and
   scheduled-dispatch policy:
-  - `@workspace` recruits a new product Session for each scheduled fire;
-  - `@new` asks the Workspace to recruit once; the first successful dispatch
+  - `@new-each-run` recruits a new product Session for each scheduled fire;
+  - `@new-then-resume` asks the Workspace to recruit once; the first successful dispatch
     rewrites the Issue to that concrete `@resumeId`, so every later fire returns
     to the same accountable coworker;
   - an exact `@resumeId` continues that accountable Session, even when its
@@ -163,8 +163,8 @@ plain tracked item; add a `when` and it starts firing.
   - `@human` and `@unassigned` are valid only for unscheduled work.
   CLI `issue create` defaults to `@me` when called by an attributable Session
   (who creates it owns it); `@me` is resolved to a concrete `@resumeId` before
-  writing. Otherwise omitted scheduled ownership defaults to `@new`, while an
-  unscheduled board item defaults to `@workspace`. Use `@workspace` explicitly
+  writing. Otherwise omitted scheduled ownership defaults to `@new-then-resume`, while an
+  unscheduled board item defaults to `@unassigned`. Use `@new-each-run` explicitly
   only when every fire should recruit a newcomer.
 - **`when`** *(OPTIONAL — present iff the issue self-schedules)* — one of:
   - `{ kind: every, every: "30m" }` — repeat on an interval (`30m`, `2h`,
@@ -178,7 +178,7 @@ plain tracked item; add a `when` and it starts firing.
     only for compatibility with old files; new Issues should write it explicitly.
   - `{ kind: at, at: "2026-03-01T13:30:00Z" }` — run ONCE at an ISO timestamp,
     then never again.
-- **`agent`** *(optional)* — runtime override for `@new` / `@workspace`
+- **`agent`** *(optional)* — runtime override for `@new-then-resume` / `@new-each-run`
   scheduled work; defaults to this Workspace's runtime resolution. An exact
   Session assignee already has an immutable runtime, so Session-owned Issues
   cannot set this.
@@ -192,9 +192,14 @@ plain tracked item; add a `when` and it starts firing.
   selected runtime; omit it to inherit.
 
 `agent`, `credential`, `model`, and `effort` are one Session-creation tuple.
-They are valid only for `@new` / `@workspace`; an exact `@resumeId` Session owns
+They are valid only for `@new-then-resume` / `@new-each-run`; an exact `@resumeId` Session owns
 all four. The scheduler freezes explicit values into the fresh Session runtime
 binding and does not rewrite persistent Workspace configuration.
+
+> **Deprecated assignee aliases:** never write `@workspace` or `@new` in a new
+> or edited Issue. They exist only so older Workspace files can be migrated:
+> `@workspace` → `@new-each-run`, and `@new` → `@new-then-resume`. The CLI and
+> API reject both deprecated spellings with the canonical replacement.
 
 The old parallel `execution` field is retired and rejected after migration;
 never write it into a new Issue.

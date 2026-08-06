@@ -26,7 +26,7 @@ function issue(overrides: Partial<IssueRecord> = {}): IssueRecord {
     title: 'Market scan',
     status: 'todo',
     priority: 'none',
-    assignee: '@workspace',
+    assignee: '@new-each-run',
     what: 'Read the market.',
     ...overrides,
   }
@@ -76,14 +76,14 @@ describe('IssueChangeTracker', () => {
   it('deduplicates a known UI or CLI mutation by final-state fingerprint', async () => {
     const { provenance, tracker } = await harness()
     const before = issue()
-    const after = issue({ assignee: '@new' })
+    const after = issue({ assignee: '@new-then-resume' })
     await tracker.observeWorkspace({ workspaceId: 'ws-1', issues: [before], origin: human, now: 10 })
     await provenance.append({
       artifact: { kind: 'issue', workspaceId: 'ws-1', issueId: after.id },
       action: 'updated',
       origin: human,
       at: 20,
-      mutation: { fields: [{ field: 'assignee', before: '@workspace', after: '@new' }] },
+      mutation: { fields: [{ field: 'assignee', before: '@new-each-run', after: '@new-then-resume' }] },
       fingerprint: issueMutationFingerprint('ws-1', after.id, after),
     })
 

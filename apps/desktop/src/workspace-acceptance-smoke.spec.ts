@@ -19,6 +19,8 @@ describe('Workspace acceptance renderer source', () => {
     expect(source).toContain('scheduledIssueDispatched')
     expect(source).toContain('scheduledIssueAutoCompleted')
     expect(source).toContain('waitForScheduledRun')
+    expect(source).toContain('--assignee @new-each-run')
+    expect(source).not.toContain('--assignee @workspace')
     expect(source).toContain('preserve these literal characters & | < > ^ % !')
     expect(source).toContain("block?.type === 'tool' && block?.status === 'completed'")
     expect(source).toContain("diagnosticText.includes('\"type\":\"message_update\"')")

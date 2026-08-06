@@ -97,7 +97,7 @@ export interface ScheduleScannerDeps {
     /** Fresh-Session credential/model/effort selection inherited from Issue frontmatter. */
     selection?: SessionRuntimeSelection,
   ) => Promise<{ taskId: string; resumeId: string }>
-  /** Persist @new -> exact @resumeId after the first fresh dispatch. */
+  /** Persist @new-then-resume -> exact @resumeId after the first fresh dispatch. */
   claimFreshSession?: (input: {
     issueWorkspace: WorkspaceMeta
     issueId: string
@@ -406,7 +406,7 @@ export class ScheduleScanner {
             )
       if (claimFreshSession) {
         if (!this.deps.claimFreshSession) {
-          throw new Error('Issue @new ownership cannot be persisted in this runtime')
+          throw new Error('Issue @new-then-resume ownership cannot be persisted in this runtime')
         }
         try {
           await this.deps.claimFreshSession({

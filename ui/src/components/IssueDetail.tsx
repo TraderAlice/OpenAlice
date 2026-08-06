@@ -153,10 +153,8 @@ function AssigneeEditor({
       aria-label={t('issues.detail.assignee')}
       onChange={(event) => onChange(event.target.value)}
     >
-      {scheduled && <option value="@new">{t('issues.detail.assigneeNew')}</option>}
-      <option value="@workspace">
-        {scheduled ? t('issues.detail.assigneeWorkspaceScheduled') : t('issues.detail.assigneeWorkspace')}
-      </option>
+      {scheduled && <option value="@new-then-resume">{t('issues.detail.assigneeNew')}</option>}
+      {scheduled && <option value="@new-each-run">{t('issues.detail.assigneeWorkspaceScheduled')}</option>}
       {!scheduled && <option value="@human">{t('issues.detail.human')}</option>}
       {!scheduled && <option value="@unassigned">{t('issues.detail.unassigned')}</option>}
       <optgroup label={t('issues.detail.workspaceSessions')}>
@@ -614,7 +612,7 @@ function PropertiesRail({
       })
     }
     const blockedMessages = {
-      'Assigned Session does not exist. Choose an active Session or @workspace.': 'missingSession',
+      'Assigned Session does not exist. Choose an active Session or @new-each-run.': 'missingSession',
       'Assigned Session is retired. Reassign the Issue before its next run.': 'retiredSession',
       'Assigned Session has no resumable runtime conversation yet.': 'unboundSession',
       'Schedule has no future fire. Check its expression and timestamp.': 'noFutureRun',
@@ -883,7 +881,7 @@ function CommentComposer({
         <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted-foreground sm:basis-auto">
           {ownerResumeId
             ? <>{t('issues.detail.assignedSessionPrefix')} <span className="font-mono text-foreground/75">@{ownerResumeId}</span> {t('issues.detail.assignedSessionSuffix')}</>
-            : assignee === '@new'
+            : assignee === '@new-then-resume'
               ? t('issues.detail.replyBeforeFirstRun')
               : t('issues.detail.replyWithoutOwner')}
         </p>
@@ -1089,8 +1087,8 @@ function unknownOriginLabel(reason: string, t: TFunction): string {
 
 function mutationValue(field: string, value: string, t: TFunction): string {
   if (field === 'assignee') {
-    if (value === '@new') return t('issues.detail.mutationValue.newSessionKeepOwner')
-    if (value === '@workspace') return t('issues.detail.mutationValue.newSessionEachRun')
+    if (value === '@new-then-resume') return t('issues.detail.mutationValue.newSessionKeepOwner')
+    if (value === '@new-each-run') return t('issues.detail.mutationValue.newSessionEachRun')
     if (value === '@human') return t('issues.detail.human')
     if (value === '@unassigned') return t('issues.detail.unassigned')
   }

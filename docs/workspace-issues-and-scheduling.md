@@ -33,7 +33,7 @@ workspaces.
 title: Pre-market brief
 status: todo
 priority: high
-assignee: "@workspace"
+assignee: "@new-then-resume"
 when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: codex
 credential: openai-primary
@@ -51,22 +51,22 @@ The filename stem is the stable issue id. Frontmatter:
 - `status` — `backlog | todo | in_progress | done | canceled`; default `todo`.
 - `priority` — `urgent | high | medium | low | none`; default `none`.
 - `assignee` — the single ownership and dispatch contract:
-  - `@new` means the owning Workspace recruits one new product Session on the
+  - `@new-then-resume` means the owning Workspace recruits one new product Session on the
     first fire, then persists that concrete Session as the future owner;
-  - `@workspace` means the owning Workspace recruits a new product Session for
+  - `@new-each-run` means the owning Workspace recruits a new product Session for
     every scheduled fire;
   - an exact `@resumeId` continues one accountable product Session;
   - `@human` or `@unassigned` is valid only for unscheduled work.
-  When omitted, a scheduled Issue defaults to `@new` so its first run establishes
-  one durable owner; an unscheduled board item defaults to `@workspace`.
+  When omitted, a scheduled Issue defaults to `@new-then-resume` so its first run establishes
+  one durable owner; an unscheduled board item defaults to `@unassigned`.
   Structured creation by an attributable resumable Session still assigns that
-  creating Session. Use `@workspace` explicitly only when every fire should
+  creating Session. Use `@new-each-run` explicitly only when every fire should
   recruit a newcomer.
 - `when` — optional schedule:
   - `{ kind: at, at: <ISO timestamp> }`
   - `{ kind: every, every: <duration> }`
   - `{ kind: cron, cron: <5-field expression>, timezone: local | <IANA zone> }`
-- `agent` — optional CLI adapter id for `@new` / `@workspace` scheduled work;
+- `agent` — optional CLI adapter id for `@new-then-resume` / `@new-each-run` scheduled work;
   otherwise Workspace/default resolution is used. A Session assignee already
   owns its runtime and cannot be overridden here.
 - `credential` — optional secret-free OpenAlice vault slug for the fresh
@@ -83,7 +83,7 @@ Only the credential slug is persisted; endpoint and key material remain in the
 vault and are resolved just in time. The scheduler freezes the tuple into the
 new Session's durable runtime binding without rewriting Workspace files. All
 four are forbidden when `assignee` is an exact `@resumeId`, because that
-Session owns its runtime conversation. `@new` may use them for its first
+Session owns its runtime conversation. `@new-then-resume` may use them for its first
 dispatch; after it becomes an exact Session owner, the claim rewrite removes
 the tuple.
 
@@ -93,6 +93,12 @@ fresh/omitted scheduled ownership to the former `workspace` shape. That history
 is preserved as explicit `@workspace`; the new omission default is `@new`.
 Migration `0019_issue_session_signatures` then writes those owners as
 `@resumeId` / `@workspace`, the same visible signature language used in reports.
+
+Migration `0033_semantic_issue_assignees` retires those ambiguous scheduling
+aliases. `@workspace` is deprecated in favor of `@new-each-run`, and `@new` is
+deprecated in favor of `@new-then-resume`. Readers keep compatibility for
+pre-migration Workspace files, but API, CLI, UI, documentation, and skills must
+reject or avoid the deprecated values; new writes never emit them.
 
 The markdown below frontmatter is the Issue's canonical **What**: the work
 definition humans inspect and edit. For scheduled Issues, Alice sends this exact
@@ -149,7 +155,7 @@ Agents normally use:
 ```bash
 alice-workspace issue list
 alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @workspace --agent codex --credential openai-primary --model gpt-5.6 --effort high
+alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6 --effort high
 alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6 --effort high
 alice-workspace issue comment --id <id> --text "..."
 ```
@@ -344,11 +350,11 @@ manufacture shell sleep loops. Add `--reconstruct` only when an unattributed
 artifact explicitly needs reconstruction guidance.
 
 The Issue detail UI treats scheduling as an intrinsic Work item capability.
-`assignee: "@new"` recruits one fresh Session on the first fire and then
-rewrites itself to that concrete `@resumeId`; `assignee: "@workspace"`
+`assignee: "@new-then-resume"` recruits one fresh Session on the first fire and then
+rewrites itself to that concrete `@resumeId`; `assignee: "@new-each-run"`
 recruits a new Session on every fire; `assignee: "@resumeId"` keeps one already
 known responsible Session. The first and third modes produce a stable owner to
-ask; `@workspace` execution exposes the creator and each concrete run as
+ask; `@new-each-run` execution exposes the creator and each concrete run as
 separate follow-up targets.
 
 Issue mutation has two complementary histories. Activity records attributable

@@ -35,7 +35,7 @@ const scheduledIssue: IssueDetailData = {
     what: 'Scan the market and publish a brief.',
     status: 'in_progress',
     priority: 'high',
-    assignee: '@workspace',
+    assignee: '@new-each-run',
     agent: 'codex',
     when: {
       kind: 'cron',
@@ -164,7 +164,7 @@ describe('IssueActivity provenance identity', () => {
         wsId="ws-home"
         issueId="audit"
         ownerResumeId={null}
-        assignee="@workspace"
+        assignee="@new-each-run"
         onPosted={vi.fn()}
       />,
     )

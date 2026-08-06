@@ -116,7 +116,7 @@ describe('business inquiry routes', () => {
   })
 
   it('rejects Ask owner for a Workspace-owned Issue', async () => {
-    const { app } = build({ assignee: '@workspace' })
+    const { app } = build({ assignee: '@new-each-run' })
     const response = await app.request('/issues/ws-1/issue-1', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: 'Status?', relation: 'owner' }),

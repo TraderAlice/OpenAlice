@@ -331,11 +331,11 @@ existing resumable Workspace Session.
 #### Mode B: recruit once, then keep that worker
 
 ```yaml
-assignee: "@new"
+assignee: "@new-then-resume"
 ```
 
 - The first scheduled fire creates a new headless product Session.
-- OpenAlice immediately rewrites `@new` to that Session's exact `@resumeId`.
+- OpenAlice immediately rewrites `@new-then-resume` to that Session's exact `@resumeId`.
 - Later fires and Issue comments continue the same accountable coworker.
 - The Issue may specify `agent` before the first claim; after the claim, the
   concrete Session owns its runtime.
@@ -343,7 +343,7 @@ assignee: "@new"
 #### Mode C: a fresh worker per fire
 
 ```yaml
-assignee: "@workspace"
+assignee: "@new-each-run"
 ```
 
 - Every scheduled fire creates a new headless product Session and `resumeId`.
@@ -456,8 +456,8 @@ approval state, routing, fills, and slippage.
 9. Mutable artifacts retain occurrence-level provenance instead of one mutable
    “author” field.
 10. Issue creation provenance and future execution responsibility are separate.
-11. Issue assignee is the only ownership/dispatch contract: `@new` recruits
-    once and becomes an exact owner, `@workspace` recruits on every fire, and
+11. Issue assignee is the only ownership/dispatch contract: `@new-then-resume` recruits
+    once and becomes an exact owner, `@new-each-run` recruits on every fire, and
     an exact `@resumeId` continues one known Session.
 12. Trade decision attribution and trade execution authority remain separate.
 13. Provenance is stamped from authoritative context, not asserted by an agent.
