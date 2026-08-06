@@ -886,6 +886,7 @@ export const zh: Resources = {
     noAgentsBody: 'OpenAlice 通常会自带 Pi 用于工作区对话。如果打包版出现这个提示，说明运行时包需要检查；你仍然可以先以 Lite 模式继续使用。',
     selectCredential: 'AI 访问',
     aiAccess: 'AI 访问',
+    credentialMenuTitle: '{{runtime}} 要如何访问 AI？',
     modelField: '模型',
     effortField: '推理强度',
     runtimeFallback: '运行时',

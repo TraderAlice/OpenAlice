@@ -169,6 +169,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
     trigger.focus()
     await user.keyboard('{ArrowUp}')
+    expect(screen.getByText(i18n.t('chatLanding.credentialMenuTitle', { runtime: 'OpenCode' }))).toBeTruthy()
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
 
     await user.keyboard('{Escape}')

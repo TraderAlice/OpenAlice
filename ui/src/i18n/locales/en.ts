@@ -898,6 +898,7 @@ export const en = {
     noAgentsBody: 'OpenAlice normally includes Pi for workspace chat. If this appears in a packaged build, the runtime bundle needs attention; you can continue in Lite while setup is checked.',
     selectCredential: 'AI access',
     aiAccess: 'AI access',
+    credentialMenuTitle: 'How should {{runtime}} access AI?',
     modelField: 'Model',
     effortField: 'Effort',
     runtimeFallback: 'Runtime',
