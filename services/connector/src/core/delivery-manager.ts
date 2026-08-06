@@ -149,9 +149,13 @@ export class DeliveryManager {
       getServiceStatus: () => this.health().status,
       sendTest: (connectorId) => this.sendTest(connectorId),
     }
-    await adapter.start(config, context)
+    // Keep the adapter registered while it starts. An adapter that reaches an
+    // external service can fail after it has recorded a useful degraded health
+    // reason; dropping it here reduced that evidence to a generic
+    // "configured but not running" state in Settings.
     this.adapters.set(id, adapter)
     this.commands.set(id, commands)
+    await adapter.start(config, context)
   }
 
   private get recorder(): ConnectorIORecorder {

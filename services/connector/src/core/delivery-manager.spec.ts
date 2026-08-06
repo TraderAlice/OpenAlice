@@ -101,6 +101,38 @@ describe('DeliveryManager connector registry', () => {
     })).resolves.toBeUndefined()
   })
 
+  it('keeps a failed adapter registered so its degraded health remains visible', async () => {
+    const adapter: ConnectorAdapter = {
+      id: 'broken',
+      start: async () => { throw new Error('Telegram API did not become ready') },
+      stop: async () => undefined,
+      deliver: async () => { throw new Error('Telegram is not ready') },
+      health: () => ({
+        id: 'broken',
+        enabled: true,
+        status: 'degraded',
+        lastError: 'Telegram API did not become ready',
+      }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'broken', label: 'Broken', description: 'Broken adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+    })
+
+    await manager.start()
+
+    expect(manager.health()).toMatchObject({
+      status: 'degraded',
+      adapters: [{ id: 'broken', status: 'degraded' }],
+    })
+  })
+
   it('treats an online bot waiting for /link as an intentional setup phase', async () => {
     const registry = new ConnectorRegistry()
     registry.register({
