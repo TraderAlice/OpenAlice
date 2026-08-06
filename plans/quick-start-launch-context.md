@@ -40,6 +40,8 @@ the primary send path.
       access choice.
 - [x] Give the AI-access menu a runtime-aware context line without adding a
       focusable setting or implementation-detail explanation.
+- [x] Restyle example prompts as a labeled, responsive suggestion strip with
+      one-shot staggered entrance and reduced-motion fallback.
 - [x] Persist and migrate the recent access mode without storing secrets.
 - [x] Carry explicit native access through every Quick Start launch route and
       Session runtime binding.

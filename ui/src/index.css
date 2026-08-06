@@ -239,6 +239,17 @@ body {
   }
 }
 
+@keyframes oa-suggestion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .oa-view-enter {
   animation: oa-view-enter var(--motion-standard) var(--motion-ease-out) both;
 }
@@ -286,6 +297,10 @@ body {
 .oa-popover-enter {
   transform-origin: top;
   animation: oa-popover-enter var(--motion-standard) var(--motion-ease-out) both;
+}
+
+.oa-suggestion-enter {
+  animation: oa-suggestion-enter var(--motion-standard) var(--motion-ease-out) backwards;
 }
 
 /* ==================== Typography scale ====================
@@ -589,7 +604,8 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-dialog-surface,
   .oa-dialog-backdrop,
   .oa-disclosure-enter,
-  .oa-popover-enter {
+  .oa-popover-enter,
+  .oa-suggestion-enter {
     animation: none;
   }
   .oa-pressable,
