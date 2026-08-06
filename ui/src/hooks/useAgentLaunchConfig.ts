@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { configApi, type WorkspaceCredentialDefault } from '../api/config'
-import type { ModelReasoningEffort, ModelReasoningMode } from '../api'
-import { preferencesApi, type QuickChatPreferences } from '../api/preferences'
+import type { ModelReasoningEffort, ModelReasoningMode, PresetModel } from '../api'
+import {
+  preferencesApi,
+  type QuickChatLaunchPreference,
+  type QuickChatPreferences,
+} from '../api/preferences'
 import {
   detectWorkspaceCredential,
   getAgentReadiness,
@@ -16,6 +20,11 @@ import {
   type WorkspaceCredentialDetection,
 } from '../components/workspace/api'
 import { requiresWorkspaceCredential, resolveAgentRuntime } from '../lib/agentRuntime'
+import {
+  runtimeEffortOptions,
+  runtimeModelOptions,
+  runtimeModelSemantics,
+} from '../components/issue-runtime-options'
 import {
   WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
   WORKSPACE_DEFAULTS_CHANGED_EVENT,
@@ -215,13 +224,14 @@ export function formatContextWindow(value: number): string {
 export interface AgentLaunchPreferencesState {
   readonly lastCredentialByAgent: Readonly<Record<string, string>>
   readonly recentChatWorkspaceId: string | null
+  readonly recentLaunch: QuickChatLaunchPreference | null
   readonly loaded: boolean
-  rememberCredential(agent: string, credentialSlug: string | null): Promise<void>
+  rememberLaunch(launch: QuickChatLaunchPreference): Promise<void>
   adoptRecentChatWorkspace(workspaceId: string | null): void
 }
 
 function fallbackPreferences(): QuickChatPreferences {
-  return { lastCredentialByAgent: {}, recentChatWorkspaceId: null }
+  return { lastCredentialByAgent: {}, recentChatWorkspaceId: null, recentLaunch: null }
 }
 
 /** Shared persistence boundary for every chat-style launcher. Keeping this
@@ -254,18 +264,16 @@ export function useAgentLaunchPreferences(): AgentLaunchPreferencesState {
     }
   }, [])
 
-  const rememberCredential = useCallback(async (
-    agent: string,
-    credentialSlug: string | null,
-  ): Promise<void> => {
+  const rememberLaunch = useCallback(async (launch: QuickChatLaunchPreference): Promise<void> => {
     setPreferences((current) => ({
       ...current,
-      lastCredentialByAgent: credentialSlug === null
-        ? Object.fromEntries(Object.entries(current.lastCredentialByAgent).filter(([key]) => key !== agent))
-        : { ...current.lastCredentialByAgent, [agent]: credentialSlug },
+      lastCredentialByAgent: launch.credentialSlug === null
+        ? Object.fromEntries(Object.entries(current.lastCredentialByAgent).filter(([key]) => key !== launch.agent))
+        : { ...current.lastCredentialByAgent, [launch.agent]: launch.credentialSlug },
+      recentLaunch: launch,
     }))
     try {
-      const saved = await preferencesApi.rememberQuickChatCredential(agent, credentialSlug)
+      const saved = await preferencesApi.rememberQuickChatLaunch(launch)
       if (saved) {
         setPreferences(saved)
         window.dispatchEvent(new CustomEvent(AGENT_LAUNCH_PREFERENCES_CHANGED_EVENT, { detail: saved }))
@@ -283,8 +291,9 @@ export function useAgentLaunchPreferences(): AgentLaunchPreferencesState {
   return {
     lastCredentialByAgent: preferences.lastCredentialByAgent,
     recentChatWorkspaceId: preferences.recentChatWorkspaceId,
+    recentLaunch: preferences.recentLaunch ?? null,
     loaded,
-    rememberCredential,
+    rememberLaunch,
     adoptRecentChatWorkspace,
   }
 }
@@ -311,6 +320,11 @@ export interface AgentLaunchConfigState {
   readonly credential: SavedCredential | null
   readonly detectedCredential: WorkspaceCredentialDetection | null
   readonly workspaceConfigResolved: boolean
+  readonly defaultModel: string | null
+  readonly modelOptions: readonly PresetModel[]
+  readonly launchModel: string | undefined
+  readonly effortOptions: readonly ModelReasoningEffort[]
+  readonly launchReasoningEffort: ModelReasoningEffort | undefined
   readonly aiDetails: AgentLaunchAiDetails | null
   readonly selectedRuntimeUsesGlobalConfig: boolean
   readonly credentialSelectionReady: boolean
@@ -324,6 +338,8 @@ export interface AgentLaunchConfigState {
   selectAgent(agent: string): void
   selectCredential(credentialSlug: string): void
   selectRuntimeDefault(): void
+  selectModel(model: string | null): void
+  selectReasoningEffort(effort: ModelReasoningEffort | null): void
   resetCredentialSelection(): void
 }
 
@@ -356,9 +372,15 @@ export function useAgentLaunchConfig({
     agentReadiness: AgentCredentialReadiness | null
   } | null>(null)
   const [workspaceCredentialDefaults, setWorkspaceCredentialDefaults] = useState<Record<string, WorkspaceCredentialDefault>>({})
+  const [presets, setPresets] = useState<Awaited<ReturnType<typeof configApi.getPresets>>['presets']>([])
   const [agentConfigRevision, setAgentConfigRevision] = useState(0)
+  const immediateLaunchRef = useRef<QuickChatLaunchPreference | null>(preferences.recentLaunch)
+  if (preferences.recentLaunch !== immediateLaunchRef.current) {
+    immediateLaunchRef.current = preferences.recentLaunch
+  }
 
-  const effectiveAgent = resolveAgentRuntime(agents, selectedAgentId, defaultAgent, runtimeReadiness)
+  const preferredAgent = selectedAgentId ?? preferences.recentLaunch?.agent ?? null
+  const effectiveAgent = resolveAgentRuntime(agents, preferredAgent, defaultAgent, runtimeReadiness)
   const selectedAgent = agents.find((agent) => agent.id === effectiveAgent) ?? null
   const selectedRuntimeReadiness = effectiveAgent ? runtimeReadiness?.agents[effectiveAgent] ?? null : null
   const selectedRuntimeUsesGlobalConfig = selectedRuntimeReadiness?.ready === true && (
@@ -388,6 +410,14 @@ export function useAgentLaunchConfig({
     void getAgentRuntimeReadiness()
       .then((snapshot) => { if (live) setRuntimeReadiness(snapshot) })
       .catch(() => { if (live) setRuntimeReadiness(null) })
+    return () => { live = false }
+  }, [])
+
+  useEffect(() => {
+    let live = true
+    void configApi.getPresets()
+      .then(({ presets: next }) => { if (live) setPresets(next) })
+      .catch(() => { if (live) setPresets([]) })
     return () => { live = false }
   }, [])
 
@@ -436,10 +466,8 @@ export function useAgentLaunchConfig({
     const onWorkspaceAgentConfigChanged = (event: Event) => {
       const detail = (event as CustomEvent<WorkspaceAgentConfigChangedDetail>).detail
       if (!detail || (detail.wsId === workspaceId && detail.agent === effectiveAgent)) {
-        // A picker choice is intentionally stronger than the detected
-        // Workspace binding during ordinary interaction. Once Settings saves,
-        // however, the Workspace file becomes the new truth; retaining the
-        // transient choice would keep Quick Start painted with the old model.
+        // Refresh the Workspace-owned fallback. The recent Quick Start tuple
+        // remains independent and intentionally continues to win when present.
         setPickedCredential(null)
         setAgentConfigRevision((revision) => revision + 1)
       }
@@ -476,11 +504,22 @@ export function useAgentLaunchConfig({
     pickedCredential.workspaceId === workspaceId
     ? pickedCredential.slug
     : undefined
+  const scopedRecentLaunch = preferences.loaded && preferences.recentLaunch?.agent === effectiveAgent
+    ? preferences.recentLaunch
+    : null
+  const recentCredential = scopedRecentLaunch?.credentialSlug
+  const recentCredentialAvailable = typeof recentCredential === 'string' &&
+    credentials?.some((candidate) => candidate.slug === recentCredential) === true
+  const preferredCredential = scopedPickedCredential !== undefined
+    ? scopedPickedCredential
+    : recentCredentialAvailable
+      ? recentCredential
+      : undefined
   const loginBackedCreationDefault = !hasWorkspace && effectiveAgent
     ? workspaceCredentialDefaults[effectiveAgent]?.credentialSlug ?? null
     : null
-  const explicitLoginBackedCredential = scopedPickedCredential !== undefined
-    ? scopedPickedCredential
+  const explicitLoginBackedCredential = preferredCredential !== undefined
+    ? preferredCredential
     : hasWorkspace
       ? !workspaceConfigResolved
         ? null
@@ -493,7 +532,7 @@ export function useAgentLaunchConfig({
   const effectiveCredential = needsCredential
     ? resolveAgentCredential(
         credentials,
-        scopedPickedCredential ?? null,
+        preferredCredential ?? null,
         detectedCredential?.slug ?? null,
         workspaceCredentialReady,
         effectiveAgent ? workspaceCredentialDefaults[effectiveAgent]?.credentialSlug ?? null : null,
@@ -503,7 +542,19 @@ export function useAgentLaunchConfig({
       )
     : resolveExplicitLoginBackedCredential(credentials, explicitLoginBackedCredential)
   const credential = credentials?.find((candidate) => candidate.slug === effectiveCredential) ?? null
-  const aiDetails = resolveAgentLaunchAiDetails(
+  const launchCredentialSlug = typeof preferredCredential === 'string' &&
+    credentials?.some((candidate) => candidate.slug === preferredCredential) === true
+    ? preferredCredential
+    : undefined
+  const recentTupleMatchesCredential = scopedRecentLaunch !== null &&
+    scopedRecentLaunch.credentialSlug === (launchCredentialSlug ?? null)
+  const launchModel = recentTupleMatchesCredential
+    ? scopedRecentLaunch.model ?? undefined
+    : undefined
+  const launchReasoningEffort = recentTupleMatchesCredential
+    ? scopedRecentLaunch.reasoningEffort ?? undefined
+    : undefined
+  const baseAiDetails = resolveAgentLaunchAiDetails(
     needsCredential,
     effectiveCredential,
     credential,
@@ -511,6 +562,37 @@ export function useAgentLaunchConfig({
     effectiveAgent ? workspaceCredentialDefaults[effectiveAgent] : undefined,
     hasWorkspace,
   )
+  const defaultModel = launchCredentialSlug
+    ? credential?.resolvedModel ?? null
+    : baseAiDetails?.model ?? null
+  const modelOptions = runtimeModelOptions({
+    agent: effectiveAgent,
+    credential: launchCredentialSlug ? credential : null,
+    defaultModel,
+    presets,
+  })
+  const effectiveModel = launchModel ?? defaultModel
+  const selectedModelSemantics = runtimeModelSemantics(effectiveModel, modelOptions)
+  const effortOptions = runtimeEffortOptions({
+    agent: effectiveAgent,
+    semantics: selectedModelSemantics,
+    modelKnown: selectedModelSemantics !== null,
+  })
+  const aiDetails = launchModel || launchReasoningEffort
+    ? {
+        model: effectiveModel,
+        contextWindow: selectedModelSemantics?.contextWindow ?? baseAiDetails?.contextWindow ?? null,
+        ...(selectedModelSemantics?.reasoning?.mode
+          ? { reasoningMode: selectedModelSemantics.reasoning.mode }
+          : {}),
+        ...(launchReasoningEffort
+          ? { reasoningEffort: launchReasoningEffort }
+          : selectedModelSemantics?.reasoning?.defaultEffort
+            ? { reasoningEffort: selectedModelSemantics.reasoning.defaultEffort }
+            : {}),
+        source: 'new-injection' as const,
+      }
+    : baseAiDetails
   const noCredentials = needsCredential &&
     workspaceConfigResolved &&
     !workspaceCredentialReady &&
@@ -524,19 +606,70 @@ export function useAgentLaunchConfig({
   const selectAgent = useCallback((agent: string) => {
     setSelectedAgentId(agent)
     setPickedCredential(null)
-  }, [])
+    const launch = {
+      agent,
+      credentialSlug: preferences.lastCredentialByAgent[agent] ?? null,
+      model: null,
+      reasoningEffort: null,
+    }
+    immediateLaunchRef.current = launch
+    void preferences.rememberLaunch(launch)
+  }, [preferences])
 
   const selectCredential = useCallback((credentialSlug: string) => {
     if (!canSelectCredential || effectiveAgent === null) return
     setPickedCredential({ agent: effectiveAgent, workspaceId, slug: credentialSlug })
-    void preferences.rememberCredential(effectiveAgent, credentialSlug)
+    const launch = {
+      agent: effectiveAgent,
+      credentialSlug,
+      model: null,
+      reasoningEffort: null,
+    }
+    immediateLaunchRef.current = launch
+    void preferences.rememberLaunch(launch)
   }, [canSelectCredential, effectiveAgent, preferences, workspaceId])
 
   const selectRuntimeDefault = useCallback(() => {
     if (!canSelectCredential || effectiveAgent === null) return
     setPickedCredential({ agent: effectiveAgent, workspaceId, slug: null })
-    void preferences.rememberCredential(effectiveAgent, null)
+    const launch = {
+      agent: effectiveAgent,
+      credentialSlug: null,
+      model: null,
+      reasoningEffort: null,
+    }
+    immediateLaunchRef.current = launch
+    void preferences.rememberLaunch(launch)
   }, [canSelectCredential, effectiveAgent, preferences, workspaceId])
+
+  const selectModel = useCallback((model: string | null) => {
+    if (effectiveAgent === null) return
+    const launch = {
+      agent: effectiveAgent,
+      credentialSlug: launchCredentialSlug ?? null,
+      model,
+      reasoningEffort: null,
+    }
+    immediateLaunchRef.current = launch
+    void preferences.rememberLaunch(launch)
+  }, [effectiveAgent, launchCredentialSlug, preferences])
+
+  const selectReasoningEffort = useCallback((reasoningEffort: ModelReasoningEffort | null) => {
+    if (effectiveAgent === null) return
+    const immediate = immediateLaunchRef.current
+    const model = immediate?.agent === effectiveAgent &&
+      immediate.credentialSlug === (launchCredentialSlug ?? null)
+      ? immediate.model
+      : launchModel ?? null
+    const launch = {
+      agent: effectiveAgent,
+      credentialSlug: launchCredentialSlug ?? null,
+      model,
+      reasoningEffort,
+    }
+    immediateLaunchRef.current = launch
+    void preferences.rememberLaunch(launch)
+  }, [effectiveAgent, launchCredentialSlug, launchModel, preferences])
 
   const resetCredentialSelection = useCallback(() => setPickedCredential(null), [])
 
@@ -553,6 +686,11 @@ export function useAgentLaunchConfig({
     credential,
     detectedCredential,
     workspaceConfigResolved,
+    defaultModel,
+    modelOptions,
+    launchModel,
+    effortOptions,
+    launchReasoningEffort,
     aiDetails,
     selectedRuntimeUsesGlobalConfig,
     credentialSelectionReady,
@@ -566,10 +704,12 @@ export function useAgentLaunchConfig({
     selectedMissing: selectedAgent?.installed === false,
     anyInstalled: agents.some((agent) => agent.installed !== false),
     agentsKnown: agents.length > 0,
-    launchCredentialSlug: resolveAgentLaunchCredentialSlug(canSelectCredential, effectiveCredential),
+    launchCredentialSlug,
     selectAgent,
     selectCredential,
     selectRuntimeDefault,
+    selectModel,
+    selectReasoningEffort,
     resetCredentialSelection,
   }), [
     agents,
@@ -578,15 +718,23 @@ export function useAgentLaunchConfig({
     credentials,
     credential,
     credentialSelectionReady,
+    defaultModel,
     detectedCredential,
+    effortOptions,
     effectiveAgent,
     effectiveCredential,
+    launchCredentialSlug,
+    launchModel,
+    launchReasoningEffort,
+    modelOptions,
     needsCredential,
     noCredentials,
     runtimeReadiness,
     selectAgent,
     selectCredential,
     selectRuntimeDefault,
+    selectModel,
+    selectReasoningEffort,
     selectedAgent,
     selectedRuntimeReadiness,
     selectedRuntimeUsesGlobalConfig,

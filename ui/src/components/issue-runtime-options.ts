@@ -34,7 +34,7 @@ function uniqueModels(models: readonly PresetModel[]): PresetModel[] {
   })
 }
 
-export function issueModelOptions(input: {
+export function runtimeModelOptions(input: {
   readonly agent: string | null
   readonly credential: SavedCredential | null
   readonly defaultModel: string | null
@@ -55,14 +55,14 @@ export function issueModelOptions(input: {
   ])
 }
 
-export function issueModelSemantics(
+export function runtimeModelSemantics(
   model: string | null,
   models: readonly PresetModel[],
 ): ModelSemantics | null {
   return models.find((candidate) => candidate.id === model)?.semantics ?? null
 }
 
-export function issueEffortOptions(input: {
+export function runtimeEffortOptions(input: {
   readonly agent: string | null
   readonly semantics: ModelSemantics | null
   readonly modelKnown: boolean
@@ -74,3 +74,10 @@ export function issueEffortOptions(input: {
   if (input.modelKnown) return []
   return input.agent === 'claude' ? CLAUDE_RUNTIME_EFFORTS : ALL_RUNTIME_EFFORTS
 }
+
+// Issue properties and interactive launchers deliberately share one catalog
+// and effort policy. Keep the old names as compatibility aliases for the Issue
+// surface while newer launchers use the ownership-neutral names.
+export const issueModelOptions = runtimeModelOptions
+export const issueModelSemantics = runtimeModelSemantics
+export const issueEffortOptions = runtimeEffortOptions

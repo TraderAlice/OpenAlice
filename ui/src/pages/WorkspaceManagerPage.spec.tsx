@@ -20,11 +20,12 @@ const mocks = vi.hoisted(() => ({
   detectWorkspaceCredential: vi.fn(),
   getAgentReadiness: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
+  getPresets: vi.fn(),
   quickStartWorkspaceManager: vi.fn(),
   openWebPiSession: vi.fn(),
   resumeSession: vi.fn(),
   getQuickChat: vi.fn(),
-  rememberQuickChatCredential: vi.fn(),
+  rememberQuickChatLaunch: vi.fn(),
   openAgentConfig: vi.fn(),
   refreshWorkspaceManager: vi.fn(),
 }))
@@ -57,13 +58,14 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
 vi.mock('../api/preferences', () => ({
   preferencesApi: {
     getQuickChat: mocks.getQuickChat,
-    rememberQuickChatCredential: mocks.rememberQuickChatCredential,
+    rememberQuickChatLaunch: mocks.rememberQuickChatLaunch,
   },
 }))
 
 vi.mock('../api/config', () => ({
   configApi: {
     getWorkspaceCredentialDefaults: mocks.getWorkspaceCredentialDefaults,
+    getPresets: mocks.getPresets,
   },
 }))
 
@@ -218,8 +220,9 @@ beforeEach(async () => {
     defaults: {},
     compatibleByAgent: {},
   })
+  mocks.getPresets.mockResolvedValue({ presets: [] })
   mocks.getQuickChat.mockResolvedValue({ lastCredentialByAgent: {}, recentChatWorkspaceId: null })
-  mocks.rememberQuickChatCredential.mockResolvedValue(undefined)
+  mocks.rememberQuickChatLaunch.mockResolvedValue(undefined)
   mocks.openWebPiSession.mockResolvedValue(undefined)
   mocks.resumeSession.mockResolvedValue(undefined)
   mocks.refreshWorkspaceManager.mockResolvedValue(undefined)
@@ -441,7 +444,12 @@ describe('WorkspaceManagerPage runtime selection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /DeepSeek/ }))
     expect(screen.getByLabelText('Model deepseek-chat')).toBeTruthy()
-    expect(mocks.rememberQuickChatCredential).toHaveBeenCalledWith('pi', 'deepseek-1')
+    expect(mocks.rememberQuickChatLaunch).toHaveBeenCalledWith({
+      agent: 'pi',
+      credentialSlug: 'deepseek-1',
+      model: null,
+      reasoningEffort: null,
+    })
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Audit issues.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start manager' }))
 
@@ -449,7 +457,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
       'Audit issues.',
       'pi',
       'deepseek-1',
-      'deepseek-chat',
+      undefined,
       undefined,
     ))
   })

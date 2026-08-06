@@ -220,8 +220,8 @@ function HarnessLandingPage({
         launchConfig.launchCredentialSlug,
         effectiveTargetWorkspaceId,
         templateName,
-        launchConfig.aiDetails?.model,
-        launchConfig.aiDetails?.reasoningEffort,
+        launchConfig.launchModel,
+        launchConfig.launchReasoningEffort,
       )
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')
