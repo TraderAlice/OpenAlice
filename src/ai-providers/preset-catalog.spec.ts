@@ -8,6 +8,7 @@ import {
   DEEPSEEK,
   DEFAULT_MODEL_BY_VENDOR,
   GEMINI,
+  KIMI,
   LONGCAT,
 } from './preset-catalog.js';
 import { BUILTIN_PRESETS } from './presets.js';
@@ -80,6 +81,25 @@ describe('credential form catalog', () => {
         maxOutputTokens: 384_000,
         reasoning: { efforts: ['low', 'high', 'max'], defaultEffort: 'high' },
       });
+  });
+
+  it('uses Kimi K3 as the Open Platform default while retaining current fallback tiers', () => {
+    expect(KIMI.models?.map((model) => model.id)).toEqual([
+      'kimi-k3',
+      'kimi-k2.7-code',
+      'kimi-k2.7-code-highspeed',
+      'kimi-k2.6',
+    ]);
+    expect(DEFAULT_MODEL_BY_VENDOR['kimi']).toBe('kimi-k3');
+    expect(KIMI.models?.find((model) => model.id === 'kimi-k3')?.semantics).toEqual({
+      contextWindow: 1_048_576,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'high', 'max'],
+        defaultEffort: 'max',
+        interleaved: true,
+      },
+    });
   });
 
   it('serializes provider-aware setup guidance for every API-key preset', () => {

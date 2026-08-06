@@ -80,7 +80,7 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - Gemini thinking: https://ai.google.dev/gemini-api/docs/generate-content/thinking
  * - MiniMax Anthropic API: https://platform.minimax.io/docs/api-reference/text-anthropic-api
  * - MiniMax OpenAI `reasoning_split`: https://platform.minimax.io/docs/api-reference/text-openai-api
- * - Kimi thinking models: https://platform.kimi.ai/docs/guide/use-kimi-k2-thinking-model
+ * - Kimi K3/reasoning effort: https://platform.kimi.ai/docs/guide/kimi-k3-quickstart
  * - DeepSeek models/limits: https://api-docs.deepseek.com/quick_start/pricing
  * - DeepSeek thinking: https://api-docs.deepseek.com/guides/thinking_mode
  * - LongCat Chat API: https://longcat.chat/platform/docs/api/chat.html
@@ -224,7 +224,20 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     'glm-5.2': { reasoning: { mode: 'adaptive', efforts: ['high', 'max'] } },
   },
   kimi: {
+    'kimi-k3': {
+      contextWindow: 1_048_576,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'high', 'max'],
+        defaultEffort: 'max',
+        interleaved: true,
+      },
+    },
     'kimi-k2.7-code': {
+      contextWindow: 256_000,
+      reasoning: { mode: 'required', interleaved: true },
+    },
+    'kimi-k2.7-code-highspeed': {
       contextWindow: 256_000,
       reasoning: { mode: 'required', interleaved: true },
     },
