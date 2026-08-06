@@ -43,7 +43,7 @@ You have two equivalent paths, and both write the **same**
    with no separate path.
 2. **Editing the file directly** with your normal file tools. Reach for this when
    you are writing rich markdown **What** or scheduling frontmatter
-   (`when` / `assignee` / `agent` / `model` / `effort`) — the CLI verbs cover the board fields, What, and
+  (`when` / `assignee` / `agent` / `credential` / `model` / `effort`) — the CLI verbs cover the board fields, What, and
    comments, but the document and schedule shape read most clearly as text. The
    file is always the single source of truth either way.
 
@@ -87,6 +87,7 @@ alice-workspace issue create --title "Pre-market brief" --priority high \
   --assignee @me \
   --what "Pull pre-market movers and overnight news for my watchlist, write a short brief to research/premarket.md, then run: alice-workspace inbox push --doc research/premarket.md --comments 'Pre-market brief'." \
   --agent codex \
+  --credential openai-primary \
   --model gpt-5.6 \
   --effort high
 ```
@@ -124,7 +125,7 @@ overnight headlines that move the thesis.
 title: Split the data fetcher into source + transform
 status: backlog
 priority: medium
-assignee: unassigned
+assignee: "@unassigned"
 ---
 
 `src/fetch.ts` mixes the HTTP call with the normalization step, which makes the
@@ -153,8 +154,8 @@ plain tracked item; add a `when` and it starts firing.
   `low`, `none`. Display/sort only.
 - **`assignee`** *(optional)* — the single owner and
   scheduled-dispatch policy:
-  - `@workspace` recruits a new product Session for each scheduled fire;
-  - `@new` asks the Workspace to recruit once; the first successful dispatch
+  - `@new-each-run` recruits a new product Session for each scheduled fire;
+  - `@new-then-resume` asks the Workspace to recruit once; the first successful dispatch
     rewrites the Issue to that concrete `@resumeId`, so every later fire returns
     to the same accountable coworker;
   - an exact `@resumeId` continues that accountable Session, even when its
@@ -162,8 +163,8 @@ plain tracked item; add a `when` and it starts firing.
   - `@human` and `@unassigned` are valid only for unscheduled work.
   CLI `issue create` defaults to `@me` when called by an attributable Session
   (who creates it owns it); `@me` is resolved to a concrete `@resumeId` before
-  writing. Otherwise omitted scheduled ownership defaults to `@new`, while an
-  unscheduled board item defaults to `@workspace`. Use `@workspace` explicitly
+  writing. Otherwise omitted scheduled ownership defaults to `@new-then-resume`, while an
+  unscheduled board item defaults to `@unassigned`. Use `@new-each-run` explicitly
   only when every fire should recruit a newcomer.
 - **`when`** *(OPTIONAL — present iff the issue self-schedules)* — one of:
   - `{ kind: every, every: "30m" }` — repeat on an interval (`30m`, `2h`,
@@ -177,21 +178,28 @@ plain tracked item; add a `when` and it starts firing.
     only for compatibility with old files; new Issues should write it explicitly.
   - `{ kind: at, at: "2026-03-01T13:30:00Z" }` — run ONCE at an ISO timestamp,
     then never again.
-- **`agent`** *(optional)* — runtime override for `@new` / `@workspace`
+- **`agent`** *(optional)* — runtime override for `@new-then-resume` / `@new-each-run`
   scheduled work; defaults to this Workspace's runtime resolution. An exact
   Session assignee already has an immutable runtime, so Session-owned Issues
   cannot set this.
+- **`credential`** *(optional)* — secret-free OpenAlice vault slug for the
+  fresh Session. Omit it to inherit Workspace/native authentication. Never put
+  a key or endpoint in the Issue file.
 - **`model`** *(optional)* — native model id for one scheduled run. Omit it to
-  inherit the Workspace/native runtime default. Provider routing and
-  authentication always remain Workspace-owned.
+  inherit the selected credential, Workspace, or native runtime default.
 - **`effort`** *(optional)* — one-run reasoning effort: `none`, `minimal`,
   `low`, `medium`, `high`, `xhigh`, or `max`. Use a level supported by the
   selected runtime; omit it to inherit.
 
-`agent`, `model`, and `effort` are one run-selection tuple. They are valid only
-for `@new` / `@workspace`; an exact `@resumeId` Session owns all three. The
-scheduler passes explicit model/effort values as one-run CLI arguments and does
-not rewrite persistent Workspace configuration.
+`agent`, `credential`, `model`, and `effort` are one Session-creation tuple.
+They are valid only for `@new-then-resume` / `@new-each-run`; an exact `@resumeId` Session owns
+all four. The scheduler freezes explicit values into the fresh Session runtime
+binding and does not rewrite persistent Workspace configuration.
+
+> **Deprecated assignee aliases:** never write `@workspace` or `@new` in a new
+> or edited Issue. They exist only so older Workspace files can be migrated:
+> `@workspace` → `@new-each-run`, and `@new` → `@new-then-resume`. The CLI and
+> API reject both deprecated spellings with the canonical replacement.
 
 The old parallel `execution` field is retired and rejected after migration;
 never write it into a new Issue.

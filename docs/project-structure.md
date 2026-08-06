@@ -201,11 +201,13 @@ catalog in `template.json`; creation records the chosen immutable source in
 Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
 project skills are copied to `.agents/skills/` and Claude-specific discovery to
-`.claude/skills/`. Pi keeps providers in its normal user agent directory and
-selects a Workspace provider through `.pi/settings.json`; the shared runtime
-lifecycle also gives Workspaces without an explicit Pi theme the native
-`light/dark` automatic pair. OpenAlice never redirects Pi away from its native
-global packages, settings, auth, or sessions and never replaces an explicit Pi
+`.claude/skills/`. Pi registers an OpenAlice-managed provider through the
+Workspace-local `.pi/extensions/openalice-provider.ts` and selects it through
+`.pi/settings.json`; the sensitive provider definition and rollback state stay
+in `.pi/openalice-provider.json`. The shared runtime lifecycle also gives
+Workspaces without an explicit Pi theme the native `light/dark` automatic pair.
+OpenAlice never writes Pi's global model registry, redirects Pi away from its
+native global packages/settings/auth/sessions, or replaces an explicit Pi
 project theme.
 OpenCode keeps provider configuration in `opencode.json` and TUI configuration
 in its native `tui.json` project layer. The runtime lifecycle selects the

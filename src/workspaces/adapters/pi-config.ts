@@ -22,6 +22,7 @@ import { isModelReasoningEffort } from '../../ai-providers/model-semantics.js';
 
 export const PI_PROJECT_SETTINGS_PATH = '.pi/settings.json';
 export const PI_BINDING_STATE_PATH = '.pi/openalice-provider.json';
+export const PI_PROVIDER_EXTENSION_PATH = '.pi/extensions/openalice-provider.ts';
 export const LEGACY_PI_AGENT_DIR = '.pi-agent';
 export const PI_AUTOMATIC_THEME_PAIR = 'light/dark';
 
@@ -40,8 +41,12 @@ interface SavedSetting {
 }
 
 interface PiBindingState {
-  readonly version: 1;
+  readonly version: 1 | 2;
   readonly providerId: string;
+  /** Version 2 keeps the custom provider entirely inside this Workspace. */
+  readonly provider?: Readonly<Record<string, unknown>>;
+  /** Digest of the OpenAlice-owned extension file for conflict-aware upgrades/reset. */
+  readonly extensionSha256?: string;
   readonly previous: {
     readonly defaultProvider: SavedSetting;
     readonly defaultModel: SavedSetting;
@@ -58,6 +63,46 @@ interface PiBindingState {
 }
 
 let piGlobalWriteQueue: Promise<void> = Promise.resolve();
+
+const PI_PROVIDER_EXTENSION_SOURCE = `// OpenAlice-managed Pi provider extension. Changes may be replaced by Workspace AI settings.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+export default function openAliceWorkspaceProvider(pi: {
+  registerProvider(providerId: string, provider: Record<string, unknown>): void
+}): void {
+  const statePath = join(process.cwd(), '.pi', 'openalice-provider.json')
+  const state = JSON.parse(readFileSync(statePath, 'utf8')) as Record<string, unknown>
+  if (state['version'] !== 2) return
+  const providerId = state['providerId']
+  const provider = state['provider']
+  if (typeof providerId !== 'string' || !provider || typeof provider !== 'object' || Array.isArray(provider)) {
+    throw new Error(\`Invalid OpenAlice Pi provider state: \${statePath}\`)
+  }
+  // Pi's models.json loader supplies compatibility defaults, while the
+  // extension API deliberately requires complete model objects. Keep the
+  // durable sidecar limited to facts OpenAlice actually knows, then project
+  // the same Pi defaults only at registration time.
+  const models = Array.isArray((provider as Record<string, unknown>)['models'])
+    ? (provider as Record<string, unknown>)['models'] as Array<Record<string, unknown>>
+    : undefined
+  const registeredProvider = models
+    ? {
+        ...(provider as Record<string, unknown>),
+        models: models.map((model) => ({
+          name: model['id'],
+          reasoning: false,
+          input: ['text'],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 128000,
+          maxTokens: 16384,
+          ...model,
+        })),
+      }
+    : provider as Record<string, unknown>
+  pi.registerProvider(providerId, registeredProvider)
+}
+`;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -122,7 +167,7 @@ function wireShapeFromApi(api: unknown): NonNullable<WorkspaceAiCred['wireShape'
   return 'openai-chat';
 }
 
-function buildProvider(cwd: string, cred: WorkspaceAiCred): Record<string, unknown> {
+export function buildPiProvider(cwd: string, cred: WorkspaceAiCred): Record<string, unknown> {
   const provider: Record<string, unknown> = {
     name: `${PI_PROVIDER_NAME_PREFIX} (${basename(cwd)})`,
     api: providerApi(cred),
@@ -182,6 +227,67 @@ async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
   await rename(temp, target);
 }
 
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+async function readText(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    if (isENOENT(error)) return null;
+    throw error;
+  }
+}
+
+async function assertProviderExtensionWritable(
+  cwd: string,
+  state: PiBindingState | null,
+): Promise<void> {
+  const path = join(cwd, PI_PROVIDER_EXTENSION_PATH);
+  const existing = await readText(path);
+  if (existing === null || existing === PI_PROVIDER_EXTENSION_SOURCE) return;
+  if (
+    state?.version === 2 &&
+    typeof state.extensionSha256 === 'string' &&
+    sha256(existing) === state.extensionSha256
+  ) return;
+  throw new Error(`Refusing to overwrite user-edited Pi extension: ${path}`);
+}
+
+async function writeProviderExtension(cwd: string): Promise<void> {
+  const path = join(cwd, PI_PROVIDER_EXTENSION_PATH);
+  const target = await writableTarget(path);
+  await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+  const temp = `${target}.openalice-${process.pid}-${randomUUID()}`;
+  await writeFile(temp, PI_PROVIDER_EXTENSION_SOURCE, { encoding: 'utf8', mode: 0o600 });
+  await chmod(temp, 0o600).catch(() => undefined);
+  await rename(temp, target);
+}
+
+async function ensureProviderExtension(cwd: string, state: PiBindingState | null): Promise<void> {
+  await assertProviderExtensionWritable(cwd, state);
+  if (await readText(join(cwd, PI_PROVIDER_EXTENSION_PATH)) === PI_PROVIDER_EXTENSION_SOURCE) return;
+  await writeProviderExtension(cwd);
+}
+
+/** Return true when it is safe to remove the managed sidecar as well. A
+ * user-edited extension becomes user-owned and may still depend on that state. */
+async function removeProviderExtension(cwd: string, state: PiBindingState | null): Promise<boolean> {
+  const path = join(cwd, PI_PROVIDER_EXTENSION_PATH);
+  const existing = await readText(path);
+  if (existing === null) return true;
+  const injectedDigest = state?.version === 2 ? state.extensionSha256 : undefined;
+  if (
+    existing === PI_PROVIDER_EXTENSION_SOURCE ||
+    (typeof injectedDigest === 'string' && sha256(existing) === injectedDigest)
+  ) {
+    await rm(path, { force: true });
+    return true;
+  }
+  return false;
+}
+
 async function withPiGlobalWrite<T>(operation: () => Promise<T>): Promise<T> {
   let result!: T;
   const run = async (): Promise<void> => {
@@ -200,38 +306,54 @@ function providersObject(models: Record<string, unknown>, path: string): Record<
   return { ...existing };
 }
 
-async function upsertGlobalProvider(
-  agentDir: string,
-  providerId: string,
-  provider: Record<string, unknown>,
-): Promise<void> {
-  await withPiGlobalWrite(async () => {
-    const path = join(agentDir, PI_GLOBAL_MODELS_FILENAME);
-    const models = await readJsonRecord(path, 'Pi models.json') ?? {};
-    const providers = providersObject(models, path);
-    const existing = providers[providerId];
-    if (existing !== undefined) {
+async function removeGlobalProvider(agentDir: string, providerId: string): Promise<boolean> {
+  try {
+    return await withPiGlobalWrite(async () => {
+      const path = join(agentDir, PI_GLOBAL_MODELS_FILENAME);
+      const models = await readJsonRecord(path, 'Pi models.json');
+      if (!models) return false;
+      const providers = providersObject(models, path);
+      const existing = providers[providerId];
       if (!isRecord(existing) || typeof existing['name'] !== 'string' || !existing['name'].startsWith(PI_PROVIDER_NAME_PREFIX)) {
-        throw new Error(`Refusing to overwrite non-OpenAlice Pi provider: ${providerId}`);
+        return false;
       }
-    }
-    providers[providerId] = provider;
-    await writeJsonAtomic(path, { ...models, providers });
-  });
+      delete providers[providerId];
+      await writeJsonAtomic(path, { ...models, providers });
+      return true;
+    });
+  } catch {
+    // Global models.json is Pi/user-owned. A malformed or concurrently edited
+    // file must never block a complete Workspace-local binding; leave it for
+    // the user to repair instead of overwriting it.
+    return false;
+  }
 }
 
-async function removeGlobalProvider(agentDir: string, providerId: string): Promise<void> {
-  await withPiGlobalWrite(async () => {
-    const path = join(agentDir, PI_GLOBAL_MODELS_FILENAME);
+/** Remove stale OpenAlice-owned global provider nodes after every known
+ * Workspace has either localized successfully or been added to keepProviderIds. */
+export async function cleanupGlobalPiWorkspaceProviders(
+  keepProviderIds: ReadonlySet<string>,
+  env: EnvLike = process.env,
+): Promise<number> {
+  return withPiGlobalWrite(async () => {
+    const path = join(resolvePiAgentDir(env), PI_GLOBAL_MODELS_FILENAME);
     const models = await readJsonRecord(path, 'Pi models.json');
-    if (!models) return;
+    if (!models) return 0;
     const providers = providersObject(models, path);
-    const existing = providers[providerId];
-    if (!isRecord(existing) || typeof existing['name'] !== 'string' || !existing['name'].startsWith(PI_PROVIDER_NAME_PREFIX)) {
-      return;
+    let removed = 0;
+    for (const [providerId, provider] of Object.entries(providers)) {
+      if (
+        keepProviderIds.has(providerId) ||
+        !providerId.startsWith(PI_PROVIDER_PREFIX) ||
+        !isRecord(provider) ||
+        typeof provider['name'] !== 'string' ||
+        !provider['name'].startsWith(PI_PROVIDER_NAME_PREFIX)
+      ) continue;
+      delete providers[providerId];
+      removed += 1;
     }
-    delete providers[providerId];
-    await writeJsonAtomic(path, { ...models, providers });
+    if (removed > 0) await writeJsonAtomic(path, { ...models, providers });
+    return removed;
   });
 }
 
@@ -258,10 +380,11 @@ async function readBindingState(cwd: string): Promise<PiBindingState | null> {
   const parsed = await readJsonRecord(path, 'OpenAlice Pi binding state');
   if (!parsed) return null;
   if (
-    parsed['version'] !== 1 ||
+    (parsed['version'] !== 1 && parsed['version'] !== 2) ||
     typeof parsed['providerId'] !== 'string' ||
     !isRecord(parsed['previous']) ||
-    !isRecord(parsed['injected'])
+    !isRecord(parsed['injected']) ||
+    (parsed['version'] === 2 && (!isRecord(parsed['provider']) || typeof parsed['extensionSha256'] !== 'string'))
   ) {
     throw new Error(`Unsupported OpenAlice Pi binding state: ${path}`);
   }
@@ -286,6 +409,7 @@ function injectedSettings(
 async function writeProjectBinding(
   cwd: string,
   providerId: string,
+  provider: Readonly<Record<string, unknown>>,
   cred: WorkspaceAiCred,
   shellPath: string | null,
 ): Promise<void> {
@@ -311,13 +435,20 @@ async function writeProjectBinding(
   } else if (existingState?.injected.defaultThinkingLevel?.present) {
     applySavedSetting(settings, 'defaultThinkingLevel', previous.defaultThinkingLevel);
   }
-  await writeJsonAtomic(join(cwd, PI_PROJECT_SETTINGS_PATH), settings);
+  // The generic extension safely no-ops until the version-2 state exists. Put
+  // it in place first, then publish provider state, and activate the project
+  // selection last. A concurrent Pi launch therefore sees either the old
+  // complete binding or the new complete binding, never a selected orphan.
+  await ensureProviderExtension(cwd, existingState);
   await writeJsonAtomic(join(cwd, PI_BINDING_STATE_PATH), {
-    version: 1,
+    version: 2,
     providerId,
+    provider,
+    extensionSha256: sha256(PI_PROVIDER_EXTENSION_SOURCE),
     previous,
     injected,
   } satisfies PiBindingState);
+  await writeJsonAtomic(join(cwd, PI_PROJECT_SETTINGS_PATH), settings);
 }
 
 /** Keep the launcher-managed Windows shell in the same reversible project
@@ -376,8 +507,79 @@ async function resetProjectBinding(cwd: string, agentDir: string): Promise<void>
   const settingsPath = join(cwd, PI_PROJECT_SETTINGS_PATH);
   if (Object.keys(settings).length === 0) await rm(settingsPath, { force: true });
   else await writeJsonAtomic(settingsPath, settings);
-  await rm(join(cwd, PI_BINDING_STATE_PATH), { force: true });
+  const canRemoveBindingState = await removeProviderExtension(cwd, state);
+  if (canRemoveBindingState) await rm(join(cwd, PI_BINDING_STATE_PATH), { force: true });
   await removeGlobalProvider(agentDir, providerId);
+}
+
+function providerForProjectSelection(
+  provider: Readonly<Record<string, unknown>>,
+  selectedModel: unknown,
+): Readonly<Record<string, unknown>> {
+  if (typeof selectedModel !== 'string' || selectedModel.length === 0) return provider;
+  const models = Array.isArray(provider['models']) ? provider['models'].filter(isRecord) : [];
+  const selected = models.find((model) => model['id'] === selectedModel);
+  if (selected) return provider;
+  // Older cross-process global writes could tear provider registration away
+  // from the project selection. The project file is the durable Workspace
+  // intent, so recover that model id without borrowing stale model semantics.
+  return { ...provider, models: [{ id: selectedModel }] };
+}
+
+/**
+ * Upgrade one namespaced global Pi provider into the Workspace-local extension
+ * contract. Version-2 bindings are also reconciled here so a deleted managed
+ * extension is restored before launch. The global node is removed only after
+ * the local extension and state are complete.
+ */
+export async function localizePiWorkspaceProvider(
+  cwd: string,
+  env: EnvLike = process.env,
+): Promise<boolean> {
+  const settings = await readProjectSettings(cwd);
+  const state = await readBindingState(cwd);
+  const providerId = state?.providerId ?? (
+    typeof settings['defaultProvider'] === 'string' && settings['defaultProvider'].startsWith(PI_PROVIDER_PREFIX)
+      ? settings['defaultProvider']
+      : null
+  );
+  if (!providerId || settings['defaultProvider'] !== providerId) return false;
+
+  if (state?.version === 2 && state.provider) {
+    await ensureProviderExtension(cwd, state);
+    await removeGlobalProvider(resolvePiAgentDir(env), providerId);
+    return false;
+  }
+
+  const modelsPath = join(resolvePiAgentDir(env), PI_GLOBAL_MODELS_FILENAME);
+  const models = await readJsonRecord(modelsPath, 'Pi models.json');
+  if (!models) return false;
+  const provider = providersObject(models, modelsPath)[providerId];
+  if (!isRecord(provider)) return false;
+  const localProvider = providerForProjectSelection(provider, settings['defaultModel']);
+  await ensureProviderExtension(cwd, state);
+  const previous = state?.previous ?? {
+    defaultProvider: { present: false },
+    defaultModel: { present: false },
+    shellPath: { present: false },
+    defaultThinkingLevel: { present: false },
+  };
+  const injected = state?.injected ?? {
+    defaultProvider: snapshotSetting(settings, 'defaultProvider'),
+    defaultModel: snapshotSetting(settings, 'defaultModel'),
+    shellPath: { present: false },
+    defaultThinkingLevel: { present: false },
+  };
+  await writeJsonAtomic(join(cwd, PI_BINDING_STATE_PATH), {
+    version: 2,
+    providerId,
+    provider: localProvider,
+    extensionSha256: sha256(PI_PROVIDER_EXTENSION_SOURCE),
+    previous,
+    injected,
+  } satisfies PiBindingState);
+  await removeGlobalProvider(resolvePiAgentDir(env), providerId);
+  return true;
 }
 
 export interface PiConfigOptions {
@@ -399,13 +601,16 @@ export async function writePiWorkspaceConfig(
     return;
   }
   const providerId = piWorkspaceProviderId(cwd);
-  // Refuse malformed project-owned files before touching the shared global
-  // registry. I/O can still fail later, but a known-bad local settings/state
-  // file must never leave a newly orphaned provider behind.
-  await readProjectSettings(cwd);
-  await readBindingState(cwd);
-  await upsertGlobalProvider(agentDir, providerId, buildProvider(cwd, cred));
-  await writeProjectBinding(cwd, providerId, cred, options.shellPath ?? null);
+  await writeProjectBinding(
+    cwd,
+    providerId,
+    buildPiProvider(cwd, cred),
+    cred,
+    options.shellPath ?? null,
+  );
+  // Clean up an earlier global binding only after the local projection is
+  // active. Failure is deliberately non-fatal because that file is Pi-owned.
+  await removeGlobalProvider(agentDir, providerId);
 }
 
 export async function readPiWorkspaceConfig(
@@ -414,6 +619,7 @@ export async function readPiWorkspaceConfig(
 ): Promise<WorkspaceAiCred | null> {
   const env = options.env ?? process.env;
   await migrateLegacyPiAgentDir(cwd, env);
+  await localizePiWorkspaceProvider(cwd, env);
   const settings = await readProjectSettings(cwd);
   const state = await readBindingState(cwd);
   const providerId = state?.providerId ?? (
@@ -422,10 +628,13 @@ export async function readPiWorkspaceConfig(
       : null
   );
   if (!providerId || settings['defaultProvider'] !== providerId) return null;
-  const models = await readJsonRecord(join(resolvePiAgentDir(env), PI_GLOBAL_MODELS_FILENAME), 'Pi models.json');
-  if (!models) return null;
-  const providers = providersObject(models, join(resolvePiAgentDir(env), PI_GLOBAL_MODELS_FILENAME));
-  const provider = providers[providerId];
+  let provider: unknown = state?.version === 2 ? state.provider : undefined;
+  if (!isRecord(provider)) {
+    const modelsPath = join(resolvePiAgentDir(env), PI_GLOBAL_MODELS_FILENAME);
+    const models = await readJsonRecord(modelsPath, 'Pi models.json');
+    if (!models) return null;
+    provider = providersObject(models, modelsPath)[providerId];
+  }
   if (!isRecord(provider)) return null;
   const modelId = typeof settings['defaultModel'] === 'string' ? settings['defaultModel'] : null;
   const modelEntries = Array.isArray(provider['models'])
@@ -587,9 +796,15 @@ export async function migrateLegacyPiAgentDir(cwd: string, env: EnvLike = proces
   if (workspaceProvider) {
     const cred = legacyProviderCred(workspaceProvider);
     const providerId = piWorkspaceProviderId(cwd);
-    await upsertGlobalProvider(agentDir, providerId, buildProvider(cwd, cred));
     const shellPath = (await readJsonRecord(join(legacyDir, PI_GLOBAL_SETTINGS_FILENAME), 'Legacy Pi settings.json'))?.['shellPath'];
-    await writeProjectBinding(cwd, providerId, cred, typeof shellPath === 'string' ? shellPath : null);
+    const provider = buildPiProvider(cwd, cred);
+    await writeProjectBinding(
+      cwd,
+      providerId,
+      provider,
+      cred,
+      typeof shellPath === 'string' ? shellPath : null,
+    );
   }
 
   await rm(legacyDir, { recursive: true, force: true });

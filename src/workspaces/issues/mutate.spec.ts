@@ -34,7 +34,7 @@ describe('createIssue', () => {
       // Defaults applied on read-back.
       expect(res.issue.status).toBe('todo')
       expect(res.issue.priority).toBe('none')
-      expect(res.issue.assignee).toBe('@workspace')
+      expect(res.issue.assignee).toBe('@unassigned')
     }
     const { issue } = await readBack('fix-the-login-bug')
     expect(issue?.title).toBe('Fix the Login Bug!')
@@ -64,25 +64,25 @@ describe('createIssue', () => {
     expect(issue?.what).toBe('run the research routine')
   })
 
-  it('accepts @new only for scheduled work that will choose its first owner', async () => {
+  it('accepts @new-then-resume only for scheduled work that will choose its first owner', async () => {
     const scheduled = await createIssue(dir, {
       id: 'choose-owner',
       title: 'Choose one owner',
-      assignee: '@new',
+      assignee: '@new-then-resume',
       when: { kind: 'every', every: '30m' },
       agent: 'pi',
     })
-    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new')
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new-then-resume')
 
     const unscheduled = await createIssue(dir, {
       id: 'no-trigger',
       title: 'No trigger',
-      assignee: '@new',
+      assignee: '@new-then-resume',
     })
     expect(unscheduled.ok).toBe(false)
     if (!unscheduled.ok) {
       expect(unscheduled.reason).toBe('invalid')
-      if (unscheduled.reason === 'invalid') expect(unscheduled.error).toContain('@new needs a schedule')
+      if (unscheduled.reason === 'invalid') expect(unscheduled.error).toContain('@new-then-resume needs a schedule')
     }
   })
 
@@ -92,7 +92,27 @@ describe('createIssue', () => {
       title: 'Default scheduled owner',
       when: { kind: 'every', every: '30m' },
     })
-    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new')
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new-then-resume')
+  })
+
+  it('rejects deprecated assignee aliases with their canonical replacements', async () => {
+    const oldWorkspace = await createIssue(dir, {
+      id: 'old-workspace',
+      title: 'Old workspace spelling',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@workspace',
+    })
+    expect(oldWorkspace.ok).toBe(false)
+    if (!oldWorkspace.ok && oldWorkspace.reason === 'invalid') {
+      expect(oldWorkspace.error).toBe('@workspace is deprecated; use @new-each-run')
+    }
+
+    await createIssue(dir, { id: 'canonical', title: 'Canonical' })
+    const oldNew = await updateIssueFields(dir, 'canonical', { assignee: '@new' })
+    expect(oldNew.ok).toBe(false)
+    if (!oldNew.ok && oldNew.reason === 'invalid') {
+      expect(oldNew.error).toBe('@new is deprecated; use @new-then-resume')
+    }
   })
 
   it('refuses to overwrite an existing issue (conflict)', async () => {
@@ -132,8 +152,9 @@ describe('updateIssueFields', () => {
     const res = await updateIssueFields(dir, 'task-1', {
       status: 'in_progress',
       priority: 'urgent',
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'medium',
     })
@@ -141,16 +162,18 @@ describe('updateIssueFields', () => {
     if (res.ok) {
       expect(res.issue.status).toBe('in_progress')
       expect(res.issue.priority).toBe('urgent')
-      expect(res.issue.assignee).toBe('@workspace')
+      expect(res.issue.assignee).toBe('@new-each-run')
       expect(res.issue.agent).toBe('pi')
+      expect(res.issue.credential).toBe('gemini-primary')
     }
     const { issue } = await readBack('task-1')
     expect(issue).toMatchObject({
       status: 'in_progress',
       priority: 'urgent',
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       what: 'keep the fire prompt',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'medium',
     })
@@ -171,8 +194,9 @@ describe('updateIssueFields', () => {
       id: 'owned',
       title: 'Owned',
       when: { kind: 'every', every: '15m' },
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       agent: 'codex',
+      credential: 'openai-primary',
       model: 'gpt-5.6',
       effort: 'high',
     })
@@ -183,6 +207,7 @@ describe('updateIssueFields', () => {
     const { issue } = await readBack('owned')
     expect(issue?.assignee).toBe('@resume-kind-owl-abc123')
     expect(issue?.agent).toBeUndefined()
+    expect(issue?.credential).toBeUndefined()
     expect(issue?.model).toBeUndefined()
     expect(issue?.effort).toBeUndefined()
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })

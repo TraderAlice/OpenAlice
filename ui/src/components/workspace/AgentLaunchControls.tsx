@@ -224,7 +224,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         </button>
       )}
 
-      {config.needsCredential && !config.noCredentials && config.credentials && config.credentials.length > 0 && (
+      {config.canSelectCredential && !config.noCredentials && config.credentials && config.credentials.length > 0 && (
         <div
           ref={credentialBoxRef}
           className="relative"
@@ -255,7 +255,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
           >
             <KeyRound className="h-3 w-3 shrink-0" />
             <span className="truncate">
-              {config.credential?.label?.trim() || config.credential?.slug || t('chatLanding.selectCredential')}
+              {config.credential?.label?.trim() || config.credential?.slug || t('chatLanding.runtimeDefaultModel')}
             </span>
             <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
           </button>
@@ -271,6 +271,22 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
               )}
               className="oa-popover-enter absolute bottom-full left-0 z-20 mb-1 min-w-[200px] rounded-lg border border-border/70 bg-secondary py-1 shadow-lg"
             >
+              {!config.needsCredential && config.detectedCredential?.configured !== true && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  onClick={() => {
+                    config.selectRuntimeDefault()
+                    setCredentialMenuOpen(false)
+                    credentialTriggerRef.current?.focus()
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors hover:bg-muted ${config.effectiveCredential === null ? 'text-primary' : 'text-foreground'}`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{t('chatLanding.runtimeDefaultModel')}</span>
+                  {config.effectiveCredential === null && <Check className="h-3.5 w-3.5 shrink-0" />}
+                </button>
+              )}
               {config.credentials.map((credential) => {
                 const active = credential.slug === config.effectiveCredential
                 return (

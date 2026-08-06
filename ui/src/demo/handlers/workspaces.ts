@@ -364,7 +364,13 @@ export const workspacesHandlers = [
     },
   })),
   http.post('/api/workspaces/manager/quick-start', async ({ request }) => {
-    const body = await request.json().catch(() => ({})) as { prompt?: string }
+    const body = await request.json().catch(() => ({})) as {
+      prompt?: string
+      agent?: string
+      credentialSlug?: string
+      model?: string
+      reasoningEffort?: string
+    }
     demoManagerMessages = [
       { role: 'user', content: body.prompt ?? 'Audit the active Workspace floor.' },
       { role: 'assistant', content: 'Demo manager: active desks are inventoried and ready for coordination.' },
@@ -712,8 +718,8 @@ export const workspacesHandlers = [
       agents: [
         { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
         { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
-        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'workspace-required', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
-        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', aiProvider: { credentialSource: 'workspace-required', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
+        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
+        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
       ],
     }),
   ),
@@ -938,6 +944,9 @@ export const workspacesHandlers = [
       agent?: unknown
       targetWsId?: unknown
       template?: unknown
+      credentialSlug?: unknown
+      model?: unknown
+      reasoningEffort?: unknown
     } | null
     const explicit = typeof body?.targetWsId === 'string'
       ? demoWorkspaces.find((workspace) => workspace.id === body.targetWsId)

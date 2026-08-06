@@ -20,12 +20,14 @@
  *   title: <required, short human title>
  *   status: backlog | todo | in_progress | done | canceled   (optional → 'todo')
  *   priority: urgent | high | medium | low | none             (optional → 'none')
- *   assignee: "@workspace" | "@new" | "@human" | "@unassigned" | "@<resumeId>"
- *             (optional → scheduled '@new', otherwise '@workspace')
+ *   assignee: "@new-each-run" | "@new-then-resume" | "@human" |
+ *             "@unassigned" | "@<resumeId>"
+ *             (optional → scheduled '@new-then-resume', otherwise '@unassigned')
  *   when: { kind: at, at } | { kind: every, every } |
  *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
  *   what: <legacy fire prompt; migrated into the markdown What body>
  *   agent: <optional adapter id for the scheduled run>
+ *   credential: <optional OpenAlice vault slug for one scheduled Session>
  *   model: <optional native model id for one scheduled run>
  *   effort: none | minimal | low | medium | high | xhigh | max
  *   ---
@@ -47,10 +49,12 @@ import {
   type ModelReasoningEffort,
 } from '../../ai-providers/model-semantics.js'
 import {
+  DEPRECATED_NEW_ASSIGNEE,
+  DEPRECATED_WORKSPACE_ASSIGNEE,
   HUMAN_ASSIGNEE,
-  NEW_ASSIGNEE,
+  NEW_EACH_RUN_ASSIGNEE,
+  NEW_THEN_RESUME_ASSIGNEE,
   UNASSIGNED_ASSIGNEE,
-  WORKSPACE_ASSIGNEE,
   resumeIdFromSignature,
 } from '../session-signature.js'
 
@@ -92,15 +96,23 @@ export const issueWhenSchema = z.discriminatedUnion('kind', [
   }),
 ])
 
-/** Who owns the Issue. Workspace ownership recruits a fresh Session for each
- * scheduled fire; `@new` recruits once and is replaced by the allocated
- * `@resumeId`; Session ownership resumes exactly one product Session. */
+/** Canonical writable assignees. Legacy aliases live only in the file reader
+ * below and migration 0033; every product/API/CLI writer uses this strict schema. */
 export const issueAssigneeSchema = z.union([
-  z.literal(WORKSPACE_ASSIGNEE),
-  z.literal(NEW_ASSIGNEE),
+  z.literal(NEW_EACH_RUN_ASSIGNEE),
+  z.literal(NEW_THEN_RESUME_ASSIGNEE),
   z.literal(HUMAN_ASSIGNEE),
   z.literal(UNASSIGNED_ASSIGNEE),
   z.string().regex(/^@resume-[^\s]+$/, 'Session assignee must be @<resumeId>'),
+])
+
+/** Existing files remain readable until migration 0033 rewrites them. The
+ * aliases are deliberately excluded from `issueAssigneeSchema` so no writer can
+ * accidentally keep producing the deprecated vocabulary. */
+const issueAssigneeFileSchema = z.union([
+  issueAssigneeSchema,
+  z.literal(DEPRECATED_WORKSPACE_ASSIGNEE),
+  z.literal(DEPRECATED_NEW_ASSIGNEE),
 ])
 
 /** Exact product Session owner encoded by the single assignee contract. */
@@ -110,7 +122,7 @@ export function issueAssigneeResumeId(assignee: string): string | null {
 
 /** Transitional ownership: the first dispatch claims one durable Session. */
 export function issueAssigneeClaimsFirstSession(assignee: string): boolean {
-  return assignee === NEW_ASSIGNEE
+  return assignee === NEW_THEN_RESUME_ASSIGNEE
 }
 
 /**
@@ -123,7 +135,7 @@ const issueFrontmatterObjectSchema = z.object({
   title: z.string().min(1),
   status: z.enum(ISSUE_STATUSES).default('todo'),
   priority: z.enum(ISSUE_PRIORITIES).default('none'),
-  assignee: issueAssigneeSchema.optional(),
+  assignee: issueAssigneeFileSchema.optional(),
   /** Present iff the issue self-schedules. Absent ⇒ pure board work item. */
   when: issueWhenSchema.optional(),
   /** Legacy compatibility only. New files keep What in the markdown document
@@ -133,8 +145,9 @@ const issueFrontmatterObjectSchema = z.object({
   /** Runtime override for Workspace-owned scheduled work. A Session owner
    * already carries its runtime identity and therefore cannot set this. */
   agent: z.string().min(1).optional(),
-  /** One-run model selection. Provider routing and authentication remain
-   * inherited from the Workspace/native login. */
+  /** Secret-free vault reference frozen into a fresh Session binding. */
+  credential: z.string().min(1).optional(),
+  /** One-run model selection for the selected credential/runtime source. */
   model: z.string().min(1).optional(),
   /** One-run reasoning effort, projected through the selected native CLI. */
   effort: z.custom<ModelReasoningEffort>(isModelReasoningEffort, {
@@ -148,25 +161,33 @@ const issueFrontmatterObjectSchema = z.object({
 export const issueFrontmatterSchema = issueFrontmatterObjectSchema
   .transform((value) => ({
     ...value,
-    assignee: value.assignee ?? (value.when ? NEW_ASSIGNEE : WORKSPACE_ASSIGNEE),
+    assignee:
+      value.assignee === DEPRECATED_WORKSPACE_ASSIGNEE
+        ? value.when ? NEW_EACH_RUN_ASSIGNEE : UNASSIGNED_ASSIGNEE
+        : value.assignee === DEPRECATED_NEW_ASSIGNEE
+          ? NEW_THEN_RESUME_ASSIGNEE
+          : value.assignee ?? (value.when ? NEW_THEN_RESUME_ASSIGNEE : UNASSIGNED_ASSIGNEE),
   }))
   .superRefine((value, ctx) => {
     if (value.when && (value.assignee === HUMAN_ASSIGNEE || value.assignee === UNASSIGNED_ASSIGNEE)) {
       ctx.addIssue({
         code: 'custom',
         path: ['assignee'],
-        message: 'scheduled issues must be assigned to @workspace, @new, or an exact @resumeId',
+        message: 'scheduled issues must use @new-each-run, @new-then-resume, or an exact @resumeId',
       })
     }
-    if (!value.when && value.assignee === NEW_ASSIGNEE) {
+    if (!value.when && (
+      value.assignee === NEW_EACH_RUN_ASSIGNEE
+      || value.assignee === NEW_THEN_RESUME_ASSIGNEE
+    )) {
       ctx.addIssue({
         code: 'custom',
         path: ['assignee'],
-        message: '@new needs a schedule so its first run can claim a Session',
+        message: `${value.assignee} needs a schedule`,
       })
     }
     if (issueAssigneeResumeId(value.assignee)) {
-      for (const field of ['agent', 'model', 'effort'] as const) {
+      for (const field of ['agent', 'credential', 'model', 'effort'] as const) {
         if (!value[field]) continue
         ctx.addIssue({
           code: 'custom',

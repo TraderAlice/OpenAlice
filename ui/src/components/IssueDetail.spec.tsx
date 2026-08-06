@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   openAgentConfig: vi.fn(),
   openHeadlessRun: vi.fn(),
   getWorkspaceSessionDirectory: vi.fn(),
+  listAgentCredentials: vi.fn(),
+  getPresets: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -33,7 +35,7 @@ const scheduledIssue: IssueDetailData = {
     what: 'Scan the market and publish a brief.',
     status: 'in_progress',
     priority: 'high',
-    assignee: '@workspace',
+    assignee: '@new-each-run',
     agent: 'codex',
     when: {
       kind: 'cron',
@@ -74,6 +76,11 @@ vi.mock('./workspace/api', () => ({
   detectWorkspaceCredential: mocks.detectWorkspaceCredential,
   getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
   getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
+  listAgentCredentials: mocks.listAgentCredentials,
+}))
+
+vi.mock('../api/config', () => ({
+  configApi: { getPresets: mocks.getPresets },
 }))
 
 vi.mock('./MarkdownWhatEditor', () => ({
@@ -83,7 +90,50 @@ vi.mock('./MarkdownWhatEditor', () => ({
 beforeEach(async () => {
   await i18n.changeLanguage('en')
   delete scheduledIssue.issue.automationHealth
+  delete scheduledIssue.issue.credential
+  delete scheduledIssue.issue.model
+  delete scheduledIssue.issue.effort
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
+  mocks.listAgentCredentials.mockResolvedValue([{
+    slug: 'longcat-1',
+    vendor: 'longcat',
+    label: 'LongCat primary',
+    authType: 'api-key',
+    wires: { 'openai-chat': 'https://example.test' },
+    resolvedModel: 'LongCat-2.0',
+  }, {
+    slug: 'deepseek-1',
+    vendor: 'deepseek',
+    label: 'DeepSeek primary',
+    authType: 'api-key',
+    wires: { 'openai-chat': 'https://example.test' },
+    resolvedModel: 'deepseek-v4-flash',
+  }])
+  mocks.getPresets.mockResolvedValue({ presets: [{
+    id: 'longcat',
+    label: 'LongCat',
+    description: '',
+    category: 'third-party',
+    defaultName: 'LongCat',
+    schema: {},
+    models: [{
+      id: 'LongCat-2.0',
+      label: 'LongCat 2.0',
+      semantics: { reasoning: { mode: 'optional', defaultEnabled: true } },
+    }],
+  }, {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    description: '',
+    category: 'third-party',
+    defaultName: 'DeepSeek',
+    schema: {},
+    models: [{
+      id: 'deepseek-v4-flash',
+      label: 'DeepSeek V4 Flash',
+      semantics: { reasoning: { mode: 'optional', efforts: ['low', 'high', 'max'], defaultEffort: 'high' } },
+    }],
+  }] })
 })
 
 afterEach(() => {
@@ -114,7 +164,7 @@ describe('IssueActivity provenance identity', () => {
         wsId="ws-home"
         issueId="audit"
         ownerResumeId={null}
-        assignee="@workspace"
+        assignee="@new-each-run"
         onPosted={vi.fn()}
       />,
     )
@@ -160,15 +210,32 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('min-h-10')
+    const credential = screen.getByRole('combobox', { name: 'Run credential' }) as HTMLSelectElement
     const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
     const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
     await waitFor(() => {
+      expect(credential.selectedOptions[0]?.textContent).toBe('Workspace default · LongCat primary')
       expect(model.selectedOptions[0]?.textContent).toBe('Default · LongCat-2.0')
       expect(effort.selectedOptions[0]?.textContent).toBe('Default · thinking on')
     })
 
     fireEvent.change(model, { target: { value: 'custom' } })
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+  })
+
+  it('chooses a credential before narrowing model and effort options', async () => {
+    scheduledIssue.issue.credential = 'deepseek-1'
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    const credential = await screen.findByRole('combobox', { name: 'Run credential' }) as HTMLSelectElement
+    const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
+    const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
+    await waitFor(() => {
+      expect(credential.value).toBe('deepseek-1')
+      expect(Array.from(model.options).map((option) => option.value)).toContain('deepseek-v4-flash')
+      expect(Array.from(model.options).map((option) => option.value)).not.toContain('LongCat-2.0')
+      expect(Array.from(effort.options).map((option) => option.value))
+        .toEqual(['', 'low', 'high', 'max'])
+    })
   })
 
   it('places mobile work-item controls before long-form Issue content', async () => {

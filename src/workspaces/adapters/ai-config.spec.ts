@@ -21,7 +21,13 @@ import {
   syncPiProjectTrust,
   syncPiWindowsShellPath,
 } from './pi.js';
-import { migrateLegacyPiAgentDir, piWorkspaceProviderId } from './pi-config.js';
+import {
+  localizePiWorkspaceProvider,
+  migrateLegacyPiAgentDir,
+  PI_BINDING_STATE_PATH,
+  PI_PROVIDER_EXTENSION_PATH,
+  piWorkspaceProviderId,
+} from './pi-config.js';
 import { prepareAgentRuntimeWorkspace } from '../cli-adapter.js';
 import { credentialToWorkspaceAiCred } from '../credential-injection.js';
 
@@ -778,83 +784,6 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
-  it('projects one-run model and effort overrides into every native CLI', () => {
-    expect(claudeAdapter.composeHeadlessCommand!(
-      ['claude'],
-      ctx(),
-      'do x',
-      { model: 'claude-opus-4-8', reasoningEffort: 'high' },
-    )).toEqual(expect.arrayContaining([
-      '--model', 'claude-opus-4-8', '--effort', 'high',
-    ]));
-    expect(codexAdapter.composeHeadlessCommand!(
-      ['codex'],
-      ctx(),
-      'do x',
-      { model: 'gpt-5.6', reasoningEffort: 'xhigh' },
-    )).toEqual(expect.arrayContaining([
-      '--model', 'gpt-5.6', '-c', 'model_reasoning_effort="xhigh"',
-    ]));
-    expect(opencodeAdapter.composeHeadlessCommand!(
-      ['opencode'],
-      ctx(),
-      'do x',
-      { model: 'openai/gpt-5.6', reasoningEffort: 'high' },
-    )).toEqual(expect.arrayContaining([
-      '--model', 'openai/gpt-5.6', '--variant', 'high',
-    ]));
-    expect(piAdapter.composeHeadlessCommand!(
-      ['pi'],
-      ctx(),
-      'do x',
-      { model: 'gpt-5.6', reasoningEffort: 'none' },
-    )).toEqual(expect.arrayContaining([
-      '--model', 'gpt-5.6', '--thinking', 'off',
-    ]));
-  });
-
-  it('rejects a one-run effort Claude Code does not expose', () => {
-    expect(() => claudeAdapter.composeHeadlessCommand!(
-      ['claude'],
-      ctx(),
-      'do x',
-      { reasoningEffort: 'xhigh' },
-    )).toThrow(/cannot use one-run effort xhigh/);
-  });
-
-  it('keeps custom-provider model overrides inside registered opencode/Pi models', async () => {
-    await opencodeAdapter.writeAiConfig!(dir, {
-      baseUrl: 'https://provider.test/v1',
-      model: 'registered-model',
-    });
-    expect(opencodeAdapter.composeHeadlessCommand!(
-      ['opencode'],
-      { cwd: dir, env: {} },
-      'do x',
-      { model: 'registered-model', reasoningEffort: 'high' },
-    )).toEqual(expect.arrayContaining([
-      '--model', 'workspace/registered-model', '--variant', 'high',
-    ]));
-    expect(() => opencodeAdapter.composeHeadlessCommand!(
-      ['opencode'],
-      { cwd: dir, env: {} },
-      'do x',
-      { model: 'unregistered-model' },
-    )).toThrow(/not registered by this Workspace provider/);
-
-    await mkdir(join(dir, '.pi'), { recursive: true });
-    await writeFile(join(dir, '.pi/settings.json'), JSON.stringify({
-      defaultProvider: 'openalice-workspace-test',
-      defaultModel: 'registered-model',
-    }));
-    expect(() => piAdapter.composeHeadlessCommand!(
-      ['pi'],
-      { cwd: dir, env: {} },
-      'do x',
-      { model: 'unregistered-model' },
-    )).toThrow(/not registered by this Workspace provider/);
-  });
-
   it('resumes headless conversations by backend-resolved native id for all runtimes', () => {
     const resume = { sessionId: 'native-session-1' } as const;
     expect(claudeAdapter.composeHeadlessCommand!(['claude'], { ...ctx(), resume }, 'next')).toContain('native-session-1');
@@ -913,9 +842,9 @@ describe('piAdapter AI-config', () => {
   const readGlobalModels = async (): Promise<Record<string, any>> =>
     JSON.parse(await readFile(join(dir, 'pi-user-agent', 'models.json'), 'utf8')) as Record<string, any>;
 
-  const readWorkspaceProvider = async (): Promise<Record<string, any>> => {
-    const models = await readGlobalModels();
-    return models['providers'][piWorkspaceProviderId(dir)] as Record<string, any>;
+  const readWorkspaceProvider = async (cwd = dir): Promise<Record<string, any>> => {
+    const state = JSON.parse(await readFile(join(cwd, '.pi/openalice-provider.json'), 'utf8')) as Record<string, any>;
+    return state['provider'] as Record<string, any>;
   };
 
   it('prepares Pi to follow the terminal light/dark mode by default', async () => {
@@ -1073,7 +1002,7 @@ describe('piAdapter AI-config', () => {
     expect(piAdapter.composeEnv!({ cwd: dir, env: mcpEnv })).toEqual({});
   });
 
-  it('writes the provider globally and selects it through native project settings', async () => {
+  it('registers the provider through a managed project extension and native project settings', async () => {
     await piAdapter.writeAiConfig!(dir, {
       baseUrl: 'https://cn.test/v1', apiKey: 'sk-p', model: 'deepseek-chat',
     });
@@ -1087,21 +1016,27 @@ describe('piAdapter AI-config', () => {
     const settings = JSON.parse(await read('.pi/settings.json'));
     expect(settings.defaultProvider).toBe(piWorkspaceProviderId(dir));
     expect(settings.defaultModel).toBe('deepseek-chat');
+    const extension = await readFile(join(dir, PI_PROVIDER_EXTENSION_PATH), 'utf8');
+    expect(extension).toContain('pi.registerProvider(providerId, registeredProvider)');
+    expect(extension).toContain('contextWindow: 128000');
+    expect(extension).toContain('maxTokens: 16384');
+    expect(extension).not.toContain('sk-p');
+    expect(existsSync(join(dir, 'pi-user-agent', 'models.json'))).toBe(false);
     if (process.platform === 'win32') expect(settings.shellPath).toMatch(/bash\.exe$/i);
     else expect(settings.shellPath).toBeUndefined();
     expect(existsSync(join(dir, '.pi-agent'))).toBe(false);
   });
 
-  it('serializes concurrent Workspace providers without dropping either global entry', async () => {
+  it('keeps concurrent Workspace providers isolated in their own project state', async () => {
     const other = join(dir, 'second-workspace');
     await mkdir(other, { recursive: true });
     await Promise.all([
       piAdapter.writeAiConfig!(dir, { baseUrl: 'https://one/v1', model: 'one' }),
       piAdapter.writeAiConfig!(other, { baseUrl: 'https://two/v1', model: 'two' }),
     ]);
-    const providers = (await readGlobalModels())['providers'];
-    expect(providers[piWorkspaceProviderId(dir)].models).toEqual([{ id: 'one' }]);
-    expect(providers[piWorkspaceProviderId(other)].models).toEqual([{ id: 'two' }]);
+    expect((await readWorkspaceProvider(dir))['models']).toEqual([{ id: 'one' }]);
+    expect((await readWorkspaceProvider(other))['models']).toEqual([{ id: 'two' }]);
+    expect(existsSync(join(dir, 'pi-user-agent', 'models.json'))).toBe(false);
   });
 
   it('writes managed shellPath into Pi settings when the runtime profile provides one', async () => {
@@ -1245,6 +1180,25 @@ describe('piAdapter AI-config', () => {
       customField: true,
     });
     expect(existsSync(join(dir, '.pi/openalice-provider.json'))).toBe(false);
+    expect(existsSync(join(dir, PI_PROVIDER_EXTENSION_PATH))).toBe(false);
+  });
+
+  it('never overwrites or strands a user-edited provider extension', async () => {
+    await piAdapter.writeAiConfig!(dir, { baseUrl: 'https://one.test/v1', model: 'one' });
+    const extensionPath = join(dir, PI_PROVIDER_EXTENSION_PATH);
+    const userExtension = `${await readFile(extensionPath, 'utf8')}\n// user-owned customization\n`;
+    await writeFile(extensionPath, userExtension);
+
+    await expect(
+      piAdapter.writeAiConfig!(dir, { baseUrl: 'https://two.test/v1', model: 'two' }),
+    ).rejects.toThrow(/Refusing to overwrite user-edited Pi extension/);
+    expect(await readFile(extensionPath, 'utf8')).toBe(userExtension);
+    expect((await readWorkspaceProvider())['baseUrl']).toBe('https://one.test/v1');
+
+    await piAdapter.writeAiConfig!(dir, {});
+    expect(await readFile(extensionPath, 'utf8')).toBe(userExtension);
+    expect(existsSync(join(dir, PI_BINDING_STATE_PATH))).toBe(true);
+    expect(await piAdapter.readAiConfig!(dir)).toBeNull();
   });
 
   it('Pi reset leaves project selections edited after injection in place', async () => {
@@ -1261,6 +1215,7 @@ describe('piAdapter AI-config', () => {
       defaultModel: 'user-model',
     });
     expect(existsSync(join(dir, '.pi/openalice-provider.json'))).toBe(false);
+    expect(existsSync(join(dir, PI_PROVIDER_EXTENSION_PATH))).toBe(false);
   });
 
   it('round-trips through readAiConfig', async () => {
@@ -1276,13 +1231,60 @@ describe('piAdapter AI-config', () => {
     expect(await piAdapter.readAiConfig!(dir)).toBeNull();
   });
 
-  it('preserves malformed Pi-owned global models instead of overwriting it', async () => {
+  it('does not let malformed Pi-owned global models block a local provider binding', async () => {
     const modelsPath = join(dir, 'pi-user-agent', 'models.json');
     await mkdir(dirname(modelsPath), { recursive: true });
     await writeFile(modelsPath, '{ user is repairing this');
-    await expect(piAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'm' }))
-      .rejects.toThrow(/not valid JSON/);
+    await expect(piAdapter.writeAiConfig!(dir, { baseUrl: 'u', model: 'm' })).resolves.toBeUndefined();
+    expect((await readWorkspaceProvider())['models']).toEqual([{ id: 'm' }]);
     expect(await readFile(modelsPath, 'utf8')).toBe('{ user is repairing this');
+  });
+
+  it('localizes an existing global provider and repairs a torn project model selection', async () => {
+    const providerId = piWorkspaceProviderId(dir);
+    await mkdir(join(dir, '.pi'), { recursive: true });
+    await mkdir(join(dir, 'pi-user-agent'), { recursive: true });
+    await writeFile(join(dir, '.pi/settings.json'), JSON.stringify({
+      defaultProvider: providerId,
+      defaultModel: 'intended-model',
+    }));
+    await writeFile(join(dir, '.pi/openalice-provider.json'), JSON.stringify({
+      version: 1,
+      providerId,
+      previous: {
+        defaultProvider: { present: false },
+        defaultModel: { present: false },
+        shellPath: { present: false },
+      },
+      injected: {
+        defaultProvider: { present: true, value: providerId },
+        defaultModel: { present: true, value: 'intended-model' },
+        shellPath: { present: false },
+      },
+    }));
+    await writeFile(join(dir, 'pi-user-agent/models.json'), JSON.stringify({
+      providers: {
+        [providerId]: {
+          name: `OpenAlice workspace provider (${basename(dir)})`,
+          api: 'openai-completions',
+          baseUrl: 'https://provider.test/v1',
+          apiKey: 'localize-key',
+          models: [{ id: 'stale-model', reasoning: true }],
+        },
+        user: { name: 'User provider', api: 'openai-completions' },
+      },
+    }));
+
+    await expect(localizePiWorkspaceProvider(dir)).resolves.toBe(true);
+    expect((await readWorkspaceProvider())['models']).toEqual([{ id: 'intended-model' }]);
+    expect((await readGlobalModels())['providers']).toEqual({
+      user: { name: 'User provider', api: 'openai-completions' },
+    });
+    expect(await piAdapter.readAiConfig!(dir)).toMatchObject({
+      baseUrl: 'https://provider.test/v1',
+      apiKey: 'localize-key',
+      model: 'intended-model',
+    });
   });
 
   it('migrates legacy provider, settings, auth, trust, packages, and sessions without hiding user state', async () => {

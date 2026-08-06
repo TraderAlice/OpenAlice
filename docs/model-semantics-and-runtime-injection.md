@@ -99,11 +99,14 @@ resolved value:
 - Claude Code: project `effortLevel` (only values Claude can persist);
 - Codex: project `model_reasoning_effort`.
 
-### Persistent defaults and one-run overrides
+### Workspace defaults and durable Session bindings
 
-Workspace defaults and headless run selection are different configuration
-layers. A Workspace-local file expresses the durable preference; an explicit
-CLI argument selects one Issue run and wins without rewriting that file:
+A Workspace-local file is a default for creating a product Session. A fresh
+Session resolves that default together with any explicit credential, model, or
+effort choice into one immutable, secret-free `SessionRuntimeBinding` owned by
+its `resumeId`. The binding is then projected on every launch of that Session:
+interactive TUI, structured Web surface, headless Issue turn, and exact resume.
+It is not a headless-only override.
 
 Fresh Session runtime selection follows the same ownership rule. The optional
 `.alice/workspace.json` `defaultAgent` is the durable default for one Workspace.
@@ -112,27 +115,45 @@ Quick Chat, sidebar, CLI, or API runtime choice wins for that one Session withou
 rewriting either default. If neither default resolves to a registered agent
 runtime, Alice falls back to the first registered runtime.
 
-| Runtime | Workspace-local preference | One-run headless override |
+| Runtime | Workspace-local preference | Per-process Session projection |
 |---|---|---|
 | Claude Code | `.claude/settings.local.json`: `model`, `effortLevel` | `--model`, `--effort` |
 | Codex | `.codex/config.toml`: `model`, `model_reasoning_effort` | `--model`, `-c model_reasoning_effort=...` |
 | opencode | `opencode.json` provider/model binding | `--model`, `--variant` |
 | Pi | project settings plus registered provider | `--model`, `--thinking` |
 
-An Issue may request only agent/model/effort. Endpoint, provider, key, auth, and
-wire shape always come from the selected Workspace/native login. Dispatch
-records the requested model/effort for provenance and translates them into CLI
-arguments; it never mutates persistent configuration.
+An Issue's agent/credential/model/effort fields seed a new Session binding when
+its owner is `@new-then-resume` or `@new-each-run`. The credential field is only an
+OpenAlice-vault slug; it never contains a key or endpoint. Once an exact
+`@resumeId` exists, those fields cannot replace its credential source, model, or
+effort. Follow-up turns replay the stored binding instead of consulting newly
+changed Workspace defaults.
 
-OpenAlice-managed opencode models register effort-named variants in the
-Workspace config up front, so `--variant` remains a genuine one-run selection.
-Dispatch rejects a custom-provider model or effort that is not registered
-instead of silently falling back or rewriting the provider during a run.
+The persisted credential component records only an ownership reference:
+native runtime state, an OpenAlice-vault slug plus wire shape, or a fingerprint
+of an explicitly configured Workspace provider. Vault secrets are resolved
+just in time and enter only the child environment. Workspace fingerprints make
+replacement visible instead of silently resuming through a different key.
 
-Exact Session ownership is intentionally stricter. An `@resumeId` already owns
-its runtime conversation, so an Issue cannot attach agent, model, or effort
-overrides to it. This avoids silently changing a resumed conversation's saved
-model semantics.
+Credential, model, and effort are independent optional launch dimensions. A
+native credential binding means OpenAlice injects no managed key or endpoint;
+the Agent runtime owns authentication and provider discovery through its normal
+login/config chain. That native binding may still carry a process-level model
+or effort override. A native binding with neither override is also valid and
+must still traverse the adapter projection seam, even when the resulting
+projection is empty.
+
+Legacy resume identities that predate this binding contract are upgraded to an
+explicit native binding on their next activation. They must not inspect and
+adopt a provider that was added to the Workspace after the Session was created.
+Fresh Sessions may still resolve an existing Workspace-local provider as their
+creation default and persist that choice before the first process starts.
+
+Every Agent adapter must implement `sessionRuntime.project(...)`. Registration
+rejects an Agent adapter without that contract; utility adapters such as Shell
+explicitly opt out. The adapter maps the same resolved binding to its native
+arguments and environment for every supported surface. Adapter argv must never
+contain credential material.
 
 Codex project configuration must not be confused with `CODEX_HOME`; the latter
 owns global auth, sessions, skills, and user configuration. Provider definitions
@@ -206,6 +227,13 @@ overrides remain available for facts OpenAlice cannot discover. An override is
 bound to the selected model id (`reasoningModel` in creation defaults); changing
 models must not carry an old model's capability assertion forward invisibly.
 
+Issue launch controls follow the same ownership chain as Session creation. The
+user first chooses Workspace/native auth or one compatible vault credential,
+then sees model suggestions from that credential's provider catalog, then sees
+only the registered effort tiers for the selected model. Free-typed model ids
+remain available; because their semantics are unknown, their effort picker
+falls back to the selected Agent runtime's native range.
+
 Connection probes verify that a key, endpoint, wire shape, and model can answer.
 They do not prove the complete capability set. Error-guided retries (for
 example, a model that mandates thinking) are useful diagnostics but do not
@@ -213,20 +241,21 @@ replace the curated registry.
 
 The UI must disclose configuration ownership instead of presenting every
 resolved launch value as if it were already on disk. A launch surface
-distinguishes a Workspace-local binding from a credential that will be written
-only when the next session starts. Creation defaults are also explicitly
-creation-time policy: changing one never rewrites an existing Workspace.
+distinguishes a Workspace-local default from a credential that will be bound
+only to the next Session. Selecting the latter must not rewrite the Workspace.
+Creation defaults are also explicitly creation-time policy: changing one never
+rewrites an existing Workspace.
 Stable Workspace ownership stays implicit so provenance does not displace the
-effective model, reasoning, and context values. When Send will write or replace
-runtime configuration, that pending side effect is disclosed on its own line;
-successful explicit saves use transient confirmation instead of a permanent
-success state.
+effective model, reasoning, and context values. When Send will apply a
+Session-only provider/model override, that ownership is disclosed on its own
+line; successful explicit Workspace saves use transient confirmation instead
+of a permanent success state.
 This disclosure applies to all four supported Agent runtimes. Claude Code and
 Codex use their native global login and global runtime configuration by default.
 Merely storing a compatible credential in Alice never selects or injects it;
-only an explicit Workspace binding or explicit new-Workspace creation default
-overrides the native fallback. When a Workspace-local override exists its real
-model must be shown instead of a generic “runtime managed” label. Their native
+only an explicit Session selection, Workspace binding, or new-Workspace
+creation default overrides the native fallback. When a Workspace-local override
+exists its real model must be shown instead of a generic “runtime managed” label. Their native
 project files do not declare a context limit, so the UI omits that field rather
 than borrowing the Pi/opencode injection default.
 
@@ -248,14 +277,46 @@ Official endpoints may be omitted because the probe resolves their default from
 the wire shape. Both automatic creation-default saves and explicit Workspace
 saves must acknowledge completion in the UI.
 
+## Native Authentication and Explicit Overrides
+
+Claude Code, Codex, OpenCode, and Pi all own native login or provider state.
+OpenAlice launches them against that state by default and must not require an
+OpenAlice-vault credential merely because a Workspace has no managed provider
+binding. Runtime readiness probes exercise the effective native or existing
+Workspace configuration; they never inject the first compatible vault entry as
+a fallback and never mutate provider ownership while diagnosing readiness.
+Readiness is diagnostic rather than a synchronous preflight: ordinary Chat,
+Manager, Session spawn, and Session resume proceed through the selected native
+runtime without waiting for a probe. Onboarding, explicit Retry, and background
+health surfaces may probe and cache the result without becoming a launch gate.
+
+Choosing an OpenAlice credential is an explicit override. A fresh Session may
+bind that vault reference without writing it into the Workspace or changing the
+runtime's global state. An absent choice means
+“use the runtime default”; it does not mean “pick any compatible credential.”
+Existing Workspace bindings remain authoritative until the user resets or
+replaces them, and OpenAlice never imports a runtime-global secret into its
+vault or a Workspace.
+
+Native “global” state follows the runtime actually launched. A source or
+user-installed Pi uses its own normal global agent directory. Packaged managed
+Pi uses the instance-scoped `PI_CODING_AGENT_DIR` under the complete OpenAlice
+home, so `/login` persists for that managed runtime without reading or changing
+a separately installed shell Pi. Authentication/provider failures from either
+path must settle launch UI state and point users to native CLI login first;
+OpenAlice provider setup remains an optional explicit alternative.
+
 ## Configuration Ownership and Reset
 
 Agent configuration files may also contain user- or runtime-owned settings.
 Injectors must update only OpenAlice-owned keys/nodes, preserve unknown data,
 and restore the prior value on reset where a shared scalar is overridden.
 
-Pi uses a namespaced global provider plus project binding/rollback state.
-Claude Code and opencode use the same lifecycle rule with
+Pi uses one generic OpenAlice-managed project extension plus local provider and
+binding/rollback state. The extension registers only the provider stored in
+that Workspace's sensitive `.pi/openalice-provider.json`; Pi's global
+`models.json` remains user-owned. Claude Code and opencode use the same
+lifecycle rule with
 `.claude/openalice-provider.json` and `.opencode/openalice-provider.json`:
 the first write snapshots only the nodes OpenAlice will replace, later writes
 retain that original snapshot, and reset restores a node only if it still equals
@@ -284,13 +345,15 @@ contain credentials.
 - `src/ai-providers/model-semantics.ts` — exact semantic resolution and runtime-neutral binding inputs.
 - `src/ai-providers/presets.ts` — backend-to-UI preset serialization.
 - `src/core/config.ts` — credential access and creation-time Workspace defaults.
-- `src/workspaces/cli-adapter.ts` — adapter capability and provider-projection contract.
+- `src/workspaces/cli-adapter.ts` — mandatory Agent Session projection contract and persisted binding shape.
+- `src/workspaces/session-runtime-binding.ts` — fresh binding creation and just-in-time resume resolution.
 - `src/workspaces/credential-injection.ts` — credential + selection + semantics composition.
 - `src/workspaces/adapters/index.ts` — built-in adapter registration.
 - `src/workspaces/adapters/` — declared runtime compatibility, native projection, and round-trip parsing.
 - `src/workspaces/adapters/owned-toml-config.ts` — reversible Codex project-scalar ownership.
-- `src/workspaces/schedule/scanner.ts` — Issue selection to one-run override dispatch.
-- `src/workspaces/headless-task-registry.ts` — durable requested model/effort provenance.
+- `src/workspaces/resume-registry.ts` — durable product Session identity and immutable runtime binding.
+- `src/workspaces/schedule/scanner.ts` — Issue selection to fresh Session creation.
+- `src/workspaces/headless-task-registry.ts` — per-turn execution provenance.
 - `ui/src/components/credentials/` — credential/account setup.
 - `ui/src/components/workspace/WorkspaceAIConfigModal.tsx` — per-Workspace selection and unknown-model overrides.
 
@@ -312,6 +375,10 @@ Tests for this subsystem must cover:
 - reset removes only OpenAlice-owned configuration and restores prior values;
 - credential secrets never appear in logs, docs, committed fixtures, or test snapshots;
 - sensitive rollback sidecars remain excluded from git alongside native provider config.
+- readiness probes never create or replace a Workspace provider binding;
+- diagnostic readiness failures never block an ordinary native launch or resume;
+- missing OpenAlice credentials never block a native-login-capable runtime;
+- failed interactive resumes return a visible error and remain retryable.
 
 ## Registry Maintenance
 

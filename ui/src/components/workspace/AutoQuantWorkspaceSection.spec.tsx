@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkspacesContext, type WorkspacesContextValue } from '../../contexts/workspaces-context'
@@ -108,7 +109,8 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('AutoQuantWorkspaceSection session actions', () => {
-  it('keeps the active research current and routes destructive actions through the More menu', () => {
+  it('keeps the active research current and routes destructive actions through the More menu', async () => {
+    const user = userEvent.setup()
     const onNavigate = vi.fn()
     render(
       <WorkspacesContext.Provider value={context()}>
@@ -124,7 +126,9 @@ describe('AutoQuantWorkspaceSection session actions', () => {
       params: { wsId: workspace.id, sessionId: session.id, source: 'auto-quant' },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: `More actions for ${sessionTitle}` }))
+    const more = screen.getByRole('button', { name: `More actions for ${sessionTitle}` })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     fireEvent.click(screen.getByRole('menuitem', { name: `Delete ${sessionTitle}` }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(workspace.id, session.id)
   })

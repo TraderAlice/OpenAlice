@@ -6,7 +6,7 @@ import {
   matchCredentialByApiKey,
   resolveInjectionModel,
 } from './credential-injection.js'
-import { AdapterRegistry, type CliAdapter, type WorkspaceAiCred } from './cli-adapter.js'
+import { AdapterRegistry, emptyAgentSessionRuntime, type CliAdapter, type WorkspaceAiCred } from './cli-adapter.js'
 import { createBuiltinAdapterRegistry } from './adapters/index.js'
 import type { Credential } from '@/core/config.js'
 import type { Logger } from './logger.js'
@@ -56,6 +56,7 @@ describe('credentialToWorkspaceAiCred', () => {
     const futureAdapter: CliAdapter = {
       id: 'future',
       displayName: 'Future Runtime',
+      sessionRuntime: emptyAgentSessionRuntime,
       capabilities: {
         parallelPerCwd: true,
         resumeLast: false,
@@ -270,6 +271,7 @@ function stubAdapter(id: string, calls: WriteCall[], writeable = true): CliAdapt
   const adapter: CliAdapter = {
     id,
     displayName: id,
+    sessionRuntime: emptyAgentSessionRuntime,
     capabilities: {
       parallelPerCwd: true,
       resumeLast: false,

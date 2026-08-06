@@ -50,7 +50,7 @@ export function issueAutomationHealth(input: IssueAutomationHealthInput): IssueA
     return { state: 'running', message: 'A scheduled run is in progress.', latestTaskId: latest.taskId }
   }
   if (input.ownerState === 'missing') {
-    return withLatest({ state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @workspace.' })
+    return withLatest({ state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @new-each-run.' })
   }
   if (input.ownerState === 'retired') {
     return withLatest({ state: 'blocked', message: 'Assigned Session is retired. Reassign the Issue before its next run.' })

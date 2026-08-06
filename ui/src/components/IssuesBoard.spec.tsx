@@ -43,7 +43,7 @@ function issue(overrides: Partial<IssueListItem>): IssueListItem {
     title: 'Issue title',
     status: 'todo',
     priority: 'none',
-    assignee: '@workspace',
+    assignee: '@new-each-run',
     ...overrides,
   }
 }
@@ -90,7 +90,7 @@ describe('IssuesBoard', () => {
     expect(screen.getByText('收盘扫描')).toBeTruthy()
     expect(screen.getByText('#daily-close-scan')).toBeTruthy()
     expect(screen.getByText('market-desk')).toBeTruthy()
-    expect(screen.queryByText('@workspace')).toBeNull()
+    expect(screen.queryByText('@new-each-run')).toBeNull()
     expect(screen.queryByText('pi override')).toBeNull()
 
     const rowText = screen.getByTitle('Open daily-close-scan').textContent ?? ''
@@ -131,13 +131,13 @@ describe('IssuesBoard', () => {
     expect(screen.getByText('claude override')).toBeTruthy()
   })
 
-  it('explains transitional ownership without exposing the raw @new token', () => {
+  it('explains transitional ownership without exposing the raw @new-then-resume token', () => {
     mocks.useIssues.mockReturnValue({
       data: snapshot([
         issue({
           id: 'first-owner',
           title: 'Assign one durable owner',
-          assignee: '@new',
+          assignee: '@new-then-resume',
           when: { kind: 'every', every: '1h' },
         }),
       ]),
@@ -148,7 +148,7 @@ describe('IssuesBoard', () => {
     render(<IssuesBoard />)
 
     expect(screen.getByText('Assign on first run')).toBeTruthy()
-    expect(screen.queryByText('@new')).toBeNull()
+    expect(screen.queryByText('@new-then-resume')).toBeNull()
   })
 
   it('localizes board chrome, schedule health, and accessible metadata', async () => {
@@ -160,7 +160,7 @@ describe('IssuesBoard', () => {
           title: '工作日扫描',
           status: 'in_progress',
           priority: 'high',
-          assignee: '@new',
+          assignee: '@new-then-resume',
           agent: 'claude',
           when: { kind: 'cron', cron: '30 8 * * 1-5' },
           automationHealth: { state: 'running', message: 'Run is active.' },

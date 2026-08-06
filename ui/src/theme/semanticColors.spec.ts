@@ -39,7 +39,7 @@ const CORE_TOKENS = [
 ] as const
 
 const PALETTE_IDS: readonly ThemePaletteId[] = [
-  'paper', 'porcelain', 'linen', 'graphite', 'midnight', 'moss', 'iris',
+  'paper', 'porcelain', 'linen', 'windows-classic', 'graphite', 'midnight', 'moss', 'iris',
 ]
 
 const ALLOWED_LITERAL_COLOR_FILES = new Set([
@@ -98,12 +98,12 @@ function hexContrast(a: string, b: string): number {
 }
 
 describe('semantic color contract', () => {
-  it('ships one universal library with seven complete semantic cards', () => {
+  it('ships one universal library with eight complete semantic cards', () => {
     expect(THEME_PALETTES.map(({ id }) => id)).toEqual(PALETTE_IDS)
     expect(THEME_PALETTES.map(({ appearance }) => appearance)).toEqual([
-      'light', 'light', 'light', 'dark', 'dark', 'dark', 'dark',
+      'light', 'light', 'light', 'light', 'dark', 'dark', 'dark', 'dark',
     ])
-    expect(new Set(PALETTE_IDS).size).toBe(7)
+    expect(new Set(PALETTE_IDS).size).toBe(8)
 
     for (const id of PALETTE_IDS) {
       const block = paletteBlock(id)
@@ -114,7 +114,7 @@ describe('semantic color contract', () => {
     }
   })
 
-  it('keeps every semantic token symmetric across all seven cards', () => {
+  it('keeps every semantic token symmetric across all eight cards', () => {
     const tokens = [...paletteBlock('paper').matchAll(/^\s*(--[\w-]+):/gm)].map((match) => match[1])
     expect(tokens.length).toBeGreaterThan(CORE_TOKENS.length)
 
@@ -149,7 +149,7 @@ describe('semantic color contract', () => {
 
   it('keeps the new product and ANSI text roles at normal-text contrast', () => {
     const ansiTokens = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'] as const
-    for (const id of ['linen', 'moss', 'iris'] as const) {
+    for (const id of ['linen', 'windows-classic', 'moss', 'iris'] as const) {
       expect(hexContrast(paletteToken(id, 'foreground'), paletteToken(id, 'background')), id).toBeGreaterThanOrEqual(4.5)
       expect(hexContrast(paletteToken(id, 'muted-foreground'), paletteToken(id, 'background')), id).toBeGreaterThanOrEqual(4.5)
       expect(hexContrast(paletteToken(id, 'primary-foreground'), paletteToken(id, 'primary')), id).toBeGreaterThanOrEqual(4.5)
@@ -177,6 +177,7 @@ describe('semantic color contract', () => {
     expect(paletteAppearance('midnight')).toBe('dark')
     expect(paletteAppearance('paper')).toBe('light')
     expect(paletteAppearance('linen')).toBe('light')
+    expect(paletteAppearance('windows-classic')).toBe('light')
     expect(paletteAppearance('moss')).toBe('dark')
     expect(paletteAppearance('iris')).toBe('dark')
     expect(palette).not.toMatch(/data-theme|prefers-color-scheme/)

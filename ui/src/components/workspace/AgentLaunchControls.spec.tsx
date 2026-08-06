@@ -61,6 +61,7 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     runtimeReadiness: null,
     selectedRuntimeReadiness: null,
     needsCredential: true,
+    canSelectCredential: true,
     credentials,
     effectiveCredential: 'primary',
     credential: credentials[0]!,
@@ -78,8 +79,8 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     launchCredentialSlug: 'primary',
     selectAgent: vi.fn(),
     selectCredential: vi.fn(),
+    selectRuntimeDefault: vi.fn(),
     resetCredentialSelection: vi.fn(),
-    checkSelectedRuntime: vi.fn(async () => null),
     ...overrides,
   }
 }
@@ -161,5 +162,34 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     expect(selectCredential).toHaveBeenCalledWith('backup')
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
+  })
+
+  it('keeps native runtime login as the default and makes a vault override explicit', async () => {
+    const user = userEvent.setup()
+    const selectCredential = vi.fn()
+    const selectRuntimeDefault = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({
+          needsCredential: false,
+          effectiveCredential: null,
+          credential: null,
+          launchCredentialSlug: undefined,
+          selectCredential,
+          selectRuntimeDefault,
+        })}
+        onConfigureProvider={vi.fn()}
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
+    expect(trigger.textContent).toContain(i18n.t('chatLanding.runtimeDefaultModel'))
+    await user.click(trigger)
+    await user.click(screen.getByRole('menuitem', { name: /Primary/ }))
+    expect(selectCredential).toHaveBeenCalledWith('primary')
+
+    await user.click(trigger)
+    await user.click(screen.getByRole('menuitem', { name: i18n.t('chatLanding.runtimeDefaultModel') }))
+    expect(selectRuntimeDefault).toHaveBeenCalledOnce()
   })
 })

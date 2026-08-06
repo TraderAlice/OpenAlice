@@ -376,9 +376,13 @@ function IssueRow({ wsId, wsTag, issue, agentRuntime, dupOthers, onOpen }: Board
   const { t } = useTranslation()
   const terminal = issue.status === 'done' || issue.status === 'canceled'
   const titleMatchesId = issue.title.trim().toLowerCase() === issue.id.trim().toLowerCase()
-  const explicitAssignee = issue.assignee !== '@workspace'
+  const explicitAssignee = issue.assignee !== '@unassigned'
   const explicitAgent = agentRuntime?.source === 'override' && agentRuntime.distinctOverride !== false
-  const assigneeLabel = issue.assignee === '@new' ? t('issues.assignOnFirstRun') : issue.assignee
+  const assigneeLabel = issue.assignee === '@new-then-resume'
+    ? t('issues.assignOnFirstRun')
+    : issue.assignee === '@new-each-run'
+      ? t('issues.detail.mutationValue.newSessionEachRun')
+      : issue.assignee
   return (
     <li>
       <button

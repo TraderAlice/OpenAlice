@@ -201,22 +201,17 @@ function HarnessLandingPage({
       launchSelectorsRef.current?.openAgentMenu()
       return
     }
+    if (launchConfig.needsProviderSetup) {
+      goConfigureProvider()
+      return
+    }
     setError(null)
     setLaunching(true)
     try {
-      const runtimeRow = await launchConfig.checkSelectedRuntime()
-      if (runtimeRow?.ready !== true) {
-        if (runtimeRow?.repairTarget === 'ai-provider' || launchConfig.needsProviderSetup) {
-          goConfigureProvider()
-          return
-        }
-        setError(runtimeRow?.message ?? t('chatLanding.runtimeNotReady'))
-        return
-      }
       // A global OpenCode/Pi config is only a fallback when the user has not
-      // selected a vault credential for this launch. The provider pill is an
-      // explicit per-Workspace choice: always send it so the backend can write
-      // the selected provider/model before spawning the runtime.
+      // selected a vault credential for this launch. The provider/model choice
+      // seeds this new product Session; the backend persists a secret-free
+      // binding and never rewrites the Workspace merely to start it.
       // On success this focuses the new session's terminal tab; the landing tab
       // stays open in the background, so clear it for next time.
       const workspaceId = await quickChat(
@@ -225,6 +220,8 @@ function HarnessLandingPage({
         launchConfig.launchCredentialSlug,
         effectiveTargetWorkspaceId,
         templateName,
+        launchConfig.aiDetails?.model,
+        launchConfig.aiDetails?.reasoningEffort,
       )
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')
@@ -487,8 +484,9 @@ function HarnessLandingPage({
           </div>
         )}
 
-        {/* The selected cred differs from the one today's workspace already uses
-            — sending switches it. A notice, not a block (the user chose it). */}
+        {/* The selected credential differs from this Workspace's creation
+            default. It applies only to the new Session; make that divergence
+            visible without implying that Send rewrites Workspace files. */}
         {launchConfig.willOverwriteCredential && launchConfig.credential && (
           <div className="rounded-lg border border-border/60 bg-secondary/60 px-3 py-2 text-[12px] text-muted-foreground">
             {t('chatLanding.credOverwrite', {

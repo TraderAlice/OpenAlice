@@ -69,6 +69,7 @@ interface IssueSpec {
   status?: string
   priority?: string
   agent?: string
+  credential?: string
   model?: string
   effort?: string
   assignee?: string
@@ -82,12 +83,13 @@ function issueMd(spec: IssueSpec): string {
   if (spec.priority) lines.push(`priority: ${spec.priority}`)
   if (spec.what) lines.push(`what: ${spec.what}`)
   if (spec.agent) lines.push(`agent: ${spec.agent}`)
+  if (spec.credential) lines.push(`credential: ${spec.credential}`)
   if (spec.model) lines.push(`model: ${spec.model}`)
   if (spec.effort) lines.push(`effort: ${spec.effort}`)
   // Scanner tests exercise dispatch policy, not declaration defaults. Keep the
   // historical fresh-every-fire fixture explicit now that omitted scheduled
-  // ownership means recruit once (`@new`).
-  const assignee = spec.assignee ?? (spec.when ? '@workspace' : undefined)
+  // ownership means recruit once (`@new-then-resume`).
+  const assignee = spec.assignee ?? (spec.when ? '@new-each-run' : undefined)
   if (assignee) lines.push(`assignee: ${JSON.stringify(assignee)}`)
   if (spec.when) {
     const w = spec.when
@@ -216,13 +218,14 @@ describe('ScheduleScanner', () => {
     expect(markers.get('w1', 't1')).toBe(NOW)
   })
 
-  it('passes Issue model and effort as one-run dispatch overrides', async () => {
+  it('passes Issue credential, model, and effort as one fresh-Session selection', async () => {
     const ws = await makeWs('w1', [{
       id: 'tuned',
       title: 'tuned run',
       when: { kind: 'every', every: '30m' },
       what: 'go',
       agent: 'claude',
+      credential: 'anthropic-primary',
       model: 'claude-opus-4-8',
       effort: 'high',
     }])
@@ -236,7 +239,7 @@ describe('ScheduleScanner', () => {
       { kind: 'issue', workspaceId: 'w1', issueId: 'tuned' },
       undefined,
       undefined,
-      { model: 'claude-opus-4-8', reasoningEffort: 'high' },
+      { credentialSlug: 'anthropic-primary', model: 'claude-opus-4-8', reasoningEffort: 'high' },
     )
   })
 
@@ -265,13 +268,13 @@ describe('ScheduleScanner', () => {
       .toBe('@resume-kind-owl-abc123')
   })
 
-  it('assigns @new to the first fresh Session before advancing the marker', async () => {
+  it('assigns @new-then-resume to the first fresh Session before advancing the marker', async () => {
     const ws = await makeWs('w1', [{
       id: 'sticky',
       title: 'sticky worker',
       when: { kind: 'every', every: '30m' },
       what: 'own this work from now on',
-      assignee: '@new',
+      assignee: '@new-then-resume',
     }])
     const claimFreshSession = vi.fn(async () => undefined)
     const { scanner, dispatch, markers } = scannerFor([ws], { claimFreshSession })
@@ -298,7 +301,7 @@ describe('ScheduleScanner', () => {
   it('advances the dispatched occurrence when the Session claim write fails', async () => {
     const ws = await makeWs('w1', [{
       id: 'sticky', title: 'sticky worker', when: { kind: 'every', every: '30m' },
-      what: 'own this work', assignee: '@new',
+      what: 'own this work', assignee: '@new-then-resume',
     }])
     const claimFreshSession = vi.fn(async () => { throw new Error('claim write failed') })
     const { scanner, markers } = scannerFor([ws], { claimFreshSession })

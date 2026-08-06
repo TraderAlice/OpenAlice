@@ -231,7 +231,7 @@ describe('InboxPage responsive detail header', () => {
     expect(screen.queryByRole('dialog', {
       name: 'Sender identity: pi · @resume-plain-linen-river-2218b6',
     })).toBeNull()
-    expect(document.activeElement).toBe(sender)
+    await waitFor(() => expect(document.activeElement).toBe(sender))
 
     fireEvent.click(sender)
     fireEvent.click(screen.getByRole('button', { name: 'Open conversation' }))

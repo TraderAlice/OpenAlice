@@ -96,6 +96,51 @@ away from the pointer.
 
 ## Shared Vocabulary
 
+### Component primitive ownership
+
+Behavioral UI primitives live as source under `ui/src/components/ui/`. They are
+initialized from shadcn's Base UI recipes through `ui/components.json`, then
+owned and reviewed as OpenAlice code. Product components such as
+`PageSidebarLayout`, `ConfirmDialog`, and the UTA `Dialog` wrapper retain their
+domain API and composition; the lower layer owns portals, focus containment,
+keyboard navigation, outside dismissal, scroll locking, and focus return.
+
+- Use an existing owned primitive before adding document-level listeners or a
+  new focus trap for a dialog, sheet, popover, menu, or tooltip.
+- Keep the shared primitives aligned with the official `base-nova` registry
+  output. Base UI owns modal and nested-overlay coordination; do not add an
+  OpenAlice portal-boundary context or manually move descendant overlays into
+  Dialog, AlertDialog, or Sheet content.
+- Keep generated primitives bound to semantic tokens. Running the shadcn CLI
+  must not replace `ui/src/index.css`, palette definitions, typography, or the
+  current default visual hierarchy.
+- Prefer the official Base UI package required by the checked-in primitives.
+  Do not add a second primitive base, third-party registry, or generic shadcn
+  block when a product composition already exists.
+- Treat `data-slot` as the stable styling seam. Future selectable UI styles
+  may vary geometry, elevation, density, typography, and motion through that
+  seam; `data-palette` remains the color axis.
+- Runtime-selectable component appearance is published as `data-ui-style` on
+  the document root. Profiles may restyle owned `data-slot` primitives and
+  shared `oa-*` shell/form seams, but must not branch product behavior, fork a
+  primitive, hard-code a second color system, or recolor terminal ANSI output.
+  Keep the current workstation as the compatibility default and gate compact
+  desktop density behind both sufficient width and a fine pointer so a visual
+  profile never reduces touch usability.
+- A style profile may declare an optional recommended day/night palette pair.
+  Selecting the style must never apply that pair automatically. Settings shows
+  an explicit preview and opt-in; the resulting style-scoped override must not
+  rewrite the saved Day/Night colors, and leaving that style restores them.
+- Repeated navigation rows remain rows under every style profile. A profile may
+  restyle the row and its compact trailing actions, but must not give the row's
+  primary label its own card or command-button chrome.
+- Delete superseded event plumbing during migration. A component is not
+  migrated if its old global Escape/outside-click/focus-loop implementation is
+  still running beside the primitive.
+
+The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
+project. Backend tests keep their existing root `@` alias.
+
 Motion tokens and primitives live in `ui/src/index.css`:
 
 | Primitive | Intended use |

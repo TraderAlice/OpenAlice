@@ -1,4 +1,5 @@
 import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
+import type { ChatDisplayMode } from './workspace/chat-display-mode'
 
 /**
  * Chat activity sidebar — **workspace chat only**.
@@ -13,12 +14,22 @@ import { ChatWorkspaceSection } from './workspace/ChatWorkspaceSection'
  * have moved to the Legacy section of the ActivityBar — they're
  * pre-Workspace artifacts that don't share this surface anymore.
  */
-export function ChatChannelListContainer({ onNavigate }: { onNavigate?: () => void }) {
+export function ChatChannelListContainer({
+  onNavigate,
+  displayMode,
+  onRequestDisplayMode,
+}: {
+  onNavigate?: () => void
+  displayMode: ChatDisplayMode
+  onRequestDisplayMode: (mode: ChatDisplayMode) => void
+}) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <ChatWorkspaceSection onNavigate={onNavigate} />
-      </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <ChatWorkspaceSection
+        onNavigate={onNavigate}
+        displayMode={displayMode}
+        onRequestDisplayMode={onRequestDisplayMode}
+      />
     </div>
   )
 }

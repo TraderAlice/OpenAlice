@@ -172,6 +172,17 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     expect(unavailable.body.error).toBe('unavailable_assignee_session')
   })
 
+  it('rejects deprecated assignee aliases with a canonical replacement', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
+    const { app } = build()
+    const deprecated = await req(app, 'PATCH', '/ws-1/i1', { assignee: '@new' })
+    expect(deprecated.status).toBe(400)
+    expect(deprecated.body).toEqual({
+      error: 'deprecated_assignee',
+      message: '@new is deprecated; use @new-then-resume',
+    })
+  })
+
   it('400 no_fields when the body has none of the patchable fields', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T' })
     const { app } = build()
@@ -188,6 +199,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
       priority: 'high',
       assignee: '@human',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'high',
       what: 'new exact work',
@@ -199,6 +211,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
       priority: 'high',
       assignee: '@human',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'high',
       what: 'new exact work',
@@ -208,6 +221,7 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     const re = await readWorkspaceIssues(wsDir)
     expect(re.ok && re.issues[0].status).toBe('in_progress')
     expect(re.ok && re.issues[0].agent).toBe('pi')
+    expect(re.ok && re.issues[0].credential).toBe('gemini-primary')
     expect(re.ok && re.issues[0].model).toBe('gemini-3.5-pro')
     expect(re.ok && re.issues[0].effort).toBe('high')
     expect(re.ok && re.issues[0].what).toBe('new exact work')
@@ -219,8 +233,9 @@ describe('PATCH /api/issues/:wsId/:id', () => {
         fields: expect.arrayContaining([
           { field: 'status', before: 'todo', after: 'in_progress' },
           { field: 'priority', before: 'none', after: 'high' },
-          { field: 'assignee', before: '@workspace', after: '@human' },
+          { field: 'assignee', before: '@unassigned', after: '@human' },
           { field: 'runtime', after: 'pi' },
+          { field: 'credential', after: 'gemini-primary' },
           { field: 'model', after: 'gemini-3.5-pro' },
           { field: 'effort', after: 'high' },
           { field: 'what' },
@@ -312,7 +327,7 @@ describe('POST /api/issues/:wsId/:id/comments', () => {
   })
 
   it('asks the creator or reconstructs for a human comment without a fixed owner', async () => {
-    await createIssue(wsDir, { id: 'i1', title: 'T', assignee: '@workspace' })
+    await createIssue(wsDir, { id: 'i1', title: 'T' })
     const { app, ask } = build()
     const r = await req(app, 'POST', '/ws-1/i1/comments', { text: 'how should I read this?' })
     expect(r.status).toBe(200)
@@ -337,7 +352,7 @@ describe('POST /api/issues/:wsId/:id/comments', () => {
       targetResumeId: 'resume-kind-owl-abc123',
       taskId: 'run-comment-reply',
     })
-    expect(r.body.issue.assignee).toBe('@workspace')
+    expect(r.body.issue.assignee).toBe('@unassigned')
   })
 
   it('notifies the fixed owner and persists pending delivery without blocking the comment', async () => {

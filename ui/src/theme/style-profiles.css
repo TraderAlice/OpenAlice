@@ -1,0 +1,301 @@
+/* Runtime component appearance profiles. Colors stay entirely owned by the
+   active semantic palette; these profiles only alter typography, geometry,
+   elevation, density, and motion. */
+
+.oa-style-profile-card {
+  border-radius: 0.75rem;
+  transition:
+    border-color var(--motion-standard) var(--motion-ease-standard),
+    background-color var(--motion-standard) var(--motion-ease-standard),
+    box-shadow var(--motion-standard) var(--motion-ease-standard),
+    transform var(--motion-fast) var(--motion-ease-standard);
+}
+
+.oa-style-profile-card[data-selected="true"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary-muted) 58%, var(--background));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 38%, transparent);
+}
+
+.oa-style-profile-preview {
+  border-radius: 0.4rem;
+}
+
+.oa-style-profile-card[data-ui-style-preview="win98"],
+.oa-style-profile-card[data-ui-style-preview="win98"] .oa-style-profile-preview,
+.oa-style-profile-card[data-ui-style-preview="win98"] .oa-style-profile-row {
+  border-radius: 0;
+}
+
+.oa-style-profile-card[data-ui-style-preview="win98"] .oa-style-profile-preview {
+  box-shadow:
+    inset 1px 1px color-mix(in srgb, var(--background) 92%, var(--foreground)),
+    inset -1px -1px color-mix(in srgb, var(--foreground) 48%, var(--background));
+}
+
+.oa-style-profile-card[data-ui-style-preview="broker-classic"],
+.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-preview,
+.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-row {
+  border-radius: 0.125rem;
+}
+
+.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-toolbar {
+  height: 0.2rem;
+}
+
+.oa-style-profile-card[data-ui-style-preview="broker-classic"] .oa-style-profile-row {
+  height: 0.32rem;
+}
+
+/* Windows 98 ------------------------------------------------------------- */
+
+:root[data-ui-style="win98"] {
+  --font-sans: Tahoma, "MS Sans Serif", "Microsoft Sans Serif", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --motion-fast: 0ms;
+  --motion-standard: 0ms;
+  --motion-slow: 0ms;
+  --oa-win-highlight: color-mix(in srgb, var(--background) 94%, var(--foreground));
+  --oa-win-light: color-mix(in srgb, var(--background) 76%, var(--foreground));
+  --oa-win-shadow: color-mix(in srgb, var(--foreground) 42%, var(--background));
+  --oa-win-dark: color-mix(in srgb, var(--foreground) 72%, var(--background));
+}
+
+:root[data-ui-style="win98"] body {
+  background: var(--background);
+  transition: none;
+}
+
+:root[data-ui-style="win98"] :where(
+  button,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="tooltip-content"],
+  .rounded,
+  .rounded-sm,
+  .rounded-md,
+  .rounded-lg,
+  .rounded-xl,
+  .rounded-2xl,
+  .rounded-3xl
+) {
+  border-radius: 0 !important;
+}
+
+:root[data-ui-style="win98"] :where(
+  button:not([data-slot="dialog-close"]),
+  [role="button"].oa-pressable,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+) {
+  border-color: var(--oa-win-shadow);
+  box-shadow:
+    inset 1px 1px var(--oa-win-highlight),
+    inset -1px -1px var(--oa-win-dark),
+    inset 2px 2px var(--oa-win-light),
+    inset -2px -2px var(--oa-win-shadow);
+}
+
+:root[data-ui-style="win98"] :where(
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select
+) {
+  background: var(--background);
+  box-shadow:
+    inset 1px 1px var(--oa-win-dark),
+    inset -1px -1px var(--oa-win-highlight),
+    inset 2px 2px var(--oa-win-shadow);
+}
+
+/* Session entries are list rows, not three adjacent command buttons. Keep the
+   title surface flat and reserve the classic raised chrome for its compact
+   lifecycle/menu actions. The row itself owns hover and selected state. */
+:root[data-ui-style="win98"] .oa-session-row {
+  gap: 2px;
+  min-height: 28px;
+  padding-block: 2px;
+}
+
+:root[data-ui-style="win98"] .oa-session-row-main {
+  align-self: stretch;
+  min-height: 24px;
+  padding-inline: 4px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-ui-style="win98"] .oa-session-row-main:active {
+  transform: none;
+  box-shadow: none;
+}
+
+:root[data-ui-style="win98"] .oa-session-row > .oa-workspace-row-action {
+  height: 24px;
+  width: 24px;
+}
+
+:root[data-ui-style="win98"] :where(
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"]
+) {
+  border: 1px solid var(--oa-win-dark);
+  box-shadow:
+    inset 1px 1px var(--oa-win-highlight),
+    inset -1px -1px var(--oa-win-shadow),
+    3px 3px 0 color-mix(in srgb, var(--foreground) 34%, transparent);
+}
+
+:root[data-ui-style="win98"] :where(
+  [data-slot="dropdown-menu-item"],
+  [data-slot="dropdown-menu-checkbox-item"],
+  [data-slot="dropdown-menu-radio-item"],
+  [data-slot="dropdown-menu-sub-trigger"]
+) {
+  border-radius: 0 !important;
+}
+
+:root[data-ui-style="win98"] :where(button, [role="button"]):focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: -4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root[data-ui-style="win98"] .oa-pressable:hover:not(:disabled):not([aria-disabled="true"]),
+  :root[data-ui-style="win98"] .oa-icon-action:hover:not(:disabled):not([aria-disabled="true"]),
+  :root[data-ui-style="win98"] .oa-nav-row:hover {
+    transform: none;
+  }
+
+  :root[data-ui-style="win98"] :where(button, [role="button"]):active:not(:disabled):not([aria-disabled="true"]) {
+    transform: translate(1px, 1px);
+    box-shadow:
+      inset 1px 1px var(--oa-win-dark),
+      inset -1px -1px var(--oa-win-highlight),
+      inset 2px 2px var(--oa-win-shadow);
+  }
+}
+
+/* Broker Classic --------------------------------------------------------- */
+
+:root[data-ui-style="broker-classic"] {
+  --font-sans: Arial, Tahoma, "Microsoft YaHei", "PingFang SC", sans-serif;
+  --motion-fast: 60ms;
+  --motion-standard: 90ms;
+  --motion-slow: 120ms;
+}
+
+:root[data-ui-style="broker-classic"] body {
+  background: var(--background);
+}
+
+:root[data-ui-style="broker-classic"] :where(
+  button,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  .rounded,
+  .rounded-sm,
+  .rounded-md,
+  .rounded-lg,
+  .rounded-xl,
+  .rounded-2xl,
+  .rounded-3xl
+) {
+  border-radius: 0.125rem !important;
+}
+
+:root[data-ui-style="broker-classic"] :where(
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"]
+) {
+  border: 1px solid var(--border);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+:root[data-ui-style="broker-classic"] :where(table) {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-ui-style="broker-classic"] :where(th, td) {
+  border-color: var(--border);
+}
+
+:root[data-ui-style="broker-classic"] :where(.text-display, [class*="tabular-nums"]) {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 48rem) and (hover: hover) and (pointer: fine) {
+  :root[data-ui-style="broker-classic"] {
+    font-size: 15px;
+  }
+
+  :root[data-ui-style="broker-classic"] :where(
+    [data-slot="button"],
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="dropdown-menu-sub-trigger"]
+  ) {
+    min-height: 1.5rem;
+  }
+
+  :root[data-ui-style="broker-classic"] :where(
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea
+  ) {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+  }
+
+  :root[data-ui-style="broker-classic"] [data-settings-scroll-area] {
+    scrollbar-width: thin;
+  }
+}
+
+/* Profile choices are specimens, not ordinary controls: keep each card's own
+   geometry visible even while another profile is active on the document. */
+:root[data-ui-style] .oa-style-profile-card {
+  box-shadow: none;
+}
+
+:root[data-ui-style] .oa-style-profile-card[data-ui-style-preview="default"] {
+  border-radius: 0.75rem !important;
+}
+
+:root[data-ui-style] .oa-style-profile-card[data-ui-style-preview="win98"] {
+  border-radius: 0 !important;
+}
+
+:root[data-ui-style] .oa-style-profile-card[data-ui-style-preview="broker-classic"] {
+  border-radius: 0.125rem !important;
+}
+
+:root[data-ui-style] .oa-style-profile-card[data-selected="true"] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 38%, transparent);
+}

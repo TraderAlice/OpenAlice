@@ -164,6 +164,32 @@ describe('WorkspaceView Files panel', () => {
   })
 })
 
+describe('WorkspaceView paused Session recovery', () => {
+  it('shows a failed resume and lets the user retry instead of staying on Opening', async () => {
+    const paused = session(2, 'paused')
+    const onResume = vi.fn(async () => { throw new Error('Pi CLI login is required') })
+
+    render(
+      <WorkspaceView
+        wsId="chat-1"
+        sessionId={paused.id}
+        activeRecord={paused}
+        sessions={[paused]}
+        onSpawnFresh={vi.fn()}
+        onResume={onResume}
+        onOpenWebPi={vi.fn(async () => undefined)}
+        onSelectSession={vi.fn()}
+        onSessionLost={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue in terminal' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Pi CLI login is required')
+    expect((screen.getByRole('button', { name: 'Continue in terminal' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+})
+
 describe('WorkspaceView terminal canvas', () => {
   it('gives a pinned terminal one shared Workspace and Session titlebar', () => {
     const activeRecord = session(2, 'running')

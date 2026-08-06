@@ -28,6 +28,44 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/semantic-issue-assignees.md]] — Replaced ambiguous scheduled-Issue
+  assignee tokens with behavior-named canonical values, explicit deprecated
+  aliases, and an idempotent Workspace-file migration. Delivered in serial PR
+  #990.
+- [[plans/issue-runtime-choice.md]] — Made scheduled Issue launch selection a
+  credential-first flow, narrowed model and effort choices to that provider,
+  and froze the result in the new Session runtime binding.
+- [[plans/session-runtime-bindings.md]] — Made credential source, model, and
+  effort a durable product-Session binding projected by every Agent adapter
+  across interactive, Web, and headless launch/resume.
+- [[plans/native-runtime-auth-fallback.md]] — Makes OpenCode and Pi honor their
+  native global login/config by default, keeps OpenAlice-managed credentials as
+  an explicit Workspace override, and makes launch/resume authentication
+  failures visible instead of leaving Sessions stuck opening. Delivered in
+  serial PR #983.
+- [[plans/pi-local-workspace-provider.md]] — Moved OpenAlice-managed Pi
+  provider registration from the user-global model registry into reversible,
+  Workspace-local extension state. Delivered in serial PR #981.
+- [[plans/runtime-ui-style-profiles.md]] — Added independent runtime-selectable
+  component appearance profiles for Default, Windows 98, and Broker Classic
+  while preserving palette choice and shared shadcn/Base UI behavior. Delivered
+  in serial PR #976.
+- [[plans/shadcn-systematic-ui-audit.md]] — Exercised every installed
+  shadcn/Base UI primitive through real product entries, repaired the
+  menu-to-dialog focus handoff, and passed browser, full-suite, build, and
+  packaged Electron acceptance. Delivered in serial PR #974.
+- [[plans/shadcn-base-ui-migration.md]] — Replaced the initial Radix-backed
+  shadcn primitives and custom overlay patches with the official Base UI + Nova
+  source while preserving OpenAlice's product hierarchy and palette. Delivered
+  for integration in serial PR #973.
+- [[plans/mobile-activity-sheet.md]] — Moved the phone ActivityBar onto the
+  shared Sheet behavior while preserving the static desktop rail. Delivered as
+  serial PR #971 after the foundation in PR #970 was accepted and merged.
+- [[plans/shadcn-overlay-foundation.md]] — Established an OpenAlice-owned
+  shadcn/Radix primitive layer, retired representative hand-written overlay
+  behavior, and preserved the current product hierarchy and visual language as
+  the foundation for later runtime-selectable style profiles. Implemented in
+  Draft PR #970.
 - [[plans/desktop-upgrade-release-gate.md]] — Adds a real N-1 desktop-state
   upgrade journey to the native package matrix and validates final updater
   metadata and artifacts before a release can be published.

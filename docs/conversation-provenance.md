@@ -107,8 +107,12 @@ support activity feeds and auditing, but do not change the forward semantics.
 | PID/live PTY | Ephemeral process incarnation | No |
 
 `ResumeRegistry` must bind a `resumeId` immutably to one `workspaceId` and one
-runtime kind. It may learn or refresh the native locator, but it must never
-reassign the product Session to another Workspace or runtime.
+runtime kind. It also owns that Session's immutable, secret-free runtime
+binding: credential source reference, model, and effort. It may learn or
+refresh the native locator and re-resolve a referenced vault secret at launch,
+but it must never reassign the product Session to another Workspace/runtime or
+silently replace its launch selection. Native ids, API keys, and provider
+payloads remain backend-only.
 
 ## Standard Provenance Envelope
 
@@ -327,11 +331,11 @@ existing resumable Workspace Session.
 #### Mode B: recruit once, then keep that worker
 
 ```yaml
-assignee: "@new"
+assignee: "@new-then-resume"
 ```
 
 - The first scheduled fire creates a new headless product Session.
-- OpenAlice immediately rewrites `@new` to that Session's exact `@resumeId`.
+- OpenAlice immediately rewrites `@new-then-resume` to that Session's exact `@resumeId`.
 - Later fires and Issue comments continue the same accountable coworker.
 - The Issue may specify `agent` before the first claim; after the claim, the
   concrete Session owns its runtime.
@@ -339,7 +343,7 @@ assignee: "@new"
 #### Mode C: a fresh worker per fire
 
 ```yaml
-assignee: "@workspace"
+assignee: "@new-each-run"
 ```
 
 - Every scheduled fire creates a new headless product Session and `resumeId`.
@@ -452,8 +456,8 @@ approval state, routing, fills, and slippage.
 9. Mutable artifacts retain occurrence-level provenance instead of one mutable
    “author” field.
 10. Issue creation provenance and future execution responsibility are separate.
-11. Issue assignee is the only ownership/dispatch contract: `@new` recruits
-    once and becomes an exact owner, `@workspace` recruits on every fire, and
+11. Issue assignee is the only ownership/dispatch contract: `@new-then-resume` recruits
+    once and becomes an exact owner, `@new-each-run` recruits on every fire, and
     an exact `@resumeId` continues one known Session.
 12. Trade decision attribution and trade execution authority remain separate.
 13. Provenance is stamped from authoritative context, not asserted by an agent.

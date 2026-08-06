@@ -6,8 +6,8 @@ import { createInterface } from 'node:readline';
 
 import type {
   CliAdapter,
-  HeadlessRunOverrides,
   OnDiskSession,
+  ResolvedSessionRuntimeBinding,
   SpawnContext,
   WorkspaceAiCred,
 } from '../cli-adapter.js';
@@ -23,7 +23,9 @@ const CODEX_ISOLATED_CONFIG_PATH = `${CODEX_ISOLATED_HOME_PATH}/config.toml`;
 const CODEX_ISOLATED_ENV_PATH = `${CODEX_ISOLATED_HOME_PATH}/env.json`;
 const CODEX_LEGACY_ENV_PATH = '.codex/env.json';
 const CODEX_KEY_ENV_NAME = 'OPENALICE_WORKSPACE_KEY';
+const CODEX_SESSION_KEY_ENV_NAME = 'OPENALICE_SESSION_KEY';
 const CODEX_PROVIDER_NAME = 'workspace';
+const CODEX_SESSION_PROVIDER_NAME = 'openalice_session';
 const CODEX_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const CODEX_INTERACTIVE_PERMISSION_ARGS = [
   '--sandbox',
@@ -136,6 +138,30 @@ export const codexAdapter: CliAdapter = {
     },
   },
 
+  sessionRuntime: {
+    project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
+      const ai = runtime.ai;
+      const args = [
+        ...(runtime.binding.model ? ['--model', runtime.binding.model] : []),
+        ...(runtime.binding.reasoningEffort
+          ? ['-c', `model_reasoning_effort=${tomlString(runtime.binding.reasoningEffort)}`]
+          : []),
+      ];
+      const env: Record<string, string> = {};
+      if (ai?.apiKey || ai?.baseUrl) {
+        args.push(
+          '-c', `model_provider=${tomlString(CODEX_SESSION_PROVIDER_NAME)}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.name=${tomlString('OpenAlice Session provider')}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.base_url=${tomlString(ai.baseUrl || CODEX_DEFAULT_BASE_URL)}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.env_key=${tomlString(CODEX_SESSION_KEY_ENV_NAME)}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.wire_api=${tomlString('responses')}`,
+        );
+        if (ai.apiKey) env[CODEX_SESSION_KEY_ENV_NAME] = ai.apiKey;
+      }
+      return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
+    },
+  },
+
   /**
    * Every OpenAlice-owned interactive Codex launch explicitly selects full
    * host access and disables command approvals. Without launch-time flags,
@@ -147,7 +173,8 @@ export const codexAdapter: CliAdapter = {
    * is present.
    */
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
-    const head = codexMcpHead(ctx);
+    const [binary, ...baseArgs] = codexMcpHead(ctx);
+    const head = [binary!, ...(ctx.sessionRuntime?.interactiveArgs ?? []), ...baseArgs];
     if (ctx.resume === undefined) {
       // Quick-chat seed: `codex [-c …] -- <prompt>` opens the interactive TUI on
       // that prompt ("Optional user prompt to start the session" per `codex
@@ -177,13 +204,13 @@ export const codexAdapter: CliAdapter = {
     _base: readonly string[],
     ctx: SpawnContext,
     prompt: string,
-    overrides?: HeadlessRunOverrides,
   ): readonly string[] {
-    const custom = readCustomProviderSelection(ctx.cwd);
-    const model = overrides?.model ?? custom?.model;
-    const reasoningEffort = overrides?.reasoningEffort ?? custom?.reasoningEffort;
+    const custom = ctx.sessionRuntime ? null : readCustomProviderSelection(ctx.cwd);
+    const model = custom?.model;
+    const reasoningEffort = custom?.reasoningEffort;
     const head = [
       'codex',
+      ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...(model ? ['--model', model] : []),
       ...(reasoningEffort
         ? ['-c', `model_reasoning_effort=${tomlString(reasoningEffort)}`]
@@ -570,7 +597,7 @@ export const codexAdapter: CliAdapter = {
  * the injected `alice*` CLI tools.
  */
 function codexMcpHead(ctx: SpawnContext): string[] {
-  const custom = readCustomProviderSelection(ctx.cwd);
+  const custom = ctx.sessionRuntime ? null : readCustomProviderSelection(ctx.cwd);
   const selection = custom
     ? [
         ...(custom.model ? ['--model', custom.model] : []),

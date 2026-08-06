@@ -69,6 +69,7 @@ const DEFAULT_EXCLUDES = [
   '.opencode/openalice-provider.json',
   '.pi/settings.json',
   '.pi/openalice-provider.json',
+  '.pi/extensions/openalice-provider.ts',
   // Pre-#662 compatibility: never commit an old redirected Pi agent home
   // before the runtime migration has reconciled and removed it.
   '.pi-agent/',
@@ -77,8 +78,8 @@ const DEFAULT_EXCLUDES = [
 /**
  * Append defensive entries to `<outDir>/.git/info/exclude` (per-clone,
  * untracked). Most can carry a per-workspace API key; Pi's local files carry
- * provider selection and reversible injection metadata while the key remains
- * in Pi's user model registry. None should reach a commit. `extra` paths are
+ * provider selection, local registration, and reversible injection metadata.
+ * None should reach a commit. `extra` paths are
  * appended too. Caller must have run `git init`/`clone` first (`.git/` must
  * exist).
  */

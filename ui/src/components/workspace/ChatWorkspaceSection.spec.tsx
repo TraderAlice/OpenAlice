@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkspacesContext, type WorkspacesContextValue } from '../../contexts/workspaces-context'
@@ -111,29 +112,143 @@ function renderSection(
   workspaces: readonly Workspace[] = [chatWorkspace],
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
   onNavigate?: () => void,
+  displayMode: 'focused' | 'recent' | 'multi' = 'multi',
+  onRequestDisplayMode: (mode: 'focused' | 'recent' | 'multi') => void = () => undefined,
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
-      <ChatWorkspaceSection onNavigate={onNavigate} />
+      <ChatWorkspaceSection
+        onNavigate={onNavigate}
+        displayMode={displayMode}
+        onRequestDisplayMode={onRequestDisplayMode}
+      />
     </WorkspacesContext.Provider>,
   )
 }
 
 beforeEach(async () => {
   for (const mock of Object.values(actions)) mock.mockClear()
+  window.localStorage.clear()
   await i18n.changeLanguage('en')
 })
 
 afterEach(cleanup)
 
 describe('ChatWorkspaceSection actions', () => {
-  it('keeps conversation creation primary and scopes workspace creation to the workspace list', () => {
+  it('keeps one durable Workspace focused and starts new conversations inside it', () => {
+    const sessions = [chatSession(1), chatSession(2)]
+    const focusedWorkspace = { ...chatWorkspace, sessions }
+    const onNavigate = vi.fn()
+
+    renderSection([focusedWorkspace], null, onNavigate, 'focused')
+
+    expect(screen.getByText('Recent conversations')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Chat context: chat-jul11' })).toBeTruthy()
+    expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'chat-landing',
+      params: { targetWsId: chatWorkspace.id },
+    })
+    expect(onNavigate).toHaveBeenCalledOnce()
+  })
+
+  it('routes the bottom Workspace context menu into the Workspace tree', () => {
+    const onRequestDisplayMode = vi.fn()
+    renderSection([chatWorkspace], null, undefined, 'focused', onRequestDisplayMode)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
+    expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace tree' }))
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
+  })
+
+  it('keeps Escape scoped to the open Workspace context menu', () => {
+    renderSection([chatWorkspace], null, undefined, 'focused')
+
+    const trigger = screen.getByRole('button', { name: 'Chat context: chat-jul11' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
+
+    const allowed = fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(allowed).toBe(false)
+    expect(screen.queryByRole('dialog', { name: 'Chat Workspace options' })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('offers an explicit recent view and orders sessions across Workspaces with ownership visible', () => {
+    const olderWorkspace = {
+      ...chatWorkspace,
+      sessions: [{ ...chatSession(1), lastActiveAt: '2026-07-01T12:00:00.000Z' }],
+    }
+    const newerWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+      sessions: [{
+        ...chatSession(2),
+        id: 'newest-session',
+        wsId: 'chat-2',
+        lastActiveAt: '2026-08-03T12:00:00.000Z',
+      }],
+    }
+    const onRequestDisplayMode = vi.fn()
+
+    const { unmount } = renderSection(
+      [olderWorkspace, newerWorkspace],
+      null,
+      undefined,
+      'focused',
+      onRequestDisplayMode,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Recent across Workspaces' }))
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('recent')
+    unmount()
+
+    renderSection([olderWorkspace, newerWorkspace], null, undefined, 'recent')
+    const newer = screen.getByRole('button', { name: 'Conversation 2' })
+    const older = screen.getByRole('button', { name: 'Conversation 1' })
+    expect(newer.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('chat-aug3')).toBeTruthy()
+    expect(screen.getByText('chat-jul11')).toBeTruthy()
+    expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
+  })
+
+  it('switches the focused Workspace without expanding the whole tree', () => {
+    const alternative = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+    }
+    const onRequestDisplayMode = vi.fn()
+    renderSection([chatWorkspace, alternative], null, undefined, 'focused', onRequestDisplayMode)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Switch Workspace' }), {
+      target: { value: chatWorkspace.id },
+    })
+
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'chat-landing',
+      params: { targetWsId: chatWorkspace.id },
+    })
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('focused')
+  })
+
+  it('keeps conversation creation primary and scopes workspace creation to the workspace list', async () => {
+    const user = userEvent.setup()
     const onNavigate = vi.fn()
     renderSection([chatWorkspace], null, onNavigate)
 
     const newChat = screen.getByRole('button', { name: 'New chat' })
-    const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
-    const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
+    const workspaceHeading = screen.getByText('Workspaces', { selector: 'span.uppercase' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
     const newSession = screen.getByRole('button', { name: 'New conversation in chat-jul11' })
     const moreWorkspaceActions = screen.getByRole('button', { name: 'More actions for chat-jul11' })
@@ -141,13 +256,12 @@ describe('ChatWorkspaceSection actions', () => {
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
     expect(newChat.querySelector('.lucide-message-square-plus')).toBeTruthy()
-    expect(workspaceHeading.parentElement?.nextElementSibling?.contains(newWorkspace)).toBe(true)
-    expect(newWorkspace.className).toContain('w-full')
-    expect(newWorkspace.textContent).toBe('New workspace')
-    expect(newWorkspace.querySelector('.lucide-panels-top-left')).toBeTruthy()
+    expect(workspaceHeading.parentElement?.nextElementSibling?.tagName).toBe('UL')
+    expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
-    fireEvent.click(moreWorkspaceActions)
+    moreWorkspaceActions.focus()
+    await user.keyboard('{ArrowDown}')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
     expect(onNavigate).not.toHaveBeenCalled()
 
@@ -168,9 +282,13 @@ describe('ChatWorkspaceSection actions', () => {
       params: { targetWsId: chatWorkspace.id },
     })
     expect(onNavigate).toHaveBeenCalledTimes(3)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    expect(screen.getByRole('button', { name: 'New workspace' })).toBeTruthy()
   })
 
-  it('keeps named Workspace identity compact and scopes every row action to it', () => {
+  it('keeps named Workspace identity compact and scopes every row action to it', async () => {
+    const user = userEvent.setup()
     const namedWorkspace: Workspace = {
       ...chatWorkspace,
       id: 'chat-optical',
@@ -192,7 +310,8 @@ describe('ChatWorkspaceSection actions', () => {
     const more = screen.getByRole('button', {
       name: 'More actions for Optical Networking Follow-up (chat-jun30)',
     })
-    fireEvent.click(more)
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     const configure = screen.getByRole('menuitem', {
       name: 'Configure Optical Networking Follow-up (chat-jun30)',
     })
@@ -214,7 +333,9 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([])
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    expect(screen.getByRole('button', { name: 'New workspace' })).toBeTruthy()
   })
 
   it('reports a failed Workspace inventory without pretending the list is empty', () => {
@@ -275,7 +396,8 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledTimes(1)
   })
 
-  it('owns Manager Session navigation and lifecycle actions under the Manager entry', () => {
+  it('owns Manager Session navigation and lifecycle actions under the Manager entry', async () => {
+    const user = userEvent.setup()
     const onNavigate = vi.fn()
     const manager: ManagerWorkspaceSnapshot = {
       id: MANAGER_WORKSPACE_ID,
@@ -343,8 +465,10 @@ describe('ChatWorkspaceSection actions', () => {
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' }))
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('menuitem', { name: 'Delete Coordinate owners' }))
+    const managerMore = within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' })
+    managerMore.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
     expect(onNavigate).toHaveBeenCalledTimes(2)
 

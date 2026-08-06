@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Logger } from './logger.js'
 import { ResumeRegistry } from './resume-registry.js'
 
-const noopLogger = { warn() {} } as unknown as Logger
+const noopLogger = { warn() {}, error() {} } as unknown as Logger
 let dir: string
 let path: string
 
@@ -40,6 +40,39 @@ describe('ResumeRegistry', () => {
       .rejects.toThrow(/belongs to ws-1\/pi/)
   })
 
+  it('persists one immutable secret-free Session runtime binding', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger)
+    const runtimeBinding = {
+      version: 1 as const,
+      credential: {
+        source: 'vault' as const,
+        credentialSlug: 'openai-1',
+        wireShape: 'openai-responses' as const,
+      },
+      model: 'gpt-5.6-terra',
+      reasoningEffort: 'high' as const,
+    }
+    const created = await registry.ensure({
+      resumeId: 'resume-runtime',
+      wsId: 'ws-1',
+      agent: 'codex',
+      runtimeBinding,
+    })
+    expect(created.runtimeBinding).toEqual(runtimeBinding)
+    await expect(registry.ensure({
+      resumeId: created.resumeId,
+      wsId: 'ws-1',
+      agent: 'codex',
+      runtimeBinding: { ...runtimeBinding, model: 'gpt-other' },
+    })).rejects.toThrow(/different runtime binding/)
+
+    expect((await ResumeRegistry.load(path, noopLogger)).get(created.resumeId)?.runtimeBinding)
+      .toEqual(runtimeBinding)
+    const raw = await readFile(path, 'utf8')
+    expect(raw).toContain('openai-1')
+    expect(raw).not.toContain('sk-secret')
+  })
+
   it('keeps legacy UUID identities valid without rewriting them', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger)
     const legacyId = '550e8400-e29b-41d4-a716-446655440000'
@@ -51,6 +84,22 @@ describe('ResumeRegistry', () => {
 
     expect(record.resumeId).toBe(legacyId)
     expect((await ResumeRegistry.load(path, noopLogger)).get(legacyId)?.resumeId).toBe(legacyId)
+  })
+
+  it('fails closed instead of dropping a corrupted persisted runtime binding', async () => {
+    await writeFile(path, JSON.stringify({
+      version: 2,
+      records: [{
+        resumeId: 'resume-corrupt',
+        wsId: 'ws-1',
+        agent: 'codex',
+        createdAt: 1,
+        updatedAt: 1,
+        runtimeBinding: { version: 1, credential: { source: 'vault' } },
+      }],
+    }))
+
+    await expect(ResumeRegistry.load(path, noopLogger)).rejects.toThrow(/invalid Session runtime binding/)
   })
 
   it('lists one workspace newest-first for directory projection', async () => {

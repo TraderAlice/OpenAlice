@@ -38,6 +38,7 @@ const files = new Map([
   ['default/persona.default.md', '# OpenAlice\n'],
   ['src/workspaces/templates/.keep', 'fixture\n'],
   ['src/workspaces/cli/bin/openalice-cli.cjs', 'module.exports = {}\n'],
+  ['src/workspaces/cli/bin/pi-session-provider.ts', 'export {}\n'],
   ['services/uta/dist/uta.js', 'export {}\n'],
   ['services/connector/dist/connector.cjs', 'module.exports = {}\n'],
   ['packages/guardian-runtime/dist/index.js', 'export {}\n'],

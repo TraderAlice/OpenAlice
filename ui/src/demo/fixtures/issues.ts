@@ -45,7 +45,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           title: 'Morning movers scan',
           status: 'in_progress',
           priority: 'high',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
           agent: 'codex',
           when: { kind: 'cron', cron: '30 8 * * 1-5', timezone: 'America/New_York' },
           lastFiredAtMs: now - HOUR,
@@ -92,7 +92,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           title: 'Liquidity risk review',
           status: 'todo',
           priority: 'high',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
           nameCollision: true,
         },
       ],
@@ -108,7 +108,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           title: 'Weekly macro digest',
           status: 'in_progress',
           priority: 'medium',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
           agent: 'codex',
           when: { kind: 'cron', cron: '0 16 * * 5', timezone: 'local' },
           lastFiredAtMs: now - 2 * DAY,
@@ -125,7 +125,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           when: { kind: 'at', at: new Date(now + 3 * DAY).toISOString() },
           lastFiredAtMs: null,
           nextDueAtMs: now + 3 * DAY,
-          automationHealth: { state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @workspace.' },
+          automationHealth: { state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @new-each-run.' },
         },
         // Completed work item.
         {
@@ -507,6 +507,7 @@ export function demoIssueUpdate(
     boardIssue.assignee = patch.assignee
     if (patch.assignee.startsWith('@resume-')) {
       delete boardIssue.agent
+      delete boardIssue.credential
       delete boardIssue.model
       delete boardIssue.effort
     }
@@ -536,6 +537,10 @@ export function demoIssueUpdate(
   if (patch.model !== undefined) {
     if (patch.model === null) delete boardIssue.model
     else boardIssue.model = patch.model
+  }
+  if (patch.credential !== undefined) {
+    if (patch.credential === null) delete boardIssue.credential
+    else boardIssue.credential = patch.credential
   }
   if (patch.effort !== undefined) {
     if (patch.effort === null) delete boardIssue.effort

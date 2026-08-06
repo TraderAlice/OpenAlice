@@ -224,6 +224,17 @@
   border-top: 1px solid var(--border);
   font-size: 12px;
 }
+.resume-cta-error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 45%, var(--border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  color: var(--destructive);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
 .resume-cta-meta dt {
   color: var(--muted-foreground);
   margin: 0;

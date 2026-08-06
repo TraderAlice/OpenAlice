@@ -20,6 +20,11 @@ import {
   type ThemePreferenceSlot,
 } from '../theme/palettes'
 import { useThemeStore, type AppTheme } from '../theme/store'
+import {
+  UI_STYLE_PROFILES,
+  type UiStyleProfileDefinition,
+  type UiStyleProfileId,
+} from '../theme/styleProfiles'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { AboutOpenAliceSection } from '../components/settings/AboutOpenAliceSection'
 
@@ -36,16 +41,28 @@ export function AppearanceSection() {
   const theme = useThemeStore((s) => s.theme)
   const dayPalette = useThemeStore((s) => s.dayPalette)
   const nightPalette = useThemeStore((s) => s.nightPalette)
+  const uiStyle = useThemeStore((s) => s.uiStyle)
+  const stylePaletteMode = useThemeStore((s) => s.stylePaletteMode)
   const setTheme = useThemeStore((s) => s.setTheme)
   const setDayPalette = useThemeStore((s) => s.setDayPalette)
   const setNightPalette = useThemeStore((s) => s.setNightPalette)
+  const setUiStyle = useThemeStore((s) => s.setUiStyle)
+  const setStylePaletteMode = useThemeStore((s) => s.setStylePaletteMode)
   const effectiveSlot = useEffectivePreferenceSlot()
   const [editingSlot, setEditingSlot] = useState<ThemePreferenceSlot>(effectiveSlot)
   const [paletteFilter, setPaletteFilter] = useState<PaletteLibraryFilter>('recommended')
   const [customizingPalettes, setCustomizingPalettes] = useState(false)
   const paletteEditorId = useId()
   const modes: readonly AppTheme[] = ['auto', 'day', 'night']
-  const activePalette = effectiveSlot === 'day' ? dayPalette : nightPalette
+  const activeStyleDefinition: UiStyleProfileDefinition = UI_STYLE_PROFILES.find(
+    (profile) => profile.id === uiStyle,
+  )!
+  const recommendedPalettePair = activeStyleDefinition.recommendedPalettePair
+  const recommendedPaletteApplied = recommendedPalettePair != null && stylePaletteMode === 'recommended'
+  const effectivePalettePair = recommendedPaletteApplied ? recommendedPalettePair : undefined
+  const activePalette = effectiveSlot === 'day'
+    ? effectivePalettePair?.day ?? dayPalette
+    : effectivePalettePair?.night ?? nightPalette
   const activePaletteDefinition = paletteDefinition(activePalette)
   const editingPalette = editingSlot === 'day' ? dayPalette : nightPalette
   const recommendedAppearance = editingSlot === 'day' ? 'light' : 'dark'
@@ -69,19 +86,96 @@ export function AppearanceSection() {
   }
 
   const choosePalette = (palette: ThemePaletteId) => {
+    if (recommendedPaletteApplied) setStylePaletteMode('saved')
     if (editingSlot === 'day') setDayPalette(palette)
     else setNightPalette(palette)
   }
 
   const resetPair = () => {
+    if (recommendedPaletteApplied) setStylePaletteMode('saved')
     setDayPalette(DEFAULT_DAY_PALETTE)
     setNightPalette(DEFAULT_NIGHT_PALETTE)
     setPaletteFilter('recommended')
   }
 
+  const applyRecommendedPalette = () => {
+    if (!recommendedPalettePair) return
+    setStylePaletteMode(recommendedPaletteApplied ? 'saved' : 'recommended')
+  }
+
   return (
     <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
       <div className="border-b border-border/60 pb-5">
+        <div>
+          <span className="text-sm font-medium text-foreground">
+            {t('settings.appearance.interfaceStyle')}
+          </span>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+            {t('settings.appearance.interfaceStyleDescription')}
+          </p>
+        </div>
+        <div
+          className="mt-3 grid gap-2.5 sm:grid-cols-3"
+          role="radiogroup"
+          aria-label={t('settings.appearance.interfaceStyle')}
+        >
+          {UI_STYLE_PROFILES.map((profile) => (
+            <StyleProfileCard
+              key={profile.id}
+              profile={profile.id}
+              label={t(profile.labelKey)}
+              description={t(profile.descriptionKey)}
+              selected={uiStyle === profile.id}
+              onSelect={setUiStyle}
+            />
+          ))}
+        </div>
+        {recommendedPalettePair && (
+          <div
+            data-palette-preview={recommendedPalettePair.day}
+            className="oa-palette-preview mt-3 flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center"
+          >
+            <span className="oa-palette-preview-shell flex h-11 w-full shrink-0 overflow-hidden rounded border sm:w-24" aria-hidden>
+              <span className="oa-palette-preview-sidebar flex w-6 shrink-0 items-center justify-center border-r">
+                <span className="oa-palette-preview-sidebar-dot h-2 w-2 rounded-full" />
+              </span>
+              <span className="oa-palette-preview-canvas flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-2">
+                <span className="oa-palette-preview-primary-line h-1.5 w-3/5 rounded-full" />
+                <span className="oa-palette-preview-muted-line h-1 w-full rounded-full" />
+                <span className="oa-palette-preview-muted-line h-1 w-3/4 rounded-full" />
+              </span>
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-[12px] font-semibold text-foreground">
+                {t('settings.appearance.recommendedPalette', {
+                  style: t(activeStyleDefinition.labelKey),
+                })}
+              </span>
+              <p className="mt-0.5 text-[10.5px] leading-snug text-muted-foreground">
+                {t('settings.appearance.recommendedPaletteDescription', {
+                  palette: t(paletteDefinition(recommendedPalettePair.day).labelKey),
+                })}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={applyRecommendedPalette}
+              aria-pressed={recommendedPaletteApplied}
+              className={`oa-pressable min-h-10 shrink-0 rounded-md border px-3 py-1.5 text-[11px] font-medium sm:min-h-8 ${
+                recommendedPaletteApplied
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-foreground hover:border-primary/35 hover:text-primary'
+              }`}
+            >
+              {t(recommendedPaletteApplied
+                ? 'settings.appearance.useSavedPalettes'
+                : 'settings.appearance.applyRecommendedPalette')}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="border-b border-border/60 py-5">
         <div>
           <span className="text-sm font-medium text-foreground">
             {t('settings.appearance.colorMode')}
@@ -234,6 +328,44 @@ export function AppearanceSection() {
       </div>
 
     </ConfigSection>
+  )
+}
+
+function StyleProfileCard({
+  profile,
+  label,
+  description,
+  selected,
+  onSelect,
+}: {
+  profile: UiStyleProfileId
+  label: string
+  description: string
+  selected: boolean
+  onSelect: (profile: UiStyleProfileId) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={label}
+      data-ui-style-preview={profile}
+      data-selected={selected}
+      onClick={() => onSelect(profile)}
+      className="oa-style-profile-card oa-pressable min-h-24 min-w-0 border border-border bg-background p-2.5 text-left"
+    >
+      <span className="oa-style-profile-preview flex h-10 overflow-hidden border border-border bg-card" aria-hidden>
+        <span className="oa-style-profile-rail w-3.5 shrink-0 border-r border-border bg-sidebar" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1 p-1.5">
+          <span className="oa-style-profile-toolbar h-1.5 w-full bg-muted" />
+          <span className="oa-style-profile-row h-2 w-4/5 border border-border bg-background" />
+          <span className="oa-style-profile-row h-2 w-3/5 border border-border bg-background" />
+        </span>
+      </span>
+      <span className="mt-2 block text-[12px] font-semibold text-foreground">{label}</span>
+      <span className="mt-0.5 block text-[10.5px] leading-snug text-muted-foreground">{description}</span>
+    </button>
   )
 }
 

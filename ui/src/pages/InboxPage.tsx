@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Skeleton } from '../components/StateViews'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { FileContentView } from '../components/FileContentView'
@@ -255,7 +256,6 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   const [continuing, setContinuing] = useState(false)
   const [continueError, setContinueError] = useState<string | null>(null)
   const [senderPopoverOpen, setSenderPopoverOpen] = useState(false)
-  const senderPopoverRef = useRef<HTMLSpanElement>(null)
   const senderTriggerRef = useRef<HTMLButtonElement>(null)
   // Resolve the issue id (a filename stem) to its display title via the warm,
   // process-cached board snapshot — a cheap path (no extra fetch on the hot
@@ -270,27 +270,6 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
   useEffect(() => {
     setSenderPopoverOpen(false)
   }, [entry.id])
-
-  useEffect(() => {
-    if (!senderPopoverOpen) return
-    const closeOnOutsideClick = (event: globalThis.MouseEvent) => {
-      if (!senderPopoverRef.current?.contains(event.target as Node)) {
-        setSenderPopoverOpen(false)
-      }
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setSenderPopoverOpen(false)
-      senderTriggerRef.current?.focus({ preventScroll: true })
-    }
-    document.addEventListener('mousedown', closeOnOutsideClick)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [senderPopoverOpen])
 
   const openWorkspace = () => {
     if (!wsAlive) return
@@ -367,29 +346,31 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 {displayLabel}
               </span>
               {senderLabel && senderDisplay && (
-                <span ref={senderPopoverRef} className="relative inline-flex min-w-0 items-center">
+                <span className="inline-flex min-w-0 items-center">
                   <ChevronRight size={11} className="mr-1 shrink-0 text-muted-foreground/35" aria-hidden />
-                  <button
-                    ref={senderTriggerRef}
-                    type="button"
-                    aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
-                    aria-haspopup="dialog"
-                    aria-expanded={senderPopoverOpen}
-                    aria-controls={`inbox-sender-${entry.id}`}
-                    onClick={() => setSenderPopoverOpen((open) => !open)}
-                    className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[11px] font-medium text-muted-foreground/75 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-0"
-                  >
-                    {origin?.kind === 'interactive'
-                      ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
-                      : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
-                    <span>{t('inbox.fromSender', { sender: senderDisplay })}</span>
-                  </button>
-                  {senderPopoverOpen && (
-                    <div
+                  <Popover open={senderPopoverOpen} onOpenChange={setSenderPopoverOpen}>
+                    <PopoverTrigger
+                      render={<button
+                        ref={senderTriggerRef}
+                        type="button"
+                        aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
+                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[11px] font-medium text-muted-foreground/75 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-0"
+                      />}
+                    >
+                        {origin?.kind === 'interactive'
+                          ? <Terminal size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />
+                          : <Bot size={12} strokeWidth={1.75} className="shrink-0" aria-hidden />}
+                        <span>{t('inbox.fromSender', { sender: senderDisplay })}</span>
+                    </PopoverTrigger>
+                    <PopoverContent
                       id={`inbox-sender-${entry.id}`}
                       role="dialog"
                       aria-label={t('inbox.senderIdentityTitle', { sender: senderLabel })}
-                      className="oa-popover-enter absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg"
+                      align="start"
+                      sideOffset={8}
+                      initialFocus={false}
+                      finalFocus={senderTriggerRef}
+                      className="z-30 w-72 max-w-[calc(100vw-3rem)] gap-0 rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg ring-0"
                     >
                       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
                         {t('inbox.senderSession')}
@@ -416,8 +397,8 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                               : t('inbox.openWorkspace')}
                         </button>
                       )}
-                    </div>
-                  )}
+                    </PopoverContent>
+                  </Popover>
                 </span>
               )}
               {issueId && (

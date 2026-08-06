@@ -63,6 +63,11 @@ const { port: uiPort, strictPort } = readUiPort()
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
   // Inject the backend port as a compile-time constant so the dev client can
   // open the PTY WebSocket *directly* against the backend, bypassing the Vite
   // dev proxy. node-http-proxy's WS upgrade forwarding chokes under the

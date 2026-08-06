@@ -356,6 +356,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       credentialSlug?: string,
       targetWsId?: string,
       template?: 'chat' | 'auto-quant-v2',
+      model?: string | null,
+      reasoningEffort?: import('../api').ModelReasoningEffort,
     ): Promise<string> => {
       await ensureTerminalAppearancePublished()
       const { workspace, session } = await apiQuickChat(
@@ -364,6 +366,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         credentialSlug,
         targetWsId,
         template,
+        model,
+        reasoningEffort,
       )
       const nowIso = new Date().toISOString()
       const newRecord: SessionRecord = {
@@ -415,8 +419,16 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     prompt: string,
     agent: string,
     credentialSlug?: string,
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
   ): Promise<ManagerQuickStartResult> => {
-    const result = await apiQuickStartWorkspaceManager(prompt, agent, credentialSlug)
+    const result = await apiQuickStartWorkspaceManager(
+      prompt,
+      agent,
+      credentialSlug,
+      model,
+      reasoningEffort,
+    )
     setWorkspaceManager(result.manager)
     setWorkspaceManagerLoaded(true)
     setWorkspaceManagerError(null)
@@ -447,19 +459,17 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     async (wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void> => {
       await ensureTerminalAppearancePublished()
       const resp = await apiResumeSession(wsId, sessionId)
-      if (resp) {
-        const patch = {
-          state: 'running' as const,
-          surface: 'terminal' as const,
-          pid: resp.pid,
-          startedAt: resp.startedAt,
-          lastActiveAt: new Date().toISOString(),
-        }
-        if (wsId === MANAGER_WORKSPACE_ID) {
-          setWorkspaceManager((current) => patchManagerSession(current, sessionId, patch))
-        } else {
-          setWorkspaces((prev) => patchSession(prev, wsId, sessionId, patch))
-        }
+      const patch = {
+        state: 'running' as const,
+        surface: 'terminal' as const,
+        pid: resp.pid,
+        startedAt: resp.startedAt,
+        lastActiveAt: new Date().toISOString(),
+      }
+      if (wsId === MANAGER_WORKSPACE_ID) {
+        setWorkspaceManager((current) => patchManagerSession(current, sessionId, patch))
+      } else {
+        setWorkspaces((prev) => patchSession(prev, wsId, sessionId, patch))
       }
       if (wsId === MANAGER_WORKSPACE_ID) {
         openOrFocus({ kind: 'workspace-manager', params: { sessionId } })

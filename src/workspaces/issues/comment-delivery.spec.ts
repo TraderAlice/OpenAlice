@@ -49,7 +49,7 @@ describe('dispatchIssueCommentReply', () => {
   it('keeps agent-authored workspace-owned comments as notes', async () => {
     expect(await dispatchIssueCommentReply({
       issueWorkspaceId: 'ws-home',
-      issue: issue('@workspace'),
+      issue: issue('@new-each-run'),
       comment,
       source: { kind: 'workspace', workspaceId: 'ws-home' },
     })).toEqual({ status: 'not_requested', reason: 'non_human_note' })
@@ -78,7 +78,7 @@ describe('dispatchIssueCommentReply', () => {
     expect(await dispatchIssueCommentReply({
       conversation: control,
       issueWorkspaceId: 'ws-home',
-      issue: issue('@workspace'),
+      issue: issue('@new-each-run'),
       comment,
       source: { kind: 'human' },
     })).toEqual({

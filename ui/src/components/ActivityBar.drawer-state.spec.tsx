@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ActivityBar } from './ActivityBar'
@@ -69,22 +70,26 @@ afterEach(() => {
 })
 
 describe('ActivityBar mobile drawer state', () => {
-  it('keeps the closed mobile drawer out of navigation without hiding the desktop rail', () => {
+  it('unmounts the closed mobile drawer without hiding the desktop rail', () => {
     const onClose = vi.fn()
     const { rerender } = render(
       <ActivityBar open={false} onClose={onClose} desktopStatic={false} />,
     )
-    const activityBar = screen.getByTestId('activity-bar')
-
-    expect(activityBar.getAttribute('aria-hidden')).toBe('true')
-    expect(activityBar.hasAttribute('inert')).toBe(true)
+    expect(screen.queryByTestId('activity-bar')).toBeNull()
 
     rerender(<ActivityBar open onClose={onClose} desktopStatic={false} />)
-    expect(activityBar.getAttribute('aria-hidden')).toBe('false')
-    expect(activityBar.hasAttribute('inert')).toBe(false)
+    const mobileActivityBar = screen.getByTestId('activity-bar')
+    expect(mobileActivityBar.getAttribute('data-slot')).toBe('sheet-content')
+    expect(mobileActivityBar.getAttribute('role')).toBe('dialog')
+    expect(mobileActivityBar.getAttribute('aria-modal')).toBe('true')
+    expect(mobileActivityBar.className).toContain('data-[side=left]:w-[280px]')
+
+    rerender(<ActivityBar open={false} onClose={onClose} desktopStatic={false} />)
+    expect(screen.queryByTestId('activity-bar')).toBeNull()
 
     rerender(<ActivityBar open={false} onClose={onClose} desktopStatic />)
-    expect(activityBar.getAttribute('aria-hidden')).toBe('false')
+    const activityBar = screen.getByTestId('activity-bar')
+    expect(activityBar.getAttribute('aria-hidden')).toBeNull()
     expect(activityBar.hasAttribute('inert')).toBe(false)
     expect(activityBar.getAttribute('role')).toBeNull()
     expect(activityBar.getAttribute('aria-modal')).toBeNull()
@@ -109,7 +114,19 @@ describe('ActivityBar mobile drawer state', () => {
     expect(sectionInfo.className).toContain('md:min-w-7')
   })
 
-  it('contains mobile focus, closes on Escape, and restores the trigger', () => {
+  it('dismisses through the shared Sheet overlay', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<ActivityBar open onClose={onClose} desktopStatic={false} />)
+
+    const overlay = document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')
+    expect(overlay).toBeTruthy()
+    await user.click(overlay!)
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('contains mobile focus, closes on Escape, and restores the trigger', async () => {
+    const user = userEvent.setup()
     const trigger = document.createElement('button')
     document.body.append(trigger)
     trigger.focus()
@@ -128,24 +145,22 @@ describe('ActivityBar mobile drawer state', () => {
     const currentDestination = screen.getByRole('button', { name: 'Settings' })
     const firstAction = screen.getByRole('button', { name: 'Ask Alice' })
     const lastAction = screen.getByRole('button', { name: 'Dev Panel' })
-    const backdrop = document.querySelector<HTMLElement>('.bg-backdrop')
+    const backdrop = document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')
 
     expect(drawer.getAttribute('aria-modal')).toBe('true')
-    expect(drawer.getAttribute('tabindex')).toBe('-1')
-    expect(document.activeElement).toBe(currentDestination)
+    await waitFor(() => expect(document.activeElement).toBe(currentDestination))
     expect(drawer.className).toContain('motion-reduce:transition-none')
     expect(backdrop?.getAttribute('aria-hidden')).toBe('true')
-    expect(backdrop?.className).toContain('motion-reduce:transition-none')
 
     lastAction.focus()
-    fireEvent.keyDown(document, { key: 'Tab' })
-    expect(document.activeElement).toBe(firstAction)
+    await user.tab()
+    await waitFor(() => expect(document.activeElement).toBe(firstAction))
 
     firstAction.focus()
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(lastAction)
+    await user.tab({ shift: true })
+    await waitFor(() => expect(document.activeElement).toBe(lastAction))
 
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
 
     rerender(
@@ -156,7 +171,7 @@ describe('ActivityBar mobile drawer state', () => {
         returnFocusRef={returnFocusRef}
       />,
     )
-    expect(document.activeElement).toBe(trigger)
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
     trigger.remove()
   })
 })

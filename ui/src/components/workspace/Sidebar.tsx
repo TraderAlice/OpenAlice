@@ -627,6 +627,7 @@ function HeadlessTaskRow(props: {
 export interface SessionRowProps {
   reorderId?: string;
   session: SessionRecord;
+  subtitle?: string;
   isActive: boolean;
   onSelect: () => void;
   onPause: () => void;
@@ -649,27 +650,37 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   if (isPaused) metaParts.push(t('workspace.paused'));
   const meta = metaParts.join(' · ');
   // Full message on hover when it's been truncated, then the technical meta.
-  const tooltip = s.title?.trim() ? `${s.title.trim()}\n${meta}` : meta;
+  const tooltipParts = [s.title?.trim() || null, props.subtitle, meta].filter(Boolean);
+  const tooltip = tooltipParts.join('\n');
 
   return (
     <div
       data-reorder-id={props.reorderId}
-      className={`group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
+      data-active={props.isActive}
+      className={`oa-session-row group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
         props.isActive ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
     >
       {props.isActive && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
       <button
         type="button"
-        className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
+        className="oa-session-row-main flex-1 min-w-0 flex items-center gap-1.5 text-left"
         onClick={props.onSelect}
         title={tooltip}
+        aria-label={display}
         aria-current={props.isActive ? 'page' : undefined}
       >
         <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused ? 'text-muted-foreground/40' : 'text-muted-foreground/70'}`}>
           <AgentBadgeGlyph agentId={s.agent} />
         </span>
-        <span className={`truncate ${isPaused ? 'text-muted-foreground' : 'text-foreground'}`}>{display}</span>
+        <span className="min-w-0 flex-1">
+          <span className={`block truncate ${isPaused ? 'text-muted-foreground' : 'text-foreground'}`}>{display}</span>
+          {props.subtitle && (
+            <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground/55">
+              {props.subtitle}
+            </span>
+          )}
+        </span>
       </button>
       {/* Right-aligned, always-visible state-as-action: a running session shows
           STOP (■, click to pause it); a paused one shows PLAY (▶, click to

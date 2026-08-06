@@ -69,7 +69,7 @@ describe('readWorkspaceIssues', () => {
         title: 'Fix the login bug',
         status: 'todo',
         priority: 'none',
-        assignee: '@workspace',
+        assignee: '@unassigned',
       })
       expect(i.when).toBeUndefined()
       expect(isFireable(i)).toBe(false)
@@ -93,10 +93,11 @@ describe('readWorkspaceIssues', () => {
           'title: Morning research sweep',
           'status: in_progress',
           'priority: high',
-          'assignee: "@workspace"',
+          'assignee: "@new-each-run"',
           'when: { kind: every, every: 30m }',
           'what: run the research routine',
           'agent: codex',
+          'credential: openai-primary',
           'model: gpt-5.6',
           'effort: high',
         ].join('\n'),
@@ -113,9 +114,10 @@ describe('readWorkspaceIssues', () => {
         title: 'Morning research sweep',
         status: 'in_progress',
         priority: 'high',
-        assignee: '@workspace',
+        assignee: '@new-each-run',
         what: 'run the research routine\n\n## Context\n\nScan overnight movers and summarize.',
         agent: 'codex',
+        credential: 'openai-primary',
         model: 'gpt-5.6',
         effort: 'high',
       })
@@ -137,7 +139,29 @@ describe('readWorkspaceIssues', () => {
     if (!result.ok) return
     const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
     expect(issueAssigneeResumeId(byId['owned'].assignee)).toBe('resume-kind-owl-abc123')
-    expect(byId['legacy'].assignee).toBe('@new')
+    expect(byId['legacy'].assignee).toBe('@new-then-resume')
+  })
+
+  it('reads deprecated assignee aliases as canonical values until migration 0033 runs', async () => {
+    await writeIssue('old-each', fm([
+      'title: Old each-run policy',
+      'assignee: "@workspace"',
+      'when: { kind: every, every: 30m }',
+    ].join('\n')))
+    await writeIssue('old-sticky', fm([
+      'title: Old sticky policy',
+      'assignee: "@new"',
+      'when: { kind: every, every: 30m }',
+    ].join('\n')))
+    await writeIssue('old-plain', fm('title: Old plain owner\nassignee: "@workspace"'))
+
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
+    expect(byId['old-each'].assignee).toBe('@new-each-run')
+    expect(byId['old-sticky'].assignee).toBe('@new-then-resume')
+    expect(byId['old-plain'].assignee).toBe('@unassigned')
   })
 
   it('rejects every runtime override on an exact Session owner', async () => {
@@ -146,13 +170,14 @@ describe('readWorkspaceIssues', () => {
       'when: { kind: every, every: 30m }',
       'assignee: "@resume-kind-owl-abc123"',
       'agent: codex',
+      'credential: openai-primary',
       'model: gpt-5.6',
       'effort: high',
     ].join('\n')))
     const result = await readWorkspaceIssues(dir)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.invalid[0]?.error).toMatch(/agent.*model.*effort/)
+    expect(result.invalid[0]?.error).toMatch(/agent.*credential.*model.*effort/)
   })
 
   it('rejects retired execution declarations instead of silently keeping two owner models', async () => {

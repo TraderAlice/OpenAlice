@@ -7,12 +7,13 @@ import {
   snapshotRuntimeReadiness,
   type AgentRuntimeReadinessRow,
 } from './agent-runtime-readiness.js';
-import type { CliAdapter } from './cli-adapter.js';
+import { emptyAgentSessionRuntime, type CliAdapter } from './cli-adapter.js';
 import type { HeadlessTaskResult } from './headless-task.js';
 
 const piAdapter: CliAdapter = {
   id: 'pi',
   displayName: 'Pi',
+  sessionRuntime: emptyAgentSessionRuntime,
   kind: 'agent',
   binary: 'pi',
   capabilities: {
@@ -21,6 +22,10 @@ const piAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'none',
     headless: true,
+    aiProvider: {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['openai-chat'],
+    },
   },
   composeCommand: () => ['pi'],
   composeHeadlessCommand: () => ['pi', '-p', 'hi'],
@@ -64,6 +69,18 @@ describe('agent runtime readiness helpers', () => {
       })),
     ).toBe('failed');
     expect(classifyRuntimeReadinessFailure(result({ stderrTail: 'boom' }))).toBe('failed');
+  });
+
+  it('routes missing native provider state to CLI login for a login-capable runtime', () => {
+    expect(failedRuntimeReadinessRow({
+      adapter: piAdapter,
+      availability: { installed: true, path: '/usr/bin/pi' },
+      result: result({ stderrTail: 'missing API key provider config' }),
+      source: 'global-login',
+    })).toMatchObject({
+      status: 'provider_required',
+      repairTarget: 'cli-login',
+    });
   });
 
   it('requires a clean exit with a decoded assistant reply to count as ready', () => {

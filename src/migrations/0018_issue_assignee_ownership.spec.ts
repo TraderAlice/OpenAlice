@@ -65,7 +65,7 @@ Do fresh work.
     expect(issues.ok).toBe(true)
     if (!issues.ok) return
     expect(issues.issues.map((issue) => [issue.id, issue.assignee])).toEqual([
-      ['fresh', '@workspace'],
+      ['fresh', '@new-each-run'],
       ['owned', '@resume-calm-cedar-a1b2c3'],
     ])
   })
@@ -93,7 +93,7 @@ Human-owned.
     if (!issues.ok) return
     expect(issues.issues.map((issue) => [issue.id, issue.assignee])).toEqual([
       ['human', '@human'],
-      ['workspace', '@workspace'],
+      ['workspace', '@unassigned'],
     ])
   })
 })

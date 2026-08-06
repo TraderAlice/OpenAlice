@@ -40,6 +40,8 @@ export interface WorkspacesContextValue {
     prompt: string,
     agent: string,
     credentialSlug?: string,
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
   ): Promise<ManagerQuickStartResult>
   spawn(wsId: string, opts?: SpawnOpts, source?: WorkspaceSource): Promise<void>
   openHeadlessRun(
@@ -57,6 +59,8 @@ export interface WorkspacesContextValue {
     credentialSlug?: string,
     targetWsId?: string,
     template?: 'chat' | 'auto-quant-v2',
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
   ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>

@@ -5,8 +5,8 @@ import { promisify } from 'node:util';
 
 import type {
   CliAdapter,
-  HeadlessRunOverrides,
   OnDiskSession,
+  ResolvedSessionRuntimeBinding,
   SpawnContext,
   WorkspaceAiCred,
 } from '../cli-adapter.js';
@@ -26,6 +26,7 @@ const OPENCODE_TUI_CONFIG_PATH = 'tui.json';
 const OPENCODE_TUI_CONFIGC_PATH = 'tui.jsonc';
 const OPENCODE_BINDING_STATE_PATH = '.opencode/openalice-provider.json';
 const OPENCODE_PROVIDER_NAME = 'workspace';
+const OPENCODE_SESSION_PROVIDER_NAME = 'openalice-session';
 const OPENCODE_SYSTEM_THEME = 'system';
 const OPENCODE_OWNED_PATHS = [
   ['$schema'],
@@ -80,68 +81,6 @@ export function openCodeSessionTitle(
   return title || null;
 }
 
-function opencodeRunModel(cwd: string, model: string): string {
-  if (model.includes('/')) return model;
-  try {
-    const config = JSON.parse(readFileSync(join(cwd, OPENCODE_CONFIG_PATH), 'utf8')) as Record<string, unknown>;
-    const providers = config['provider'];
-    const workspace = providers && typeof providers === 'object'
-      ? (providers as Record<string, unknown>)[OPENCODE_PROVIDER_NAME]
-      : null;
-    const models = workspace && typeof workspace === 'object'
-      ? (workspace as Record<string, unknown>)['models']
-      : null;
-    if (models && typeof models === 'object') {
-      if (Object.prototype.hasOwnProperty.call(models, model)) {
-        return `${OPENCODE_PROVIDER_NAME}/${model}`;
-      }
-      throw new Error(
-        `OpenCode model override "${model}" is not registered by this Workspace provider; use a provider/model id or save that model in Workspace AI settings first`,
-      );
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith('OpenCode model override')) throw err;
-  }
-  return model;
-}
-
-function opencodeRunVariant(
-  cwd: string,
-  requestedModel: string | undefined,
-  effort: ModelReasoningEffort,
-): string {
-  if (requestedModel?.includes('/')) return effort;
-  try {
-    const config = JSON.parse(readFileSync(join(cwd, OPENCODE_CONFIG_PATH), 'utf8')) as Record<string, unknown>;
-    const topModel = typeof config['model'] === 'string' ? config['model'] : null;
-    const model = requestedModel
-      ?? (topModel?.startsWith(`${OPENCODE_PROVIDER_NAME}/`)
-        ? topModel.slice(OPENCODE_PROVIDER_NAME.length + 1)
-        : null);
-    if (!model) return effort;
-    const providers = config['provider'];
-    const workspace = providers && typeof providers === 'object'
-      ? (providers as Record<string, unknown>)[OPENCODE_PROVIDER_NAME]
-      : null;
-    const models = workspace && typeof workspace === 'object'
-      ? (workspace as Record<string, unknown>)['models']
-      : null;
-    const modelConfig = models && typeof models === 'object'
-      ? (models as Record<string, unknown>)[model]
-      : null;
-    if (!modelConfig || typeof modelConfig !== 'object') return effort;
-    const variants = (modelConfig as Record<string, unknown>)['variants'];
-    if (!variants || typeof variants !== 'object' || !Object.prototype.hasOwnProperty.call(variants, effort)) {
-      throw new Error(
-        `OpenCode effort override "${effort}" is not registered for Workspace model "${model}"`,
-      );
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith('OpenCode effort override')) throw err;
-  }
-  return effort;
-}
-
 function modelEffortOptions(
   cred: WorkspaceAiCred,
   effort = cred.reasoningEffort,
@@ -173,6 +112,37 @@ function modelEffortVariants(cred: WorkspaceAiCred): Record<string, Record<strin
       modelEffortOptions(cred, effort) ?? {},
     ]),
   );
+}
+
+function openCodeProvider(cred: WorkspaceAiCred, name: string): Record<string, unknown> {
+  const options: Record<string, unknown> = {};
+  if (cred.baseUrl) options['baseURL'] = cred.baseUrl;
+  if (cred.apiKey) {
+    if (cred.wireShape === 'anthropic' && cred.authMode === 'bearer') {
+      options['headers'] = { Authorization: `Bearer ${cred.apiKey}` };
+    } else {
+      options['apiKey'] = cred.apiKey;
+    }
+  }
+  const npm = cred.wireShape === 'anthropic' ? '@ai-sdk/anthropic'
+    : cred.wireShape === 'google-generative-ai' ? '@ai-sdk/google'
+    : cred.wireShape === 'openai-responses' ? '@ai-sdk/openai'
+    : OPENCODE_SDK_NPM;
+  const provider: Record<string, unknown> = { npm, name, options };
+  if (cred.model) {
+    const model: Record<string, unknown> = { name: cred.model };
+    if (typeof cred.reasoning === 'boolean') model['reasoning'] = cred.reasoning;
+    const effortOptions = modelEffortOptions(cred);
+    if (effortOptions) model['options'] = effortOptions;
+    const effortVariants = modelEffortVariants(cred);
+    if (effortVariants) model['variants'] = effortVariants;
+    const contextWindow = positiveNumber(cred.contextWindow);
+    if (contextWindow !== null) {
+      model['limit'] = { context: contextWindow, output: DEFAULT_OUTPUT_TOKENS };
+    }
+    provider['models'] = { [cred.model]: model };
+  }
+  return provider;
 }
 
 function readModelEffort(
@@ -327,7 +297,7 @@ export const opencodeAdapter: CliAdapter = {
     transcriptDiscovery: 'subprocess',
     headless: true,
     aiProvider: {
-      credentialSource: 'workspace-required',
+      credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
       defaultWire: 'openai-chat',
       vendorPolicies: {
@@ -344,6 +314,32 @@ export const opencodeAdapter: CliAdapter = {
     },
   },
 
+  sessionRuntime: {
+    project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
+      const ai = runtime.ai;
+      const model = runtime.binding.model;
+      const selectedModel = ai && (ai.apiKey || ai.baseUrl) && model
+        ? `${OPENCODE_SESSION_PROVIDER_NAME}/${model}`
+        : model;
+      const args = [
+        ...(selectedModel ? ['--model', selectedModel] : []),
+        ...(runtime.binding.reasoningEffort
+          ? ['--variant', runtime.binding.reasoningEffort]
+          : []),
+      ];
+      const env: Record<string, string> = {};
+      if (ai && (ai.apiKey || ai.baseUrl)) {
+        env['OPENCODE_CONFIG_CONTENT'] = JSON.stringify({
+          provider: {
+            [OPENCODE_SESSION_PROVIDER_NAME]: openCodeProvider(ai, 'OpenAlice Session provider'),
+          },
+          ...(selectedModel ? { model: selectedModel } : {}),
+        });
+      }
+      return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
+    },
+  },
+
   lifecycle: {
     async prepareWorkspace({ cwd }): Promise<void> {
       await syncOpenCodeWorkspaceTheme(cwd);
@@ -354,7 +350,7 @@ export const opencodeAdapter: CliAdapter = {
     // Tool access is via the injected CLI shims, so the command head is just
     // the binary + a resume flag (if any). Resume is a top-level flag on the
     // bare TUI — verified against opencode 1.16.0.
-    const head = ['opencode'];
+    const head = ['opencode', ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
     if (ctx.resume === undefined) {
       // Quick-chat seed: `opencode --prompt <text>` opens the TUI seeded with
       // that first message (top-level flag on the default TUI command, verified
@@ -375,14 +371,10 @@ export const opencodeAdapter: CliAdapter = {
     _base: readonly string[],
     ctx: SpawnContext,
     prompt: string,
-    overrides?: HeadlessRunOverrides,
   ): readonly string[] {
     return [
       'opencode', 'run', '--format', 'json',
-      ...(overrides?.model ? ['--model', opencodeRunModel(ctx.cwd, overrides.model)] : []),
-      ...(overrides?.reasoningEffort
-        ? ['--variant', opencodeRunVariant(ctx.cwd, overrides.model, overrides.reasoningEffort)]
-        : []),
+      ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...(ctx.resume === 'last' ? ['--continue'] : ctx.resume ? ['--session', ctx.resume.sessionId] : []),
       '--', prompt,
     ];
@@ -502,47 +494,7 @@ export const opencodeAdapter: CliAdapter = {
       return;
     }
 
-    const options: Record<string, unknown> = {};
-    if (cred.baseUrl) options['baseURL'] = cred.baseUrl;
-    if (cred.apiKey) {
-      if (cred.wireShape === 'anthropic' && cred.authMode === 'bearer') {
-        // Do not also set apiKey: @ai-sdk/anthropic would add x-api-key and
-        // bearer-only gateways can reject the resulting dual-auth request.
-        options['headers'] = { Authorization: `Bearer ${cred.apiKey}` };
-      } else {
-        options['apiKey'] = cred.apiKey;
-      }
-    }
-
-    // The @ai-sdk package opencode loads depends on the wire shape (all bundled):
-    // anthropic → @ai-sdk/anthropic, Google Generative AI → @ai-sdk/google,
-    // OpenAI Responses → @ai-sdk/openai, and OpenAI Chat Completions → the
-    // openai-compatible SDK.
-    const npm = cred.wireShape === 'anthropic' ? '@ai-sdk/anthropic'
-      : cred.wireShape === 'google-generative-ai' ? '@ai-sdk/google'
-      : cred.wireShape === 'openai-responses' ? '@ai-sdk/openai'
-      : OPENCODE_SDK_NPM;
-    const provider: Record<string, unknown> = {
-      npm,
-      name: 'OpenAlice workspace provider',
-      options,
-    };
-    if (cred.model) {
-      const model: Record<string, unknown> = { name: cred.model };
-      if (typeof cred.reasoning === 'boolean') model['reasoning'] = cred.reasoning;
-      const effortOptions = modelEffortOptions(cred);
-      if (effortOptions) model['options'] = effortOptions;
-      const effortVariants = modelEffortVariants(cred);
-      if (effortVariants) model['variants'] = effortVariants;
-      const contextWindow = positiveNumber(cred.contextWindow);
-      if (contextWindow !== null) {
-        // opencode treats missing custom-model limits as 0, which disables its
-        // proactive context tracking. Supplying both fields satisfies its config
-        // schema while keeping output conservative and invisible in OpenAlice UI.
-        model['limit'] = { context: contextWindow, output: DEFAULT_OUTPUT_TOKENS };
-      }
-      provider['models'] = { [cred.model]: model };
-    }
+    const provider = openCodeProvider(cred, 'OpenAlice workspace provider');
 
     // Top-level default model is "<provider>/<id>" so opencode resolves the
     // workspace provider without a UI model picker. The reversible state keeps

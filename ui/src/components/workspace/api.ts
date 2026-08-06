@@ -705,6 +705,11 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly updatedAt: number;
   readonly resumable: boolean;
   readonly active: boolean;
+  readonly runtime?: {
+    readonly credentialSource: 'native' | 'vault' | 'workspace';
+    readonly model?: string;
+    readonly reasoningEffort?: ModelReasoningEffort;
+  };
   readonly latestExecution?: {
     readonly taskId: string;
     readonly status: 'running' | 'done' | 'failed' | 'interrupted';
@@ -876,11 +881,17 @@ export async function quickStartWorkspaceManager(
   prompt: string,
   agent: string,
   credentialSlug?: string,
+  model?: string | null,
+  reasoningEffort?: ModelReasoningEffort,
 ): Promise<ManagerQuickStartResult> {
+  const request: Record<string, unknown> = { prompt, agent };
+  if (credentialSlug !== undefined) request['credentialSlug'] = credentialSlug;
+  if (model) request['model'] = model;
+  if (reasoningEffort) request['reasoningEffort'] = reasoningEffort;
   const res = await fetch('/api/workspaces/manager/quick-start', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt, agent, ...(credentialSlug ? { credentialSlug } : {}) }),
+    body: JSON.stringify(request),
   })
   const body = (await res.json().catch(() => null)) as (ManagerQuickStartResult & { message?: string; error?: string }) | null
   if (!res.ok || !body?.manager || !body.session || !('snapshot' in body)) {
@@ -902,8 +913,9 @@ export class QuickChatError extends Error {
  * Quick-chat launch — the "type a message → you're in" front door. One POST
  * reuses-or-creates the chat workspace and spawns a fresh session seeded with
  * `prompt`; the returned `session.sessionId` is what the caller attaches to.
- * `credentialSlug` seeds a loginless runtime (opencode/pi) — ignored for
- * claude/codex, which carry their own CLI login.
+ * Credential, model, and effort are independent optional Session overrides.
+ * Omitting a credential leaves authentication/provider discovery to the
+ * runtime; choosing one never rewrites the Workspace merely to launch.
  */
 export async function quickChat(
   prompt: string,
@@ -911,12 +923,16 @@ export async function quickChat(
   credentialSlug?: string,
   targetWsId?: string,
   template?: 'chat' | 'auto-quant-v2',
+  model?: string | null,
+  reasoningEffort?: ModelReasoningEffort,
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;
   if (template !== undefined) body['template'] = template;
+  if (model) body['model'] = model;
+  if (reasoningEffort) body['reasoningEffort'] = reasoningEffort;
   const res = await fetch('/api/workspaces/quick-chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -946,12 +962,15 @@ export async function pauseSession(wsId: string, sessionId: string): Promise<boo
 export async function resumeSession(
   wsId: string,
   sessionId: string,
-): Promise<SpawnedSession | null> {
+): Promise<SpawnedSession> {
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/resume`,
     { method: 'POST' },
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    throw new Error(body?.message ?? body?.error ?? `resume session failed: ${res.status}`);
+  }
   return (await res.json()) as SpawnedSession;
 }
 

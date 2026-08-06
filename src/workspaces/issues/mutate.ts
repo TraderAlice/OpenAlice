@@ -25,6 +25,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
 import { isModelReasoningEffort, type ModelReasoningEffort } from '../../ai-providers/model-semantics.js'
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js'
+import { deprecatedIssueAssigneeReplacement } from '../session-signature.js'
 import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
@@ -50,6 +51,8 @@ export interface IssueFieldPatch {
   assignee?: string
   /** Runtime override for scheduled fires; null removes the override. */
   agent?: string | null
+  /** Secret-free vault slug for a fresh scheduled Session; null inherits. */
+  credential?: string | null
   /** Native model id for one scheduled fire; null inherits Workspace/runtime. */
   model?: string | null
   /** Reasoning effort for one scheduled fire; null inherits Workspace/runtime. */
@@ -69,6 +72,7 @@ export interface CreateIssueInput {
   when?: unknown
   what?: string
   agent?: string
+  credential?: string
   model?: string
   effort?: ModelReasoningEffort
   /** @deprecated Compatibility alias for callers written before What became the
@@ -144,6 +148,12 @@ export async function updateIssueFields(
   const data = parseFrontmatterObject(split.frontmatter)
   if (!data) return { ok: false, reason: 'invalid', error: 'frontmatter is not a mapping' }
 
+  // Reading legacy aliases is intentionally compatible, but every write is an
+  // upgrade boundary. Never reserialize a deprecated token after migration 0033.
+  if (typeof data.assignee === 'string' && deprecatedIssueAssigneeReplacement(data.assignee)) {
+    data.assignee = current.issue.assignee
+  }
+
   if (patch.status !== undefined) {
     if (!ISSUE_STATUSES.includes(patch.status)) {
       return { ok: false, reason: 'invalid', error: `invalid status: ${patch.status}` }
@@ -158,13 +168,22 @@ export async function updateIssueFields(
   }
   if (patch.assignee !== undefined) {
     const a = patch.assignee.trim()
+    const replacement = deprecatedIssueAssigneeReplacement(a)
+    if (replacement) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: `${a} is deprecated; use ${replacement}`,
+      }
+    }
     const assignee = issueAssigneeSchema.safeParse(a)
     if (!assignee.success) {
-      return { ok: false, reason: 'invalid', error: 'assignee must be @workspace, @new, @human, @unassigned, or an exact @resumeId' }
+      return { ok: false, reason: 'invalid', error: 'assignee must be @new-each-run, @new-then-resume, @human, @unassigned, or an exact @resumeId' }
     }
     data.assignee = assignee.data
     if (issueAssigneeResumeId(assignee.data)) {
       delete data.agent
+      delete data.credential
       delete data.model
       delete data.effort
     }
@@ -176,6 +195,15 @@ export async function updateIssueFields(
       const a = patch.agent.trim()
       if (a.length === 0) return { ok: false, reason: 'invalid', error: 'agent must be a non-empty string or null' }
       data.agent = a
+    }
+  }
+  if (patch.credential !== undefined) {
+    if (patch.credential === null) {
+      delete data.credential
+    } else {
+      const credential = patch.credential.trim()
+      if (!credential) return { ok: false, reason: 'invalid', error: 'credential must be a non-empty vault slug or null' }
+      data.credential = credential
     }
   }
   if (patch.model !== undefined) {
@@ -232,6 +260,23 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
 
   const existing = await readWorkspaceFile(wsDir, relFor(id))
   if (existing !== null) return { ok: false, reason: 'conflict', id }
+  if (input.assignee !== undefined) {
+    const replacement = deprecatedIssueAssigneeReplacement(input.assignee)
+    if (replacement) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: `${input.assignee} is deprecated; use ${replacement}`,
+      }
+    }
+    if (!issueAssigneeSchema.safeParse(input.assignee).success) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: 'assignee must be @new-each-run, @new-then-resume, @human, @unassigned, or an exact @resumeId',
+      }
+    }
+  }
   // Assemble frontmatter from only the provided keys (so we don't write default
   // noise), then validate the whole thing against the issue schema.
   const data: Record<string, unknown> = { title }
@@ -240,6 +285,7 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
   if (input.assignee !== undefined) data.assignee = input.assignee
   if (input.when !== undefined) data.when = input.when
   if (input.agent !== undefined) data.agent = input.agent
+  if (input.credential !== undefined) data.credential = input.credential
   if (input.model !== undefined) data.model = input.model
   if (input.effort !== undefined) data.effort = input.effort
 
