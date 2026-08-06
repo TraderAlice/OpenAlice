@@ -33,3 +33,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0031_pi_local_workspace_provider` | 0.89.1-beta | 2026-08-04 | workspaces/workspaces/*/.pi, workspaces/departed-workspaces/*/.pi, Pi user agent directory/models.json | Move OpenAlice-managed Pi providers from the global model registry into Workspace-local extensions. |
 | `0032_session_runtime_bindings` | 0.90.0-beta | 2026-08-05 | workspaces/state/resume-identities.json | Version product Session identities for durable runtime, credential-reference, model, and effort bindings. |
 | `0033_semantic_issue_assignees` | 0.90.0-beta | 2026-08-06 | workspaces/<id>/.alice/issues/*.md | Replace deprecated @workspace/@new Issue aliases with behavior-named assignee tokens. |
+| `0034_quick_chat_recent_launch` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Remember Quick Start runtime, credential, model, and effort as one Session-only launch tuple. |

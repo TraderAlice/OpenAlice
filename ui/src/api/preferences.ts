@@ -1,8 +1,17 @@
+import type { ModelReasoningEffort } from './types'
 import { fetchJson, headers } from './client'
+
+export interface QuickChatLaunchPreference {
+  agent: string
+  credentialSlug: string | null
+  model: string | null
+  reasoningEffort: ModelReasoningEffort | null
+}
 
 export interface QuickChatPreferences {
   lastCredentialByAgent: Record<string, string>
   recentChatWorkspaceId: string | null
+  recentLaunch?: QuickChatLaunchPreference | null
 }
 
 export type WorkspaceShellStatus =
@@ -38,6 +47,14 @@ export const preferencesApi = {
       method: 'PUT',
       headers,
       body: JSON.stringify({ workspaceId }),
+    })
+  },
+
+  rememberQuickChatLaunch(launch: QuickChatLaunchPreference): Promise<QuickChatPreferences> {
+    return fetchJson('/api/preferences/quick-chat/recent-launch', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(launch),
     })
   },
 

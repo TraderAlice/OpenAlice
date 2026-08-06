@@ -17,10 +17,11 @@ const mocks = vi.hoisted(() => ({
   getAgentRuntimeReadiness: vi.fn(),
   probeAgentRuntimeReadiness: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
+  getPresets: vi.fn(),
   getQuickChat: vi.fn(),
   quickChat: vi.fn(),
   rememberRecentChatWorkspace: vi.fn(),
-  rememberQuickChatCredential: vi.fn(),
+  rememberQuickChatLaunch: vi.fn(),
 }))
 
 vi.mock('../contexts/workspaces-context', () => ({
@@ -47,6 +48,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
 vi.mock('../api/config', () => ({
   configApi: {
     getWorkspaceCredentialDefaults: mocks.getWorkspaceCredentialDefaults,
+    getPresets: mocks.getPresets,
   },
 }))
 
@@ -54,7 +56,7 @@ vi.mock('../api/preferences', () => ({
   preferencesApi: {
     getQuickChat: mocks.getQuickChat,
     rememberRecentChatWorkspace: mocks.rememberRecentChatWorkspace,
-    rememberQuickChatCredential: mocks.rememberQuickChatCredential,
+    rememberQuickChatLaunch: mocks.rememberQuickChatLaunch,
   },
 }))
 
@@ -199,13 +201,14 @@ beforeEach(async () => {
     defaults: {},
     compatibleByAgent: { pi: ['google-1'] },
   })
+  mocks.getPresets.mockResolvedValue({ presets: [] })
   mocks.getQuickChat.mockResolvedValue({
     lastCredentialByAgent: {},
     recentChatWorkspaceId: 'chat-1',
   })
   mocks.quickChat.mockResolvedValue('chat-1')
   mocks.rememberRecentChatWorkspace.mockResolvedValue(undefined)
-  mocks.rememberQuickChatCredential.mockResolvedValue(undefined)
+  mocks.rememberQuickChatLaunch.mockResolvedValue(undefined)
 })
 
 afterEach(cleanup)
@@ -320,11 +323,11 @@ describe('ChatLandingPage keyboard submission', () => {
     await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
       '你好',
       'pi',
-      'google-1',
+      undefined,
       'chat-1',
       'chat',
-      'gemini-3.1-flash-lite',
-      'minimal',
+      undefined,
+      undefined,
     ))
   })
 
@@ -407,7 +410,7 @@ describe('ChatLandingPage keyboard submission', () => {
     expect(screen.queryByText('The runtime reported an error: 429: balance exhausted')).toBeNull()
   })
 
-  it('submits an explicit login-backed credential with its own model instead of the Workspace model', async () => {
+  it('submits only the explicit credential while its model and effort remain optional defaults', async () => {
     const nativePiAgent: AgentInfo = {
       ...piAgent,
       capabilities: {
@@ -464,13 +467,95 @@ describe('ChatLandingPage keyboard submission', () => {
       'deepseek-1',
       'chat-1',
       'chat',
-      'deepseek-v4-flash',
+      undefined,
+      undefined,
+    ))
+  })
+
+  it('persists and submits explicit model and effort choices as one recent launch tuple', async () => {
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    const model = await screen.findByRole('combobox', { name: 'AI model' })
+    fireEvent.change(model, { target: { value: 'gemini-3.1-pro-preview' } })
+    fireEvent.blur(model)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Reasoning effort' }), {
+      target: { value: 'high' },
+    })
+
+    await waitFor(() => expect(mocks.rememberQuickChatLaunch).toHaveBeenLastCalledWith({
+      agent: 'pi',
+      credentialSlug: null,
+      model: 'gemini-3.1-pro-preview',
+      reasoningEffort: 'high',
+    }))
+    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Go deeper.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'Go deeper.',
+      'pi',
+      undefined,
+      'chat-1',
+      'chat',
+      'gemini-3.1-pro-preview',
       'high',
     ))
   })
 })
 
 describe('ChatLandingPage AI source disclosure', () => {
+  it('restores the complete recent launch tuple ahead of an unrelated Workspace default', async () => {
+    mocks.listAgentCredentials.mockResolvedValue([
+      {
+        slug: 'google-1',
+        vendor: 'google',
+        authType: 'api-key',
+        wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+        resolvedModel: 'gemini-3.1-flash-lite',
+      },
+      {
+        slug: 'deepseek-1',
+        vendor: 'deepseek',
+        label: 'DeepSeek',
+        authType: 'api-key',
+        wires: { 'openai-chat': 'https://api.deepseek.com' },
+        resolvedModel: 'deepseek-v4-flash',
+      },
+    ])
+    mocks.getQuickChat.mockResolvedValue({
+      lastCredentialByAgent: { pi: 'deepseek-1' },
+      recentChatWorkspaceId: 'chat-1',
+      recentLaunch: {
+        agent: 'pi',
+        credentialSlug: 'deepseek-1',
+        model: 'deepseek-v4-flash',
+        reasoningEffort: 'high',
+      },
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect((await screen.findByRole('button', { name: 'AI provider' })).textContent).toContain('DeepSeek')
+    await waitFor(() => {
+      expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).value)
+        .toBe('deepseek-v4-flash')
+      expect((screen.getByRole('combobox', { name: 'Reasoning effort' }) as HTMLSelectElement).value)
+        .toBe('high')
+    })
+    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Continue.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'Continue.',
+      'pi',
+      'deepseek-1',
+      'chat-1',
+      'chat',
+      'deepseek-v4-flash',
+      'high',
+    ))
+  })
+
   it('keeps an existing Workspace source implicit so the model leads the metadata row', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
@@ -552,7 +637,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect(screen.getByLabelText('Model kimi-k2.7-code')).toBeTruthy()
   })
 
-  it('replaces a transient provider choice with the Workspace config saved in Settings', async () => {
+  it('keeps the recent provider choice independent when Workspace Settings changes', async () => {
     mocks.listAgentCredentials.mockResolvedValue([
       {
         slug: 'google-1',
@@ -588,8 +673,8 @@ describe('ChatLandingPage AI source disclosure', () => {
       detail: { wsId: 'chat-1', agent: 'pi' },
     }))
 
-    expect(await screen.findByLabelText('Model gemini-3.1-pro-preview')).toBeTruthy()
-    expect(screen.queryByLabelText('Model deepseek-v3.2')).toBeNull()
-    expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(2))
+    expect(await screen.findByLabelText('Model deepseek-v3.2')).toBeTruthy()
+    expect(screen.queryByLabelText('Model gemini-3.1-pro-preview')).toBeNull()
   })
 })

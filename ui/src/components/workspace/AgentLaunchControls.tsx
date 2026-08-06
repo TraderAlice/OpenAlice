@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useEffect,
+  useId,
   useImperativeHandle,
   useRef,
   useState,
@@ -82,6 +83,76 @@ function handleMenuKeyDown(
 
   event.preventDefault()
   items[nextIndex]?.focus()
+}
+
+function AgentLaunchModelEditor({ config }: { config: AgentLaunchConfigState }) {
+  const { t } = useTranslation()
+  const listId = useId()
+  const [draft, setDraft] = useState(config.launchModel ?? '')
+
+  useEffect(() => setDraft(config.launchModel ?? ''), [config.launchModel])
+
+  const commit = () => {
+    const next = draft.trim()
+    if (next !== (config.launchModel ?? '')) config.selectModel(next || null)
+  }
+  const defaultLabel = config.defaultModel
+    ? t('chatLanding.defaultModelValue', { model: config.defaultModel })
+    : t('chatLanding.runtimeDefaultModel')
+
+  return (
+    <label className="relative inline-flex min-h-8 min-w-0 max-w-[220px] items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50">
+      <Cpu className="pointer-events-none absolute left-2.5 h-3 w-3 shrink-0" />
+      <input
+        list={listId}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur()
+          if (event.key === 'Escape') {
+            setDraft(config.launchModel ?? '')
+            event.currentTarget.blur()
+          }
+        }}
+        aria-label={t('chatLanding.selectModel')}
+        placeholder={defaultLabel}
+        className="min-w-0 w-[190px] bg-transparent py-1 pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground"
+      />
+      <datalist id={listId}>
+        {config.modelOptions.map((model) => (
+          <option key={model.id} value={model.id}>{model.label}</option>
+        ))}
+      </datalist>
+    </label>
+  )
+}
+
+function AgentLaunchEffortEditor({ config }: { config: AgentLaunchConfigState }) {
+  const { t } = useTranslation()
+  const current = config.launchReasoningEffort
+  const options = current && !config.effortOptions.includes(current)
+    ? [current, ...config.effortOptions]
+    : config.effortOptions
+  return (
+    <label className="relative inline-flex min-h-8 min-w-0 max-w-[190px] items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50">
+      <BrainCircuit className="pointer-events-none absolute left-2.5 h-3 w-3 shrink-0" />
+      <select
+        value={current ?? ''}
+        onChange={(event) => config.selectReasoningEffort(
+          event.target.value
+            ? event.target.value as NonNullable<AgentLaunchConfigState['launchReasoningEffort']>
+            : null,
+        )}
+        aria-label={t('chatLanding.selectEffort')}
+        className="min-w-0 max-w-[190px] appearance-none bg-transparent py-1 pl-7 pr-7 text-[11px] text-foreground outline-none"
+      >
+        <option value="">{t('chatLanding.defaultEffort')}</option>
+        {options.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2 h-3 w-3 opacity-60" />
+    </label>
+  )
 }
 
 /** The shared runtime + credential selector used by every chat-style launch
@@ -317,6 +388,9 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
           )}
         </div>
       )}
+
+      {config.selectedAgent && <AgentLaunchModelEditor config={config} />}
+      {config.selectedAgent && <AgentLaunchEffortEditor config={config} />}
     </>
   )
 })

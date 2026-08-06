@@ -2,12 +2,19 @@ import { http, HttpResponse } from 'msw'
 
 const lastCredentialByAgent: Record<string, string> = { pi: 'minimax-1' }
 let recentChatWorkspaceId: string | null = 'demo-chat-ws'
+let recentLaunch = {
+  agent: 'pi',
+  credentialSlug: 'minimax-1' as string | null,
+  model: null as string | null,
+  reasoningEffort: null as string | null,
+}
 
 export const preferencesHandlers = [
   http.get('/api/preferences/quick-chat', () =>
     HttpResponse.json({
       lastCredentialByAgent: { ...lastCredentialByAgent },
       recentChatWorkspaceId,
+      recentLaunch,
     }),
   ),
   http.put('/api/preferences/quick-chat', async ({ request }) => {
@@ -27,6 +34,7 @@ export const preferencesHandlers = [
     return HttpResponse.json({
       lastCredentialByAgent: { ...lastCredentialByAgent },
       recentChatWorkspaceId,
+      recentLaunch,
     })
   }),
   http.put('/api/preferences/quick-chat/recent-workspace', async ({ request }) => {
@@ -38,6 +46,21 @@ export const preferencesHandlers = [
     return HttpResponse.json({
       lastCredentialByAgent: { ...lastCredentialByAgent },
       recentChatWorkspaceId,
+      recentLaunch,
+    })
+  }),
+  http.put('/api/preferences/quick-chat/recent-launch', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as typeof recentLaunch | null
+    if (!body || typeof body.agent !== 'string') {
+      return HttpResponse.json({ error: 'invalid_quick_chat_launch_preference' }, { status: 400 })
+    }
+    recentLaunch = body
+    if (body.credentialSlug === null) delete lastCredentialByAgent[body.agent]
+    else lastCredentialByAgent[body.agent] = body.credentialSlug
+    return HttpResponse.json({
+      lastCredentialByAgent: { ...lastCredentialByAgent },
+      recentChatWorkspaceId,
+      recentLaunch,
     })
   }),
   // Vercel demo is not a Windows host, so the machine-local shell setting is
