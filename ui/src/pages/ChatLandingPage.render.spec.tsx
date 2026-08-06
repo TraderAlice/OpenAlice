@@ -347,14 +347,21 @@ describe('ChatLandingPage suggestion strip', () => {
 
     const strip = screen.getByTestId('harness-landing-suggestions')
     expect(strip.textContent).toContain('Try asking')
-    const suggestions = strip.querySelectorAll('button')
+    const suggestions = strip.querySelectorAll<HTMLButtonElement>('button.oa-suggestion-enter')
     expect(suggestions).toHaveLength(3)
     expect(suggestions[0]?.className).toContain('oa-suggestion-enter')
     expect(suggestions[1]?.style.animationDelay).toBe('55ms')
+    expect(suggestions[0]?.textContent).toContain("Read today's cross-asset signals")
 
     fireEvent.click(suggestions[0]!)
     expect((screen.getByPlaceholderText('Ask Alice…') as HTMLTextAreaElement).value)
-      .toBe("What's moving in semiconductors today?")
+      .toContain("Read today's macro backdrop")
+
+    fireEvent.click(screen.getByRole('button', { name: 'More ideas' }))
+    expect(strip.textContent).toContain('Find what actually needs follow-up')
+    expect(strip.textContent).toContain('Turn research into a scheduled Issue')
+    expect(strip.textContent).toContain('Delegate a reproducible study')
+    expect(strip.textContent).not.toContain("Read today's cross-asset signals")
   })
 })
 
