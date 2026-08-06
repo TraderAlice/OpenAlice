@@ -401,12 +401,12 @@ function HarnessLandingPage({
             data-testid="harness-landing-controls"
             className="flex items-end justify-between gap-2 px-1 pt-1"
           >
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
               <AgentLaunchSelectors
                 config={launchConfig}
                 onConfigureProvider={goConfigureProvider}
                 showRuntime={false}
-                labeled
+                toolbar
               />
             </div>
             <div className="flex shrink-0 items-center justify-end gap-1.5">

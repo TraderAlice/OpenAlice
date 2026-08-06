@@ -331,6 +331,8 @@ describe('ChatLandingPage adapter inventory', () => {
     expect(inferenceRow.contains(await screen.findByRole('button', { name: 'AI access' }))).toBe(true)
     expect(inferenceRow.contains(screen.getByRole('combobox', { name: 'AI model' }))).toBe(true)
     expect(inferenceRow.contains(screen.getByRole('combobox', { name: 'Reasoning effort' }))).toBe(true)
+    expect(inferenceRow.textContent).not.toContain('Model')
+    expect(inferenceRow.textContent).not.toContain('Effort')
   })
 })
 

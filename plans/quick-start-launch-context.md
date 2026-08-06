@@ -32,6 +32,8 @@ the primary send path.
 
 - [x] Split Session context from AI execution controls and make the layout
       responsive from phone through desktop widths.
+- [x] Keep AI execution controls as a compact composer toolbar instead of
+      expanding them into labeled settings fields.
 - [x] Add human-readable provider identity and an explicit native-runtime
       access choice.
 - [x] Persist and migrate the recent access mode without storing secrets.
