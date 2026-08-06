@@ -9,6 +9,7 @@ import {
   Loader2,
   MessageSquare,
   Paperclip,
+  RefreshCw,
   Sparkles,
   X,
 } from 'lucide-react'
@@ -139,6 +140,7 @@ function HarnessLandingPage({
   const [value, setValue] = useState('')
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [examplePage, setExamplePage] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const launchSelectorsRef = useRef<AgentLaunchSelectorsHandle>(null)
   const credentialWorkspace = workspaceTarget
@@ -152,6 +154,55 @@ function HarnessLandingPage({
   const effectiveAgent = launchConfig.effectiveAgent
   const selectedInfo = launchConfig.selectedAgent
   const installHint = selectedInfo ? installHintFor(selectedInfo.id) : undefined
+  const exampleGroups = mode === 'chat'
+    ? [
+        [
+          {
+            id: 'market',
+            label: t('chatLanding.marketBriefLabel'),
+            title: t('chatLanding.marketBriefTitle'),
+            prompt: t('chatLanding.marketBriefPrompt'),
+          },
+          {
+            id: 'portfolio',
+            label: t('chatLanding.portfolioReviewLabel'),
+            title: t('chatLanding.portfolioReviewTitle'),
+            prompt: t('chatLanding.portfolioReviewPrompt'),
+          },
+          {
+            id: 'thesis',
+            label: t('chatLanding.researchMemoLabel'),
+            title: t('chatLanding.researchMemoTitle'),
+            prompt: t('chatLanding.researchMemoPrompt'),
+          },
+        ],
+        [
+          {
+            id: 'workspace',
+            label: t('chatLanding.workspaceAuditLabel'),
+            title: t('chatLanding.workspaceAuditTitle'),
+            prompt: t('chatLanding.workspaceAuditPrompt'),
+          },
+          {
+            id: 'automation',
+            label: t('chatLanding.automationLabel'),
+            title: t('chatLanding.automationTitle'),
+            prompt: t('chatLanding.automationPrompt'),
+          },
+          {
+            id: 'quant',
+            label: t('chatLanding.quantDeskLabel'),
+            title: t('chatLanding.quantDeskTitle'),
+            prompt: t('chatLanding.quantDeskPrompt'),
+          },
+        ],
+      ]
+    : [[
+        { id: 'quant-1', label: null, title: t('autoQuantLanding.ex1'), prompt: t('autoQuantLanding.ex1') },
+        { id: 'quant-2', label: null, title: t('autoQuantLanding.ex2'), prompt: t('autoQuantLanding.ex2') },
+        { id: 'quant-3', label: null, title: t('autoQuantLanding.ex3'), prompt: t('autoQuantLanding.ex3') },
+      ]]
+  const examples = exampleGroups[examplePage % exampleGroups.length]!
 
   const goConfigureProvider = () => {
     openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
@@ -501,18 +552,37 @@ function HarnessLandingPage({
               {t(`${copyKey}.examplesLabel`)}
             </span>
             <span aria-hidden className="h-px min-w-4 flex-1 bg-border/45" />
-          </div>
-          <div className="scrollbar-hide flex gap-2 overflow-x-auto px-4 pb-1 pr-14 md:flex-wrap md:overflow-visible md:px-1 md:pr-1 md:pb-0">
-            {[t(`${copyKey}.ex1`), t(`${copyKey}.ex2`), t(`${copyKey}.ex3`)].map((ex, index) => (
+            {mode === 'chat' && (
               <button
-                key={ex}
                 type="button"
-                onClick={() => useExample(ex)}
+                onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
+                disabled={launching}
+                className="oa-pressable inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/55 hover:text-foreground disabled:opacity-40"
+                aria-label={t('chatLanding.moreExamples')}
+              >
+                <RefreshCw aria-hidden className="h-3 w-3" />
+                {t('chatLanding.moreExamples')}
+              </button>
+            )}
+          </div>
+          <div className="scrollbar-hide flex gap-2 overflow-x-auto px-4 pb-1 pr-14 md:overflow-visible md:px-1 md:pr-1 md:pb-0">
+            {examples.map((example, index) => (
+              <button
+                key={`${examplePage}-${example.id}`}
+                type="button"
+                onClick={() => useExample(example.prompt)}
                 disabled={launching}
                 style={{ animationDelay: `${index * 55}ms` }}
-                className="oa-pressable oa-suggestion-enter min-h-9 shrink-0 rounded-lg border border-border/45 bg-secondary/45 px-3.5 py-1.5 text-left text-[12px] text-muted-foreground hover:border-border hover:bg-muted/70 hover:text-foreground focus-visible:border-primary/60 disabled:opacity-40"
+                className="group oa-pressable oa-suggestion-enter flex min-h-[54px] w-[230px] shrink-0 flex-col justify-center rounded-lg border border-border/45 bg-secondary/45 px-3.5 py-2 text-left hover:border-border hover:bg-muted/70 focus-visible:border-primary/60 md:min-w-0 md:flex-1 disabled:opacity-40"
               >
-                {ex}
+                {example.label && (
+                  <span className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-primary/75">
+                    {example.label}
+                  </span>
+                )}
+                <span className="line-clamp-2 text-[11.5px] leading-snug text-muted-foreground group-hover:text-foreground">
+                  {example.title}
+                </span>
               </button>
             ))}
           </div>

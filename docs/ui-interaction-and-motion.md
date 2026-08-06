@@ -45,6 +45,11 @@ Avoid duplicating these layers inside the focused view. A page navigator should
 not be restyled as a stack of cards, and a detail surface should not create a
 second page shell inside itself.
 
+Launch-surface example prompts are compact capability navigation, not generic
+chatbot filler. Their visible titles should stay scannable while the inserted
+prompt carries the evidence, freshness, persistence, and permission boundaries
+needed for the real task. Prefer a small rotating set over a wall of commands.
+
 ### Responsive Behavior
 
 Narrow layouts are a change in information hierarchy, not a compressed desktop.

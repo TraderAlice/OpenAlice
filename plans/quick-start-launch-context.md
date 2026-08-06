@@ -42,6 +42,9 @@ the primary send path.
       focusable setting or implementation-detail explanation.
 - [x] Restyle example prompts as a labeled, responsive suggestion strip with
       one-shot staggered entrance and reduced-motion fallback.
+- [x] Replace generic chatbot examples with two compact sets that expose
+      market, portfolio, research, Workspace, automation, and AutoQuant
+      capabilities through evidence- and permission-aware full prompts.
 - [x] Persist and migrate the recent access mode without storing secrets.
 - [x] Carry explicit native access through every Quick Start launch route and
       Session runtime binding.
