@@ -330,7 +330,6 @@ export interface AgentLaunchConfigState {
   readonly credentialSelectionReady: boolean
   readonly noCredentials: boolean
   readonly needsProviderSetup: boolean
-  readonly willOverwriteCredential: boolean
   readonly selectedMissing: boolean
   readonly anyInstalled: boolean
   readonly agentsKnown: boolean
@@ -696,11 +695,6 @@ export function useAgentLaunchConfig({
     credentialSelectionReady,
     noCredentials,
     needsProviderSetup: noCredentials,
-    willOverwriteCredential: canSelectCredential &&
-      detectedCredential?.slug !== null &&
-      detectedCredential?.slug !== undefined &&
-      effectiveCredential !== null &&
-      effectiveCredential !== detectedCredential.slug,
     selectedMissing: selectedAgent?.installed === false,
     anyInstalled: agents.some((agent) => agent.installed !== false),
     agentsKnown: agents.length > 0,

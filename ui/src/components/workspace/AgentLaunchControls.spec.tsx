@@ -77,7 +77,6 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     credentialSelectionReady: true,
     noCredentials: false,
     needsProviderSetup: false,
-    willOverwriteCredential: false,
     selectedMissing: false,
     anyInstalled: true,
     agentsKnown: true,
