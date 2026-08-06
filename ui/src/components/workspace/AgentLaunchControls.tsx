@@ -66,6 +66,8 @@ export interface AgentLaunchSelectorsProps {
   readonly showAi?: boolean
   readonly menuPlacement?: 'up' | 'down'
   readonly labeled?: boolean
+  /** Visually recede selectors into a composer toolbar until hover/focus. */
+  readonly toolbar?: boolean
 }
 
 export interface AgentLaunchSelectorsHandle {
@@ -116,9 +118,11 @@ function handleMenuKeyDown(
 function AgentLaunchModelEditor({
   config,
   labeled = false,
+  toolbar = false,
 }: {
   config: AgentLaunchConfigState
   labeled?: boolean
+  toolbar?: boolean
 }) {
   const { t } = useTranslation()
   const listId = useId()
@@ -140,7 +144,7 @@ function AgentLaunchModelEditor({
     : undefined
 
   return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
+    <label className={`relative inline-flex min-w-0 items-center rounded-md text-[11px] text-muted-foreground transition-colors focus-within:bg-muted/70 focus-within:ring-1 focus-within:ring-primary/50 ${toolbar ? 'bg-transparent hover:bg-muted/55' : 'bg-muted'} ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[220px]' : 'min-h-8 max-w-[220px]'}`}>
       <Cpu className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
       {labeled && (
         <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
@@ -162,7 +166,7 @@ function AgentLaunchModelEditor({
         aria-label={t('chatLanding.selectModel')}
         title={contextLabel}
         placeholder={defaultLabel}
-        className={`min-w-0 bg-transparent pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground ${labeled ? 'w-full pb-1 pt-5 sm:w-[190px]' : 'w-[190px] py-1'}`}
+        className={`min-w-0 bg-transparent pl-7 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground ${labeled ? 'w-full pb-1 pt-5 sm:w-[190px]' : toolbar ? 'w-[150px] py-1' : 'w-[190px] py-1'}`}
       />
       <datalist id={listId}>
         {config.modelOptions.map((model) => (
@@ -176,9 +180,11 @@ function AgentLaunchModelEditor({
 function AgentLaunchEffortEditor({
   config,
   labeled = false,
+  toolbar = false,
 }: {
   config: AgentLaunchConfigState
   labeled?: boolean
+  toolbar?: boolean
 }) {
   const { t } = useTranslation()
   const current = config.launchReasoningEffort
@@ -200,10 +206,12 @@ function AgentLaunchEffortEditor({
               ? t('chatLanding.reasoningOptionalSummary')
               : t('chatLanding.reasoningRuntimeSummary')
   const defaultLabel = details
-    ? t('chatLanding.defaultEffortValue', { effort: resolvedDefault })
+    ? toolbar
+      ? resolvedDefault
+      : t('chatLanding.defaultEffortValue', { effort: resolvedDefault })
     : t('chatLanding.defaultEffort')
   return (
-    <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : 'min-h-8 max-w-[190px]'}`}>
+    <label className={`relative inline-flex min-w-0 items-center rounded-md text-[11px] text-muted-foreground transition-colors focus-within:bg-muted/70 focus-within:ring-1 focus-within:ring-primary/50 ${toolbar ? 'bg-transparent hover:bg-muted/55' : 'bg-muted'} ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : toolbar ? 'min-h-8 max-w-[175px]' : 'min-h-8 max-w-[190px]'}`}>
       <BrainCircuit className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
       {labeled && (
         <span className="pointer-events-none absolute left-2.5 top-1.5 text-[9.5px] font-medium text-muted-foreground">
@@ -218,7 +226,7 @@ function AgentLaunchEffortEditor({
             : null,
         )}
         aria-label={t('chatLanding.selectEffort')}
-        className={`min-w-0 appearance-none bg-transparent pl-7 pr-7 text-[11px] text-foreground outline-none ${labeled ? 'w-full max-w-none pb-1 pt-5 sm:max-w-[190px]' : 'max-w-[190px] py-1'}`}
+        className={`min-w-0 appearance-none bg-transparent pl-7 pr-7 text-[11px] text-foreground outline-none ${labeled ? 'w-full max-w-none pb-1 pt-5 sm:max-w-[190px]' : toolbar ? 'max-w-[175px] py-1' : 'max-w-[190px] py-1'}`}
       >
         <option value="">{defaultLabel}</option>
         {options.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
@@ -238,6 +246,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
     showAi = true,
     menuPlacement = 'up',
     labeled = false,
+    toolbar = false,
   },
   ref,
 ) {
@@ -419,7 +428,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             aria-haspopup="menu"
             aria-expanded={credentialMenuOpen}
             aria-label={t('chatLanding.selectCredential')}
-            className={`oa-pressable inline-flex items-center gap-2 rounded-md bg-muted px-2.5 text-left text-muted-foreground hover:text-foreground ${labeled ? 'min-h-12 w-full max-w-none py-1.5 sm:w-auto sm:max-w-[240px]' : 'min-h-8 max-w-[240px] py-1'}`}
+            className={`oa-pressable inline-flex items-center gap-2 rounded-md text-left text-muted-foreground transition-colors hover:text-foreground ${toolbar ? 'bg-transparent px-1.5 hover:bg-muted/55' : 'bg-muted px-2.5'} ${labeled ? 'min-h-12 w-full max-w-none py-1.5 sm:w-auto sm:max-w-[240px]' : toolbar ? 'min-h-8 max-w-[200px] py-1' : 'min-h-8 max-w-[240px] py-1'}`}
           >
             <KeyRound className="h-3 w-3 shrink-0" />
             <span className="min-w-0 flex-1">
@@ -523,10 +532,10 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
       {showAi && config.selectedAgent && (
         <div
           data-testid="agent-launch-inference-group"
-          className="contents sm:flex sm:shrink-0 sm:items-center sm:gap-2"
+          className={`contents sm:flex sm:shrink-0 sm:items-center ${toolbar ? 'sm:gap-1' : 'sm:gap-2'}`}
         >
-          <AgentLaunchModelEditor config={config} labeled={labeled} />
-          <AgentLaunchEffortEditor config={config} labeled={labeled} />
+          <AgentLaunchModelEditor config={config} labeled={labeled} toolbar={toolbar} />
+          <AgentLaunchEffortEditor config={config} labeled={labeled} toolbar={toolbar} />
         </div>
       )}
     </>
