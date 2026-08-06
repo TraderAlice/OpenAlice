@@ -1,6 +1,6 @@
 # Semantic Issue assignees
 
-Status: active
+Status: completed in serial PR #990
 
 Related owner guides:
 
@@ -34,7 +34,7 @@ migrated idempotently. Unscheduled Issues without an owner project as
 - [x] Update scheduler, API, CLI, UI, fixtures, and focused tests.
 - [x] Update the shipped self-scheduling skill and durable owner guides.
 - [x] Run migration index generation, type checks, tests, real CLI, browser, and package smoke.
-- [ ] Deliver through one serial PR to `dev`.
+- [x] Deliver through one serial PR to `dev`.
 
 ## Completion
 
