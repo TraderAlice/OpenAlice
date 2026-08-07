@@ -130,7 +130,7 @@ describe('FileViewerPage back navigation', () => {
     expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'tracked',
-      params: {},
+      params: { entity: 'stock-vst' },
     })
   })
 })

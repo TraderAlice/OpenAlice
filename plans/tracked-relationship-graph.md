@@ -38,6 +38,13 @@ clusters form, or which tracked anchors have no supporting material.
 9. Pointer focus uses a fixed, native-button hit target. Only the centered node
    mark scales; labels stay outside that transform so long names cannot shift
    the hover boundary and cause edge jitter.
+10. Workspace-owned Issues are first-class Tracked navigation anchors without
+    being duplicated into `EntityStore`. The sidebar selects them by
+    `workspaceId + issueId`; Tracked shows a document-like preview and complete
+    Markdown body, while the explicit Details action switches to the canonical
+    Issues work-item surface. Selection is mirrored into `/tracked` query
+    parameters without changing the single-tab identity, so reload and browser
+    Back can reconstruct the selected anchor.
 
 ## Work
 
@@ -55,6 +62,10 @@ clusters form, or which tracked anchors have no supporting material.
       is explicitly requested.
 - [x] Stabilize node-edge hover by separating hit testing, mark motion, and
       label geometry.
+- [x] Add an Issues group to the Tracked sidebar with a lightweight shell,
+      complete body rendering, and canonical Issues Details navigation.
+- [x] Persist Tracked entity/Issue selection in the route while preserving the
+      single Tracked tab and browser Back behavior.
 - [x] Complete browser, full-suite, and packaged Electron verification.
 
 ## Verification

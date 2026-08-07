@@ -142,6 +142,13 @@ Tracked is a global, file-backed index over those durable Workspaces:
 - `EntityStore` persists only deliberately registered asset/topic anchors.
 - `entity-backlinks.ts` scans authored `[[name]]` links in Workspace Markdown
   and Issue notes; prose is never inferred into an edge.
+- the Tracked sidebar combines those global asset/topic anchors with the live
+  Workspace Issue index. Issues keep their canonical `workspaceId + issueId`
+  identity, render their complete Markdown body without the work-item controls,
+  and open the canonical Issues detail surface through the explicit Details
+  action; they are never copied into `EntityStore`. The active entity or Issue
+  is encoded in `/tracked` query parameters so refresh and browser Back restore
+  the same selection while retaining one Tracked tab.
 - the relationship graph is a read-time projection of those two canonical
   sources. Shared notes bridge every registered entity they reference, while
   unlinked entities remain visible. The graph has no second persisted index or

@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TrendingUp, Hash, FileText, ListChecks, CircleAlert, List, Network } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { TrendingUp, Hash, FileText, ListChecks, CircleAlert, List, Network, ArrowUpRight } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { PageLoading, Skeleton } from '../components/StateViews'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { TrackedGraphView } from '../components/TrackedGraphView'
+import { MarkdownContent } from '../components/MarkdownContent'
 import { api } from '../api'
 import { entitiesLive, refreshEntities } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
+import { useIssues } from '../hooks/useIssues'
+import { trackedIssueAnchors } from '../lib/tracked-issues'
 import type { EntityDetail, Backlink, EntityGraph, EntityGraphArtifactNode } from '../api/entities'
+import type { IssueDetail as IssueDetailData } from '../api/issues'
 
 type TrackedViewMode = 'detail' | 'graph'
 
@@ -39,12 +44,22 @@ export function TrackedPage() {
   const loading = entitiesLive.useStore((s) => s.loading)
   const listError = entitiesLive.useStore((s) => s.error)
   const refreshing = entitiesLive.useStore((s) => s.refreshing)
+  const { data: issueSnapshot, error: issueListError, loading: issuesLoading } = useIssues()
+  const issueAnchors = trackedIssueAnchors(issueSnapshot)
   const selectedName = useTrackedSelection((s) => s.selectedName)
+  const selectedIssue = useTrackedSelection((s) => s.selectedIssue)
   const selectTracked = useTrackedSelection((s) => s.select)
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const navigate = useNavigate()
   const [viewMode, setViewModeState] = useState<TrackedViewMode>(readTrackedViewMode)
   const [graph, setGraph] = useState<EntityGraph | null>(null)
   const [graphLoading, setGraphLoading] = useState(false)
   const [graphRequest, setGraphRequest] = useState(0)
+
+  const selectEntity = useCallback((name: string) => {
+    selectTracked(name)
+    openOrFocus({ kind: 'tracked', params: { entity: name } })
+  }, [openOrFocus, selectTracked])
 
   const setViewMode = useCallback((mode: TrackedViewMode) => {
     setViewModeState(mode)
@@ -54,6 +69,10 @@ export function TrackedPage() {
       // View preference persistence is best-effort.
     }
   }, [])
+
+  useEffect(() => {
+    if (selectedIssue) setViewMode('detail')
+  }, [selectedIssue, setViewMode])
 
   const [detail, setDetail] = useState<EntityDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -90,6 +109,37 @@ export function TrackedPage() {
     }
   }, [selectedName, detailRequest, viewMode])
 
+  const [issueDetail, setIssueDetail] = useState<IssueDetailData | null>(null)
+  const [issueDetailLoading, setIssueDetailLoading] = useState(false)
+  const [issueDetailError, setIssueDetailError] = useState(false)
+  const [issueDetailRequest, setIssueDetailRequest] = useState(0)
+  useEffect(() => {
+    if (viewMode !== 'detail' || !selectedIssue) {
+      setIssueDetail(null)
+      setIssueDetailLoading(false)
+      setIssueDetailError(false)
+      return
+    }
+    let cancelled = false
+    setIssueDetail(null)
+    setIssueDetailLoading(true)
+    setIssueDetailError(false)
+    api.issues
+      .getDetail(selectedIssue.workspaceId, selectedIssue.issueId)
+      .then((next) => {
+        if (cancelled) return
+        setIssueDetail(next)
+        setIssueDetailLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setIssueDetail(null)
+        setIssueDetailLoading(false)
+        setIssueDetailError(true)
+      })
+    return () => { cancelled = true }
+  }, [issueDetailRequest, selectedIssue, viewMode])
+
   useEffect(() => {
     if (viewMode !== 'graph') return
     let cancelled = false
@@ -111,12 +161,16 @@ export function TrackedPage() {
   }, [graphRequest, viewMode])
 
   const openArtifact = useOpenTrackedArtifact()
+  const selectedIssueAnchor = selectedIssue
+    ? issueAnchors.find((anchor) => anchor.workspaceId === selectedIssue.workspaceId && anchor.issue.id === selectedIssue.issueId)
+    : null
+  const hasAnchors = entities.length > 0 || issueAnchors.length > 0
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={t('nav.item.tracked')}
-        description={t('tracked.pageDescription', { count: entities.length })}
+        description={t('tracked.pageDescription', { count: entities.length + issueAnchors.length })}
         right={(
           <SegmentedControl
             value={viewMode}
@@ -134,11 +188,11 @@ export function TrackedPage() {
         {listError && entities.length > 0 && (
           <StaleCollectionNotice refreshing={refreshing} onRetry={refreshEntities} />
         )}
-        {loading && entities.length === 0 ? (
+        {!hasAnchors && (loading || issuesLoading) ? (
           <TrackedListSkeleton />
-        ) : listError && entities.length === 0 ? (
+        ) : !hasAnchors && (listError || issueListError) ? (
           <CollectionLoadError refreshing={refreshing} onRetry={refreshEntities} />
-        ) : entities.length === 0 ? (
+        ) : !hasAnchors ? (
           <EmptyState />
         ) : viewMode === 'graph' ? (
           graphLoading && !graph ? (
@@ -149,12 +203,31 @@ export function TrackedPage() {
             <TrackedGraphView
               graph={graph}
               selectedName={selectedName}
-              onSelectEntity={selectTracked}
+              onSelectEntity={selectEntity}
               onOpenEntity={(name) => {
-                selectTracked(name)
+                selectEntity(name)
                 setViewMode('detail')
               }}
               onOpenArtifact={openArtifact}
+            />
+          )
+        ) : selectedIssue ? (
+          issueDetailLoading ? (
+            <PageLoading />
+          ) : issueDetailError || !issueDetail ? (
+            <DetailLoadError
+              name={selectedIssueAnchor?.issue.title ?? selectedIssue.issueId}
+              onRetry={() => setIssueDetailRequest((request) => request + 1)}
+            />
+          ) : (
+            <IssueAnchorDetail
+              detail={issueDetail}
+              workspaceTag={selectedIssueAnchor?.workspaceTag ?? selectedIssue.workspaceId.slice(0, 8)}
+              onOpenDetails={() => {
+                navigate(
+                  `/issues/${encodeURIComponent(selectedIssue.workspaceId)}/${encodeURIComponent(selectedIssue.issueId)}`,
+                )
+              }}
             />
           )
         ) : !selectedName ? (
@@ -350,6 +423,85 @@ function Detail({ detail }: { detail: EntityDetail }) {
       )}
     </div>
   )
+}
+
+function IssueAnchorDetail({
+  detail,
+  workspaceTag,
+  onOpenDetails,
+}: {
+  detail: IssueDetailData
+  workspaceTag: string
+  onOpenDetails: () => void
+}) {
+  const { t } = useTranslation()
+  const { issue } = detail
+  const body = withoutDuplicateLeadingTitle(issue.what, issue.title)
+  return (
+    <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8 md:py-8">
+      <article className="overflow-hidden rounded-xl border border-border/80 bg-card/35 shadow-sm">
+        <header className="border-b border-border/70 bg-secondary/20 px-5 py-5 md:px-7">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground shadow-sm">
+              <ListChecks size={17} strokeWidth={1.8} aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
+                <span className="uppercase tracking-[0.14em]">{t('tracked.issue')}</span>
+                <span className="text-border" aria-hidden>·</span>
+                <span>{workspaceTag}</span>
+                <span className="text-border" aria-hidden>·</span>
+                <span className="font-mono">{issue.id}</span>
+              </div>
+              <h2 className="break-words text-[20px] font-semibold leading-snug tracking-[-0.01em] text-foreground md:text-[24px]">
+                {issue.title}
+              </h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <IssueMetaPill>{t(`issues.status.${issue.status}`)}</IssueMetaPill>
+                <IssueMetaPill>{t(`issues.priority.${issue.priority}`)}</IssueMetaPill>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenDetails}
+              className="oa-pressable inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[12px] font-medium text-foreground shadow-sm transition-colors hover:border-primary/45 hover:bg-muted"
+            >
+              {t('tracked.openIssueDetails')}
+              <ArrowUpRight size={13} strokeWidth={1.8} aria-hidden />
+            </button>
+          </div>
+        </header>
+        <div className="px-5 py-6 md:px-7 md:py-7">
+          <MarkdownContent
+            text={body || t('tracked.issueNoDescription')}
+            className="text-[14px] leading-7 text-muted-foreground md:text-[15px]"
+          />
+        </div>
+      </article>
+    </div>
+  )
+}
+
+function IssueMetaPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+      {children}
+    </span>
+  )
+}
+
+/** Avoid repeating the Issue title when its Markdown document starts with it. */
+function withoutDuplicateLeadingTitle(markdown: string, title: string): string {
+  const lines = markdown.split(/\r?\n/)
+  const firstContent = lines.findIndex((line) => line.trim().length > 0)
+  if (firstContent < 0) return markdown
+  const heading = lines[firstContent].trim().match(/^#{1,6}\s+(.+?)\s*#*$/)
+  if (!heading || heading[1].trim().toLocaleLowerCase() !== title.trim().toLocaleLowerCase()) {
+    return markdown
+  }
+  lines.splice(firstContent, 1)
+  while (lines[firstContent]?.trim() === '') lines.splice(firstContent, 1)
+  return lines.join('\n')
 }
 
 // Issue notes live at `.alice/issues/<id>.md` (the only dot-dir the backlink

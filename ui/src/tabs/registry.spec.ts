@@ -50,6 +50,15 @@ describe('file-viewer URL projection', () => {
   })
 })
 
+describe('Tracked selection URL projection', () => {
+  it('projects an Issue selection into a reload-safe query', () => {
+    expect(getView('tracked').toUrl({
+      kind: 'tracked',
+      params: { workspace: 'workspace-1', issue: 'power-watch' },
+    })).toBe('/tracked?workspace=workspace-1&issue=power-watch')
+  })
+})
+
 describe('shared product shells', () => {
   it('assigns every Ask Alice surface to the shared chat shell', () => {
     expect(getViewShell({ kind: 'chat-landing', params: {} })).toBe('chat')
