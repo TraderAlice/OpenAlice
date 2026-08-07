@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
+  healthy dev/CLI Runtime already owning the selected data location and hand
+  the user to its verified browser UI without takeover.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY

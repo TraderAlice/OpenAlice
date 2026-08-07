@@ -33,11 +33,12 @@ import { dirname, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import {
   acquireGuardianRuntime,
+  startGuardianControlServer,
   currentProcessStartedAt,
+  buildGuardianRuntimeStatus,
   normalizeProcessExitCode,
   takeoverRequested,
 } from '@traderalice/guardian-runtime'
-import { startGuardianControlServer } from './control-server.mjs'
 import {
   planProdPorts,
   readProdPortsFile,
@@ -206,13 +207,7 @@ async function readRuntimeVersion() {
 function runtimeStatus() {
   const owner = guardianRuntimeLock?.owner
   const capabilities = LAUNCHER === 'cli-server' ? ['runtime.stop'] : []
-  return {
-    protocol: 1,
-    control: {
-      apiVersion: 1,
-      minClientApiVersion: 1,
-      capabilities: ['runtime.status', ...capabilities],
-    },
+  return buildGuardianRuntimeStatus({
     productVersion: RUNTIME_VERSION,
     runtimeVersion: RUNTIME_VERSION,
     state: stopping ? 'stopping' : aliceStatus === 'ready' ? 'running' : 'starting',
@@ -238,7 +233,7 @@ function runtimeStatus() {
         : {}),
     },
     pendingActivation: pendingActivation(),
-    uptimeSeconds: Math.max(0, Math.floor((Date.now() - GUARDIAN_STARTED_AT) / 1_000)),
+    startedAtMs: GUARDIAN_STARTED_AT,
     components: {
       alice: aliceStatus,
       uta: utaStatus,
@@ -262,7 +257,7 @@ function runtimeStatus() {
       },
     },
     capabilities,
-  }
+  })
 }
 
 async function readConnectorEnabled() {
