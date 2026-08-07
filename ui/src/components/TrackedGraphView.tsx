@@ -439,8 +439,6 @@ export function TrackedGraphView({
                 data-focus-state={focusState}
                 data-hovered={node.id === hoveredNodeId ? 'true' : 'false'}
                 className="oa-tracked-graph-node"
-                onPointerEnter={() => setHoveredNodeId(node.id)}
-                onPointerLeave={() => setHoveredNodeId((value) => value === node.id ? null : value)}
               >
                 <g
                   data-enter-phase={entrancePhaseById.phases.get(node.id) ?? 0}
@@ -450,8 +448,11 @@ export function TrackedGraphView({
                     '--oa-graph-enter-y': `${enterY}px`,
                   } as CSSProperties}
                 >
-                  <g className="oa-tracked-graph-node-focus">
-                    <title>{nodeTitle(node)}</title>
+                  <title>{nodeTitle(node)}</title>
+                  {/* Keep the visual transform independent from the fixed hit
+                      target and label. Otherwise scaling a long, off-centre
+                      label can move the node out from under the pointer. */}
+                  <g className="oa-tracked-graph-node-mark pointer-events-none">
                     <circle
                       r={radius + 7}
                       fill="var(--accent)"
@@ -467,16 +468,7 @@ export function TrackedGraphView({
                       width={(radius + 8) * 2}
                       height={(radius + 8) * 2}
                     >
-                      <button
-                        type="button"
-                        aria-label={node.kind === 'entity'
-                          ? t('tracked.graph.entityNodeLabel', { name: node.label, count: degree })
-                          : t('tracked.graph.artifactNodeLabel', { name: node.label, workspace: node.workspaceTag })}
-                        title={nodeTitle(node)}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={() => activateNode(node)}
-                        className="flex h-full w-full items-center justify-center rounded-full bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-                      >
+                      <div className="flex h-full w-full items-center justify-center">
                         <span
                           aria-hidden
                           className={node.kind === 'artifact' && node.artifactType === 'issue' ? 'rounded-[1.5px]' : 'rounded-full'}
@@ -489,25 +481,46 @@ export function TrackedGraphView({
                             boxShadow: `0 0 0 ${node.kind === 'entity' ? 2 : 1.25}px var(--background)`,
                           }}
                         />
-                      </button>
+                      </div>
                     </foreignObject>
-                    <text
-                      x={labelOnLeft ? -(radius + 6) : radius + 6}
-                      y={node.kind === 'entity' ? 4 : 3}
-                      textAnchor={labelOnLeft ? 'end' : 'start'}
-                      fill="var(--foreground)"
-                      fontSize={node.kind === 'entity' ? 12 : 10}
-                      fontWeight={node.kind === 'entity' ? 600 : 450}
-                      paintOrder="stroke"
-                      stroke="var(--background)"
-                      strokeWidth={4}
-                      strokeLinejoin="round"
-                      opacity={showLabel ? 1 : 0}
-                      className="oa-tracked-graph-label pointer-events-none"
-                    >
-                      {node.label}
-                    </text>
                   </g>
+                  <foreignObject
+                    x={-(radius + 8)}
+                    y={-(radius + 8)}
+                    width={(radius + 8) * 2}
+                    height={(radius + 8) * 2}
+                  >
+                    <button
+                      type="button"
+                      aria-label={node.kind === 'entity'
+                        ? t('tracked.graph.entityNodeLabel', { name: node.label, count: degree })
+                        : t('tracked.graph.artifactNodeLabel', { name: node.label, workspace: node.workspaceTag })}
+                      title={nodeTitle(node)}
+                      onPointerEnter={() => setHoveredNodeId(node.id)}
+                      onPointerLeave={() => setHoveredNodeId((value) => value === node.id ? null : value)}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={() => activateNode(node)}
+                      className="h-full w-full rounded-full bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    >
+                      <span className="sr-only">{node.label}</span>
+                    </button>
+                  </foreignObject>
+                  <text
+                    x={labelOnLeft ? -(radius + 6) : radius + 6}
+                    y={node.kind === 'entity' ? 4 : 3}
+                    textAnchor={labelOnLeft ? 'end' : 'start'}
+                    fill="var(--foreground)"
+                    fontSize={node.kind === 'entity' ? 12 : 10}
+                    fontWeight={node.kind === 'entity' ? 600 : 450}
+                    paintOrder="stroke"
+                    stroke="var(--background)"
+                    strokeWidth={4}
+                    strokeLinejoin="round"
+                    opacity={showLabel ? 1 : 0}
+                    className="oa-tracked-graph-label pointer-events-none"
+                  >
+                    {node.label}
+                  </text>
                 </g>
               </g>
             )

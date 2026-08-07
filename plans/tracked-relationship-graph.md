@@ -35,6 +35,9 @@ clusters form, or which tracked anchors have no supporting material.
 8. Material nodes use the same preview-first interaction as entities. Selecting
    a note or Issue keeps the graph in place, animates a compact inspector into
    view, and defers provenance navigation to the explicit Details action.
+9. Pointer focus uses a fixed, native-button hit target. Only the centered node
+   mark scales; labels stay outside that transform so long names cannot shift
+   the hover boundary and cause edge jitter.
 
 ## Work
 
@@ -50,6 +53,8 @@ clusters form, or which tracked anchors have no supporting material.
       handling and no continuous background animation.
 - [x] Add animated material previews that preserve graph context until Details
       is explicitly requested.
+- [x] Stabilize node-edge hover by separating hit testing, mark motion, and
+      label geometry.
 - [x] Complete browser, full-suite, and packaged Electron verification.
 
 ## Verification
@@ -63,6 +68,8 @@ clusters form, or which tracked anchors have no supporting material.
 - graph entrance and focus states in Day/Night modes and at phone width, with
   motion disabled by both the shared reduced-motion rule and zero-motion style
   profiles
+- long-label node focus on the real `/tracked` route, confirming the fixed
+  pointer target keeps an identical center and size before and after mark scale
 - Issue and note previews at desktop and phone widths, including explicit
   Details navigation with the graph route preserved until activation
 - `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace`

@@ -95,9 +95,16 @@ describe('TrackedGraphView', () => {
     )
 
     const assetButton = screen.getByRole('button', { name: /asset-a, linked/ })
+    const assetNode = assetButton.closest('[data-graph-node]')
+    const visualMark = assetNode?.querySelector('.oa-tracked-graph-node-mark')
+    expect(visualMark).toBeTruthy()
+    expect(visualMark?.querySelector('button')).toBeNull()
+    expect(visualMark?.querySelector('text')).toBeNull()
+    expect(assetNode?.querySelector('.oa-tracked-graph-label')).toBeTruthy()
+
     fireEvent.pointerEnter(assetButton)
 
-    expect(assetButton.closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('active')
+    expect(assetNode?.getAttribute('data-focus-state')).toBe('active')
     expect(screen.getByRole('button', { name: /shared-note, source material/ })
       .closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('related')
     expect(screen.getByRole('button', { name: /topic-b, linked/ })
@@ -106,6 +113,6 @@ describe('TrackedGraphView', () => {
       .closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('dimmed')
 
     fireEvent.pointerLeave(assetButton)
-    expect(assetButton.closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('idle')
+    expect(assetNode?.getAttribute('data-focus-state')).toBe('idle')
   })
 })
