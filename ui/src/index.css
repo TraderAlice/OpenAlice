@@ -266,8 +266,26 @@ body {
   to { stroke-dashoffset: 0; }
 }
 
+@keyframes oa-tracked-graph-preview-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    border-color: var(--border);
+  }
+}
+
 .oa-tracked-graph-node {
   transition: opacity var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-tracked-graph-preview-enter {
+  animation: oa-tracked-graph-preview-enter var(--motion-slow) var(--motion-ease-out) backwards;
+  transform-origin: bottom right;
 }
 
 .oa-tracked-graph-node-enter {
@@ -682,7 +700,8 @@ html[lang="ja"] .oa-onboarding-title {
     animation: none;
   }
   .oa-tracked-graph-node-enter,
-  .oa-tracked-graph-edge {
+  .oa-tracked-graph-edge,
+  .oa-tracked-graph-preview-enter {
     animation: none;
   }
   .oa-pressable,
