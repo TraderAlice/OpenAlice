@@ -72,6 +72,7 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     modelOptions: [],
     launchModel: undefined,
     effortOptions: ['low', 'medium', 'high'],
+    selectedReasoningEffort: undefined,
     launchReasoningEffort: undefined,
     aiDetails: null,
     selectedRuntimeUsesGlobalConfig: false,

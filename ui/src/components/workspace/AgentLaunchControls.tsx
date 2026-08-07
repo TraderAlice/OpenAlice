@@ -205,7 +205,7 @@ function AgentLaunchEffortEditor({
   labeled?: boolean
 }) {
   const { t } = useTranslation()
-  const current = config.launchReasoningEffort
+  const current = config.selectedReasoningEffort
   const options = current && !config.effortOptions.includes(current)
     ? [current, ...config.effortOptions]
     : config.effortOptions
@@ -284,10 +284,10 @@ function AgentLaunchInferenceMenu({
     ?? config.defaultModel
     ?? t('chatLanding.runtimeDefaultModel')
   const modelValue = config.launchModel ?? ''
-  const effortValue = config.launchReasoningEffort ?? ''
-  const effortOptions = config.launchReasoningEffort
-    && !config.effortOptions.includes(config.launchReasoningEffort)
-    ? [config.launchReasoningEffort, ...config.effortOptions]
+  const effortValue = config.selectedReasoningEffort ?? ''
+  const effortOptions = config.selectedReasoningEffort
+    && !config.effortOptions.includes(config.selectedReasoningEffort)
+    ? [config.selectedReasoningEffort, ...config.effortOptions]
     : config.effortOptions
   const knownModels = config.modelOptions.filter((model) => model.id !== config.defaultModel)
   const customCurrentModel = config.launchModel

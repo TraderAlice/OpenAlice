@@ -84,6 +84,19 @@ const opencodeAgent: AgentInfo = {
   displayName: 'opencode',
 }
 
+const codexAgent: AgentInfo = {
+  ...piAgent,
+  id: 'codex',
+  displayName: 'Codex',
+  capabilities: {
+    ...piAgent.capabilities,
+    aiProvider: {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['openai-responses'],
+    },
+  },
+}
+
 function chatWorkspace(): Workspace {
   return {
     id: 'chat-1',
@@ -678,6 +691,77 @@ describe('ChatLandingPage AI source disclosure', () => {
       'chat',
       'deepseek-v4-flash',
       'high',
+      undefined,
+    ))
+  })
+
+  it('projects a registered model default into the new Session launch', async () => {
+    mocks.useWorkspaces.mockImplementation(() => ({
+      ...context(workspaces),
+      agents: [codexAgent],
+      defaultAgent: 'codex',
+    }))
+    mocks.detectWorkspaceCredential.mockResolvedValue(null)
+    mocks.getAgentRuntimeReadiness.mockResolvedValue({
+      agents: {
+        codex: {
+          agent: 'codex',
+          displayName: 'Codex',
+          installed: true,
+          binPath: '/tmp/codex',
+          status: 'ready',
+          ready: true,
+          source: 'global-login',
+          checkedAt: '2026-08-07T00:00:00.000Z',
+          durationMs: 1,
+        },
+      },
+      overallReady: true,
+      checkedAt: '2026-08-07T00:00:00.000Z',
+    })
+    mocks.getPresets.mockResolvedValue({
+      presets: [{
+        id: 'codex-oauth',
+        label: 'OpenAI Codex (Subscription)',
+        models: [{
+          id: 'gpt-5.6-sol',
+          label: 'GPT 5.6 Sol (Power)',
+          semantics: {
+            reasoning: {
+              mode: 'required',
+              efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+              defaultEffort: 'low',
+            },
+          },
+        }],
+      }],
+    })
+    mocks.getQuickChat.mockResolvedValue({
+      lastCredentialByAgent: {},
+      recentChatWorkspaceId: 'chat-1',
+      recentLaunch: {
+        agent: 'codex',
+        accessMode: 'auto',
+        credentialSlug: null,
+        model: 'gpt-5.6-sol',
+        reasoningEffort: null,
+      },
+    })
+
+    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+
+    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('low reasoning')
+    fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use model defaults.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(mocks.quickChat).toHaveBeenCalledWith(
+      'Use model defaults.',
+      'codex',
+      undefined,
+      'chat-1',
+      'chat',
+      'gpt-5.6-sol',
+      'low',
       undefined,
     ))
   })
