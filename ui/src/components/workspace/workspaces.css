@@ -1422,7 +1422,7 @@ button.files-row:focus-visible {
 .webpi-composer-wrap { width: 100%; max-width: 100%; min-width: 0; padding: 10px max(18px, calc((100% - 760px) / 2)) 14px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--background) 88%, transparent); }
 .webpi-composer { width: 100%; max-width: 100%; min-width: 0; display: flex; align-items: flex-end; gap: 8px; padding: 9px 10px 9px 13px; border: 1px solid var(--border); border-radius: 14px; background: var(--secondary); box-shadow: 0 6px 24px color-mix(in srgb, var(--shadow-color) 9%, transparent); }
 .webpi-composer:focus-within { border-color: color-mix(in srgb, var(--primary) 60%, var(--border)); }
-.webpi-composer textarea { width: 100%; min-width: 0; flex: 1; min-height: 25px; max-height: 150px; resize: none; border: 0; outline: 0; color: var(--foreground); background: transparent; font: inherit; font-size: 13px; line-height: 1.6; }
+.webpi-composer [data-slot="textarea"] { width: 100%; min-width: 0; flex: 1; min-height: 25px; max-height: 150px; overflow-y: auto; resize: none; border: 0; border-radius: 0; padding: 0; outline: 0; color: var(--foreground); background: transparent; box-shadow: none; font: inherit; font-size: 13px; line-height: 1.6; }
 .webpi-send { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; color: var(--primary-foreground); background: var(--primary); }
 .webpi-send:disabled { opacity: .35; }
 .webpi-composer-hint { padding: 5px 3px 0; text-align: right; color: var(--muted-foreground); font-size: 9px; }
