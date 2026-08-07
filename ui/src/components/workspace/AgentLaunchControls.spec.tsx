@@ -250,7 +250,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
           defaultModel: 'gpt-5',
           modelOptions: [
             { id: 'gpt-5', label: 'GPT-5' },
-            { id: 'gpt-5.6', label: 'GPT-5.6' },
+            { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
           ],
           aiDetails: {
             model: 'gpt-5',
@@ -277,7 +277,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     await user.keyboard('{ArrowDown}')
     await user.click(screen.getByRole('menuitem', { name: /Model/ }))
     fireEvent.click(await screen.findByRole('menuitemradio', { name: /GPT-5.6/ }))
-    expect(selectModel).toHaveBeenCalledWith('gpt-5.6')
+    expect(selectModel).toHaveBeenCalledWith('gpt-5.6-sol')
 
     await user.keyboard('{Escape}{Escape}')
     trigger.focus()

@@ -35,6 +35,7 @@ const MODEL_REASONING_EFFORTS = [
   'high',
   'xhigh',
   'max',
+  'ultra',
 ] as const satisfies readonly ModelReasoningEffort[]
 
 const COMMENT_MAX = 16_000

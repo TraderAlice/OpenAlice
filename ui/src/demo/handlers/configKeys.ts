@@ -61,9 +61,9 @@ export const demoCredentialPresets = [
       modelHelp: 'Choose a model enabled for this API project, or paste another exact ID.',
     },
     models: [
-      { id: 'gpt-5.6', label: 'GPT 5.6 (Sol alias)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
       { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
-      { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)', semantics: { contextWindow: 400_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
       { id: 'gpt-5.5', label: 'GPT 5.5 (Previous generation)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' } } },
       { id: 'gpt-5.4', label: 'GPT 5.4 (Previous generation)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh'], defaultEffort: 'none' } } },
     ],
@@ -73,9 +73,9 @@ export const demoCredentialPresets = [
         apiKey: { type: 'string' },
         model: {
           type: 'string',
-          default: 'gpt-5.6',
+          default: 'gpt-5.6-sol',
           oneOf: [
-            { const: 'gpt-5.6', title: 'GPT 5.6 (Sol alias)' },
+            { const: 'gpt-5.6-sol', title: 'GPT 5.6 Sol (Power)' },
             { const: 'gpt-5.6-terra', title: 'GPT 5.6 Terra (Balanced)' },
             { const: 'gpt-5.6-luna', title: 'GPT 5.6 Luna (Cost-efficient)' },
             { const: 'gpt-5.5', title: 'GPT 5.5 (Previous generation)' },
@@ -206,7 +206,7 @@ export const configKeysHandlers = [
     HttpResponse.json({
       credentials: [
         { slug: 'anthropic-1', vendor: 'anthropic', label: 'Anthropic', authType: 'api-key', wires: { anthropic: '' }, apiKey: null, hasApiKey: true, lastModel: 'claude-opus-4-8' },
-        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-responses': '', 'openai-chat': '' }, apiKey: null, hasApiKey: true, lastModel: 'gpt-5.6' },
+        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-responses': '', 'openai-chat': '' }, apiKey: null, hasApiKey: true, lastModel: 'gpt-5.6-sol' },
       ],
     }),
   ),

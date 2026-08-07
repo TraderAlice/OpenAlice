@@ -14,7 +14,7 @@ import { z } from 'zod'
 import { dataPath } from './paths.js'
 
 const modelReasoningEffortSchema = z.enum([
-  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra',
 ])
 
 const quickChatLaunchSchema = z.object({

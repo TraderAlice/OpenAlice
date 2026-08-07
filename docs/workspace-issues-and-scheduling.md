@@ -37,7 +37,7 @@ assignee: "@new-then-resume"
 when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: codex
 credential: openai-primary
-model: gpt-5.6
+model: gpt-5.6-sol
 effort: high
 ---
 
@@ -155,8 +155,8 @@ Agents normally use:
 ```bash
 alice-workspace issue list
 alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6 --effort high
-alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6 --effort high
+alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6-sol --effort high
+alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6-sol --effort high
 alice-workspace issue comment --id <id> --text "..."
 ```
 

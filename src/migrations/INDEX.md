@@ -35,3 +35,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0033_semantic_issue_assignees` | 0.90.0-beta | 2026-08-06 | workspaces/<id>/.alice/issues/*.md | Replace deprecated @workspace/@new Issue aliases with behavior-named assignee tokens. |
 | `0034_quick_chat_recent_launch` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Remember Quick Start runtime, credential, model, and effort as one Session-only launch tuple. |
 | `0035_quick_chat_access_mode` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Distinguish Workspace AI, saved credentials, and native runtime accounts in Quick Start. |
+| `0036_codex_56_subscription_model` | 0.89.3-beta | 2026-08-07 | data/preferences.json, workspaces/state/resume-identities.json | Use the explicit GPT-5.6 Sol slug for native Codex subscription Sessions. |

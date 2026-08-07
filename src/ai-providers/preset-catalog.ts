@@ -8,7 +8,11 @@
  */
 
 import { z } from 'zod'
-import { resolveModelSemantics, type ModelSemantics } from './model-semantics.js'
+import {
+  resolveModelSemantics,
+  type ModelReasoningEffort,
+  type ModelSemantics,
+} from './model-semantics.js'
 
 // ==================== Types ====================
 
@@ -24,6 +28,27 @@ function withModelSemantics(vendor: string, models: ModelOption[]): ModelOption[
     const semantics = resolveModelSemantics(vendor, model.id)
     return semantics ? { ...model, semantics } : model
   })
+}
+
+const CODEX_56_CONTEXT_WINDOW = 272_000
+
+function codexSubscriptionModel(
+  id: string,
+  label: string,
+  input: { efforts: ModelReasoningEffort[]; defaultEffort: ModelReasoningEffort },
+): ModelOption {
+  return {
+    id,
+    label,
+    semantics: {
+      contextWindow: CODEX_56_CONTEXT_WINDOW,
+      reasoning: {
+        mode: 'required',
+        efforts: input.efforts,
+        defaultEffort: input.defaultEffort,
+      },
+    },
+  }
 }
 
 /**
@@ -149,15 +174,24 @@ export const CODEX_OAUTH: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('codex-oauth'),
-    model: z.string().default('gpt-5.6').describe('Model'),
+    model: z.string().default('gpt-5.6-sol').describe('Model'),
   }),
-  models: withModelSemantics('openai', [
-    { id: 'gpt-5.6', label: 'GPT 5.6 (Power · Sol)' },
-    { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
-    { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Fastest)' },
+  models: [
+    codexSubscriptionModel('gpt-5.6-sol', 'GPT 5.6 Sol (Power)', {
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+      defaultEffort: 'low',
+    }),
+    codexSubscriptionModel('gpt-5.6-terra', 'GPT 5.6 Terra (Balanced)', {
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+      defaultEffort: 'medium',
+    }),
+    codexSubscriptionModel('gpt-5.6-luna', 'GPT 5.6 Luna (Fastest)', {
+      efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      defaultEffort: 'medium',
+    }),
     { id: 'gpt-5.5', label: 'GPT 5.5 (Previous generation)' },
     { id: 'gpt-5.4', label: 'GPT 5.4 (Previous generation)' },
-  ]),
+  ],
 }
 
 export const CODEX_API: PresetDef = {
@@ -169,11 +203,11 @@ export const CODEX_API: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('codex'),
     loginMethod: z.literal('api-key'),
-    model: z.string().default('gpt-5.6').describe('Model'),
+    model: z.string().default('gpt-5.6-sol').describe('Model'),
     apiKey: z.string().min(1).describe('OpenAI API key'),
   }),
   models: withModelSemantics('openai', [
-    { id: 'gpt-5.6', label: 'GPT 5.6 (Sol alias)' },
+    { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)' },
     { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
     { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)' },
     { id: 'gpt-5.5', label: 'GPT 5.5 (Previous generation)' },
@@ -187,7 +221,7 @@ export const CODEX_API: PresetDef = {
     apiKeyLabel: 'OpenAI API key',
     apiKeyPlaceholder: 'sk-...',
     apiKeyHelp: 'Use an OpenAI Platform API key. A ChatGPT subscription is a separate Codex CLI login and does not belong in this field.',
-    modelHelp: 'Choose a model enabled for this API project, or paste another exact ID. GPT 5.6 is the current Sol alias; Terra balances capability and cost, while Luna favors efficient high-volume work.',
+    modelHelp: 'Choose a model enabled for this API project, or paste another exact ID. Sol is the flagship tier, Terra balances capability and cost, and Luna favors efficient high-volume work.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -471,7 +505,7 @@ export const PRESET_CATALOG: PresetDef[] = [
  */
 export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   anthropic: 'claude-opus-4-8',
-  openai: 'gpt-5.6',
+  openai: 'gpt-5.6-sol',
   google: 'gemini-3.1-flash-lite',
   minimax: 'MiniMax-M3',
   glm: 'glm-5.2',

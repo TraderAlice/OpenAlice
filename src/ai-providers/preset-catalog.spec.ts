@@ -53,10 +53,25 @@ describe('credential form catalog', () => {
   });
 
   it('offers the GPT 5.6 family to Codex subscriptions and OpenAI API keys', () => {
-    const expected = ['gpt-5.6', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
+    const expected = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4'];
     expect(CODEX_OAUTH.models?.map((model) => model.id)).toEqual(expected);
     expect(CODEX_API.models?.map((model) => model.id)).toEqual(expected);
-    expect(DEFAULT_MODEL_BY_VENDOR['openai']).toBe('gpt-5.6');
+    expect(DEFAULT_MODEL_BY_VENDOR['openai']).toBe('gpt-5.6-sol');
+    expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-sol')?.semantics)
+      .toMatchObject({
+        contextWindow: 272_000,
+        reasoning: {
+          efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+          defaultEffort: 'low',
+        },
+      });
+    expect(CODEX_OAUTH.models?.find((model) => model.id === 'gpt-5.6-luna')?.semantics)
+      .toMatchObject({
+        reasoning: {
+          efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+          defaultEffort: 'medium',
+        },
+      });
   });
 
   it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {
@@ -151,13 +166,13 @@ describe('credential form catalog', () => {
 
   it('serializes rich semantics beside the backwards-compatible model oneOf', () => {
     const openai = BUILTIN_PRESETS.find((preset) => preset.id === 'codex-api')!;
-    expect(openai.models?.find((model) => model.id === 'gpt-5.6')?.semantics).toMatchObject({
+    expect(openai.models?.find((model) => model.id === 'gpt-5.6-sol')?.semantics).toMatchObject({
       contextWindow: 1_050_000,
       reasoning: { mode: 'optional', defaultEffort: 'medium' },
     });
     const properties = openai.schema['properties'] as Record<string, Record<string, unknown>>;
     expect(properties['model']?.['oneOf']).toEqual(expect.arrayContaining([
-      expect.objectContaining({ const: 'gpt-5.6' }),
+      expect.objectContaining({ const: 'gpt-5.6-sol' }),
     ]));
   });
 });

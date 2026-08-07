@@ -291,7 +291,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     )
 
     fireEvent.change(await screen.findByPlaceholderText('gpt-5.5'), {
-      target: { value: 'gpt-5.6' },
+      target: { value: 'gpt-5.6-sol' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
@@ -301,7 +301,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
       expect.objectContaining({
         baseUrl: null,
         apiKey: null,
-        model: 'gpt-5.6',
+        model: 'gpt-5.6-sol',
       }),
     ))
     expect(mocks.testAgentConfig).not.toHaveBeenCalled()
@@ -379,7 +379,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     const openAiPi = {
       ...savedPi,
       baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-5.6',
+      model: 'gpt-5.6-sol',
     }
     mocks.getAgentConfig.mockReset()
       .mockResolvedValueOnce({ claude: null, codex: null, opencode: null, pi: openAiPi })
@@ -397,7 +397,7 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
         defaultName: 'OpenAI',
         description: '',
         models: [{
-          id: 'gpt-5.6',
+          id: 'gpt-5.6-sol',
           label: 'GPT 5.6',
           semantics: {
             reasoning: {
