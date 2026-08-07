@@ -302,17 +302,17 @@ body {
     stroke-width var(--motion-fast) var(--motion-ease-standard);
 }
 
-.oa-tracked-graph-node-focus {
+.oa-tracked-graph-node-mark {
   transform-box: fill-box;
   transform-origin: center;
   transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
-.oa-tracked-graph-node[data-focus-state="active"] .oa-tracked-graph-node-focus {
+.oa-tracked-graph-node[data-focus-state="active"] .oa-tracked-graph-node-mark {
   transform: scale(1.14);
 }
 
-.oa-tracked-graph-node[data-focus-state="related"] .oa-tracked-graph-node-focus {
+.oa-tracked-graph-node[data-focus-state="related"] .oa-tracked-graph-node-mark {
   transform: scale(1.035);
 }
 
@@ -715,7 +715,7 @@ html[lang="ja"] .oa-onboarding-title {
   }
   .oa-tracked-graph-node,
   .oa-tracked-graph-edge,
-  .oa-tracked-graph-node-focus,
+  .oa-tracked-graph-node-mark,
   .oa-tracked-graph-hover-halo,
   .oa-tracked-graph-label {
     transition-duration: 0.01ms;
