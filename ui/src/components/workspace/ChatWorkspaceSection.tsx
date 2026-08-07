@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Clock3,
   LayoutGrid,
+  Layers3,
   MessageSquarePlus,
   Network,
   PanelsTopLeft,
@@ -345,6 +346,7 @@ export function ChatWorkspaceSection({
             navigate({ kind: 'chat-landing', params: { targetWsId: workspaceId } })
           }}
           onConfigure={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id)}
+          onUpgrade={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id, undefined, 'template')}
           onBrowseSessions={() => focusedWorkspace && navigate({
             kind: 'workspace',
             params: { wsId: focusedWorkspace.id, source: 'chat' },
@@ -392,6 +394,7 @@ interface ChatWorkspaceContextFooterProps {
   onRequestDisplayMode: (mode: ChatDisplayMode) => void
   onSwitchWorkspace: (workspaceId: string) => void
   onConfigure: () => void
+  onUpgrade: () => void
   onBrowseSessions: () => void
   onOpenManager: () => void
   onCreateWorkspace: () => void
@@ -440,6 +443,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
       ? t('chat.allWorkspaces')
       : t('chat.multiModeDescription')
   const TriggerIcon = props.displayMode === 'recent' ? Clock3 : LayoutGrid
+  const upgrade = props.workspace?.upgradeAvailable ?? null
 
   const modeOption = (
     mode: ChatDisplayMode,
@@ -471,7 +475,9 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? popoverId : undefined}
-        aria-label={t('chat.workspaceContextLabel', { name: title })}
+        aria-label={upgrade
+          ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgrade.to })
+          : t('chat.workspaceContextLabel', { name: title })}
         className="oa-pressable flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -479,8 +485,11 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
           <span className="block truncate font-medium text-foreground" title={props.displayMode === 'focused' && props.workspace ? workspaceDisplayTitle(props.workspace) : title}>
             {title}
           </span>
-          <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/70">{subtitle}</span>
+          <span className={`mt-0.5 block truncate text-[10px] ${upgrade ? 'font-medium text-primary' : 'text-muted-foreground/70'}`}>
+            {upgrade ? t('chat.workspaceUpdateAvailable', { version: upgrade.to }) : subtitle}
+          </span>
         </span>
+        {upgrade && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
       </button>
 
@@ -526,6 +535,18 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             <SettingsIcon size={14} strokeWidth={2} aria-hidden />
             <span>{t('workspace.configure')}</span>
           </button>
+          {upgrade && (
+            <button
+              type="button"
+              onClick={() => closeAndRun(props.onUpgrade)}
+              aria-label={t('chat.reviewWorkspaceUpdateLabel', { version: upgrade.to })}
+              className="flex min-h-9 w-full items-center gap-2.5 rounded-md bg-primary/10 px-2.5 py-2 text-left text-xs font-medium text-primary transition-colors hover:bg-primary/15"
+            >
+              <Layers3 size={14} strokeWidth={2} aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{t('chat.reviewWorkspaceUpdate')}</span>
+              <span className="shrink-0 tabular-nums text-[10px] text-primary/75">v{upgrade.to}</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => closeAndRun(props.onBrowseSessions)}
