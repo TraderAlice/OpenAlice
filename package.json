@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/electron/main.js",
   "scripts": {
+    "cli": "node packages/cli/bin/openalice.ts",
     "dev": "tsx scripts/guardian/dev.ts",
     "dev:onboarding": "tsx scripts/onboarding-test-dev.ts",
     "remote:ssh": "node packages/cli/bin/openalice.mjs ssh",
@@ -39,6 +40,7 @@
     "electron:smoke:upgrade": "node scripts/desktop-upgrade-smoke.mjs",
     "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",
+    "test:cli": "pnpm -F @traderalice/openalice-cli test",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:uta:live-paper": "vitest run --config vitest.uta-live.config.ts",

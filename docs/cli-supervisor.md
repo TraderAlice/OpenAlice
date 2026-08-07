@@ -450,6 +450,21 @@ completion; detailed shell installation remains user-owned.
 
 ## Verification
 
+Run the repository's TypeScript CLI entry directly when developing or
+dogfooding the Supervisor. Bare `pnpm cli` opens the real interactive TUI; any
+following arguments are passed through to the same command surface:
+
+```bash
+pnpm cli
+pnpm cli status --json
+pnpm cli doctor
+pnpm test:cli
+```
+
+This source entry does not install or copy a CLI payload. When `pnpm dev`
+already owns the selected home, the TUI and read-only commands discover that
+live Runtime rather than starting or replacing another owner.
+
 For command-only changes:
 
 ```bash
