@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { TrendingUp, Hash, FileText, ListChecks, CircleAlert, List, Network, ArrowUpRight } from 'lucide-react'
@@ -12,7 +12,7 @@ import { entitiesLive, refreshEntities } from '../live/entities'
 import { useTrackedSelection } from '../live/tracked-selection'
 import { useWorkspace } from '../tabs/store'
 import { useIssues } from '../hooks/useIssues'
-import { trackedIssueAnchors } from '../lib/tracked-issues'
+import { graphWithTrackedIssues, trackedIssueAnchors } from '../lib/tracked-issues'
 import type { EntityDetail, Backlink, EntityGraph, EntityGraphArtifactNode } from '../api/entities'
 import type { IssueDetail as IssueDetailData } from '../api/issues'
 
@@ -45,10 +45,11 @@ export function TrackedPage() {
   const listError = entitiesLive.useStore((s) => s.error)
   const refreshing = entitiesLive.useStore((s) => s.refreshing)
   const { data: issueSnapshot, error: issueListError, loading: issuesLoading } = useIssues()
-  const issueAnchors = trackedIssueAnchors(issueSnapshot)
+  const issueAnchors = useMemo(() => trackedIssueAnchors(issueSnapshot), [issueSnapshot])
   const selectedName = useTrackedSelection((s) => s.selectedName)
   const selectedIssue = useTrackedSelection((s) => s.selectedIssue)
   const selectTracked = useTrackedSelection((s) => s.select)
+  const selectTrackedIssue = useTrackedSelection((s) => s.selectIssue)
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const navigate = useNavigate()
   const [viewMode, setViewModeState] = useState<TrackedViewMode>(readTrackedViewMode)
@@ -61,6 +62,14 @@ export function TrackedPage() {
     openOrFocus({ kind: 'tracked', params: { entity: name } })
   }, [openOrFocus, selectTracked])
 
+  const selectIssue = useCallback((issue: { workspaceId: string; issueId: string }) => {
+    selectTrackedIssue(issue)
+    openOrFocus({
+      kind: 'tracked',
+      params: { workspace: issue.workspaceId, issue: issue.issueId },
+    })
+  }, [openOrFocus, selectTrackedIssue])
+
   const setViewMode = useCallback((mode: TrackedViewMode) => {
     setViewModeState(mode)
     try {
@@ -69,10 +78,6 @@ export function TrackedPage() {
       // View preference persistence is best-effort.
     }
   }, [])
-
-  useEffect(() => {
-    if (selectedIssue) setViewMode('detail')
-  }, [selectedIssue, setViewMode])
 
   const [detail, setDetail] = useState<EntityDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -164,6 +169,10 @@ export function TrackedPage() {
   const selectedIssueAnchor = selectedIssue
     ? issueAnchors.find((anchor) => anchor.workspaceId === selectedIssue.workspaceId && anchor.issue.id === selectedIssue.issueId)
     : null
+  const graphWithIssues = useMemo(
+    () => graph ? graphWithTrackedIssues(graph, issueAnchors) : null,
+    [graph, issueAnchors],
+  )
   const hasAnchors = entities.length > 0 || issueAnchors.length > 0
 
   return (
@@ -195,18 +204,25 @@ export function TrackedPage() {
         ) : !hasAnchors ? (
           <EmptyState />
         ) : viewMode === 'graph' ? (
-          graphLoading && !graph ? (
+          graphLoading && !graphWithIssues ? (
             <PageLoading />
-          ) : !graph ? (
+          ) : !graphWithIssues ? (
             <GraphLoadError onRetry={() => setGraphRequest((request) => request + 1)} />
           ) : (
             <TrackedGraphView
-              graph={graph}
+              graph={graphWithIssues}
               selectedName={selectedName}
+              selectedIssue={selectedIssue}
               onSelectEntity={selectEntity}
+              onSelectIssue={selectIssue}
               onOpenEntity={(name) => {
                 selectEntity(name)
                 setViewMode('detail')
+              }}
+              onOpenIssue={(issue) => {
+                navigate(
+                  `/issues/${encodeURIComponent(issue.workspaceId)}/${encodeURIComponent(issue.issueId)}`,
+                )
               }}
               onOpenArtifact={openArtifact}
             />

@@ -57,6 +57,7 @@ const mocks = vi.hoisted(() => ({
   getGraph: vi.fn(),
   getIssue: vi.fn(),
   selectTracked: vi.fn(),
+  selectIssue: vi.fn(),
   navigate: vi.fn(),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
@@ -114,7 +115,12 @@ vi.mock('../live/tracked-selection', () => ({
     selectedName: string | null
     selectedIssue: { workspaceId: string; issueId: string } | null
     select: typeof mocks.selectTracked
-  }) => unknown) => selector({ ...mocks.selectionState.current, select: mocks.selectTracked }),
+    selectIssue: typeof mocks.selectIssue
+  }) => unknown) => selector({
+    ...mocks.selectionState.current,
+    select: mocks.selectTracked,
+    selectIssue: mocks.selectIssue,
+  }),
 }))
 
 vi.mock('../hooks/useIssues', () => ({
@@ -219,6 +225,25 @@ describe('TrackedPage Issue anchors', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Details' }))
 
     expect(mocks.getIssue).toHaveBeenCalledWith('workspace-1', 'power-watch')
+    expect(mocks.navigate).toHaveBeenCalledWith('/issues/workspace-1/power-watch')
+  })
+
+  it('keeps an Issue selection inside Graph mode until Details is opened', async () => {
+    window.localStorage.setItem('openalice.tracked.view-mode.v1', 'graph')
+    mocks.issuesState.current = { data: issueSnapshot, error: null, loading: false }
+    mocks.selectionState.current = {
+      selectedName: null,
+      selectedIssue: { workspaceId: 'workspace-1', issueId: 'power-watch' },
+    }
+
+    render(<TrackedPage />)
+
+    expect(await screen.findByRole('button', { name: /Power watch/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Graph' }).getAttribute('aria-pressed')).toBe('true')
+    expect(mocks.getIssue).not.toHaveBeenCalled()
+    expect(screen.getByText('Issue · power')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open details' }))
     expect(mocks.navigate).toHaveBeenCalledWith('/issues/workspace-1/power-watch')
   })
 })

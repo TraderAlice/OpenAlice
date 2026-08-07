@@ -27,6 +27,7 @@ import type {
   EntityGraphNode,
 } from '../api/entities'
 import { layoutTrackedGraph, type GraphPositions } from '../lib/tracked-graph-layout'
+import { issueIdFromGraphNode, trackedIssuePath } from '../lib/tracked-issues'
 import { SegmentedControl } from './SegmentedControl'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
@@ -57,14 +58,20 @@ const INITIAL_VIEW_BOX: ViewBox = { x: 0, y: 0, width: CANVAS_WIDTH, height: CAN
 export function TrackedGraphView({
   graph,
   selectedName,
+  selectedIssue,
   onSelectEntity,
+  onSelectIssue,
   onOpenEntity,
+  onOpenIssue,
   onOpenArtifact,
 }: {
   graph: EntityGraph
   selectedName: string | null
+  selectedIssue: { workspaceId: string; issueId: string } | null
   onSelectEntity: (name: string) => void
+  onSelectIssue: (issue: { workspaceId: string; issueId: string }) => void
   onOpenEntity: (name: string) => void
+  onOpenIssue: (issue: { workspaceId: string; issueId: string }) => void
   onOpenArtifact: (artifact: EntityGraphArtifactNode, returnEntityName: string) => void
 }) {
   const { t } = useTranslation()
@@ -118,30 +125,48 @@ export function TrackedGraphView({
     const node = graph.nodes.find((candidate) => candidate.kind === 'entity' && candidate.label === selectedName)
     return node?.kind === 'entity' ? node : null
   }, [graph.nodes, selectedName])
+  const selectedIssueArtifact = useMemo(() => {
+    if (!selectedIssue) return null
+    const path = trackedIssuePath(selectedIssue.issueId)
+    const node = graph.nodes.find((candidate) => candidate.kind === 'artifact'
+      && candidate.artifactType === 'issue'
+      && candidate.workspaceId === selectedIssue.workspaceId
+      && candidate.path === path)
+    return node?.kind === 'artifact' ? node : null
+  }, [graph.nodes, selectedIssue])
   const selectedArtifact = useMemo(() => {
     const node = selectedArtifactId ? nodeById.get(selectedArtifactId) : undefined
     return node?.kind === 'artifact' ? node : null
   }, [nodeById, selectedArtifactId])
+  const selectedNode = selectedArtifact ?? selectedIssueArtifact ?? selectedEntity
+  const selectedArtifactNode = selectedNode?.kind === 'artifact' ? selectedNode : null
 
   useEffect(() => {
     setSelectedArtifactId(null)
   }, [selectedName])
 
+  useEffect(() => {
+    if (!selectedIssueArtifact) return
+    setSelectedArtifactId(selectedIssueArtifact.id)
+    setKindFilters((current) => current.artifact ? current : { ...current, artifact: true })
+    setShowUnlinked(true)
+  }, [selectedIssueArtifact])
+
   const neighborhood = useMemo(() => {
-    if (!selectedEntity) return null
-    const ids = new Set<string>([selectedEntity.id])
-    const adjacentArtifacts = new Set<string>()
-    for (const edge of graph.edges) {
-      if (edge.source === selectedEntity.id) adjacentArtifacts.add(edge.target)
-      if (edge.target === selectedEntity.id) adjacentArtifacts.add(edge.source)
-    }
-    for (const artifactId of adjacentArtifacts) ids.add(artifactId)
-    for (const edge of graph.edges) {
-      if (adjacentArtifacts.has(edge.source)) ids.add(edge.target)
-      if (adjacentArtifacts.has(edge.target)) ids.add(edge.source)
+    if (!selectedNode) return null
+    const ids = new Set<string>([selectedNode.id])
+    let frontier = new Set<string>([selectedNode.id])
+    for (let depth = 0; depth < 2; depth += 1) {
+      const next = new Set<string>()
+      for (const edge of graph.edges) {
+        if (frontier.has(edge.source) && !ids.has(edge.target)) next.add(edge.target)
+        if (frontier.has(edge.target) && !ids.has(edge.source)) next.add(edge.source)
+      }
+      for (const id of next) ids.add(id)
+      frontier = next
     }
     return ids
-  }, [graph.edges, selectedEntity])
+  }, [graph.edges, selectedNode])
 
   const visibleNodes = useMemo(() => graph.nodes.filter((node) => {
     if (scope === 'related' && neighborhood && !neighborhood.has(node.id)) return false
@@ -178,16 +203,23 @@ export function TrackedGraphView({
       return
     }
     setSelectedArtifactId(node.id)
-  }, [onSelectEntity])
+    const issueId = issueIdFromGraphNode(node)
+    if (issueId) onSelectIssue({ workspaceId: node.workspaceId, issueId })
+  }, [onSelectEntity, onSelectIssue])
 
   const openPreviewDetails = useCallback(() => {
-    if (selectedArtifact) {
-      const returnEntityName = relatedEntityForArtifact(selectedArtifact.id)
-      if (returnEntityName) onOpenArtifact(selectedArtifact, returnEntityName)
+    if (selectedArtifactNode) {
+      const issueId = issueIdFromGraphNode(selectedArtifactNode)
+      if (issueId) {
+        onOpenIssue({ workspaceId: selectedArtifactNode.workspaceId, issueId })
+        return
+      }
+      const returnEntityName = relatedEntityForArtifact(selectedArtifactNode.id)
+      if (returnEntityName) onOpenArtifact(selectedArtifactNode, returnEntityName)
       return
     }
     if (selectedEntity) onOpenEntity(selectedEntity.label)
-  }, [onOpenArtifact, onOpenEntity, relatedEntityForArtifact, selectedArtifact, selectedEntity])
+  }, [onOpenArtifact, onOpenEntity, onOpenIssue, relatedEntityForArtifact, selectedArtifactNode, selectedEntity])
 
   const fitVisible = useCallback((preferReadable = false) => {
     const points = visibleNodes.flatMap((node) => positions[node.id] ? [positions[node.id]!] : [])
@@ -217,7 +249,7 @@ export function TrackedGraphView({
     if (preferReadable && canvasAspect < 0.82) {
       height = Math.min(720, Math.max(420, height))
       width = height * canvasAspect
-      const selectedPoint = selectedEntity ? positions[selectedEntity.id] : undefined
+      const selectedPoint = selectedNode ? positions[selectedNode.id] : undefined
       if (selectedPoint) {
         // Give the selected anchor's outward-facing label breathing room.
         centerX = selectedPoint.x + (selectedPoint.x < CANVAS_WIDTH / 2 ? -width * 0.14 : width * 0.14)
@@ -225,7 +257,7 @@ export function TrackedGraphView({
       }
     }
     setViewBox({ x: centerX - width / 2, y: centerY - height / 2, width, height })
-  }, [canvasAspect, positions, selectedEntity, visibleNodes])
+  }, [canvasAspect, positions, selectedNode, visibleNodes])
 
   useEffect(() => {
     fitVisible(true)
@@ -293,7 +325,7 @@ export function TrackedGraphView({
     zoom(event.deltaY > 0 ? 1.12 : 0.88, point?.x, point?.y)
   }
 
-  const activeNodeId = hoveredNodeId ?? selectedArtifact?.id ?? selectedEntity?.id ?? null
+  const activeNodeId = hoveredNodeId ?? selectedNode?.id ?? null
   const connectedToActive = useMemo(() => {
     const ids = new Set<string>()
     if (!activeNodeId) return ids
@@ -305,8 +337,8 @@ export function TrackedGraphView({
     return ids
   }, [activeNodeId, visibleEdges])
   const entrancePhaseById = useMemo(() => {
-    const origin = selectedEntity && positions[selectedEntity.id]
-      ? positions[selectedEntity.id]!
+    const origin = selectedNode && positions[selectedNode.id]
+      ? positions[selectedNode.id]!
       : { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 }
     const ordered = [...visibleNodes].sort((left, right) => {
       const leftPoint = positions[left.id] ?? origin
@@ -319,7 +351,7 @@ export function TrackedGraphView({
     const divisor = Math.max(1, ordered.length - 1)
     ordered.forEach((node, index) => phases.set(node.id, Math.min(4, Math.floor((index / divisor) * 5))))
     return { origin, phases }
-  }, [positions, selectedEntity, visibleNodes])
+  }, [positions, selectedNode, visibleNodes])
 
   return (
     <div className="relative h-full min-h-[360px] overflow-hidden bg-background">
@@ -413,7 +445,7 @@ export function TrackedGraphView({
           {visibleNodes.map((node) => {
             const point = positions[node.id]
             if (!point) return null
-            const selected = node.id === selectedEntity?.id || node.id === selectedArtifact?.id
+            const selected = node.id === selectedNode?.id
             const active = connectedToActive.has(node.id)
             const faded = activeNodeId !== null && !active
             const focusState = activeNodeId === null
@@ -425,6 +457,7 @@ export function TrackedGraphView({
             // labels appear on hover (or in a genuinely small graph) so a
             // high-degree selected entity does not turn its cluster into text.
             const showLabel = node.kind === 'entity'
+              || selected
               || (hoveredNodeId !== null && active)
               || visibleNodes.length <= 12
             const labelOnLeft = point.x < CANVAS_WIDTH / 2
@@ -535,27 +568,27 @@ export function TrackedGraphView({
         <LegendDot color="var(--chart-3)" label={t('tracked.graph.issue')} square />
       </div>
 
-      {(selectedArtifact ?? selectedEntity) && (
+      {selectedNode && (
         <div
-          key={(selectedArtifact ?? selectedEntity)?.id}
+          key={selectedNode.id}
           className="oa-tracked-graph-preview-enter absolute bottom-3 right-3 z-10 max-w-[min(420px,calc(100%-1.5rem))] rounded-lg border border-border/70 bg-background/92 px-3 py-2.5 shadow-sm backdrop-blur-sm sm:bottom-4 sm:right-4"
         >
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 truncate font-mono text-[12px] font-semibold text-foreground">
-                {selectedArtifact && (
-                  selectedArtifact.artifactType === 'issue'
+                {selectedArtifactNode && (
+                  selectedArtifactNode.artifactType === 'issue'
                     ? <ListChecks size={12} className="shrink-0 text-muted-foreground" aria-hidden />
                     : <FileText size={12} className="shrink-0 text-muted-foreground" aria-hidden />
                 )}
-                <span className="truncate">{(selectedArtifact ?? selectedEntity)?.label}</span>
+                <span className="truncate">{selectedNode.label}</span>
               </div>
-              {selectedArtifact ? (
+              {selectedArtifactNode ? (
                 <div className="mt-0.5 min-w-0 text-[11px] leading-relaxed text-muted-foreground">
                   <div className="truncate">
-                    {t(selectedArtifact.artifactType === 'issue' ? 'tracked.graph.issue' : 'tracked.graph.note')} · {selectedArtifact.workspaceTag}
+                    {t(selectedArtifactNode.artifactType === 'issue' ? 'tracked.graph.issue' : 'tracked.graph.note')} · {selectedArtifactNode.workspaceTag}
                   </div>
-                  <div className="truncate font-mono text-[10px] opacity-80">{selectedArtifact.path}</div>
+                  <div className="truncate font-mono text-[10px] opacity-80">{selectedArtifactNode.path}</div>
                 </div>
               ) : (
                 <div className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{selectedEntity?.description}</div>
