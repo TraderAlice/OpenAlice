@@ -86,7 +86,7 @@ export interface CredentialSetupGuide {
 }
 
 export type ModelReasoningMode = 'none' | 'optional' | 'adaptive' | 'required'
-export type ModelReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export type ModelReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
 
 export interface ModelSemantics {
   contextWindow?: number

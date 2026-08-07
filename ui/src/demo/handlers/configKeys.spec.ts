@@ -22,7 +22,7 @@ function modelIds(presetId: string): string[] {
 describe('demo credential catalog', () => {
   it('covers the current OpenAI and Anthropic forms instead of falling back to Custom', () => {
     expect(modelIds('codex-api')).toEqual([
-      'gpt-5.6',
+      'gpt-5.6-sol',
       'gpt-5.6-terra',
       'gpt-5.6-luna',
       'gpt-5.5',

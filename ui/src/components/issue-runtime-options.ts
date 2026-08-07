@@ -7,7 +7,7 @@ import type {
 import type { SavedCredential } from './workspace/api'
 
 const ALL_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
-  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra',
 ]
 
 const CLAUDE_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [

@@ -21,6 +21,7 @@ export type ModelReasoningEffort =
   | 'high'
   | 'xhigh'
   | 'max'
+  | 'ultra'
 
 export const MODEL_REASONING_EFFORTS = [
   'none',
@@ -30,6 +31,7 @@ export const MODEL_REASONING_EFFORTS = [
   'high',
   'xhigh',
   'max',
+  'ultra',
 ] as const satisfies readonly ModelReasoningEffort[]
 
 export function isModelReasoningEffort(value: unknown): value is ModelReasoningEffort {
@@ -137,7 +139,7 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     'gpt-5.6': { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
     'gpt-5.6-sol': { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
     'gpt-5.6-terra': { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
-    'gpt-5.6-luna': { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
+    'gpt-5.6-luna': { contextWindow: 400_000, maxOutputTokens: 128_000, reasoning: OPENAI_56_REASONING },
     'gpt-5.5': {
       contextWindow: 1_050_000,
       maxOutputTokens: 128_000,

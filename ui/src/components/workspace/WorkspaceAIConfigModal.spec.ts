@@ -117,7 +117,7 @@ describe('WorkspaceAIConfigModal Pi model capability mapping', () => {
     'lets %s native-login model and effort changes save without an HTTP probe',
     (agent) => {
       const form = configToForm(null, nativeCapabilities)
-      form.model = agent === 'codex' ? 'gpt-5.6' : 'claude-opus-4-8'
+      form.model = agent === 'codex' ? 'gpt-5.6-sol' : 'claude-opus-4-8'
       form.reasoningEffort = 'high'
 
       expect(connectionFieldsChanged(null, form, nativeCapabilities)).toBe(false)

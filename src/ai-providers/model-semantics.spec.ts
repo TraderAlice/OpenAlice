@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   describeModelSemantics,
+  isModelReasoningEffort,
   modelSupportsReasoning,
   resolveModelSemantics,
 } from './model-semantics.js'
@@ -9,13 +10,27 @@ import { DEFAULT_MODEL_BY_VENDOR } from './preset-catalog.js'
 
 describe('model semantics registry', () => {
   it('keeps exact known facts distinct from unknown models and aliases', () => {
-    expect(resolveModelSemantics('openai', 'gpt-5.6')).toMatchObject({
+    expect(resolveModelSemantics('openai', 'gpt-5.6-sol')).toMatchObject({
       contextWindow: 1_050_000,
       reasoning: { mode: 'optional', defaultEffort: 'medium' },
     })
     expect(resolveModelSemantics('anthropic', 'default')).toBeNull()
+    expect(resolveModelSemantics('openai', 'gpt-5.6')).toEqual(
+      resolveModelSemantics('openai', 'gpt-5.6-sol'),
+    )
     expect(resolveModelSemantics('custom', 'gpt-5.6')).toBeNull()
     expect(resolveModelSemantics('openai', 'future-model')).toBeNull()
+  })
+
+  it('keeps Luna\'s smaller API context distinct from Sol and Terra', () => {
+    expect(resolveModelSemantics('openai', 'gpt-5.6-luna')?.contextWindow).toBe(400_000)
+    expect(resolveModelSemantics('openai', 'gpt-5.6-terra')?.contextWindow).toBe(1_050_000)
+  })
+
+  it('accepts Codex subscription ultra effort without adding it to API model semantics', () => {
+    expect(isModelReasoningEffort('ultra')).toBe(true)
+    expect(resolveModelSemantics('openai', 'gpt-5.6-sol')?.reasoning?.efforts)
+      .not.toContain('ultra')
   })
 
   it('records required versus optional reasoning without collapsing either to unknown', () => {
