@@ -331,6 +331,9 @@ export interface AgentLaunchConfigState {
   readonly modelOptions: readonly PresetModel[]
   readonly launchModel: string | undefined
   readonly effortOptions: readonly ModelReasoningEffort[]
+  /** Explicit picker value. Undefined means use the selected model's registered default. */
+  readonly selectedReasoningEffort: ModelReasoningEffort | undefined
+  /** Effective value frozen into a fresh Session launch. */
   readonly launchReasoningEffort: ModelReasoningEffort | undefined
   readonly aiDetails: AgentLaunchAiDetails | null
   readonly selectedRuntimeUsesGlobalConfig: boolean
@@ -572,7 +575,7 @@ export function useAgentLaunchConfig({
   const launchModel = recentTupleMatchesCredential
     ? scopedRecentLaunch.model ?? undefined
     : undefined
-  const launchReasoningEffort = recentTupleMatchesCredential
+  const selectedReasoningEffort = recentTupleMatchesCredential
     ? scopedRecentLaunch.reasoningEffort ?? undefined
     : undefined
   const baseAiDetails = accessMode === 'native'
@@ -596,6 +599,8 @@ export function useAgentLaunchConfig({
   })
   const effectiveModel = launchModel ?? defaultModel
   const selectedModelSemantics = runtimeModelSemantics(effectiveModel, modelOptions)
+  const launchReasoningEffort = selectedReasoningEffort
+    ?? (launchModel ? selectedModelSemantics?.reasoning?.defaultEffort : undefined)
   const effortOptions = runtimeEffortOptions({
     agent: effectiveAgent,
     semantics: selectedModelSemantics,
@@ -734,6 +739,7 @@ export function useAgentLaunchConfig({
     modelOptions,
     launchModel,
     effortOptions,
+    selectedReasoningEffort,
     launchReasoningEffort,
     aiDetails,
     selectedRuntimeUsesGlobalConfig,
@@ -766,6 +772,7 @@ export function useAgentLaunchConfig({
     effectiveCredential,
     launchCredentialSlug,
     launchModel,
+    selectedReasoningEffort,
     launchReasoningEffort,
     modelOptions,
     needsCredential,
