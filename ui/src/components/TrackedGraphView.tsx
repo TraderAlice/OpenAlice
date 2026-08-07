@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react'
@@ -281,6 +282,22 @@ export function TrackedGraphView({
     }
     return ids
   }, [activeNodeId, visibleEdges])
+  const entrancePhaseById = useMemo(() => {
+    const origin = selectedEntity && positions[selectedEntity.id]
+      ? positions[selectedEntity.id]!
+      : { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 }
+    const ordered = [...visibleNodes].sort((left, right) => {
+      const leftPoint = positions[left.id] ?? origin
+      const rightPoint = positions[right.id] ?? origin
+      const leftDistance = Math.hypot(leftPoint.x - origin.x, leftPoint.y - origin.y)
+      const rightDistance = Math.hypot(rightPoint.x - origin.x, rightPoint.y - origin.y)
+      return leftDistance - rightDistance || left.id.localeCompare(right.id)
+    })
+    const phases = new Map<string, number>()
+    const divisor = Math.max(1, ordered.length - 1)
+    ordered.forEach((node, index) => phases.set(node.id, Math.min(4, Math.floor((index / divisor) * 5))))
+    return { origin, phases }
+  }, [positions, selectedEntity, visibleNodes])
 
   return (
     <div className="relative h-full min-h-[360px] overflow-hidden bg-background">
@@ -356,8 +373,16 @@ export function TrackedGraphView({
                 y2={target.y}
                 stroke="var(--chart-axis)"
                 strokeWidth={emphasized ? 1.8 : 1}
-                opacity={activeNodeId ? (emphasized ? 0.7 : 0.1) : 0.24}
+                opacity={activeNodeId
+                  ? (emphasized ? (hoveredNodeId ? 0.82 : 0.7) : (hoveredNodeId ? 0.06 : 0.1))
+                  : 0.24}
+                pathLength={1}
                 vectorEffect="non-scaling-stroke"
+                data-enter-phase={Math.max(
+                  entrancePhaseById.phases.get(edge.source) ?? 0,
+                  entrancePhaseById.phases.get(edge.target) ?? 0,
+                )}
+                className="oa-tracked-graph-edge"
               />
             )
           })}
@@ -369,72 +394,99 @@ export function TrackedGraphView({
             const selected = node.id === selectedEntity?.id
             const active = connectedToActive.has(node.id)
             const faded = activeNodeId !== null && !active
+            const focusState = activeNodeId === null
+              ? 'idle'
+              : node.id === activeNodeId ? 'active' : active ? 'related' : 'dimmed'
             const degree = degreeById.get(node.id) ?? 0
             const radius = node.kind === 'entity' ? Math.min(14, 8.5 + degree * 0.45) : node.artifactType === 'issue' ? 5.5 : 4.2
             // Entity names carry the graph's meaning and stay visible. Source
             // labels appear on hover (or in a genuinely small graph) so a
             // high-degree selected entity does not turn its cluster into text.
-            const showLabel = node.kind === 'entity' || node.id === hoveredNodeId || visibleNodes.length <= 12
+            const showLabel = node.kind === 'entity'
+              || (hoveredNodeId !== null && active)
+              || visibleNodes.length <= 12
             const labelOnLeft = point.x < CANVAS_WIDTH / 2
+            const enterX = Math.max(-54, Math.min(54, (entrancePhaseById.origin.x - point.x) * 0.18))
+            const enterY = Math.max(-42, Math.min(42, (entrancePhaseById.origin.y - point.y) * 0.18))
             return (
               <g
                 key={node.id}
                 transform={`translate(${point.x} ${point.y})`}
-                opacity={faded ? 0.32 : 1}
+                opacity={faded ? (hoveredNodeId ? 0.14 : 0.32) : 1}
+                data-graph-node={node.id}
+                data-focus-state={focusState}
+                data-hovered={node.id === hoveredNodeId ? 'true' : 'false'}
+                className="oa-tracked-graph-node"
                 onPointerEnter={() => setHoveredNodeId(node.id)}
                 onPointerLeave={() => setHoveredNodeId((value) => value === node.id ? null : value)}
               >
-                <title>{nodeTitle(node)}</title>
-                {selected && (
-                  <circle r={radius + 5} fill="none" stroke="var(--primary)" strokeWidth={2} opacity={0.45} vectorEffect="non-scaling-stroke" />
-                )}
-                <foreignObject
-                  x={-(radius + 8)}
-                  y={-(radius + 8)}
-                  width={(radius + 8) * 2}
-                  height={(radius + 8) * 2}
+                <g
+                  data-enter-phase={entrancePhaseById.phases.get(node.id) ?? 0}
+                  className="oa-tracked-graph-node-enter"
+                  style={{
+                    '--oa-graph-enter-x': `${enterX}px`,
+                    '--oa-graph-enter-y': `${enterY}px`,
+                  } as CSSProperties}
                 >
-                  <button
-                    type="button"
-                    aria-label={node.kind === 'entity'
-                      ? t('tracked.graph.entityNodeLabel', { name: node.label, count: degree })
-                      : t('tracked.graph.artifactNodeLabel', { name: node.label, workspace: node.workspaceTag })}
-                    title={nodeTitle(node)}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={() => activateNode(node)}
-                    className="flex h-full w-full items-center justify-center rounded-full bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-                  >
-                    <span
-                      aria-hidden
-                      className={node.kind === 'artifact' && node.artifactType === 'issue' ? 'rounded-[1.5px]' : 'rounded-full'}
-                      style={{
-                        width: radius * 2,
-                        height: radius * 2,
-                        backgroundColor: node.kind === 'entity'
-                          ? node.entityType === 'asset' ? 'var(--chart-1)' : 'var(--chart-4)'
-                          : node.artifactType === 'issue' ? 'var(--chart-3)' : 'var(--muted-foreground)',
-                        boxShadow: `0 0 0 ${node.kind === 'entity' ? 2 : 1.25}px var(--background)`,
-                      }}
+                  <g className="oa-tracked-graph-node-focus">
+                    <title>{nodeTitle(node)}</title>
+                    <circle
+                      r={radius + 7}
+                      fill="var(--accent)"
+                      opacity={node.id === hoveredNodeId ? 0.72 : 0}
+                      className="oa-tracked-graph-hover-halo"
                     />
-                  </button>
-                </foreignObject>
-                {showLabel && (
-                  <text
-                    x={labelOnLeft ? -(radius + 6) : radius + 6}
-                    y={node.kind === 'entity' ? 4 : 3}
-                    textAnchor={labelOnLeft ? 'end' : 'start'}
-                    fill="var(--foreground)"
-                    fontSize={node.kind === 'entity' ? 12 : 10}
-                    fontWeight={node.kind === 'entity' ? 600 : 450}
-                    paintOrder="stroke"
-                    stroke="var(--background)"
-                    strokeWidth={4}
-                    strokeLinejoin="round"
-                    className="pointer-events-none"
-                  >
-                    {node.label}
-                  </text>
-                )}
+                    {selected && (
+                      <circle r={radius + 5} fill="none" stroke="var(--primary)" strokeWidth={2} opacity={0.45} vectorEffect="non-scaling-stroke" />
+                    )}
+                    <foreignObject
+                      x={-(radius + 8)}
+                      y={-(radius + 8)}
+                      width={(radius + 8) * 2}
+                      height={(radius + 8) * 2}
+                    >
+                      <button
+                        type="button"
+                        aria-label={node.kind === 'entity'
+                          ? t('tracked.graph.entityNodeLabel', { name: node.label, count: degree })
+                          : t('tracked.graph.artifactNodeLabel', { name: node.label, workspace: node.workspaceTag })}
+                        title={nodeTitle(node)}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={() => activateNode(node)}
+                        className="flex h-full w-full items-center justify-center rounded-full bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      >
+                        <span
+                          aria-hidden
+                          className={node.kind === 'artifact' && node.artifactType === 'issue' ? 'rounded-[1.5px]' : 'rounded-full'}
+                          style={{
+                            width: radius * 2,
+                            height: radius * 2,
+                            backgroundColor: node.kind === 'entity'
+                              ? node.entityType === 'asset' ? 'var(--chart-1)' : 'var(--chart-4)'
+                              : node.artifactType === 'issue' ? 'var(--chart-3)' : 'var(--muted-foreground)',
+                            boxShadow: `0 0 0 ${node.kind === 'entity' ? 2 : 1.25}px var(--background)`,
+                          }}
+                        />
+                      </button>
+                    </foreignObject>
+                    <text
+                      x={labelOnLeft ? -(radius + 6) : radius + 6}
+                      y={node.kind === 'entity' ? 4 : 3}
+                      textAnchor={labelOnLeft ? 'end' : 'start'}
+                      fill="var(--foreground)"
+                      fontSize={node.kind === 'entity' ? 12 : 10}
+                      fontWeight={node.kind === 'entity' ? 600 : 450}
+                      paintOrder="stroke"
+                      stroke="var(--background)"
+                      strokeWidth={4}
+                      strokeLinejoin="round"
+                      opacity={showLabel ? 1 : 0}
+                      className="oa-tracked-graph-label pointer-events-none"
+                    >
+                      {node.label}
+                    </text>
+                  </g>
+                </g>
               </g>
             )
           })}

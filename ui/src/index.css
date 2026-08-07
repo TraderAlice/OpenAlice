@@ -250,6 +250,79 @@ body {
   }
 }
 
+@keyframes oa-tracked-graph-node-enter {
+  from {
+    opacity: 0;
+    transform: translate(var(--oa-graph-enter-x), var(--oa-graph-enter-y)) scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oa-tracked-graph-edge-enter {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.oa-tracked-graph-node {
+  transition: opacity var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-tracked-graph-node-enter {
+  animation: oa-tracked-graph-node-enter var(--motion-slow) var(--motion-ease-out) backwards;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.oa-tracked-graph-edge {
+  stroke-dasharray: 1;
+  animation: oa-tracked-graph-edge-enter var(--motion-slow) var(--motion-ease-out) backwards;
+  transition:
+    opacity var(--motion-standard) var(--motion-ease-standard),
+    stroke-width var(--motion-fast) var(--motion-ease-standard);
+}
+
+.oa-tracked-graph-node-focus {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.oa-tracked-graph-node[data-focus-state="active"] .oa-tracked-graph-node-focus {
+  transform: scale(1.14);
+}
+
+.oa-tracked-graph-node[data-focus-state="related"] .oa-tracked-graph-node-focus {
+  transform: scale(1.035);
+}
+
+.oa-tracked-graph-hover-halo,
+.oa-tracked-graph-label {
+  transition: opacity var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="1"],
+.oa-tracked-graph-edge[data-enter-phase="1"] {
+  animation-delay: calc(var(--motion-fast) / 4);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="2"],
+.oa-tracked-graph-edge[data-enter-phase="2"] {
+  animation-delay: calc(var(--motion-fast) / 2);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="3"],
+.oa-tracked-graph-edge[data-enter-phase="3"] {
+  animation-delay: calc(var(--motion-fast) - var(--motion-fast) / 4);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="4"],
+.oa-tracked-graph-edge[data-enter-phase="4"] {
+  animation-delay: var(--motion-fast);
+}
+
 .oa-view-enter {
   animation: oa-view-enter var(--motion-standard) var(--motion-ease-out) both;
 }
@@ -608,6 +681,10 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-suggestion-enter {
     animation: none;
   }
+  .oa-tracked-graph-node-enter,
+  .oa-tracked-graph-edge {
+    animation: none;
+  }
   .oa-pressable,
   .oa-icon-action,
   .oa-icon-action > svg,
@@ -615,6 +692,13 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-nav-row,
   .oa-nav-icon,
   .oa-status-surface {
+    transition-duration: 0.01ms;
+  }
+  .oa-tracked-graph-node,
+  .oa-tracked-graph-edge,
+  .oa-tracked-graph-node-focus,
+  .oa-tracked-graph-hover-halo,
+  .oa-tracked-graph-label {
     transition-duration: 0.01ms;
   }
   .oa-pressable:hover,

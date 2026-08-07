@@ -28,6 +28,10 @@ clusters form, or which tracked anchors have no supporting material.
 5. Source-node navigation reuses the existing Tracked file/Issue provenance.
 6. Narrow canvases prioritize a readable window around the selected entity;
    the explicit Fit action retains a complete bird's-eye view.
+7. Graph motion is contextual rather than ambient: nodes settle outward from
+   the selected anchor in short waves, edges draw once, and pointer focus
+   emphasizes only the hovered node's one-hop neighborhood. Motion tokens and
+   reduced-motion preferences remain authoritative.
 
 ## Work
 
@@ -39,16 +43,21 @@ clusters form, or which tracked anchors have no supporting material.
       fit, entity selection, and source navigation.
 - [x] Mirror the contract in the demo surface and all shipped locales.
 - [x] Add core, route, layout, component, page, and demo regressions.
+- [x] Add token-based entrance and one-hop focus motion with reduced-motion
+      handling and no continuous background animation.
 - [x] Complete browser, full-suite, and packaged Electron verification.
 
 ## Verification
 
 - `npx tsc --noEmit`
 - `cd ui && npx tsc -b`
-- focused core, route, layout, component, page, and demo suites (12 tests)
-- `pnpm test` (483 files passed, 1 skipped; 3985 tests passed, 9 skipped)
+- focused core, route, layout, component, page, and demo suites (13 tests)
+- `pnpm test` (483 files passed, 1 skipped; 3986 tests passed, 9 skipped)
 - real `/tracked` route in Day and Auto color modes at desktop, tablet, and
   phone widths, including scope, filters, zoom, detail, source, and Back flows
+- graph entrance and focus states in Day/Night modes and at phone width, with
+  motion disabled by both the shared reduced-motion rule and zero-motion style
+  profiles
 - `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace`
 
 ## Completion Criteria

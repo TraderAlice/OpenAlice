@@ -78,4 +78,30 @@ describe('TrackedGraphView', () => {
     expect(screen.queryByRole('button', { name: /second-hop-c, linked/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /other-note, source material/ })).toBeNull()
   })
+
+  it('focuses one-hop relationships when a node is hovered', () => {
+    render(
+      <TrackedGraphView
+        graph={graph}
+        selectedName={null}
+        onSelectEntity={vi.fn()}
+        onOpenEntity={vi.fn()}
+        onOpenArtifact={vi.fn()}
+      />,
+    )
+
+    const assetButton = screen.getByRole('button', { name: /asset-a, linked/ })
+    fireEvent.pointerEnter(assetButton)
+
+    expect(assetButton.closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('active')
+    expect(screen.getByRole('button', { name: /shared-note, source material/ })
+      .closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('related')
+    expect(screen.getByRole('button', { name: /topic-b, linked/ })
+      .closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('dimmed')
+    expect(screen.getByRole('button', { name: /other-note, source material/ })
+      .closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('dimmed')
+
+    fireEvent.pointerLeave(assetButton)
+    expect(assetButton.closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('idle')
+  })
 })
