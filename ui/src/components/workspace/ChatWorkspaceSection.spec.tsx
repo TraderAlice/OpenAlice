@@ -21,6 +21,7 @@ const actions = vi.hoisted(() => ({
   resumeSession: vi.fn(async () => undefined),
   openWebPiSession: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
+  openAgentConfig: vi.fn(),
 }))
 const { openOrFocus } = actions
 
@@ -102,7 +103,7 @@ function workspaceContext(
     resumeSession: actions.resumeSession,
     openWebPiSession: actions.openWebPiSession,
     requestDeleteSession: actions.requestDeleteSession,
-    openAgentConfig: vi.fn(),
+    openAgentConfig: actions.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),
   }
@@ -162,6 +163,25 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Workspace tree' }))
     expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
+  })
+
+  it('surfaces a template update from the bottom Workspace context', () => {
+    const upgradeWorkspace: Workspace = {
+      ...chatWorkspace,
+      currentVersion: '1.8.2',
+      upgradeAvailable: { from: '1.8.2', to: '1.8.3' },
+    }
+    renderSection([upgradeWorkspace], null, undefined, 'focused')
+
+    const trigger = screen.getByRole('button', {
+      name: 'Chat context: chat-jul11. Template update available to v1.8.3.',
+    })
+    expect(within(trigger).getByText('Update available · v1.8.3')).toBeTruthy()
+
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Review template update to v1.8.3' }))
+
+    expect(actions.openAgentConfig).toHaveBeenCalledWith('chat-1', undefined, 'template')
   })
 
   it('keeps Escape scoped to the open Workspace context menu', () => {
