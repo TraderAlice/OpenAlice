@@ -22,7 +22,7 @@ export function useWikilinkHandler(): (entityKey: string) => void {
     (entityKey: string) => {
       select(entityKey)
       setSidebar('tracked')
-      openOrFocus({ kind: 'tracked', params: {} })
+      openOrFocus({ kind: 'tracked', params: { entity: entityKey } })
     },
     [openOrFocus, setSidebar, select],
   )

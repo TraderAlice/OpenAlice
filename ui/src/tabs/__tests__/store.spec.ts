@@ -98,6 +98,22 @@ describe('openOrFocus', () => {
     expect(focused?.spec).toEqual({ kind: 'portfolio', params: {} })
     expect(group.activeTabId).toBe(group.tabIds[1])
   })
+
+  it('updates Tracked selection without creating another Tracked tab', () => {
+    const store = useWorkspace.getState()
+    store.openOrFocus({ kind: 'tracked', params: { entity: 'stock-vst' } })
+    store.openOrFocus({
+      kind: 'tracked',
+      params: { workspace: 'workspace-1', issue: 'power-watch' },
+    })
+
+    const state = useWorkspace.getState()
+    expect(getFocusedGroup(state)?.tabIds).toHaveLength(1)
+    expect(getFocusedTab(state)?.spec).toEqual({
+      kind: 'tracked',
+      params: { workspace: 'workspace-1', issue: 'power-watch' },
+    })
+  })
 })
 
 // ==================== closeTab ====================

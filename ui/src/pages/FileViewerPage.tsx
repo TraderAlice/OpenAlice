@@ -56,7 +56,10 @@ export function FileViewerPage({ spec }: Props) {
     if (source === 'tracked') {
       if (returnTrackedName) selectTracked(returnTrackedName)
       setSidebar('tracked')
-      openOrFocus({ kind: 'tracked', params: {} })
+      openOrFocus({
+        kind: 'tracked',
+        params: returnTrackedName ? { entity: returnTrackedName } : {},
+      })
       return
     }
     setSidebar(

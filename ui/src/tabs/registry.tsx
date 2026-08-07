@@ -375,13 +375,24 @@ const inboxModule: ViewModule<'inbox'> = {
 const trackedModule: ViewModule<'tracked'> = {
   kind: 'tracked',
   title: () => 'Tracked',
-  toUrl: () => '/tracked',
-  Component: () => (
+  toUrl: (spec) => {
+    const search = new URLSearchParams()
+    if (spec.params.entity) search.set('entity', spec.params.entity)
+    if (spec.params.workspace && spec.params.issue) {
+      search.set('workspace', spec.params.workspace)
+      search.set('issue', spec.params.issue)
+    }
+    const query = search.toString()
+    return query ? `/tracked?${query}` : '/tracked'
+  },
+  Component: ({ spec }) => (
     <PageSidebarShell
       storageKey="tracked"
       titleKey="nav.item.tracked"
       defaultWidth={232}
-      sidebar={({ closeMobileDrawer }) => <TrackedSidebar onNavigate={closeMobileDrawer} />}
+      sidebar={({ closeMobileDrawer }) => (
+        <TrackedSidebar routeSelection={spec.params} onNavigate={closeMobileDrawer} />
+      )}
     >
       <TrackedPage />
     </PageSidebarShell>

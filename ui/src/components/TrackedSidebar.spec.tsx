@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EntityListItem } from '../api/entities'
+import type { IssueListItem, IssueSnapshot } from '../api/issues'
 import { i18n } from '../i18n'
 import { TrackedSidebar } from './TrackedSidebar'
 
@@ -15,8 +16,21 @@ const trackedEntity: EntityListItem = {
   backlinkCount: 1,
 }
 
+const trackedIssue: IssueListItem = {
+  id: 'power-watch',
+  title: 'Power watch',
+  status: 'in_progress',
+  priority: 'high',
+  assignee: '@human',
+}
+
+const issueSnapshot: IssueSnapshot = {
+  workspaces: [{ wsId: 'workspace-1', tag: 'power', status: 'ok', issues: [trackedIssue] }],
+}
+
 const mocks = vi.hoisted(() => ({
   select: vi.fn(),
+  selectIssue: vi.fn(),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
   entitiesState: {
@@ -25,6 +39,13 @@ const mocks = vi.hoisted(() => ({
       loading: false,
       error: null as string | null,
       refreshing: false,
+    },
+  },
+  issuesState: {
+    current: {
+      data: null as IssueSnapshot | null,
+      error: null as string | null,
+      loading: false,
     },
   },
 }))
@@ -39,11 +60,19 @@ vi.mock('../live/entities', () => ({
 vi.mock('../live/tracked-selection', () => ({
   useTrackedSelection: (selector: (state: {
     selectedName: string | null
+    selectedIssue: { workspaceId: string; issueId: string } | null
     select: typeof mocks.select
+    selectIssue: typeof mocks.selectIssue
   }) => unknown) => selector({
     selectedName: null,
+    selectedIssue: null,
     select: mocks.select,
+    selectIssue: mocks.selectIssue,
   }),
+}))
+
+vi.mock('../hooks/useIssues', () => ({
+  useIssues: () => mocks.issuesState.current,
 }))
 
 vi.mock('../tabs/store', () => ({
@@ -64,6 +93,7 @@ beforeEach(async () => {
     error: null,
     refreshing: false,
   }
+  mocks.issuesState.current = { data: null, error: null, loading: false }
   await i18n.changeLanguage('en')
 })
 
@@ -117,7 +147,47 @@ describe('TrackedSidebar navigation', () => {
 
     expect(mocks.select).toHaveBeenCalledWith('stock-vst')
     expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
-    expect(mocks.openOrFocus).toHaveBeenCalledWith({ kind: 'tracked', params: {} })
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'tracked',
+      params: { entity: 'stock-vst' },
+    })
     expect(onNavigate).toHaveBeenCalledOnce()
+  })
+
+  it('shows Workspace-owned Issues as Tracked anchors before opening details', () => {
+    mocks.entitiesState.current = {
+      entities: [trackedEntity],
+      loading: false,
+      error: null,
+      refreshing: false,
+    }
+    mocks.issuesState.current = { data: issueSnapshot, error: null, loading: false }
+    const onNavigate = vi.fn()
+
+    render(<TrackedSidebar onNavigate={onNavigate} />)
+    mocks.selectIssue.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: /power.*Power watch/i }))
+
+    expect(mocks.selectIssue).toHaveBeenCalledWith({ workspaceId: 'workspace-1', issueId: 'power-watch' })
+    expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'tracked',
+      params: { workspace: 'workspace-1', issue: 'power-watch' },
+    })
+    expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+    expect(onNavigate).toHaveBeenCalledOnce()
+  })
+
+  it('restores an Issue selection supplied by the Tracked URL', () => {
+    mocks.issuesState.current = { data: issueSnapshot, error: null, loading: false }
+
+    render(
+      <TrackedSidebar routeSelection={{ workspace: 'workspace-1', issue: 'power-watch' }} />,
+    )
+
+    expect(mocks.selectIssue).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      issueId: 'power-watch',
+    })
   })
 })

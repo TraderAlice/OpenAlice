@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { EntityDetail, EntityListItem } from '../api/entities'
+import type { IssueDetail as IssueDetailData, IssueSnapshot } from '../api/issues'
 import { i18n } from '../i18n'
 import { TrackedPage } from './TrackedPage'
 
@@ -24,10 +25,39 @@ const detail: EntityDetail = {
   }],
 }
 
+const issueSnapshot: IssueSnapshot = {
+  workspaces: [{
+    wsId: 'workspace-1',
+    tag: 'power',
+    status: 'ok',
+    issues: [{
+      id: 'power-watch',
+      title: 'Power watch',
+      status: 'in_progress',
+      priority: 'high',
+      assignee: '@human',
+    }],
+  }],
+}
+
+const issueDetail: IssueDetailData = {
+  issue: {
+    id: 'power-watch',
+    title: 'Power watch',
+    what: '# Power watch\n\nWatch the power complex and report material changes.',
+    status: 'in_progress',
+    priority: 'high',
+    assignee: '@human',
+  },
+  runs: [],
+}
+
 const mocks = vi.hoisted(() => ({
   getEntity: vi.fn(),
   getGraph: vi.fn(),
+  getIssue: vi.fn(),
   selectTracked: vi.fn(),
+  navigate: vi.fn(),
   openOrFocus: vi.fn(),
   setSidebar: vi.fn(),
   refreshEntities: vi.fn(),
@@ -39,6 +69,24 @@ const mocks = vi.hoisted(() => ({
       refreshing: false,
     },
   },
+  issuesState: {
+    current: {
+      data: null as IssueSnapshot | null,
+      error: null as string | null,
+      loading: false,
+    },
+  },
+  selectionState: {
+    current: {
+      selectedName: 'stock-vst' as string | null,
+      selectedIssue: null as { workspaceId: string; issueId: string } | null,
+    },
+  },
+}))
+
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-router-dom')>(),
+  useNavigate: () => mocks.navigate,
 }))
 
 vi.mock('../api', () => ({
@@ -46,6 +94,9 @@ vi.mock('../api', () => ({
     entities: {
       get: mocks.getEntity,
       graph: mocks.getGraph,
+    },
+    issues: {
+      getDetail: mocks.getIssue,
     },
   },
 }))
@@ -60,9 +111,20 @@ vi.mock('../live/entities', () => ({
 
 vi.mock('../live/tracked-selection', () => ({
   useTrackedSelection: (selector: (state: {
-    selectedName: string
+    selectedName: string | null
+    selectedIssue: { workspaceId: string; issueId: string } | null
     select: typeof mocks.selectTracked
-  }) => unknown) => selector({ selectedName: 'stock-vst', select: mocks.selectTracked }),
+  }) => unknown) => selector({ ...mocks.selectionState.current, select: mocks.selectTracked }),
+}))
+
+vi.mock('../hooks/useIssues', () => ({
+  useIssues: () => mocks.issuesState.current,
+}))
+
+vi.mock('../components/MarkdownContent', () => ({
+  MarkdownContent: ({ text }: { text: string }) => (
+    <div>{text.split('\n').filter(Boolean).map((line) => <p key={line}>{line}</p>)}</div>
+  ),
 }))
 
 vi.mock('../tabs/store', () => ({
@@ -84,9 +146,12 @@ beforeEach(async () => {
     error: null,
     refreshing: false,
   }
+  mocks.issuesState.current = { data: null, error: null, loading: false }
+  mocks.selectionState.current = { selectedName: 'stock-vst', selectedIssue: null }
   await i18n.changeLanguage('en')
   mocks.getEntity.mockResolvedValue(detail)
   mocks.getGraph.mockResolvedValue({ nodes: [], edges: [] })
+  mocks.getIssue.mockResolvedValue(issueDetail)
 })
 
 afterEach(cleanup)
@@ -134,6 +199,27 @@ describe('TrackedPage detail recovery', () => {
     expect(await screen.findByRole('heading', { name: 'stock-vst' })).toBeTruthy()
     expect(mocks.getEntity).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('TrackedPage Issue anchors', () => {
+  it('shows a lightweight Issue summary and defers the full surface to Details', async () => {
+    mocks.issuesState.current = { data: issueSnapshot, error: null, loading: false }
+    mocks.selectionState.current = {
+      selectedName: null,
+      selectedIssue: { workspaceId: 'workspace-1', issueId: 'power-watch' },
+    }
+
+    render(<TrackedPage />)
+
+    expect(await screen.findByRole('heading', { name: 'Power watch' })).toBeTruthy()
+    expect(screen.getByText('Watch the power complex and report material changes.')).toBeTruthy()
+    expect(screen.getAllByText('Power watch')).toHaveLength(1)
+    expect(screen.getByText('power')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+
+    expect(mocks.getIssue).toHaveBeenCalledWith('workspace-1', 'power-watch')
+    expect(mocks.navigate).toHaveBeenCalledWith('/issues/workspace-1/power-watch')
   })
 })
 
