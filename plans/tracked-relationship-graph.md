@@ -45,6 +45,11 @@ clusters form, or which tracked anchors have no supporting material.
     Issues work-item surface. Selection is mirrored into `/tracked` query
     parameters without changing the single-tab identity, so reload and browser
     Back can reconstruct the selected anchor.
+11. Sidebar selection does not choose the page's presentation mode. In Graph
+    mode, entity and Issue rows both focus their graph node and open the same
+    preview-first inspector; only its explicit Details action enters the
+    document or canonical Issue surface. The graph projects unlinked Issues as
+    isolated material nodes so this rule applies to the complete Issue index.
 
 ## Work
 
@@ -66,14 +71,17 @@ clusters form, or which tracked anchors have no supporting material.
       complete body rendering, and canonical Issues Details navigation.
 - [x] Persist Tracked entity/Issue selection in the route while preserving the
       single Tracked tab and browser Back behavior.
+- [x] Unify sidebar entity/Issue selection in Graph mode, including isolated
+      graph nodes for Issues without entity backlinks.
 - [x] Complete browser, full-suite, and packaged Electron verification.
 
 ## Verification
 
 - `npx tsc --noEmit`
 - `cd ui && npx tsc -b`
-- focused core, route, layout, component, page, and demo suites (13 tests)
-- `pnpm test` (483 files passed, 1 skipped; 3986 tests passed, 9 skipped)
+- focused core, route, layout, component, page, and demo suites, including
+  sidebar Issue focus and unlinked-Issue graph projection
+- `pnpm test` (484 files passed, 1 skipped; 3995 tests passed, 9 skipped)
 - real `/tracked` route in Day and Auto color modes at desktop, tablet, and
   phone widths, including scope, filters, zoom, detail, source, and Back flows
 - graph entrance and focus states in Day/Night modes and at phone width, with
@@ -83,6 +91,8 @@ clusters form, or which tracked anchors have no supporting material.
   pointer target keeps an identical center and size before and after mark scale
 - Issue and note previews at desktop and phone widths, including explicit
   Details navigation with the graph route preserved until activation
+- real sidebar entity-to-Issue switching in Graph mode, followed by canonical
+  Issue Details navigation and browser Back to the persisted graph selection
 - `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace`
 
 ## Completion Criteria

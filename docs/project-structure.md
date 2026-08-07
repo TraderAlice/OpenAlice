@@ -151,8 +151,11 @@ Tracked is a global, file-backed index over those durable Workspaces:
   the same selection while retaining one Tracked tab.
 - the relationship graph is a read-time projection of those two canonical
   sources. Shared notes bridge every registered entity they reference, while
-  unlinked entities remain visible. The graph has no second persisted index or
-  layout state to migrate.
+  unlinked entities and Issues remain visible. Selecting either an entity or
+  an Issue preserves the current Detail/Graph mode; in Graph mode both focus
+  their existing graph node and defer navigation to the preview's explicit
+  Details action. The graph has no second persisted index or layout state to
+  migrate.
 - opening a graph material node keeps the same Tracked provenance and return
   path as opening it from the backlink detail list.
 

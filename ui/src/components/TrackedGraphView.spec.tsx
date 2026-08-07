@@ -20,6 +20,10 @@ const graph: EntityGraph = {
       id: 'artifact:other', kind: 'artifact', label: 'other-note', artifactType: 'note',
       workspaceId: 'ws-1', workspaceTag: 'research', path: 'other-note.md',
     },
+    {
+      id: 'artifact:issue', kind: 'artifact', label: 'Power watch', artifactType: 'issue',
+      workspaceId: 'ws-1', workspaceTag: 'research', path: '.alice/issues/power-watch.md',
+    },
   ],
   edges: [
     { id: 'note-a', source: 'artifact:note', target: 'entity:a' },
@@ -43,8 +47,11 @@ describe('TrackedGraphView', () => {
       <TrackedGraphView
         graph={graph}
         selectedName="asset-a"
+        selectedIssue={null}
         onSelectEntity={onSelectEntity}
+        onSelectIssue={vi.fn()}
         onOpenEntity={vi.fn()}
+        onOpenIssue={vi.fn()}
         onOpenArtifact={onOpenArtifact}
       />,
     )
@@ -70,8 +77,11 @@ describe('TrackedGraphView', () => {
       <TrackedGraphView
         graph={graph}
         selectedName="asset-a"
+        selectedIssue={null}
         onSelectEntity={vi.fn()}
+        onSelectIssue={vi.fn()}
         onOpenEntity={vi.fn()}
+        onOpenIssue={vi.fn()}
         onOpenArtifact={vi.fn()}
       />,
     )
@@ -88,8 +98,11 @@ describe('TrackedGraphView', () => {
       <TrackedGraphView
         graph={graph}
         selectedName={null}
+        selectedIssue={null}
         onSelectEntity={vi.fn()}
+        onSelectIssue={vi.fn()}
         onOpenEntity={vi.fn()}
+        onOpenIssue={vi.fn()}
         onOpenArtifact={vi.fn()}
       />,
     )
@@ -114,5 +127,31 @@ describe('TrackedGraphView', () => {
 
     fireEvent.pointerLeave(assetButton)
     expect(assetNode?.getAttribute('data-focus-state')).toBe('idle')
+  })
+
+  it('focuses a sidebar Issue through the same graph selection and preview path', () => {
+    const onSelectIssue = vi.fn()
+    const onOpenIssue = vi.fn()
+    render(
+      <TrackedGraphView
+        graph={graph}
+        selectedName={null}
+        selectedIssue={{ workspaceId: 'ws-1', issueId: 'power-watch' }}
+        onSelectEntity={vi.fn()}
+        onSelectIssue={onSelectIssue}
+        onOpenEntity={vi.fn()}
+        onOpenIssue={onOpenIssue}
+        onOpenArtifact={vi.fn()}
+      />,
+    )
+
+    const issueButton = screen.getByRole('button', { name: /Power watch, source material/ })
+    expect(issueButton.closest('[data-graph-node]')?.getAttribute('data-focus-state')).toBe('active')
+    expect(screen.getByText('Issue · research')).toBeTruthy()
+
+    fireEvent.click(issueButton)
+    expect(onSelectIssue).toHaveBeenCalledWith({ workspaceId: 'ws-1', issueId: 'power-watch' })
+    fireEvent.click(screen.getByRole('button', { name: 'Open details' }))
+    expect(onOpenIssue).toHaveBeenCalledWith({ workspaceId: 'ws-1', issueId: 'power-watch' })
   })
 })
