@@ -81,6 +81,7 @@ export function TrackedGraphView({
     artifact: true,
   })
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null)
 
   useEffect(() => {
     setPositions(layoutTrackedGraph(graph))
@@ -113,10 +114,18 @@ export function TrackedGraphView({
     }
     return degree
   }, [graph.edges])
-  const selectedEntity = useMemo(
-    () => graph.nodes.find((node) => node.kind === 'entity' && node.label === selectedName) ?? null,
-    [graph.nodes, selectedName],
-  )
+  const selectedEntity = useMemo(() => {
+    const node = graph.nodes.find((candidate) => candidate.kind === 'entity' && candidate.label === selectedName)
+    return node?.kind === 'entity' ? node : null
+  }, [graph.nodes, selectedName])
+  const selectedArtifact = useMemo(() => {
+    const node = selectedArtifactId ? nodeById.get(selectedArtifactId) : undefined
+    return node?.kind === 'artifact' ? node : null
+  }, [nodeById, selectedArtifactId])
+
+  useEffect(() => {
+    setSelectedArtifactId(null)
+  }, [selectedName])
 
   const neighborhood = useMemo(() => {
     if (!selectedEntity) return null
@@ -146,6 +155,10 @@ export function TrackedGraphView({
     [graph.edges, visibleIds],
   )
 
+  useEffect(() => {
+    if (selectedArtifactId && !visibleIds.has(selectedArtifactId)) setSelectedArtifactId(null)
+  }, [selectedArtifactId, visibleIds])
+
   const relatedEntityForArtifact = useCallback((artifactId: string): string | null => {
     const selectedId = selectedEntity?.id
     const entityIds = graph.edges.flatMap((edge) => {
@@ -160,12 +173,21 @@ export function TrackedGraphView({
 
   const activateNode = useCallback((node: EntityGraphNode) => {
     if (node.kind === 'entity') {
+      setSelectedArtifactId(null)
       onSelectEntity(node.label)
       return
     }
-    const returnEntityName = relatedEntityForArtifact(node.id)
-    if (returnEntityName) onOpenArtifact(node, returnEntityName)
-  }, [onOpenArtifact, onSelectEntity, relatedEntityForArtifact])
+    setSelectedArtifactId(node.id)
+  }, [onSelectEntity])
+
+  const openPreviewDetails = useCallback(() => {
+    if (selectedArtifact) {
+      const returnEntityName = relatedEntityForArtifact(selectedArtifact.id)
+      if (returnEntityName) onOpenArtifact(selectedArtifact, returnEntityName)
+      return
+    }
+    if (selectedEntity) onOpenEntity(selectedEntity.label)
+  }, [onOpenArtifact, onOpenEntity, relatedEntityForArtifact, selectedArtifact, selectedEntity])
 
   const fitVisible = useCallback((preferReadable = false) => {
     const points = visibleNodes.flatMap((node) => positions[node.id] ? [positions[node.id]!] : [])
@@ -271,7 +293,7 @@ export function TrackedGraphView({
     zoom(event.deltaY > 0 ? 1.12 : 0.88, point?.x, point?.y)
   }
 
-  const activeNodeId = hoveredNodeId ?? selectedEntity?.id ?? null
+  const activeNodeId = hoveredNodeId ?? selectedArtifact?.id ?? selectedEntity?.id ?? null
   const connectedToActive = useMemo(() => {
     const ids = new Set<string>()
     if (!activeNodeId) return ids
@@ -391,7 +413,7 @@ export function TrackedGraphView({
           {visibleNodes.map((node) => {
             const point = positions[node.id]
             if (!point) return null
-            const selected = node.id === selectedEntity?.id
+            const selected = node.id === selectedEntity?.id || node.id === selectedArtifact?.id
             const active = connectedToActive.has(node.id)
             const faded = activeNodeId !== null && !active
             const focusState = activeNodeId === null
@@ -500,16 +522,35 @@ export function TrackedGraphView({
         <LegendDot color="var(--chart-3)" label={t('tracked.graph.issue')} square />
       </div>
 
-      {selectedEntity?.kind === 'entity' && (
-        <div className="absolute bottom-3 right-3 z-10 max-w-[min(420px,calc(100%-1.5rem))] rounded-lg border border-border/70 bg-background/92 px-3 py-2.5 shadow-sm backdrop-blur-sm sm:bottom-4 sm:right-4">
+      {(selectedArtifact ?? selectedEntity) && (
+        <div
+          key={(selectedArtifact ?? selectedEntity)?.id}
+          className="oa-tracked-graph-preview-enter absolute bottom-3 right-3 z-10 max-w-[min(420px,calc(100%-1.5rem))] rounded-lg border border-border/70 bg-background/92 px-3 py-2.5 shadow-sm backdrop-blur-sm sm:bottom-4 sm:right-4"
+        >
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <div className="truncate font-mono text-[12px] font-semibold text-foreground">{selectedEntity.label}</div>
-              <div className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{selectedEntity.description}</div>
+              <div className="flex items-center gap-1.5 truncate font-mono text-[12px] font-semibold text-foreground">
+                {selectedArtifact && (
+                  selectedArtifact.artifactType === 'issue'
+                    ? <ListChecks size={12} className="shrink-0 text-muted-foreground" aria-hidden />
+                    : <FileText size={12} className="shrink-0 text-muted-foreground" aria-hidden />
+                )}
+                <span className="truncate">{(selectedArtifact ?? selectedEntity)?.label}</span>
+              </div>
+              {selectedArtifact ? (
+                <div className="mt-0.5 min-w-0 text-[11px] leading-relaxed text-muted-foreground">
+                  <div className="truncate">
+                    {t(selectedArtifact.artifactType === 'issue' ? 'tracked.graph.issue' : 'tracked.graph.note')} · {selectedArtifact.workspaceTag}
+                  </div>
+                  <div className="truncate font-mono text-[10px] opacity-80">{selectedArtifact.path}</div>
+                </div>
+              ) : (
+                <div className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{selectedEntity?.description}</div>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => onOpenEntity(selectedEntity.label)}
+              onClick={openPreviewDetails}
               className="oa-pressable shrink-0 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:bg-accent"
             >
               {t('tracked.graph.openDetails')}

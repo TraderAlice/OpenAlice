@@ -32,6 +32,9 @@ clusters form, or which tracked anchors have no supporting material.
    the selected anchor in short waves, edges draw once, and pointer focus
    emphasizes only the hovered node's one-hop neighborhood. Motion tokens and
    reduced-motion preferences remain authoritative.
+8. Material nodes use the same preview-first interaction as entities. Selecting
+   a note or Issue keeps the graph in place, animates a compact inspector into
+   view, and defers provenance navigation to the explicit Details action.
 
 ## Work
 
@@ -45,6 +48,8 @@ clusters form, or which tracked anchors have no supporting material.
 - [x] Add core, route, layout, component, page, and demo regressions.
 - [x] Add token-based entrance and one-hop focus motion with reduced-motion
       handling and no continuous background animation.
+- [x] Add animated material previews that preserve graph context until Details
+      is explicitly requested.
 - [x] Complete browser, full-suite, and packaged Electron verification.
 
 ## Verification
@@ -58,6 +63,8 @@ clusters form, or which tracked anchors have no supporting material.
 - graph entrance and focus states in Day/Night modes and at phone width, with
   motion disabled by both the shared reduced-motion rule and zero-motion style
   profiles
+- Issue and note previews at desktop and phone widths, including explicit
+  Details navigation with the graph route preserved until activation
 - `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace`
 
 ## Completion Criteria

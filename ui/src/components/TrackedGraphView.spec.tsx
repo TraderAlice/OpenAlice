@@ -36,7 +36,7 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('TrackedGraphView', () => {
-  it('uses native node controls and opens source material with Tracked context', () => {
+  it('uses native node controls and previews source material before opening it', () => {
     const onSelectEntity = vi.fn()
     const onOpenArtifact = vi.fn()
     render(
@@ -55,6 +55,10 @@ describe('TrackedGraphView', () => {
     expect(onSelectEntity).toHaveBeenCalledWith('topic-b')
 
     fireEvent.click(screen.getByRole('button', { name: /shared-note, source material/ }))
+    expect(onOpenArtifact).not.toHaveBeenCalled()
+    expect(screen.getByText('Note · research')).toBeTruthy()
+    expect(screen.getByText('shared-note.md')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open details' }))
     expect(onOpenArtifact).toHaveBeenCalledWith(
       expect.objectContaining({ path: 'shared-note.md' }),
       'asset-a',
