@@ -9,7 +9,7 @@
  * this surface is for chatting, not workspace management.
  */
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Check,
@@ -43,6 +43,7 @@ import { workspaceDisplayName, workspaceDisplayTitle } from './display'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
 import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { ChatDisplayMode } from './chat-display-mode'
 
 const CHAT_TEMPLATE = 'chat'
@@ -403,30 +404,6 @@ interface ChatWorkspaceContextFooterProps {
 function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): ReactElement {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const popoverId = useId()
-
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return
-      setOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopPropagation()
-      setOpen(false)
-      triggerRef.current?.focus({ preventScroll: true })
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [open])
 
   const closeAndRun = (action: () => void) => {
     setOpen(false)
@@ -467,38 +444,38 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
   )
 
   return (
-    <div ref={rootRef} className="relative shrink-0 border-t border-border/60 bg-secondary p-2">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? popoverId : undefined}
-        aria-label={upgrade
-          ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgrade.to })
-          : t('chat.workspaceContextLabel', { name: title })}
-        className="oa-pressable flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-      >
-        <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium text-foreground" title={props.displayMode === 'focused' && props.workspace ? workspaceDisplayTitle(props.workspace) : title}>
-            {title}
+    <div className="shrink-0 border-t border-border/60 bg-secondary p-2">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={<button
+            type="button"
+            aria-label={upgrade
+              ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgrade.to })
+              : t('chat.workspaceContextLabel', { name: title })}
+            className="oa-pressable flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          />}
+        >
+          <TriggerIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium text-foreground" title={props.displayMode === 'focused' && props.workspace ? workspaceDisplayTitle(props.workspace) : title}>
+              {title}
+            </span>
+            <span className={`mt-0.5 block truncate text-[10px] ${upgrade ? 'font-medium text-primary' : 'text-muted-foreground/70'}`}>
+              {upgrade ? t('chat.workspaceUpdateAvailable', { version: upgrade.to }) : subtitle}
+            </span>
           </span>
-          <span className={`mt-0.5 block truncate text-[10px] ${upgrade ? 'font-medium text-primary' : 'text-muted-foreground/70'}`}>
-            {upgrade ? t('chat.workspaceUpdateAvailable', { version: upgrade.to }) : subtitle}
-          </span>
-        </span>
-        {upgrade && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}
-        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
-      </button>
+          {upgrade && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        </PopoverTrigger>
 
-      {open && (
-        <div
-          id={popoverId}
+        <PopoverContent
           role="dialog"
           aria-label={t('chat.workspaceContextMenu')}
-          className="oa-popover-enter absolute bottom-full left-2 right-2 z-40 mb-1 max-h-[min(34rem,calc(100vh-5rem))] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-lg [scrollbar-gutter:stable]"
+          side="top"
+          align="start"
+          sideOffset={4}
+          initialFocus={false}
+          className="z-40 max-h-[min(34rem,calc(100vh-1rem))] w-72 max-w-[calc(100vw-1rem)] gap-0 overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-lg ring-0 [scrollbar-gutter:stable]"
         >
           <p className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
             {t('chat.view')}
@@ -533,7 +510,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40"
           >
             <SettingsIcon size={14} strokeWidth={2} aria-hidden />
-            <span>{t('workspace.configure')}</span>
+            <span className="min-w-0 flex-1 truncate">{t('workspace.configure')}</span>
           </button>
           {upgrade && (
             <button
@@ -554,7 +531,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40"
           >
             <ChevronRight size={14} strokeWidth={2} aria-hidden />
-            <span>{t('chat.browseWorkspace')}</span>
+            <span className="min-w-0 flex-1 truncate">{t('chat.browseWorkspace')}</span>
           </button>
           <button
             type="button"
@@ -562,7 +539,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Network size={14} strokeWidth={2} aria-hidden />
-            <span>{t('workspaceManager.title')}</span>
+            <span className="min-w-0 flex-1 truncate">{t('workspaceManager.title')}</span>
           </button>
           <button
             type="button"
@@ -570,10 +547,10 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             className="flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <PanelsTopLeft size={14} strokeWidth={2} aria-hidden />
-            <span>{t('chat.newWorkspace')}</span>
+            <span className="min-w-0 flex-1 truncate">{t('chat.newWorkspace')}</span>
           </button>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

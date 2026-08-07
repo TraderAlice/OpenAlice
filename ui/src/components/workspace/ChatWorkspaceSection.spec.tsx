@@ -160,7 +160,9 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([chatWorkspace], null, undefined, 'focused', onRequestDisplayMode)
 
     fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
-    expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
+    const menu = screen.getByRole('dialog', { name: 'Chat Workspace options' })
+    expect(menu.className).toContain('w-72')
+    expect(menu.className).not.toContain('absolute bottom-full')
     fireEvent.click(screen.getByRole('button', { name: 'Workspace tree' }))
     expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
   })
@@ -190,6 +192,7 @@ describe('ChatWorkspaceSection actions', () => {
     const trigger = screen.getByRole('button', { name: 'Chat context: chat-jul11' })
     fireEvent.click(trigger)
     expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
+    trigger.focus()
 
     const allowed = fireEvent.keyDown(document, { key: 'Escape' })
 
