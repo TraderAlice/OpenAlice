@@ -260,5 +260,9 @@ the tagline, pillars, or other marketing copy.
 - Strict TypeScript, ES2023 target.
 - Zod for config schemas; TypeBox for tool parameter schemas.
 - `decimal.js` for financial arithmetic.
+- For standard UI controls, prefer the shared shadcn/Base UI primitives under
+  `ui/src/components/ui/`. Extend that layer before hand-rolling portals,
+  positioning, focus, dismissal, keyboard behavior, or bespoke control styling
+  inside a feature component.
 - Prefer structured Workspace launcher logs; the main process currently uses
   `console` and does not have a universal pino sink.
