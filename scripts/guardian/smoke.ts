@@ -205,9 +205,10 @@ async function main(): Promise<void> {
   // Alice tsx spawn worked → web plugin bound its port.
   await waitFor('Alice listening (alice child spawned)', () => portBound(webPort))
 
-  // Vite pnpm spawn worked → it announces a Local URL.
-  await waitFor('Vite dev server up (vite child spawned)', () => /\[vite\][^\n]*localhost:\d+/i.test(out))
-  const uiPort = Number(/\[vite\][^\n]*localhost:(\d+)/i.exec(out)?.[1])
+  // Vite pnpm spawn worked → it announces the stable IPv4 loopback URL that
+  // Guardian exposes to other local surfaces through Runtime discovery.
+  await waitFor('Vite dev server up (vite child spawned)', () => /\[vite\][^\n]*127\.0\.0\.1:\d+/i.test(out))
+  const uiPort = Number(/\[vite\][^\n]*127\.0\.0\.1:(\d+)/i.exec(out)?.[1])
   if (!uiPort) fail(`could not parse Vite port from output:\n${out.slice(-600)}`)
 
   // A second process may inspect and open this dev-owned Runtime, but may not
@@ -225,6 +226,10 @@ async function main(): Promise<void> {
   }
   if (discovered.endpoints.web !== `http://127.0.0.1:${uiPort}`) {
     fail(`dev discovery advertised ${String(discovered.endpoints.web)} instead of Vite ${uiPort}`)
+  }
+  const discoveredWeb = await fetch(`${discovered.endpoints.web}/api/auth/status`)
+  if (!discoveredWeb.ok) {
+    fail(`dev discovery Web endpoint returned HTTP ${discoveredWeb.status}`)
   }
   if (!discovered.control.capabilities.includes('runtime.status')) {
     fail('dev discovery did not advertise runtime.status')
