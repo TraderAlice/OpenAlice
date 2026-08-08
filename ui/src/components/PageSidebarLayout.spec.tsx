@@ -142,7 +142,7 @@ describe('PageSidebarLayout', () => {
     expect(document.activeElement).toBe(contextTrigger)
   })
 
-  it('persists the desktop focus mode and restores the full sidebar', () => {
+  it('persists the desktop focus mode and restores the full sidebar', async () => {
     window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
     const view = render(
       <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
@@ -165,7 +165,9 @@ describe('PageSidebarLayout', () => {
     expect(collapsedSurface.hasAttribute('inert')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
+    await waitFor(() => {
+      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
+    })
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
     expect(desktopSidebar.getAttribute('data-state')).toBe('collapsed')
     expect(expandedSurface.hasAttribute('inert')).toBe(true)
@@ -181,7 +183,9 @@ describe('PageSidebarLayout', () => {
     expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Market' }))
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
+    await waitFor(() => {
+      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
+    })
     expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
     expect(screen.getByTestId('page-sidebar-expanded').hasAttribute('inert')).toBe(false)
     expect(screen.getByText('Market navigation')).toBeTruthy()
