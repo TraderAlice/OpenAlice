@@ -40,6 +40,64 @@ class FakeThirdPartyAdapter implements ConnectorAdapter {
 }
 
 describe('DeliveryManager connector registry', () => {
+  it('exposes adapter startup immediately instead of blocking service health', async () => {
+    let finishStart: (() => void) | undefined
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'slow', label: 'Slow', description: 'Slow adapter.', fields: [], commands: [] },
+      create: () => ({
+        id: 'slow',
+        start: async () => new Promise<void>((resolve) => { finishStart = resolve }),
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        health: () => ({ id: 'slow', enabled: true, status: 'starting' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { slow: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+
+    const startup = manager.start()
+    expect(manager.health()).toMatchObject({
+      status: 'healthy',
+      adapters: [{ id: 'slow', status: 'starting' }],
+    })
+    finishStart?.()
+    await startup
+  })
+
+  it('retains the concrete startup error after isolating a failed adapter', async () => {
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'offline', label: 'Offline', description: 'Offline adapter.', fields: [], commands: [] },
+      create: () => ({
+        id: 'offline',
+        start: async () => { throw new Error('proxy connection refused') },
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        health: () => ({ id: 'offline', enabled: true, status: 'starting' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { offline: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+
+    await manager.start()
+
+    expect(manager.health()).toMatchObject({
+      status: 'degraded',
+      adapters: [{
+        id: 'offline',
+        status: 'degraded',
+        lastError: 'proxy connection refused',
+      }],
+    })
+  })
+
   it('runs an unrecognized third adapter without changing delivery core', async () => {
     const adapter = new FakeThirdPartyAdapter()
     const registry = new ConnectorRegistry()

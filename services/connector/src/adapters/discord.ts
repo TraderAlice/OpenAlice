@@ -11,6 +11,14 @@ import type {
   ConnectorAdapterRegistration,
 } from '../core/adapter.js'
 import {
+  DIRECT_CONNECTOR_PROXY_TRANSPORT,
+  type ConnectorProxyTransport,
+} from '../core/proxy.js'
+import {
+  CONNECTOR_ADAPTER_STARTUP_TIMEOUT_MS,
+  withStartupDeadline,
+} from '../core/startup.js'
+import {
   AdapterHealthTracker,
   decodeInboxAttachments,
   formatInboxNotification,
@@ -21,6 +29,11 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
   private readonly tracker = new AdapterHealthTracker(this.id)
   private client?: Client
   private ownerUserId?: string
+
+  constructor(
+    private readonly proxy: ConnectorProxyTransport = DIRECT_CONNECTOR_PROXY_TRANSPORT,
+    private readonly startupTimeoutMs = CONNECTOR_ADAPTER_STARTUP_TIMEOUT_MS,
+  ) {}
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
     const discord = await import('discord.js')
@@ -35,43 +48,49 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
     this.ownerUserId = optionalString(config, 'ownerUserId')
 
     this.registerCommands(context)
-    await this.publishSlashCommands(applicationId, botToken, discord)
+    let client: Client | undefined
+    try {
+      await withStartupDeadline('Discord', this.startupTimeoutMs, async (signal) => {
+        await this.publishSlashCommands(applicationId, botToken, discord, signal)
 
-    const client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
-      partials: [Partials.Channel],
-    })
-    this.client = client
-    client.on(Events.InteractionCreate, async (interaction) => {
-      if (!interaction.isChatInputCommand()) return
-      const handled = await context.commands.execute({
-        connectorId: this.id,
-        command: interaction.commandName,
-        userId: interaction.user.id,
-        chatId: interaction.channelId,
-        reply: async (message) => {
-          await interaction.reply({ content: message, ephemeral: false })
-        },
-      }).catch(async (error) => {
-        this.tracker.degraded(error)
-        if (!interaction.replied) await interaction.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
-        return true
+        const createdClient = new Client({
+          intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
+          partials: [Partials.Channel],
+          ...(this.proxy.dispatcher ? { rest: { agent: this.proxy.dispatcher } } : {}),
+        })
+        client = createdClient
+        this.client = createdClient
+        createdClient.on(Events.InteractionCreate, async (interaction) => {
+          if (!interaction.isChatInputCommand()) return
+          const handled = await context.commands.execute({
+            connectorId: this.id,
+            command: interaction.commandName,
+            userId: interaction.user.id,
+            chatId: interaction.channelId,
+            reply: async (message) => {
+              await interaction.reply({ content: message, ephemeral: false })
+            },
+          }).catch(async (error) => {
+            this.tracker.degraded(error)
+            if (!interaction.replied) await interaction.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
+            return true
+          })
+          if (!handled && !interaction.replied) await interaction.reply('Unknown connector command.').catch(() => undefined)
+        })
+        createdClient.on(Events.Error, (error) => this.tracker.degraded(error))
+
+        const ready = new Promise<void>((resolveReady) => {
+          createdClient.once(Events.ClientReady, () => resolveReady())
+        })
+        await createdClient.login(botToken)
+        await ready
       })
-      if (!handled && !interaction.replied) await interaction.reply('Unknown connector command.').catch(() => undefined)
-    })
-    client.on(Events.Error, (error) => this.tracker.degraded(error))
-
-    const ready = new Promise<void>((resolveReady) => {
-      client.once(Events.ClientReady, () => resolveReady())
-    })
-    await client.login(botToken)
-    await Promise.race([
-      ready,
-      new Promise<never>((_resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Discord gateway did not become ready within 15 seconds')), 15_000)
-        timer.unref?.()
-      }),
-    ])
+    } catch (error) {
+      client?.destroy()
+      this.client = undefined
+      this.tracker.degraded(error)
+      throw error
+    }
     if (this.ownerUserId) this.tracker.healthy(this.ownerUserId)
     else this.tracker.awaitingLink()
   }
@@ -139,6 +158,7 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
     applicationId: string,
     token: string,
     discord: typeof import('discord.js'),
+    signal: AbortSignal,
   ): Promise<void> {
     const {
       ApplicationIntegrationType,
@@ -152,12 +172,17 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
       integration_types: [ApplicationIntegrationType.UserInstall],
       contexts: [InteractionContextType.BotDM],
     }))
-    await new REST({ version: '10' }).setToken(token).put(Routes.applicationCommands(applicationId), { body })
+    await new REST({
+      version: '10',
+      ...(this.proxy.dispatcher ? { agent: this.proxy.dispatcher } : {}),
+    }).setToken(token).put(Routes.applicationCommands(applicationId), { body, signal })
   }
 }
 
-export function discordConnectorRegistration(): ConnectorAdapterRegistration {
-  return { definition: DISCORD_CONNECTOR_DEFINITION, create: () => new DiscordConnectorAdapter() }
+export function discordConnectorRegistration(
+  proxy: ConnectorProxyTransport = DIRECT_CONNECTOR_PROXY_TRANSPORT,
+): ConnectorAdapterRegistration {
+  return { definition: DISCORD_CONNECTOR_DEFINITION, create: () => new DiscordConnectorAdapter(proxy) }
 }
 
 function requiredString(config: ConnectorAdapterConfig, key: string): string {

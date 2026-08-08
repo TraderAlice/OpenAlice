@@ -17,6 +17,7 @@ import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
+import { installConnectorProxyTransport } from './core/proxy.js'
 import { dataPath } from '@/core/paths.js'
 
 const CONNECTOR_PORT = Number(process.env['OPENALICE_CONNECTOR_PORT'] ?? 47334)
@@ -27,9 +28,11 @@ async function main(): Promise<void> {
 
   const configStore = new ConnectorConfigStore()
   const config = await configStore.read()
+  const proxy = installConnectorProxyTransport()
+  if (proxy.active) console.log('[connector] shared environment proxy enabled')
   const registry = new ConnectorRegistry()
-  registry.register(discordConnectorRegistration())
-  registry.register(telegramConnectorRegistration())
+  registry.register(discordConnectorRegistration(proxy))
+  registry.register(telegramConnectorRegistration(proxy))
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -42,7 +45,10 @@ async function main(): Promise<void> {
     recorder: journal,
     updateAdapterSettings: (id, patch) => configStore.patchAdapter(id, patch),
   })
-  await manager.start()
+  // Begin SDK startup before binding so health can immediately report each
+  // adapter as `starting`; do not make the loopback control plane wait on an
+  // external platform request.
+  const adapterStartup = manager.start()
 
   const app = new Hono()
   app.get('/__connector/health', (c) => c.json(manager.health()))
@@ -71,10 +77,13 @@ async function main(): Promise<void> {
     server.close()
     await manager.stop()
     await journal.flush()
+    await proxy.close()
     process.exit(0)
   }
   process.on('SIGINT', () => { void shutdown('SIGINT') })
   process.on('SIGTERM', () => { void shutdown('SIGTERM') })
+
+  await adapterStartup
 }
 
 main().catch((error) => {
