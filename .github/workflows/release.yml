@@ -399,12 +399,22 @@ jobs:
             arch: x64
           - os: ubuntu-latest
             arch: x64
+          # GitHub-hosted runners are x64-only; Linux arm64 is emulated via
+          # QEMU inside a node:22-trixie container so pnpm deploys the
+          # platform-specific native SDKs (e.g. longbridge's glibc prebuild)
+          # for arm64.
+          - os: ubuntu-latest
+            arch: arm64
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Set up QEMU for arm64 emulation
+        uses: docker/setup-qemu-action@v3
+        if: matrix.arch == 'arm64'
 
       - uses: pnpm/action-setup@v6
 
@@ -413,13 +423,37 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # arm64 has no native GitHub-hosted runner, so the whole install, build,
+      # and upgrade-smoke sequence runs inside a linux/arm64 container. The
+      # workspace is bind-mounted, so dist/broker-packs lands on the runner for
+      # the artifact step below.
+      - name: Build Broker Packs (arm64 emulated)
+        if: matrix.arch == 'arm64'
+        env:
+          PREVIOUS_TAG: ${{ needs.release.outputs.previous_tag }}
+        run: |
+          docker run --rm --platform linux/arm64 \
+            --workdir /workspace \
+            --volume "$PWD:/workspace" \
+            --env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+            --env PREVIOUS_TAG="$PREVIOUS_TAG" \
+            node:22-trixie bash -euo pipefail -c '
+              corepack enable && corepack prepare pnpm@11.7.0 --activate
+              pnpm install --frozen-lockfile
+              pnpm broker-packs:build
+              pnpm broker-packs:upgrade-smoke -- --from "$PREVIOUS_TAG"
+            '
+
       - name: Install dependencies
+        if: matrix.arch != 'arm64'
         run: pnpm install --frozen-lockfile
 
       - name: Build optional Broker Packs
+        if: matrix.arch != 'arm64'
         run: pnpm broker-packs:build
 
       - name: Prove previous-release Broker Pack upgrade
+        if: matrix.arch != 'arm64'
         run: pnpm broker-packs:upgrade-smoke -- --from "${{ needs.release.outputs.previous_tag }}"
 
       - name: Preserve Broker Packs

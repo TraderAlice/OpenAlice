@@ -46,6 +46,7 @@ describe('Release workflow critical path', () => {
       { os: 'macos-15-intel', arch: 'x64' },
       { os: 'windows-latest', arch: 'x64' },
       { os: 'ubuntu-latest', arch: 'x64' },
+      { os: 'ubuntu-latest', arch: 'arm64' },
     ])
     expect(step(brokerPacks, 'Preserve Broker Packs').with?.['name']).toBe(
       'broker-packs-${{ runner.os }}-${{ matrix.arch }}',
