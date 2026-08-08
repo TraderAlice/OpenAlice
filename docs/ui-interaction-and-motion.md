@@ -161,7 +161,12 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   such as `PageSidebarLayout` continue to own route content, responsive mode,
   collapse affordances, and persisted preferences; they must not add a second
   visible border or parallel document-level drag listeners beside the shared
-  separator.
+  separator. Responsive min/max values must be derived from the measured split
+  group rather than the window: app-shell chrome sits outside that group. Keep
+  the complete constraint set feasible at every supported width; when there is
+  not enough room for both preferred minimums, preserve the navigator minimum
+  and give the working view the measured remainder instead of sending mutually
+  impossible hard minimums to the primitive.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.

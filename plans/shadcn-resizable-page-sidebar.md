@@ -1,6 +1,6 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `complete` (implemented in Draft PR #1025; awaiting maintainer acceptance)
+- Status: `complete` (responsive hardening included in Draft PR #1025; awaiting maintainer acceptance)
 - Updated: `2026-08-08`
 - Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
   maintainer acceptance.
@@ -33,6 +33,10 @@ current mobile Sheet hierarchy.
 - The official current `base-nova` registry source wraps v4 `Group`, `Panel`,
   and `Separator` as stable shadcn components and supplies an enlarged invisible
   hit target around a single visible rule.
+- The first migration increment combined the navigator's responsive maximum
+  with an unconditional 500px content-panel minimum. Once the page-owned group
+  became narrower than 700px after app-shell chrome, those constraints were
+  impossible; a resize could leave the navigator at 100% and content at 0%.
 
 ## Scope
 
@@ -82,12 +86,15 @@ current mobile Sheet hierarchy.
 4. Use the panel imperative API for focus-mode collapse and restore. Derive
    visible/hidden content from the applied panel state so pointer collapse,
    button collapse, stored state, and assistive semantics cannot diverge.
-5. Keep the main panel's 500px minimum as the authoritative protection for the
-   working view. Retain the current responsive cap only where it is stricter
-   than that invariant.
+5. Preserve the former responsive contract as a feasible pair: keep the
+   navigator at least 200px, reserve up to 500px for content, and let that
+   content minimum shrink to the actual remainder when the page-owned group is
+   narrower than 701px. The group must never receive contradictory minimums.
 6. Do not reproduce upstream separator behavior in tests. Product tests cover
    composition, persisted state, focus-mode semantics, and the single-divider
    contract; real browser acceptance covers pointer and keyboard resizing.
+7. Measure the page-owned group before applying responsive constraints. Window
+   width includes app-shell chrome and is not a valid initial substitute.
 
 ## Work
 
@@ -107,15 +114,30 @@ current mobile Sheet hierarchy.
       and unsigned packaged Electron Workspace smoke.
 - [x] Open and maintain one labeled autonomous Draft PR to `dev`; present it
       for maintainer acceptance without merging it from the goal.
+- [x] Reproduce the responsive failure in the real Chat route and identify the
+      infeasible 200px navigator + 500px content minimum pair.
+- [x] Make the responsive constraints feasible at every desktop group width and
+      remove resize-settle state races.
+- [x] Add focused constraint regression coverage for narrow, boundary, medium,
+      and wide group widths.
+- [x] Re-run narrow/wide drag, collapse/expand, reload, browser, full automated,
+      build, and unsigned Electron acceptance on the repaired increment.
 
 ## Verification Evidence
 
 - Real `pnpm dev` data: Chat pointer and keyboard resizing both persisted over
   reload; focus mode stayed at 44px over reload and restored the prior expanded
   pixel width.
-- Responsive acceptance: 740px used the existing mobile Sheet, 768px kept a
-  500px working pane while temporarily capping the navigator, and 900/1200px
-  restored the saved wider preference without overwriting it.
+- Previous responsive acceptance missed the page-owned group width after app
+  chrome. The reopened regression was reproduced with the navigator at 940px
+  and content at 0px in a 941px group. After repair, the same group recovered
+  to 319px / 621px, a real pointer drag persisted 268px over reload, and a
+  collapsed-state reload restored 44px before expanding back to 268px.
+- A temporary viewport acceptance shell loaded the real `pnpm dev` route (not
+  demo data): 740px used the mobile Sheet; a 768px viewport produced a 708px
+  split group with a feasible 207px navigator + 500px content pair; narrowing,
+  collapsing to 44px, expanding to the responsive cap, and returning to a
+  1200px viewport restored the untouched 260px preference.
 - Route walk: Chat, AutoQuant, Inbox, Tracked, Market, Portfolio, Automation,
   Settings, Workspaces, and Dev Panel each rendered two panels with one shared
   separator. The full-width Issues and Trading-as-Git routes remained outside
@@ -125,7 +147,7 @@ current mobile Sheet hierarchy.
   reduced motion removed the sidebar surface transition; browser console had
   no warnings or errors.
 - Automated/build: `npx tsc --noEmit`, `cd ui && npx tsc -b`, focused sidebar
-  tests, `pnpm test` (487 files, 4007 passing tests), `cd ui && pnpm build`, and
+  tests, `pnpm test` (487 files, 4008 passing tests), `cd ui && pnpm build`, and
   `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace` passed.
 
 ## Verification Matrix
@@ -135,7 +157,7 @@ current mobile Sheet hierarchy.
 | One separator | shared layout DOM/class assertion | Inbox and Tracked visual inspection |
 | Pointer resize | upstream primitive + product persistence callback | mouse/trackpad drag in Chat and Inbox |
 | Keyboard resize | separator role/focus composition | focus handle and use arrow keys |
-| Responsive constraints | stored/default/max-size unit cases | 740px, 900px, and 1200px widths |
+| Responsive constraints | feasible-pair sweep from 201–1600px plus boundary cases | real 740px mobile, 708px split-group, 941px split-group, and 1200px viewport paths |
 | Focus mode | collapse/restore and `inert` tests | collapse, navigate, reload, restore |
 | Mobile ownership | existing Sheet focus/dismissal suite | phone drawer selection and Escape |
 | Theme/style profiles | semantic `data-slot` source review | Day/Night plus Windows 98 spot check |
@@ -149,8 +171,9 @@ current mobile Sheet hierarchy.
   OpenAlice document-level resize listeners.
 - Page-specific widths and focus mode survive reloads without changing their
   existing storage contract.
-- The working pane never drops below its current minimum; mobile routes keep
-  their existing Sheet behavior and focus return.
+- The working pane keeps its 500px minimum whenever geometry permits and gets
+  the measured remainder beside the 200px navigator below that boundary;
+  mobile routes keep their existing Sheet behavior and focus return.
 - All current shell consumers compile and representative real routes remain
   usable across the responsive and style-profile matrix.
 - Required browser, automated, build, and unsigned Electron checks pass, and a

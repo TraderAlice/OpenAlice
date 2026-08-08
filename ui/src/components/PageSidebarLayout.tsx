@@ -15,6 +15,7 @@ const MIN_WIDTH = 200
 const MAX_WIDTH = 420
 const MAIN_PANE_MIN_WIDTH = 500
 const COLLAPSED_WIDTH = 44
+const RESIZE_SEPARATOR_WIDTH = 1
 function clampWidth(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(value)))
@@ -40,15 +41,40 @@ function readStoredCollapsed(storageKey: string): boolean {
   return window.localStorage.getItem(collapsedStorageName(storageKey)) === '1'
 }
 
-function responsiveMaxWidth(containerWidth: number): number {
-  if (!Number.isFinite(containerWidth) || containerWidth <= 0) return MAX_WIDTH
+export function calculatePageSidebarConstraints(containerWidth: number): {
+  navigatorMaxWidth: number
+  contentMinWidth: number
+} {
+  if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
+    return {
+      navigatorMaxWidth: MAX_WIDTH,
+      contentMinWidth: 0,
+    }
+  }
+
+  const panelBudget = Math.max(0, Math.floor(containerWidth) - RESIZE_SEPARATOR_WIDTH)
   const ratio =
     containerWidth < 900 ? 0.30 :
       containerWidth < 1180 ? 0.34 :
         0.36
   const proportional = Math.floor(containerWidth * ratio)
-  const reserveMain = Math.floor(containerWidth - MAIN_PANE_MIN_WIDTH)
-  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, proportional, reserveMain))
+  const reserveMain = panelBudget - MAIN_PANE_MIN_WIDTH
+  const navigatorMaxWidth = Math.max(
+    MIN_WIDTH,
+    Math.min(MAX_WIDTH, proportional, reserveMain),
+  )
+
+  // The former flex layout reserved 500px for content only when the container
+  // had enough room. Below that point the navigator kept its 200px minimum and
+  // content received the remainder. Keep the two panel constraints feasible at
+  // every desktop width instead of asking the resizable group to satisfy two
+  // contradictory hard minimums.
+  const contentMinWidth = Math.max(
+    0,
+    Math.min(MAIN_PANE_MIN_WIDTH, panelBudget - MIN_WIDTH),
+  )
+
+  return { navigatorMaxWidth, contentMinWidth }
 }
 
 function useIsDesktop(minWidth: number): boolean {
@@ -103,7 +129,6 @@ export function PageSidebarLayout({
   const isAppDesktop = useIsDesktop(768)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null)
-  const widthPersistTimerRef = useRef<number | null>(null)
   const userResizeRef = useRef(false)
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null)
@@ -115,10 +140,15 @@ export function PageSidebarLayout({
     readStoredWidth(storageKey, clampWidth(defaultWidth, defaultWidth)),
   )
   const latestWidthRef = useRef(preferredWidth)
-  const [containerWidth, setContainerWidth] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 0,
-  )
-  const maxWidth = responsiveMaxWidth(containerWidth)
+  // The page-owned group is narrower than window.innerWidth because the app
+  // rail remains outside it. Wait for the real group measurement before
+  // applying responsive constraints; using the viewport here can briefly make
+  // the panel minimums impossible and poison the group's restored layout.
+  const [containerWidth, setContainerWidth] = useState(0)
+  const {
+    navigatorMaxWidth: maxWidth,
+    contentMinWidth,
+  } = calculatePageSidebarConstraints(containerWidth)
   const width = Math.min(preferredWidth, maxWidth)
   const closeMobileDrawer = useCallback(() => setDrawerOpen(false), [])
   const openMobileDrawer = useCallback(() => setDrawerOpen(true), [])
@@ -141,26 +171,9 @@ export function PageSidebarLayout({
   }, [storageKey])
 
   const commitPreferredWidth = useCallback((next: number) => {
-    if (widthPersistTimerRef.current !== null) {
-      window.clearTimeout(widthPersistTimerRef.current)
-      widthPersistTimerRef.current = null
-    }
     latestWidthRef.current = next
     setPreferredWidth(next)
     persistWidth(next)
-  }, [persistWidth])
-
-  const queuePreferredWidth = useCallback((next: number) => {
-    latestWidthRef.current = next
-    if (widthPersistTimerRef.current !== null) {
-      window.clearTimeout(widthPersistTimerRef.current)
-    }
-    widthPersistTimerRef.current = window.setTimeout(() => {
-      widthPersistTimerRef.current = null
-      userResizeRef.current = false
-      setPreferredWidth(next)
-      persistWidth(next)
-    }, 150)
   }, [persistWidth])
 
   const updateCollapsed = useCallback((next: boolean) => {
@@ -175,15 +188,18 @@ export function PageSidebarLayout({
     if (userResizeRef.current) {
       updateCollapsed(nextCollapsed)
       if (!nextCollapsed) {
-        queuePreferredWidth(clampWidth(size.inPixels, MIN_WIDTH))
+        latestWidthRef.current = clampWidth(size.inPixels, MIN_WIDTH)
       }
     }
-  }, [queuePreferredWidth, updateCollapsed])
+  }, [updateCollapsed])
 
   const handleLayoutChanged = useCallback(() => {
     if (!userResizeRef.current) return
     const panel = sidebarPanelRef.current
-    if (!panel || panel.isCollapsed()) return
+    if (!panel || panel.isCollapsed()) {
+      userResizeRef.current = false
+      return
+    }
     const nextWidth = clampWidth(panel.getSize().inPixels, MIN_WIDTH)
     commitPreferredWidth(nextWidth)
     userResizeRef.current = false
@@ -211,20 +227,14 @@ export function PageSidebarLayout({
   }, [maxWidth, updateCollapsed])
 
   useLayoutEffect(() => {
-    if (!isDesktop || !collapsed) return
+    if (!isDesktop || containerWidth <= 0 || !collapsed) return
     sidebarPanelRef.current?.collapse()
-  }, [collapsed, isDesktop])
+  }, [collapsed, containerWidth, isDesktop])
 
   useLayoutEffect(() => {
-    if (!isDesktop || collapsed || userResizeRef.current) return
+    if (!isDesktop || containerWidth <= 0 || collapsed || userResizeRef.current) return
     sidebarPanelRef.current?.resize(Math.min(latestWidthRef.current, maxWidth))
-  }, [collapsed, isDesktop, maxWidth])
-
-  useEffect(() => () => {
-    if (widthPersistTimerRef.current !== null) {
-      window.clearTimeout(widthPersistTimerRef.current)
-    }
-  }, [])
+  }, [collapsed, containerWidth, isDesktop, maxWidth])
 
   useEffect(() => {
     if (isDesktop) setDrawerOpen(false)
@@ -284,7 +294,7 @@ export function PageSidebarLayout({
         <ResizablePanel
           id={`page-sidebar-${storageKey}-navigator`}
           panelRef={sidebarPanelRef}
-          defaultSize={width}
+          defaultSize={collapsed ? COLLAPSED_WIDTH : width}
           minSize={MIN_WIDTH}
           maxSize={maxWidth}
           collapsedSize={COLLAPSED_WIDTH}
@@ -357,7 +367,7 @@ export function PageSidebarLayout({
         />
         <ResizablePanel
           id={`page-sidebar-${storageKey}-content`}
-          minSize={MAIN_PANE_MIN_WIDTH}
+          minSize={contentMinWidth}
           groupResizeBehavior="preserve-relative-size"
           className="min-h-0 min-w-0"
         >

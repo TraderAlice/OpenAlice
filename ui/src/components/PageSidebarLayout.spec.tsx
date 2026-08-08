@@ -6,7 +6,7 @@ import { useMobilePageNavigation, MobilePageNavigationProvider } from '../contex
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import { PageSidebarLayout } from './PageSidebarLayout'
+import { calculatePageSidebarConstraints, PageSidebarLayout } from './PageSidebarLayout'
 
 class ResizeObserverStub {
   observe() {}
@@ -36,6 +36,45 @@ afterEach(() => {
 })
 
 describe('PageSidebarLayout', () => {
+  it('keeps responsive panel minimums feasible while preserving the former content reserve', () => {
+    expect(calculatePageSidebarConstraints(0)).toEqual({
+      navigatorMaxWidth: 420,
+      contentMinWidth: 0,
+    })
+
+    expect(calculatePageSidebarConstraints(616)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 415,
+    })
+    expect(calculatePageSidebarConstraints(700)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 499,
+    })
+    expect(calculatePageSidebarConstraints(701)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 500,
+    })
+    expect(calculatePageSidebarConstraints(941)).toEqual({
+      navigatorMaxWidth: 319,
+      contentMinWidth: 500,
+    })
+    expect(calculatePageSidebarConstraints(1_200)).toEqual({
+      navigatorMaxWidth: 420,
+      contentMinWidth: 500,
+    })
+
+    for (let containerWidth = 201; containerWidth <= 1_600; containerWidth += 7) {
+      const { navigatorMaxWidth, contentMinWidth } = calculatePageSidebarConstraints(containerWidth)
+      const panelBudget = containerWidth - 1
+
+      expect(navigatorMaxWidth).toBeGreaterThanOrEqual(200)
+      expect(navigatorMaxWidth).toBeLessThanOrEqual(420)
+      expect(contentMinWidth).toBeGreaterThanOrEqual(0)
+      expect(contentMinWidth).toBeLessThanOrEqual(500)
+      expect(200 + contentMinWidth).toBeLessThanOrEqual(panelBudget)
+    }
+  })
+
   it('registers its phone navigator into the app context bar without rendering a second bar', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({

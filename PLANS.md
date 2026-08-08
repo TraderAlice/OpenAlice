@@ -33,8 +33,9 @@ the durable truth after it changes.
 
 - [[plans/shadcn-resizable-page-sidebar.md]] — Replaced the hand-written
   page-sidebar drag rail with the official shadcn Resizable primitive while
-  preserving OpenAlice focus mode, responsive hierarchy, and stored widths.
-  Implemented in Draft PR #1025 for maintainer acceptance.
+  preserving OpenAlice focus mode, stored widths, and a feasible measured-group
+  responsive hierarchy across narrow and wide layouts. Implemented in Draft PR
+  #1025 for maintainer acceptance.
 - [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
   local relationship graph derived from Tracked entities and authored Workspace
   backlinks, with provenance-preserving material navigation.
