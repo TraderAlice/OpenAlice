@@ -270,6 +270,18 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
       },
     },
   },
+  'atlas-cloud': {
+    'deepseek-ai/deepseek-v4-pro': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 384_000,
+      reasoning: {
+        mode: 'optional',
+        efforts: ['high', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    },
+  },
   longcat: {
     'LongCat-2.0': {
       maxOutputTokens: 131_072,
