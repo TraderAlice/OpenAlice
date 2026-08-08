@@ -1115,10 +1115,11 @@ html[lang="ja"] .oa-onboarding-title {
 .markdown-content--reading h1 {
   max-width: 100%;
   margin-bottom: 1.35rem;
-  font-size: clamp(1.65rem, 2.5vw, 1.9rem);
+  font-size: clamp(1.45rem, 2.3vw, 1.75rem);
   font-weight: 660;
   line-height: 1.24;
   letter-spacing: -0.02em;
+  text-wrap: pretty;
 }
 
 .markdown-content--reading h2 {
@@ -1200,7 +1201,7 @@ html[lang="ja"] .oa-onboarding-title {
   }
 
   .markdown-content--reading h1 {
-    font-size: 1.55rem;
+    font-size: 1.45rem;
   }
 
   .markdown-content--reading h2 {
