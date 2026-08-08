@@ -767,6 +767,7 @@ export const en = {
     testConnection: 'Test connection',
     collapsePanel: 'Collapse {{title}}',
     openPanel: 'Open {{title}}',
+    resizePanel: 'Resize {{title}}',
     closePanel: 'Close {{title}}',
     focusContent: 'Focus content',
     moreActions: 'More actions for {{target}}',

@@ -88,6 +88,7 @@ describe('PageSidebarLayout', () => {
   })
 
   it('persists the desktop focus mode and restores the full sidebar', () => {
+    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
     const view = render(
       <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
         <div>Market content</div>
@@ -97,17 +98,21 @@ describe('PageSidebarLayout', () => {
     const desktopSidebar = screen.getByTestId('page-sidebar-desktop')
     const expandedSurface = screen.getByTestId('page-sidebar-expanded')
     const collapsedSurface = screen.getByTestId('page-sidebar-collapsed')
+    const separator = screen.getByRole('separator')
     expect(desktopSidebar.getAttribute('data-state')).toBe('expanded')
-    expect(desktopSidebar.getAttribute('style')).toContain('width: 270px')
-    expect(desktopSidebar.className).toContain('transition-[width]')
-    expect(desktopSidebar.className).toContain('motion-reduce:transition-none')
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(separator.getAttribute('data-slot')).toBe('resizable-handle')
+    expect(separator.getAttribute('aria-label')).toBe('Resize Market')
+    expect(separator.className).toContain('w-px')
+    expect(desktopSidebar.className).not.toContain('border-r')
+    expect(separator.tabIndex).toBe(0)
     expect(expandedSurface.hasAttribute('inert')).toBe(false)
     expect(collapsedSurface.hasAttribute('inert')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
     expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
+    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
     expect(desktopSidebar.getAttribute('data-state')).toBe('collapsed')
-    expect(desktopSidebar.getAttribute('style')).toContain('width: 44px')
     expect(expandedSurface.hasAttribute('inert')).toBe(true)
     expect(collapsedSurface.hasAttribute('inert')).toBe(false)
     expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()

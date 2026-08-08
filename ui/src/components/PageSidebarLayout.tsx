@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Sidebar } from './Sidebar'
 import { useRegisterMobilePageNavigation } from '../contexts/MobilePageNavigationContext'
@@ -9,7 +15,6 @@ const MIN_WIDTH = 200
 const MAX_WIDTH = 420
 const MAIN_PANE_MIN_WIDTH = 500
 const COLLAPSED_WIDTH = 44
-const RESIZE_HANDLE_WIDTH = 10
 function clampWidth(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(value)))
@@ -97,14 +102,19 @@ export function PageSidebarLayout({
   const isDesktop = useIsDesktop(desktopMinWidth)
   const isAppDesktop = useIsDesktop(768)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null)
+  const widthPersistTimerRef = useRef<number | null>(null)
+  const userResizeRef = useRef(false)
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null)
   const mobileDrawerId = useId()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => readStoredCollapsed(storageKey))
+  const collapsedRef = useRef(collapsed)
   const [preferredWidth, setPreferredWidth] = useState(() =>
     readStoredWidth(storageKey, clampWidth(defaultWidth, defaultWidth)),
   )
+  const latestWidthRef = useRef(preferredWidth)
   const [containerWidth, setContainerWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 0,
   )
@@ -130,39 +140,91 @@ export function PageSidebarLayout({
     window.localStorage.setItem(storageName(storageKey), String(next))
   }, [storageKey])
 
+  const commitPreferredWidth = useCallback((next: number) => {
+    if (widthPersistTimerRef.current !== null) {
+      window.clearTimeout(widthPersistTimerRef.current)
+      widthPersistTimerRef.current = null
+    }
+    latestWidthRef.current = next
+    setPreferredWidth(next)
+    persistWidth(next)
+  }, [persistWidth])
+
+  const queuePreferredWidth = useCallback((next: number) => {
+    latestWidthRef.current = next
+    if (widthPersistTimerRef.current !== null) {
+      window.clearTimeout(widthPersistTimerRef.current)
+    }
+    widthPersistTimerRef.current = window.setTimeout(() => {
+      widthPersistTimerRef.current = null
+      userResizeRef.current = false
+      setPreferredWidth(next)
+      persistWidth(next)
+    }, 150)
+  }, [persistWidth])
+
   const updateCollapsed = useCallback((next: boolean) => {
+    if (collapsedRef.current === next) return
+    collapsedRef.current = next
     setCollapsed(next)
     window.localStorage.setItem(collapsedStorageName(storageKey), next ? '1' : '0')
   }, [storageKey])
 
-  const beginResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    const startX = event.clientX
-    const startWidth = width
-    let nextWidth = startWidth
-
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      nextWidth = Math.max(MIN_WIDTH, Math.min(maxWidth, Math.round(startWidth + moveEvent.clientX - startX)))
-      setPreferredWidth(nextWidth)
+  const handleSidebarResize = useCallback((size: PanelSize) => {
+    const nextCollapsed = size.inPixels <= COLLAPSED_WIDTH + 1
+    if (userResizeRef.current) {
+      updateCollapsed(nextCollapsed)
+      if (!nextCollapsed) {
+        queuePreferredWidth(clampWidth(size.inPixels, MIN_WIDTH))
+      }
     }
+  }, [queuePreferredWidth, updateCollapsed])
 
-    const onPointerUp = () => {
-      persistWidth(nextWidth)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      window.removeEventListener('pointermove', onPointerMove)
-      window.removeEventListener('pointerup', onPointerUp)
-      window.removeEventListener('pointercancel', onPointerUp)
+  const handleLayoutChanged = useCallback(() => {
+    if (!userResizeRef.current) return
+    const panel = sidebarPanelRef.current
+    if (!panel || panel.isCollapsed()) return
+    const nextWidth = clampWidth(panel.getSize().inPixels, MIN_WIDTH)
+    commitPreferredWidth(nextWidth)
+    userResizeRef.current = false
+  }, [commitPreferredWidth])
+
+  const finishUserResize = useCallback(() => {
+    if (!userResizeRef.current) return
+    const panel = sidebarPanelRef.current
+    if (panel && !panel.isCollapsed()) {
+      commitPreferredWidth(clampWidth(panel.getSize().inPixels, MIN_WIDTH))
     }
+    userResizeRef.current = false
+  }, [commitPreferredWidth])
 
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    window.addEventListener('pointermove', onPointerMove)
-    window.addEventListener('pointerup', onPointerUp)
-    window.addEventListener('pointercancel', onPointerUp)
-  }, [maxWidth, persistWidth, width])
+  const collapseSidebar = useCallback(() => {
+    updateCollapsed(true)
+    sidebarPanelRef.current?.collapse()
+  }, [updateCollapsed])
+
+  const expandSidebar = useCallback(() => {
+    const targetWidth = Math.min(latestWidthRef.current, maxWidth)
+    updateCollapsed(false)
+    sidebarPanelRef.current?.expand()
+    sidebarPanelRef.current?.resize(targetWidth)
+  }, [maxWidth, updateCollapsed])
+
+  useLayoutEffect(() => {
+    if (!isDesktop || !collapsed) return
+    sidebarPanelRef.current?.collapse()
+  }, [collapsed, isDesktop])
+
+  useLayoutEffect(() => {
+    if (!isDesktop || collapsed || userResizeRef.current) return
+    sidebarPanelRef.current?.resize(Math.min(latestWidthRef.current, maxWidth))
+  }, [collapsed, isDesktop, maxWidth])
+
+  useEffect(() => () => {
+    if (widthPersistTimerRef.current !== null) {
+      window.clearTimeout(widthPersistTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (isDesktop) setDrawerOpen(false)
@@ -193,7 +255,7 @@ export function PageSidebarLayout({
       {actionContent}
       <button
         type="button"
-        onClick={() => updateCollapsed(true)}
+        onClick={collapseSidebar}
         className="oa-icon-action flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         aria-label={t('common.collapsePanel', { title })}
         title={t('common.focusContent')}
@@ -211,64 +273,97 @@ export function PageSidebarLayout({
 
   if (isDesktop) {
     return (
-      <div ref={rootRef} className="flex h-full min-h-0 w-full overflow-hidden">
-        <div
-          data-testid="page-sidebar-desktop"
-          data-state={collapsed ? 'collapsed' : 'expanded'}
-          className="relative h-full min-h-0 shrink-0 overflow-hidden border-r border-border/80 bg-secondary transition-[width] duration-[var(--motion-slow)] [transition-timing-function:var(--motion-ease-out)] motion-reduce:transition-none"
-          style={{ width: collapsed ? COLLAPSED_WIDTH : width + RESIZE_HANDLE_WIDTH }}
+      <ResizablePanelGroup
+        id={`page-sidebar-${storageKey}`}
+        elementRef={rootRef}
+        orientation="horizontal"
+        onLayoutChanged={handleLayoutChanged}
+        resizeTargetMinimumSize={{ fine: 10, coarse: 28 }}
+        className="min-h-0 min-w-0 overflow-hidden"
+      >
+        <ResizablePanel
+          id={`page-sidebar-${storageKey}-navigator`}
+          panelRef={sidebarPanelRef}
+          defaultSize={width}
+          minSize={MIN_WIDTH}
+          maxSize={maxWidth}
+          collapsedSize={COLLAPSED_WIDTH}
+          collapsible
+          groupResizeBehavior="preserve-pixel-size"
+          onResize={handleSidebarResize}
+          className="h-full min-h-0 overflow-hidden bg-secondary"
         >
           <div
-            data-testid="page-sidebar-expanded"
-            aria-hidden={collapsed}
-            inert={collapsed ? true : undefined}
-            className={`absolute inset-y-0 left-0 flex transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
-              collapsed
-                ? 'pointer-events-none opacity-0'
-                : 'opacity-100 delay-[60ms]'
-            }`}
-            style={{ width: width + RESIZE_HANDLE_WIDTH }}
+            data-testid="page-sidebar-desktop"
+            data-state={collapsed ? 'collapsed' : 'expanded'}
+            className="relative h-full min-h-0 w-full overflow-hidden bg-secondary"
           >
             <div
-              className="h-full min-h-0 shrink-0"
-              style={{ width }}
+              data-testid="page-sidebar-expanded"
+              aria-hidden={collapsed}
+              inert={collapsed ? true : undefined}
+              className={`absolute inset-0 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
+                collapsed
+                  ? 'pointer-events-none opacity-0'
+                  : 'opacity-100 delay-[60ms]'
+              }`}
             >
               {sidebarPanel}
             </div>
-            <ResizeHandle width={width} maxWidth={maxWidth} onPointerDown={beginResize} />
+            <aside
+              data-testid="page-sidebar-collapsed"
+              aria-hidden={!collapsed}
+              inert={!collapsed ? true : undefined}
+              className={`absolute inset-0 flex flex-col items-center bg-secondary py-1.5 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
+                collapsed
+                  ? 'opacity-100 delay-[80ms]'
+                  : 'pointer-events-none opacity-0'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={expandSidebar}
+                className="oa-icon-action flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={t('common.openPanel', { title })}
+                title={t('common.openPanel', { title })}
+              >
+                <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+              </button>
+              <span
+                aria-hidden
+                className="mt-3 select-none text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground [writing-mode:vertical-rl] rotate-180"
+              >
+                {title}
+              </span>
+            </aside>
           </div>
-          <aside
-            data-testid="page-sidebar-collapsed"
-            aria-hidden={!collapsed}
-            inert={!collapsed ? true : undefined}
-            className={`absolute inset-y-0 left-0 flex shrink-0 flex-col items-center bg-secondary py-1.5 transition-opacity duration-[var(--motion-fast)] [transition-timing-function:var(--motion-ease-standard)] motion-reduce:delay-0 motion-reduce:transition-none ${
-              collapsed
-                ? 'opacity-100 delay-[80ms]'
-                : 'pointer-events-none opacity-0'
-            }`}
-            style={{ width: COLLAPSED_WIDTH }}
-          >
-            <button
-              type="button"
-              onClick={() => updateCollapsed(false)}
-              className="oa-icon-action flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              aria-label={t('common.openPanel', { title })}
-              title={t('common.openPanel', { title })}
-            >
-              <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
-            </button>
-            <span
-              aria-hidden
-              className="mt-3 select-none text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground [writing-mode:vertical-rl] rotate-180"
-            >
-              {title}
-            </span>
-          </aside>
-        </div>
-        <div className="min-h-0 min-w-0 flex flex-1 flex-col">
-          {children}
-        </div>
-      </div>
+        </ResizablePanel>
+        <ResizableHandle
+          id={`page-sidebar-${storageKey}-handle`}
+          aria-label={t('common.resizePanel', { title })}
+          onPointerDown={() => {
+            userResizeRef.current = true
+          }}
+          onPointerUp={finishUserResize}
+          onPointerCancel={finishUserResize}
+          onKeyDown={(event) => {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+              userResizeRef.current = true
+            }
+          }}
+          onKeyUp={finishUserResize}
+          onBlur={finishUserResize}
+          className="z-10 bg-border/80 transition-colors hover:bg-primary/50 active:bg-primary/70"
+        />
+        <ResizablePanel
+          id={`page-sidebar-${storageKey}-content`}
+          minSize={MAIN_PANE_MIN_WIDTH}
+          groupResizeBehavior="preserve-relative-size"
+          className="min-h-0 min-w-0"
+        >
+          <div className="flex h-full min-h-0 min-w-0 flex-col">{children}</div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     )
   }
 
@@ -343,34 +438,6 @@ export function PageSidebarLayout({
           </Sidebar>
         </SheetContent>
       </Sheet>
-    </div>
-  )
-}
-
-function ResizeHandle({
-  width,
-  maxWidth,
-  onPointerDown,
-}: {
-  width: number
-  maxWidth: number
-  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
-}) {
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-valuemin={MIN_WIDTH}
-      aria-valuemax={maxWidth}
-      aria-valuenow={width}
-      tabIndex={0}
-      onPointerDown={onPointerDown}
-      className="group relative z-10 w-2.5 shrink-0 cursor-col-resize touch-none select-none bg-transparent"
-    >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border/80 transition-colors group-hover:bg-primary/50 group-active:bg-primary/70"
-      />
     </div>
   )
 }

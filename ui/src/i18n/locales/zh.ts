@@ -755,6 +755,7 @@ export const zh: Resources = {
     testConnection: '测试连接',
     collapsePanel: '收起{{title}}',
     openPanel: '打开{{title}}',
+    resizePanel: '调整{{title}}宽度',
     closePanel: '关闭{{title}}',
     focusContent: '聚焦内容区',
     moreActions: '{{target}}的更多操作',

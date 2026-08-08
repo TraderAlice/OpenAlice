@@ -156,6 +156,12 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 - Delete superseded event plumbing during migration. A component is not
   migrated if its old global Escape/outside-click/focus-loop implementation is
   still running beside the primitive.
+- Shared split layouts use the checked-in shadcn Resizable primitive for their
+  separator, pointer/touch capture, and keyboard resizing. Product adapters
+  such as `PageSidebarLayout` continue to own route content, responsive mode,
+  collapse affordances, and persisted preferences; they must not add a second
+  visible border or parallel document-level drag listeners beside the shared
+  separator.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.
