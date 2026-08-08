@@ -128,8 +128,10 @@ vi.mock('../hooks/useIssues', () => ({
 }))
 
 vi.mock('../components/MarkdownContent', () => ({
-  MarkdownContent: ({ text }: { text: string }) => (
-    <div>{text.split('\n').filter(Boolean).map((line) => <p key={line}>{line}</p>)}</div>
+  MarkdownContent: ({ text, variant }: { text: string; variant?: string }) => (
+    <div data-testid="tracked-markdown" data-variant={variant}>
+      {text.split('\n').filter(Boolean).map((line) => <p key={line}>{line}</p>)}
+    </div>
   ),
 }))
 
@@ -222,6 +224,7 @@ describe('TrackedPage Issue anchors', () => {
     expect(screen.getByText('Watch the power complex and report material changes.')).toBeTruthy()
     expect(screen.getAllByText('Power watch')).toHaveLength(1)
     expect(screen.getByText('power')).toBeTruthy()
+    expect(screen.getByTestId('tracked-markdown').getAttribute('data-variant')).toBe('reading')
     fireEvent.click(screen.getByRole('button', { name: 'Details' }))
 
     expect(mocks.getIssue).toHaveBeenCalledWith('workspace-1', 'power-watch')

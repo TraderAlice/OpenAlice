@@ -120,17 +120,23 @@ function addCodeBlockWrappers(html: string): string {
   return html.replace(
     /<pre><code class="hljs language-(\w+)">([\s\S]*?)<\/code><\/pre>/g,
     (_, lang, code) =>
-      `<div class="code-block-wrapper"><div class="code-header"><span>${lang}</span><button class="code-copy-btn" data-code>${COPY_ICON} Copy</button></div><pre><code class="hljs language-${lang}">${code}</code></pre></div>`,
+      `<div class="code-block-wrapper"><div class="code-header"><span>${lang}</span><button type="button" class="code-copy-btn" data-code>${COPY_ICON} Copy</button></div><pre><code class="hljs language-${lang}">${code}</code></pre></div>`,
   ).replace(
     /<pre><code class="hljs">([\s\S]*?)<\/code><\/pre>/g,
     (_, code) =>
-      `<div class="code-block-wrapper"><div class="code-header"><span>code</span><button class="code-copy-btn" data-code>${COPY_ICON} Copy</button></div><pre><code class="hljs">${code}</code></pre></div>`,
+      `<div class="code-block-wrapper"><div class="code-header"><span>code</span><button type="button" class="code-copy-btn" data-code>${COPY_ICON} Copy</button></div><pre><code class="hljs">${code}</code></pre></div>`,
   )
 }
 
 interface MarkdownContentProps {
   text: string
   className?: string
+  /**
+   * Long-form documents need a calmer measure and stronger hierarchy than
+   * chat messages, comments, and runtime output. Reading mode changes only
+   * presentation; parsing and interaction stay shared.
+   */
+  variant?: 'default' | 'reading'
   /**
    * GitHub-flavoured `~~delete~~` rendering. Disable on terse agent comments
    * because financial prose often uses `~$123` for approximate prices.
@@ -161,12 +167,22 @@ export function renderMarkdownHtml(
       ? markedWithoutStrikethrough
       : markedWithStrikethrough
   const raw = DOMPurify.sanitize(parser.parse(text) as string)
-  return addCodeBlockWrappers(raw)
+  return addMarkdownStructure(addCodeBlockWrappers(raw))
+}
+
+/** Give wide tables their own scroll owner instead of letting a document
+ * stretch the complete application shell. The wrapper is generated after
+ * sanitization and contains no user-controlled attributes. */
+function addMarkdownStructure(html: string): string {
+  return html
+    .replace(/<table>/g, '<div class="markdown-table-shell"><table>')
+    .replace(/<\/table>/g, '</table></div>')
 }
 
 export function MarkdownContent({
   text,
   className,
+  variant = 'default',
   strikethrough = true,
   codeSpanWikilinks = false,
   onWikilink,
@@ -228,8 +244,11 @@ export function MarkdownContent({
   }, [handleClick])
 
   return (
-    <div ref={contentRef} className={className}>
-      <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />
+    <div ref={contentRef} className={className} data-markdown-variant={variant}>
+      <div
+        className={`markdown-content${variant === 'reading' ? ' markdown-content--reading' : ''}`}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
     </div>
   )
 }
