@@ -1,11 +1,11 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `active`
+- Status: `complete` (implemented in Draft PR #1025; awaiting maintainer acceptance)
 - Updated: `2026-08-08`
 - Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
   maintainer acceptance.
-- Related PR: #1023 established the adjacent long-form reading surface but is
-  not part of this migration.
+- Related PRs: #1023 established the adjacent long-form reading surface but is
+  not part of this migration; Draft PR #1025 contains this implementation.
 - Owner guides: [[docs/ui-interaction-and-motion.md]] and
   [[docs/development-workflow.md]].
 - Upstream reference: [shadcn Resizable](https://ui.shadcn.com/docs/components/base/resizable)
@@ -105,7 +105,7 @@ current mobile Sheet hierarchy.
       palettes; verify reduced-motion behavior and browser console health.
 - [x] Run root/UI typechecks, the complete Vitest suite, production UI build,
       and unsigned packaged Electron Workspace smoke.
-- [ ] Open and maintain one labeled autonomous Draft PR to `dev`; present it
+- [x] Open and maintain one labeled autonomous Draft PR to `dev`; present it
       for maintainer acceptance without merging it from the goal.
 
 ## Verification Evidence

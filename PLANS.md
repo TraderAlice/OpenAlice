@@ -21,9 +21,6 @@ the durable truth after it changes.
 
 ## Active
 
-- [[plans/shadcn-resizable-page-sidebar.md]] — Replaces the hand-written
-  page-sidebar drag rail with the official shadcn Resizable primitive while
-  preserving OpenAlice focus mode, responsive hierarchy, and stored widths.
 - [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
   healthy dev/CLI Runtime already owning the selected data location and hand
   the user to its verified browser UI without takeover.
@@ -34,6 +31,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/shadcn-resizable-page-sidebar.md]] — Replaced the hand-written
+  page-sidebar drag rail with the official shadcn Resizable primitive while
+  preserving OpenAlice focus mode, responsive hierarchy, and stored widths.
+  Implemented in Draft PR #1025 for maintainer acceptance.
 - [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
   local relationship graph derived from Tracked entities and authored Workspace
   backlinks, with provenance-preserving material navigation.
