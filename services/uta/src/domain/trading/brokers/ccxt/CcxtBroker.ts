@@ -45,6 +45,7 @@ import {
   type CcxtExchangeOverrides,
   type CcxtSubAccountDef,
   exchangeOverrides,
+  defaultFetchBalance,
   defaultFetchOrderById,
   defaultCancelOrderById,
   defaultPlaceOrder,
@@ -729,7 +730,8 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   /** The sub-account decomposition for this venue: the override's list for
    *  separate-wallet venues (binance), else the single unified default. */
   private resolveSubAccounts(): CcxtSubAccountDef[] {
-    return this.overrides.subAccounts?.length ? this.overrides.subAccounts : [UNIFIED_SUBACCOUNT]
+    const resolved = this.overrides.resolveSubAccounts?.(this.exchange) ?? this.overrides.subAccounts
+    return resolved?.length ? resolved : [UNIFIED_SUBACCOUNT]
   }
 
   async listSubAccounts(): Promise<SubAccountRef[]> {
@@ -768,6 +770,16 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
   }
 
   // ---- Queries ----
+
+  /** Fetch derivative positions through the venue override on every account
+   *  surface. Keeping getAccount and getPositions on one path prevents a UTA
+   *  account from showing correct rows but zero account-level PnL (or vice versa). */
+  private async fetchDerivativePositions() {
+    const fetchOverride = this.overrides.fetchPositions
+    return fetchOverride
+      ? await fetchOverride(this.exchange, defaultFetchPositions)
+      : await defaultFetchPositions(this.exchange)
+  }
 
   /**
    * Synthesize asset holdings (BTC/ETH/etc balances) into Position records.
@@ -897,16 +909,23 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       const info = (b['info'] ?? {}) as Record<string, unknown>
       if (info['totalInitialMargin'] !== undefined) initMargin = initMargin.plus(new Decimal(String(info['totalInitialMargin'])))
     }
+    const fetchBalance = async (params?: Record<string, unknown>) => {
+      const fetchOverride = this.overrides.fetchBalance
+      return fetchOverride
+        ? await fetchOverride(this.exchange, params, defaultFetchBalance)
+        : await defaultFetchBalance(this.exchange, params)
+    }
     if (walletTypes?.length) {
       for (const type of walletTypes) {
         try {
-          accrue(await this.exchange.fetchBalance({ type }) as unknown as Record<string, unknown>)
+          accrue(await fetchBalance({ type }))
         } catch (err) {
+          if (this.overrides.strictPrivateReads) throw err
           console.warn(`CcxtBroker[${this.id}]: fetchBalance(${type}) skipped — ${err instanceof Error ? err.message.slice(0, 120) : String(err)}`)
         }
       }
     } else {
-      accrue(await this.exchange.fetchBalance() as unknown as Record<string, unknown>)
+      accrue(await fetchBalance())
     }
     return { balances, initMargin }
   }
@@ -987,12 +1006,16 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       let realizedPnL = new Decimal(0)
       if (includesDerivatives) {
         try {
-          const rawPositions = await this.exchange.fetchPositions()
+          const rawPositions = await this.fetchDerivativePositions()
           for (const p of rawPositions) {
             unrealizedPnL = unrealizedPnL.plus(new Decimal(String(p.unrealizedPnl ?? 0)))
             realizedPnL = realizedPnL.plus(new Decimal(String((p as unknown as Record<string, unknown>).realizedPnl ?? 0)))
           }
-        } catch { /* positions are display-only here — don't fail the account read */ }
+        } catch (err) {
+          if (this.overrides.strictPrivateReads) throw err
+          // Positions are display-only for permissive venues; preserve the
+          // account balance read even when their optional PnL endpoint fails.
+        }
       }
 
       return {
@@ -1020,12 +1043,9 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
     const includesDerivatives = scoped.some(s => s.kind === 'derivatives' || s.kind === 'unified')
 
     try {
-      const fetchOverride = this.overrides.fetchPositions
       const [raw, spotHoldings] = await Promise.all([
         includesDerivatives
-          ? (fetchOverride
-              ? fetchOverride(this.exchange, defaultFetchPositions)
-              : defaultFetchPositions(this.exchange))
+          ? this.fetchDerivativePositions()
           : Promise.resolve([] as Awaited<ReturnType<typeof defaultFetchPositions>>),
         this.fetchAssetHoldings(subAccountId),
       ])
@@ -1151,9 +1171,9 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
 
   /**
    * All open orders on the account — the surface external-order observation
-   * diffs against. Venue-dependent: some exchanges can't enumerate open
-   * orders without a symbol scope; those degrade to [] with a once-per-
-   * instance warning rather than failing the observation pass.
+   * diffs against. Verified venue overrides fail loudly when any namespace is
+   * incomplete. Unverified defaults that cannot enumerate without a symbol
+   * degrade to [] with a once-per-instance warning.
    */
   async getOpenOrders(): Promise<OpenOrder[]> {
     if (this.keyless) return []
@@ -1172,6 +1192,7 @@ export class CcxtBroker implements IBroker<CcxtBrokerMeta> {
       }
       return converted
     } catch (err) {
+      if (this.overrides.fetchAllOpenOrders) throw BrokerError.from(err)
       if (!this.warnedOpenOrdersUnsupported) {
         this.warnedOpenOrdersUnsupported = true
         console.warn(
