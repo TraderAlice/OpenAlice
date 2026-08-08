@@ -136,6 +136,12 @@ describe('preset → engine config translation', () => {
     expect(cfg.demoTrading).toBe(true)
   })
 
+  it('Bitget preset keeps Unified/v3 routing disabled', () => {
+    const cfg = BITGET_PRESET.toEngineConfig({ mode: 'live', apiKey: 'k', secret: 's', password: 'p' })
+    expect(cfg.options).toBeUndefined()
+    expect(BITGET_PRESET.hint).toContain('Classic accounts')
+  })
+
   it('Alpaca mode=paper sets paper=true', () => {
     const cfg = ALPACA_PRESET.toEngineConfig({ mode: 'paper', apiKey: 'k', apiSecret: 's' })
     expect(cfg.paper).toBe(true)
