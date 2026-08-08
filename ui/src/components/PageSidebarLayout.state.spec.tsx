@@ -153,9 +153,12 @@ vi.mock('@/components/ui/resizable', async () => {
         resizableHarness.resizeCalls++
         const parsed = typeof nextSize === 'number' ? nextSize : Number.parseFloat(nextSize)
         if (!Number.isFinite(parsed)) return
-        resizableHarness.navigatorSize = parsed
-        resizableHarness.navigatorCollapsed = parsed <= 45
-        onResize?.({ asPercentage: parsed / 10, inPixels: parsed })
+        const applied = isNavigator && resizableHarness.navigatorCollapsible && parsed < 200
+          ? 44
+          : parsed
+        resizableHarness.navigatorSize = applied
+        resizableHarness.navigatorCollapsed = applied <= 45
+        onResize?.({ asPercentage: applied / 10, inPixels: applied })
       },
     }), [onResize])
 
@@ -716,12 +719,14 @@ describe('PageSidebarLayout applied state', () => {
       </PageSidebarLayout>,
     )
 
+    const resizeCallsBeforeCollapse = resizableHarness.resizeCalls
     fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
 
     expect(requestAnimationFrame).not.toHaveBeenCalled()
     expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
     expect(resizableHarness.navigatorSize).toBe(44)
-    expect(resizableHarness.collapseCalls).toBe(1)
+    expect(resizableHarness.collapseCalls).toBe(0)
+    expect(resizableHarness.resizeCalls).toBe(resizeCallsBeforeCollapse + 1)
   })
 
   it('uses one geometry transaction per repeated collapse and restore cycle', async () => {
@@ -745,12 +750,36 @@ describe('PageSidebarLayout applied state', () => {
       expect(resizableHarness.navigatorSize).toBe(312)
     }
 
-    expect(resizableHarness.collapseCalls).toBe(8)
+    expect(resizableHarness.collapseCalls).toBe(0)
     expect(resizableHarness.expandCalls).toBe(0)
-    expect(resizableHarness.resizeCalls).toBe(8)
+    expect(resizableHarness.resizeCalls).toBe(16)
     expect(resizableHarness.groupMounts).toBe(1)
     expect(resizableHarness.navigatorDefaultSizes).toEqual([312])
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
+  })
+
+  it('does not reopen after a collapsed percentage arrives with stale painted pixels', () => {
+    resizableHarness.navigatorSize = 312
+    render(
+      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
+        <div>Market content</div>
+      </PageSidebarLayout>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
+    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
+
+    // The primitive commits its percentage before the flex item paints. The
+    // callback can briefly pair the collapsed percentage with the previous
+    // expanded offsetWidth; percentage geometry must remain authoritative.
+    act(() => {
+      resizableHarness.onNavigatorResize?.({
+        asPercentage: (44 / (resizableHarness.groupWidth - 1)) * 100,
+        inPixels: 312,
+      })
+    })
+
+    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
   })
 
   it('repairs an impossible one-panel layout without persisting it', () => {
@@ -816,6 +845,12 @@ describe('PageSidebarLayout applied state', () => {
     expect(resizableHarness.navigatorSize).toBe(312)
     expect(resizableHarness.paintedNavigatorSize).toBeNull()
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
+
+    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
+    expect(resizableHarness.navigatorSize).toBe(44)
+    expect(screen.getByTestId('page-sidebar-collapsed').textContent).toBe('')
   })
 
   it('clears pointer overdrag immediately when reduced motion is requested', () => {

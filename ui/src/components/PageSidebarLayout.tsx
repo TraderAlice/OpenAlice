@@ -161,6 +161,7 @@ export function PageSidebarLayout({
   const resizeHandleRef = useRef<HTMLDivElement | null>(null)
   const userResizeIntentRef = useRef(false)
   const userResizeChangedRef = useRef(false)
+  const programmaticCollapseRef = useRef(false)
   const collapseMotionTimerRef = useRef<number | null>(null)
   const overdragMotionTimerRef = useRef<number | null>(null)
   const layoutRepairFrameRef = useRef<number | null>(null)
@@ -283,7 +284,24 @@ export function PageSidebarLayout({
   }, [layoutEpoch])
 
   const handleSidebarResize = useCallback((size: PanelSize) => {
-    const nextCollapsed = size.inPixels <= COLLAPSED_WIDTH + 1
+    const groupWidth = rootRef.current?.getBoundingClientRect().width ?? 0
+    // react-resizable-panels publishes its percentage layout synchronously,
+    // before the browser paints the matching flex width. During an imperative
+    // collapse, `inPixels` can therefore still be the old expanded DOM width
+    // even though `asPercentage` already represents the 44px rail. Derive the
+    // applied logical width from the settled percentage so the product state
+    // cannot immediately bounce back to "expanded".
+    const logicalPixels = groupWidth > RESIZE_SEPARATOR_WIDTH && Number.isFinite(size.asPercentage)
+      ? ((groupWidth - RESIZE_SEPARATOR_WIDTH) * size.asPercentage) / 100
+      : size.inPixels
+    const nextCollapsed = logicalPixels <= COLLAPSED_WIDTH + 1
+    if (programmaticCollapseRef.current) {
+      // resize(0) may report several interpolated widths while it crosses the
+      // min-size gap. Keep the explicit collapse intent authoritative until
+      // the primitive reaches its configured collapsed size.
+      if (!nextCollapsed) return
+      programmaticCollapseRef.current = false
+    }
     // Applied panel geometry is the source of truth for which surface is
     // interactive. Pointer drags may begin inside react-resizable-panels'
     // enlarged virtual hit region rather than on the one-pixel Separator DOM
@@ -293,11 +311,10 @@ export function PageSidebarLayout({
     // group's own settled-layout callback has already fired. The Panel
     // ResizeObserver is the last reliable boundary for that delayed write.
     if (!nextCollapsed) {
-      const groupWidth = rootRef.current?.getBoundingClientRect().width ?? 0
       const invalidLayout = groupWidth > RESIZE_SEPARATOR_WIDTH && (
-        size.inPixels < MIN_WIDTH - 1 ||
-        size.inPixels > maxWidth + 1 ||
-        groupWidth - RESIZE_SEPARATOR_WIDTH - size.inPixels < contentMinWidth - 1
+        logicalPixels < MIN_WIDTH - 1 ||
+        logicalPixels > maxWidth + 1 ||
+        groupWidth - RESIZE_SEPARATOR_WIDTH - logicalPixels < contentMinWidth - 1
       )
       if (invalidLayout) scheduleExpandedLayoutRepair()
     }
@@ -582,17 +599,20 @@ export function PageSidebarLayout({
 
   const collapseSidebar = useCallback(() => {
     clearOverdragMotion()
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      sidebarPanelRef.current?.collapse()
-      updateCollapsed(true)
-      return
-    }
-    armCollapseMotion()
-    sidebarPanelRef.current?.collapse()
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!reduceMotion) armCollapseMotion()
+
+    // Asking for zero crosses the primitive's collapse midpoint and lets it
+    // snap to the configured 44px collapsedSize. Its collapse() command can
+    // stop at minSize when pixel constraints are rounded during a recovered
+    // group lifecycle, which is what left the header button looking dead.
+    programmaticCollapseRef.current = true
     updateCollapsed(true)
+    sidebarPanelRef.current?.resize(0)
   }, [armCollapseMotion, clearOverdragMotion, updateCollapsed])
 
   const expandSidebar = useCallback(() => {
+    programmaticCollapseRef.current = false
     const targetWidth = Math.min(latestWidthRef.current, maxWidth)
     disarmCollapseMotion()
     clearOverdragMotion()
@@ -608,7 +628,7 @@ export function PageSidebarLayout({
     const panel = sidebarPanelRef.current
     if (!panel) return
     if (collapsed) {
-      if (!panel.isCollapsed()) panel.collapse()
+      if (!panel.isCollapsed()) panel.resize(0)
       return
     }
     const targetWidth = Math.min(latestWidthRef.current, maxWidth)
@@ -638,6 +658,7 @@ export function PageSidebarLayout({
   }, [isDesktop, layoutEpoch, scheduleExpandedLayoutRepair])
 
   useEffect(() => () => {
+    programmaticCollapseRef.current = false
     if (layoutRepairFrameRef.current !== null) {
       window.cancelAnimationFrame(layoutRepairFrameRef.current)
       layoutRepairFrameRef.current = null
@@ -753,12 +774,6 @@ export function PageSidebarLayout({
               >
                 <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
               </button>
-              <span
-                aria-hidden
-                className="mt-3 select-none text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground [writing-mode:vertical-rl] rotate-180"
-              >
-                {title}
-              </span>
             </aside>
           </div>
         </ResizablePanel>
