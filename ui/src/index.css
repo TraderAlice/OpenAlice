@@ -1113,7 +1113,7 @@ html[lang="ja"] .oa-onboarding-title {
 }
 
 .markdown-content--reading h1 {
-  max-width: 30ch;
+  max-width: 100%;
   margin-bottom: 1.35rem;
   font-size: clamp(1.65rem, 2.5vw, 1.9rem);
   font-weight: 660;
