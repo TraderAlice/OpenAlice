@@ -194,6 +194,15 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   timer begins only after release. When a new drag interrupts a returning
   spring, cancel that timer and freeze the currently painted edge before
   resuming direct manipulation so the handle never snaps away from the pointer.
+  Registration inputs such as `defaultSize` must remain stable during a held
+  pointer transaction; crossing a collapse midpoint is applied state, not a
+  reason to unregister and rebuild the Panel. If the product tracks gesture
+  state outside the primitive, capture that pointer at the split-group boundary
+  so an out-of-bounds release cannot strand it. A final invariant observer must
+  compare the painted navigator and content flex items, not only the primitive's
+  internal size callback. If those surfaces diverge into an impossible
+  `100%`/`0%` pair, rebuild one coherent group snapshot from the last valid
+  preference; repeating an already-satisfied internal resize is not recovery.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.

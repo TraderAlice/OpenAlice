@@ -1,6 +1,6 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `complete` (repeat-cycle repair included in Draft PR #1025; awaiting maintainer acceptance)
+- Status: `complete` (rapid-reversal repair included in Draft PR #1025; awaiting maintainer acceptance)
 - Updated: `2026-08-08`
 - Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
   maintainer acceptance.
@@ -51,6 +51,17 @@ current mobile Sheet hierarchy.
   the pointer was still held. That timer could erase the active gesture, and a
   new press during the returning spring snapped the transformed handle away
   from the pointer before the next drag had captured it.
+- A later manual stress pass found a deeper same-gesture race. `defaultSize`
+  was derived from product collapse state, so every midpoint crossing changed
+  a Panel registration prop. React-resizable-panels v4 unregisters and
+  re-registers that Panel while the pointer is still active; rapid reversals
+  could therefore strand a valid internal max beside stale `flex: 100` / `0`
+  DOM styles. The collapse transition also remained armed after reversing back
+  above the midpoint, allowing painted flex width to lag pointer-owned layout.
+- Product pointer bookkeeping lived on the split-group element while the
+  primitive finishes drags at `document`. Throwing the pointer outside the
+  group could leave the product gesture ref active after the primitive had
+  settled, suppressing later geometry recovery.
 - `react-resizable-panels` deliberately expands the one-pixel separator into a
   10px fine-pointer and 28px coarse-pointer hit region. A pointer can begin in
   that virtual region without firing React's `pointerdown` handler on the
@@ -250,6 +261,24 @@ At every settled desktop layout exactly one surface is interactive:
 - [x] Re-run complete typecheck, Vitest, UI build, and unsigned Electron smoke;
       update Draft PR #1025 with the repaired evidence.
 
+### Rapid-reversal registration repair
+
+- [x] Preserve the user's full-screen failure before reload and confirm a
+      940px / 0px painted flex pair beside a still-valid 33.936% separator max.
+- [x] Keep `defaultSize` stable for each mounted primitive group so midpoint
+      crossings cannot unregister and rebuild Panels during a held gesture.
+- [x] Remove collapse flex transition immediately when the held pointer
+      reverses above the midpoint; start its cleanup timer only after release.
+- [x] Capture the pointer on the product split group so movement and release
+      outside its bounds cannot strand product gesture state.
+- [x] Observe both painted flex items independently from the primitive store;
+      rebuild the group from the last valid preference when DOM geometry is
+      impossible instead of issuing an internal resize that may be a no-op.
+- [x] Add focused coverage for stable registration defaults, held reversal,
+      pointer capture/release, and store-valid / DOM-invalid recovery.
+- [x] Re-run full automated, browser, build, and unsigned Electron verification
+      and update Draft PR #1025.
+
 ## Verification Evidence
 
 - Real `pnpm dev` data: Chat pointer and keyboard resizing both persisted over
@@ -333,6 +362,18 @@ At every settled desktop layout exactly one surface is interactive:
   root/UI typechecks, the complete Vitest suite (488 files, 4025 passing tests,
   9 skipped), UI production build, and unsigned packaged Electron Workspace
   smoke with managed Pi acceptance.
+- Rapid-reversal acceptance preserved the user's second failure before reload:
+  a 941px group painted the navigator/content at 940px/0px (`flex: 100`/`0`)
+  while the separator still advertised a valid 33.936% maximum. After repair,
+  one held gesture survived 80 alternating left/right crossings and returned to
+  200px/740px. Twenty more gestures threw the pointer outside the split group
+  twice per gesture and returned with clean gesture/motion state. Twelve settled
+  reversal-collapse/restore cycles produced exactly 44px/896px then
+  200px/740px every time.
+- Final rapid-reversal checks passed on 2026-08-08: 26 focused sidebar tests;
+  root/UI typechecks; the complete Vitest suite (488 files, 4028 passing tests,
+  9 skipped); production build; and unsigned packaged Electron Workspace smoke
+  with managed Pi acceptance.
 
 ## Verification Matrix
 

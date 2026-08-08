@@ -33,8 +33,8 @@ the durable truth after it changes.
 
 - [[plans/shadcn-resizable-page-sidebar.md]] — Replaced the hand-written
   page-sidebar rail with shadcn Resizable and closed its responsive,
-  threshold-motion, resisted-overdrag, and repeat-cycle contracts in Draft PR
-  #1025.
+  threshold-motion, resisted-overdrag, repeat-cycle, and rapid-reversal
+  contracts in Draft PR #1025.
 - [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
   local relationship graph derived from Tracked entities and authored Workspace
   backlinks, with provenance-preserving material navigation.

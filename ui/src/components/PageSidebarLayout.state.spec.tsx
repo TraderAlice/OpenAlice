@@ -9,13 +9,24 @@ import { i18n } from '../i18n'
 const resizableHarness = vi.hoisted(() => ({
   groupWidth: 941,
   navigatorSize: 312,
+  paintedNavigatorSize: null as number | null,
   navigatorCollapsed: false,
   navigatorCollapsible: true,
   collapseCalls: 0,
   expandCalls: 0,
   resizeCalls: 0,
+  groupMounts: 0,
+  navigatorMounts: 0,
+  navigatorDefaultSizes: [] as number[],
   onNavigatorResize: undefined as ((size: PanelSize) => void) | undefined,
   onLayoutChanged: undefined as ((layout: Record<string, number>) => void) | undefined,
+}))
+
+const resizeObserverHarness = vi.hoisted(() => ({
+  instances: [] as Array<{
+    callback: ResizeObserverCallback
+    elements: Element[]
+  }>,
 }))
 
 vi.mock('@/components/ui/resizable', async () => {
@@ -46,6 +57,9 @@ vi.mock('@/components/ui/resizable', async () => {
     onPointerCancelCapture?: React.PointerEventHandler<HTMLDivElement>
   }) {
     resizableHarness.onLayoutChanged = onLayoutChanged
+    React.useEffect(() => {
+      resizableHarness.groupMounts++
+    }, [])
     return (
       <div
         ref={(element) => {
@@ -79,6 +93,8 @@ vi.mock('@/components/ui/resizable', async () => {
     children,
     id,
     panelRef,
+    elementRef,
+    defaultSize,
     onResize,
     collapsible,
     'data-page-sidebar-panel': pageSidebarPanel,
@@ -86,6 +102,8 @@ vi.mock('@/components/ui/resizable', async () => {
     children?: React.ReactNode
     id?: string
     panelRef?: React.Ref<PanelImperativeHandle>
+    elementRef?: React.Ref<HTMLDivElement>
+    defaultSize?: number
     onResize?: (size: PanelSize) => void
     collapsible?: boolean
     'data-page-sidebar-panel'?: string
@@ -95,6 +113,16 @@ vi.mock('@/components/ui/resizable', async () => {
       resizableHarness.onNavigatorResize = onResize
       resizableHarness.navigatorCollapsible = collapsible ?? false
     }
+
+    React.useEffect(() => {
+      if (isNavigator && typeof defaultSize === 'number') {
+        resizableHarness.navigatorMounts++
+        if (resizableHarness.navigatorMounts > 1) {
+          resizableHarness.paintedNavigatorSize = null
+        }
+        resizableHarness.navigatorDefaultSizes.push(defaultSize)
+      }
+    }, [defaultSize, isNavigator])
 
     React.useImperativeHandle(panelRef, () => ({
       collapse() {
@@ -131,7 +159,37 @@ vi.mock('@/components/ui/resizable', async () => {
       },
     }), [onResize])
 
-    return <div data-testid={id} data-page-sidebar-panel={pageSidebarPanel}>{children}</div>
+    return (
+      <div
+        ref={(element) => {
+          if (element) {
+            element.getBoundingClientRect = () => {
+              const paintedNavigatorSize = resizableHarness.paintedNavigatorSize ?? resizableHarness.navigatorSize
+              const width = isNavigator
+                ? paintedNavigatorSize
+                : Math.max(0, resizableHarness.groupWidth - 1 - paintedNavigatorSize)
+              const left = isNavigator ? 0 : paintedNavigatorSize + 1
+              return {
+                x: left,
+                y: 0,
+                width,
+                height: 800,
+                top: 0,
+                right: left + width,
+                bottom: 800,
+                left,
+                toJSON: () => ({}),
+              }
+            }
+          }
+          assignRef(elementRef, element)
+        }}
+        data-testid={id}
+        data-page-sidebar-panel={pageSidebarPanel}
+      >
+        {children}
+      </div>
+    )
   }
 
   function ResizableHandle({
@@ -175,9 +233,27 @@ vi.mock('@/components/ui/resizable', async () => {
 import { PageSidebarLayout } from './PageSidebarLayout'
 
 class ResizeObserverStub {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  private readonly record: {
+    callback: ResizeObserverCallback
+    elements: Element[]
+  }
+
+  constructor(callback: ResizeObserverCallback) {
+    this.record = { callback, elements: [] }
+    resizeObserverHarness.instances.push(this.record)
+  }
+
+  observe(element: Element) {
+    this.record.elements.push(element)
+  }
+
+  unobserve(element: Element) {
+    this.record.elements = this.record.elements.filter((candidate) => candidate !== element)
+  }
+
+  disconnect() {
+    this.record.elements = []
+  }
 }
 
 function driveNavigatorGeometry(inPixels: number, collapsed: boolean) {
@@ -199,15 +275,30 @@ function settleNavigatorLayout(inPixels: number) {
   }))
 }
 
+function notifyPaintedPanelResize() {
+  const navigator = screen.getByTestId('page-sidebar-market-navigator')
+  const content = screen.getByTestId('page-sidebar-market-content')
+  const observer = resizeObserverHarness.instances.find(({ elements }) => (
+    elements.includes(navigator) && elements.includes(content)
+  ))
+  if (!observer) throw new Error('Panel geometry ResizeObserver was not registered')
+  act(() => observer.callback([], {} as ResizeObserver))
+}
+
 beforeEach(async () => {
   resizableHarness.navigatorSize = 312
+  resizableHarness.paintedNavigatorSize = null
   resizableHarness.navigatorCollapsed = false
   resizableHarness.navigatorCollapsible = true
   resizableHarness.collapseCalls = 0
   resizableHarness.expandCalls = 0
   resizableHarness.resizeCalls = 0
+  resizableHarness.groupMounts = 0
+  resizableHarness.navigatorMounts = 0
+  resizableHarness.navigatorDefaultSizes = []
   resizableHarness.onNavigatorResize = undefined
   resizableHarness.onLayoutChanged = undefined
+  resizeObserverHarness.instances = []
   window.localStorage.clear()
   await i18n.changeLanguage('en')
   vi.stubGlobal('ResizeObserver', ResizeObserverStub)
@@ -352,6 +443,42 @@ describe('PageSidebarLayout applied state', () => {
     expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).not.toBe('1')
   })
 
+  it('captures the active pointer so an outside release cannot strand gesture state', () => {
+    resizableHarness.navigatorSize = 200
+    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
+    render(
+      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
+        <div>Market content</div>
+      </PageSidebarLayout>,
+    )
+
+    const group = screen.getByTestId('page-sidebar-market')
+    const setPointerCapture = vi.fn()
+    const releasePointerCapture = vi.fn()
+    group.setPointerCapture = setPointerCapture
+    group.hasPointerCapture = vi.fn(() => true)
+    group.releasePointerCapture = releasePointerCapture
+
+    fireEvent.pointerDown(screen.getByRole('separator'), {
+      button: 0,
+      buttons: 1,
+      clientX: 200,
+      isPrimary: true,
+      pointerId: 41,
+      pointerType: 'mouse',
+    })
+    expect(setPointerCapture).toHaveBeenCalledWith(41)
+
+    fireEvent.pointerUp(group, {
+      buttons: 0,
+      clientX: -40,
+      isPrimary: true,
+      pointerId: 41,
+      pointerType: 'mouse',
+    })
+    expect(releasePointerCapture).toHaveBeenCalledWith(41)
+  })
+
   it('keeps resistance when a new drag interrupts the previous spring', () => {
     vi.useFakeTimers()
     resizableHarness.navigatorSize = 200
@@ -411,6 +538,57 @@ describe('PageSidebarLayout applied state', () => {
 
     expect(group.getAttribute('data-overdrag-state')).toBe('resisting')
     expect(Number.parseFloat(group.style.getPropertyValue('--oa-page-sidebar-overdrag'))).toBeCloseTo(23.6, 1)
+    vi.useRealTimers()
+  })
+
+  it('keeps collapse motion cursor-attached when a held drag reverses direction', () => {
+    vi.useFakeTimers()
+    resizableHarness.navigatorSize = 200
+    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '200')
+    render(
+      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
+        <div>Market content</div>
+      </PageSidebarLayout>,
+    )
+
+    const group = screen.getByTestId('page-sidebar-market')
+    fireEvent.pointerDown(screen.getByRole('separator'), {
+      button: 0,
+      buttons: 1,
+      clientX: 200,
+      isPrimary: true,
+      pointerId: 42,
+      pointerType: 'mouse',
+    })
+    fireEvent.pointerMove(group, {
+      buttons: 1,
+      clientX: 110,
+      isPrimary: true,
+      pointerId: 42,
+      pointerType: 'mouse',
+    })
+    expect(group.getAttribute('data-collapse-motion')).toBe('armed')
+
+    act(() => vi.advanceTimersByTime(400))
+    expect(group.getAttribute('data-collapse-motion')).toBe('armed')
+
+    fireEvent.pointerMove(group, {
+      buttons: 1,
+      clientX: 160,
+      isPrimary: true,
+      pointerId: 42,
+      pointerType: 'mouse',
+    })
+    expect(group.getAttribute('data-collapse-motion')).toBeNull()
+    expect(group.getAttribute('data-overdrag-state')).toBe('resisting')
+
+    fireEvent.pointerUp(group, {
+      buttons: 0,
+      clientX: 160,
+      isPrimary: true,
+      pointerId: 42,
+      pointerType: 'mouse',
+    })
     vi.useRealTimers()
   })
 
@@ -570,6 +748,8 @@ describe('PageSidebarLayout applied state', () => {
     expect(resizableHarness.collapseCalls).toBe(8)
     expect(resizableHarness.expandCalls).toBe(0)
     expect(resizableHarness.resizeCalls).toBe(8)
+    expect(resizableHarness.groupMounts).toBe(1)
+    expect(resizableHarness.navigatorDefaultSizes).toEqual([312])
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
   })
 
@@ -612,6 +792,29 @@ describe('PageSidebarLayout applied state', () => {
 
     expect(resizableHarness.navigatorSize).toBe(312)
     expect(resizableHarness.resizeCalls).toBe(1)
+    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
+  })
+
+  it('rebuilds the group when painted flex geometry diverges from a valid panel store', () => {
+    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0)
+      return 1
+    })
+    render(
+      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
+        <div>Market content</div>
+      </PageSidebarLayout>,
+    )
+
+    // The imperative store still reports the valid 312px size, but a stale
+    // registration write has left the actual flex items at 940px / 0px.
+    resizableHarness.paintedNavigatorSize = 940
+    notifyPaintedPanelResize()
+
+    expect(resizableHarness.groupMounts).toBe(2)
+    expect(resizableHarness.navigatorSize).toBe(312)
+    expect(resizableHarness.paintedNavigatorSize).toBeNull()
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
   })
 
