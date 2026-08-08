@@ -161,6 +161,7 @@ export function PageSidebarLayout({
   const userResizeChangedRef = useRef(false)
   const collapseMotionTimerRef = useRef<number | null>(null)
   const overdragMotionTimerRef = useRef<number | null>(null)
+  const layoutRepairFrameRef = useRef<number | null>(null)
   const pointerGestureRef = useRef<{
     pointerId: number
     startX: number
@@ -173,7 +174,6 @@ export function PageSidebarLayout({
   const navigatorPanelId = `page-sidebar-${storageKey}-navigator`
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => readStoredCollapsed(storageKey))
-  const [pointerCollapseRequested, setPointerCollapseRequested] = useState(false)
   const collapsedRef = useRef(collapsed)
   const [preferredWidth, setPreferredWidth] = useState(() =>
     readStoredWidth(storageKey, clampWidth(defaultWidth, defaultWidth)),
@@ -222,6 +222,23 @@ export function PageSidebarLayout({
     window.localStorage.setItem(collapsedStorageName(storageKey), next ? '1' : '0')
   }, [storageKey])
 
+  const scheduleExpandedLayoutRepair = useCallback(() => {
+    if (layoutRepairFrameRef.current !== null) return
+    layoutRepairFrameRef.current = window.requestAnimationFrame(() => {
+      layoutRepairFrameRef.current = null
+      const panel = sidebarPanelRef.current
+      const groupWidth = rootRef.current?.getBoundingClientRect().width ?? 0
+      if (!panel || panel.isCollapsed() || groupWidth <= RESIZE_SEPARATOR_WIDTH) return
+      const currentWidth = panel.getSize().inPixels
+      const invalidLayout =
+        currentWidth < MIN_WIDTH - 1 ||
+        currentWidth > maxWidth + 1 ||
+        groupWidth - RESIZE_SEPARATOR_WIDTH - currentWidth < contentMinWidth - 1
+      if (!invalidLayout) return
+      panel.resize(Math.min(latestWidthRef.current, maxWidth))
+    })
+  }, [contentMinWidth, maxWidth])
+
   const handleSidebarResize = useCallback((size: PanelSize) => {
     const nextCollapsed = size.inPixels <= COLLAPSED_WIDTH + 1
     // Applied panel geometry is the source of truth for which surface is
@@ -229,15 +246,53 @@ export function PageSidebarLayout({
     // enlarged virtual hit region rather than on the one-pixel Separator DOM
     // node, so interaction bookkeeping must never gate this synchronization.
     updateCollapsed(nextCollapsed)
+    // Constraint re-registration may write a stale one-panel layout after the
+    // group's own settled-layout callback has already fired. The Panel
+    // ResizeObserver is the last reliable boundary for that delayed write.
+    if (!nextCollapsed) {
+      const groupWidth = rootRef.current?.getBoundingClientRect().width ?? 0
+      const invalidLayout = groupWidth > RESIZE_SEPARATOR_WIDTH && (
+        size.inPixels < MIN_WIDTH - 1 ||
+        size.inPixels > maxWidth + 1 ||
+        groupWidth - RESIZE_SEPARATOR_WIDTH - size.inPixels < contentMinWidth - 1
+      )
+      if (invalidLayout) scheduleExpandedLayoutRepair()
+    }
     if (userResizeIntentRef.current) {
       userResizeChangedRef.current = true
     }
-  }, [updateCollapsed])
+  }, [contentMinWidth, maxWidth, scheduleExpandedLayoutRepair, updateCollapsed])
 
   const handleLayoutChanged = useCallback((layout: Layout) => {
-    if (!userResizeIntentRef.current) return
     const panel = sidebarPanelRef.current
-    if (!panel || panel.isCollapsed()) {
+    if (!panel) return
+
+    const groupWidth = rootRef.current?.getBoundingClientRect().width ?? 0
+    const percentage = layout[navigatorPanelId]
+    const settledPixels = groupWidth > RESIZE_SEPARATOR_WIDTH && Number.isFinite(percentage)
+      ? ((groupWidth - RESIZE_SEPARATOR_WIDTH) * percentage) / 100
+      : panel.getSize().inPixels
+    const appliedCollapsed = panel.isCollapsed()
+
+    // react-resizable-panels re-registers a Panel when a pixel constraint
+    // changes. During that registration window it can briefly settle a
+    // one-panel layout at 100%, even though the rebuilt separator still
+    // advertises the correct max. Never persist that impossible geometry.
+    // Restore the product preference after registration has settled instead.
+    const invalidExpandedLayout = !appliedCollapsed && (
+      settledPixels < MIN_WIDTH - 1 ||
+      settledPixels > maxWidth + 1 ||
+      groupWidth - RESIZE_SEPARATOR_WIDTH - settledPixels < contentMinWidth - 1
+    )
+    if (invalidExpandedLayout) {
+      userResizeIntentRef.current = false
+      userResizeChangedRef.current = false
+      scheduleExpandedLayoutRepair()
+      return
+    }
+
+    if (!userResizeIntentRef.current) return
+    if (appliedCollapsed) {
       userResizeIntentRef.current = false
       userResizeChangedRef.current = false
       return
@@ -247,16 +302,11 @@ export function PageSidebarLayout({
     // layout map is already authoritative; convert its percentage using the
     // measured group budget and keep the imperative size as a cancellation
     // fallback only.
-    const groupWidth = rootRef.current?.getBoundingClientRect().width ?? 0
-    const percentage = layout[navigatorPanelId]
-    const settledPixels = groupWidth > RESIZE_SEPARATOR_WIDTH && Number.isFinite(percentage)
-      ? ((groupWidth - RESIZE_SEPARATOR_WIDTH) * percentage) / 100
-      : panel.getSize().inPixels
     const nextWidth = clampWidth(settledPixels, MIN_WIDTH)
     commitPreferredWidth(nextWidth)
     userResizeIntentRef.current = false
     userResizeChangedRef.current = false
-  }, [commitPreferredWidth, navigatorPanelId])
+  }, [commitPreferredWidth, contentMinWidth, maxWidth, navigatorPanelId, scheduleExpandedLayoutRepair])
 
   const beginUserResize = useCallback(() => {
     userResizeIntentRef.current = true
@@ -271,17 +321,39 @@ export function PageSidebarLayout({
     rootRef.current?.removeAttribute('data-collapse-motion')
   }, [])
 
-  const clearOverdragMotion = useCallback(() => {
+  const cancelOverdragCleanup = useCallback(() => {
     if (overdragMotionTimerRef.current !== null) {
       window.clearTimeout(overdragMotionTimerRef.current)
       overdragMotionTimerRef.current = null
     }
+  }, [])
+
+  const clearOverdragMotion = useCallback(() => {
+    cancelOverdragCleanup()
     const root = rootRef.current
     if (!root) return
     root.removeAttribute('data-overdrag-motion')
     root.removeAttribute('data-overdrag-state')
     root.style.removeProperty('--oa-page-sidebar-overdrag')
-  }, [])
+  }, [cancelOverdragCleanup])
+
+  const interruptOverdragMotion = useCallback(() => {
+    cancelOverdragCleanup()
+    const root = rootRef.current
+    const navigator = root?.querySelector<HTMLElement>('[data-page-sidebar-panel="navigator"]')
+    const handle = resizeHandleRef.current
+    if (!root || !navigator || !handle) return
+    // Freeze the currently painted spring position before removing its
+    // transition. Snapping the handle back under an active pointer can cancel
+    // pointer capture, which made an immediately repeated drag lose resistance.
+    const visualOffset = Math.max(
+      0,
+      navigator.getBoundingClientRect().right - handle.getBoundingClientRect().left,
+    )
+    root.style.setProperty('--oa-page-sidebar-overdrag', `${visualOffset.toFixed(3)}px`)
+    root.removeAttribute('data-overdrag-motion')
+    root.removeAttribute('data-overdrag-state')
+  }, [cancelOverdragCleanup])
 
   const scheduleOverdragCleanup = useCallback(() => {
     if (overdragMotionTimerRef.current !== null) {
@@ -319,16 +391,19 @@ export function PageSidebarLayout({
     const hitSlop = Math.max(0, (targetSize - rect.width) / 2)
     if (event.clientX < rect.left - hitSlop || event.clientX > rect.right + hitSlop) return
     beginUserResize()
+    // A return/commit cleanup from the previous gesture must not be allowed to
+    // erase the next gesture. This is also required when the next gesture
+    // starts from the collapsed rail and re-opens the panel.
+    interruptOverdragMotion()
     const panel = sidebarPanelRef.current
     if (!panel || panel.isCollapsed()) return
-    clearOverdragMotion()
     pointerGestureRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startWidth: panel.getSize().inPixels,
       rawOverdrag: 0,
     }
-  }, [beginUserResize, clearOverdragMotion])
+  }, [beginUserResize, interruptOverdragMotion])
 
   const updatePointerOverdrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const gesture = pointerGestureRef.current
@@ -347,10 +422,8 @@ export function PageSidebarLayout({
 
     if (shouldCollapsePageSidebar(rawOverdrag)) {
       root.setAttribute('data-overdrag-state', 'armed')
-      root.setAttribute('data-overdrag-motion', 'committing')
       root.style.setProperty('--oa-page-sidebar-overdrag', '0px')
       armCollapseMotion()
-      scheduleOverdragCleanup()
       return
     }
 
@@ -397,12 +470,15 @@ export function PageSidebarLayout({
     pointerGestureRef.current = null
 
     if (gesture && shouldCollapsePageSidebar(gesture.rawOverdrag)) {
-      userResizeIntentRef.current = false
-      userResizeChangedRef.current = false
-      // The primitive normally commits at the same midpoint. Keep an
-      // imperative fallback for coarse rounding, but let pointer-up settlement
-      // finish first so it cannot overwrite that fallback.
-      setPointerCollapseRequested(true)
+      const root = rootRef.current
+      root?.setAttribute('data-overdrag-motion', 'committing')
+      root?.removeAttribute('data-overdrag-state')
+      root?.style.setProperty('--oa-page-sidebar-overdrag', '0px')
+      scheduleOverdragCleanup()
+      // The shadcn primitive owns the threshold geometry. Calling collapse()
+      // again here races its pointer-up settlement and can overwrite the
+      // primitive's remembered expanded layout.
+      finishUserResize()
       return
     }
 
@@ -411,6 +487,7 @@ export function PageSidebarLayout({
   }, [
     finishUserResize,
     returnFromOverdrag,
+    scheduleOverdragCleanup,
   ])
 
   const cancelPointerResize = useCallback(() => {
@@ -420,67 +497,52 @@ export function PageSidebarLayout({
   }, [finishUserResize, returnFromOverdrag])
 
   const collapseSidebar = useCallback(() => {
-    updateCollapsed(true)
+    clearOverdragMotion()
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       sidebarPanelRef.current?.collapse()
+      updateCollapsed(true)
       return
     }
     armCollapseMotion()
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => sidebarPanelRef.current?.collapse())
-    })
-  }, [armCollapseMotion, updateCollapsed])
+    sidebarPanelRef.current?.collapse()
+    updateCollapsed(true)
+  }, [armCollapseMotion, clearOverdragMotion, updateCollapsed])
 
   const expandSidebar = useCallback(() => {
     const targetWidth = Math.min(latestWidthRef.current, maxWidth)
-    updateCollapsed(false)
-    sidebarPanelRef.current?.expand()
+    disarmCollapseMotion()
+    clearOverdragMotion()
+    // resize() expands a collapsed primitive and restores the exact persisted
+    // pixel preference in one transaction. expand()+resize() creates two
+    // competing layouts and can poison the next collapse cycle.
     sidebarPanelRef.current?.resize(targetWidth)
-  }, [maxWidth, updateCollapsed])
+    updateCollapsed(false)
+  }, [clearOverdragMotion, disarmCollapseMotion, maxWidth, updateCollapsed])
 
   useLayoutEffect(() => {
-    if (!isDesktop || containerWidth <= 0 || !collapsed) return
-    sidebarPanelRef.current?.collapse()
-  }, [collapsed, containerWidth, isDesktop])
-
-  useLayoutEffect(() => {
-    if (!isDesktop || containerWidth <= 0 || collapsed || userResizeIntentRef.current) return
-    sidebarPanelRef.current?.resize(Math.min(latestWidthRef.current, maxWidth))
-  }, [collapsed, containerWidth, isDesktop, maxWidth])
+    if (!isDesktop || containerWidth <= 0 || userResizeIntentRef.current) return
+    const panel = sidebarPanelRef.current
+    if (!panel) return
+    if (collapsed) {
+      if (!panel.isCollapsed()) panel.collapse()
+      return
+    }
+    const targetWidth = Math.min(latestWidthRef.current, maxWidth)
+    const currentWidth = panel.getSize().inPixels
+    if (panel.isCollapsed() || Math.abs(currentWidth - targetWidth) > 1) {
+      panel.resize(targetWidth)
+    }
+  }, [collapsed, containerWidth, contentMinWidth, isDesktop, maxWidth])
 
   useEffect(() => {
     if (isDesktop) setDrawerOpen(false)
   }, [isDesktop])
 
-  useEffect(() => {
-    if (!pointerCollapseRequested) return
-    setPointerCollapseRequested(false)
-    const root = rootRef.current
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      clearOverdragMotion()
-      window.setTimeout(() => sidebarPanelRef.current?.collapse(), 0)
-      return
-    }
-    root?.setAttribute('data-overdrag-motion', 'committing')
-    root?.removeAttribute('data-overdrag-state')
-    root?.style.setProperty('--oa-page-sidebar-overdrag', '0px')
-    armCollapseMotion()
-    scheduleOverdragCleanup()
-    // A macrotask boundary guarantees that the primitive's pointer-up
-    // settlement finishes before the rounding fallback runs.
-    window.setTimeout(() => {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => sidebarPanelRef.current?.collapse())
-      })
-    }, 0)
-  }, [
-    armCollapseMotion,
-    clearOverdragMotion,
-    pointerCollapseRequested,
-    scheduleOverdragCleanup,
-  ])
-
   useEffect(() => () => {
+    if (layoutRepairFrameRef.current !== null) {
+      window.cancelAnimationFrame(layoutRepairFrameRef.current)
+      layoutRepairFrameRef.current = null
+    }
     disarmCollapseMotion()
     clearOverdragMotion()
   }, [clearOverdragMotion, disarmCollapseMotion])

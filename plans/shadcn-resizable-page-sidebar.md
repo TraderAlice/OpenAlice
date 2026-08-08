@@ -1,6 +1,6 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `complete` (resisted overdrag included in Draft PR #1025; awaiting maintainer acceptance)
+- Status: `complete` (repeat-cycle repair included in Draft PR #1025; awaiting maintainer acceptance)
 - Updated: `2026-08-08`
 - Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
   maintainer acceptance.
@@ -43,6 +43,14 @@ current mobile Sheet hierarchy.
   `PageSidebarLayout` still rendered `data-state="expanded"` and left the full
   navigator surface accessible. The expanded sidebar was therefore compressed
   into the collapsed rail instead of switching surfaces.
+- Repeated narrow/wide responsive cycles exposed a delayed v4 registration
+  race: the route first recovered to 200px, then a stale one-panel layout wrote
+  `flex: 100` after the group's settled callback, leaving content at 0px while
+  the separator still advertised the correct 33.936% maximum.
+- The first overdrag implementation also started its 280ms visual cleanup while
+  the pointer was still held. That timer could erase the active gesture, and a
+  new press during the returning spring snapped the transformed handle away
+  from the pointer before the next drag had captured it.
 - `react-resizable-panels` deliberately expands the one-pixel separator into a
   10px fine-pointer and 28px coarse-pointer hit region. A pointer can begin in
   that virtual region without firing React's `pointerdown` handler on the
@@ -224,6 +232,24 @@ At every settled desktop layout exactly one surface is interactive:
 - [x] Add focused state/motion regressions and measure both return and commit
       trajectories in the real `pnpm dev` Chat route.
 
+### Repeat-cycle state-machine repair
+
+- [x] Reproduce the delayed 100% navigator / 0px content layout in the real
+      in-app browser and distinguish it from persisted width corruption.
+- [x] Remove duplicate pointer fallback, button, and effect geometry calls so
+      every collapse or restore has one owner and one primitive transaction.
+- [x] Move overdrag cleanup to pointer release; cancel and visually freeze an
+      interrupted spring before a new drag begins.
+- [x] Reject impossible geometry in both the settled group callback and the
+      later Panel resize callback, then restore the last valid pixel preference
+      without persisting the 100% layout.
+- [x] Add focused regressions for eight collapse/restore cycles, interrupted
+      spring timers, and both immediate and delayed impossible layouts.
+- [x] Verify ten repeated resisted drags, ten drag-collapse/drag-reopen cycles,
+      and ten narrow/wide responsive cycles in the real Chat route.
+- [x] Re-run complete typecheck, Vitest, UI build, and unsigned Electron smoke;
+      update Draft PR #1025 with the repaired evidence.
+
 ## Verification Evidence
 
 - Real `pnpm dev` data: Chat pointer and keyboard resizing both persisted over
@@ -295,6 +321,18 @@ At every settled desktop layout exactly one surface is interactive:
   skipped), UI production build, and unsigned packaged Electron Workspace
   smoke. Browser acceptance also covered pointer cancel and emulated
   `prefers-reduced-motion: reduce`, which clears the overdrag immediately.
+- Repeat-cycle repair acceptance first reproduced the delayed failure as a
+  940px navigator / 0px content layout with `flex: 100`, while persisted Chat
+  width remained a valid 200px. The repaired route held 200px / 740px through
+  ten drag-collapse/drag-reopen cycles and ten 800px/1093px responsive cycles,
+  then remained stable through a further 1.5-second delayed-write window.
+  Ten independent resisted drags each produced the same 23.596px displacement;
+  a returning spring interrupted after 50ms remained resisted after a 350ms
+  hold instead of being erased by the previous cleanup timer.
+- Final repeat-cycle checks passed on 2026-08-08: 23 focused sidebar tests,
+  root/UI typechecks, the complete Vitest suite (488 files, 4025 passing tests,
+  9 skipped), UI production build, and unsigned packaged Electron Workspace
+  smoke with managed Pi acceptance.
 
 ## Verification Matrix
 

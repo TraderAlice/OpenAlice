@@ -183,6 +183,17 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   width changes feel lazy. Do not toggle the primitive's `collapsible`
   metadata during an active pointer transaction; its native midpoint remains
   the single collapse boundary.
+  Keep geometry transactions single-owner: native pointer and keyboard
+  interactions settle through the primitive, while a product collapse or
+  restore affordance issues exactly one imperative geometry call. Product
+  effects may reconcile applied geometry with persisted intent, but must not
+  repeat the same collapse/expand transaction. Because pixel constraint changes
+  can re-register v4 Panels after the group's settled callback, validate both
+  the settled layout and the final Panel ResizeObserver result; reject and
+  repair one-panel `100%` layouts instead of persisting them. A spring cleanup
+  timer begins only after release. When a new drag interrupts a returning
+  spring, cancel that timer and freeze the currently painted edge before
+  resuming direct manipulation so the handle never snaps away from the pointer.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.
