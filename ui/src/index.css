@@ -1081,36 +1081,62 @@ html[lang="ja"] .oa-onboarding-title {
    larger text. This is deliberately not a card: the document remains the one
    dominant surface inside the existing application shell. */
 .markdown-content--reading {
-  --markdown-font-size: 16px;
-  --markdown-leading: 1.78;
-  color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
+  --markdown-font-size: 15px;
+  --markdown-leading: 1.72;
+  color: color-mix(in srgb, var(--foreground) 84%, var(--muted-foreground));
   font-kerning: normal;
   text-rendering: optimizeLegibility;
 }
 
 .markdown-content--reading p {
-  margin-block: 0.9em;
+  margin-block: 0.82em;
+}
+
+.markdown-content--reading strong {
+  font-weight: 620;
+}
+
+/* Long CJK italics are difficult to scan and commonly appear as report decks.
+   Treat a first-paragraph, all-emphasis block as editorial standfirst text. */
+.markdown-content--reading > p:first-of-type:has(> em:only-child) {
+  max-width: 44rem;
+  margin: 0 0 2.2rem;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 58%, var(--border));
+  padding-left: 1rem;
+  color: color-mix(in srgb, var(--foreground) 70%, var(--muted-foreground));
+  font-size: 0.98em;
+  line-height: 1.78;
+}
+
+.markdown-content--reading > p:first-of-type:has(> em:only-child) em {
+  font-style: normal;
 }
 
 .markdown-content--reading h1 {
-  margin-bottom: 0.8em;
-  font-size: clamp(1.75rem, 3vw, 2.15rem);
-  line-height: 1.2;
-  letter-spacing: -0.025em;
+  max-width: 30ch;
+  margin-bottom: 1.35rem;
+  font-size: clamp(1.65rem, 2.5vw, 1.9rem);
+  font-weight: 660;
+  line-height: 1.24;
+  letter-spacing: -0.02em;
 }
 
 .markdown-content--reading h2 {
-  margin-top: 2.1em;
-  margin-bottom: 0.65em;
-  font-size: 1.35em;
-  line-height: 1.3;
-  letter-spacing: -0.018em;
+  margin-top: 2.6em;
+  margin-bottom: 0.75em;
+  border-top: 1px solid color-mix(in srgb, var(--border) 64%, transparent);
+  padding-top: 0.85em;
+  font-size: 1.24em;
+  font-weight: 660;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
 }
 
 .markdown-content--reading h3 {
-  margin-top: 1.55em;
-  margin-bottom: 0.45em;
-  font-size: 1.08em;
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+  font-size: 1.04em;
+  font-weight: 650;
 }
 
 .markdown-content--reading h4 {
@@ -1132,17 +1158,35 @@ html[lang="ja"] .oa-onboarding-title {
 
 .markdown-content--reading ul,
 .markdown-content--reading ol {
-  margin-block: 0.9em;
-  padding-left: 1.5em;
+  margin-block: 0.8em;
+  padding-left: 1.35em;
 }
 
 .markdown-content--reading li {
-  margin-block: 0.42em;
-  padding-left: 0.18em;
+  margin-block: 0.34em;
+  padding-left: 0.12em;
 }
 
 .markdown-content--reading .markdown-table-shell {
-  margin-block: 1.35em;
+  margin-block: 1.25em 1.8em;
+  border-color: color-mix(in srgb, var(--border) 72%, transparent);
+  background: transparent;
+}
+
+.markdown-content--reading table {
+  font-size: 0.84em;
+  line-height: 1.42;
+}
+
+.markdown-content--reading th,
+.markdown-content--reading td {
+  padding: 0.58em 0.72em;
+}
+
+.markdown-content--reading th {
+  background: color-mix(in srgb, var(--muted) 38%, var(--card));
+  font-size: 0.88em;
+  font-weight: 620;
 }
 
 .markdown-content--reading .code-block-wrapper {
@@ -1151,16 +1195,16 @@ html[lang="ja"] .oa-onboarding-title {
 
 @media (max-width: 639px) {
   .markdown-content--reading {
-    --markdown-font-size: 15px;
-    --markdown-leading: 1.72;
+    --markdown-font-size: 14.5px;
+    --markdown-leading: 1.7;
   }
 
   .markdown-content--reading h1 {
-    font-size: 1.65rem;
+    font-size: 1.55rem;
   }
 
   .markdown-content--reading h2 {
-    font-size: 1.27em;
+    font-size: 1.2em;
   }
 
   .markdown-content table {
