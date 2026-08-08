@@ -261,7 +261,7 @@ export const BITGET_PRESET: BrokerPresetDef = {
   label: 'Bitget',
   description: 'Bitget — spot and USDT-M perpetuals.',
   category: 'crypto',
-  hint: 'Bitget requires API key + secret + passphrase (set when creating the key). Demo Trading routes orders to a simulated environment using the production domain.',
+  hint: 'Bitget requires API key + secret + passphrase (set when creating the key). OpenAlice currently supports Classic accounts; Bitget Unified Trading Account (v3) is not yet supported. Demo Trading routes orders to a simulated environment using the production domain.',
   defaultName: 'bitget-main',
   badge: 'BG',
   badgeColor: 'text-primary',

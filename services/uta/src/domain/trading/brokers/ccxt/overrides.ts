@@ -24,6 +24,7 @@
  */
 
 import type { Exchange, Order as CcxtOrder, Position as CcxtPosition } from 'ccxt'
+import { bitgetOverrides } from './exchanges/bitget.js'
 import { bybitOverrides } from './exchanges/bybit.js'
 import { hyperliquidOverrides } from './exchanges/hyperliquid.js'
 
@@ -33,6 +34,24 @@ import { hyperliquidOverrides } from './exchanges/hyperliquid.js'
 type DefaultImpl<TArgs extends unknown[], TResult> = (...args: TArgs) => Promise<TResult>
 
 export interface CcxtExchangeOverrides {
+  /** Fail account reads when one of the wallets or position namespaces this
+   *  adapter claims to aggregate is unreadable. Use only where a partial read
+   *  would look valid while hiding material funds or risk. */
+  strictPrivateReads?: boolean
+
+  /** Propagate an all-open-orders failure instead of degrading to an empty
+   *  list. Verified multi-namespace adapters use this because a partial list
+   *  is actively unsafe for external-order observation. */
+  strictOpenOrderReads?: boolean
+
+  /** Fetch one normalized balance wallet. Override when a venue needs routing
+   *  parameters beyond the generic CCXT `type` selector. */
+  fetchBalance?(
+    exchange: Exchange,
+    params: Record<string, unknown> | undefined,
+    defaultImpl: DefaultImpl<[Exchange, Record<string, unknown> | undefined], Record<string, unknown>>,
+  ): Promise<Record<string, unknown>>
+
   /** Fetch a single order by ID (regular + conditional). */
   fetchOrderById?(
     exchange: Exchange,
@@ -106,8 +125,8 @@ export interface CcxtExchangeOverrides {
    *  (ANG-111). Leave undefined for UNIFIED-account venues (okx / bybit UTA),
    *  where a single fetchBalance() returns the whole account — those expose one
    *  implicit 'default' sub-account and never require a selector. A per-type
-   *  fetch failure (e.g. an un-activated COIN-M wallet → -2015) is skipped, not
-   *  fatal. */
+   *  fetch failure (e.g. an un-activated COIN-M wallet → -2015) is normally
+   *  skipped; adapters with `strictPrivateReads` propagate it instead. */
   subAccounts?: CcxtSubAccountDef[]
 }
 
@@ -125,6 +144,16 @@ export interface CcxtSubAccountDef {
 }
 
 // ==================== Default implementations ====================
+
+/** Default: fetch one wallet balance, preserving an actually-unscoped call. */
+export async function defaultFetchBalance(
+  exchange: Exchange,
+  params?: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return await (params === undefined
+    ? exchange.fetchBalance()
+    : exchange.fetchBalance(params)) as unknown as Record<string, unknown>
+}
 
 /** Default: fetchOrder + { stop: true } fallback. Works for binance, okx, bitget, etc. */
 export async function defaultFetchOrderById(exchange: Exchange, orderId: string, symbol: string): Promise<CcxtOrder> {
@@ -199,6 +228,7 @@ const binanceOverrides: CcxtExchangeOverrides = {
 
 export const exchangeOverrides: Record<string, CcxtExchangeOverrides> = {
   binance: binanceOverrides,
+  bitget: bitgetOverrides,
   bybit: bybitOverrides,
   hyperliquid: hyperliquidOverrides,
 }

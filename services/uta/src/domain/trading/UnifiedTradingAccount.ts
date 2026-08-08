@@ -649,7 +649,7 @@ export class UnifiedTradingAccount {
   }
 
   /** The sub-accounts (wallets) this connection spans. One element for ordinary
-   *  brokers; >1 only for separate-wallet venues (CCXT Binance: spot / futures). */
+   *  brokers; >1 only for separate-wallet venues (CCXT Binance / Bitget Classic). */
   async listSubAccounts(): Promise<SubAccountRef[]> {
     return this._ensureSubAccounts()
   }

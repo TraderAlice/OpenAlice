@@ -178,6 +178,7 @@ suggestion, or implementation proposal changes the product, it gets credited.
   <a href="https://github.com/rudyll"><img src="https://github.com/rudyll.png" width="56" height="56" alt="@rudyll" /></a>
   <a href="https://github.com/jalilsedna"><img src="https://github.com/jalilsedna.png" width="56" height="56" alt="@jalilsedna" /></a>
   <a href="https://github.com/dbydd"><img src="https://github.com/dbydd.png" width="56" height="56" alt="@dbydd" /></a>
+  <a href="https://github.com/enderzcx"><img src="https://github.com/enderzcx.png" width="56" height="56" alt="@enderzcx" /></a>
 </p>
 
 **See the full list and what each person shaped**: [CONTRIBUTORS.md](./CONTRIBUTORS.md)

@@ -40,6 +40,7 @@ vi.mock('ccxt', () => {
     default: {
       bybit: MockExchange,
       binance: MockExchange,
+      bitget: MockExchange,
     },
   }
 })
@@ -999,6 +1000,60 @@ describe('CcxtBroker — sub-accounts', () => {
     ])
   })
 
+  it('Bitget Classic exposes separate spot and USDT-M wallets', async () => {
+    const acc = makeAccount({ exchange: 'bitget' })
+    expect(await acc.listSubAccounts()).toEqual([
+      { id: 'spot', label: 'Spot', kind: 'spot' },
+      { id: 'derivatives', label: 'USDT-M Futures', kind: 'derivatives' },
+    ])
+  })
+
+  it('Bitget Classic aggregates spot and explicit USDT-M account state', async () => {
+    const acc = makeAccount({ exchange: 'bitget' })
+    setInitialized(acc, {})
+    const fetchBalance = vi.fn()
+      .mockResolvedValueOnce({ USDT: { total: 4.44 } })
+      .mockResolvedValueOnce({ USDT: { total: 1000 } })
+    ;(acc as any).exchange.fetchBalance = fetchBalance
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockResolvedValue([
+      { unrealizedPnl: 12.5, realizedPnl: 3 },
+    ])
+
+    const info = await acc.getAccount()
+
+    expect(fetchBalance.mock.calls.map(call => call[0])).toEqual([
+      { type: 'spot' },
+      { type: 'swap', productType: 'USDT-FUTURES' },
+    ])
+    expect((acc as any).exchange.fetchPositions).toHaveBeenCalledWith(undefined, {
+      productType: 'USDT-FUTURES',
+    })
+    expect(info.netLiquidation).toBe('1004.44')
+    expect(info.unrealizedPnL).toBe('12.5')
+    expect(info.realizedPnL).toBe('3')
+  })
+
+  it('fails a Bitget Classic account read when the USDT-M wallet is unreadable', async () => {
+    const acc = makeAccount({ exchange: 'bitget' })
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fetchBalance = vi.fn()
+      .mockResolvedValueOnce({ USDT: { total: 4.44 } })
+      .mockRejectedValueOnce(new Error('USDT-M permission denied'))
+
+    await expect(acc.getAccount()).rejects.toThrow('USDT-M permission denied')
+  })
+
+  it('fails a Bitget Classic account read when positions are unreadable', async () => {
+    const acc = makeAccount({ exchange: 'bitget' })
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fetchBalance = vi.fn()
+      .mockResolvedValueOnce({ USDT: { total: 4.44 } })
+      .mockResolvedValueOnce({ USDT: { total: 1000 } })
+    ;(acc as any).exchange.fetchPositions = vi.fn().mockRejectedValue(new Error('positions permission denied'))
+
+    await expect(acc.getAccount()).rejects.toThrow('positions permission denied')
+  })
+
   it('subAccountForContract routes spot vs derivative instruments (binance)', () => {
     const acc = makeAccount({ exchange: 'binance' })
     const spot = new Contract(); spot.secType = 'CRYPTO'
@@ -1387,6 +1442,31 @@ describe('CcxtBroker — getPositions', () => {
     expect(positions).toHaveLength(1)
     expect(positions[0].marketPrice).toBe('60000')
     expect((acc as any).exchange.fetchTicker).toHaveBeenCalledWith('BTC/USDT')
+  })
+})
+
+// ==================== getOpenOrders ====================
+
+describe('CcxtBroker — getOpenOrders', () => {
+  it('propagates Bitget Classic namespace failures instead of reporting a false empty list', async () => {
+    const acc = makeAccount({ exchange: 'bitget' })
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fetchOpenOrders = vi.fn().mockImplementation(
+      async (_symbol: unknown, _since: unknown, _limit: unknown, params: Record<string, unknown>) => {
+        if (params['planType'] === 'profit_loss') throw new Error('bitget permission denied')
+        return []
+      },
+    )
+
+    await expect(acc.getOpenOrders()).rejects.toThrow('permission denied')
+  })
+
+  it('keeps permissive venues on the existing empty-list fallback', async () => {
+    const acc = makeAccount({ exchange: 'binance' })
+    setInitialized(acc, {})
+    ;(acc as any).exchange.fetchOpenOrders = vi.fn().mockRejectedValue(new Error('listing unsupported'))
+
+    await expect(acc.getOpenOrders()).resolves.toEqual([])
   })
 })
 
