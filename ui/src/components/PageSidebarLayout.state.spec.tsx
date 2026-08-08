@@ -28,6 +28,7 @@ vi.mock('@/components/ui/resizable', async () => {
     elementRef,
     onLayoutChanged,
     onPointerDownCapture,
+    onPointerMoveCapture,
     onPointerUpCapture,
     onPointerCancelCapture,
   }: {
@@ -36,6 +37,7 @@ vi.mock('@/components/ui/resizable', async () => {
     elementRef?: React.Ref<HTMLDivElement>
     onLayoutChanged?: (layout: Record<string, number>) => void
     onPointerDownCapture?: React.PointerEventHandler<HTMLDivElement>
+    onPointerMoveCapture?: React.PointerEventHandler<HTMLDivElement>
     onPointerUpCapture?: React.PointerEventHandler<HTMLDivElement>
     onPointerCancelCapture?: React.PointerEventHandler<HTMLDivElement>
   }) {
@@ -60,6 +62,7 @@ vi.mock('@/components/ui/resizable', async () => {
         }}
         data-testid={id}
         onPointerDownCapture={onPointerDownCapture}
+        onPointerMoveCapture={onPointerMoveCapture}
         onPointerUpCapture={onPointerUpCapture}
         onPointerCancelCapture={onPointerCancelCapture}
       >
@@ -204,6 +207,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -279,6 +283,82 @@ describe('PageSidebarLayout applied state', () => {
     settleNavigatorLayout(276)
 
     expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('276')
+  })
+
+  it('arms collapse motion only near the minimum-width threshold', () => {
+    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
+    render(
+      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
+        <div>Market content</div>
+      </PageSidebarLayout>,
+    )
+
+    const contentPanel = screen.getByTestId('page-sidebar-market-content')
+    const group = screen.getByTestId('page-sidebar-market')
+    fireEvent.pointerDown(contentPanel, {
+      button: 0,
+      buttons: 1,
+      clientX: 315,
+      isPrimary: true,
+      pointerId: 14,
+      pointerType: 'mouse',
+    })
+
+    fireEvent.pointerMove(group, {
+      buttons: 1,
+      clientX: 250,
+      isPrimary: true,
+      pointerId: 14,
+      pointerType: 'mouse',
+    })
+    expect(group.getAttribute('data-collapse-motion')).toBeNull()
+
+    fireEvent.pointerMove(group, {
+      buttons: 1,
+      clientX: 223,
+      isPrimary: true,
+      pointerId: 14,
+      pointerType: 'mouse',
+    })
+    expect(group.getAttribute('data-collapse-motion')).toBe('armed')
+
+    fireEvent.pointerUp(group, {
+      button: 0,
+      buttons: 0,
+      clientX: 223,
+      isPrimary: true,
+      pointerId: 14,
+      pointerType: 'mouse',
+    })
+    expect(group.getAttribute('data-collapse-motion')).toBeNull()
+
+    fireEvent.keyDown(screen.getByRole('separator'), { key: 'Home' })
+    expect(group.getAttribute('data-collapse-motion')).toBe('armed')
+  })
+
+  it('collapses immediately when reduced motion is requested', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(min-width: 768px)' || query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })))
+    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame')
+    render(
+      <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
+        <div>Market content</div>
+      </PageSidebarLayout>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled()
+    expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('collapsed')
+    expect(resizableHarness.navigatorSize).toBe(44)
   })
 
   it('does not persist a passive responsive cap or a pointer click without resize', () => {

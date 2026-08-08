@@ -32,9 +32,8 @@ the durable truth after it changes.
 ## Completed
 
 - [[plans/shadcn-resizable-page-sidebar.md]] — Replaced the hand-written
-  page-sidebar drag rail with shadcn Resizable and closed the responsive state
-  contract across enlarged pointer targets, collapse/restore, persisted width,
-  route breakpoints, and real desktop shell geometry in Draft PR #1025.
+  page-sidebar rail with shadcn Resizable and closed its responsive and
+  threshold-motion contracts in Draft PR #1025.
 - [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
   local relationship graph derived from Tracked entities and authored Workspace
   backlinks, with provenance-preserving material navigation.

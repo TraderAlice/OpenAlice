@@ -25,6 +25,8 @@ const MAX_WIDTH = 420
 const MAIN_PANE_MIN_WIDTH = 500
 const COLLAPSED_WIDTH = 44
 const RESIZE_SEPARATOR_WIDTH = 1
+const COLLAPSE_MOTION_ARM_DISTANCE = 24
+const COLLAPSE_MOTION_CLEANUP_MS = 260
 function clampWidth(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(value)))
@@ -141,6 +143,7 @@ export function PageSidebarLayout({
   const resizeHandleRef = useRef<HTMLDivElement | null>(null)
   const userResizeIntentRef = useRef(false)
   const userResizeChangedRef = useRef(false)
+  const collapseMotionTimerRef = useRef<number | null>(null)
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null)
   const mobileDrawerId = useId()
@@ -236,6 +239,27 @@ export function PageSidebarLayout({
     userResizeChangedRef.current = false
   }, [])
 
+  const disarmCollapseMotion = useCallback(() => {
+    if (collapseMotionTimerRef.current !== null) {
+      window.clearTimeout(collapseMotionTimerRef.current)
+      collapseMotionTimerRef.current = null
+    }
+    rootRef.current?.removeAttribute('data-collapse-motion')
+  }, [])
+
+  const armCollapseMotion = useCallback(() => {
+    const root = rootRef.current
+    if (!root) return
+    root.setAttribute('data-collapse-motion', 'armed')
+    if (collapseMotionTimerRef.current !== null) {
+      window.clearTimeout(collapseMotionTimerRef.current)
+    }
+    collapseMotionTimerRef.current = window.setTimeout(() => {
+      collapseMotionTimerRef.current = null
+      root.removeAttribute('data-collapse-motion')
+    }, COLLAPSE_MOTION_CLEANUP_MS)
+  }, [])
+
   const beginPointerResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary || event.button !== 0) return
     const handle = resizeHandleRef.current
@@ -247,7 +271,20 @@ export function PageSidebarLayout({
     beginUserResize()
   }, [beginUserResize])
 
+  const preparePointerCollapseMotion = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!userResizeIntentRef.current) return
+    const root = rootRef.current
+    if (!root) return
+    const collapseThreshold = root.getBoundingClientRect().left + MIN_WIDTH
+    if (event.clientX <= collapseThreshold + COLLAPSE_MOTION_ARM_DISTANCE) {
+      armCollapseMotion()
+    } else if (!sidebarPanelRef.current?.isCollapsed()) {
+      disarmCollapseMotion()
+    }
+  }, [armCollapseMotion, disarmCollapseMotion])
+
   const finishUserResize = useCallback(() => {
+    if (!sidebarPanelRef.current?.isCollapsed()) disarmCollapseMotion()
     if (!userResizeIntentRef.current) return
     const panel = sidebarPanelRef.current
     if (userResizeChangedRef.current && panel && !panel.isCollapsed()) {
@@ -255,12 +292,19 @@ export function PageSidebarLayout({
     }
     userResizeIntentRef.current = false
     userResizeChangedRef.current = false
-  }, [commitPreferredWidth])
+  }, [commitPreferredWidth, disarmCollapseMotion])
 
   const collapseSidebar = useCallback(() => {
     updateCollapsed(true)
-    sidebarPanelRef.current?.collapse()
-  }, [updateCollapsed])
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      sidebarPanelRef.current?.collapse()
+      return
+    }
+    armCollapseMotion()
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => sidebarPanelRef.current?.collapse())
+    })
+  }, [armCollapseMotion, updateCollapsed])
 
   const expandSidebar = useCallback(() => {
     const targetWidth = Math.min(latestWidthRef.current, maxWidth)
@@ -282,6 +326,8 @@ export function PageSidebarLayout({
   useEffect(() => {
     if (isDesktop) setDrawerOpen(false)
   }, [isDesktop])
+
+  useEffect(() => disarmCollapseMotion, [disarmCollapseMotion])
 
   useEffect(() => {
     if (!isDesktop) return
@@ -332,13 +378,15 @@ export function PageSidebarLayout({
         orientation="horizontal"
         onLayoutChanged={handleLayoutChanged}
         onPointerDownCapture={beginPointerResize}
+        onPointerMoveCapture={preparePointerCollapseMotion}
         onPointerUpCapture={finishUserResize}
         onPointerCancelCapture={finishUserResize}
         resizeTargetMinimumSize={{ fine: 10, coarse: 28 }}
-        className="min-h-0 min-w-0 overflow-hidden"
+        className="oa-page-sidebar-resizable min-h-0 min-w-0 overflow-hidden"
       >
         <ResizablePanel
           id={navigatorPanelId}
+          data-collapse-state={collapsed ? 'collapsed' : 'expanded'}
           panelRef={sidebarPanelRef}
           defaultSize={collapsed ? COLLAPSED_WIDTH : width}
           minSize={MIN_WIDTH}
@@ -401,6 +449,9 @@ export function PageSidebarLayout({
           onKeyDownCapture={(event) => {
             if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
               beginUserResize()
+            }
+            if (event.key === 'ArrowLeft' || event.key === 'Home') {
+              armCollapseMotion()
             }
           }}
           onKeyUp={finishUserResize}

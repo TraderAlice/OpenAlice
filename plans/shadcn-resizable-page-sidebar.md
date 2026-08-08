@@ -1,6 +1,6 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `complete` (responsive state-consistency hardening included in Draft PR #1025; awaiting maintainer acceptance)
+- Status: `complete` (responsive and collapse-motion hardening included in Draft PR #1025; awaiting maintainer acceptance)
 - Updated: `2026-08-08`
 - Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
   maintainer acceptance.
@@ -197,6 +197,20 @@ At every settled desktop layout exactly one surface is interactive:
 - [x] Re-run root/UI typechecks, focused and full Vitest, UI production build,
       and unsigned Electron Workspace smoke before updating Draft PR #1025.
 
+### Collapse-motion follow-up
+
+- [x] Measure the real 200px-to-44px threshold transition in `pnpm dev` rather
+      than inferring motion from classes; the pre-change route sampled 44px at
+      every 20ms interval and therefore had no spatial transition.
+- [x] Keep ordinary pointer resizing unanimated and arm width motion only while
+      approaching the discrete collapse threshold, plus explicit button and
+      keyboard collapse actions.
+- [x] Use the shared 180ms motion token and the product-owned group seam rather
+      than styling react-resizable-panels' nested content wrapper.
+- [x] Add motion-arming regression coverage and verify reduced-motion fallback.
+- [x] Re-run real browser sampling, focused/full tests, typechecks, and UI build
+      before pushing the follow-up commit to Draft PR #1025.
+
 ## Verification Evidence
 
 - Real `pnpm dev` data: Chat pointer and keyboard resizing both persisted over
@@ -239,6 +253,17 @@ At every settled desktop layout exactly one surface is interactive:
   focused sidebar tests; the complete Vitest suite (487 files, 4014 passing
   tests); UI production build; and unsigned packaged Electron Workspace smoke
   including its managed Pi acceptance flow.
+- Collapse-motion browser sampling first proved the existing snap had no
+  intermediate frame: every 20ms sample went directly from 200px to 44px. The
+  follow-up samples now read 200 -> 128 -> 94 -> 72 -> 59 -> 52 -> 48 -> 46 ->
+  45 -> 44px over the shared 180ms token, while ordinary expanded resizing
+  retains a zero-second transition. Reload after the animation stayed at 44px
+  and the collapsed interactive surface remained authoritative.
+- Final motion checks passed on 2026-08-08: root/UI typechecks, 14 focused
+  sidebar tests, the complete Vitest suite (487 files, 4016 passing tests), and
+  the UI production build. The regression also proves distant pointer movement
+  does not arm motion, the 24px approach zone does, and reduced-motion button
+  collapse bypasses both animation frames.
 
 ## Verification Matrix
 

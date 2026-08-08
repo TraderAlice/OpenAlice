@@ -353,6 +353,15 @@ body {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
+/* Keep direct pointer resizing attached to the cursor, then soften only the
+   primitive's discrete 200px -> 44px collapse snap. Panel classes are applied
+   to react-resizable-panels' nested content element, so this rule deliberately
+   targets the direct flex item from the product-owned group seam. */
+.oa-page-sidebar-resizable[data-collapse-motion="armed"]
+  > [data-panel][data-collapse-state] {
+  transition: flex-grow var(--motion-standard) var(--motion-ease-out);
+}
+
 /* Page-owned navigators become touch surfaces inside the phone drawer.
    A 40px height floor removes the old 18–28px rows; icon controls keep 36px
    of horizontal room so adjacent workspace names remain distinguishable. */

@@ -173,7 +173,10 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   synchronization. Capture resize intent at the split-group boundary so the
   separator's enlarged fine/coarse pointer target behaves like its visible
   one-pixel rule. Persist keyboard changes from the settled layout map rather
-  than a pre-paint DOM width, which can lag one key press behind.
+  than a pre-paint DOM width, which can lag one key press behind. Direct pointer
+  resizing must stay attached to the cursor; arm the shared motion token only
+  near the discrete minimum-to-collapsed snap so the 200px-to-44px state change
+  retains spatial continuity without making ordinary width changes feel lazy.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.
