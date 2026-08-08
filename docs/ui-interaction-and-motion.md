@@ -50,6 +50,20 @@ chatbot filler. Their visible titles should stay scannable while the inserted
 prompt carries the evidence, freshness, persistence, and permission boundaries
 needed for the real task. Prefer a small rotating set over a wall of commands.
 
+### Long-form Markdown
+
+`MarkdownContent` owns one parser and interaction contract with two deliberate
+presentation densities. The default variant stays compact for chat, comments,
+runtime output, and small previews. Durable reports and Issue documents use the
+`reading` variant: a restrained reading measure, stronger heading hierarchy,
+more paragraph rhythm, and document-owned horizontal scrolling for wide tables.
+
+Route Markdown files through `FileContentView` so Tracked artifacts, Inbox
+attachments, and Workspace file views retain the same reading treatment. Do not
+fork Markdown parsing or recreate feature-local heading, list, table, quote, and
+code styles. Long documents remain the dominant page surface rather than being
+wrapped in a decorative card; surrounding shell chrome supplies the context.
+
 ### Responsive Behavior
 
 Narrow layouts are a change in information hierarchy, not a compressed desktop.

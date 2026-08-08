@@ -490,7 +490,8 @@ function IssueAnchorDetail({
         <div className="px-5 py-6 md:px-7 md:py-7">
           <MarkdownContent
             text={body || t('tracked.issueNoDescription')}
-            className="text-[14px] leading-7 text-muted-foreground md:text-[15px]"
+            variant="reading"
+            className="mx-auto max-w-[46rem]"
           />
         </div>
       </article>
