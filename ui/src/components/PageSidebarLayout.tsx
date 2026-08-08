@@ -25,8 +25,24 @@ const MAX_WIDTH = 420
 const MAIN_PANE_MIN_WIDTH = 500
 const COLLAPSED_WIDTH = 44
 const RESIZE_SEPARATOR_WIDTH = 1
-const COLLAPSE_MOTION_ARM_DISTANCE = 24
 const COLLAPSE_MOTION_CLEANUP_MS = 260
+const OVERDRAG_ARM_DISTANCE = 64
+const OVERDRAG_COLLAPSE_DISTANCE = (MIN_WIDTH - COLLAPSED_WIDTH) / 2
+const OVERDRAG_DAMPING_DISTANCE = 38
+const OVERDRAG_MAX_VISUAL_DISTANCE = 34
+const OVERDRAG_RETURN_CLEANUP_MS = 280
+
+export function calculatePageSidebarOverdrag(rawDistance: number): number {
+  if (!Number.isFinite(rawDistance) || rawDistance <= 0) return 0
+  return OVERDRAG_MAX_VISUAL_DISTANCE * (
+    1 - Math.exp(-rawDistance / OVERDRAG_DAMPING_DISTANCE)
+  )
+}
+
+export function shouldCollapsePageSidebar(rawDistance: number): boolean {
+  return Number.isFinite(rawDistance) && rawDistance >= OVERDRAG_COLLAPSE_DISTANCE
+}
+
 function clampWidth(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(value)))
@@ -144,12 +160,20 @@ export function PageSidebarLayout({
   const userResizeIntentRef = useRef(false)
   const userResizeChangedRef = useRef(false)
   const collapseMotionTimerRef = useRef<number | null>(null)
+  const overdragMotionTimerRef = useRef<number | null>(null)
+  const pointerGestureRef = useRef<{
+    pointerId: number
+    startX: number
+    startWidth: number
+    rawOverdrag: number
+  } | null>(null)
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null)
   const mobileDrawerId = useId()
   const navigatorPanelId = `page-sidebar-${storageKey}-navigator`
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => readStoredCollapsed(storageKey))
+  const [pointerCollapseRequested, setPointerCollapseRequested] = useState(false)
   const collapsedRef = useRef(collapsed)
   const [preferredWidth, setPreferredWidth] = useState(() =>
     readStoredWidth(storageKey, clampWidth(defaultWidth, defaultWidth)),
@@ -247,6 +271,32 @@ export function PageSidebarLayout({
     rootRef.current?.removeAttribute('data-collapse-motion')
   }, [])
 
+  const clearOverdragMotion = useCallback(() => {
+    if (overdragMotionTimerRef.current !== null) {
+      window.clearTimeout(overdragMotionTimerRef.current)
+      overdragMotionTimerRef.current = null
+    }
+    const root = rootRef.current
+    if (!root) return
+    root.removeAttribute('data-overdrag-motion')
+    root.removeAttribute('data-overdrag-state')
+    root.style.removeProperty('--oa-page-sidebar-overdrag')
+  }, [])
+
+  const scheduleOverdragCleanup = useCallback(() => {
+    if (overdragMotionTimerRef.current !== null) {
+      window.clearTimeout(overdragMotionTimerRef.current)
+    }
+    overdragMotionTimerRef.current = window.setTimeout(() => {
+      overdragMotionTimerRef.current = null
+      const root = rootRef.current
+      if (!root) return
+      root.removeAttribute('data-overdrag-motion')
+      root.removeAttribute('data-overdrag-state')
+      root.style.removeProperty('--oa-page-sidebar-overdrag')
+    }, OVERDRAG_RETURN_CLEANUP_MS)
+  }, [])
+
   const armCollapseMotion = useCallback(() => {
     const root = rootRef.current
     if (!root) return
@@ -269,19 +319,67 @@ export function PageSidebarLayout({
     const hitSlop = Math.max(0, (targetSize - rect.width) / 2)
     if (event.clientX < rect.left - hitSlop || event.clientX > rect.right + hitSlop) return
     beginUserResize()
-  }, [beginUserResize])
-
-  const preparePointerCollapseMotion = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!userResizeIntentRef.current) return
-    const root = rootRef.current
-    if (!root) return
-    const collapseThreshold = root.getBoundingClientRect().left + MIN_WIDTH
-    if (event.clientX <= collapseThreshold + COLLAPSE_MOTION_ARM_DISTANCE) {
-      armCollapseMotion()
-    } else if (!sidebarPanelRef.current?.isCollapsed()) {
-      disarmCollapseMotion()
+    const panel = sidebarPanelRef.current
+    if (!panel || panel.isCollapsed()) return
+    clearOverdragMotion()
+    pointerGestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: panel.getSize().inPixels,
+      rawOverdrag: 0,
     }
-  }, [armCollapseMotion, disarmCollapseMotion])
+  }, [beginUserResize, clearOverdragMotion])
+
+  const updatePointerOverdrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = pointerGestureRef.current
+    const root = rootRef.current
+    if (!gesture || !root || event.pointerId !== gesture.pointerId || event.buttons !== 1) return
+
+    const rawWidth = gesture.startWidth + event.clientX - gesture.startX
+    const rawOverdrag = Math.max(0, MIN_WIDTH - rawWidth)
+    gesture.rawOverdrag = rawOverdrag
+
+    if (rawOverdrag === 0) {
+      root.removeAttribute('data-overdrag-state')
+      root.style.setProperty('--oa-page-sidebar-overdrag', '0px')
+      return
+    }
+
+    if (shouldCollapsePageSidebar(rawOverdrag)) {
+      root.setAttribute('data-overdrag-state', 'armed')
+      root.setAttribute('data-overdrag-motion', 'committing')
+      root.style.setProperty('--oa-page-sidebar-overdrag', '0px')
+      armCollapseMotion()
+      scheduleOverdragCleanup()
+      return
+    }
+
+    if (root.hasAttribute('data-overdrag-motion')) clearOverdragMotion()
+    const visualDistance = calculatePageSidebarOverdrag(rawOverdrag)
+    root.style.setProperty('--oa-page-sidebar-overdrag', `${visualDistance.toFixed(3)}px`)
+    root.setAttribute(
+      'data-overdrag-state',
+      rawOverdrag >= OVERDRAG_ARM_DISTANCE ? 'armed' : 'resisting',
+    )
+  }, [armCollapseMotion, clearOverdragMotion, scheduleOverdragCleanup])
+
+  const returnFromOverdrag = useCallback(() => {
+    const root = rootRef.current
+    if (!root || !root.hasAttribute('data-overdrag-state')) {
+      clearOverdragMotion()
+      return
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      clearOverdragMotion()
+      return
+    }
+    root.setAttribute('data-overdrag-motion', 'returning')
+    root.removeAttribute('data-overdrag-state')
+    window.requestAnimationFrame(() => {
+      root.style.setProperty('--oa-page-sidebar-overdrag', '0px')
+    })
+    scheduleOverdragCleanup()
+  }, [clearOverdragMotion, scheduleOverdragCleanup])
 
   const finishUserResize = useCallback(() => {
     if (!sidebarPanelRef.current?.isCollapsed()) disarmCollapseMotion()
@@ -293,6 +391,33 @@ export function PageSidebarLayout({
     userResizeIntentRef.current = false
     userResizeChangedRef.current = false
   }, [commitPreferredWidth, disarmCollapseMotion])
+
+  const finishPointerResize = useCallback(() => {
+    const gesture = pointerGestureRef.current
+    pointerGestureRef.current = null
+
+    if (gesture && shouldCollapsePageSidebar(gesture.rawOverdrag)) {
+      userResizeIntentRef.current = false
+      userResizeChangedRef.current = false
+      // The primitive normally commits at the same midpoint. Keep an
+      // imperative fallback for coarse rounding, but let pointer-up settlement
+      // finish first so it cannot overwrite that fallback.
+      setPointerCollapseRequested(true)
+      return
+    }
+
+    returnFromOverdrag()
+    finishUserResize()
+  }, [
+    finishUserResize,
+    returnFromOverdrag,
+  ])
+
+  const cancelPointerResize = useCallback(() => {
+    pointerGestureRef.current = null
+    returnFromOverdrag()
+    finishUserResize()
+  }, [finishUserResize, returnFromOverdrag])
 
   const collapseSidebar = useCallback(() => {
     updateCollapsed(true)
@@ -327,7 +452,38 @@ export function PageSidebarLayout({
     if (isDesktop) setDrawerOpen(false)
   }, [isDesktop])
 
-  useEffect(() => disarmCollapseMotion, [disarmCollapseMotion])
+  useEffect(() => {
+    if (!pointerCollapseRequested) return
+    setPointerCollapseRequested(false)
+    const root = rootRef.current
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      clearOverdragMotion()
+      window.setTimeout(() => sidebarPanelRef.current?.collapse(), 0)
+      return
+    }
+    root?.setAttribute('data-overdrag-motion', 'committing')
+    root?.removeAttribute('data-overdrag-state')
+    root?.style.setProperty('--oa-page-sidebar-overdrag', '0px')
+    armCollapseMotion()
+    scheduleOverdragCleanup()
+    // A macrotask boundary guarantees that the primitive's pointer-up
+    // settlement finishes before the rounding fallback runs.
+    window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => sidebarPanelRef.current?.collapse())
+      })
+    }, 0)
+  }, [
+    armCollapseMotion,
+    clearOverdragMotion,
+    pointerCollapseRequested,
+    scheduleOverdragCleanup,
+  ])
+
+  useEffect(() => () => {
+    disarmCollapseMotion()
+    clearOverdragMotion()
+  }, [clearOverdragMotion, disarmCollapseMotion])
 
   useEffect(() => {
     if (!isDesktop) return
@@ -378,14 +534,15 @@ export function PageSidebarLayout({
         orientation="horizontal"
         onLayoutChanged={handleLayoutChanged}
         onPointerDownCapture={beginPointerResize}
-        onPointerMoveCapture={preparePointerCollapseMotion}
-        onPointerUpCapture={finishUserResize}
-        onPointerCancelCapture={finishUserResize}
+        onPointerMoveCapture={updatePointerOverdrag}
+        onPointerUpCapture={finishPointerResize}
+        onPointerCancelCapture={cancelPointerResize}
         resizeTargetMinimumSize={{ fine: 10, coarse: 28 }}
         className="oa-page-sidebar-resizable min-h-0 min-w-0 overflow-hidden"
       >
         <ResizablePanel
           id={navigatorPanelId}
+          data-page-sidebar-panel="navigator"
           data-collapse-state={collapsed ? 'collapsed' : 'expanded'}
           panelRef={sidebarPanelRef}
           defaultSize={collapsed ? COLLAPSED_WIDTH : width}
@@ -460,6 +617,7 @@ export function PageSidebarLayout({
         />
         <ResizablePanel
           id={`page-sidebar-${storageKey}-content`}
+          data-page-sidebar-panel="content"
           minSize={contentMinWidth}
           groupResizeBehavior="preserve-relative-size"
           className="min-h-0 min-w-0"

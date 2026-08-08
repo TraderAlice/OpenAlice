@@ -6,7 +6,12 @@ import { useMobilePageNavigation, MobilePageNavigationProvider } from '../contex
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import { calculatePageSidebarConstraints, PageSidebarLayout } from './PageSidebarLayout'
+import {
+  calculatePageSidebarConstraints,
+  calculatePageSidebarOverdrag,
+  PageSidebarLayout,
+  shouldCollapsePageSidebar,
+} from './PageSidebarLayout'
 
 class ResizeObserverStub {
   observe() {}
@@ -36,6 +41,17 @@ afterEach(() => {
 })
 
 describe('PageSidebarLayout', () => {
+  it('applies diminishing resistance and a deliberate overdrag commit boundary', () => {
+    expect(calculatePageSidebarOverdrag(-1)).toBe(0)
+    expect(calculatePageSidebarOverdrag(0)).toBe(0)
+    expect(calculatePageSidebarOverdrag(16)).toBeCloseTo(11.67, 1)
+    expect(calculatePageSidebarOverdrag(40)).toBeCloseTo(22.14, 1)
+    expect(calculatePageSidebarOverdrag(64)).toBeCloseTo(27.69, 1)
+    expect(calculatePageSidebarOverdrag(200)).toBeLessThanOrEqual(34)
+    expect(shouldCollapsePageSidebar(77.9)).toBe(false)
+    expect(shouldCollapsePageSidebar(78)).toBe(true)
+  })
+
   it('keeps responsive panel minimums feasible while preserving the former content reserve', () => {
     expect(calculatePageSidebarConstraints(0)).toEqual({
       navigatorMaxWidth: 420,

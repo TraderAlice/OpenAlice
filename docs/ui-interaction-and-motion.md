@@ -174,9 +174,15 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   separator's enlarged fine/coarse pointer target behaves like its visible
   one-pixel rule. Persist keyboard changes from the settled layout map rather
   than a pre-paint DOM width, which can lag one key press behind. Direct pointer
-  resizing must stay attached to the cursor; arm the shared motion token only
-  near the discrete minimum-to-collapsed snap so the 200px-to-44px state change
-  retains spatial continuity without making ordinary width changes feel lazy.
+  resizing must stay attached to the cursor above the navigator minimum. Below
+  that minimum, keep the primitive layout and internal content measure fixed,
+  show only a bounded damped overdrag, and spring back on release before the
+  primitive's native collapsed-state midpoint. Arm the shared motion token as
+  that midpoint is crossed so the 200px-to-44px commit retains spatial
+  continuity without squeezing the navigator's controls or making ordinary
+  width changes feel lazy. Do not toggle the primitive's `collapsible`
+  metadata during an active pointer transaction; its native midpoint remains
+  the single collapse boundary.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.

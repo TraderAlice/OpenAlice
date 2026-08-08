@@ -1,6 +1,6 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `complete` (responsive and collapse-motion hardening included in Draft PR #1025; awaiting maintainer acceptance)
+- Status: `complete` (resisted overdrag included in Draft PR #1025; awaiting maintainer acceptance)
 - Updated: `2026-08-08`
 - Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
   maintainer acceptance.
@@ -211,6 +211,19 @@ At every settled desktop layout exactly one surface is interactive:
 - [x] Re-run real browser sampling, focused/full tests, typechecks, and UI build
       before pushing the follow-up commit to Draft PR #1025.
 
+### Resisted-overdrag follow-up
+
+- [x] Keep direct resizing cursor-attached above 200px, then hold primitive
+      layout at the expanded minimum while presenting a damped visual overdrag.
+- [x] Keep the navigator's internal content at its 200px layout width so the
+      transient gesture clips content rather than squeezing controls and text.
+- [x] Require a deliberate raw pointer overdrag before collapse; release below
+      that boundary must spring back to 200px without changing focus mode.
+- [x] Preserve button and keyboard collapse behavior, pointer-cancel recovery,
+      width persistence, and reduced-motion behavior.
+- [x] Add focused state/motion regressions and measure both return and commit
+      trajectories in the real `pnpm dev` Chat route.
+
 ## Verification Evidence
 
 - Real `pnpm dev` data: Chat pointer and keyboard resizing both persisted over
@@ -264,6 +277,24 @@ At every settled desktop layout exactly one surface is interactive:
   the UI production build. The regression also proves distant pointer movement
   does not arm motion, the 24px approach zone does, and reduced-motion button
   collapse bypasses both animation frames.
+- Resisted-overdrag acceptance used CDP pointer events against the live Chat
+  route so geometry could be measured while the pointer remained down. A raw
+  40px pull beyond the 200px minimum produced 22.133px of visual displacement,
+  while both the primitive panel and its internal content stayed exactly
+  200px. Release returned the separator through 338.63 -> 344.77 -> 350.78 ->
+  351.92px, made one sub-pixel overshoot, and settled back at 352px without
+  entering focus mode.
+- The collapse boundary is the primitive's native `(200 - 44) / 2 = 78px`
+  midpoint rather than a second product threshold. Crossing it blended the
+  damped preview into the existing spatial collapse, sampled 128.13 -> 58.97
+  -> 47.61 -> 45.52 -> 44.13 -> 44px, and changed the interactive product
+  surface only when applied geometry reached the collapsed width. Reload kept
+  44px; Expand restored 200px; explicit button collapse still reached 44px.
+- Final overdrag checks passed on 2026-08-08: 19 focused sidebar tests, root and
+  UI typechecks, the complete Vitest suite (488 files, 4021 passing tests, 9
+  skipped), UI production build, and unsigned packaged Electron Workspace
+  smoke. Browser acceptance also covered pointer cancel and emulated
+  `prefers-reduced-motion: reduce`, which clears the overdrag immediately.
 
 ## Verification Matrix
 
