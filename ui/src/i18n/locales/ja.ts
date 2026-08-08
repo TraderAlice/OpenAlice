@@ -756,6 +756,7 @@ export const ja: Resources = {
     testConnection: '接続をテスト',
     collapsePanel: '{{title}}を折りたたむ',
     openPanel: '{{title}}を開く',
+    resizePanel: '{{title}}の幅を調整',
     closePanel: '{{title}}を閉じる',
     focusContent: 'コンテンツに集中',
     moreActions: '{{target}}のその他の操作',

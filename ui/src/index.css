@@ -353,6 +353,56 @@ body {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
+/* Keep direct pointer resizing attached to the cursor, then soften only the
+   primitive's discrete 200px -> 44px collapse snap. Panel classes are applied
+   to react-resizable-panels' nested content element, so this rule deliberately
+   targets the direct flex item from the product-owned group seam. */
+.oa-page-sidebar-resizable[data-collapse-motion="armed"]
+  > [data-panel][data-collapse-state] {
+  transition: flex-grow var(--motion-standard) var(--motion-ease-out);
+}
+
+/* The expanded navigator keeps a hard 200px layout floor. Pointer travel past
+   that floor is represented as a damped, clipped overdrag: content retains its
+   layout width, the separator follows the resisted edge, and the working pane
+   shifts only for the duration of the gesture. Releasing before the commit
+   boundary uses a deliberately light spring; a committed gesture blends this
+   offset back into the primitive-owned 200px -> 44px collapse. */
+.oa-page-sidebar-resizable {
+  --oa-page-sidebar-overdrag: 0px;
+}
+
+.oa-page-sidebar-resizable > [data-page-sidebar-panel="navigator"] {
+  clip-path: inset(0 var(--oa-page-sidebar-overdrag) 0 0);
+}
+
+.oa-page-sidebar-resizable > [data-slot="resizable-handle"],
+.oa-page-sidebar-resizable > [data-page-sidebar-panel="content"] {
+  transform: translateX(calc(-1 * var(--oa-page-sidebar-overdrag)));
+}
+
+.oa-page-sidebar-resizable[data-overdrag-motion]
+  > [data-page-sidebar-panel="navigator"] {
+  transition: clip-path 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
+}
+
+.oa-page-sidebar-resizable[data-overdrag-motion]
+  > [data-slot="resizable-handle"],
+.oa-page-sidebar-resizable[data-overdrag-motion]
+  > [data-page-sidebar-panel="content"] {
+  transition: transform 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
+}
+
+.oa-page-sidebar-resizable[data-overdrag-state="resisting"]
+  > [data-slot="resizable-handle"] {
+  background-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+}
+
+.oa-page-sidebar-resizable[data-overdrag-state="armed"]
+  > [data-slot="resizable-handle"] {
+  background-color: color-mix(in srgb, var(--primary) 78%, var(--border));
+}
+
 /* Page-owned navigators become touch surfaces inside the phone drawer.
    A 40px height floor removes the old 18–28px rows; icon controls keep 36px
    of horizontal room so adjacent workspace names remain distinguishable. */

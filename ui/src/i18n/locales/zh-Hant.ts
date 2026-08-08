@@ -763,6 +763,7 @@ export const zhHant: Resources = {
     testConnection: '測試連線',
     collapsePanel: '收合{{title}}',
     openPanel: '開啟{{title}}',
+    resizePanel: '調整{{title}}寬度',
     closePanel: '關閉{{title}}',
     focusContent: '聚焦內容區',
     moreActions: '{{target}}的更多操作',
