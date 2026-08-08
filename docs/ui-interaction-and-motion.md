@@ -166,7 +166,14 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
   the complete constraint set feasible at every supported width; when there is
   not enough room for both preferred minimums, preserve the navigator minimum
   and give the working view the measured remainder instead of sending mutually
-  impossible hard minimums to the primitive.
+  impossible hard minimums to the primitive. Treat the primitive's applied
+  panel geometry as the authority for which expanded or collapsed surface is
+  interactive; input-source bookkeeping may decide whether a settled width is
+  persisted, but must never gate `aria-hidden`, `inert`, or collapse-state
+  synchronization. Capture resize intent at the split-group boundary so the
+  separator's enlarged fine/coarse pointer target behaves like its visible
+  one-pixel rule. Persist keyboard changes from the settled layout map rather
+  than a pre-paint DOM width, which can lag one key press behind.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.

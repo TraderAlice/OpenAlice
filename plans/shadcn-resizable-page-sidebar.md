@@ -1,6 +1,6 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `complete` (responsive hardening included in Draft PR #1025; awaiting maintainer acceptance)
+- Status: `complete` (responsive state-consistency hardening included in Draft PR #1025; awaiting maintainer acceptance)
 - Updated: `2026-08-08`
 - Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
   maintainer acceptance.
@@ -37,6 +37,19 @@ current mobile Sheet hierarchy.
   with an unconditional 500px content-panel minimum. Once the page-owned group
   became narrower than 700px after app-shell chrome, those constraints were
   impossible; a resize could leave the navigator at 100% and content at 0%.
+- The repaired constraint pair exposed a second, independent state bug. In a
+  real 941px Chat split group the primitive reported the navigator at its 44px
+  collapsed minimum (`aria-valuenow` equalled `aria-valuemin`), while
+  `PageSidebarLayout` still rendered `data-state="expanded"` and left the full
+  navigator surface accessible. The expanded sidebar was therefore compressed
+  into the collapsed rail instead of switching surfaces.
+- `react-resizable-panels` deliberately expands the one-pixel separator into a
+  10px fine-pointer and 28px coarse-pointer hit region. A pointer can begin in
+  that virtual region without firing React's `pointerdown` handler on the
+  separator element itself. The primitive still resizes and collapses the
+  panel, but the current `userResizeRef` gate suppresses product-state sync and
+  persistence. Previous browser acceptance clicked the visible one-pixel rule
+  and did not cover this normal human acquisition path.
 
 ## Scope
 
@@ -95,6 +108,41 @@ current mobile Sheet hierarchy.
    contract; real browser acceptance covers pointer and keyboard resizing.
 7. Measure the page-owned group before applying responsive constraints. Window
    width includes app-shell chrome and is not a valid initial substitute.
+8. Keep three state layers explicit and one-directional:
+   - **applied geometry** is the primitive's current panel size and collapsed
+     state;
+   - **interactive surface** is derived from applied geometry and controls
+     expanded/collapsed rendering, `aria-hidden`, and `inert`;
+   - **user preference** is the last settled expanded width plus the deliberate
+     focus-mode choice, persisted without being overwritten by responsive caps.
+9. A pointer or keyboard interaction marker may decide whether a settled width
+   becomes the next user preference, but it must never gate geometry-to-surface
+   synchronization. Pointer acquisition is observed at the split-group capture
+   boundary so the primitive's enlarged hit region and the visible separator
+   behave identically; shadcn continues to own actual drag capture and motion.
+
+## Responsive State Contract
+
+| Input or transition | Applied geometry | Interactive surface | Persisted preference |
+|---|---|---|---|
+| Collapse button | 44px | collapsed rail only | store focus mode; retain prior expanded width |
+| Expand button | responsive cap of saved width | expanded navigator only | clear focus mode; retain saved width |
+| Pointer drag from visible 1px rule | primitive result | derive from result on every resize | commit settled expanded width; collapsed drag retains prior width |
+| Pointer drag from 10px/28px virtual hit region | identical to visible-rule drag | identical to visible-rule drag | identical to visible-rule drag |
+| Arrow/Home/End on separator | primitive result | derive from result | commit settled expanded width or focus mode |
+| Container narrows while expanded | clamp to measured feasible maximum, never below 200px | remain expanded | do not overwrite the wider preference |
+| Container widens again | restore saved width when feasible | remain expanded | unchanged |
+| Reload in focus mode | 44px from first stable layout | collapsed rail only | unchanged |
+| Reload expanded | saved width capped by current group | expanded navigator only | unchanged until user resizes |
+| Viewport crosses below route breakpoint | desktop group unmounts; mobile Sheet owns navigation | no compressed desktop navigator | desktop width/focus preference unchanged |
+
+At every settled desktop layout exactly one surface is interactive:
+
+- `inPixels <= 45`: collapsed surface visible and interactive; expanded surface
+  hidden and inert;
+- `inPixels >= 200`: expanded surface visible and interactive; collapsed surface
+  hidden and inert;
+- no stable layout may render the expanded surface between 45px and 200px.
 
 ## Work
 
@@ -123,6 +171,32 @@ current mobile Sheet hierarchy.
 - [x] Re-run narrow/wide drag, collapse/expand, reload, browser, full automated,
       build, and unsigned Electron acceptance on the repaired increment.
 
+### Responsive state-consistency increment
+
+- [x] Replace separator-element `pointerdown` authority with split-group input
+      capture that covers the primitive's complete fine/coarse hit region.
+- [x] Synchronize the product collapsed surface from applied panel geometry on
+      every resize, independently of whether the change came from pointer,
+      keyboard, button, restore, or responsive constraints.
+- [x] Keep width persistence scoped to a settled user resize; prove that
+      responsive caps and programmatic restore do not overwrite the user's
+      wider expanded preference.
+- [x] Add focused state-transition tests for geometry/surface agreement,
+      collapsed-width retention, expanded-width persistence, and passive
+      responsive non-persistence.
+- [x] Reproduce pointer acquisition from both sides of the visible separator,
+      including 2–4px offsets inside the 10px fine-pointer virtual hit region
+      and wider coarse-pointer acquisition, then verify the same contract with
+      keyboard Home/End/Arrow input.
+- [x] Exercise desktop widths around the route breakpoint and the 701px
+      feasibility boundary, then round-trip narrow -> wide -> narrow with both
+      expanded and focus-mode preferences.
+- [x] Re-walk Chat, Inbox, Tracked, Settings, AutoQuant, and one dense shell
+      route in Default Day/Night plus Windows 98; verify reduced-motion,
+      console health, focus order, and exactly one interactive surface.
+- [x] Re-run root/UI typechecks, focused and full Vitest, UI production build,
+      and unsigned Electron Workspace smoke before updating Draft PR #1025.
+
 ## Verification Evidence
 
 - Real `pnpm dev` data: Chat pointer and keyboard resizing both persisted over
@@ -149,6 +223,22 @@ current mobile Sheet hierarchy.
 - Automated/build: `npx tsc --noEmit`, `cd ui && npx tsc -b`, focused sidebar
   tests, `pnpm test` (487 files, 4008 passing tests), `cd ui && pnpm build`, and
   `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace` passed.
+- State-consistency reproduction and repair used the live `pnpm dev` Chat
+  route. Before the repair, a 941px group exposed a 44px navigator with
+  `data-state="expanded"`; after the repair, Home produced 44px with only the
+  collapsed surface interactive, reload retained 44px, and Expand restored
+  the prior 294px preference. ArrowRight then settled at 319px and a second
+  reload restored exactly 319px rather than the previous painted width.
+- The same live-runtime geometry/ARIA/inert invariant passed on Chat (319px),
+  Inbox (200px), Tracked (257px), Settings (200px), AutoQuant (218px), and
+  Automation Runs (220px), each with exactly one separator. Focused state tests
+  cover fine-pointer acquisition 3px beside the rule, a 12px coarse-pointer
+  acquisition, passive responsive caps, collapsed-width retention, and the
+  pre-paint keyboard-width race.
+- Final hardening checks passed on 2026-08-08: root and UI typechecks; 12
+  focused sidebar tests; the complete Vitest suite (487 files, 4014 passing
+  tests); UI production build; and unsigned packaged Electron Workspace smoke
+  including its managed Pi acceptance flow.
 
 ## Verification Matrix
 
@@ -156,8 +246,11 @@ current mobile Sheet hierarchy.
 |---|---|---|
 | One separator | shared layout DOM/class assertion | Inbox and Tracked visual inspection |
 | Pointer resize | upstream primitive + product persistence callback | mouse/trackpad drag in Chat and Inbox |
+| Enlarged hit target | group-capture and state-transition regression | start mouse drags 2–4px on either side of the one-pixel rule; cover the wider coarse target separately |
 | Keyboard resize | separator role/focus composition | focus handle and use arrow keys |
 | Responsive constraints | feasible-pair sweep from 201–1600px plus boundary cases | real 740px mobile, 708px split-group, 941px split-group, and 1200px viewport paths |
+| Geometry/surface agreement | collapsed/expanded state-transition assertions | inspect applied panel pixels, `data-state`, `aria-hidden`, and `inert` together |
+| Preference isolation | passive-cap and settled-user-resize assertions | narrow/wide/reload round trip without preference drift |
 | Focus mode | collapse/restore and `inert` tests | collapse, navigate, reload, restore |
 | Mobile ownership | existing Sheet focus/dismissal suite | phone drawer selection and Escape |
 | Theme/style profiles | semantic `data-slot` source review | Day/Night plus Windows 98 spot check |
@@ -171,6 +264,11 @@ current mobile Sheet hierarchy.
   OpenAlice document-level resize listeners.
 - Page-specific widths and focus mode survive reloads without changing their
   existing storage contract.
+- Applied geometry and rendered interaction state cannot diverge: a 44px panel
+  always exposes only the collapsed rail, and an expanded surface never renders
+  below the 200px navigator minimum.
+- Visible-rule, adjacent fine-pointer, coarse-pointer, and keyboard resize paths
+  produce the same settled state and preference behavior.
 - The working pane keeps its 500px minimum whenever geometry permits and gets
   the measured remainder beside the 200px navigator below that boundary;
   mobile routes keep their existing Sheet behavior and focus return.

@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels'
+import type { Layout, PanelImperativeHandle, PanelSize } from 'react-resizable-panels'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -129,10 +138,13 @@ export function PageSidebarLayout({
   const isAppDesktop = useIsDesktop(768)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null)
-  const userResizeRef = useRef(false)
+  const resizeHandleRef = useRef<HTMLDivElement | null>(null)
+  const userResizeIntentRef = useRef(false)
+  const userResizeChangedRef = useRef(false)
   const mobileTriggerRef = useRef<HTMLButtonElement | null>(null)
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null)
   const mobileDrawerId = useId()
+  const navigatorPanelId = `page-sidebar-${storageKey}-navigator`
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => readStoredCollapsed(storageKey))
   const collapsedRef = useRef(collapsed)
@@ -185,33 +197,64 @@ export function PageSidebarLayout({
 
   const handleSidebarResize = useCallback((size: PanelSize) => {
     const nextCollapsed = size.inPixels <= COLLAPSED_WIDTH + 1
-    if (userResizeRef.current) {
-      updateCollapsed(nextCollapsed)
-      if (!nextCollapsed) {
-        latestWidthRef.current = clampWidth(size.inPixels, MIN_WIDTH)
-      }
+    // Applied panel geometry is the source of truth for which surface is
+    // interactive. Pointer drags may begin inside react-resizable-panels'
+    // enlarged virtual hit region rather than on the one-pixel Separator DOM
+    // node, so interaction bookkeeping must never gate this synchronization.
+    updateCollapsed(nextCollapsed)
+    if (userResizeIntentRef.current) {
+      userResizeChangedRef.current = true
     }
   }, [updateCollapsed])
 
-  const handleLayoutChanged = useCallback(() => {
-    if (!userResizeRef.current) return
+  const handleLayoutChanged = useCallback((layout: Layout) => {
+    if (!userResizeIntentRef.current) return
     const panel = sidebarPanelRef.current
     if (!panel || panel.isCollapsed()) {
-      userResizeRef.current = false
+      userResizeIntentRef.current = false
+      userResizeChangedRef.current = false
       return
     }
-    const nextWidth = clampWidth(panel.getSize().inPixels, MIN_WIDTH)
+    // Keyboard layout callbacks run before the browser has painted the new
+    // flex width, so offsetWidth can lag one key press behind. The settled
+    // layout map is already authoritative; convert its percentage using the
+    // measured group budget and keep the imperative size as a cancellation
+    // fallback only.
+    const groupWidth = rootRef.current?.getBoundingClientRect().width ?? 0
+    const percentage = layout[navigatorPanelId]
+    const settledPixels = groupWidth > RESIZE_SEPARATOR_WIDTH && Number.isFinite(percentage)
+      ? ((groupWidth - RESIZE_SEPARATOR_WIDTH) * percentage) / 100
+      : panel.getSize().inPixels
+    const nextWidth = clampWidth(settledPixels, MIN_WIDTH)
     commitPreferredWidth(nextWidth)
-    userResizeRef.current = false
-  }, [commitPreferredWidth])
+    userResizeIntentRef.current = false
+    userResizeChangedRef.current = false
+  }, [commitPreferredWidth, navigatorPanelId])
+
+  const beginUserResize = useCallback(() => {
+    userResizeIntentRef.current = true
+    userResizeChangedRef.current = false
+  }, [])
+
+  const beginPointerResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!event.isPrimary || event.button !== 0) return
+    const handle = resizeHandleRef.current
+    if (!handle) return
+    const rect = handle.getBoundingClientRect()
+    const targetSize = event.pointerType === 'mouse' ? 10 : 28
+    const hitSlop = Math.max(0, (targetSize - rect.width) / 2)
+    if (event.clientX < rect.left - hitSlop || event.clientX > rect.right + hitSlop) return
+    beginUserResize()
+  }, [beginUserResize])
 
   const finishUserResize = useCallback(() => {
-    if (!userResizeRef.current) return
+    if (!userResizeIntentRef.current) return
     const panel = sidebarPanelRef.current
-    if (panel && !panel.isCollapsed()) {
+    if (userResizeChangedRef.current && panel && !panel.isCollapsed()) {
       commitPreferredWidth(clampWidth(panel.getSize().inPixels, MIN_WIDTH))
     }
-    userResizeRef.current = false
+    userResizeIntentRef.current = false
+    userResizeChangedRef.current = false
   }, [commitPreferredWidth])
 
   const collapseSidebar = useCallback(() => {
@@ -232,7 +275,7 @@ export function PageSidebarLayout({
   }, [collapsed, containerWidth, isDesktop])
 
   useLayoutEffect(() => {
-    if (!isDesktop || containerWidth <= 0 || collapsed || userResizeRef.current) return
+    if (!isDesktop || containerWidth <= 0 || collapsed || userResizeIntentRef.current) return
     sidebarPanelRef.current?.resize(Math.min(latestWidthRef.current, maxWidth))
   }, [collapsed, containerWidth, isDesktop, maxWidth])
 
@@ -288,11 +331,14 @@ export function PageSidebarLayout({
         elementRef={rootRef}
         orientation="horizontal"
         onLayoutChanged={handleLayoutChanged}
+        onPointerDownCapture={beginPointerResize}
+        onPointerUpCapture={finishUserResize}
+        onPointerCancelCapture={finishUserResize}
         resizeTargetMinimumSize={{ fine: 10, coarse: 28 }}
         className="min-h-0 min-w-0 overflow-hidden"
       >
         <ResizablePanel
-          id={`page-sidebar-${storageKey}-navigator`}
+          id={navigatorPanelId}
           panelRef={sidebarPanelRef}
           defaultSize={collapsed ? COLLAPSED_WIDTH : width}
           minSize={MIN_WIDTH}
@@ -350,15 +396,11 @@ export function PageSidebarLayout({
         </ResizablePanel>
         <ResizableHandle
           id={`page-sidebar-${storageKey}-handle`}
+          elementRef={resizeHandleRef}
           aria-label={t('common.resizePanel', { title })}
-          onPointerDown={() => {
-            userResizeRef.current = true
-          }}
-          onPointerUp={finishUserResize}
-          onPointerCancel={finishUserResize}
-          onKeyDown={(event) => {
+          onKeyDownCapture={(event) => {
             if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
-              userResizeRef.current = true
+              beginUserResize()
             }
           }}
           onKeyUp={finishUserResize}
