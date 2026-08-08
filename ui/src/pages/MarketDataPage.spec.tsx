@@ -35,6 +35,7 @@ vi.mock('../hooks/useConfigPage', () => ({
         eia: 'test-eia-key',
         econdb: 'test-econdb-key',
         intrinio: 'test-intrinio-key',
+        marketdata: 'test-marketdata-key',
       },
     },
     status: 'idle',
@@ -61,14 +62,17 @@ describe('MarketDataPage provider credentials', () => {
   it('gives every key field and test action a provider-specific name', () => {
     openProviderKeys()
 
-    for (const provider of ['FMP', 'FRED', 'BLS', 'EIA', 'EconDB', 'Intrinio']) {
+    for (const [provider, key] of [
+      ['FMP', 'fmp'], ['FRED', 'fred'], ['BLS', 'bls'], ['EIA', 'eia'],
+      ['EconDB', 'econdb'], ['Intrinio', 'intrinio'], ['MarketData.app', 'marketdata'],
+    ]) {
       const input = screen.getByLabelText(`${provider} API key`)
       expect(screen.getByText(provider, { selector: 'label' }).getAttribute('for'))
         .toBe(input.getAttribute('id'))
       expect(input.getAttribute('aria-describedby')).toBe(
-        `market-data-provider-${provider.toLowerCase()}-key-description ` +
-        `market-data-provider-${provider.toLowerCase()}-key-hint ` +
-        `market-data-provider-${provider.toLowerCase()}-key-test-status`,
+        `market-data-provider-${key}-key-description ` +
+        `market-data-provider-${key}-key-hint ` +
+        `market-data-provider-${key}-key-test-status`,
       )
       expect(screen.getByRole('button', { name: `Test ${provider} key` })).toBeTruthy()
     }

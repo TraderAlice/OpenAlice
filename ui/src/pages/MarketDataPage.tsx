@@ -75,6 +75,7 @@ const KEY_GROUPS: { label: string | null; providers: ProviderEntry[] }[] = [
     providers: [
       { key: 'econdb', name: 'EconDB', desc: 'Global macro indicators, country profiles, shipping data.', hint: 'econdb.com' },
       { key: 'intrinio', name: 'Intrinio', desc: 'Equities, ETFs, fundamentals, news, options snapshots.', hint: 'intrinio.com' },
+      { key: 'marketdata', name: 'MarketData.app', desc: 'Historical US equity-option chains for point-in-time spread research.', hint: 'Free token — marketdata.app → Dashboard' },
     ],
   },
 ]

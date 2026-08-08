@@ -331,6 +331,7 @@ const marketDataSchema = z.object({
     benzinga: z.string().optional(),
     tiingo: z.string().optional(),
     biztoc: z.string().optional(),
+    marketdata: z.string().optional(),
   }).default({}),
   /** Hosted reference-data hub (TraderHub). Enabled by default: anonymous
    *  GETs of public boards, no user data attached; one switch to opt out.

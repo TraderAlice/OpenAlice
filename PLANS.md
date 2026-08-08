@@ -31,6 +31,7 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/marketdata-option-history.md]] — Adds filtered historical equity-option chains from MarketData.app to MCP/CLI and Market Data credentials.
 - [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
   local relationship graph derived from Tracked entities and authored Workspace
   backlinks, with provenance-preserving material navigation.

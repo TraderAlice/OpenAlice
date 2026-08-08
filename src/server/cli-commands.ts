@@ -103,6 +103,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       shipping: 'Inspect ports and maritime chokepoints',
       fed: 'Read FOMC documents, the Fed balance sheet, and dealer positioning',
       crypto: 'Inspect crypto derivatives markets',
+      options: 'Read filtered historical US equity-option chains',
       index: 'Discover index identifiers',
     },
     commands: {
@@ -157,6 +158,9 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       crypto: {
         options: 'cryptoOptionsChains',
         futures: 'cryptoFuturesInstruments',
+      },
+      options: {
+        history: 'equityOptionsHistory',
       },
       index: {
         search: 'indexSearch',

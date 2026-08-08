@@ -424,13 +424,20 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
 /** Market data routes: POST /test-provider, GET /hub-status */
 export function createMarketDataRoutes(ctx: EngineContext) {
-  const TEST_ENDPOINTS: Record<string, { credField: string; provider: string; model: string; params: Record<string, unknown> }> = {
+  const recentHistoricalDate = () => {
+    const date = new Date()
+    date.setUTCDate(date.getUTCDate() - 10)
+    while (date.getUTCDay() === 0 || date.getUTCDay() === 6) date.setUTCDate(date.getUTCDate() - 1)
+    return date.toISOString().slice(0, 10)
+  }
+  const TEST_ENDPOINTS: Record<string, { credField: string; provider: string; model: string; params: Record<string, unknown> | (() => Record<string, unknown>) }> = {
     fred:             { credField: 'federal_reserve_api_key',  provider: 'federal_reserve', model: 'FredSearch',              params: { query: 'GDP' } },
     bls:              { credField: 'bls_api_key',              provider: 'bls',              model: 'BlsSearch',               params: { query: 'unemployment' } },
     eia:              { credField: 'eia_api_key',              provider: 'eia',              model: 'ShortTermEnergyOutlook',  params: {} },
     econdb:           { credField: 'econdb_api_key',           provider: 'econdb',           model: 'AvailableIndicators',     params: {} },
     fmp:              { credField: 'fmp_api_key',              provider: 'fmp',              model: 'EquityScreener',          params: { limit: 1 } },
     intrinio:         { credField: 'intrinio_api_key',         provider: 'intrinio',         model: 'EquitySearch',            params: { query: 'AAPL', limit: 1 } },
+    marketdata:       { credField: 'marketdata_api_key',       provider: 'marketdata',       model: 'OptionsChains',           params: () => ({ symbol: 'AAPL', date: recentHistoricalDate() }) },
   }
 
   const app = new Hono()
@@ -467,7 +474,8 @@ export function createMarketDataRoutes(ctx: EngineContext) {
       if (!key) return c.json({ ok: false, error: 'No API key provided' }, 400)
 
       const result = await ctx.bbEngine.execute(
-        endpoint.provider, endpoint.model, endpoint.params,
+        endpoint.provider, endpoint.model,
+        typeof endpoint.params === 'function' ? endpoint.params() : endpoint.params,
         { [endpoint.credField]: key },
       )
       const data = result as unknown[]

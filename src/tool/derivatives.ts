@@ -12,6 +12,35 @@ import type { DerivativesClientLike } from '@/domain/market-data/client/types'
 
 export function createDerivativesTools(derivativesClient: DerivativesClientLike) {
   return {
+    equityOptionsHistory: tool({
+      description: `Get a filtered historical end-of-day US equity-option chain from MarketData.app.
+
+Use for option-strategy research and as-of validation, never for a current executable quote.
+Date, expiration, side, and a bounded strike range are required to preserve point-in-time meaning
+and avoid consuming credits on an entire chain. Returns bid/ask, mark, last, volume, open interest,
+IV and Greeks when the provider has them.`,
+      inputSchema: z.object({
+        symbol: z.string().min(1).transform((value) => value.toUpperCase()),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD'),
+        expiration: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD'),
+        side: z.enum(['call', 'put']),
+        minStrike: z.number().finite(),
+        maxStrike: z.number().finite(),
+      }).refine(({ minStrike, maxStrike }) => minStrike <= maxStrike, {
+        message: 'minStrike must be less than or equal to maxStrike',
+        path: ['minStrike'],
+      }).meta({ examples: [{
+        symbol: 'MSTR', date: '2026-07-20', expiration: '2026-09-18',
+        side: 'put', minStrike: 75, maxStrike: 105,
+      }] }),
+      execute: async ({ symbol, date, expiration, side, minStrike, maxStrike }) => {
+        return await derivativesClient.getOptionsChains({
+          provider: 'marketdata', symbol, date, expiration, side,
+          strike_min: minStrike, strike_max: maxStrike,
+        })
+      },
+    }),
+
     cryptoOptionsChains: tool({
       description: `Get the crypto options chain from Deribit (keyless).
 

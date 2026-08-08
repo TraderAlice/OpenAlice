@@ -7,10 +7,11 @@ description: >
   ratios, estimates, insiders, short interest), ETF drilldowns, FRED/BLS/EIA
   macro series, OECD cross-country indicators, IMF PortWatch shipping, and
   Deribit crypto curves. Use whenever you need a macro number, a fundamental,
-  a calendar, or a ready-made board: "what's CPI", "AAPL ratios", "earnings
+  a calendar, a filtered historical US equity-option chain, or a ready-made board: "what's CPI", "AAPL ratios", "earnings
   this week", "which sectors are rotating in", "Suez canal traffic", "Fed
   balance sheet". Data is served hub-first (hosted TraderHub) with local
-  fallback — no API keys needed. Discover flags live with
+  fallback; historical equity-option chains are the exception and require a
+  MarketData.app token. Discover flags live with
   `traderhub <group> <verb> --help`; do NOT guess flags.
 ---
 
@@ -29,6 +30,20 @@ traderhub <group> <verb> --help   # a verb's flags
 **Not here:** K-lines/quotes (realtime — see `alice analysis` + the
 `alice-analysis` skill), collected-RSS articles (`alice rss`), trading (use
 `alice-uta` — see the `alice-uta` skill).
+
+## Historical US equity-option chains
+
+MarketData.app supplies point-in-time end-of-day chains for research. It needs
+a token in Settings → Market Data. Always bound one date, expiry, side, and
+strike range; this preserves the as-of contract and controls API credits.
+
+```bash
+traderhub options history --symbol MSTR --date 2026-07-20 \
+  --expiration 2026-09-18 --side put --min-strike 75 --max-strike 105
+```
+
+Use `alice-uta contract quote` for current executable bid/ask. Historical
+MarketData rows must never price a live order.
 
 ## Reach for a BOARD before assembling primitives
 

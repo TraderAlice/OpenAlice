@@ -18,6 +18,12 @@ OpenAlice has three market-data layers with different jobs:
 | Bar service | Charts, quant tools, snapshots, simulations | `barId`-keyed K-line provider federation through `/api/bars` |
 | Embedded provider compatibility | Remaining Alice fundamentals/search clients | Private `@traderalice/opentypebb` workspace package and `/api/market-data-v1` compatibility routes |
 
+Historical US equity-option chains are a bounded derivatives read:
+`traderhub options history` / `equityOptionsHistory` → the typed derivatives
+client → MarketData.app. The agent boundary requires one date, expiry, side,
+and strike range to preserve point-in-time meaning and control credits. Current
+execution quotes remain broker-owned through UTA.
+
 The first two layers are the product architecture. The compatibility package is
 an implementation detail retained for provider adapters, legacy models, and
 routes that have not yet moved to an OpenAlice-owned contract.

@@ -23,6 +23,10 @@ describe('buildSDKCredentials — in-process opentypebb path', () => {
     expect(buildSDKCredentials({ fmp: 'k2' })).toEqual({ fmp_api_key: 'k2' })
   })
 
+  it('maps MarketData without exposing the token outside the provider credential field', () => {
+    expect(buildSDKCredentials({ marketdata: 'token' })).toEqual({ marketdata_api_key: 'token' })
+  })
+
   it('maps multiple providers in one call', () => {
     expect(buildSDKCredentials({ fred: 'k1', fmp: 'k2', bls: 'k3' })).toEqual({
       federal_reserve_api_key: 'k1',
