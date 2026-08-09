@@ -772,16 +772,37 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
           />
         ))}
         {sessions.length > visibleSessions.length && (
-          <button
-            type="button"
-            onClick={(event) => props.onBrowseSessions(props.workspace!.id, event.currentTarget)}
-            className="oa-pressable mx-2 my-1 flex min-h-8 items-center rounded-md px-2 text-[11px] font-medium text-primary hover:bg-primary/10"
-          >
-            {t('chat.viewAllSessions', { count: sessions.length })}
-          </button>
+          <ConversationListFooter
+            count={sessions.length}
+            onOpen={(restoreFocus) => props.onBrowseSessions(props.workspace!.id, restoreFocus)}
+          />
         )}
       </div>
 
+    </div>
+  )
+}
+
+function ConversationListFooter({
+  count,
+  onOpen,
+}: {
+  count: number
+  onOpen: (restoreFocus: HTMLElement | null) => void
+}): ReactElement {
+  const { t } = useTranslation()
+
+  return (
+    <div className="mx-2 mt-1 border-t border-border/55 pt-1">
+      <button
+        type="button"
+        aria-label={t('chat.viewAllSessions', { count })}
+        onClick={(event) => onOpen(event.currentTarget)}
+        className="flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+      >
+        <span className="min-w-0 flex-1 truncate">{t('chat.browseWorkspace')}</span>
+        <ChevronRight size={13} strokeWidth={2} className="shrink-0 text-muted-foreground/60" aria-hidden />
+      </button>
     </div>
   )
 }
@@ -1022,13 +1043,10 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
             />
           ))}
           {orderedSessions.length > visibleSessions.length && (
-            <button
-              type="button"
-              onClick={(event) => props.onBrowseSessions(event.currentTarget)}
-              className="oa-pressable ml-2 my-1 flex min-h-7 items-center rounded-md px-2 text-[10.5px] font-medium text-primary hover:bg-primary/10"
-            >
-              {t('chat.viewAllSessions', { count: orderedSessions.length })}
-            </button>
+            <ConversationListFooter
+              count={orderedSessions.length}
+              onOpen={props.onBrowseSessions}
+            />
           )}
         </div>
       )}

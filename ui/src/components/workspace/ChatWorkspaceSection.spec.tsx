@@ -415,7 +415,12 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(6)
     expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'View all 9 sessions' }))
+    const browseAll = screen.getByRole('button', { name: 'View all 9 sessions' })
+    expect(browseAll.textContent).toBe('Browse all conversations')
+    expect(browseAll.className).toContain('w-full')
+    expect(browseAll.className).not.toContain('oa-pressable')
+    expect(browseAll.parentElement?.className).toContain('border-t')
+    fireEvent.click(browseAll)
 
     const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
     const browser = within(dialog)
