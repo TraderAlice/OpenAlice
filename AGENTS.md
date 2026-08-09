@@ -35,6 +35,25 @@ Before changing files:
 4. Start from the real surface: reproduce UI/runtime behavior, inspect the
    relevant current code, and read the applicable owner guide before designing.
 
+## UI Design Workflow
+
+For frontend visual, layout, or interaction changes, separate product design
+from implementation instead of treating the first workable patch as the
+design.
+
+- In serial/interactive work, first present multiple viable approaches with
+  their user impact and tradeoffs, recommend one, and align with the maintainer
+  before moving into detailed design and implementation.
+- After alignment, state the chosen interaction model, responsive behavior,
+  accessibility implications, and shared primitive ownership before editing
+  the feature surface. Verify the result in the real browser route.
+- In autonomous/topic work, follow the same sequence without waiting for live
+  approval: record the alternatives and comparison in the execution plan or PR,
+  explicitly choose one, and explain why it is the best fit before implementing
+  it. Do not imply that the maintainer approved an autonomously selected design.
+- Keep the ceremony proportional for small fixes, but do not skip the design
+  decision merely because implementation is easy.
+
 ## Product and Architecture Boundaries
 
 - `src/` is Alice: Workspace lifecycle, tools, data domains, HTTP/IPC surfaces,
