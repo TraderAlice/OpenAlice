@@ -149,4 +149,25 @@ describe('OverviewCard', () => {
     expect(screen.getByRole('button', { name: 'x3 Live' }).closest('li')?.className)
       .toContain('hidden sm:list-item')
   })
+
+  it('labels a live waiting Session as ready instead of working', () => {
+    render(
+      <OverviewCard
+        workspace={{
+          ...workspace,
+          sessions: [{
+            ...workspace.sessions[0]!,
+            activity: { phase: 'waiting', observedAt: 10 },
+          }],
+        }}
+        lastCommit={null}
+        onOpen={() => undefined}
+        onOpenSession={() => undefined}
+      />,
+    )
+
+    const sessionButton = screen.getByRole('button', { name: 'x1 Ready' })
+    expect(screen.getByText('Ready').className).toContain('text-success')
+    expect(sessionButton).toBeTruthy()
+  })
 })

@@ -240,6 +240,11 @@ Recorded on 2026-08-09 against the proposal branch:
   passed, including a first reply emitted before attach, output emitted while
   disconnected, cold reconnect replay, current activity replay, and identity /
   activity separation.
+- Component-level UI regressions now render the Sidebar Session row, Workspace
+  Session library, and Workspace overview card with a live PTY whose native
+  Agent activity is `waiting`; all three assert `Ready` rather than `Working`
+  while preserving the running/lifecycle controls. The focused UI set passes
+  18 tests across four files.
 - `npx tsc --noEmit`, `cd ui && npx tsc -b`, and
   `npx tsc -p apps/desktop/tsconfig.json --noEmit` — passed.
 - `pnpm electron:build` — passed as an unsigned development build.

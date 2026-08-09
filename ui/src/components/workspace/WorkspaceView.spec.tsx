@@ -109,6 +109,37 @@ describe('WorkspaceView Session library', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start a new session' }))
     expect(onSpawnFresh).toHaveBeenCalledTimes(1)
   })
+
+  it('shows native Agent activity without treating a live waiting TUI as paused', () => {
+    const waiting = {
+      ...session(1, 'running'),
+      activity: { phase: 'waiting' as const, observedAt: 10 },
+    }
+    const working = {
+      ...session(2, 'running'),
+      activity: { phase: 'working' as const, observedAt: 20 },
+    }
+
+    render(
+      <WorkspaceView
+        wsId="chat-1"
+        sessionId={null}
+        activeRecord={null}
+        sessions={[waiting, working]}
+        onSpawnFresh={vi.fn()}
+        onResume={vi.fn()}
+        onOpenWebPi={vi.fn()}
+        onSelectSession={vi.fn()}
+        onSessionLost={vi.fn()}
+      />,
+    )
+
+    const waitingRow = screen.getByRole('button', { name: 'Open Conversation 1' })
+    const workingRow = screen.getByRole('button', { name: 'Open Conversation 2' })
+    expect(within(waitingRow).getByText('Ready').className).toContain('text-success')
+    expect(within(workingRow).getByText('Working').className).toContain('text-primary')
+    expect(screen.getByRole('button', { name: 'Running: 2' })).toBeTruthy()
+  })
 })
 
 describe('WorkspaceView Files panel', () => {
