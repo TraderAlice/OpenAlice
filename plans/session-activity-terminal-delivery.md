@@ -134,6 +134,40 @@ separate facts.
 - Runtime-specific event capture belongs to adapters. Framing, validation,
   replay, and public protocol ownership belong to the shared terminal layer.
 
+## Pi Surface Ownership (Recommended, Not Yet Approved)
+
+The three Pi launch surfaces have different transports and must not share one
+implicit stdout behavior:
+
+| Surface | Process transport | OpenAlice identity | Extension ownership |
+|---|---|---|---|
+| Terminal TUI | `node-pty` | `AQ_SESSION_ID` | activity always; provider only for injected access |
+| Headless JSON | `child_process` pipes | `AQ_RUN_ID` | provider only for injected access |
+| WebPi RPC | `child_process` pipes | `AQ_SESSION_ID` | provider only for injected access; activity comes from RPC state |
+
+Three repair designs were considered after package acceptance exposed the
+missing provider registration:
+
+1. Reload the combined extension everywhere and gate activity with
+   `process.stdout.isTTY`. This is the smallest patch, but it makes semantic
+   ownership depend on a transport heuristic and is vulnerable to wrappers.
+2. Add per-surface environment maps to `AgentSessionRuntimeProjection`. This is
+   explicit, but expands a shared adapter contract merely to separate two Pi
+   responsibilities that already have distinct files and argv groups.
+3. Restore `pi-session-provider.ts` to provider registration only, add a
+   separate `pi-session-activity.ts`, and compose the two repeatable
+   `--extension` flags per surface. Pi 0.83 documents repeated extension flags,
+   and this keeps JSON/RPC stdout structurally incapable of receiving activity
+   OSC frames.
+
+Option 3 is the current recommendation. It is recorded for design review and
+has not been implemented. The activity extension should remember the final
+assistant `stopReason` observed at `agent_end`, then emit `failed` versus
+`waiting` only at `agent_settled`. Pi deliberately omits `willRetry` from the
+extension-facing `agent_end`, while `agent_settled` fires only after automatic
+retry, compaction, and queued continuation have all finished. Emitting failure
+earlier would therefore display a transient failure during a successful retry.
+
 ## Non-goals
 
 - Replacing native TUI Sessions with an in-process Agent loop.
