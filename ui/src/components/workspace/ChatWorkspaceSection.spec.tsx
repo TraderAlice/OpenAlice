@@ -242,7 +242,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
   })
 
-  it('switches the focused Workspace without expanding the whole tree', () => {
+  it('switches the focused Workspace through a searchable Dialog', () => {
     const alternative = {
       ...chatWorkspace,
       id: 'chat-2',
@@ -254,9 +254,13 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([chatWorkspace, alternative], null, undefined, 'focused', onRequestDisplayMode)
 
     fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Switch Workspace' }), {
-      target: { value: chatWorkspace.id },
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Workspace' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Switch Workspace' })
+    expect(screen.queryByRole('dialog', { name: 'Chat Workspace options' })).toBeNull()
+    const picker = within(dialog)
+    expect(picker.getByRole('searchbox', { name: 'Search Workspaces…' })).toBeTruthy()
+    fireEvent.click(picker.getByRole('button', { name: /chat-jul11/ }))
 
     expect(openOrFocus).toHaveBeenCalledWith({
       kind: 'chat-landing',
@@ -403,7 +407,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
-  it('bounds expanded Workspace history and routes the full catalog to the Session library', () => {
+  it('bounds expanded Workspace history and opens the complete conversation Dialog', () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
     const onNavigate = vi.fn()
     renderSection([{ ...chatWorkspace, sessions }], null, onNavigate)
@@ -412,11 +416,62 @@ describe('ChatWorkspaceSection actions', () => {
     expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'View all 9 sessions' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    const browser = within(dialog)
+    expect(browser.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(9)
+    expect(openOrFocus).not.toHaveBeenCalled()
+
+    fireEvent.click(browser.getByRole('button', { name: 'Conversation 3' }))
     expect(openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace',
-      params: { wsId: chatWorkspace.id, source: 'chat' },
+      params: { wsId: chatWorkspace.id, sessionId: 'chat-session-3', source: 'chat' },
     })
     expect(onNavigate).toHaveBeenCalledTimes(1)
+  })
+
+  it('browses current or cross-Workspace conversations without leaving the page first', async () => {
+    const user = userEvent.setup()
+    const olderWorkspace = {
+      ...chatWorkspace,
+      sessions: [{ ...chatSession(1), title: 'Older thesis' }],
+    }
+    const currentWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+      sessions: [{
+        ...chatSession(2),
+        id: 'current-session',
+        wsId: 'chat-2',
+        title: 'Current thesis',
+      }],
+    }
+    renderSection([olderWorkspace, currentWorkspace], null, undefined, 'focused')
+
+    const trigger = screen.getByRole('button', { name: 'Chat context: chat-aug3' })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    const browser = within(dialog)
+    expect(browser.getByRole('button', { name: 'Current thesis' })).toBeTruthy()
+    expect(browser.queryByRole('button', { name: 'Older thesis' })).toBeNull()
+
+    fireEvent.click(browser.getByRole('button', { name: 'All Workspaces' }))
+    expect(browser.getByRole('button', { name: 'Older thesis' })).toBeTruthy()
+
+    fireEvent.change(browser.getByRole('searchbox', { name: 'Search conversations…' }), {
+      target: { value: 'older' },
+    })
+    expect(browser.queryByRole('button', { name: 'Current thesis' })).toBeNull()
+    expect(browser.getByRole('button', { name: 'Older thesis' })).toBeTruthy()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Browse all conversations' })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
   })
 
   it('owns Manager Session navigation and lifecycle actions under the Manager entry', async () => {
