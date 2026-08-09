@@ -64,6 +64,14 @@ fork Markdown parsing or recreate feature-local heading, list, table, quote, and
 code styles. Long documents remain the dominant page surface rather than being
 wrapped in a decorative card; surrounding shell chrome supplies the context.
 
+Treat the generated Markdown body as a stable DOM island. Live Workspace,
+Manager, Inbox, and provenance state may update the surrounding interaction
+layer, but an unchanged HTML string must preserve the existing report nodes so
+selection, browser translation, find-in-page, and extension annotations remain
+intact. Polling stores must reconcile identical JSON snapshots before
+publication, and content renderers that only need a Workspace action should use
+the action-only hook instead of subscribing to the complete Workspace state.
+
 ### Responsive Behavior
 
 Narrow layouts are a change in information hierarchy, not a compressed desktop.

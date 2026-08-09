@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/static-markdown-content-stability.md]] — Keeps Inbox and Tracked
+  Markdown DOM stable across unchanged Workspace Manager and Inbox polling so
+  text selection, browser translation, and report interactions survive.
 - [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
   healthy dev/CLI Runtime already owning the selected data location and hand
   the user to its verified browser UI without takeover.

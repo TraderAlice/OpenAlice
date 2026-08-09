@@ -19,6 +19,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react'
@@ -66,8 +67,14 @@ import {
 } from '../components/workspace/api'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
-import { WorkspacesContext, type SpawnOpts } from './workspaces-context'
+import {
+  WorkspacesContext,
+  type SpawnOpts,
+  type WorkspacesContextValue,
+} from './workspaces-context'
+import { WorkspaceActionsContext } from './workspace-actions-context'
 import { reconcileWorkspaceList } from './workspace-list-reconcile'
+import { reconcileJsonSnapshot } from '../lib/reconcile-json-state'
 
 const LIST_POLL_MS = 3000
 
@@ -132,7 +139,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   const refreshWorkspaceManager = useCallback(async (): Promise<void> => {
     try {
-      setWorkspaceManager(await getWorkspaceManager())
+      const incoming = await getWorkspaceManager()
+      setWorkspaceManager((current) => reconcileJsonSnapshot(current, incoming))
       setWorkspaceManagerError(null)
     } catch (err) {
       setWorkspaceManagerError((err as Error).message)
@@ -602,6 +610,92 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setPendingSessionDelete({ wsId, sessionId })
   }, [])
 
+  const openAgentConfig = useCallback((
+    wsId: string,
+    agent?: AgentId,
+    section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb',
+  ): void => {
+    setConfiguringAgentTarget({
+      wsId,
+      ...(agent ? { agent } : {}),
+      ...(section ? { section } : {}),
+    })
+  }, [])
+
+  const workspaceActions = useMemo(() => ({ openHeadlessRun }), [openHeadlessRun])
+
+  const contextValue = useMemo<WorkspacesContextValue>(() => ({
+    workspaces,
+    templates,
+    agents,
+    defaultAgent,
+    issueDefaultAgent,
+    listError,
+    workspaceManager,
+    workspaceManagerLoaded,
+    workspaceManagerError,
+    hasLoaded,
+    templatesLoaded,
+    templatesError,
+    autoQuantDefaultWorkspaceId,
+    autoQuantPreferenceLoaded,
+    autoQuantPreferenceError,
+    refresh,
+    refreshTemplates,
+    refreshAutoQuantPreference,
+    refreshWorkspaceManager,
+    quickStartWorkspaceManager,
+    spawn,
+    openHeadlessRun,
+    setDefaultAgent,
+    setIssueDefaultAgent,
+    initializeAutoQuant,
+    setAutoQuantDefaultWorkspace,
+    quickChat,
+    pauseSession,
+    resumeSession,
+    openWebPiSession,
+    requestDeleteSession,
+    openAgentConfig,
+    saveWorkspaceMetadata,
+    renameWorkspace,
+  }), [
+    agents,
+    autoQuantDefaultWorkspaceId,
+    autoQuantPreferenceError,
+    autoQuantPreferenceLoaded,
+    defaultAgent,
+    hasLoaded,
+    initializeAutoQuant,
+    issueDefaultAgent,
+    listError,
+    openAgentConfig,
+    openHeadlessRun,
+    openWebPiSession,
+    pauseSession,
+    quickChat,
+    quickStartWorkspaceManager,
+    refresh,
+    refreshAutoQuantPreference,
+    refreshTemplates,
+    refreshWorkspaceManager,
+    renameWorkspace,
+    requestDeleteSession,
+    resumeSession,
+    saveWorkspaceMetadata,
+    setAutoQuantDefaultWorkspace,
+    setDefaultAgent,
+    setIssueDefaultAgent,
+    spawn,
+    templates,
+    templatesError,
+    templatesLoaded,
+    workspaceManager,
+    workspaceManagerError,
+    workspaceManagerLoaded,
+    workspaces,
+  ])
+
   const pendingDeleteSession = pendingSessionDelete
     ? (pendingSessionDelete.wsId === MANAGER_WORKSPACE_ID
         ? workspaceManager?.sessions.find((s) => s.id === pendingSessionDelete.sessionId) ?? null
@@ -612,85 +706,45 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     pendingDeleteSession?.title?.trim() || pendingDeleteSession?.name || ''
 
   return (
-    <WorkspacesContext.Provider
-      value={{
-        workspaces,
-        templates,
-        agents,
-        defaultAgent,
-        issueDefaultAgent,
-        listError,
-        workspaceManager,
-        workspaceManagerLoaded,
-        workspaceManagerError,
-        hasLoaded,
-        templatesLoaded,
-        templatesError,
-        autoQuantDefaultWorkspaceId,
-        autoQuantPreferenceLoaded,
-        autoQuantPreferenceError,
-        refresh,
-        refreshTemplates,
-        refreshAutoQuantPreference,
-        refreshWorkspaceManager,
-        quickStartWorkspaceManager,
-        spawn,
-        openHeadlessRun,
-        setDefaultAgent,
-        setIssueDefaultAgent,
-        initializeAutoQuant,
-        setAutoQuantDefaultWorkspace,
-        quickChat,
-        pauseSession,
-        resumeSession,
-        openWebPiSession,
-        requestDeleteSession,
-        openAgentConfig: (wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb') =>
-          setConfiguringAgentTarget({
-            wsId,
-            ...(agent ? { agent } : {}),
-            ...(section ? { section } : {}),
-          }),
-        saveWorkspaceMetadata,
-        renameWorkspace,
-      }}
-    >
-      {children}
-      {configuringAgentTarget !== null && (
-        <WorkspaceAIConfigModal
-          wsId={configuringAgentTarget.wsId}
-          initialAgent={configuringAgentTarget.agent}
-          initialSection={configuringAgentTarget.section ?? (configuringAgentTarget.agent ? 'ai' : 'general')}
-          onAiSaved={({ model, runtimeLabel, workspaceLabel }) => {
-            toast.success(model
-              ? t('workspaceSettings.ai.savedModelToast', {
-                  model,
-                  runtime: runtimeLabel,
-                  workspace: workspaceLabel,
-                })
-              : t('workspaceSettings.ai.savedConfigToast', {
-                  runtime: runtimeLabel,
-                  workspace: workspaceLabel,
-                }))
-          }}
-          onClose={() => setConfiguringAgentTarget(null)}
-        />
-      )}
-      {pendingSessionDelete !== null && (
-        <ConfirmDialog
-          title={t('chat.deleteSessionTitle')}
-          message={t('chat.deleteSessionMessage', {
-            title: pendingDeleteLabel || pendingSessionDelete.sessionId,
-          })}
-          confirmLabel={t('common.delete')}
-          onConfirm={async () => {
-            await deleteSession(pendingSessionDelete.wsId, pendingSessionDelete.sessionId)
-            setPendingSessionDelete(null)
-          }}
-          onClose={() => setPendingSessionDelete(null)}
-        />
-      )}
-    </WorkspacesContext.Provider>
+    <WorkspaceActionsContext.Provider value={workspaceActions}>
+      <WorkspacesContext.Provider value={contextValue}>
+        {children}
+        {configuringAgentTarget !== null && (
+          <WorkspaceAIConfigModal
+            wsId={configuringAgentTarget.wsId}
+            initialAgent={configuringAgentTarget.agent}
+            initialSection={configuringAgentTarget.section ?? (configuringAgentTarget.agent ? 'ai' : 'general')}
+            onAiSaved={({ model, runtimeLabel, workspaceLabel }) => {
+              toast.success(model
+                ? t('workspaceSettings.ai.savedModelToast', {
+                    model,
+                    runtime: runtimeLabel,
+                    workspace: workspaceLabel,
+                  })
+                : t('workspaceSettings.ai.savedConfigToast', {
+                    runtime: runtimeLabel,
+                    workspace: workspaceLabel,
+                  }))
+            }}
+            onClose={() => setConfiguringAgentTarget(null)}
+          />
+        )}
+        {pendingSessionDelete !== null && (
+          <ConfirmDialog
+            title={t('chat.deleteSessionTitle')}
+            message={t('chat.deleteSessionMessage', {
+              title: pendingDeleteLabel || pendingSessionDelete.sessionId,
+            })}
+            confirmLabel={t('common.delete')}
+            onConfirm={async () => {
+              await deleteSession(pendingSessionDelete.wsId, pendingSessionDelete.sessionId)
+              setPendingSessionDelete(null)
+            }}
+            onClose={() => setPendingSessionDelete(null)}
+          />
+        )}
+      </WorkspacesContext.Provider>
+    </WorkspaceActionsContext.Provider>
   )
 }
 

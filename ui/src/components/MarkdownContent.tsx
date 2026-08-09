@@ -5,7 +5,7 @@
  * the same typography without inheriting chat chrome.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Marked, type TokenizerAndRendererExtension } from 'marked'
 import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js'
@@ -13,7 +13,7 @@ import DOMPurify from 'dompurify'
 import 'highlight.js/styles/github-dark.min.css'
 
 import { useWikilinkHandler } from '../live/wikilink'
-import { useWorkspaces } from '../contexts/workspaces-context'
+import { useWorkspaceActions } from '../contexts/workspace-actions-context'
 import { resolveSessionSignature } from './workspace/api'
 
 function escapeHtml(s: string): string {
@@ -189,7 +189,7 @@ export function MarkdownContent({
 }: MarkdownContentProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const defaultWikilink = useWikilinkHandler()
-  const { openHeadlessRun } = useWorkspaces()
+  const { openHeadlessRun } = useWorkspaceActions()
   const wikilink = onWikilink ?? defaultWikilink
 
   const html = useMemo(() => {
@@ -245,10 +245,27 @@ export function MarkdownContent({
 
   return (
     <div ref={contentRef} className={className} data-markdown-variant={variant}>
-      <div
-        className={`markdown-content${variant === 'reading' ? ' markdown-content--reading' : ''}`}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <StaticMarkdownBody html={html} variant={variant} />
     </div>
   )
 }
+
+/**
+ * Keep browser-owned state inside an unchanged report intact. Selection,
+ * translation overlays, find-in-page markers, and extension annotations all
+ * live in this subtree; unrelated parent/context updates must not replace it.
+ */
+const StaticMarkdownBody = memo(function StaticMarkdownBody({
+  html,
+  variant,
+}: {
+  html: string
+  variant: NonNullable<MarkdownContentProps['variant']>
+}) {
+  return (
+    <div
+      className={`markdown-content${variant === 'reading' ? ' markdown-content--reading' : ''}`}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+})
