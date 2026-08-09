@@ -567,7 +567,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(screen.queryByTestId('terminal-view')).toBeNull()
     expect(container.firstElementChild?.classList.contains('workspaces-root')).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue in terminal' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Resume in TUI' }))
 
     expect(mocks.resumeSession).toHaveBeenCalledWith(
       'workspace-manager',
@@ -630,7 +630,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     }} />)
 
     expect(mocks.openWebPiSession).not.toHaveBeenCalled()
-    const openWebPi = screen.getByText('Open WebPi').closest('button')
+    const openWebPi = screen.getByText('Open in WebPi').closest('button')
     expect(openWebPi).toBeTruthy()
     fireEvent.click(openWebPi as HTMLButtonElement)
 

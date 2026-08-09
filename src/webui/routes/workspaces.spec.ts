@@ -837,6 +837,7 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(opened.body.session).toMatchObject({
       sourceRunId: 'run-1',
       resumeId: 'resume-run-1',
+      runtime: { credentialSource: 'native' },
     });
   });
 

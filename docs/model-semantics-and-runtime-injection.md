@@ -134,6 +134,9 @@ native runtime state, an OpenAlice-vault slug plus wire shape, or a fingerprint
 of an explicitly configured Workspace provider. Vault secrets are resolved
 just in time and enter only the child environment. Workspace fingerprints make
 replacement visible instead of silently resuming through a different key.
+Paused Session surfaces may expose that secret-free binding so users can verify
+the credential source, model, and effort that will be replayed before resuming;
+they must never expose resolved keys, endpoints, or native runtime identifiers.
 
 Credential, model, and effort are independent optional launch dimensions. A
 native credential binding means OpenAlice injects no managed key or endpoint;
