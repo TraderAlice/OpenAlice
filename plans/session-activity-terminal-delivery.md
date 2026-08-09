@@ -35,11 +35,12 @@ path must preserve the visible initial reply and recover it after a WebSocket
 disconnect. A successful model request is not sufficient if the user-facing
 terminal never receives the response.
 
-A local prerequisite was also reproduced for OpenCode: its interactive TUI is
-currently launched with a `--variant` option that only `opencode run` accepts,
-so the child exits before activity or output behavior can be exercised.
-That immediate startup defect is deliberately isolated in Draft PR #1037 and
-is not part of the lifecycle proposal's acceptance decision.
+A local prerequisite was also reproduced for OpenCode: its interactive TUI was
+launched with a `--variant` option that only `opencode run` accepts, so the
+child exited before activity or output behavior could be exercised. That
+immediate startup defect was deliberately isolated in PR #1037, merged to
+`dev` as `a49133a1`, and is not part of the lifecycle proposal's acceptance
+decision. This Draft branch now includes that `dev` baseline.
 
 ## Open Design Questions
 
@@ -249,12 +250,13 @@ Recorded on 2026-08-09 against the proposal branch:
   offboarding the temporary Workspace. No AI credential or broker was loaded.
 - `pnpm exec tsx scripts/session-activity-runtime-smoke.ts --agent <runtime>`
   now provides an opt-in native/global-login acceptance path. In a disposable
-  checkout combining this proposal with the isolated OpenCode argv fix from
-  #1037, real OpenCode and Pi turns both emitted
+  checkout combining this proposal with the then-isolated OpenCode argv fix
+  from #1037, real OpenCode and Pi turns both emitted
   `waiting -> working -> waiting`, and both PTY processes remained alive after
-  settling. Running the configured-effort OpenCode check on this proposal alone
-  reproduced the pre-plugin argv failure, preserving the dependency boundary
-  instead of folding #1037 into this PR.
+  settling. Before #1037 merged, running the configured-effort OpenCode check
+  on this proposal alone reproduced the pre-plugin argv failure, preserving
+  the dependency boundary instead of folding that fix into this PR. The Draft
+  branch was synchronized with `dev` after #1037 merged.
 - GitHub Desktop Package Smoke currently fails on macOS and Windows because the
   proposal leaves `--provider openalice-session` in Pi headless arguments after
   removing the extension that registers that provider. The acceptance process
