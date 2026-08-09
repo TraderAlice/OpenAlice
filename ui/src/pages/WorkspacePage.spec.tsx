@@ -149,4 +149,38 @@ describe('WorkspacePage identity', () => {
       terminalHeaderActions: expect.anything(),
     }))
   })
+
+  it('lets a paused TUI handoff own the pane without removing the page header', () => {
+    mocks.workspaces = [workspace({
+      displayName: 'Optical Networking Follow-up',
+      sessions: [{
+        id: 'paused-session',
+        resumeId: 'resume-paused',
+        wsId: 'chat-1',
+        agent: 'codex',
+        name: 'x4',
+        createdAt: '2026-07-31T00:00:00.000Z',
+        lastActiveAt: '2026-07-31T00:00:00.000Z',
+        state: 'paused',
+        surface: 'terminal',
+        pid: null,
+        startedAt: null,
+        title: null,
+      }],
+    })]
+
+    const { container } = render(
+      <WorkspacePage
+        spec={{ kind: 'workspace', params: { wsId: 'chat-1', sessionId: 'paused-session' } }}
+        visible
+      />,
+    )
+
+    const shell = container.querySelector('.workspace-page-shell')
+    expect(shell?.classList.contains('is-paused-canvas')).toBe(true)
+    expect(shell?.classList.contains('is-terminal-canvas')).toBe(false)
+    expect(screen.getByText('Optical Networking Follow-up').parentElement?.getAttribute('title'))
+      .toBe('Optical Networking Follow-up\nchat-jun30')
+    expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy()
+  })
 })
