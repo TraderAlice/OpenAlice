@@ -143,7 +143,7 @@ separate facts.
 
 ### 1. Baseline and contract
 
-- [ ] Preserve source-dev, Docker-shaped HTTP, and Electron/PT​​Y reproduction
+- [x] Preserve source-dev, Docker-shaped HTTP, and Electron/PT​​Y reproduction
       evidence for initial output, reconnect, and completed-turn behavior.
 - [x] Define the versioned activity phases and private adapter-to-terminal
       framing, including identity validation and unsupported fallback.
@@ -205,6 +205,14 @@ Recorded on 2026-08-09 against the proposal branch:
 - `pnpm docker:smoke` — passed after building an isolated image, opening the
   HTTP Workspace PTY WebSocket, executing the injected `alice` CLI, and
   offboarding the temporary Workspace. No AI credential or broker was loaded.
+- `pnpm exec tsx scripts/session-activity-runtime-smoke.ts --agent <runtime>`
+  now provides an opt-in native/global-login acceptance path. In a disposable
+  checkout combining this proposal with the isolated OpenCode argv fix from
+  #1037, real OpenCode and Pi turns both emitted
+  `waiting -> working -> waiting`, and both PTY processes remained alive after
+  settling. Running the configured-effort OpenCode check on this proposal alone
+  reproduced the pre-plugin argv failure, preserving the dependency boundary
+  instead of folding #1037 into this PR.
 
 The real Chat route remains an explicit manual acceptance item. The in-app
 browser automation surface rejected interaction with the existing localhost
