@@ -397,17 +397,43 @@ describe('codexAdapter AI-config', () => {
     expect(await codexAdapter.listOnDisk!(dir)).toEqual([]);
   });
 
-  it('reads Codex native titles from its session index', async () => {
+  it('prefers Codex Desktop generated titles from its local thread catalog', async () => {
     await codexAdapter.writeAiConfig!(dir, { baseUrl: 'https://oai.test/v1', model: 'gpt-x' });
     const home = join(dir, '.codex', 'openalice-home');
     await mkdir(home, { recursive: true });
     await writeFile(join(home, 'session_index.jsonl'), [
-      JSON.stringify({ id: 'native-1', thread_name: '  Native Codex title  ', updated_at: '2026-07-30' }),
+      JSON.stringify({ id: 'native-1', thread_name: 'Legacy Codex title', updated_at: '2026-07-30' }),
       '{"partially-written":',
       '',
     ].join('\n'));
-    expect(await codexAdapter.readSessionTitle!(dir, 'native-1')).toBe('Native Codex title');
+
+    const sqliteDir = join(home, 'sqlite');
+    await mkdir(sqliteDir, { recursive: true });
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite') as typeof import('node:sqlite');
+    const database = new DatabaseSync(join(sqliteDir, 'codex-dev.db'));
+    database.exec(`
+      CREATE TABLE local_thread_catalog (
+        thread_id TEXT NOT NULL,
+        display_title TEXT NOT NULL
+      )
+    `);
+    database.prepare(
+      'INSERT INTO local_thread_catalog (thread_id, display_title) VALUES (?, ?)',
+    ).run('native-1', '  Generated investigation title  ');
+    database.close();
+
+    expect(await codexAdapter.readSessionTitle!(dir, 'native-1')).toBe('Generated investigation title');
     expect(await codexAdapter.readSessionTitle!(dir, 'missing')).toBeNull();
+  });
+
+  it('keeps reading Codex native titles from the legacy session index', async () => {
+    await codexAdapter.writeAiConfig!(dir, { baseUrl: 'https://oai.test/v1', model: 'gpt-x' });
+    const home = join(dir, '.codex', 'openalice-home');
+    await mkdir(home, { recursive: true });
+    await writeFile(join(home, 'session_index.jsonl'),
+      `${JSON.stringify({ id: 'native-legacy', thread_name: 'Legacy Codex title' })}\n`);
+
+    expect(await codexAdapter.readSessionTitle!(dir, 'native-legacy')).toBe('Legacy Codex title');
   });
 });
 
