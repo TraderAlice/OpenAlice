@@ -167,7 +167,7 @@ separate facts.
       layer without exposing control bytes as product content.
 - [x] Store the latest activity in `PersistentSession` and include it in attach,
       reconnect, and lifecycle projections.
-- [ ] Extend REST, WebSocket, Electron IPC, demo, and UI types without changing
+- [x] Extend REST, WebSocket, Electron IPC, demo, and UI types without changing
       the meaning of `SessionRecord.state`.
 
 ### 4. Product behavior
@@ -175,7 +175,7 @@ separate facts.
 - [x] Present live-process waiting separately from working in the Session row
       and paused/open-TUI surface.
 - [x] Keep unknown adapters honest and preserve accessible status semantics.
-- [ ] Verify late attach and repeated reconnect show the same final response and
+- [x] Verify late attach and repeated reconnect show the same final response and
       current activity without a reload.
 
 ### 5. Verification and delivery
@@ -184,10 +184,32 @@ separate facts.
       and UI regression tests.
 - [x] Run root/UI typechecks and the monorepo test suite.
 - [ ] Walk the real Chat route in `pnpm dev` and a Docker-shaped HTTP launch.
-- [ ] Run the relevant Electron/PT​​Y smoke and record platform-only residual
+- [x] Run the relevant Electron/PT​​Y smoke and record platform-only residual
       risk without invoking release signing.
 - [x] Open one labeled Draft PR targeting `dev`; keep it unmerged pending topic
       acceptance.
+
+## Verification Evidence
+
+Recorded on 2026-08-09 against the proposal branch:
+
+- `pnpm exec vitest run src/workspaces/persistent-session.spec.ts` — 15 tests
+  passed, including a first reply emitted before attach, output emitted while
+  disconnected, cold reconnect replay, current activity replay, and identity /
+  activity separation.
+- `npx tsc --noEmit`, `cd ui && npx tsc -b`, and
+  `npx tsc -p apps/desktop/tsconfig.json --noEmit` — passed.
+- `pnpm electron:build` — passed as an unsigned development build.
+- `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:pty --skip-build` —
+  passed with a real Electron IPC PTY attach and CLI socket round trip.
+- `pnpm docker:smoke` — passed after building an isolated image, opening the
+  HTTP Workspace PTY WebSocket, executing the injected `alice` CLI, and
+  offboarding the temporary Workspace. No AI credential or broker was loaded.
+
+The real Chat route remains an explicit manual acceptance item. The in-app
+browser automation surface rejected interaction with the existing localhost
+tab under its URL security policy, so this proposal does not claim visual
+browser acceptance from that route.
 
 ## Completion Criteria
 
