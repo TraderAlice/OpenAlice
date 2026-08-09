@@ -31,6 +31,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/static-markdown-content-stability.md]] — Keeps Inbox and Tracked
+  Markdown DOM stable across unchanged Workspace Manager and Inbox polling so
+  text selection, browser translation, and report interactions survive.
+  Delivered for topic review in Draft PR #1030.
 - [[plans/shadcn-resizable-page-sidebar.md]] — Replaced the hand-written
   page-sidebar rail with shadcn Resizable and closed its responsive,
   threshold-motion, resisted-overdrag, repeat-cycle, and rapid-reversal

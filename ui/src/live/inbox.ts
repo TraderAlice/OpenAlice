@@ -2,6 +2,7 @@ import { api } from '../api'
 import type { InboxEntry } from '../api/inbox'
 import { createLiveStore } from './createLiveStore'
 import { reloadOnHotUpdate } from '../lib/hmr'
+import { reconcileJsonCollection } from '../lib/reconcile-json-state'
 
 reloadOnHotUpdate('live/inbox')
 
@@ -25,6 +26,15 @@ export interface InboxState {
   loading: boolean
 }
 
+export function reconcileInboxHistoryState(
+  current: InboxState,
+  incomingEntries: InboxEntry[],
+): InboxState {
+  const entries = reconcileJsonCollection(current.entries, incomingEntries, (entry) => entry.id)
+  if (entries === current.entries && !current.loading) return current
+  return { ...current, entries, loading: false }
+}
+
 const POLL_INTERVAL_MS = 20_000
 
 /** Module-level setter populated by the subscribe callback so external
@@ -44,10 +54,10 @@ export const inboxLive = createLiveStore<InboxState>({
       try {
         const { entries } = await api.inbox.history({ limit: 100 })
         if (disposed) return
-        apply((prev) => ({ ...prev, entries, loading: false }))
+        apply((prev) => reconcileInboxHistoryState(prev, entries))
       } catch {
         if (disposed) return
-        apply((prev) => ({ ...prev, loading: false }))
+        apply((prev) => prev.loading ? { ...prev, loading: false } : prev)
       }
     }
 
