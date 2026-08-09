@@ -1,6 +1,6 @@
 # Static Markdown Content Stability
 
-Status: Active
+Status: Completed
 
 Related issue: [#712](https://github.com/TraderAlice/OpenAlice/issues/712)
 
@@ -63,7 +63,7 @@ response.
 - [x] Run required TypeScript and test gates.
 - [x] Reproduce the real Inbox and Tracked routes and verify DOM identity over
       repeated polling intervals.
-- [ ] Publish one labeled Draft PR to `dev` and keep it open for topic review.
+- [x] Publish one labeled Draft PR to `dev` and keep it open for topic review.
 
 ## Verification
 
@@ -95,3 +95,7 @@ The plan is complete when the acceptance boundary is covered by tests, real
 route observation shows no Markdown subtree replacement for unchanged polls,
 the required checks pass, and the Draft PR records exact verification and any
 residual HTML-iframe risk.
+
+Completed in Draft PR
+[#1030](https://github.com/TraderAlice/OpenAlice/pull/1030). Arbitrary HTML
+report iframe stability remains an explicit non-goal of this topic.
