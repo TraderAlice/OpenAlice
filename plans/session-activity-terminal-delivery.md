@@ -54,6 +54,11 @@ is not part of the lifecycle proposal's acceptance decision.
 4. Is a Workspace-local managed OpenCode/Pi hook an acceptable ownership
    boundary, or should adapters integrate through a non-file registration
    surface when the runtime provides one?
+5. Should Pi keep provider registration and activity reporting in one extension
+   with an explicit interactive-only activity guard, or split them into two
+   independently loaded extensions? The current prototype incorrectly removes
+   the provider extension from headless/WebPi while retaining
+   `--provider openalice-session`.
 
 ## Acceptance Criteria
 
@@ -154,6 +159,9 @@ separate facts.
 
 - [x] Add a managed Pi extension that emits start/settled activity only for the
       interactive Session path.
+- [ ] Restore process-local Pi provider registration for headless and WebPi
+      launches without allowing activity OSC frames onto machine-readable
+      stdout.
 - [ ] Decide whether Pi exposes a trustworthy native failure event or whether
       child-exit failure is the only supported failure boundary.
 - [x] Add a reversible Workspace-local OpenCode plugin that emits
@@ -213,11 +221,19 @@ Recorded on 2026-08-09 against the proposal branch:
   settling. Running the configured-effort OpenCode check on this proposal alone
   reproduced the pre-plugin argv failure, preserving the dependency boundary
   instead of folding #1037 into this PR.
+- GitHub Desktop Package Smoke currently fails on macOS and Windows because the
+  proposal leaves `--provider openalice-session` in Pi headless arguments after
+  removing the extension that registers that provider. The acceptance process
+  reports `Unknown provider "openalice-session"`; this is a proposal regression,
+  not an infrastructure-only failure. A follow-on design decision must either
+  guard activity emission while loading the shared extension on every required
+  surface, or split provider registration from interactive activity reporting.
 
 The real Chat route remains an explicit manual acceptance item. The in-app
 browser automation surface rejected interaction with the existing localhost
-tab under its URL security policy, so this proposal does not claim visual
-browser acceptance from that route.
+tab under its URL security policy. The Vercel preview was also protected by the
+team login gate, so this proposal does not claim visual browser acceptance from
+either route.
 
 ## Completion Criteria
 
