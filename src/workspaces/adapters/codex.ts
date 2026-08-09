@@ -41,18 +41,71 @@ function codexHome(cwd: string): string {
 
 const codexTitleIndexInFlight = new Map<string, Promise<ReadonlyMap<string, string>>>();
 
+type NodeSqliteModule = typeof import('node:sqlite');
+
+let nodeSqliteModule: NodeSqliteModule | null | undefined;
+
+/**
+ * Node 22 still labels the built-in SQLite module experimental and emits one
+ * process warning when it is first loaded. OPENALICE requires Node >=22.19,
+ * where the synchronous read-only API we use is present. Load it lazily so
+ * non-Codex users never touch the module; suppress only the module-load warning
+ * in this synchronous section so a background title refresh stays silent.
+ */
+function loadNodeSqlite(): NodeSqliteModule | null {
+  if (nodeSqliteModule !== undefined) return nodeSqliteModule;
+  const originalEmitWarning = process.emitWarning;
+  try {
+    process.emitWarning = (() => undefined) as typeof process.emitWarning;
+    nodeSqliteModule = process.getBuiltinModule('node:sqlite') as NodeSqliteModule;
+  } catch {
+    nodeSqliteModule = null;
+  } finally {
+    process.emitWarning = originalEmitWarning;
+  }
+  return nodeSqliteModule;
+}
+
+function readCodexDesktopTitleCatalog(home: string): ReadonlyMap<string, string> {
+  const sqlite = loadNodeSqlite();
+  if (!sqlite) return new Map<string, string>();
+  const path = join(home, 'sqlite', 'codex-dev.db');
+  if (!existsSync(path)) return new Map<string, string>();
+
+  let database: InstanceType<NodeSqliteModule['DatabaseSync']> | undefined;
+  try {
+    database = new sqlite.DatabaseSync(path, { readOnly: true });
+    const rows = database.prepare(
+      'SELECT thread_id, display_title FROM local_thread_catalog',
+    ).all() as Array<{ thread_id?: unknown; display_title?: unknown }>;
+    const titles = new Map<string, string>();
+    for (const row of rows) {
+      const id = typeof row.thread_id === 'string' ? row.thread_id : null;
+      const title = typeof row.display_title === 'string' ? row.display_title.trim() : '';
+      if (id && title) titles.set(id, title);
+    }
+    return titles;
+  } catch {
+    // Codex owns this private catalog and may migrate or lock it. A title is
+    // presentation metadata only, so fall through to the legacy index/fallback.
+    return new Map<string, string>();
+  } finally {
+    database?.close();
+  }
+}
+
 function readCodexSessionTitleIndex(cwd: string): Promise<ReadonlyMap<string, string>> {
   const home = codexHome(cwd);
   const existing = codexTitleIndexInFlight.get(home);
   if (existing) return existing;
   const read = (async () => {
+    const titles = new Map<string, string>();
     let raw: string;
     try {
       raw = await readFile(join(home, 'session_index.jsonl'), 'utf8');
     } catch {
-      return new Map<string, string>();
+      raw = '';
     }
-    const titles = new Map<string, string>();
     for (const line of raw.split(/\r?\n/)) {
       if (!line.trim()) continue;
       try {
@@ -64,6 +117,10 @@ function readCodexSessionTitleIndex(cwd: string): Promise<ReadonlyMap<string, st
         // A partially-written tail must not hide the rest of the index.
       }
     }
+    // Current Codex Desktop keeps its generated short titles in the local
+    // thread catalog. Prefer that newer projection when both stores know the
+    // same native thread id, while retaining session_index.jsonl compatibility.
+    for (const [id, title] of readCodexDesktopTitleCatalog(home)) titles.set(id, title);
     return titles;
   })().finally(() => codexTitleIndexInFlight.delete(home));
   codexTitleIndexInFlight.set(home, read);
