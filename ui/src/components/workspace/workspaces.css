@@ -14,19 +14,17 @@
 
 /* ── Right-pane Resume CTA ─────────────────────────────────────────────────
  *
- * Two-layer design: a heavily-blurred faux-TUI backdrop fills the pane
- * to telegraph "paused conversation" at a glance, with a focused Resume
- * card centered on top. The faux-TUI is decorative (no real session
- * content — we don't persist agent-CLI scrollback); its job is to make
- * the paused state read as a chat to anyone, not just developers.
+ * Two-layer design: a heavily-blurred faux-TUI backdrop owns the pane
+ * to telegraph the handoff from the browser to a native agent TUI, with a
+ * focused Resume control centered on top. The faux-TUI is decorative (no
+ * real session content — we don't persist agent-CLI scrollback); its job is
+ * to make the otherwise-unusual browser-to-terminal transition legible.
  */
 
 .resume-cta-frame {
   flex: 1 1 auto;
   position: relative;
   overflow: hidden;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
   background: var(--secondary);
 }
 
@@ -174,12 +172,12 @@
   align-items: stretch;
   gap: 14px;
   padding: 24px 28px;
-  min-width: 320px;
-  max-width: 420px;
+  width: min(380px, calc(100% - 32px));
+  min-width: 0;
   background: var(--background);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px color-mix(in srgb, var(--shadow-color) 40%, transparent);
+  border-radius: 6px;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--shadow-color) 26%, transparent);
 }
 
 .resume-cta-card-header {
@@ -258,7 +256,7 @@
   color: var(--primary-foreground);
   border: 0;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
