@@ -655,6 +655,13 @@ export interface SessionRecord {
   readonly title: string | null;
   /** Headless run this stable Alice Session was materialized from. */
   readonly sourceRunId?: string | null;
+  /** Secret-free launch semantics pinned to this resumable Session. */
+  readonly runtime?: {
+    readonly credentialSource: 'native' | 'vault' | 'workspace';
+    readonly credentialSlug?: string;
+    readonly model?: string;
+    readonly reasoningEffort?: ModelReasoningEffort;
+  };
 }
 
 export interface SpawnedSession {

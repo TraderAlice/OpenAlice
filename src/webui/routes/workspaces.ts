@@ -191,6 +191,12 @@ interface PublicSessionBody {
   readonly startedAt: number | null;
   readonly title: string | null;
   readonly sourceRunId: string | null;
+  readonly runtime?: {
+    readonly credentialSource: 'native' | 'vault' | 'workspace';
+    readonly credentialSlug?: string;
+    readonly model?: string;
+    readonly reasoningEffort?: ModelReasoningEffort;
+  };
 }
 
 type OpenHeadlessSessionResult =
@@ -465,6 +471,7 @@ export function createWorkspaceRoutes(
   const publicSession = (record: SessionRecord): PublicSessionBody => {
     const terminal = svc.pool.get(record.id);
     const browser = svc.webPi?.get(record.id) ?? null;
+    const binding = svc.resumeRegistry.get(record.resumeId)?.runtimeBinding;
     return {
       id: record.id,
       wsId: record.wsId,
@@ -479,6 +486,18 @@ export function createWorkspaceRoutes(
       startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
       title: sessionPreferredTitle(record) ?? null,
       sourceRunId: record.sourceRunId ?? null,
+      ...(binding
+        ? {
+            runtime: {
+              credentialSource: binding.credential.source,
+              ...(binding.credential.source === 'vault'
+                ? { credentialSlug: binding.credential.credentialSlug }
+                : {}),
+              ...(binding.model ? { model: binding.model } : {}),
+              ...(binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
+            },
+          }
+        : {}),
     };
   };
 

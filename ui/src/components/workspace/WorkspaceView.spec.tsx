@@ -166,7 +166,15 @@ describe('WorkspaceView Files panel', () => {
 
 describe('WorkspaceView paused Session recovery', () => {
   it('shows a failed resume and lets the user retry instead of staying on Opening', async () => {
-    const paused = session(2, 'paused')
+    const paused: SessionRecord = {
+      ...session(2, 'paused'),
+      runtime: {
+        credentialSource: 'vault',
+        credentialSlug: 'deepseek-1',
+        model: 'deepseek-v4-flash',
+        reasoningEffort: 'high',
+      },
+    }
     const onResume = vi.fn(async () => { throw new Error('Pi CLI login is required') })
 
     render(
@@ -183,10 +191,23 @@ describe('WorkspaceView paused Session recovery', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue in terminal' }))
+    expect(screen.getByText('Session paused')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Conversation 2' })).toBeTruthy()
+    expect(screen.getByText('deepseek-1')).toBeTruthy()
+    expect(screen.getByText('deepseek-v4-flash')).toBeTruthy()
+    expect(screen.getByText('high reasoning')).toBeTruthy()
+    const details = screen.getByText('Session details').closest('details') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+
+    fireEvent.click(screen.getByText('Session details'))
+    expect(details.open).toBe(true)
+    expect(screen.getByText('Transcript')).toBeTruthy()
+    expect(screen.getByText('resume-2')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume in TUI' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Pi CLI login is required')
-    expect((screen.getByRole('button', { name: 'Continue in terminal' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: 'Resume in TUI' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })
 
