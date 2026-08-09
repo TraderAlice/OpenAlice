@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -9,6 +10,7 @@ import '@xterm/xterm/css/xterm.css';
 import {
   parseServerControl,
   type ClientControlMessage,
+  type SessionAgentActivity,
 } from './protocol';
 import { attachWebglRenderer } from './renderer';
 import {
@@ -19,6 +21,7 @@ import {
   installTerminalKeyboardController,
 } from './terminal-keyboard-controller';
 import { TerminalKittyKeyboardModeTracker } from './terminal-kitty-keyboard-mode-tracker';
+import { sessionActivityDot, sessionActivityLabelKey } from './session-activity-ui';
 import {
   colorSchemeUpdateSequence,
   terminalThemesEqual,
@@ -189,6 +192,7 @@ export interface TerminalViewProps {
    * Fires once per WS lifetime when the server's `attached` message lands.
    */
   readonly onAttached?: (sessionId: string) => void;
+  readonly onActivity?: (activity: SessionAgentActivity) => void;
   /**
    * Fires when the WS closes with 4404 — server doesn't recognize the
    * sessionId (record paused-since-poll-lag, server restarted, …). The
@@ -206,7 +210,12 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     );
   }
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const { t } = useTranslation();
   const [status, setStatus] = useState<Status>('connecting');
+  const [agentActivity, setAgentActivity] = useState<SessionAgentActivity>({
+    phase: 'unavailable',
+    observedAt: 0,
+  });
   const [pid, setPid] = useState<number | null>(null);
   const [scrollbackTruncated, setScrollbackTruncated] = useState(false);
   const [exitInfo, setExitInfo] = useState<ExitInfo | null>(null);
@@ -222,6 +231,8 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
 
   const onAttachedRef = useRef<TerminalViewProps['onAttached']>(props.onAttached);
   onAttachedRef.current = props.onAttached;
+  const onActivityRef = useRef<TerminalViewProps['onActivity']>(props.onActivity);
+  onActivityRef.current = props.onActivity;
   const onSessionLostRef = useRef<TerminalViewProps['onSessionLost']>(props.onSessionLost);
   onSessionLostRef.current = props.onSessionLost;
 
@@ -239,6 +250,7 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
     if (!container) return undefined;
 
     setStatus('connecting');
+    setAgentActivity({ phase: 'unavailable', observedAt: 0 });
     setPid(null);
     setScrollbackTruncated(false);
     setExitInfo(null);
@@ -543,6 +555,12 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
               attachedColorSchemeSubscription = msg.colorSchemeUpdatesSubscribed;
               maybeFinishReplay();
               onAttachedRef.current?.(msg.sessionId);
+              setAgentActivity(msg.activity);
+              onActivityRef.current?.(msg.activity);
+              break;
+            case 'activity':
+              setAgentActivity(msg.activity);
+              onActivityRef.current?.(msg.activity);
               break;
             case 'cursor':
               // No-op for now — see comment above on the URL `since` removal.
@@ -666,7 +684,12 @@ export function TerminalView(props: TerminalViewProps): ReactElement {
           </>
         )}
         <span className="terminal-meta">
-          {pid !== null ? `pid ${pid}` : ''}
+          <span
+            className={`terminal-agent-activity ${sessionActivityDot(agentActivity.phase)}`}
+            aria-hidden="true"
+          />
+          {t(sessionActivityLabelKey(agentActivity.phase))}
+          {pid !== null ? ` · pid ${pid}` : ''}
           {childExited ? ' · child exited' : ''}
           {scrollbackTruncated ? ' · scrollback truncated' : ''}
           {exitInfo

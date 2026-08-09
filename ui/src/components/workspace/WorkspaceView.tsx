@@ -4,6 +4,12 @@ import { ArrowUpRight, MessageSquarePlus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { SessionRecord } from './api';
+import {
+  sessionActivityDot,
+  sessionActivityLabelKey,
+  sessionActivityTone,
+  sessionPresentationPhase,
+} from './session-activity-ui';
 import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
@@ -283,6 +289,8 @@ function SessionRow(props: {
   const { t } = useTranslation();
   const record = props.record;
   const isPaused = record.state === 'paused';
+  const activityPhase = sessionPresentationPhase(record);
+  const activityLabel = t(sessionActivityLabelKey(activityPhase));
   const title = record.title?.trim() || record.name;
   const showInternalName = title !== record.name;
   return (
@@ -306,9 +314,9 @@ function SessionRow(props: {
             <span>{formatRelativeTime(record.lastActiveAt)}</span>
           </span>
         </span>
-        <span className={`workspace-session-state is-${record.state}`}>
-          <span aria-hidden="true" />
-          {isPaused ? t('workspace.paused') : t('workspace.filterRunning')}
+        <span className={`workspace-session-state ${sessionActivityTone(activityPhase)}`}>
+          <span className={sessionActivityDot(activityPhase)} aria-hidden="true" />
+          {activityLabel}
         </span>
         <ArrowUpRight className="workspace-session-open-icon" size={15} strokeWidth={2} aria-hidden="true" />
       </button>

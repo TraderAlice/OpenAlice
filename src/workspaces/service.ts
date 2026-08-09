@@ -2142,6 +2142,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           replayBufferBytes: config.replayBufferBytes,
           highWatermarkBytes: config.bpHighWatermarkBytes,
           lowWatermarkBytes: config.bpLowWatermarkBytes,
+          initialAgentActivity: adapter.capabilities.interactiveActivity
+            ? isFresh && !!ctx.initialPrompt ? 'starting' : 'waiting'
+            : 'unavailable',
           ...(ctx.initialReplayBytes ? { initialReplayBytes: ctx.initialReplayBytes } : {}),
         },
         adapter,

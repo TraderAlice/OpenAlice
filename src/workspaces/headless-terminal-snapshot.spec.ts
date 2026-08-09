@@ -143,4 +143,24 @@ describe('HeadlessTerminalSnapshot', () => {
       terminal.dispose()
     }
   })
+
+  it('consumes private Session activity frames without rendering them', () => {
+    const activity: string[] = []
+    const terminal = new HeadlessTerminalSnapshot({
+      cols: 80,
+      rows: 24,
+      onSessionActivity: (payload) => activity.push(payload),
+    })
+    try {
+      terminal.write('before\x1b]6973;openalice-session-activity;v=1;session=rec-1;phase=working\x1b\\after')
+
+      expect(activity).toEqual([
+        'openalice-session-activity;v=1;session=rec-1;phase=working',
+      ])
+      expect(terminal.snapshot()).toContain('beforeafter')
+      expect(terminal.snapshot()).not.toContain('openalice-session-activity')
+    } finally {
+      terminal.dispose()
+    }
+  })
 })

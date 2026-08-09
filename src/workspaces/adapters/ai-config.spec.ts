@@ -524,6 +524,39 @@ describe('opencodeAdapter AI-config', () => {
     expect(await read('tui.jsonc')).toBe('{ // user-owned\n  "scroll_speed": 2\n}\n');
   });
 
+  it('installs the managed OpenCode activity plugin without tracking it', async () => {
+    await mkdir(join(dir, '.git/info'), { recursive: true });
+
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    const plugin = await read('.opencode/plugins/openalice-session-activity.js');
+    expect(plugin).toContain('// @openalice-managed session-activity v1');
+    expect(plugin).toContain("event.type === 'session.idle'");
+    expect(await read('.git/info/exclude')).toContain(
+      '.opencode/plugins/openalice-session-activity.js\n',
+    );
+  });
+
+  it('preserves a same-name user-owned OpenCode plugin', async () => {
+    await mkdir(join(dir, '.opencode/plugins'), { recursive: true });
+    await writeFile(
+      join(dir, '.opencode/plugins/openalice-session-activity.js'),
+      '// user-owned\n',
+    );
+
+    await prepareAgentRuntimeWorkspace(opencodeAdapter, {
+      wsId: 'ws-abc',
+      cwd: dir,
+      launcherRepoRoot: '/repo',
+    });
+
+    expect(await read('.opencode/plugins/openalice-session-activity.js')).toBe('// user-owned\n');
+  });
+
   it('keeps OpenAlice MCP out of opencode env even when an MCP URL is present', () => {
     const env = opencodeAdapter.composeEnv!({ cwd: dir, env: mcpEnv });
     expect(env['OPENCODE_DISABLE_MODELS_FETCH']).toBe('1');

@@ -258,6 +258,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
           pid: sess.pid,
           startedAt: sess.startedAt,
           title: sess.title,
+          activity: { phase: 'waiting', observedAt: Date.now() },
         }
         setWorkspaces((prev) =>
           prev.map((w) =>
@@ -305,6 +306,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
             startedAt: resumed.startedAt,
             resumeId: resumed.resumeId ?? session.resumeId,
             lastActiveAt: new Date().toISOString(),
+            activity: { phase: 'starting', observedAt: Date.now() },
           }
         }
       }
@@ -393,6 +395,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         pid: session.pid,
         startedAt: session.startedAt,
         title: session.title,
+        activity: { phase: 'starting', observedAt: Date.now() },
       }
       // Upsert so the terminal slot mounts immediately (before the 3s poll):
       // append to the reused workspace, or insert the just-created one. The
@@ -477,6 +480,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         pid: resp.pid,
         startedAt: resp.startedAt,
         lastActiveAt: new Date().toISOString(),
+        activity: { phase: 'starting' as const, observedAt: Date.now() },
       }
       if (wsId === MANAGER_WORKSPACE_ID) {
         setWorkspaceManager((current) => patchManagerSession(current, sessionId, patch))
@@ -506,6 +510,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         pid: snapshot.pid,
         startedAt: snapshot.startedAt,
         lastActiveAt: new Date().toISOString(),
+        activity: { phase: 'starting' as const, observedAt: Date.now() },
       }
       if (wsId === MANAGER_WORKSPACE_ID) {
         setWorkspaceManager((current) => patchManagerSession(current, sessionId, patch))

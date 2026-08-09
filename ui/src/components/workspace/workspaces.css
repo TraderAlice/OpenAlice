@@ -839,7 +839,7 @@
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: var(--muted-foreground);
+  background: currentColor;
 }
 
 .workspace-session-state.is-running {
@@ -1285,12 +1285,22 @@ button.files-row:focus-visible {
 }
 
 .terminal-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+}
+
+.terminal-agent-activity {
+  width: 0.375rem;
+  height: 0.375rem;
+  flex: 0 0 auto;
+  border-radius: 9999px;
 }
 
 .terminal-title-separator {

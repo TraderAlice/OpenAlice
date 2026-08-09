@@ -662,6 +662,12 @@ export interface SessionRecord {
     readonly model?: string;
     readonly reasoningEffort?: ModelReasoningEffort;
   };
+  /** Native Agent work state; independent from the live/paused PTY lifecycle. */
+  /**
+   * Native Agent work state, independent from the live/paused PTY lifecycle.
+   * Optional during rolling upgrades; older launchers did not expose it.
+   */
+  readonly activity?: import('./protocol').SessionAgentActivity;
 }
 
 export interface SpawnedSession {

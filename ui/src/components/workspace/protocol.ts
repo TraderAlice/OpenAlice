@@ -53,6 +53,20 @@ export interface AttachedMessage {
   readonly scrollbackTruncated: boolean;
   readonly kittyKeyboardFlags: number;
   readonly colorSchemeUpdatesSubscribed: boolean;
+  readonly activity: SessionAgentActivity;
+}
+
+export type SessionAgentActivityPhase =
+  | 'starting'
+  | 'working'
+  | 'waiting'
+  | 'unavailable'
+  | 'failed'
+  | 'stopped';
+
+export interface SessionAgentActivity {
+  readonly phase: SessionAgentActivityPhase;
+  readonly observedAt: number;
 }
 
 export interface CursorMessage {
@@ -81,9 +95,15 @@ export interface ExitMessage {
   readonly signal: number | null;
 }
 
+export interface ActivityMessage {
+  readonly type: 'activity';
+  readonly activity: SessionAgentActivity;
+}
+
 export type ServerControlMessage =
   | AttachedMessage
   | CursorMessage
+  | ActivityMessage
   | LifecycleMessage
   | ExitMessage;
 
@@ -124,6 +144,7 @@ export function parseServerControl(text: string): ServerControlMessage | null {
           kittyKeyboardFlags:
             typeof v['kittyKeyboardFlags'] === 'number' ? v['kittyKeyboardFlags'] : 0,
           colorSchemeUpdatesSubscribed: v['colorSchemeUpdatesSubscribed'] === true,
+          activity: parseActivity(v['activity']) ?? { phase: 'unavailable', observedAt: 0 },
         };
       }
       return null;
@@ -132,6 +153,10 @@ export function parseServerControl(text: string): ServerControlMessage | null {
         return { type: 'cursor', seq: v['seq'] };
       }
       return null;
+    case 'activity': {
+      const activity = parseActivity(v['activity']);
+      return activity ? { type: 'activity', activity } : null;
+    }
     case 'lifecycle':
       if (v['kind'] === 'child-exit' && typeof v['code'] === 'number') {
         return {
@@ -157,4 +182,19 @@ export function parseServerControl(text: string): ServerControlMessage | null {
     default:
       return null;
   }
+}
+
+function parseActivity(value: unknown): SessionAgentActivity | null {
+  if (!value || typeof value !== 'object') return null;
+  const activity = value as Record<string, unknown>;
+  const phases: readonly SessionAgentActivityPhase[] = [
+    'starting', 'working', 'waiting', 'unavailable', 'failed', 'stopped',
+  ];
+  return phases.includes(activity['phase'] as SessionAgentActivityPhase) &&
+    typeof activity['observedAt'] === 'number' && Number.isFinite(activity['observedAt'])
+    ? {
+        phase: activity['phase'] as SessionAgentActivityPhase,
+        observedAt: activity['observedAt'],
+      }
+    : null;
 }

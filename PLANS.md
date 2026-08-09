@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/session-activity-terminal-delivery.md]] — Separates persistent PTY
+  lifecycle from native Agent activity, makes finished OpenCode/Pi turns visibly
+  idle, and preserves the first Quick Chat response across attach/reconnect.
 - [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
   healthy dev/CLI Runtime already owning the selected data location and hand
   the user to its verified browser UI without takeover.

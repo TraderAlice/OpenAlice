@@ -13,6 +13,7 @@ import {
   terminalViewAttributesEqual,
   type TerminalViewAttributes,
 } from './terminal-view-attributes.js';
+import type { SessionAgentActivity } from './session-activity.js';
 
 /**
  * Per-attach context the factory uses to compose a fresh PersistentSession.
@@ -66,6 +67,7 @@ export interface LiveSessionInfo {
   readonly startedAt: number;
   readonly agent: string;
   readonly agentSessionId: string | null;
+  readonly activity: SessionAgentActivity;
 }
 
 /**
@@ -162,6 +164,7 @@ export class SessionPool {
         startedAt: s.startedAt,
         agent: adapter?.id ?? 'unknown',
         agentSessionId: s.agentSessionId,
+        activity: s.agentActivity,
       });
     }
     return out;

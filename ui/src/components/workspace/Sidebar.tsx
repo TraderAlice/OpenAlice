@@ -16,6 +16,11 @@ import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
 import { workspaceDisplayName, workspaceDisplayTitle } from './display';
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
+import {
+  sessionActivityDot,
+  sessionActivityLabelKey,
+  sessionPresentationPhase,
+} from './session-activity-ui';
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
 
@@ -318,8 +323,9 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
   const w = props.workspace;
   const label = workspaceDisplayName(w);
   const isSelected = props.selection?.wsId === w.id && props.selection.sessionId === null;
-  const hasRunning = w.sessions.some((s) => s.state === 'running');
-  const runningCount = w.sessions.filter((s) => s.state === 'running').length;
+  const liveSessions = w.sessions.filter((s) => s.state === 'running');
+  const workingCount = liveSessions.filter((s) =>
+    ['starting', 'working'].includes(sessionPresentationPhase(s))).length;
   const orderedSessions = useMemo(
     () => orderSessionsForSidebar(w.sessions),
     [w.sessions],
@@ -376,9 +382,11 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
       : t('workspace.spawn');
   const chooserTitle = t('workspace.chooseAgent');
 
-  const statusClass = hasRunning
-    ? 'bg-success'
-    : w.sessions.length > 0
+  const statusClass = workingCount > 0
+    ? 'bg-primary'
+    : liveSessions.length > 0
+      ? 'bg-success'
+      : w.sessions.length > 0
       ? 'bg-muted-foreground/40'
       : 'border border-border';
 
@@ -399,7 +407,11 @@ export function WorkspaceRow(props: WorkspaceRowProps): ReactElement {
         >
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusClass}`}
-            title={hasRunning ? t('workspace.runningCount', { count: runningCount }) : t('workspace.idle')}
+            title={workingCount > 0
+              ? t('workspace.workingCount', { count: workingCount })
+              : liveSessions.length > 0
+                ? t('workspace.readyCount', { count: liveSessions.length })
+                : t('workspace.idle')}
           />
           <span className="truncate font-medium">{label}</span>
           <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0">{formatRelativeTime(w.createdAt)}</span>
@@ -639,6 +651,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const { t } = useTranslation();
   const s = props.session;
   const isPaused = s.state === 'paused';
+  const activityPhase = sessionPresentationPhase(s);
   // The server resolves native title → launch prompt → sticky name.
   const display = s.title?.trim() || s.name;
   const resumeLabel = t('workspace.resumeSession', { title: display });
@@ -648,6 +661,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
   if (s.resumeId) metaParts.push(s.resumeId);
   if (isPaused) metaParts.push(t('workspace.paused'));
+  else metaParts.push(t(sessionActivityLabelKey(activityPhase)));
   const meta = metaParts.join(' · ');
   // Full message on hover when it's been truncated, then the technical meta.
   const tooltipParts = [s.title?.trim() || null, props.subtitle, meta].filter(Boolean);
@@ -681,6 +695,13 @@ export function SessionRow(props: SessionRowProps): ReactElement {
             </span>
           )}
         </span>
+        {!isPaused && (
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${sessionActivityDot(activityPhase)}`}
+            title={t(sessionActivityLabelKey(activityPhase))}
+            aria-label={t(sessionActivityLabelKey(activityPhase))}
+          />
+        )}
       </button>
       {/* Right-aligned, always-visible state-as-action: a running session shows
           STOP (■, click to pause it); a paused one shows PLAY (▶, click to
