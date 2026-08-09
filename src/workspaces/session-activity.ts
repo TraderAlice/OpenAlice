@@ -22,6 +22,46 @@ export interface SessionAgentActivity {
   readonly observedAt: number
 }
 
+type WebPiActivityPhase =
+  | 'starting'
+  | 'idle'
+  | 'working'
+  | 'compacting'
+  | 'retrying'
+  | 'stopped'
+  | 'failed'
+
+/**
+ * Project the shared public activity snapshot from the two interactive
+ * transports. Terminal sessions own an explicit native snapshot; WebPi owns
+ * an RPC state machine; a record with no live process is stopped. Keeping this
+ * mapping here prevents REST surfaces from drifting on lifecycle semantics.
+ */
+export function projectSessionAgentActivity(input: {
+  readonly terminal?: SessionAgentActivity | null
+  readonly browser?: {
+    readonly phase: WebPiActivityPhase
+    readonly startedAt: number
+  } | null
+  readonly lastActiveAt: string
+}): SessionAgentActivity {
+  if (input.terminal) return input.terminal
+  if (input.browser) {
+    const phase: SessionAgentActivityPhase =
+      input.browser.phase === 'idle' ? 'waiting'
+      : input.browser.phase === 'failed' ? 'failed'
+      : input.browser.phase === 'stopped' ? 'stopped'
+      : input.browser.phase === 'starting' ? 'starting'
+      : 'working'
+    return { phase, observedAt: input.browser.startedAt }
+  }
+  const fallbackObservedAt = Date.parse(input.lastActiveAt)
+  return {
+    phase: 'stopped',
+    observedAt: Number.isFinite(fallbackObservedAt) ? fallbackObservedAt : 0,
+  }
+}
+
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const FRAME_PREFIX = 'openalice-session-activity'
 const PHASES = new Set<SessionAgentActivityPhase>([

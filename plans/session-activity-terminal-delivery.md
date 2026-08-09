@@ -252,6 +252,13 @@ Recorded on 2026-08-09 against the proposal branch:
   Agent activity is `waiting`; all three assert `Ready` rather than `Working`
   while preserving the running/lifecycle controls. The focused UI set passes
   18 tests across four files.
+- The ordinary Workspace list projection now includes the same activity
+  snapshot as manager/resume routes. A shared projection function gives native
+  terminal activity precedence, maps every WebPi RPC phase, and marks records
+  without a live process stopped; its focused REST/projection/replay set passes
+  76 tests. Demo Workspace fixtures and handlers also expose waiting, working,
+  and starting snapshots, so `dev:demo` no longer silently exercises only the
+  rolling-upgrade `Live` fallback.
 - A repository-wide consumer audit found `transcript.session.captured` only at
   its structured-log emission site in `transcript-watcher.ts`. Its downstream
   path stores `agentSessionId` for resume identity; no UI, terminal, or activity

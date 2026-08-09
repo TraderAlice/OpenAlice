@@ -85,7 +85,10 @@ import {
   managerTerminalPrompt,
   managerSkillPath,
 } from '../../workspaces/manager-workspace.js';
-import type { SessionAgentActivity } from '../../workspaces/session-activity.js';
+import {
+  projectSessionAgentActivity,
+  type SessionAgentActivity,
+} from '../../workspaces/session-activity.js';
 
 // The spawn body's `resume` value is an AGENT-side session id, whose shape is
 // adapter-native: uuid for claude/codex/pi, `ses_<base62>` for opencode. This
@@ -474,7 +477,6 @@ export function createWorkspaceRoutes(
     const terminal = svc.pool.get(record.id);
     const browser = svc.webPi?.get(record.id) ?? null;
     const binding = svc.resumeRegistry.get(record.resumeId)?.runtimeBinding;
-    const fallbackObservedAt = Date.parse(record.lastActiveAt);
     return {
       id: record.id,
       wsId: record.wsId,
@@ -489,18 +491,11 @@ export function createWorkspaceRoutes(
       startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
       title: sessionPreferredTitle(record) ?? null,
       sourceRunId: record.sourceRunId ?? null,
-      activity: terminal?.agentActivity ?? {
-        phase: browser
-          ? browser.phase === 'idle' ? 'waiting'
-            : browser.phase === 'failed' ? 'failed'
-              : browser.phase === 'stopped' ? 'stopped'
-                : browser.phase === 'starting' ? 'starting'
-                  : 'working'
-          : 'stopped',
-        observedAt: terminal?.startedAt
-          ?? browser?.startedAt
-          ?? (Number.isFinite(fallbackObservedAt) ? fallbackObservedAt : 0),
-      },
+      activity: projectSessionAgentActivity({
+        terminal: terminal?.agentActivity,
+        browser,
+        lastActiveAt: record.lastActiveAt,
+      }),
       ...(binding
         ? {
             runtime: {

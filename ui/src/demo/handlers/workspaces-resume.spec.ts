@@ -45,6 +45,7 @@ describe('demo Workspace resume handlers', () => {
         agent: 'codex',
         state: 'running',
         title: 'Morning movers scan · codex',
+        activity: { phase: 'starting' },
       },
     })
 
@@ -63,6 +64,9 @@ describe('demo Workspace resume handlers', () => {
     const workspace = after.workspaces.find(
       (candidate: { id: string }) => candidate.id === DEMO_AUTO_QUANT_WORKSPACE_ID,
     )
-    expect(workspace.sessions).toContainEqual(expect.objectContaining({ id: `run-${resumeId}` }))
+    expect(workspace.sessions).toContainEqual(expect.objectContaining({
+      id: `run-${resumeId}`,
+      activity: expect.objectContaining({ phase: 'starting' }),
+    }))
   })
 })

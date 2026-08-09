@@ -305,6 +305,7 @@ export function launchEnvironmentDisclosure(
   return out;
 }
 import { ScrollbackStore } from './scrollback-store.js';
+import { projectSessionAgentActivity } from './session-activity.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import {
   SessionRegistry,
@@ -2349,6 +2350,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
         title: sessionPreferredTitle(r) ?? null,
         sourceRunId: r.sourceRunId ?? null,
+        activity: projectSessionAgentActivity({
+          terminal: terminal?.agentActivity,
+          browser,
+          lastActiveAt: r.lastActiveAt,
+        }),
       };
     });
     // Workspace AI provider override signals — read by the Overview

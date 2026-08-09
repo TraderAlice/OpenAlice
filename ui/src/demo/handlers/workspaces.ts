@@ -36,6 +36,7 @@ const demoManagerSession = {
   pid: 0,
   startedAt: Date.now(),
   title: 'Audit the active Workspace floor',
+  activity: { phase: 'waiting' as const, observedAt: Date.now() },
 }
 
 let demoManagerMessages: unknown[] = []
@@ -929,6 +930,7 @@ export const workspacesHandlers = [
         ? body.title.trim()
         : 'Resumed demo run',
       sourceRunId: 'demo-headless-1',
+      activity: { phase: 'starting' as const, observedAt: Date.now() },
     }
     ;(workspace.sessions as Array<typeof session>).push(session)
     return HttpResponse.json({ session, created: true }, { status: 201 })
@@ -984,6 +986,7 @@ export const workspacesHandlers = [
       pid: 0,
       startedAt,
       title: prompt,
+      activity: { phase: 'waiting', observedAt: Date.now() },
     }
     const updatedWorkspace = {
       ...ws,
