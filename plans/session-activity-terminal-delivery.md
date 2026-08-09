@@ -245,6 +245,11 @@ Recorded on 2026-08-09 against the proposal branch:
   Agent activity is `waiting`; all three assert `Ready` rather than `Working`
   while preserving the running/lifecycle controls. The focused UI set passes
   18 tests across four files.
+- A repository-wide consumer audit found `transcript.session.captured` only at
+  its structured-log emission site in `transcript-watcher.ts`. Its downstream
+  path stores `agentSessionId` for resume identity; no UI, terminal, or activity
+  transition subscribes to that log event. `persistent-session.spec.ts` also
+  proves `setAgentSessionId()` leaves the current Agent activity unchanged.
 - `npx tsc --noEmit`, `cd ui && npx tsc -b`, and
   `npx tsc -p apps/desktop/tsconfig.json --noEmit` — passed.
 - `pnpm electron:build` — passed as an unsigned development build.
