@@ -17,12 +17,13 @@ import { shellAdapter } from './shell.js';
  *   pi       → … <prompt>           (bare trailing positional; pi REJECTS `--`)
  *   shell    → ignored              (no agent to receive a prompt)
  *
- * Scope note: this exercises `composeCommand` in isolation, NOT the launcher
- * integration (the pool factory / `composeSpawnInputs`) nor platform resolution
- * (`win-command.ts`). Two contracts live UPSTREAM of composeCommand and are NOT
- * covered here:
- *   - FRESH-ONLY gating: the route + factory only ever set `initialPrompt` on a
- *     fresh spawn. claude/codex/opencode ALSO self-gate on `resume === undefined`
+ * Scope note: this exercises `composeCommand` in isolation, NOT the pool factory
+ * / `composeSpawnInputs` nor platform resolution (`win-command.ts`). The
+ * `/quick-chat` route handoff into `SessionFactoryContext.initialPrompt` is
+ * covered in `workspaces-quickchat.spec.ts`. Two contracts live UPSTREAM of
+ * composeCommand:
+ *   - FRESH-ONLY gating: the route + factory only set `initialPrompt` on a fresh
+ *     spawn. claude/codex/opencode ALSO self-gate on `resume === undefined`
  *     (asserted below); pi does NOT (it appends the seed alongside its assigned
  *     `--session-id`, because pi mints its id at spawn — see the pi case below).
  *   - win32 shim safety: opencode/pi are `.cmd` shims, so `composeSpawnInputs`

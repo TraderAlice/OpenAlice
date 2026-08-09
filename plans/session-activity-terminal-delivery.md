@@ -240,6 +240,13 @@ Recorded on 2026-08-09 against the proposal branch:
   passed, including a first reply emitted before attach, output emitted while
   disconnected, cold reconnect replay, current activity replay, and identity /
   activity separation.
+- The Quick Chat delivery chain is now covered at each ownership boundary:
+  `workspaces-quickchat.spec.ts` proves the normalized prompt enters
+  `SessionFactoryContext.initialPrompt` before any renderer attach;
+  `interactive-seed.spec.ts` proves each native adapter places it in the
+  correct interactive argv; and `persistent-session.spec.ts` proves the first
+  resulting reply survives late attach and reconnect. The focused chain passes
+  61 tests across those three files.
 - Component-level UI regressions now render the Sidebar Session row, Workspace
   Session library, and Workspace overview card with a live PTY whose native
   Agent activity is `waiting`; all three assert `Ready` rather than `Working`

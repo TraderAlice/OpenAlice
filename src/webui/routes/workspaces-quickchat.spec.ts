@@ -496,6 +496,25 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
 });
 
 describe('POST /quick-chat — native auth and explicit credential overrides', () => {
+  it('hands the normalized seed prompt to the Session pool before any terminal attach', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, spawn } = build();
+
+    const result = await quickChat(app, {
+      prompt: '  preserve the leading and trailing context  ',
+      agent: 'opencode',
+    });
+
+    expect(result.status).toBe(201);
+    expect(spawn).toHaveBeenCalledOnce();
+    expect((spawn.mock.calls[0] as any[])[1]).toMatchObject({
+      agentId: 'opencode',
+      initialPrompt: 'preserve the leading and trailing context',
+      recordId: expect.any(String),
+      recordName: 'o1',
+    });
+  });
+
   it('opencode + empty vault → native launch without injection', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app, opencode, spawn } = build();
