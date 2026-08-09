@@ -182,7 +182,7 @@ separate facts.
 
 - [x] Add focused adapter, terminal snapshot, PersistentSession, route/protocol,
       and UI regression tests.
-- [ ] Run root/UI typechecks and the monorepo test suite.
+- [x] Run root/UI typechecks and the monorepo test suite.
 - [ ] Walk the real Chat route in `pnpm dev` and a Docker-shaped HTTP launch.
 - [ ] Run the relevant Electron/PT​​Y smoke and record platform-only residual
       risk without invoking release signing.
