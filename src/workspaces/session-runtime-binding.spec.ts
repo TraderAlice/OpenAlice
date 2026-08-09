@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Credential } from '@/core/config.js'
@@ -143,28 +145,33 @@ describe('durable Session runtime binding', () => {
     expect(resumed.ai?.apiKey).toBe('rotated-key')
   })
 
-  it('treats native login as an explicit source and freezes project model preferences', async () => {
-    const adapter = fakeAdapter(async () => ({ model: 'native-model', reasoningEffort: 'medium' }))
+  it('treats native login as the fresh default without reading project config', async () => {
+    const read = vi.fn(async () => ({ model: 'native-model', reasoningEffort: 'medium' }) as WorkspaceAiCred)
+    const adapter = fakeAdapter(read)
     await expect(createSessionRuntimeBinding({ adapter, cwd: '/workspace', credentials: {} }))
       .resolves.toMatchObject({
         binding: {
           credential: { source: 'native' },
-          model: 'native-model',
-          reasoningEffort: 'medium',
         },
       })
+    expect(read).not.toHaveBeenCalled()
   })
 
-  it('refuses to silently resume through a replaced untracked Workspace provider', async () => {
-    const read = vi.fn(async (): Promise<WorkspaceAiCred> => ({
+  it('still refuses to silently resume a persisted legacy Workspace provider after replacement', async () => {
+    const original: WorkspaceAiCred = {
       baseUrl: 'https://gateway.test/v1',
       apiKey: 'first-key',
       wireShape: 'openai-responses',
       model: 'private-model',
-    }))
+    }
+    const fingerprint = createHash('sha256').update(JSON.stringify({
+      baseUrl: original.baseUrl,
+      apiKey: original.apiKey,
+      wireShape: original.wireShape,
+      authMode: null,
+    })).digest('hex')
+    const read = vi.fn(async (): Promise<WorkspaceAiCred> => original)
     const adapter = fakeAdapter(read)
-    const created = await createSessionRuntimeBinding({ adapter, cwd: '/workspace', credentials: {} })
-    expect(created.binding.credential.source).toBe('workspace')
 
     read.mockResolvedValue({
       baseUrl: 'https://gateway.test/v1',
@@ -175,7 +182,11 @@ describe('durable Session runtime binding', () => {
     await expect(resolveSessionRuntimeBinding({
       adapter,
       cwd: '/workspace',
-      binding: created.binding,
+      binding: {
+        version: 1,
+        credential: { source: 'workspace', fingerprint },
+        model: original.model ?? undefined,
+      },
       credentials: {},
     })).rejects.toMatchObject({
       code: 'workspace_binding_changed',

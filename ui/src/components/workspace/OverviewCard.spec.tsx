@@ -49,7 +49,6 @@ describe('OverviewCard', () => {
   it('exposes native controls for the workspace and its sessions', () => {
     const onOpen = vi.fn()
     const onOpenSession = vi.fn()
-    const onConfigure = vi.fn()
     const onUpgrade = vi.fn()
     render(
       <OverviewCard
@@ -57,7 +56,6 @@ describe('OverviewCard', () => {
         lastCommit={null}
         onOpen={onOpen}
         onOpenSession={onOpenSession}
-        onConfigure={onConfigure}
         onUpgrade={onUpgrade}
       />,
     )
@@ -72,9 +70,7 @@ describe('OverviewCard', () => {
     expect(document.activeElement).toBe(sessionButton)
 
     fireEvent.click(screen.getByRole('button', { name: 'v0.2.0' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Workspace override · codex' }))
     expect(onUpgrade).toHaveBeenCalledTimes(1)
-    expect(onConfigure).toHaveBeenCalledTimes(1)
     expect(onOpen).not.toHaveBeenCalled()
 
     fireEvent.click(workspaceButton)

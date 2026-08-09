@@ -7,6 +7,7 @@
  */
 
 import { Hono } from 'hono';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
 
@@ -61,8 +62,12 @@ import {
   SessionRuntimeBindingError,
 } from '../../workspaces/session-runtime-binding.js';
 import {
+  readWorkspaceRuntimeSettings,
+  rememberWorkspaceRuntimeBinding,
+  resolveWorkspaceRuntimeSelection,
+} from '../../workspaces/workspace-runtime-settings.js';
+import {
   AgentCredentialError,
-  ensureAgentCredentialReady,
   getAgentCredentialReadiness,
 } from '../../workspaces/agent-credential-readiness.js';
 import { validateTerminalViewAttributes } from '../../workspaces/terminal-view-attributes.js';
@@ -81,6 +86,7 @@ import {
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import {
+  MANAGER_WORKSPACE_ID,
   MANAGER_SYSTEM_PROMPT,
   managerTerminalPrompt,
   managerSkillPath,
@@ -306,7 +312,28 @@ export function createWorkspaceRoutes(
       return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
     }
     if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
-    const agentId = opts.agentId ?? requestedIdentity?.agent ?? await resolveDefaultAgentId(meta);
+    const freshProductSession = !requestedIdentity && meta.id !== MANAGER_WORKSPACE_ID;
+    const runtimeSettings = freshProductSession
+      ? await readWorkspaceRuntimeSettings(meta.dir)
+      : null;
+    if (runtimeSettings && !runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
+      return {
+        ok: false,
+        status: 400,
+        body: { error: 'workspace_runtime_settings_invalid', message: runtimeSettings.error },
+      };
+    }
+    const recentInteractiveAgent = runtimeSettings?.ok
+      ? runtimeSettings.settings.runtime.interactive.recentAgent
+      : undefined;
+    const recentInteractiveAdapter = recentInteractiveAgent
+      ? svc.adapters.get(recentInteractiveAgent)
+      : undefined;
+    const validRecentInteractiveAgent = recentInteractiveAgent && recentInteractiveAdapter &&
+      isAgentRuntime(recentInteractiveAdapter)
+      ? recentInteractiveAgent
+      : undefined;
+    const agentId = opts.agentId ?? requestedIdentity?.agent ?? validRecentInteractiveAgent ?? await resolveDefaultAgentId(meta);
     if (!agentId) {
       return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'no agent runtime is registered' } };
     }
@@ -330,6 +357,12 @@ export function createWorkspaceRoutes(
     let sessionRuntime: ResolvedSessionRuntimeBinding | undefined;
     if (isAgentRuntime(adapter)) {
       try {
+        const explicitSelection = {
+          ...(opts.credentialSource ? { credentialSource: opts.credentialSource } : {}),
+          ...(opts.credentialSlug ? { credentialSlug: opts.credentialSlug } : {}),
+          ...(opts.model ? { model: opts.model } : {}),
+          ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
+        };
         sessionRuntime = requestedIdentity
           ? requestedIdentity.runtimeBinding
             ? await resolveSessionRuntimeBinding({
@@ -341,12 +374,14 @@ export function createWorkspaceRoutes(
           : await createSessionRuntimeBinding({
               adapter,
               cwd: meta.dir,
-              selection: {
-                ...(opts.credentialSource ? { credentialSource: opts.credentialSource } : {}),
-                ...(opts.credentialSlug ? { credentialSlug: opts.credentialSlug } : {}),
-                ...(opts.model ? { model: opts.model } : {}),
-                ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
-              },
+              selection: freshProductSession
+                ? resolveWorkspaceRuntimeSelection(
+                    runtimeSettings?.ok ? runtimeSettings.settings : null,
+                    'interactive',
+                    adapter.id,
+                    explicitSelection,
+                  )
+                : explicitSelection,
             });
       } catch (err) {
         if (err instanceof SessionRuntimeBindingError) {
@@ -434,6 +469,19 @@ export function createWorkspaceRoutes(
         ...(sessionRuntime ? { sessionRuntime } : {}),
       };
       const session = svc.pool.spawn(id, ctx);
+      if (freshProductSession && sessionRuntime && existsSync(meta.dir)) {
+        await rememberWorkspaceRuntimeBinding({
+          wsDir: meta.dir,
+          surface: 'interactive',
+          agent: adapter.id,
+          runtime: sessionRuntime,
+        }).catch((err) => launcherLogger.warn('workspace.runtime_preference_write_failed', {
+          wsId: id,
+          surface: 'interactive',
+          agent: adapter.id,
+          err,
+        }));
+      }
       launcherLogger.info('workspace.session_spawned', {
         id,
         sessionId: session.recordId,
@@ -698,10 +746,8 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // Detect which vault credential a workspace agent is currently configured
-  // with. A null slug can still be a real hand-edited native config; returning
-  // that distinction is what lets launch surfaces describe Claude/Codex as
-  // truthfully as the loginless runtimes.
+  // Deprecated compatibility inspection for native project config. Managed
+  // launch surfaces use `.alice/settings.json` and do not call this helper.
   const detectWorkspaceCred = async (
     meta: WorkspaceMeta,
     agentId: string,
@@ -1840,7 +1886,6 @@ export function createWorkspaceRoutes(
     const adapter = svc.adapters.get('pi');
     if (!adapter) return c.json({ error: 'unknown_agent' }, 500);
     try {
-      await ensureAgentCredentialReady({ meta, agentId: 'pi', adapter, logger: launcherLogger });
       await prepareAgentRuntimeWorkspace(adapter, {
         wsId: id,
         cwd: meta.dir,
@@ -2157,7 +2202,23 @@ export function createWorkspaceRoutes(
     if (agentId && !svc.adapters.get(agentId)) {
       return c.json({ error: 'unknown_agent', message: `no adapter: ${agentId}` }, 400);
     }
-    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await resolveDefaultAgentId(meta);
+    const runtimeSettings = !resumeIdentity
+      ? await readWorkspaceRuntimeSettings(meta.dir)
+      : null;
+    if (runtimeSettings && !runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
+      return c.json({ error: 'workspace_runtime_settings_invalid', message: runtimeSettings.error }, 400);
+    }
+    const recentHeadlessAgent = runtimeSettings?.ok
+      ? runtimeSettings.settings.runtime.headless.recentAgent
+      : undefined;
+    const recentHeadlessAdapter = recentHeadlessAgent
+      ? svc.adapters.get(recentHeadlessAgent)
+      : undefined;
+    const validRecentHeadlessAgent = recentHeadlessAgent && recentHeadlessAdapter &&
+      isAgentRuntime(recentHeadlessAdapter)
+      ? recentHeadlessAgent
+      : undefined;
+    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? validRecentHeadlessAgent ?? await resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
       return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
     }
@@ -2232,12 +2293,11 @@ export function createWorkspaceRoutes(
     return c.json({ ok: true, wasRunning });
   });
 
-  // ── agent provider config ────────────────────────────────────────────────
-  // Per-workspace AI provider config lives in CLI-native files inside the
-  // workspace (`.claude/settings.local.json`, `.codex/config.toml`,
-  // `.codex/env.json`). The CLIs read them directly via cwd-discovery /
-  // CODEX_HOME. These routes are pure file IO over the launcher's
-  // path-traversal guard.
+  // ── deprecated native-project compatibility export ─────────────────────
+  // These routes operate on CLI-native files discovered by the runtimes via
+  // cwd/CODEX_HOME. Managed Session defaults live in `.alice/settings.json`;
+  // this file-IO surface remains only for users who deliberately run a CLI
+  // directly inside the Workspace.
 
 
   // Central credential store, surfaced to the workspace AI-config modal. The
@@ -2325,7 +2385,10 @@ export function createWorkspaceRoutes(
     }
   });
 
+  // Deprecated compatibility export API. Managed Sessions do not consult
+  // these native project files for fresh launch defaults.
   app.get('/:id/agent-config', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
@@ -2346,12 +2409,13 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // Which vault credential this workspace's agent is currently configured with
+  // Which vault credential the deprecated native project export currently contains
   // (slug + effective model/protocol/context), plus any native pre-prompt setup
   // gate the adapter can inspect without changing runtime-owned state.
   // Ordinary detection does not overwrite config. The Pi adapter may perform
   // its one-time legacy `.pi-agent` layout migration before reading.
   app.get('/:id/agent-config/:agent/credential', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
@@ -2428,6 +2492,7 @@ export function createWorkspaceRoutes(
   });
 
   app.put('/:id/agent-config/:agent', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
@@ -2479,6 +2544,7 @@ export function createWorkspaceRoutes(
   // Probe live provider with the form state (does NOT touch workspace files —
   // tests exactly what the user sees in the modal, before they hit Save).
   app.post('/:id/agent-config/:agent/test', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ ok: false, error: 'invalid_id' }, 400);
@@ -2523,9 +2589,9 @@ export function createWorkspaceRoutes(
 
 // ── Agent config helpers ────────────────────────────────────────────────────
 
-// AI-provider config IO moved into the CLI adapters (writeAiConfig /
-// readAiConfig on claudeAdapter / codexAdapter). The routes above dispatch
-// through svc.adapters so each CLI owns its own file format.
+// Deprecated native-config export IO lives in the CLI adapters (writeAiConfig /
+// readAiConfig). The compatibility routes above dispatch through svc.adapters
+// so each CLI continues to own its native file format.
 
 function validId(id: string | undefined): id is string {
   return typeof id === 'string' && /^[a-zA-Z0-9_-]+$/.test(id);

@@ -416,6 +416,7 @@ export const codexAdapter: CliAdapter = {
     }
   },
 
+  /** @deprecated Native-project compatibility export; managed Sessions use sessionRuntime. */
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
     const hasAny = !!(cred.baseUrl || cred.apiKey || cred.model || cred.reasoningEffort);
     const legacyIsolated = isLegacyIsolatedHome(cwd);
@@ -499,6 +500,7 @@ export const codexAdapter: CliAdapter = {
     }
   },
 
+  /** @deprecated Compatibility inspection for legacy Session bindings only. */
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
     const isolatedHome = isolatedHomePath(cwd);
     const tomlRaw = await readWorkspaceFile(

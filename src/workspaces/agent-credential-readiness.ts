@@ -193,6 +193,13 @@ export async function getAgentCredentialReadiness(opts: {
   }
 }
 
+/**
+ * Apply a credential to native project configuration for compatibility with a
+ * CLI launched outside OpenAlice.
+ *
+ * @deprecated Managed probes, interactive Sessions, WebPi, and headless runs
+ * must resolve a Session runtime binding instead of calling this mutating gate.
+ */
 export async function ensureAgentCredentialReady(opts: {
   readonly meta: WorkspaceMeta
   readonly agentId: string

@@ -2,8 +2,9 @@
  * AI Provider — Alice's credential vault.
  *
  * Post-Workspace-pivot the in-process model loop is gone; the only thing this
- * page manages is the central set of api-key credentials that get injected into
- * workspaces (and pulled/pushed from the per-workspace AI config modal). It is
+ * page manages is the central set of api-key credentials that can be selected
+ * for per-process Workspace Session bindings. The native-project config editor
+ * is retained separately as a deprecated compatibility export. This page is
  * NOT a profile editor anymore — no backend/loginMethod, no active profile, no
  * SDK adapters, and Test runs the lightweight HTTP probe, not the old provider
  * router.
@@ -320,14 +321,9 @@ export function AIProviderPage() {
   )
 }
 
-// ==================== Default workspace credentials ====================
-//
-// A user-level "inject my usual key on every new workspace" setting. Per agent,
-// pick a vault credential to seed into each new workspace's file-based AI config
-// at create time. opencode/pi are the primary case (loginless — they need a key
-// to run); Claude Code / Codex run on their own CLI login by default, so they're
-// behind an "advanced" reveal — present (some users drive them via an unofficial
-// API key) but never pushed.
+// ==================== Legacy new-Workspace creation seeds ====================
+// Existing installation-level defaults are translated into the new Workspace's
+// secret-free `.alice/settings.json`. They never write native CLI project files.
 
 const PRIMARY_DEFAULT_AGENTS = [
   { id: 'opencode', name: 'opencode' },

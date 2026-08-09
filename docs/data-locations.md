@@ -31,6 +31,13 @@ Workspace launcher state includes the private
 with the complete home, is not part of any Workspace repository, and should be
 treated as sensitive conversation history when backing up or sharing a home.
 
+Each Workspace repository carries `.alice/settings.json`, a versioned,
+secret-free description of its recent interactive and headless Agent runtime
+choices. It may contain vault credential slugs, model ids, and effort values,
+but never provider keys or resolved endpoints. The referenced secrets remain
+under the complete home and therefore do not travel merely because a Workspace
+repository is copied.
+
 `AQ_LAUNCHER_ROOT` and `OPENALICE_GLOBAL_DIR` remain advanced split-root
 overrides. A fixed `AQ_LAUNCHER_ROOT` disables desktop home switching because
 changing only the rest of the home would still share Workspace files and

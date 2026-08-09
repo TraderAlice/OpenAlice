@@ -1,17 +1,15 @@
 /**
  * Per-workspace settings modal.
  *
- * Workspaces are VS-Code-style "open folders" — each owns its CLI config
- * files (.claude/settings.local.json, .codex/config.toml + env.json). This
- * modal is the visual editor for those files plus the workspace's
- * self-describing metadata. Files are the source of truth; the modal reads +
- * writes via the workspace API. Restart any open sessions for AI-provider
- * changes to take effect (env is read at CLI startup).
+ * Workspace metadata and launch defaults are self-describing files under
+ * `.alice/`. The legacy AI section remains an explicit compatibility editor
+ * for exporting settings into native CLI project files; it is not the managed
+ * Session launch source of truth.
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
+import { AlertTriangle, GitMerge, Info, Layers3, Rocket, RotateCcw, Settings, X } from 'lucide-react'
 import {
   getAgentConfig,
   listCredentials,
@@ -257,10 +255,9 @@ function testKey(form: FormState): string {
   ].join('|')
 }
 
-/** Connection probes cover only transport/auth/model fields. Local runtime
- * metadata such as context-window size and unknown-model reasoning capability
- * is written into the Workspace config without changing the HTTP request that
- * was already verified. */
+/** Deprecated native-export connection probes cover only transport/auth/model
+ * fields. Local runtime metadata such as context-window size and unknown-model
+ * reasoning capability does not change the HTTP request already verified. */
 export function connectionFieldsChanged(
   saved: AgentConfig | null,
   form: FormState,
@@ -731,19 +728,6 @@ export function WorkspaceAIConfigModal({
             </button>
             <button
               type="button"
-              onClick={() => setSection('ai')}
-              aria-current={section === 'ai' ? 'page' : undefined}
-              className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
-                section === 'ai'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-            >
-              <Bot size={15} />
-              <span>{t('workspaceSettings.section.aiProvider')}</span>
-            </button>
-            <button
-              type="button"
               onClick={() => setSection('template')}
               aria-current={section === 'template' ? 'page' : undefined}
               className={`flex min-h-11 min-w-max flex-none items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] font-medium transition-colors sm:mt-1 sm:min-h-0 sm:w-full ${
@@ -862,6 +846,15 @@ export function WorkspaceAIConfigModal({
 
             {section === 'ai' && (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 border-b border-warning/30 bg-warning/5 px-4 py-3">
+          <div className="flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" />
+            <div>
+              <div className="font-semibold text-foreground">{t('workspaceSettings.ai.deprecatedTitle')}</div>
+              <div className="mt-0.5">{t('workspaceSettings.ai.deprecatedDescription')}</div>
+            </div>
+          </div>
+        </div>
         {/* Tabs */}
         <div className="flex shrink-0 overflow-x-auto overscroll-x-contain border-b border-border bg-secondary/50 [scrollbar-width:none]">
           {(['claude', 'codex', 'opencode', 'pi'] as const).map((id) => (
@@ -1382,6 +1375,7 @@ export function WorkspaceAIConfigModal({
                 installationDefaultAgent={defaultAgent}
                 initialAgent={workspace?.defaultAgent ?? initialAgent}
                 onSaveDefaultAgent={(agent) => saveWorkspaceMetadata(wsId, { defaultAgent: agent })}
+                onOpenCompatibilityConfig={() => setSection('ai')}
               />
             )}
 

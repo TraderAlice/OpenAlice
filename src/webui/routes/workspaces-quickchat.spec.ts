@@ -1,7 +1,7 @@
 /**
- * POST /quick-chat — native runtime authentication plus explicit Workspace
- * overrides. Every agent CLI owns its normal login/provider state; a selected
- * OpenAlice credential is the only path that writes a Workspace configuration.
+ * POST /quick-chat — native runtime authentication plus explicit or remembered
+ * Workspace launch bindings. Managed launches never rewrite native CLI project
+ * configuration.
  *
  * core/config is partial-mocked so we can drive the vault per-test without
  * touching the real ai-provider-manager.json.
@@ -26,6 +26,11 @@ import {
 } from '../../workspaces/chat-workspace-resolver.js';
 import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
 import { writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
+import {
+  emptyWorkspaceRuntimeSettings,
+  readWorkspaceRuntimeSettings,
+  writeWorkspaceRuntimeSettings,
+} from '../../workspaces/workspace-runtime-settings.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -527,8 +532,66 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
 
     expect(r.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('uses and updates the target Workspace interactive recent binding', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-settings-'));
+    try {
+      const settings = emptyWorkspaceRuntimeSettings();
+      settings.runtime.interactive.recentAgent = 'opencode';
+      settings.runtime.interactive.agents.opencode = {
+        accessMode: 'vault',
+        credentialSlug: 'openai-2',
+        wireShape: 'openai-chat',
+        model: 'remembered-model',
+        reasoningEffort: 'medium',
+      };
+      await writeWorkspaceRuntimeSettings(dir, settings);
+      vi.mocked(readCredentials).mockResolvedValue({
+        'openai-2': { ...openaiKey, apiKey: 'sk-second' },
+      });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const launch = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(launch.status).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1]).toMatchObject({
+        agentId: 'opencode',
+        sessionRuntime: {
+          binding: {
+            credential: { source: 'vault', credentialSlug: 'openai-2' },
+            model: 'remembered-model',
+            reasoningEffort: 'medium',
+          },
+          ai: { apiKey: 'sk-second' },
+        },
+      });
+
+      const updated = await readWorkspaceRuntimeSettings(dir);
+      expect(updated).toMatchObject({
+        ok: true,
+        settings: {
+          runtime: {
+            interactive: {
+              recentAgent: 'opencode',
+              agents: {
+                opencode: {
+                  accessMode: 'vault',
+                  credentialSlug: 'openai-2',
+                  model: 'remembered-model',
+                  reasoningEffort: 'medium',
+                },
+              },
+            },
+          },
+        },
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('explicit native access bypasses an existing Workspace provider', async () => {

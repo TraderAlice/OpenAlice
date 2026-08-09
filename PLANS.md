@@ -31,6 +31,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/workspace-runtime-settings.md]] — Adds portable, secret-free
+  interactive/headless runtime preferences to each Workspace and demotes native
+  project credential injection to an explicit deprecated compatibility export.
 - [[plans/static-markdown-content-stability.md]] — Keeps Inbox and Tracked
   Markdown DOM stable across unchanged Workspace Manager and Inbox polling so
   text selection, browser translation, and report interactions survive.
