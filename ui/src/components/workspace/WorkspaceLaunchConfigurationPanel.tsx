@@ -22,6 +22,7 @@ interface Props {
   readonly installationDefaultAgent: string | null
   readonly initialAgent?: string
   readonly onSaveDefaultAgent: (agent: string | null) => Promise<void>
+  readonly onOpenCompatibilityConfig?: () => void
 }
 
 const RUNTIME_LABELS: Readonly<Record<string, string>> = {
@@ -74,6 +75,7 @@ export function WorkspaceLaunchConfigurationPanel({
   installationDefaultAgent,
   initialAgent,
   onSaveDefaultAgent,
+  onOpenCompatibilityConfig,
 }: Props) {
   const { t } = useTranslation()
   const agentIds = useMemo(() => [...new Set(agents.filter((id) => id !== 'shell'))], [agents])
@@ -218,6 +220,29 @@ export function WorkspaceLaunchConfigurationPanel({
               </div>
             </div>
           </section>
+
+          {onOpenCompatibilityConfig && (
+            <section className="rounded-lg border border-warning/30 bg-warning/5 p-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[12px] font-semibold text-foreground">
+                    {t('workspaceSettings.launch.compatibilityTitle')}
+                  </h3>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {t('workspaceSettings.launch.compatibilityDescription')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onOpenCompatibilityConfig}
+                    className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted"
+                  >
+                    {t('workspaceSettings.launch.openCompatibility')}
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="border-t border-border pt-4">
             <h3 className="text-sm font-semibold text-foreground">

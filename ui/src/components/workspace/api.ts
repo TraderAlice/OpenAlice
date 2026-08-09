@@ -6,6 +6,27 @@
 
 import type { ModelReasoningEffort, ModelReasoningMode, WireShape } from '../../api'
 
+export interface WorkspaceRuntimePreference {
+  readonly accessMode: 'native' | 'vault'
+  readonly credentialSlug?: string
+  readonly wireShape?: WireShape
+  readonly model?: string
+  readonly reasoningEffort?: ModelReasoningEffort
+}
+
+export interface WorkspaceRuntimeSurfaceSettings {
+  readonly recentAgent?: string
+  readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
+}
+
+export interface WorkspaceRuntimeSettings {
+  readonly version: 1
+  readonly runtime: {
+    readonly interactive: WorkspaceRuntimeSurfaceSettings
+    readonly headless: WorkspaceRuntimeSurfaceSettings
+  }
+}
+
 export interface Workspace {
   readonly id: string;
   readonly tag: string;
@@ -48,10 +69,10 @@ export interface Workspace {
    */
   readonly sessions: readonly SessionRecord[];
   /**
-   * Whether the workspace has UI-saved AI provider overrides for each
-   * agent. claude = `.claude/settings.local.json` exists; codex = `.codex/`
-   * dir; opencode = `opencode.json`; pi = `.pi/settings.json`. Surfaced in the
-   * Overview dashboard.
+   * Whether deprecated native-project compatibility config exists for each
+   * Agent runtime. Kept for API compatibility and advanced diagnostics; this
+   * is not a managed Session default and is not surfaced in primary menus.
+   * @deprecated Use `runtimeSettings` for managed Session defaults.
    */
   readonly agentOverride?: {
     readonly claude: boolean;
@@ -59,6 +80,9 @@ export interface Workspace {
     readonly opencode: boolean;
     readonly pi: boolean;
   };
+  /** Secret-free, Workspace-owned recent launch choices from `.alice/settings.json`. */
+  readonly runtimeSettings?: WorkspaceRuntimeSettings;
+  readonly runtimeSettingsError?: string;
 }
 
 export interface CreateError {

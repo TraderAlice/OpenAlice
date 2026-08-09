@@ -1,6 +1,6 @@
 /**
- * Bridge from Alice's central credential store to a workspace's per-CLI AI
- * config.
+ * Deprecated compatibility bridge from Alice's central credential store to a
+ * Workspace's per-CLI native project config.
  *
  * The central store (`aiProviderSchema.credentials` in `core/config.ts`) holds
  * the vendor-neutral secret: `{ vendor, authType, apiKey?, baseUrl? }`. Each CLI
@@ -10,9 +10,9 @@
  * `authMode` / `wireApi` knobs) via `overrides`. The vault's `lastModel` is a
  * remembered default, not a lock; callers may still supply a per-use model.
  *
- * This is the one place that maps Credential → WorkspaceAiCred, used by
- * template-driven injection at workspace-create time and reusable by any future
- * "apply credential to workspace" path.
+ * `credentialToWorkspaceAiCred` remains the shared, side-effect-free projection
+ * helper. `injectWorkspaceCredentials` is retained only for explicit export to
+ * a native CLI; managed Sessions must use Session runtime bindings instead.
  */
 
 import { resolveAnthropicAuthMode } from '@/core/credential-inference.js'
@@ -262,8 +262,7 @@ function positiveNumber(value: number | null | undefined): number | null {
 }
 
 /**
- * Seed a freshly-created workspace's per-agent AI config from a template's
- * `agentCredentials` declaration + Alice's central credential store.
+ * Export per-agent AI config into a Workspace's native CLI project files.
  *
  * MUST run AFTER the launcher's initial commit: `writeAiConfig` writes the
  * secret into `.claude/settings.local.json` / `.codex/env.json` / `opencode.json`
@@ -274,6 +273,9 @@ function positiveNumber(value: number | null | undefined): number | null {
  * Every miss (no adapter, credential slug absent) is a loud
  * `warn` + skip, never a hard failure — a workspace that boots without a seeded
  * provider is still usable (the user configures it manually). Best-effort.
+ *
+ * @deprecated Compatibility export only. Workspace creation and managed
+ * Session launch must persist/use `.alice/settings.json` and runtime bindings.
  */
 export async function injectWorkspaceCredentials(opts: {
   readonly dir: string

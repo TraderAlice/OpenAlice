@@ -685,7 +685,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
                   {config.accessMode === 'auto' && <Check className="h-3.5 w-3.5 shrink-0" />}
                 </button>
               )}
-              {!config.needsCredential && (
+              {(
                 <button
                   type="button"
                   role="menuitem"

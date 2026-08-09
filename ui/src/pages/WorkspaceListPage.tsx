@@ -8,8 +8,7 @@
  * with an unknown / missing template land in a trailing "Other" bucket.
  *
  * Within each section, cards sort by most-recent-activity. Card body
- * opens the workspace tab; session rows drill into that session; the
- * ⚙ override row opens the AI-provider modal.
+ * opens the workspace tab and session rows drill into that session.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -258,7 +257,6 @@ export function WorkspaceListPage() {
                         params: { wsId: w.id, sessionId: sid },
                       })
                     }
-                    onConfigure={() => openAgentConfig(w.id)}
                     onUpgrade={() => openAgentConfig(w.id, undefined, 'template')}
                   />
                 ))}

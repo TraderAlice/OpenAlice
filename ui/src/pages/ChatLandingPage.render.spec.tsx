@@ -108,6 +108,24 @@ function chatWorkspace(): Workspace {
   }
 }
 
+function withInteractivePreference(
+  workspace: Workspace,
+  preference: NonNullable<Workspace['runtimeSettings']>['runtime']['interactive']['agents'][string],
+  agent = 'pi',
+): Workspace {
+  return {
+    ...workspace,
+    defaultAgent: agent,
+    runtimeSettings: {
+      version: 1,
+      runtime: {
+        interactive: { recentAgent: agent, agents: { [agent]: preference } },
+        headless: { agents: {} },
+      },
+    },
+  }
+}
+
 function context(
   workspaces: readonly Workspace[],
   autoQuantDefaultWorkspaceId: string | null = null,
@@ -246,18 +264,19 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('ChatLandingPage polling stability', () => {
-  it('does not re-run credential detection when a poll replaces the Workspace object with the same id', async () => {
+  it('does not inspect deprecated native config when a poll replaces the Workspace object with the same id', async () => {
     const view = render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await waitFor(() => expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(1))
+    expect(await screen.findByRole('button', { name: 'AI access' })).toBeTruthy()
+    expect(mocks.detectWorkspaceCredential).not.toHaveBeenCalled()
 
     await act(async () => {
       workspaces = structuredClone(workspaces)
       view.rerender(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
     })
 
-    expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(1)
-    expect(mocks.getAgentReadiness).toHaveBeenCalledTimes(1)
+    expect(mocks.detectWorkspaceCredential).not.toHaveBeenCalled()
+    expect(mocks.getAgentReadiness).not.toHaveBeenCalled()
   })
 })
 
@@ -382,7 +401,7 @@ describe('ChatLandingPage keyboard submission', () => {
   it('does not submit when Enter confirms an IME composition candidate', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    await findInferenceTrigger('gemini-3.1-flash-lite')
+    await screen.findByRole('button', { name: 'Model and reasoning' })
     const composer = screen.getByPlaceholderText('Ask Alice…')
     fireEvent.change(composer, { target: { value: '你好' } })
 
@@ -398,7 +417,7 @@ describe('ChatLandingPage keyboard submission', () => {
       'chat',
       undefined,
       undefined,
-      undefined,
+      'native',
     ))
   })
 
@@ -477,7 +496,7 @@ describe('ChatLandingPage keyboard submission', () => {
       'chat',
       undefined,
       undefined,
-      undefined,
+      'native',
     ))
     expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
     expect(screen.queryByText('The runtime reported an error: 429: balance exhausted')).toBeNull()
@@ -525,7 +544,8 @@ describe('ChatLandingPage keyboard submission', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect(await findInferenceTrigger('glm-5.2')).toBeTruthy()
+    expect((await screen.findByRole('button', { name: 'Model and reasoning' })).textContent)
+      .toContain('Runtime default model')
     fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findInferenceTrigger('deepseek-v4-flash')).toBeTruthy()
@@ -560,13 +580,7 @@ describe('ChatLandingPage keyboard submission', () => {
     await openInferenceSubmenu('Effort')
     fireEvent.click(await screen.findByRole('menuitemradio', { name: 'high reasoning' }))
 
-    await waitFor(() => expect(mocks.rememberQuickChatLaunch).toHaveBeenLastCalledWith({
-      agent: 'pi',
-      accessMode: 'auto',
-      credentialSlug: null,
-      model: 'gemini-3.1-pro-preview',
-      reasoningEffort: 'high',
-    }))
+    expect(mocks.rememberQuickChatLaunch).not.toHaveBeenCalled()
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Go deeper.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
@@ -578,7 +592,7 @@ describe('ChatLandingPage keyboard submission', () => {
       'chat',
       'gemini-3.1-pro-preview',
       'high',
-      undefined,
+      'native',
     ))
   })
 })
@@ -618,13 +632,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /Use Pi account/ }))
-    await waitFor(() => expect(mocks.rememberQuickChatLaunch).toHaveBeenCalledWith({
-      agent: 'pi',
-      accessMode: 'native',
-      credentialSlug: null,
-      model: null,
-      reasoningEffort: null,
-    }))
+    expect(mocks.rememberQuickChatLaunch).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent)
       .toContain('Runtime default model')
 
@@ -642,7 +650,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     ))
   })
 
-  it('restores the complete recent launch tuple ahead of an unrelated Workspace default', async () => {
+  it('restores the complete Workspace recent launch tuple ahead of an unrelated installation default', async () => {
     mocks.listAgentCredentials.mockResolvedValue([
       {
         slug: 'google-1',
@@ -661,16 +669,23 @@ describe('ChatLandingPage AI source disclosure', () => {
       },
     ])
     mocks.getQuickChat.mockResolvedValue({
-      lastCredentialByAgent: { pi: 'deepseek-1' },
+      lastCredentialByAgent: { pi: 'google-1' },
       recentChatWorkspaceId: 'chat-1',
       recentLaunch: {
         agent: 'pi',
         accessMode: 'vault',
-        credentialSlug: 'deepseek-1',
-        model: 'deepseek-v4-flash',
-        reasoningEffort: 'high',
+        credentialSlug: 'google-1',
+        model: 'gemini-3.1-flash-lite',
+        reasoningEffort: 'minimal',
       },
     })
+    workspaces = [withInteractivePreference(chatWorkspace(), {
+      accessMode: 'vault',
+      credentialSlug: 'deepseek-1',
+      wireShape: 'openai-chat',
+      model: 'deepseek-v4-flash',
+      reasoningEffort: 'high',
+    })]
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
@@ -695,13 +710,17 @@ describe('ChatLandingPage AI source disclosure', () => {
     ))
   })
 
-  it('projects a registered model default into the new Session launch', async () => {
+  it('projects a registered Workspace model preference into the new Session launch', async () => {
+    workspaces = [withInteractivePreference(chatWorkspace(), {
+      accessMode: 'native',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high',
+    }, 'codex')]
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context(workspaces),
       agents: [codexAgent],
       defaultAgent: 'codex',
     }))
-    mocks.detectWorkspaceCredential.mockResolvedValue(null)
     mocks.getAgentRuntimeReadiness.mockResolvedValue({
       agents: {
         codex: {
@@ -750,7 +769,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('low reasoning')
+    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('high reasoning')
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use model defaults.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
@@ -761,12 +780,19 @@ describe('ChatLandingPage AI source disclosure', () => {
       'chat-1',
       'chat',
       'gpt-5.6-sol',
-      'low',
-      undefined,
+      'high',
+      'native',
     ))
   })
 
-  it('keeps an existing Workspace source implicit so the model leads the metadata row', async () => {
+  it('keeps a Workspace vault preference implicit so the model leads the metadata row', async () => {
+    workspaces = [withInteractivePreference(chatWorkspace(), {
+      accessMode: 'vault',
+      credentialSlug: 'google-1',
+      wireShape: 'google-generative-ai',
+      model: 'gemini-3.1-flash-lite',
+      reasoningEffort: 'minimal',
+    })]
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
@@ -776,32 +802,11 @@ describe('ChatLandingPage AI source disclosure', () => {
     expectDefaultEffort('minimal reasoning')
   })
 
-  it('labels a vault fallback as a pending write instead of existing Workspace config', async () => {
-    mocks.detectWorkspaceCredential.mockResolvedValue({
-      configured: false,
-      slug: null,
-      model: null,
-      contextWindow: null,
-      wireShape: null,
-    })
-    mocks.getAgentReadiness.mockResolvedValue({
-      agents: {
-        pi: {
-          agent: 'pi',
-          ready: true,
-          requiresCredential: true,
-          source: 'launcher-vault',
-          hasWorkspaceConfig: false,
-          hasUsableWorkspaceConfig: false,
-          detectedCredentialSlug: null,
-          compatibleCredentialSlugs: ['google-1'],
-          injectableCredentialSlugs: ['google-1'],
-        },
-      },
-    })
-
+  it('shows an explicitly selected vault credential without native-config injection copy', async () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
+    fireEvent.click(await screen.findByRole('button', { name: 'AI access' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /google-1/ }))
     expect(screen.queryByText('New Session only')).toBeNull()
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
     expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
@@ -819,28 +824,12 @@ describe('ChatLandingPage AI source disclosure', () => {
       resolvedReasoning: true,
       resolvedReasoningMode: 'required',
     }])
-    mocks.detectWorkspaceCredential.mockResolvedValue({
-      configured: false,
-      slug: null,
-      model: null,
-      contextWindow: null,
-      wireShape: null,
-    })
-    mocks.getAgentReadiness.mockResolvedValue({
-      agents: {
-        pi: {
-          agent: 'pi',
-          ready: true,
-          requiresCredential: true,
-          source: 'launcher-vault',
-          hasWorkspaceConfig: false,
-          hasUsableWorkspaceConfig: false,
-          detectedCredentialSlug: null,
-          compatibleCredentialSlugs: ['kimi-1'],
-          injectableCredentialSlugs: ['kimi-1'],
-        },
-      },
-    })
+    workspaces = [withInteractivePreference(chatWorkspace(), {
+      accessMode: 'vault',
+      credentialSlug: 'kimi-1',
+      wireShape: 'openai-chat',
+      model: 'kimi-k2.7-code',
+    })]
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
@@ -848,7 +837,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     expectDefaultEffort('Reasoning always on')
   })
 
-  it('keeps the recent provider choice independent when Workspace Settings changes', async () => {
+  it('keeps an in-progress provider choice when polling replaces equivalent Workspace settings', async () => {
     mocks.listAgentCredentials.mockResolvedValue([
       {
         slug: 'google-1',
@@ -866,25 +855,25 @@ describe('ChatLandingPage AI source disclosure', () => {
       },
     ])
 
-    render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
+    workspaces = [withInteractivePreference(chatWorkspace(), {
+      accessMode: 'vault',
+      credentialSlug: 'google-1',
+      wireShape: 'google-generative-ai',
+      model: 'gemini-3.1-flash-lite',
+    })]
+    const view = render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
 
-    mocks.detectWorkspaceCredential.mockResolvedValue({
-      configured: true,
-      slug: 'google-1',
-      model: 'gemini-3.1-pro-preview',
-      contextWindow: 512_000,
-      wireShape: 'google-generative-ai',
+    workspaces = structuredClone(workspaces)
+    await act(async () => {
+      view.rerender(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
     })
-    window.dispatchEvent(new CustomEvent('openalice:workspace-agent-config-changed', {
-      detail: { wsId: 'chat-1', agent: 'pi' },
-    }))
 
-    await waitFor(() => expect(mocks.detectWorkspaceCredential).toHaveBeenCalledTimes(2))
+    expect(mocks.detectWorkspaceCredential).not.toHaveBeenCalled()
     expect(await findInferenceTrigger('deepseek-v3.2')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent).not.toContain('gemini-3.1-pro-preview')
   })

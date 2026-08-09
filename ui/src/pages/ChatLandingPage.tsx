@@ -31,6 +31,7 @@ import { useWorkspace } from '../tabs/store'
 import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
+  useWorkspaceAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
 import { AutoQuantSetupPage } from './AutoQuantSetupPage'
 
@@ -110,7 +111,7 @@ function HarnessLandingPage({
   const targetWsId = spec.params.targetWsId
   const targetWs = targetWsId ? workspaces.find((w) => w.id === targetWsId) : undefined
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
-  const launchPreferences = useAgentLaunchPreferences()
+  const installationLaunchPreferences = useAgentLaunchPreferences()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const workspaceBoxRef = useRef<HTMLDivElement>(null)
   const activeWorkspaceOptionRef = useRef<HTMLButtonElement>(null)
@@ -120,12 +121,16 @@ function HarnessLandingPage({
       : resolveChatWorkspaceTarget(
           workspaces,
           targetWsId ?? selectedWorkspaceId,
-          launchPreferences.recentChatWorkspaceId,
+          installationLaunchPreferences.recentChatWorkspaceId,
           templateName,
         ),
-    [workspaces, templateName, targetWsId, selectedWorkspaceId, mode, launchPreferences.recentChatWorkspaceId],
+    [workspaces, templateName, targetWsId, selectedWorkspaceId, mode, installationLaunchPreferences.recentChatWorkspaceId],
   )
   const workspaceTarget = targetWs ?? selectedHarnessWorkspace
+  const launchPreferences = useWorkspaceAgentLaunchPreferences(
+    mode === 'chat' ? workspaceTarget : null,
+    installationLaunchPreferences,
+  )
   const chatWorkspaceOptions = useMemo(
     () => workspaces
       .filter((workspace) => workspace.template === templateName)
@@ -150,6 +155,7 @@ function HarnessLandingPage({
     preferences: launchPreferences,
     workspaceId: credentialWorkspace?.id ?? null,
     hasWorkspace: credentialWorkspace !== null && credentialWorkspace !== undefined,
+    managedWorkspaceLaunch: mode === 'chat' && credentialWorkspace !== null && credentialWorkspace !== undefined,
   })
   const effectiveAgent = launchConfig.effectiveAgent
   const selectedInfo = launchConfig.selectedAgent

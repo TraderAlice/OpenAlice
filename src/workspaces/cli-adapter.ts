@@ -407,21 +407,24 @@ export interface CliAdapter {
    * pointing at `<cwd>/.codex`. Merged into the spawn env AFTER
    * `envOverrides` so this takes precedence for overlapping keys.
    *
-   * Intentionally narrow: this is *launcher plumbing* (where to find files),
-   * NOT a back-door for injecting provider config (keys/URLs) — those live
-   * in the workspace's own files (`.claude/settings*.json`,
-   * `.codex/config.toml`) and are read by the CLI directly.
+   * Intentionally narrow: this is launcher plumbing. Managed credential,
+   * model, and effort projection belongs to `sessionRuntime`; native project
+   * files are only a deprecated compatibility export.
    */
   composeEnv?(ctx: SpawnContext): Record<string, string>;
 
   /**
-   * Read/write the workspace's per-CLI AI-provider override. The launcher
-   * dispatches uniformly; each adapter renders the shared `WorkspaceAiCred`
-   * into (and parses it out of) its own native config files. An empty cred
-   * resets only OpenAlice-owned values so the CLI falls back to native/global.
-   * Absent on adapters with no configurable provider (shell).
+   * Read/write a deprecated compatibility export in the CLI's native project
+   * config. Managed OpenAlice Sessions use the persisted Session binding and
+   * per-spawn `sessionRuntime` projection instead. Retained so users may export
+   * configuration for launching the CLI outside OpenAlice and so legacy
+   * Session bindings can still be resumed.
+   *
+   * @deprecated Compatibility export only; do not use as a managed launch
+   * default or readiness gate.
    */
   writeAiConfig?(cwd: string, cred: WorkspaceAiCred): Promise<void>;
+  /** @deprecated Compatibility inspection for legacy Session bindings only. */
   readAiConfig?(cwd: string): Promise<WorkspaceAiCred | null>;
 
   // ── Transcript detection (used only when capabilities.transcriptDiscovery === 'fs-watch')
