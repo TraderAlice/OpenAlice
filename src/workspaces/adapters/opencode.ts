@@ -367,8 +367,11 @@ export const opencodeAdapter: CliAdapter = {
       const selectedModel = ai && (ai.apiKey || ai.baseUrl) && model
         ? `${OPENCODE_SESSION_PROVIDER_NAME}/${model}`
         : model;
-      const args = [
+      const interactiveArgs = [
         ...(selectedModel ? ['--model', selectedModel] : []),
+      ];
+      const headlessArgs = [
+        ...interactiveArgs,
         ...(runtime.binding.reasoningEffort
           ? ['--variant', runtime.binding.reasoningEffort]
           : []),
@@ -382,7 +385,7 @@ export const opencodeAdapter: CliAdapter = {
           ...(selectedModel ? { model: selectedModel } : {}),
         });
       }
-      return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
+      return { env, interactiveArgs, headlessArgs, webArgs: interactiveArgs };
     },
   },
 
