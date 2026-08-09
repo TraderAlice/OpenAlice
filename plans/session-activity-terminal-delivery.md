@@ -186,7 +186,7 @@ separate facts.
 - [ ] Walk the real Chat route in `pnpm dev` and a Docker-shaped HTTP launch.
 - [ ] Run the relevant Electron/PT​​Y smoke and record platform-only residual
       risk without invoking release signing.
-- [ ] Open one labeled Draft PR targeting `dev`; keep it unmerged pending topic
+- [x] Open one labeled Draft PR targeting `dev`; keep it unmerged pending topic
       acceptance.
 
 ## Completion Criteria
