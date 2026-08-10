@@ -1483,7 +1483,7 @@ export function IssueDetail({
 }: IssueDetailProps) {
   const { t } = useTranslation()
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
-  const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, openHeadlessRun } = useWorkspaces()
+  const { agents, defaultAgent, issueDefaultAgent, workspaces, openAgentConfig, openHeadlessRun } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectInboxEntry = useInboxSelection((s) => s.select)
@@ -1500,6 +1500,11 @@ export function IssueDetail({
   const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
+  const workspace = workspaces.find((candidate) => candidate.id === wsId) ?? null
+  const workspaceIssueDefaultAgent = workspace?.runtimeSettings?.runtime.issues.defaultAgent
+    ?? workspace?.runtimeSettings?.runtime.issues.recent.agent
+    ?? issueDefaultAgent
+  const workspaceLegacyDefaultAgent = workspace?.defaultAgent ?? defaultAgent
 
   useEffect(() => {
     let live = true
@@ -1706,8 +1711,8 @@ export function IssueDetail({
           wsId={wsId}
           issue={issue}
           agentOptions={agentOptions}
-          issueDefaultAgent={issueDefaultAgent}
-          defaultAgent={defaultAgent}
+          issueDefaultAgent={workspaceIssueDefaultAgent}
+          defaultAgent={workspaceLegacyDefaultAgent}
           agentReadiness={agentReadiness}
           sessions={sessionDirectory}
           saving={saving}

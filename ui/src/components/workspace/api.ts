@@ -14,16 +14,24 @@ export interface WorkspaceRuntimePreference {
   readonly reasoningEffort?: ModelReasoningEffort
 }
 
-export interface WorkspaceRuntimeSurfaceSettings {
-  readonly recentAgent?: string
+export interface WorkspaceRuntimeRecentSettings {
+  readonly agent?: string
   readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
 }
 
+export interface WorkspaceRuntimeScenarioSettings {
+  readonly defaultAgent?: string
+  readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
+  readonly recent: WorkspaceRuntimeRecentSettings
+}
+
+export type WorkspaceRuntimeScenario = 'askAlice' | 'issues'
+
 export interface WorkspaceRuntimeSettings {
-  readonly version: 1
+  readonly version: 2
   readonly runtime: {
-    readonly interactive: WorkspaceRuntimeSurfaceSettings
-    readonly headless: WorkspaceRuntimeSurfaceSettings
+    readonly askAlice: WorkspaceRuntimeScenarioSettings
+    readonly issues: WorkspaceRuntimeScenarioSettings
   }
 }
 
@@ -1201,6 +1209,29 @@ export async function updateWorkspaceMetadata(
   }
   const body = (await res.json()) as { workspace: Workspace };
   return body.workspace;
+}
+
+export async function updateWorkspaceRuntimeDefaults(
+  id: string,
+  scenario: WorkspaceRuntimeScenario,
+  input: {
+    readonly defaultAgent: string | null
+    readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
+  },
+): Promise<Workspace> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(id)}/runtime-settings/${encodeURIComponent(scenario)}`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+  const body = await res.json().catch(() => null) as { workspace?: Workspace; message?: string } | null
+  if (!res.ok || !body?.workspace) {
+    throw new Error(body?.message ?? `update Workspace AI preferences failed: ${res.status}`)
+  }
+  return body.workspace
 }
 
 /**

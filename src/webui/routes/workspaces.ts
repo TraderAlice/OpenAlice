@@ -10,6 +10,7 @@ import { Hono } from 'hono';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
+import { z } from 'zod';
 
 import { probeByWireShape } from '../../workspaces/agent-probe.js';
 import type { WireShape } from '../../ai-providers/preset-catalog.js';
@@ -21,6 +22,7 @@ const DEFAULT_WIRE_BY_AGENT: Record<string, WireShape> = {
   opencode: 'openai-chat',
   pi: 'openai-chat',
 };
+
 import { listDir, PathTraversal, readWorkspaceFile } from '../../workspaces/file-service.js';
 import { gitLog, gitStatus } from '../../workspaces/git-service.js';
 import { logger as launcherLogger } from '../../workspaces/logger.js';
@@ -64,8 +66,12 @@ import {
 import {
   readWorkspaceRuntimeSettings,
   rememberWorkspaceRuntimeBinding,
+  replaceWorkspaceRuntimeDefaults,
+  resolveWorkspaceRuntimeAgent,
   resolveWorkspaceRuntimeSelection,
+  workspaceRuntimePreferenceSchema,
 } from '../../workspaces/workspace-runtime-settings.js';
+
 import {
   AgentCredentialError,
   getAgentCredentialReadiness,
@@ -91,6 +97,14 @@ import {
   managerTerminalPrompt,
   managerSkillPath,
 } from '../../workspaces/manager-workspace.js';
+
+const workspaceRuntimeDefaultsRequestSchema = z.object({
+  defaultAgent: z.string().trim().min(1).max(64).nullable(),
+  agents: z.record(
+    z.string().trim().min(1).max(64),
+    workspaceRuntimePreferenceSchema,
+  ),
+}).strict();
 
 // The spawn body's `resume` value is an AGENT-side session id, whose shape is
 // adapter-native: uuid for claude/codex/pi, `ses_<base62>` for opencode. This
@@ -323,17 +337,17 @@ export function createWorkspaceRoutes(
         body: { error: 'workspace_runtime_settings_invalid', message: runtimeSettings.error },
       };
     }
-    const recentInteractiveAgent = runtimeSettings?.ok
-      ? runtimeSettings.settings.runtime.interactive.recentAgent
+    const preferredAskAliceAgent = runtimeSettings?.ok
+      ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'askAlice')
       : undefined;
-    const recentInteractiveAdapter = recentInteractiveAgent
-      ? svc.adapters.get(recentInteractiveAgent)
+    const preferredAskAliceAdapter = preferredAskAliceAgent
+      ? svc.adapters.get(preferredAskAliceAgent)
       : undefined;
-    const validRecentInteractiveAgent = recentInteractiveAgent && recentInteractiveAdapter &&
-      isAgentRuntime(recentInteractiveAdapter)
-      ? recentInteractiveAgent
+    const validPreferredAskAliceAgent = preferredAskAliceAgent && preferredAskAliceAdapter &&
+      isAgentRuntime(preferredAskAliceAdapter)
+      ? preferredAskAliceAgent
       : undefined;
-    const agentId = opts.agentId ?? requestedIdentity?.agent ?? validRecentInteractiveAgent ?? await resolveDefaultAgentId(meta);
+    const agentId = opts.agentId ?? requestedIdentity?.agent ?? validPreferredAskAliceAgent ?? await resolveDefaultAgentId(meta);
     if (!agentId) {
       return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'no agent runtime is registered' } };
     }
@@ -377,7 +391,7 @@ export function createWorkspaceRoutes(
               selection: freshProductSession
                 ? resolveWorkspaceRuntimeSelection(
                     runtimeSettings?.ok ? runtimeSettings.settings : null,
-                    'interactive',
+                    'askAlice',
                     adapter.id,
                     explicitSelection,
                   )
@@ -472,12 +486,12 @@ export function createWorkspaceRoutes(
       if (freshProductSession && sessionRuntime && existsSync(meta.dir)) {
         await rememberWorkspaceRuntimeBinding({
           wsDir: meta.dir,
-          surface: 'interactive',
+          scenario: 'askAlice',
           agent: adapter.id,
           runtime: sessionRuntime,
         }).catch((err) => launcherLogger.warn('workspace.runtime_preference_write_failed', {
           wsId: id,
-          surface: 'interactive',
+          scenario: 'askAlice',
           agent: adapter.id,
           err,
         }));
@@ -1121,6 +1135,70 @@ export function createWorkspaceRoutes(
     } catch (err) {
       if (err instanceof PathTraversal) return c.json({ error: 'invalid_path' }, 400);
       launcherLogger.warn('workspace.metadata_write_failed', { id, err });
+      return c.json({ error: 'write_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.put('/:id/runtime-settings/:scenario', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.registry.get(id);
+    if (!meta) return c.json({ error: 'not_found' }, 404);
+    const scenario = c.req.param('scenario');
+    if (scenario !== 'askAlice' && scenario !== 'issues') {
+      return c.json({ error: 'invalid_scenario' }, 400);
+    }
+    const parsed = workspaceRuntimeDefaultsRequestSchema.safeParse(await safeJson(c));
+    if (!parsed.success) {
+      return c.json({
+        error: 'invalid_runtime_settings',
+        message: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),
+      }, 400);
+    }
+    const validateAgent = (agent: string): string | null => {
+      const adapter = svc.adapters.get(agent);
+      if (!adapter || !isAgentRuntime(adapter)) return `unknown agent runtime: ${agent}`;
+      if (scenario === 'issues' && (!adapter.capabilities.headless || !adapter.composeHeadlessCommand)) {
+        return `agent runtime does not support headless Issues: ${agent}`;
+      }
+      return null;
+    };
+    if (parsed.data.defaultAgent) {
+      const error = validateAgent(parsed.data.defaultAgent);
+      if (error) return c.json({ error: 'invalid_agent', message: error }, 400);
+    }
+    const credentials: Record<string, Credential> = await readCredentials().catch(() => ({}));
+    for (const [agent, preference] of Object.entries(parsed.data.agents)) {
+      const error = validateAgent(agent);
+      if (error) return c.json({ error: 'invalid_agent', message: error }, 400);
+      if (preference.accessMode === 'vault') {
+        const credential = credentials[preference.credentialSlug];
+        if (!credential) {
+          return c.json({
+            error: 'credential_not_found',
+            message: `credential not found: ${preference.credentialSlug}`,
+          }, 400);
+        }
+        const adapter = svc.adapters.get(agent)!;
+        if (!compatibleCredentials(credentials, adapter).some(([slug]) => slug === preference.credentialSlug)) {
+          return c.json({
+            error: 'credential_incompatible',
+            message: `credential ${preference.credentialSlug} is not compatible with ${agent}`,
+          }, 400);
+        }
+      }
+    }
+    try {
+      const settings = await replaceWorkspaceRuntimeDefaults({
+        wsDir: meta.dir,
+        scenario,
+        defaultAgent: parsed.data.defaultAgent,
+        agents: parsed.data.agents,
+      });
+      launcherLogger.info('workspace.runtime_defaults_saved', { id, scenario });
+      return c.json({ settings, workspace: await svc.publicMeta(meta) });
+    } catch (err) {
+      launcherLogger.warn('workspace.runtime_defaults_write_failed', { id, scenario, err });
       return c.json({ error: 'write_failed', message: (err as Error).message }, 500);
     }
   });
@@ -2208,17 +2286,17 @@ export function createWorkspaceRoutes(
     if (runtimeSettings && !runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
       return c.json({ error: 'workspace_runtime_settings_invalid', message: runtimeSettings.error }, 400);
     }
-    const recentHeadlessAgent = runtimeSettings?.ok
-      ? runtimeSettings.settings.runtime.headless.recentAgent
+    const preferredIssuesAgent = runtimeSettings?.ok
+      ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'issues')
       : undefined;
-    const recentHeadlessAdapter = recentHeadlessAgent
-      ? svc.adapters.get(recentHeadlessAgent)
+    const preferredIssuesAdapter = preferredIssuesAgent
+      ? svc.adapters.get(preferredIssuesAgent)
       : undefined;
-    const validRecentHeadlessAgent = recentHeadlessAgent && recentHeadlessAdapter &&
-      isAgentRuntime(recentHeadlessAdapter)
-      ? recentHeadlessAgent
+    const validPreferredIssuesAgent = preferredIssuesAgent && preferredIssuesAdapter &&
+      isAgentRuntime(preferredIssuesAdapter)
+      ? preferredIssuesAgent
       : undefined;
-    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? validRecentHeadlessAgent ?? await resolveDefaultAgentId(meta);
+    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? validPreferredIssuesAgent ?? await resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
       return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
     }

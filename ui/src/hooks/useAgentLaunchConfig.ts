@@ -307,10 +307,10 @@ export function useAgentLaunchPreferences(): AgentLaunchPreferencesState {
 
 function workspaceInteractiveLaunch(workspace: Workspace | null): QuickChatLaunchPreference | null {
   if (!workspace) return null
-  const surface = workspace.runtimeSettings?.runtime.interactive
-  const agent = surface?.recentAgent ?? workspace.defaultAgent
+  const scenario = workspace.runtimeSettings?.runtime.askAlice
+  const agent = scenario?.defaultAgent ?? scenario?.recent.agent ?? workspace.defaultAgent
   if (!agent) return null
-  const preference = surface?.agents[agent]
+  const preference = scenario?.agents[agent] ?? scenario?.recent.agents[agent]
   if (!preference || preference.accessMode === 'native') {
     return {
       agent,
@@ -354,7 +354,10 @@ export function useWorkspaceAgentLaunchPreferences(
   const lastCredentialByAgent = useMemo(() => {
     if (!workspace?.runtimeSettings) return workspace ? {} : installation.lastCredentialByAgent
     return Object.fromEntries(
-      Object.entries(workspace.runtimeSettings.runtime.interactive.agents)
+      Object.entries({
+        ...workspace.runtimeSettings.runtime.askAlice.recent.agents,
+        ...workspace.runtimeSettings.runtime.askAlice.agents,
+      })
         .filter((entry): entry is [string, { accessMode: 'vault'; credentialSlug: string }] => (
           entry[1].accessMode === 'vault' && typeof entry[1].credentialSlug === 'string'
         ))

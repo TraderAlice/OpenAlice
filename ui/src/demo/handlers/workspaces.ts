@@ -21,6 +21,8 @@ import type {
   WebPiSnapshot,
   Workspace,
   WorkspaceMetadataPatch,
+  WorkspaceRuntimePreference,
+  WorkspaceRuntimeScenario,
 } from '../../components/workspace/api'
 
 const demoManagerSession = {
@@ -704,6 +706,39 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json({ workspace })
   }),
+  http.put('/api/workspaces/:id/runtime-settings/:scenario', async ({ params, request }) => {
+    const index = demoWorkspaces.findIndex((workspace) => workspace.id === String(params.id))
+    if (index < 0) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    const scenario = String(params.scenario) as WorkspaceRuntimeScenario
+    if (scenario !== 'askAlice' && scenario !== 'issues') {
+      return HttpResponse.json({ error: 'invalid_scenario' }, { status: 400 })
+    }
+    const body = (await request.json().catch(() => ({}))) as {
+      defaultAgent?: string | null
+      agents?: Record<string, WorkspaceRuntimePreference>
+    }
+    const workspace = demoWorkspaces[index]!
+    const currentSettings = workspace.runtimeSettings ?? {
+      version: 2 as const,
+      runtime: {
+        askAlice: { agents: {}, recent: { agents: {} } },
+        issues: { agents: {}, recent: { agents: {} } },
+      },
+    }
+    const currentScenario = currentSettings.runtime[scenario]
+    const nextScenario = {
+      ...(body.defaultAgent ? { defaultAgent: body.defaultAgent } : {}),
+      agents: body.agents ?? {},
+      recent: currentScenario.recent,
+    }
+    const nextSettings = {
+      version: 2 as const,
+      runtime: { ...currentSettings.runtime, [scenario]: nextScenario },
+    }
+    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings }
+    demoWorkspaces[index] = nextWorkspace
+    return HttpResponse.json({ settings: nextSettings, workspace: nextWorkspace })
+  }),
 
   http.get('/api/workspaces/templates', () => HttpResponse.json({ templates: demoTemplates })),
   http.get('/api/workspaces/templates/:name/readme', () =>
@@ -716,10 +751,10 @@ export const workspacesHandlers = [
       // probe, so present everything as installed (a clean showcase, not a
       // "go install things" prompt).
       agents: [
-        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
-        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
-        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
-        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
+        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
+        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
+        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
+        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
       ],
     }),
   ),

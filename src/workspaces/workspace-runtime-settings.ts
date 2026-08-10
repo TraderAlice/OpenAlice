@@ -36,25 +36,45 @@ export const workspaceRuntimePreferenceSchema = z.discriminatedUnion('accessMode
   vaultPreferenceSchema,
 ])
 
-const surfaceSettingsSchema = z.object({
-  recentAgent: runtimeIdSchema.optional(),
+const recentSettingsSchema = z.object({
+  agent: runtimeIdSchema.optional(),
   agents: z.record(runtimeIdSchema, workspaceRuntimePreferenceSchema).default({}),
 }).strict()
 
+const scenarioSettingsSchema = z.object({
+  defaultAgent: runtimeIdSchema.optional(),
+  agents: z.record(runtimeIdSchema, workspaceRuntimePreferenceSchema).default({}),
+  recent: recentSettingsSchema.default({ agents: {} }),
+}).strict()
+
 export const workspaceRuntimeSettingsSchema = z.object({
+  version: z.literal(2),
+  runtime: z.object({
+    askAlice: scenarioSettingsSchema.default({ agents: {}, recent: { agents: {} } }),
+    issues: scenarioSettingsSchema.default({ agents: {}, recent: { agents: {} } }),
+  }).strict().default({
+    askAlice: { agents: {}, recent: { agents: {} } },
+    issues: { agents: {}, recent: { agents: {} } },
+  }),
+}).strict()
+
+const workspaceRuntimeSettingsV1Schema = z.object({
   version: z.literal(1),
   runtime: z.object({
-    interactive: surfaceSettingsSchema.default({ agents: {} }),
-    headless: surfaceSettingsSchema.default({ agents: {} }),
-  }).strict().default({
-    interactive: { agents: {} },
-    headless: { agents: {} },
-  }),
+    interactive: z.object({
+      recentAgent: runtimeIdSchema.optional(),
+      agents: z.record(runtimeIdSchema, workspaceRuntimePreferenceSchema).default({}),
+    }).strict().default({ agents: {} }),
+    headless: z.object({
+      recentAgent: runtimeIdSchema.optional(),
+      agents: z.record(runtimeIdSchema, workspaceRuntimePreferenceSchema).default({}),
+    }).strict().default({ agents: {} }),
+  }).strict().default({ interactive: { agents: {} }, headless: { agents: {} } }),
 }).strict()
 
 export type WorkspaceRuntimePreference = z.infer<typeof workspaceRuntimePreferenceSchema>
 export type WorkspaceRuntimeSettings = z.infer<typeof workspaceRuntimeSettingsSchema>
-export type WorkspaceRuntimeSurface = keyof WorkspaceRuntimeSettings['runtime']
+export type WorkspaceRuntimeScenario = keyof WorkspaceRuntimeSettings['runtime']
 
 export type ReadWorkspaceRuntimeSettingsResult =
   | { ok: true; settings: WorkspaceRuntimeSettings }
@@ -63,10 +83,38 @@ export type ReadWorkspaceRuntimeSettingsResult =
 
 export function emptyWorkspaceRuntimeSettings(): WorkspaceRuntimeSettings {
   return {
-    version: 1,
+    version: 2,
     runtime: {
-      interactive: { agents: {} },
-      headless: { agents: {} },
+      askAlice: { agents: {}, recent: { agents: {} } },
+      issues: { agents: {}, recent: { agents: {} } },
+    },
+  }
+}
+
+function upgradeV1Settings(
+  legacy: z.infer<typeof workspaceRuntimeSettingsV1Schema>,
+): WorkspaceRuntimeSettings {
+  return {
+    version: 2,
+    runtime: {
+      askAlice: {
+        agents: {},
+        recent: {
+          ...(legacy.runtime.interactive.recentAgent
+            ? { agent: legacy.runtime.interactive.recentAgent }
+            : {}),
+          agents: legacy.runtime.interactive.agents,
+        },
+      },
+      issues: {
+        agents: {},
+        recent: {
+          ...(legacy.runtime.headless.recentAgent
+            ? { agent: legacy.runtime.headless.recentAgent }
+            : {}),
+          agents: legacy.runtime.headless.agents,
+        },
+      },
     },
   }
 }
@@ -92,14 +140,16 @@ export async function readWorkspaceRuntimeSettings(
     return { ok: false, reason: 'invalid', error: `invalid JSON: ${error instanceof Error ? error.message : String(error)}` }
   }
   const result = workspaceRuntimeSettingsSchema.safeParse(parsed)
-  if (!result.success) {
+  if (result.success) return { ok: true, settings: result.data }
+  const legacy = workspaceRuntimeSettingsV1Schema.safeParse(parsed)
+  if (!legacy.success) {
     return {
       ok: false,
       reason: 'invalid',
       error: result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),
     }
   }
-  return { ok: true, settings: result.data }
+  return { ok: true, settings: upgradeV1Settings(legacy.data) }
 }
 
 export async function writeWorkspaceRuntimeSettings(
@@ -157,11 +207,12 @@ function sameCredential(
  */
 export function resolveWorkspaceRuntimeSelection(
   settings: WorkspaceRuntimeSettings | null,
-  surface: WorkspaceRuntimeSurface,
+  scenario: WorkspaceRuntimeScenario,
   agent: string,
   explicit: SessionRuntimeSelection | undefined,
 ): SessionRuntimeSelection | undefined {
-  const preference = settings?.runtime[surface].agents[agent]
+  const configured = settings?.runtime[scenario].agents[agent]
+  const preference = configured ?? settings?.runtime[scenario].recent.agents[agent]
   const requested = explicit ?? {}
   const mayInheritModel = sameCredential(preference, requested)
   const credential = requested.credentialSource === 'native'
@@ -179,6 +230,37 @@ export function resolveWorkspaceRuntimeSelection(
     ...(model ? { model } : {}),
     ...(reasoningEffort ? { reasoningEffort } : {}),
   }
+}
+
+/** Resolve the scenario's preferred Agent without consulting installation state. */
+export function resolveWorkspaceRuntimeAgent(
+  settings: WorkspaceRuntimeSettings | null,
+  scenario: WorkspaceRuntimeScenario,
+): string | undefined {
+  const configured = settings?.runtime[scenario]
+  return configured?.defaultAgent ?? configured?.recent.agent
+}
+
+export async function replaceWorkspaceRuntimeDefaults(input: {
+  readonly wsDir: string
+  readonly scenario: WorkspaceRuntimeScenario
+  readonly defaultAgent: string | null
+  readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
+}): Promise<WorkspaceRuntimeSettings> {
+  return updateWorkspaceRuntimeSettings(input.wsDir, (current) => {
+    const { defaultAgent: _previousDefault, ...scenario } = current.runtime[input.scenario]
+    return {
+      ...current,
+      runtime: {
+        ...current.runtime,
+        [input.scenario]: {
+          ...scenario,
+          ...(input.defaultAgent ? { defaultAgent: input.defaultAgent } : {}),
+          agents: { ...input.agents },
+        },
+      },
+    }
+  })
 }
 
 function preferenceFromBinding(binding: SessionRuntimeBinding): WorkspaceRuntimePreference | null {
@@ -201,7 +283,7 @@ function preferenceFromBinding(binding: SessionRuntimeBinding): WorkspaceRuntime
 /** Record only a fresh Session's accepted, secret-free launch binding. */
 export async function rememberWorkspaceRuntimeBinding(input: {
   readonly wsDir: string
-  readonly surface: WorkspaceRuntimeSurface
+  readonly scenario: WorkspaceRuntimeScenario
   readonly agent: string
   readonly runtime: ResolvedSessionRuntimeBinding
 }): Promise<WorkspaceRuntimeSettings | null> {
@@ -211,11 +293,14 @@ export async function rememberWorkspaceRuntimeBinding(input: {
     ...current,
     runtime: {
       ...current.runtime,
-      [input.surface]: {
-        recentAgent: input.agent,
-        agents: {
-          ...current.runtime[input.surface].agents,
-          [input.agent]: preference,
+      [input.scenario]: {
+        ...current.runtime[input.scenario],
+        recent: {
+          agent: input.agent,
+          agents: {
+            ...current.runtime[input.scenario].recent.agents,
+            [input.agent]: preference,
+          },
         },
       },
     },

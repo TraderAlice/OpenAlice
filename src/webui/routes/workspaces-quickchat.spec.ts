@@ -537,12 +537,12 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('uses and updates the target Workspace interactive recent binding', async () => {
+  it('uses and updates the target Workspace Ask Alice recent binding', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'quick-chat-settings-'));
     try {
       const settings = emptyWorkspaceRuntimeSettings();
-      settings.runtime.interactive.recentAgent = 'opencode';
-      settings.runtime.interactive.agents.opencode = {
+      settings.runtime.askAlice.recent.agent = 'opencode';
+      settings.runtime.askAlice.recent.agents.opencode = {
         accessMode: 'vault',
         credentialSlug: 'openai-2',
         wireShape: 'openai-chat',
@@ -575,14 +575,16 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
         ok: true,
         settings: {
           runtime: {
-            interactive: {
-              recentAgent: 'opencode',
-              agents: {
-                opencode: {
-                  accessMode: 'vault',
-                  credentialSlug: 'openai-2',
-                  model: 'remembered-model',
-                  reasoningEffort: 'medium',
+            askAlice: {
+              recent: {
+                agent: 'opencode',
+                agents: {
+                  opencode: {
+                    accessMode: 'vault',
+                    credentialSlug: 'openai-2',
+                    model: 'remembered-model',
+                    reasoningEffort: 'medium',
+                  },
                 },
               },
             },
