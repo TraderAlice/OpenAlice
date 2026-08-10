@@ -11,13 +11,13 @@ import { dirname } from 'node:path'
 import type { Logger } from './logger.js'
 import { generateResumeId } from './resume-id.js'
 import type { SessionRuntimeBinding } from './cli-adapter.js'
-import { parseSessionRuntimeBinding } from './session-runtime-binding.js'
+import type { SessionRuntimeBindingStore } from './session-runtime-store.js'
 
 export interface ResumeIdentityRecord {
   readonly resumeId: string
   readonly wsId: string
   readonly agent: string
-  /** Immutable, secret-free launch semantics for this product Session. */
+  /** Runtime-only hydration of the immutable Workspace-owned AI config. */
   runtimeBinding?: SessionRuntimeBinding
   agentSessionId?: string
   latestTaskId?: string
@@ -37,10 +37,15 @@ export class ResumeRegistry {
   private constructor(
     private readonly path: string,
     private readonly logger: Logger,
+    private readonly runtimeBindings: SessionRuntimeBindingStore,
   ) {}
 
-  static async load(path: string, logger: Logger): Promise<ResumeRegistry> {
-    const registry = new ResumeRegistry(path, logger)
+  static async load(
+    path: string,
+    logger: Logger,
+    runtimeBindings: SessionRuntimeBindingStore,
+  ): Promise<ResumeRegistry> {
+    const registry = new ResumeRegistry(path, logger, runtimeBindings)
     await registry.read()
     return registry
   }
@@ -48,7 +53,7 @@ export class ResumeRegistry {
   private async read(): Promise<void> {
     try {
       const parsed = JSON.parse(await readFile(this.path, 'utf8')) as { version?: unknown; records?: unknown }
-      if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.records)) {
+      if (parsed.version !== 1 || !Array.isArray(parsed.records)) {
         throw new Error('resume-identities.json has an unsupported shape')
       }
       for (const value of parsed.records) {
@@ -61,10 +66,11 @@ export class ResumeRegistry {
           typeof record['createdAt'] !== 'number' ||
           typeof record['updatedAt'] !== 'number'
         ) throw new Error('resume-identities.json contains an invalid record')
-        const runtimeBinding = parseSessionRuntimeBinding(record['runtimeBinding'])
-        if (record['runtimeBinding'] !== undefined && !runtimeBinding) {
-          throw new Error('resume-identities.json contains an invalid Session runtime binding')
-        }
+        const runtimeBinding = await this.runtimeBindings.read({
+          wsId: record['wsId'],
+          resumeId: record['resumeId'],
+          agent: record['agent'],
+        })
         this.records.set(record['resumeId'], {
           resumeId: record['resumeId'],
           wsId: record['wsId'],
@@ -142,12 +148,28 @@ export class ResumeRegistry {
       ) {
         throw new Error(`resume identity ${resumeId} already owns a different runtime binding`)
       }
-      if (input.runtimeBinding && !existing.runtimeBinding) existing.runtimeBinding = input.runtimeBinding
+      if (input.runtimeBinding && !existing.runtimeBinding) {
+        await this.runtimeBindings.ensure({
+          wsId: input.wsId,
+          resumeId,
+          agent: input.agent,
+          binding: input.runtimeBinding,
+        })
+        existing.runtimeBinding = input.runtimeBinding
+      }
       if (input.agentSessionId) existing.agentSessionId = input.agentSessionId
       if (input.latestTaskId) existing.latestTaskId = input.latestTaskId
       existing.updatedAt = input.now ?? Date.now()
       await this.flush()
       return existing
+    }
+    if (input.runtimeBinding) {
+      await this.runtimeBindings.ensure({
+        wsId: input.wsId,
+        resumeId,
+        agent: input.agent,
+        binding: input.runtimeBinding,
+      })
     }
     const now = input.now ?? Date.now()
     const record: ResumeIdentityRecord = {
@@ -220,7 +242,8 @@ export class ResumeRegistry {
     try {
       await mkdir(dirname(this.path), { recursive: true })
       const tmp = `${this.path}.tmp`
-      await writeFile(tmp, JSON.stringify({ version: 2, records: [...this.records.values()] }, null, 2), 'utf8')
+      const records = [...this.records.values()].map(({ runtimeBinding: _runtimeBinding, ...record }) => record)
+      await writeFile(tmp, JSON.stringify({ version: 1, records }, null, 2), 'utf8')
       await rename(tmp, this.path)
     } catch (err) {
       this.logger.warn('resume_registry.flush_failed', { err })

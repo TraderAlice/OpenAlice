@@ -61,7 +61,11 @@ The distinction is load-bearing:
 
 Manager Session and resume identities still use the ordinary durable registries
 under the reserved id. A launcher restart can therefore reopen the exact native
-conversation without inventing a new business Workspace.
+conversation without inventing a new business Workspace. Their secret-free AI
+launch files live under
+`<launcherRoot>/state/workspace-manager-sessions/<resumeId>.json`; they must not
+create `.alice/` at the active-floor root. Ordinary business Session launch
+files remain owned by their Workspace at `.alice/sessions/<resumeId>.json`.
 
 ## Runtime Contract
 

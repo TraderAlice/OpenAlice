@@ -34,6 +34,11 @@ Before changing files:
    stop and establish the intended base before editing.
 4. Start from the real surface: reproduce UI/runtime behavior, inspect the
    relevant current code, and read the applicable owner guide before designing.
+5. Before adding a data migration, compatibility parser, or dual-read path,
+   establish whether the affected persisted shape shipped in a released
+   version. Unreleased `dev`-only shapes are not supported upgrade boundaries:
+   replace them directly, adjust local development state once when necessary,
+   and do not leave permanent migration or compatibility code behind.
 
 ## UI Design Workflow
 

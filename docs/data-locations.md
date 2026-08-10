@@ -38,6 +38,18 @@ but never provider keys or resolved endpoints. The referenced secrets remain
 under the complete home and therefore do not travel merely because a Workspace
 repository is copied.
 
+Each product Session created in that Workspace owns a secret-free launch file
+at `.alice/sessions/<resumeId>.json`. It records the Agent runtime plus the
+credential reference, model, and effort frozen for that Session. The global
+`workspaces/state/resume-identities.json` remains only the product-to-native
+Session identity ledger; it does not own AI configuration. Copying or archiving
+a Workspace therefore carries its Session launch semantics, but never the vault
+secret referenced by a credential slug. The launcher-owned Workspace Manager is
+the deliberate exception: because its cwd is the active Workspace floor rather
+than a business Workspace, its files live under
+`workspaces/state/workspace-manager-sessions/` instead of creating `.alice/` at
+the floor root.
+
 `AQ_LAUNCHER_ROOT` and `OPENALICE_GLOBAL_DIR` remain advanced split-root
 overrides. A fixed `AQ_LAUNCHER_ROOT` disables desktop home switching because
 changing only the rest of the home would still share Workspace files and

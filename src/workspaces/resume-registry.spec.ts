@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -6,25 +6,28 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { Logger } from './logger.js'
 import { ResumeRegistry } from './resume-registry.js'
+import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js'
 
 const noopLogger = { warn() {}, error() {} } as unknown as Logger
 let dir: string
 let path: string
+let runtimeStore: WorkspaceSessionRuntimeStore
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'resume-registry-'))
   path = join(dir, 'resume-identities.json')
+  runtimeStore = new WorkspaceSessionRuntimeStore((wsId) => [join(dir, wsId, '.alice', 'sessions')])
 })
 afterEach(async () => rm(dir, { recursive: true, force: true }))
 
 describe('ResumeRegistry', () => {
   it('maps one product resumeId to a backend-only native session id', async () => {
-    const registry = await ResumeRegistry.load(path, noopLogger)
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const created = await registry.ensure({ wsId: 'ws-1', agent: 'claude', now: 1 })
     expect(created.resumeId).toMatch(/^resume-[a-z]+-[a-z]+-[a-z]+-[0-9a-z]{6}$/)
     await registry.bindAgentSessionId(created.resumeId, 'native-claude-session')
 
-    const reloaded = await ResumeRegistry.load(path, noopLogger)
+    const reloaded = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     expect(reloaded.get(created.resumeId)).toMatchObject({
       wsId: 'ws-1',
       agent: 'claude',
@@ -34,14 +37,14 @@ describe('ResumeRegistry', () => {
   })
 
   it('refuses to move an identity across workspace or runtime boundaries', async () => {
-    const registry = await ResumeRegistry.load(path, noopLogger)
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const created = await registry.ensure({ wsId: 'ws-1', agent: 'pi' })
     await expect(registry.ensure({ resumeId: created.resumeId, wsId: 'ws-2', agent: 'pi' }))
       .rejects.toThrow(/belongs to ws-1\/pi/)
   })
 
   it('persists one immutable secret-free Session runtime binding', async () => {
-    const registry = await ResumeRegistry.load(path, noopLogger)
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const runtimeBinding = {
       version: 1 as const,
       credential: {
@@ -66,15 +69,21 @@ describe('ResumeRegistry', () => {
       runtimeBinding: { ...runtimeBinding, model: 'gpt-other' },
     })).rejects.toThrow(/different runtime binding/)
 
-    expect((await ResumeRegistry.load(path, noopLogger)).get(created.resumeId)?.runtimeBinding)
+    expect((await ResumeRegistry.load(path, noopLogger, runtimeStore)).get(created.resumeId)?.runtimeBinding)
       .toEqual(runtimeBinding)
     const raw = await readFile(path, 'utf8')
-    expect(raw).toContain('openai-1')
+    expect(raw).not.toContain('openai-1')
+    const workspaceConfig = await readFile(
+      join(dir, 'ws-1', '.alice', 'sessions', `${created.resumeId}.json`),
+      'utf8',
+    )
+    expect(workspaceConfig).toContain('openai-1')
+    expect(workspaceConfig).toContain('gpt-5.6-terra')
     expect(raw).not.toContain('sk-secret')
   })
 
   it('keeps legacy UUID identities valid without rewriting them', async () => {
-    const registry = await ResumeRegistry.load(path, noopLogger)
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const legacyId = '550e8400-e29b-41d4-a716-446655440000'
     const record = await registry.ensure({
       resumeId: legacyId,
@@ -83,27 +92,37 @@ describe('ResumeRegistry', () => {
     })
 
     expect(record.resumeId).toBe(legacyId)
-    expect((await ResumeRegistry.load(path, noopLogger)).get(legacyId)?.resumeId).toBe(legacyId)
+    expect((await ResumeRegistry.load(path, noopLogger, runtimeStore)).get(legacyId)?.resumeId).toBe(legacyId)
   })
 
   it('fails closed instead of dropping a corrupted persisted runtime binding', async () => {
     await writeFile(path, JSON.stringify({
-      version: 2,
+      version: 1,
       records: [{
         resumeId: 'resume-corrupt',
         wsId: 'ws-1',
         agent: 'codex',
         createdAt: 1,
         updatedAt: 1,
-        runtimeBinding: { version: 1, credential: { source: 'vault' } },
       }],
     }))
+    const sessionDirectory = join(dir, 'ws-1', '.alice', 'sessions')
+    await mkdir(sessionDirectory, { recursive: true })
+    await writeFile(
+      join(sessionDirectory, 'resume-corrupt.json'),
+      JSON.stringify({
+        version: 1,
+        resumeId: 'resume-corrupt',
+        agent: 'codex',
+        ai: { version: 1, credential: { source: 'vault' } },
+      }),
+    )
 
-    await expect(ResumeRegistry.load(path, noopLogger)).rejects.toThrow(/invalid Session runtime binding/)
+    await expect(ResumeRegistry.load(path, noopLogger, runtimeStore)).rejects.toThrow(/unsupported shape/)
   })
 
   it('lists one workspace newest-first for directory projection', async () => {
-    const registry = await ResumeRegistry.load(path, noopLogger)
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     await registry.ensure({ resumeId: 'resume-old', wsId: 'ws-1', agent: 'pi', now: 1 })
     await registry.ensure({ resumeId: 'resume-other', wsId: 'ws-2', agent: 'codex', now: 3 })
     await registry.ensure({ resumeId: 'resume-new', wsId: 'ws-1', agent: 'claude', now: 2 })
@@ -113,7 +132,7 @@ describe('ResumeRegistry', () => {
   })
 
   it('retires and recalls a Workspace without losing native identity history', async () => {
-    const registry = await ResumeRegistry.load(path, noopLogger)
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     await registry.ensure({
       resumeId: 'resume-owner', wsId: 'ws-1', agent: 'pi', agentSessionId: 'native-1', now: 1,
     })
