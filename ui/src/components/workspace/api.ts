@@ -746,6 +746,7 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly active: boolean;
   readonly runtime?: {
     readonly credentialSource: 'native' | 'vault' | 'workspace';
+    readonly credentialSlug?: string;
     readonly model?: string;
     readonly reasoningEffort?: ModelReasoningEffort;
   };

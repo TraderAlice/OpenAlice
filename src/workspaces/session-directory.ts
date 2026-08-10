@@ -14,6 +14,7 @@ export interface WorkspaceSessionDirectoryEntry {
   active: boolean
   runtime?: {
     credentialSource: 'native' | 'vault' | 'workspace'
+    credentialSlug?: string
     model?: string
     reasoningEffort?: ModelReasoningEffort
   }
@@ -68,6 +69,9 @@ export function buildWorkspaceSessionDirectory(input: {
           ? {
               runtime: {
                 credentialSource: identity.runtimeBinding.credential.source,
+                ...(identity.runtimeBinding.credential.source === 'vault'
+                  ? { credentialSlug: identity.runtimeBinding.credential.credentialSlug }
+                  : {}),
                 ...(identity.runtimeBinding.model ? { model: identity.runtimeBinding.model } : {}),
                 ...(identity.runtimeBinding.reasoningEffort
                   ? { reasoningEffort: identity.runtimeBinding.reasoningEffort }

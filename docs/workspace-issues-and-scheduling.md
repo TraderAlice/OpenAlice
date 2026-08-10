@@ -70,19 +70,24 @@ The filename stem is the stable issue id. Frontmatter:
   otherwise Workspace/default resolution is used. A Session assignee already
   owns its runtime and cannot be overridden here.
 - `credential` — optional secret-free OpenAlice vault slug for the fresh
-  Session. Omission inherits Workspace/native runtime authentication. The slug
-  selects provider routing; keys and endpoints never enter the Issue file.
+  Session. The slug selects provider routing; keys and endpoints never enter
+  the Issue file.
+- `credentialSource: native` — explicitly use the selected Agent runtime's own
+  login. It is mutually exclusive with `credential`. When both fields are
+  omitted, the Issue inherits that Agent's Workspace **headless** preference
+  (fixed, then recent) rather than inspecting deprecated native-project export
+  files.
 - `model` — optional native model id for this Issue's run. Omission inherits the
   selected credential, Workspace, or native runtime model.
 - `effort` — optional one-run reasoning effort:
   `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
   expose that level; omission inherits its Workspace/native default.
 
-`agent`, `credential`, `model`, and `effort` are one Session-creation tuple.
+`agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the
 vault and are resolved just in time. The scheduler freezes the tuple into the
 new Session's durable runtime binding without rewriting Workspace files. All
-four are forbidden when `assignee` is an exact `@resumeId`, because that
+fields are forbidden when `assignee` is an exact `@resumeId`, because that
 Session owns its runtime conversation. `@new-then-resume` may use them for its first
 dispatch; after it becomes an exact Session owner, the claim rewrite removes
 the tuple.

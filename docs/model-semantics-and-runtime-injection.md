@@ -164,9 +164,11 @@ recent tuple, then native runtime state. A fixed tuple is treated as one
 credential/model/effort decision: switching its credential never carries a
 model or effort from a different recent credential invisibly.
 
-An Issue's agent/credential/model/effort fields seed a new Session binding when
-its owner is `@new-then-resume` or `@new-each-run`. The credential field is only an
-OpenAlice-vault slug; it never contains a key or endpoint. Once an exact
+An Issue's agent/credential-or-credentialSource/model/effort fields seed a new
+Session binding when its owner is `@new-then-resume` or `@new-each-run`.
+`credentialSource: native` explicitly selects the Agent login; `credential` is
+only an OpenAlice-vault slug. Omitting both inherits the Workspace headless
+tuple. Neither form ever contains a key or endpoint. Once an exact
 `@resumeId` exists, those fields cannot replace its credential source, model, or
 effort. Follow-up turns replay the stored binding instead of consulting newly
 changed Workspace defaults.

@@ -215,6 +215,7 @@ function rowOf(issue: IssueRecord) {
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
     ...(issue.credential ? { credential: issue.credential } : {}),
+    ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     scheduled: issue.when !== undefined,
@@ -308,7 +309,7 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
       description: [
         "Update one of THIS workspace's issues — its board fields.",
         '',
-        'Patch any subset of `status`, `priority`, `assignee`, `agent`, `model`,',
+        'Patch any subset of `status`, `priority`, `assignee`, `agent`, `credential`, `credentialSource`, `model`,',
         '`effort`, or `what`; omitted fields are',
         'left untouched. `assignee:"@me"` binds this current product',
         'Session; `@new-then-resume` recruits once and assigns that first Session permanently;',
@@ -329,11 +330,12 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           .describe('@new-each-run, @new-then-resume, @human, @unassigned, @me, or an exact @resumeId.'),
         agent: z.string().min(1).nullable().optional().describe('Runtime id for @new-each-run/@new-then-resume; null inherits the Workspace default.'),
         credential: z.string().min(1).nullable().optional().describe('OpenAlice vault slug for the fresh Session; null inherits Workspace/native auth.'),
+        credentialSource: z.literal('native').nullable().optional().describe('Use the Agent runtime login explicitly; null inherits the Workspace headless preference.'),
         model: z.string().min(1).nullable().optional().describe('Native one-run model id; null inherits the Workspace/runtime default.'),
         effort: z.enum(MODEL_REASONING_EFFORTS).nullable().optional().describe('One-run reasoning effort; null inherits the Workspace/runtime default.'),
         what: z.string().min(1).optional().describe('Canonical markdown work definition; exact scheduled prompt.'),
       }),
-      execute: async ({ id, status, priority, assignee, agent, credential, model, effort, what }) => {
+      execute: async ({ id, status, priority, assignee, agent, credential, credentialSource, model, effort, what }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         const resolvedAssignee = resolveIssueAssignee(ctx, assignee)
@@ -344,13 +346,14 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           resolvedAssignee.assignee === undefined &&
           agent === undefined &&
           credential === undefined &&
+          credentialSource === undefined &&
           model === undefined &&
           effort === undefined &&
           what === undefined
         ) {
           return {
             ok: false as const,
-            error: 'no fields to update (pass status/priority/assignee/agent/credential/model/effort/what)',
+            error: 'no fields to update (pass status/priority/assignee/agent/credential/credentialSource/model/effort/what)',
           }
         }
         const res = await updateIssueFields(dir.dir, id, {
@@ -359,6 +362,7 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           assignee: resolvedAssignee.assignee,
           agent,
           credential,
+          credentialSource,
           model,
           effort,
           what,
@@ -498,10 +502,11 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         what: z.string().min(1).optional().describe('Markdown work definition; exact scheduled prompt. Defaults to title.'),
         agent: z.string().min(1).optional().describe('Adapter id when assignee is @new-each-run or @new-then-resume; an exact Session owns its runtime.'),
         credential: z.string().min(1).optional().describe('OpenAlice vault slug to freeze into the fresh Session binding.'),
+        credentialSource: z.literal('native').optional().describe('Use the Agent runtime login explicitly instead of inheriting Workspace access.'),
         model: z.string().min(1).optional().describe('Native model id for the selected credential/runtime source.'),
         effort: z.enum(MODEL_REASONING_EFFORTS).optional().describe('Reasoning effort for one scheduled run.'),
       }),
-      execute: async ({ title, id, status, priority, assignee, when, what, agent, credential, model, effort }) => {
+      execute: async ({ title, id, status, priority, assignee, when, what, agent, credential, credentialSource, model, effort }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         // Structured creation is attributable: "who creates it owns it". A
@@ -520,6 +525,7 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           what,
           agent,
           credential,
+          credentialSource,
           model,
           effort,
         })

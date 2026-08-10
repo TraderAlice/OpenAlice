@@ -50,13 +50,12 @@ describe('buildWorkspaceSessionDirectory', () => {
     expect(result.sessions[0]).toMatchObject({
       resumeId: 'resume-kind-owl-abc123',
       resumable: true,
-      runtime: { credentialSource: 'vault', model: 'gpt-5.6-terra', reasoningEffort: 'high' },
+      runtime: { credentialSource: 'vault', credentialSlug: 'secret-slug', model: 'gpt-5.6-terra', reasoningEffort: 'high' },
       interactive: { name: 'c1', title: 'Investigate provenance' },
       latestExecution: { taskId: 'task-1', assistantPreview: 'done' },
     })
     expect(JSON.stringify(result)).not.toContain('native-secret')
     expect(JSON.stringify(result)).not.toContain('launcher-secret')
     expect(JSON.stringify(result)).not.toContain('private repeated prompt')
-    expect(JSON.stringify(result)).not.toContain('secret-slug')
   })
 })

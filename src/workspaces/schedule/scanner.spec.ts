@@ -70,6 +70,7 @@ interface IssueSpec {
   priority?: string
   agent?: string
   credential?: string
+  credentialSource?: 'native'
   model?: string
   effort?: string
   assignee?: string
@@ -84,6 +85,7 @@ function issueMd(spec: IssueSpec): string {
   if (spec.what) lines.push(`what: ${spec.what}`)
   if (spec.agent) lines.push(`agent: ${spec.agent}`)
   if (spec.credential) lines.push(`credential: ${spec.credential}`)
+  if (spec.credentialSource) lines.push(`credentialSource: ${spec.credentialSource}`)
   if (spec.model) lines.push(`model: ${spec.model}`)
   if (spec.effort) lines.push(`effort: ${spec.effort}`)
   // Scanner tests exercise dispatch policy, not declaration defaults. Keep the
@@ -240,6 +242,31 @@ describe('ScheduleScanner', () => {
       undefined,
       undefined,
       { credentialSlug: 'anthropic-primary', model: 'claude-opus-4-8', reasoningEffort: 'high' },
+    )
+  })
+
+  it('passes explicit native Agent login without mistaking it for Workspace inheritance', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'native',
+      title: 'native run',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+      agent: 'codex',
+      credentialSource: 'native',
+      model: 'gpt-5.6-sol',
+      effort: 'low',
+    }])
+    const { scanner, dispatch } = scannerFor([ws])
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'go',
+      expect.any(Number),
+      { kind: 'issue', workspaceId: 'w1', issueId: 'native' },
+      undefined,
+      undefined,
+      { credentialSource: 'native', model: 'gpt-5.6-sol', reasoningEffort: 'low' },
     )
   })
 

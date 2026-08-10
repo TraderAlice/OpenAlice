@@ -28,6 +28,7 @@
  *   what: <legacy fire prompt; migrated into the markdown What body>
  *   agent: <optional adapter id for the scheduled run>
  *   credential: <optional OpenAlice vault slug for one scheduled Session>
+ *   credentialSource: native <optional explicit Agent-runtime login>
  *   model: <optional native model id for one scheduled run>
  *   effort: none | minimal | low | medium | high | xhigh | max
  *   ---
@@ -147,6 +148,10 @@ const issueFrontmatterObjectSchema = z.object({
   agent: z.string().min(1).optional(),
   /** Secret-free vault reference frozen into a fresh Session binding. */
   credential: z.string().min(1).optional(),
+  /** Explicitly use the Agent runtime's own login for a fresh Session. When
+   * omitted with `credential`, the Issue inherits the Workspace headless
+   * preference instead. */
+  credentialSource: z.literal('native').optional(),
   /** One-run model selection for the selected credential/runtime source. */
   model: z.string().min(1).optional(),
   /** One-run reasoning effort, projected through the selected native CLI. */
@@ -169,6 +174,13 @@ export const issueFrontmatterSchema = issueFrontmatterObjectSchema
           : value.assignee ?? (value.when ? NEW_THEN_RESUME_ASSIGNEE : UNASSIGNED_ASSIGNEE),
   }))
   .superRefine((value, ctx) => {
+    if (value.credential && value.credentialSource) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['credentialSource'],
+        message: 'credential and credentialSource are mutually exclusive',
+      })
+    }
     if (value.when && (value.assignee === HUMAN_ASSIGNEE || value.assignee === UNASSIGNED_ASSIGNEE)) {
       ctx.addIssue({
         code: 'custom',
@@ -187,7 +199,7 @@ export const issueFrontmatterSchema = issueFrontmatterObjectSchema
       })
     }
     if (issueAssigneeResumeId(value.assignee)) {
-      for (const field of ['agent', 'credential', 'model', 'effort'] as const) {
+      for (const field of ['agent', 'credential', 'credentialSource', 'model', 'effort'] as const) {
         if (!value[field]) continue
         ctx.addIssue({
           code: 'custom',

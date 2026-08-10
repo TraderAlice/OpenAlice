@@ -116,6 +116,8 @@ export interface IssueListItem {
   agent?: string
   /** Secret-free OpenAlice vault slug for a fresh scheduled Session. */
   credential?: string
+  /** Explicitly use the Agent runtime's own login. Omission inherits Workspace. */
+  credentialSource?: 'native'
   /** Native model id for the scheduled fire override, if set. */
   model?: string
   /** Native reasoning effort for the scheduled fire override, if set. */
@@ -212,6 +214,8 @@ export interface IssueDetailIssue {
   agent?: string
   /** Vault slug selected for Session creation (frontmatter `credential`). */
   credential?: string
+  /** Explicit native Agent login (frontmatter `credentialSource`). */
+  credentialSource?: 'native'
   /** Native model id for the scheduled fire (frontmatter `model`), if set. */
   model?: string
   /** Native reasoning effort for the scheduled fire (frontmatter `effort`), if set. */
@@ -251,6 +255,7 @@ export interface IssuePatch {
   assignee?: string
   agent?: string | null
   credential?: string | null
+  credentialSource?: 'native' | null
   model?: string | null
   effort?: ModelReasoningEffort | null
   what?: string
