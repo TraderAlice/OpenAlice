@@ -645,7 +645,7 @@ export const zh: Resources = {
       fixedDefault: '固定默认值',
       fixedDefaultHelp: '在这里再次修改前始终使用这组选择。',
       nativeAccessHelp: 'Agent 自身登录态使用 Runtime 的全局认证。已保存的访问方式只记录凭据引用，密钥仍保存在 Alice 的凭据库中。',
-      apply: '应用到草稿',
+      apply: '保存更改',
       saved: 'Workspace AI 偏好已保存。',
     },
     launch: {

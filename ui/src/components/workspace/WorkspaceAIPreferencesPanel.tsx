@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Bot, BrainCircuit, Check, ChevronDown, Cpu, KeyRound, Pencil, RotateCcw, Settings2 } from 'lucide-react'
 
@@ -49,6 +49,21 @@ const EMPTY_MODE: WorkspaceRuntimeModeSettings = {
   agents: {},
   recent: { agents: {} },
 }
+
+type WorkspaceRuntimeDrafts = Record<WorkspaceRuntimeMode, {
+  defaultAgent: string | null
+  agents: Record<string, WorkspaceRuntimePreference>
+}>
+
+type PreferenceSaveState =
+  | { mode: WorkspaceRuntimeMode; status: 'saving' | 'saved' }
+  | {
+    mode: WorkspaceRuntimeMode
+    status: 'error'
+    message: string
+    next: WorkspaceRuntimeDrafts
+    previous: WorkspaceRuntimeDrafts
+  }
 
 function launchFromPreference(
   agent: string,
@@ -274,11 +289,13 @@ function RuntimePreferenceDialog({
   readonly agent: AgentInfo
   readonly fixed: WorkspaceRuntimePreference | undefined
   readonly recent: WorkspaceRuntimePreference | undefined
-  readonly onApply: (preference: WorkspaceRuntimePreference | null) => void
+  readonly onApply: (preference: WorkspaceRuntimePreference | null) => Promise<string | null>
   readonly onConfigureProvider: () => void
 }) {
   const { t } = useTranslation()
   const [useFixed, setUseFixed] = useState(fixed !== undefined)
+  const [applying, setApplying] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
   const [draft, setDraft] = useState<QuickChatLaunchPreference>(() => (
     launchFromPreference(agent.id, fixed ?? recent)
   ))
@@ -287,6 +304,7 @@ function RuntimePreferenceDialog({
     if (!open) return
     setUseFixed(fixed !== undefined)
     setDraft(launchFromPreference(agent.id, fixed ?? recent))
+    setApplyError(null)
   }, [agent.id, fixed, open, recent])
 
   const rememberLaunch = useCallback(async (launch: QuickChatLaunchPreference) => {
@@ -310,7 +328,7 @@ function RuntimePreferenceDialog({
   })
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!applying) onOpenChange(nextOpen) }}>
       <DialogContent
         overlayClassName="z-[70]"
         className="z-[70] max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl"
@@ -359,13 +377,21 @@ function RuntimePreferenceDialog({
           <RuntimePreferenceFields config={config} onConfigureProvider={onConfigureProvider} />
         )}
 
+        {applyError && <p role="alert" className="text-xs text-destructive">{applyError}</p>}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
-          <Button onClick={() => {
-            onApply(useFixed ? preferenceFromLaunch(draft) : null)
-            onOpenChange(false)
+          <Button variant="outline" disabled={applying} onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
+          <Button disabled={applying} onClick={() => {
+            setApplying(true)
+            setApplyError(null)
+            void onApply(useFixed ? preferenceFromLaunch(draft) : null)
+              .then((message) => {
+                if (message) setApplyError(message)
+                else onOpenChange(false)
+              })
+              .finally(() => setApplying(false))
           }}>
-            {t('workspaceSettings.preferences.apply')}
+            {applying ? t('common.saving') : t('workspaceSettings.preferences.apply')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -383,7 +409,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
     interactive: EMPTY_MODE,
     headless: EMPTY_MODE,
   }
-  const [drafts, setDrafts] = useState(() => ({
+  const [drafts, setDrafts] = useState<WorkspaceRuntimeDrafts>(() => ({
     interactive: {
       defaultAgent: persistedRuntime.interactive.defaultAgent ?? null,
       agents: { ...persistedRuntime.interactive.agents },
@@ -395,9 +421,8 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
   }))
   const [editing, setEditing] = useState<{ mode: WorkspaceRuntimeMode; agent: AgentInfo } | null>(null)
   const [credentials, setCredentials] = useState<Record<string, SavedCredential>>({})
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<PreferenceSaveState | null>(null)
+  const savedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const next = workspace.runtimeSettings?.runtime ?? {
@@ -414,9 +439,16 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
         agents: { ...next.headless.agents },
       },
     })
-    setSaved(false)
-    setError(null)
   }, [workspace.id, workspace.runtimeSettings])
+
+  useEffect(() => {
+    if (savedTimerRef.current !== null) window.clearTimeout(savedTimerRef.current)
+    setSaveState(null)
+  }, [workspace.id])
+
+  useEffect(() => () => {
+    if (savedTimerRef.current !== null) window.clearTimeout(savedTimerRef.current)
+  }, [])
 
   useEffect(() => {
     let live = true
@@ -428,28 +460,32 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
     return () => { live = false }
   }, [runtimeAgents])
 
-  const dirty = (['interactive', 'headless'] as const).some((mode) => (
-    drafts[mode].defaultAgent !== (persistedRuntime[mode].defaultAgent ?? null) ||
-    JSON.stringify(drafts[mode].agents) !== JSON.stringify(persistedRuntime[mode].agents)
-  ))
-
-  const save = async () => {
-    setSaving(true)
-    setError(null)
+  const persist = useCallback(async (
+    mode: WorkspaceRuntimeMode,
+    next: WorkspaceRuntimeDrafts,
+    previous: WorkspaceRuntimeDrafts,
+  ): Promise<string | null> => {
+    if (savedTimerRef.current !== null) window.clearTimeout(savedTimerRef.current)
+    setDrafts(next)
+    setSaveState({ mode, status: 'saving' })
     try {
       await updateWorkspaceRuntimeDefaults(workspace.id, {
-        interactive: drafts.interactive,
-        headless: drafts.headless,
+        interactive: next.interactive,
+        headless: next.headless,
       })
       await onSaved()
-      setSaved(true)
-      window.setTimeout(() => setSaved(false), 1800)
+      setSaveState({ mode, status: 'saved' })
+      savedTimerRef.current = window.setTimeout(() => setSaveState(null), 1800)
+      return null
     } catch (cause) {
-      setError((cause as Error).message)
-    } finally {
-      setSaving(false)
+      const message = (cause as Error).message
+      setDrafts(previous)
+      setSaveState({ mode, status: 'error', message, next, previous })
+      return message
     }
-  }
+  }, [onSaved, workspace.id])
+
+  const saving = saveState?.status === 'saving'
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -491,10 +527,14 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                     <select
                       aria-label={t('workspaceSettings.preferences.defaultRuntimeFor', { mode: title })}
                       value={drafts[mode].defaultAgent ?? ''}
-                      onChange={(event) => setDrafts((current) => ({
-                        ...current,
-                        [mode]: { ...current[mode], defaultAgent: event.target.value || null },
-                      }))}
+                      disabled={saving}
+                      onChange={(event) => {
+                        const next = {
+                          ...drafts,
+                          [mode]: { ...drafts[mode], defaultAgent: event.target.value || null },
+                        }
+                        void persist(mode, next, drafts)
+                      }}
                       className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                     >
                       <option value="">
@@ -518,6 +558,29 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                       <span>{recentSummary.access}</span>
                       <span aria-hidden="true">·</span>
                       <span>{recentSummary.inference}</span>
+                    </div>
+                  )}
+
+                  {saveState?.mode === mode && (
+                    <div
+                      role={saveState.status === 'error' ? 'alert' : 'status'}
+                      className={`flex min-h-5 flex-wrap items-center gap-2 text-[11px] ${saveState.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+                    >
+                      {saveState.status === 'saving' && t('common.saving')}
+                      {saveState.status === 'saved' && t('common.saved')}
+                      {saveState.status === 'error' && (
+                        <>
+                          <span>{saveState.message}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-destructive"
+                            onClick={() => void persist(mode, saveState.next, saveState.previous)}
+                          >
+                            {t('common.retry')}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -552,6 +615,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                           <Button
                             variant="ghost"
                             size="icon-sm"
+                            disabled={saving}
                             onClick={() => setEditing({ mode, agent })}
                             aria-label={t('workspaceSettings.preferences.editRuntimeFor', { runtime: agent.displayName, mode: title })}
                           >
@@ -566,15 +630,6 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
             )
           })}
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-h-5 text-[11px]">
-              {saved && <span className="text-success">{t('workspaceSettings.preferences.saved')}</span>}
-              {error && <span className="text-destructive">{error}</span>}
-            </div>
-            <Button disabled={!dirty || saving} onClick={() => void save()}>
-              {saving ? t('common.saving') : t('common.save')}
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -587,12 +642,17 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
           fixed={drafts[editing.mode].agents[editing.agent.id]}
           recent={persistedRuntime[editing.mode].recent.agents[editing.agent.id]}
           onConfigureProvider={onConfigureProvider}
-          onApply={(preference) => setDrafts((current) => {
-            const agents = { ...current[editing.mode].agents }
+          onApply={(preference) => {
+            const previous = drafts
+            const agents = { ...previous[editing.mode].agents }
             if (preference) agents[editing.agent.id] = preference
             else delete agents[editing.agent.id]
-            return { ...current, [editing.mode]: { ...current[editing.mode], agents } }
-          })}
+            const next = {
+              ...previous,
+              [editing.mode]: { ...previous[editing.mode], agents },
+            }
+            return persist(editing.mode, next, previous)
+          }}
         />
       )}
     </div>

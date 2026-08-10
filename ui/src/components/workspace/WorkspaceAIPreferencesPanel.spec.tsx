@@ -81,7 +81,7 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceAIPreferencesPanel', () => {
-  it('shows both launch modes together and saves them atomically', async () => {
+  it('shows both launch modes together and saves a runtime choice immediately', async () => {
     const onSaved = vi.fn(async () => undefined)
     render(
       <WorkspaceAIPreferencesPanel
@@ -108,7 +108,6 @@ describe('WorkspaceAIPreferencesPanel', () => {
     const runtime = screen.getByRole('combobox', { name: '无头运行的默认 Agent Runtime' })
     expect((runtime as HTMLSelectElement).value).toBe('')
     fireEvent.change(runtime, { target: { value: 'codex' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(mocks.updateWorkspaceRuntimeDefaults).toHaveBeenCalledWith(
       'chat-1',
@@ -123,9 +122,11 @@ describe('WorkspaceAIPreferencesPanel', () => {
       },
     ))
     expect(onSaved).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: '保存' })).toBeNull()
+    expect((await screen.findByRole('status')).textContent).toContain('已保存')
   })
 
-  it('uses a full settings form and opens the portaled AI access menu', async () => {
+  it('saves a runtime preference directly from the full settings form', async () => {
     render(
       <WorkspaceAIPreferencesPanel
         workspace={workspace}
@@ -146,5 +147,31 @@ describe('WorkspaceAIPreferencesPanel', () => {
     expect(screen.getByRole('menuitemradio', { name: /使用 Codex 账号/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek API/ }))
     await waitFor(() => expect(screen.queryByRole('menuitemradio', { name: /DeepSeek API/ })).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: '保存更改' }))
+    await waitFor(() => expect(mocks.updateWorkspaceRuntimeDefaults).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Codex 默认偏好' })).toBeNull())
+  })
+
+  it('rolls back a failed automatic save and allows retrying it', async () => {
+    mocks.updateWorkspaceRuntimeDefaults.mockRejectedValueOnce(new Error('保存失败'))
+    render(
+      <WorkspaceAIPreferencesPanel
+        workspace={workspace}
+        agents={agents}
+        onSaved={vi.fn()}
+        onConfigureProvider={vi.fn()}
+      />,
+    )
+
+    const runtime = screen.getByRole('combobox', { name: '无头运行的默认 Agent Runtime' }) as HTMLSelectElement
+    fireEvent.change(runtime, { target: { value: 'codex' } })
+
+    expect((await screen.findByRole('alert')).textContent).toContain('保存失败')
+    expect(runtime.value).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(mocks.updateWorkspaceRuntimeDefaults).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(runtime.value).toBe('codex'))
   })
 })
