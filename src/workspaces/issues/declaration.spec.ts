@@ -142,7 +142,7 @@ describe('readWorkspaceIssues', () => {
     expect(byId['legacy'].assignee).toBe('@new-then-resume')
   })
 
-  it('reads deprecated assignee aliases as canonical values until migration 0033 runs', async () => {
+  it('reads deprecated assignee aliases without allowing writers to emit them', async () => {
     await writeIssue('old-each', fm([
       'title: Old each-run policy',
       'assignee: "@workspace"',

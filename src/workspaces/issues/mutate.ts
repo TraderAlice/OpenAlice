@@ -151,8 +151,8 @@ export async function updateIssueFields(
   const data = parseFrontmatterObject(split.frontmatter)
   if (!data) return { ok: false, reason: 'invalid', error: 'frontmatter is not a mapping' }
 
-  // Reading legacy aliases is intentionally compatible, but every write is an
-  // upgrade boundary. Never reserialize a deprecated token after migration 0033.
+  // Reading deprecated aliases is intentionally compatible, but every write is
+  // a normalization boundary. Never reserialize a deprecated token.
   if (typeof data.assignee === 'string' && deprecatedIssueAssigneeReplacement(data.assignee)) {
     data.assignee = current.issue.assignee
   }

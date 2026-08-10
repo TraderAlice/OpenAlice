@@ -90,9 +90,8 @@ secret keeps the stored value; explicitly removing its presence clears it.
 Changes touch `data/control/restart-connector.flag`, and Guardian reconciles the
 process from the same startup path.
 
-Migration `0022_connector_service_config` moves the retired `web.port` value to
-`ports.json`, discards removed MCP-Ask state, converts the first legacy Telegram
-private chat into the single-owner adapter shape, and seals the token.
+The retired `web.port`, MCP-Ask state, and legacy Telegram connector shape
+predate the 0.89.2-beta baseline and are not supported upgrade inputs.
 
 ## Adapter Extension Rule
 

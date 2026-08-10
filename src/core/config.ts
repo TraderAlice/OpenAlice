@@ -706,8 +706,9 @@ export async function readUTAsConfig(): Promise<UTAConfig[]> {
     return []
   }
 
-  // Sealed envelope — the normal at-rest shape. A plain array is the legacy
-  // plaintext form: still readable (migration 0009 reseals it at boot).
+  // Sealed envelope — the normal at-rest shape. A plain array remains readable
+  // for manual recovery, but the 0.89.2-beta baseline no longer runs a legacy
+  // boot migration; the next explicit account save writes the sealed shape.
   if (isSealedEnvelope(raw)) {
     try {
       raw = await unseal(raw)

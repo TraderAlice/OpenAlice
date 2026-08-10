@@ -31,6 +31,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/0892-migration-baseline.md]] — Retires the development-era 0001–0038
+  migration chain, establishes 0.89.2-beta as the persisted-state baseline, and
+  prevents isolated tests from combining a temporary journal with a live
+  Workspace root.
 - [[plans/issue-runtime-choice.md]] — Aligns scheduled-Issue AI inheritance
   with Workspace headless preferences and replaces the four-field rail with a
   source-aware Runtime plus AI configuration flow.

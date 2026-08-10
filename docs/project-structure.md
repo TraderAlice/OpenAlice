@@ -335,9 +335,11 @@ Overrides:
 
 `data/` is the portable backup/migration unit. `sealing.key` deliberately
 lives beside it so a copied data directory does not carry its decryption key.
-Any upgrade-time transformation of persisted state belongs in
+The active migration chain starts after the 0.89.2-beta baseline. A
+transformation for a persisted shape that has shipped belongs in
 `src/migrations/`, must be idempotent, and must declare affected paths for the
-generated `src/migrations/INDEX.md`.
+generated `src/migrations/INDEX.md`. Unreleased development shapes are replaced
+directly and do not become permanent compatibility code.
 
 ## Change Routing
 

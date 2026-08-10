@@ -97,8 +97,8 @@ export const issueWhenSchema = z.discriminatedUnion('kind', [
   }),
 ])
 
-/** Canonical writable assignees. Legacy aliases live only in the file reader
- * below and migration 0033; every product/API/CLI writer uses this strict schema. */
+/** Canonical writable assignees. Deprecated aliases live only in the file
+ * reader below; every product/API/CLI writer uses this strict schema. */
 export const issueAssigneeSchema = z.union([
   z.literal(NEW_EACH_RUN_ASSIGNEE),
   z.literal(NEW_THEN_RESUME_ASSIGNEE),
@@ -107,9 +107,8 @@ export const issueAssigneeSchema = z.union([
   z.string().regex(/^@resume-[^\s]+$/, 'Session assignee must be @<resumeId>'),
 ])
 
-/** Existing files remain readable until migration 0033 rewrites them. The
- * aliases are deliberately excluded from `issueAssigneeSchema` so no writer can
- * accidentally keep producing the deprecated vocabulary. */
+/** Deprecated files remain readable, but aliases are deliberately excluded
+ * from `issueAssigneeSchema` so no writer can keep producing that vocabulary. */
 const issueAssigneeFileSchema = z.union([
   issueAssigneeSchema,
   z.literal(DEPRECATED_WORKSPACE_ASSIGNEE),
@@ -139,9 +138,9 @@ const issueFrontmatterObjectSchema = z.object({
   assignee: issueAssigneeFileSchema.optional(),
   /** Present iff the issue self-schedules. Absent ⇒ pure board work item. */
   when: issueWhenSchema.optional(),
-  /** Legacy compatibility only. New files keep What in the markdown document
-   * below frontmatter so the human-visible work definition and runtime prompt
-   * cannot drift. Migration 0017 removes this key from existing files. */
+  /** Deprecated read compatibility only. New files keep What in the markdown
+   * document below frontmatter so the human-visible work definition and runtime
+   * prompt cannot drift. */
   what: z.string().min(1).optional(),
   /** Runtime override for Workspace-owned scheduled work. A Session owner
    * already carries its runtime identity and therefore cannot set this. */
@@ -158,7 +157,7 @@ const issueFrontmatterObjectSchema = z.object({
   effort: z.custom<ModelReasoningEffort>(isModelReasoningEffort, {
     message: 'effort must be none, minimal, low, medium, high, xhigh, or max',
   }).optional(),
-  /** Migration 0018 removes the former parallel ownership field. Keeping a
+  /** The former parallel ownership field is outside the baseline. Keeping a
    * `never` key makes stale files fail loudly instead of being silently read. */
   execution: z.never().optional(),
 })
