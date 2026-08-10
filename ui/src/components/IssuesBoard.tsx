@@ -154,6 +154,32 @@ export function CadencePill({ when }: { when: ScheduleWhen }) {
   )
 }
 
+/**
+ * Inspector treatment for a schedule. Unlike CadencePill, this deliberately
+ * gives the wall-clock label and timezone their own lines so a narrow details
+ * rail never turns schedule metadata into an oversized wrapping capsule.
+ */
+export function CadenceSummary({ when }: { when: ScheduleWhen }) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex min-w-0 items-start gap-2.5">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Clock size={14} aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium leading-snug text-foreground">
+          {cadenceLabel(when, t)}
+        </span>
+        {when.kind === 'cron' && (
+          <span className="mt-0.5 block break-all text-xs leading-snug text-muted-foreground">
+            {when.timezone ?? t('issues.cadence.localTime')}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
 const AUTOMATION_HEALTH_CLASS: Record<IssueAutomationHealthState, string> = {
   inactive: 'bg-muted text-muted-foreground',
   not_started: 'bg-muted text-muted-foreground',
