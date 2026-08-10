@@ -21,7 +21,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   useAgentLaunchConfig,
   type AgentLaunchConfigState,
@@ -35,8 +34,8 @@ import {
   type SavedCredential,
   type Workspace,
   type WorkspaceRuntimePreference,
-  type WorkspaceRuntimeScenario,
-  type WorkspaceRuntimeScenarioSettings,
+  type WorkspaceRuntimeMode,
+  type WorkspaceRuntimeModeSettings,
 } from './api'
 
 interface Props {
@@ -46,7 +45,7 @@ interface Props {
   readonly onConfigureProvider: () => void
 }
 
-const EMPTY_SCENARIO: WorkspaceRuntimeScenarioSettings = {
+const EMPTY_MODE: WorkspaceRuntimeModeSettings = {
   agents: {},
   recent: { agents: {} },
 }
@@ -380,26 +379,44 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
     () => agents.filter((agent) => agent.kind !== 'utility' && agent.id !== 'shell'),
     [agents],
   )
-  const [scenario, setScenario] = useState<WorkspaceRuntimeScenario>('askAlice')
-  const persisted = workspace.runtimeSettings?.runtime[scenario] ?? EMPTY_SCENARIO
-  const [defaultAgent, setDefaultAgent] = useState<string | null>(persisted.defaultAgent ?? null)
-  const [fixedAgents, setFixedAgents] = useState<Record<string, WorkspaceRuntimePreference>>({ ...persisted.agents })
-  const [editingAgent, setEditingAgent] = useState<AgentInfo | null>(null)
+  const persistedRuntime = workspace.runtimeSettings?.runtime ?? {
+    interactive: EMPTY_MODE,
+    headless: EMPTY_MODE,
+  }
+  const [drafts, setDrafts] = useState(() => ({
+    interactive: {
+      defaultAgent: persistedRuntime.interactive.defaultAgent ?? null,
+      agents: { ...persistedRuntime.interactive.agents },
+    },
+    headless: {
+      defaultAgent: persistedRuntime.headless.defaultAgent ?? null,
+      agents: { ...persistedRuntime.headless.agents },
+    },
+  }))
+  const [editing, setEditing] = useState<{ mode: WorkspaceRuntimeMode; agent: AgentInfo } | null>(null)
   const [credentials, setCredentials] = useState<Record<string, SavedCredential>>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const next = workspace.runtimeSettings?.runtime[scenario] ?? EMPTY_SCENARIO
-    setDefaultAgent(next.defaultAgent ?? null)
-    setFixedAgents({ ...next.agents })
-  }, [scenario, workspace.id, workspace.runtimeSettings])
-
-  useEffect(() => {
+    const next = workspace.runtimeSettings?.runtime ?? {
+      interactive: EMPTY_MODE,
+      headless: EMPTY_MODE,
+    }
+    setDrafts({
+      interactive: {
+        defaultAgent: next.interactive.defaultAgent ?? null,
+        agents: { ...next.interactive.agents },
+      },
+      headless: {
+        defaultAgent: next.headless.defaultAgent ?? null,
+        agents: { ...next.headless.agents },
+      },
+    })
     setSaved(false)
     setError(null)
-  }, [scenario, workspace.id])
+  }, [workspace.id, workspace.runtimeSettings])
 
   useEffect(() => {
     let live = true
@@ -411,18 +428,19 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
     return () => { live = false }
   }, [runtimeAgents])
 
-  const compatibleAgents = scenario === 'issues'
-    ? runtimeAgents.filter((agent) => agent.capabilities.headless)
-    : runtimeAgents
-  const currentPersisted = workspace.runtimeSettings?.runtime[scenario] ?? EMPTY_SCENARIO
-  const dirty = defaultAgent !== (currentPersisted.defaultAgent ?? null) ||
-    JSON.stringify(fixedAgents) !== JSON.stringify(currentPersisted.agents)
+  const dirty = (['interactive', 'headless'] as const).some((mode) => (
+    drafts[mode].defaultAgent !== (persistedRuntime[mode].defaultAgent ?? null) ||
+    JSON.stringify(drafts[mode].agents) !== JSON.stringify(persistedRuntime[mode].agents)
+  ))
 
   const save = async () => {
     setSaving(true)
     setError(null)
     try {
-      await updateWorkspaceRuntimeDefaults(workspace.id, scenario, { defaultAgent, agents: fixedAgents })
+      await updateWorkspaceRuntimeDefaults(workspace.id, {
+        interactive: drafts.interactive,
+        headless: drafts.headless,
+      })
       await onSaved()
       setSaved(true)
       window.setTimeout(() => setSaved(false), 1800)
@@ -436,7 +454,7 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="mx-auto max-w-2xl space-y-4">
+        <div className="mx-auto max-w-3xl space-y-5">
           <div>
             <h3 className="text-sm font-semibold text-foreground">{t('workspaceSettings.preferences.title')}</h3>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -444,63 +462,74 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
             </p>
           </div>
 
-          <Tabs value={scenario} onValueChange={(value) => setScenario(value as WorkspaceRuntimeScenario)}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="askAlice">{t('workspaceSettings.preferences.askAlice')}</TabsTrigger>
-              <TabsTrigger value="issues">{t('workspaceSettings.preferences.issues')}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="askAlice" className="mt-3 text-[11px] text-muted-foreground">
-              {t('workspaceSettings.preferences.askAliceHelp')}
-            </TabsContent>
-            <TabsContent value="issues" className="mt-3 text-[11px] text-muted-foreground">
-              {t('workspaceSettings.preferences.issuesHelp')}
-            </TabsContent>
-          </Tabs>
-
-          <section className="rounded-lg border border-border bg-muted/20 p-3">
-            <label htmlFor="workspace-scenario-agent" className="text-xs font-medium text-foreground">
-              {t('workspaceSettings.preferences.defaultRuntime')}
-            </label>
-            <select
-              id="workspace-scenario-agent"
-              value={defaultAgent ?? ''}
-              onChange={(event) => setDefaultAgent(event.target.value || null)}
-              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
-            >
-              <option value="">{t('workspaceSettings.preferences.followRecentRuntime')}</option>
-              {compatibleAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.displayName}</option>)}
-            </select>
-          </section>
-
-          <section className="overflow-hidden rounded-lg border border-border">
-            <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              <span>{t('workspaceSettings.preferences.runtime')}</span>
-              <span>{t('workspaceSettings.preferences.resolvedPreference')}</span>
-              <span className="sr-only">{t('common.edit')}</span>
-            </div>
-            {compatibleAgents.map((agent) => {
-              const fixed = fixedAgents[agent.id]
-              const recent = currentPersisted.recent.agents[agent.id]
-              const summary = preferenceSummary(fixed ?? recent, credentials, t('workspaceSettings.preferences.agentLogin'))
-              return (
-                <div key={agent.id} className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-3 last:border-b-0">
-                  <div className="min-w-0">
-                    <div className="truncate text-[12px] font-medium text-foreground">{agent.displayName}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {fixed ? t('workspaceSettings.preferences.fixed') : t('workspaceSettings.preferences.recent')}
-                    </div>
-                  </div>
-                  <div className="min-w-0 space-y-1 text-[11px]">
-                    <div className="flex min-w-0 items-center gap-1.5 text-foreground"><KeyRound size={12} className="shrink-0" /><span className="truncate">{summary.access}</span></div>
-                    <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground"><Cpu size={12} className="shrink-0" /><span className="truncate">{summary.inference}</span></div>
-                  </div>
-                  <Button variant="ghost" size="icon-sm" onClick={() => setEditingAgent(agent)} aria-label={t('workspaceSettings.preferences.editRuntime', { runtime: agent.displayName })}>
-                    <Pencil size={14} />
-                  </Button>
+          {(['interactive', 'headless'] as const).map((mode) => {
+            const title = t(`workspaceSettings.preferences.${mode}`)
+            const compatibleAgents = mode === 'headless'
+              ? runtimeAgents.filter((agent) => agent.capabilities.headless)
+              : runtimeAgents
+            return (
+              <section key={mode} className="overflow-hidden rounded-xl border border-border bg-card">
+                <div className="border-b border-border bg-muted/25 px-4 py-3">
+                  <h4 className="text-[13px] font-semibold text-foreground">{title}</h4>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {t(`workspaceSettings.preferences.${mode}Help`)}
+                  </p>
                 </div>
-              )
-            })}
-          </section>
+                <div className="space-y-4 p-4">
+                  <label className="block text-xs font-medium text-foreground">
+                    {t('workspaceSettings.preferences.defaultRuntime')}
+                    <select
+                      aria-label={t('workspaceSettings.preferences.defaultRuntimeFor', { mode: title })}
+                      value={drafts[mode].defaultAgent ?? ''}
+                      onChange={(event) => setDrafts((current) => ({
+                        ...current,
+                        [mode]: { ...current[mode], defaultAgent: event.target.value || null },
+                      }))}
+                      className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+                    >
+                      <option value="">{t('workspaceSettings.preferences.followRecentRuntime')}</option>
+                      {compatibleAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.displayName}</option>)}
+                    </select>
+                  </label>
+
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <span>{t('workspaceSettings.preferences.runtime')}</span>
+                      <span>{t('workspaceSettings.preferences.resolvedPreference')}</span>
+                      <span className="sr-only">{t('common.edit')}</span>
+                    </div>
+                    {compatibleAgents.map((agent) => {
+                      const fixed = drafts[mode].agents[agent.id]
+                      const recent = persistedRuntime[mode].recent.agents[agent.id]
+                      const summary = preferenceSummary(fixed ?? recent, credentials, t('workspaceSettings.preferences.agentLogin'))
+                      return (
+                        <div key={agent.id} className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-3 last:border-b-0">
+                          <div className="min-w-0">
+                            <div className="truncate text-[12px] font-medium text-foreground">{agent.displayName}</div>
+                            <div className="mt-0.5 text-[10px] text-muted-foreground">
+                              {fixed ? t('workspaceSettings.preferences.fixed') : t('workspaceSettings.preferences.recent')}
+                            </div>
+                          </div>
+                          <div className="min-w-0 space-y-1 text-[11px]">
+                            <div className="flex min-w-0 items-center gap-1.5 text-foreground"><KeyRound size={12} className="shrink-0" /><span className="truncate">{summary.access}</span></div>
+                            <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground"><Cpu size={12} className="shrink-0" /><span className="truncate">{summary.inference}</span></div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setEditing({ mode, agent })}
+                            aria-label={t('workspaceSettings.preferences.editRuntimeFor', { runtime: agent.displayName, mode: title })}
+                          >
+                            <Pencil size={14} />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </section>
+            )
+          })}
 
           <div className="flex items-center justify-between gap-3">
             <div className="min-h-5 text-[11px]">
@@ -514,20 +543,20 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
         </div>
       </div>
 
-      {editingAgent && (
+      {editing && (
         <RuntimePreferenceDialog
           open
-          onOpenChange={(open) => { if (!open) setEditingAgent(null) }}
+          onOpenChange={(open) => { if (!open) setEditing(null) }}
           workspaceId={workspace.id}
-          agent={editingAgent}
-          fixed={fixedAgents[editingAgent.id]}
-          recent={currentPersisted.recent.agents[editingAgent.id]}
+          agent={editing.agent}
+          fixed={drafts[editing.mode].agents[editing.agent.id]}
+          recent={persistedRuntime[editing.mode].recent.agents[editing.agent.id]}
           onConfigureProvider={onConfigureProvider}
-          onApply={(preference) => setFixedAgents((current) => {
-            if (preference) return { ...current, [editingAgent.id]: preference }
-            const next = { ...current }
-            delete next[editingAgent.id]
-            return next
+          onApply={(preference) => setDrafts((current) => {
+            const agents = { ...current[editing.mode].agents }
+            if (preference) agents[editing.agent.id] = preference
+            else delete agents[editing.agent.id]
+            return { ...current, [editing.mode]: { ...current[editing.mode], agents } }
           })}
         />
       )}

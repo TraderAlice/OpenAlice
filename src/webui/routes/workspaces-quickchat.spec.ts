@@ -541,8 +541,8 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     const dir = await mkdtemp(join(tmpdir(), 'quick-chat-settings-'));
     try {
       const settings = emptyWorkspaceRuntimeSettings();
-      settings.runtime.askAlice.recent.agent = 'opencode';
-      settings.runtime.askAlice.recent.agents.opencode = {
+      settings.runtime.interactive.recent.agent = 'opencode';
+      settings.runtime.interactive.recent.agents.opencode = {
         accessMode: 'vault',
         credentialSlug: 'openai-2',
         wireShape: 'openai-chat',
@@ -575,7 +575,7 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
         ok: true,
         settings: {
           runtime: {
-            askAlice: {
+            interactive: {
               recent: {
                 agent: 'opencode',
                 agents: {

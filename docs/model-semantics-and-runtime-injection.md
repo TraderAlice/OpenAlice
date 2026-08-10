@@ -108,8 +108,8 @@ resolved value:
 ### Workspace settings and durable Session bindings
 
 `.alice/settings.json` is the self-describing, secret-free policy and fallback
-for creating a product Session. Version 2 stores separate `askAlice` and
-`issues` scenarios. Each scenario owns:
+for creating a product Session. Version 3 stores separate `interactive` and
+`headless` launch modes. Each mode owns:
 
 - an optional fixed default Agent runtime;
 - an optional fixed credential/model/effort tuple per Agent runtime; and
@@ -117,10 +117,11 @@ for creating a product Session. Version 2 stores separate `askAlice` and
 
 "Follow recent" means the fixed field is absent. A successful launch updates
 only the recent layer and therefore cannot overwrite a user-pinned default.
-Migration `0037_workspace_runtime_settings_v2` converts version 1
-`interactive` and `headless` entries into Ask Alice and Issues recent state.
-They never become fixed defaults merely because an older release remembered
-them. Normal runtime reads accept only the current shape, so legacy-format
+Migration `0037_workspace_runtime_settings_v2` converts version 1 state into
+the version 2 fixed/recent shape. Migration `0038_workspace_runtime_modes`
+then renames the entry-surface keys to durable launch-mode keys without changing
+any preference. Remembered values never become fixed defaults merely because an
+older release stored them. Normal runtime reads accept only the current shape, so legacy-format
 handling remains an upgrade concern rather than a permanent dual-read path.
 Vault choices store only the credential slug and wire shape; keys and resolved
 provider payloads never enter the Workspace file.
@@ -132,23 +133,25 @@ on every launch of that Session:
 interactive TUI, structured Web surface, headless Issue turn, and exact resume.
 It is not a headless-only override.
 
-Fresh Session runtime selection follows the same ownership rule. An explicit
+Fresh Session runtime selection follows the same ownership rule. Ask Alice,
+the Workspace sidebar, and interactive CLI/API starts use `interactive`;
+Issues, schedules, automation, and headless CLI/API starts use `headless`. An explicit
 Quick Chat, sidebar, Issue, CLI, or API runtime choice wins for that one
-Session. Otherwise OpenAlice uses the scenario's fixed Agent, then its recent
+Session. Otherwise OpenAlice uses the mode's fixed Agent, then its recent
 Agent, then the legacy `.alice/workspace.json` `defaultAgent`, then the
 installation-wide `workspaceDefaultAgent`. If none resolves to a registered
-Agent runtime, Alice falls back to the first registered runtime. Issue scenario
+Agent runtime, Alice falls back to the first registered runtime. Headless mode
 defaults must resolve to a headless-capable Agent.
 
 | Runtime | Workspace preference | Per-process Session projection |
 |---|---|---|
-| Claude Code | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `--effort`, credential env |
-| Codex | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
-| opencode | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `--variant`, provider projection |
-| Pi | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `--thinking`, provider projection |
+| Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
+| Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
+| opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |
+| Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider projection |
 
 Within the selected Agent, each launch dimension resolves from the explicit
-one-launch selection first, then the scenario's fixed tuple, then the matching
+one-launch selection first, then the mode's fixed tuple, then the matching
 recent tuple, then native runtime state. A fixed tuple is treated as one
 credential/model/effort decision: switching its credential never carries a
 model or effort from a different recent credential invisibly.

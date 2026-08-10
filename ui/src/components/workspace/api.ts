@@ -19,19 +19,19 @@ export interface WorkspaceRuntimeRecentSettings {
   readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
 }
 
-export interface WorkspaceRuntimeScenarioSettings {
+export interface WorkspaceRuntimeModeSettings {
   readonly defaultAgent?: string
   readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
   readonly recent: WorkspaceRuntimeRecentSettings
 }
 
-export type WorkspaceRuntimeScenario = 'askAlice' | 'issues'
+export type WorkspaceRuntimeMode = 'interactive' | 'headless'
 
 export interface WorkspaceRuntimeSettings {
-  readonly version: 2
+  readonly version: 3
   readonly runtime: {
-    readonly askAlice: WorkspaceRuntimeScenarioSettings
-    readonly issues: WorkspaceRuntimeScenarioSettings
+    readonly interactive: WorkspaceRuntimeModeSettings
+    readonly headless: WorkspaceRuntimeModeSettings
   }
 }
 
@@ -1213,14 +1213,13 @@ export async function updateWorkspaceMetadata(
 
 export async function updateWorkspaceRuntimeDefaults(
   id: string,
-  scenario: WorkspaceRuntimeScenario,
-  input: {
+  input: Readonly<Record<WorkspaceRuntimeMode, {
     readonly defaultAgent: string | null
     readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
-  },
+  }>>,
 ): Promise<Workspace> {
   const res = await fetch(
-    `/api/workspaces/${encodeURIComponent(id)}/runtime-settings/${encodeURIComponent(scenario)}`,
+    `/api/workspaces/${encodeURIComponent(id)}/runtime-settings`,
     {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },

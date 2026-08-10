@@ -22,7 +22,6 @@ import type {
   Workspace,
   WorkspaceMetadataPatch,
   WorkspaceRuntimePreference,
-  WorkspaceRuntimeScenario,
 } from '../../components/workspace/api'
 
 const demoManagerSession = {
@@ -706,34 +705,36 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json({ workspace })
   }),
-  http.put('/api/workspaces/:id/runtime-settings/:scenario', async ({ params, request }) => {
+  http.put('/api/workspaces/:id/runtime-settings', async ({ params, request }) => {
     const index = demoWorkspaces.findIndex((workspace) => workspace.id === String(params.id))
     if (index < 0) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
-    const scenario = String(params.scenario) as WorkspaceRuntimeScenario
-    if (scenario !== 'askAlice' && scenario !== 'issues') {
-      return HttpResponse.json({ error: 'invalid_scenario' }, { status: 400 })
-    }
-    const body = (await request.json().catch(() => ({}))) as {
+    type ModeInput = {
       defaultAgent?: string | null
       agents?: Record<string, WorkspaceRuntimePreference>
     }
+    const body = (await request.json().catch(() => ({}))) as {
+      interactive?: ModeInput
+      headless?: ModeInput
+    }
+    if (!body.interactive || !body.headless) {
+      return HttpResponse.json({ error: 'invalid_runtime_settings' }, { status: 400 })
+    }
     const workspace = demoWorkspaces[index]!
     const currentSettings = workspace.runtimeSettings ?? {
-      version: 2 as const,
+      version: 3 as const,
       runtime: {
-        askAlice: { agents: {}, recent: { agents: {} } },
-        issues: { agents: {}, recent: { agents: {} } },
+        interactive: { agents: {}, recent: { agents: {} } },
+        headless: { agents: {}, recent: { agents: {} } },
       },
     }
-    const currentScenario = currentSettings.runtime[scenario]
-    const nextScenario = {
-      ...(body.defaultAgent ? { defaultAgent: body.defaultAgent } : {}),
-      agents: body.agents ?? {},
-      recent: currentScenario.recent,
-    }
+    const mode = (name: 'interactive' | 'headless') => ({
+      ...(body[name]?.defaultAgent ? { defaultAgent: body[name].defaultAgent } : {}),
+      agents: body[name]?.agents ?? {},
+      recent: currentSettings.runtime[name].recent,
+    })
     const nextSettings = {
-      version: 2 as const,
-      runtime: { ...currentSettings.runtime, [scenario]: nextScenario },
+      version: 3 as const,
+      runtime: { interactive: mode('interactive'), headless: mode('headless') },
     }
     const nextWorkspace = { ...workspace, runtimeSettings: nextSettings }
     demoWorkspaces[index] = nextWorkspace

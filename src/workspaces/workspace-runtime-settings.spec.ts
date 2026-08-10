@@ -24,7 +24,7 @@ describe('Workspace runtime settings', () => {
   it('round-trips secret-free fixed defaults and recent fallbacks by scenario', async () => {
     const dir = await fixture()
     const settings = emptyWorkspaceRuntimeSettings()
-    settings.runtime.askAlice = {
+    settings.runtime.interactive = {
       defaultAgent: 'pi',
       agents: {
         pi: {
@@ -49,14 +49,14 @@ describe('Workspace runtime settings', () => {
     const dir = await fixture()
     await mkdir(join(dir, '.alice'), { recursive: true })
     await writeFile(join(dir, WORKSPACE_RUNTIME_SETTINGS_REL), JSON.stringify({
-      version: 2,
+      version: 3,
       runtime: {
-        askAlice: {
+        interactive: {
           agents: {
             pi: { accessMode: 'native', credentialSlug: 'secret-1', apiKey: 'nope' },
           },
         },
-        issues: { agents: {} },
+        headless: { agents: {} },
       },
     }))
     const result = await readWorkspaceRuntimeSettings(dir)
@@ -66,19 +66,19 @@ describe('Workspace runtime settings', () => {
 
   it('merges explicit fields over fixed defaults, which beat recent fallbacks', () => {
     const settings = emptyWorkspaceRuntimeSettings()
-    settings.runtime.askAlice.agents.pi = {
+    settings.runtime.interactive.agents.pi = {
       accessMode: 'vault',
       credentialSlug: 'deepseek-1',
       model: 'fixed-model',
       reasoningEffort: 'high',
     }
-    settings.runtime.askAlice.recent.agents.pi = {
+    settings.runtime.interactive.recent.agents.pi = {
       accessMode: 'vault',
       credentialSlug: 'deepseek-1',
       model: 'recent-model',
       reasoningEffort: 'medium',
     }
-    expect(resolveWorkspaceRuntimeSelection(settings, 'askAlice', 'pi', {
+    expect(resolveWorkspaceRuntimeSelection(settings, 'interactive', 'pi', {
       reasoningEffort: 'low',
     })).toEqual({
       credentialSlug: 'deepseek-1',
@@ -89,60 +89,68 @@ describe('Workspace runtime settings', () => {
 
   it('does not carry model or effort across an explicit credential switch', () => {
     const settings = emptyWorkspaceRuntimeSettings()
-    settings.runtime.askAlice.agents.pi = {
+    settings.runtime.interactive.agents.pi = {
       accessMode: 'vault',
       credentialSlug: 'deepseek-1',
       model: 'deepseek-chat',
       reasoningEffort: 'high',
     }
-    expect(resolveWorkspaceRuntimeSelection(settings, 'askAlice', 'pi', {
+    expect(resolveWorkspaceRuntimeSelection(settings, 'interactive', 'pi', {
       credentialSlug: 'openai-1',
     })).toEqual({ credentialSlug: 'openai-1' })
-    expect(resolveWorkspaceRuntimeSelection(settings, 'askAlice', 'pi', {
+    expect(resolveWorkspaceRuntimeSelection(settings, 'interactive', 'pi', {
       credentialSource: 'native',
     })).toEqual({ credentialSource: 'native' })
   })
 
   it('resolves fixed scenario runtime before the recent runtime', () => {
     const settings = emptyWorkspaceRuntimeSettings()
-    settings.runtime.issues.defaultAgent = 'codex'
-    settings.runtime.issues.recent.agent = 'pi'
-    expect(resolveWorkspaceRuntimeAgent(settings, 'issues')).toBe('codex')
-    delete settings.runtime.issues.defaultAgent
-    expect(resolveWorkspaceRuntimeAgent(settings, 'issues')).toBe('pi')
+    settings.runtime.headless.defaultAgent = 'codex'
+    settings.runtime.headless.recent.agent = 'pi'
+    expect(resolveWorkspaceRuntimeAgent(settings, 'headless')).toBe('codex')
+    delete settings.runtime.headless.defaultAgent
+    expect(resolveWorkspaceRuntimeAgent(settings, 'headless')).toBe('pi')
   })
 
   it('replaces fixed defaults without disturbing recent history or the other scenario', async () => {
     const dir = await fixture()
     const settings = emptyWorkspaceRuntimeSettings()
-    settings.runtime.askAlice.recent = {
+    settings.runtime.interactive.recent = {
       agent: 'pi',
       agents: { pi: { accessMode: 'native', model: 'recent-model' } },
     }
-    settings.runtime.issues.defaultAgent = 'codex'
+    settings.runtime.headless.defaultAgent = 'codex'
     await writeWorkspaceRuntimeSettings(dir, settings)
 
     const updated = await replaceWorkspaceRuntimeDefaults({
       wsDir: dir,
-      scenario: 'askAlice',
-      defaultAgent: 'opencode',
-      agents: { opencode: { accessMode: 'native', model: 'fixed-model' } },
+      runtime: {
+        interactive: {
+          defaultAgent: 'opencode',
+          agents: { opencode: { accessMode: 'native', model: 'fixed-model' } },
+        },
+        headless: { defaultAgent: 'codex', agents: {} },
+      },
     })
-    expect(updated.runtime.askAlice).toMatchObject({
+    expect(updated.runtime.interactive).toMatchObject({
       defaultAgent: 'opencode',
       agents: { opencode: { model: 'fixed-model' } },
       recent: { agent: 'pi', agents: { pi: { model: 'recent-model' } } },
     })
-    expect(updated.runtime.issues.defaultAgent).toBe('codex')
+    expect(updated.runtime.headless.defaultAgent).toBe('codex')
   })
 
   it('records fresh bindings as recent while preserving fixed defaults', async () => {
     const dir = await fixture()
     await replaceWorkspaceRuntimeDefaults({
       wsDir: dir,
-      scenario: 'askAlice',
-      defaultAgent: 'opencode',
-      agents: { opencode: { accessMode: 'native', model: 'fixed-model' } },
+      runtime: {
+        interactive: {
+          defaultAgent: 'opencode',
+          agents: { opencode: { accessMode: 'native', model: 'fixed-model' } },
+        },
+        headless: { defaultAgent: null, agents: {} },
+      },
     })
     const interactive: ResolvedSessionRuntimeBinding = {
       binding: {
@@ -157,19 +165,19 @@ describe('Workspace runtime settings', () => {
       binding: { version: 1, credential: { source: 'native' }, model: 'gpt-5.6-terra' },
       ai: null,
     }
-    await rememberWorkspaceRuntimeBinding({ wsDir: dir, scenario: 'askAlice', agent: 'pi', runtime: interactive })
-    await rememberWorkspaceRuntimeBinding({ wsDir: dir, scenario: 'issues', agent: 'codex', runtime: headless })
+    await rememberWorkspaceRuntimeBinding({ wsDir: dir, mode: 'interactive', agent: 'pi', runtime: interactive })
+    await rememberWorkspaceRuntimeBinding({ wsDir: dir, mode: 'headless', agent: 'codex', runtime: headless })
     const read = await readWorkspaceRuntimeSettings(dir)
     expect(read).toMatchObject({
       ok: true,
       settings: {
         runtime: {
-          askAlice: {
+          interactive: {
             defaultAgent: 'opencode',
             agents: { opencode: { model: 'fixed-model' } },
             recent: { agent: 'pi', agents: { pi: { credentialSlug: 'deepseek-1' } } },
           },
-          issues: {
+          headless: {
             agents: {},
             recent: { agent: 'codex', agents: { codex: { accessMode: 'native', model: 'gpt-5.6-terra' } } },
           },
