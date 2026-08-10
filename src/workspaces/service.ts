@@ -858,7 +858,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       throw new Error(`invalid Workspace runtime settings: ${runtimeSettings.error}`);
     }
     return validRegisteredRuntime(runtimeSettings.ok
-        ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'issues') ?? null
+        ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'headless') ?? null
         : null) ??
       validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
       await resolveDefaultAgentId(wsMeta);
@@ -1075,7 +1075,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       cwd: ws.dir,
       selection: resolveWorkspaceRuntimeSelection(
         read.ok ? read.settings : null,
-        'askAlice',
+        'interactive',
         adapter.id,
         undefined,
       ),
@@ -1323,7 +1323,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             cwd: ws.dir,
             selection: resolveWorkspaceRuntimeSelection(
               runtimeSettings.ok ? runtimeSettings.settings : null,
-              'issues',
+              'headless',
               adapter.id,
               undefined,
             ),
@@ -1400,7 +1400,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           cwd: ws.dir,
           selection: resolveWorkspaceRuntimeSelection(
             read.ok ? read.settings : null,
-            'issues',
+            'headless',
             adapter.id,
             opts.selection,
           ),
@@ -1485,12 +1485,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
               rememberRuntime = false;
               void rememberWorkspaceRuntimeBinding({
                 wsDir: ws.dir,
-                scenario: 'issues',
+                mode: 'headless',
                 agent: adapter.id,
                 runtime: sessionRuntime,
               }).catch((err) => launcherLogger.warn('workspace.runtime_preference_write_failed', {
                 wsId: ws.id,
-                scenario: 'issues',
+                mode: 'headless',
                 agent: adapter.id,
                 err,
               }));
@@ -1583,7 +1583,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         cwd: ws.dir,
         selection: resolveWorkspaceRuntimeSelection(
           read.ok ? read.settings : null,
-          'issues',
+          'headless',
           adapter.id,
           selection,
         ),

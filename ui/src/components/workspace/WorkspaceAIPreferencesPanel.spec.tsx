@@ -41,16 +41,16 @@ const workspace: Workspace = {
   createdAt: '2026-08-10T00:00:00.000Z',
   sessions: [],
   runtimeSettings: {
-    version: 2,
+    version: 3,
     runtime: {
-      askAlice: {
+      interactive: {
         defaultAgent: 'pi',
         agents: {
           pi: { accessMode: 'vault', credentialSlug: 'deepseek-1', model: 'deepseek-v4-flash', reasoningEffort: 'high' },
         },
         recent: { agents: {} },
       },
-      issues: {
+      headless: {
         agents: {},
         recent: { agent: 'codex', agents: { codex: { accessMode: 'native', model: 'gpt-5.6-terra' } } },
       },
@@ -76,7 +76,7 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('WorkspaceAIPreferencesPanel', () => {
-  it('separates Ask Alice and Issues defaults and saves one scenario atomically', async () => {
+  it('shows both launch modes together and saves them atomically', async () => {
     const onSaved = vi.fn(async () => undefined)
     render(
       <WorkspaceAIPreferencesPanel
@@ -87,20 +87,29 @@ describe('WorkspaceAIPreferencesPanel', () => {
       />,
     )
 
-    expect(screen.getByDisplayValue('Pi')).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.getByText('交互式 Session')).toBeTruthy()
+    expect(screen.getByText('无头运行')).toBeTruthy()
+    expect((screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }) as HTMLSelectElement).value).toBe('pi')
     expect(await screen.findByText('DeepSeek API')).toBeTruthy()
     expect(screen.getByText('deepseek-v4-flash · high')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('tab', { name: '议题' }))
-    const runtime = await screen.findByLabelText('默认 Agent Runtime')
+    const runtime = screen.getByRole('combobox', { name: '无头运行的默认 Agent Runtime' })
     expect((runtime as HTMLSelectElement).value).toBe('')
     fireEvent.change(runtime, { target: { value: 'codex' } })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(mocks.updateWorkspaceRuntimeDefaults).toHaveBeenCalledWith(
       'chat-1',
-      'issues',
-      { defaultAgent: 'codex', agents: {} },
+      {
+        interactive: {
+          defaultAgent: 'pi',
+          agents: {
+            pi: { accessMode: 'vault', credentialSlug: 'deepseek-1', model: 'deepseek-v4-flash', reasoningEffort: 'high' },
+          },
+        },
+        headless: { defaultAgent: 'codex', agents: {} },
+      },
     ))
     expect(onSaved).toHaveBeenCalledOnce()
   })
@@ -115,7 +124,7 @@ describe('WorkspaceAIPreferencesPanel', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '编辑 Codex 偏好' }))
+    fireEvent.click(screen.getByRole('button', { name: '编辑交互式 Session中的 Codex 偏好' }))
     fireEvent.click(screen.getByRole('radio', { name: /固定默认值/ }))
     const access = await screen.findByRole('button', { name: 'AI 访问' })
     expect(screen.getByRole('combobox', { name: 'AI 模型' })).toBeTruthy()

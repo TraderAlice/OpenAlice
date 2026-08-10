@@ -277,8 +277,8 @@ function resolveAgentRuntime(
   const runtimeIds = agents
     .filter((agent) => agent.kind !== 'utility')
     .map((agent) => agent.id)
-  const workspaceIssueDefault = workspace.runtimeSettings?.runtime.issues.defaultAgent
-    ?? workspace.runtimeSettings?.runtime.issues.recent.agent
+  const workspaceIssueDefault = workspace.runtimeSettings?.runtime.headless.defaultAgent
+    ?? workspace.runtimeSettings?.runtime.headless.recent.agent
     ?? null
   const issueDefaultId = workspaceIssueDefault && runtimeIds.includes(workspaceIssueDefault)
     ? workspaceIssueDefault

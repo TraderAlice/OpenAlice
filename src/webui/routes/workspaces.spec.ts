@@ -582,7 +582,7 @@ describe('PATCH /:id/metadata', () => {
   });
 });
 
-describe('PUT /:id/runtime-settings/:scenario', () => {
+describe('PUT /:id/runtime-settings', () => {
   it('persists secret-free fixed defaults without replacing recent history', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'workspace-route-ai-preferences-'));
     try {
@@ -592,35 +592,38 @@ describe('PUT /:id/runtime-settings/:scenario', () => {
         composeHeadlessCommand: () => [],
       };
       const { app } = build({ meta: { id: 'ws-1', tag: 'stable-tag', dir }, adapters: { codex } });
-      const saved = await put(app, '/ws-1/runtime-settings/issues', {
-        defaultAgent: 'codex',
-        agents: {
-          codex: { accessMode: 'native', model: 'gpt-5.6-terra', reasoningEffort: 'low' },
+      const saved = await put(app, '/ws-1/runtime-settings', {
+        interactive: { defaultAgent: null, agents: {} },
+        headless: {
+          defaultAgent: 'codex',
+          agents: {
+            codex: { accessMode: 'native', model: 'gpt-5.6-terra', reasoningEffort: 'low' },
+          },
         },
       });
       expect(saved.status).toBe(200);
-      expect(saved.body.settings.runtime.issues).toMatchObject({
+      expect(saved.body.settings.runtime.headless).toMatchObject({
         defaultAgent: 'codex',
         agents: { codex: { accessMode: 'native', model: 'gpt-5.6-terra', reasoningEffort: 'low' } },
         recent: { agents: {} },
       });
       expect(await readWorkspaceRuntimeSettings(dir)).toMatchObject({
         ok: true,
-        settings: { version: 2, runtime: { issues: { defaultAgent: 'codex' } } },
+        settings: { version: 3, runtime: { headless: { defaultAgent: 'codex' } } },
       });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
   });
 
-  it('rejects non-headless runtimes for the Issues scenario', async () => {
+  it('rejects non-headless runtimes for headless launches', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'workspace-route-ai-preferences-'));
     try {
       const pi = { id: 'pi', capabilities: { headless: false } };
       const { app } = build({ meta: { id: 'ws-1', dir }, adapters: { pi } });
-      const result = await put(app, '/ws-1/runtime-settings/issues', {
-        defaultAgent: 'pi',
-        agents: {},
+      const result = await put(app, '/ws-1/runtime-settings', {
+        interactive: { defaultAgent: null, agents: {} },
+        headless: { defaultAgent: 'pi', agents: {} },
       });
       expect(result).toMatchObject({ status: 400, body: { error: 'invalid_agent' } });
     } finally {

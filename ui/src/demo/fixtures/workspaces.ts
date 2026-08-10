@@ -35,9 +35,9 @@ export const demoWorkspace: Workspace = {
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
   sessions: [demoSession],
   runtimeSettings: {
-    version: 2,
+    version: 3,
     runtime: {
-      askAlice: {
+      interactive: {
         agents: {},
         recent: {
           agent: 'pi',
@@ -52,7 +52,7 @@ export const demoWorkspace: Workspace = {
           },
         },
       },
-      issues: { agents: {}, recent: { agent: 'pi', agents: { pi: { accessMode: 'native' } } } },
+      headless: { agents: {}, recent: { agent: 'pi', agents: { pi: { accessMode: 'native' } } } },
     },
   },
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },

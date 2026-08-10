@@ -31,9 +31,9 @@ the durable truth after it changes.
 
 ## Completed
 
-- [[plans/workspace-ai-preferences.md]] — Separates Agent runtime diagnostics
-  from scenario-aware AI defaults, with a responsive preferences editor and
-  one-time migration 0037 for legacy Workspace settings.
+- [[plans/workspace-ai-preferences.md]] — Reframes durable Workspace AI
+  preferences around interactive and headless launch modes, with both modes
+  visible together and a one-time version 3 migration.
 - [[plans/workspace-runtime-settings.md]] — Adds portable, secret-free
   interactive/headless runtime preferences to each Workspace and demotes native
   project credential injection to an explicit deprecated compatibility export.

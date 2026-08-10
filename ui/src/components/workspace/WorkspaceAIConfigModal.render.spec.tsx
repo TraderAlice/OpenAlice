@@ -207,9 +207,10 @@ describe('WorkspaceAIConfigModal local model metadata', () => {
     expect(screen.getByText('实际启动预览')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'AI 偏好' }))
-    expect(await screen.findByText(/分别配置这个 Workspace 在不同场景下/)).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '问 Alice' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '议题' })).toBeTruthy()
+    expect(await screen.findByText(/默认会自动沿用最近一次成功启动/)).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.getByRole('heading', { name: '交互式 Session' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '无头运行' })).toBeTruthy()
   })
 
   it('keeps compact settings chrome fixed around one scroll owner', async () => {

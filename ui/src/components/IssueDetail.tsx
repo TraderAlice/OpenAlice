@@ -1501,8 +1501,8 @@ export function IssueDetail({
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
   const workspace = workspaces.find((candidate) => candidate.id === wsId) ?? null
-  const workspaceIssueDefaultAgent = workspace?.runtimeSettings?.runtime.issues.defaultAgent
-    ?? workspace?.runtimeSettings?.runtime.issues.recent.agent
+  const workspaceIssueDefaultAgent = workspace?.runtimeSettings?.runtime.headless.defaultAgent
+    ?? workspace?.runtimeSettings?.runtime.headless.recent.agent
     ?? issueDefaultAgent
   const workspaceLegacyDefaultAgent = workspace?.defaultAgent ?? defaultAgent
 
