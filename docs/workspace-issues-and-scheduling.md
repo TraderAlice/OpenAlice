@@ -92,18 +92,12 @@ Session owns its runtime conversation. `@new-then-resume` may use them for its f
 dispatch; after it becomes an exact Session owner, the claim rewrite removes
 the tuple.
 
-Migration `0018_issue_assignee_ownership` removes the retired parallel
-`execution` field. It maps `resume` to the former `session:<resumeId>` shape and
-fresh/omitted scheduled ownership to the former `workspace` shape. That history
-is preserved as explicit `@workspace`; the new omission default is `@new`.
-Migration `0019_issue_session_signatures` then writes those owners as
-`@resumeId` / `@workspace`, the same visible signature language used in reports.
-
-Migration `0033_semantic_issue_assignees` retires those ambiguous scheduling
-aliases. `@workspace` is deprecated in favor of `@new-each-run`, and `@new` is
-deprecated in favor of `@new-then-resume`. Readers keep compatibility for
-pre-migration Workspace files, but API, CLI, UI, documentation, and skills must
-reject or avoid the deprecated values; new writes never emit them.
+The 0.89.2-beta baseline has one ownership field and behavior-named scheduling
+tokens. `@workspace` remains a deprecated read alias for `@new-each-run`, and
+`@new` remains a deprecated read alias for `@new-then-resume`; API, CLI, UI,
+documentation, and skills reject or avoid both aliases, and new writes never
+emit them. The retired parallel `execution` contract and `session:<resumeId>`
+storage shape are not supported upgrade inputs after this baseline.
 
 The markdown below frontmatter is the Issue's canonical **What**: the work
 definition humans inspect and edit. For scheduled Issues, Alice sends this exact
@@ -405,8 +399,8 @@ provenance store.
 | `src/webui/routes/schedule.ts` | Scheduled projection API |
 | `default/skills/self-scheduling/SKILL.md` | Agent-facing authoring instructions |
 
-The retired `.alice/issue.json` and `.alice/schedule.json` formats are migrated
-by `src/migrations/0010_workspace_issues_to_markdown/`. Do not add a second
+The retired `.alice/issue.json` and `.alice/schedule.json` formats predate the
+0.89.2-beta baseline and are no longer upgrade inputs. Do not add a second
 central schedule store or revive the legacy cron/AgentWork path.
 
 ## Verification

@@ -154,7 +154,7 @@ Add checks according to the touched surface:
 | Desktop, IPC, PTY, managed Pi, shell, packaging | Follow [Managed Workspace runtime](docs/managed-workspace-runtime.md) and run the matching Electron/package smoke |
 | Root installer or distributed CLI payload | Follow [CLI installer](docs/cli-installer.md) and run `pnpm test:install:docker`; manually walk the interactive playground before release |
 | Docker/server image, Compose, remote deployment | Follow [Docker deployment](docs/docker-deployment.md) and run `pnpm docker:smoke`; before release, opt into the credentialed agent/CLI check documented there |
-| Persisted data shape | Add an idempotent migration + spec, register it, then run `pnpm build:migration-index` |
+| Persisted data shape | First apply the release-boundary rule above. For a shipped shape, add an idempotent migration + spec, register it, then run `pnpm build:migration-index`; replace unreleased shapes directly |
 | Onboarding/first run/auth | Use isolated data; exercise dev and packaged onboarding paths where relevant |
 
 `pnpm test:e2e` is non-trading: it must never load configured broker accounts

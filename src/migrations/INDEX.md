@@ -3,37 +3,12 @@
 
 # Migration Index
 
-Each row corresponds to one migration in `src/migrations/`. The runner applies pending migrations in this order on every boot, recording applied IDs in `data/config/_meta.json`. Migrations are idempotent in their body in addition to the journal-level guard.
+The active migration chain starts after the **0.89.2-beta** baseline.
+Development-era migrations before `0039` are retired and are not runtime-reachable.
+Fresh baseline homes are seeded directly from current schemas and defaults.
+
+Each row below corresponds to an active migration in `src/migrations/`. The runner applies pending migrations in this order on every boot, recording applied IDs in `data/config/_meta.json`.
 
 | ID | App Version | Date | Affects | Summary |
 |----|-------------|------|---------|---------|
-| `0008_disable_targetless_cron_jobs` | 0.40.0-beta.3 | 2026-06-08 | cron/jobs.json | Disable enabled cron jobs that have no target workspace (legacy AgentWork-era jobs) so they stop firing into the retired path. |
-| `0009_seal_broker_credentials` | 0.41.0-beta.2 | 2026-06-11 | accounts.json | Seal broker credentials at rest (AES-256-GCM envelope + 0600), replacing plaintext accounts.json |
-| `0010_workspace_issues_to_markdown` | 0.60.0-beta.1 | 2026-06-27 | workspaces/<id>/.alice/{issue,schedule}.json | Convert legacy workspace declarations (.alice/schedule.json, .alice/issue.json) into the per-issue markdown format (.alice/issues/<id>.md) so existing self-scheduled issues survive the upgrade. |
-| `0011_workspace_issue_assignee_defaults` | 0.72.0-beta | 2026-07-04 | workspaces/<id>/.alice/issues/*.md | Remove legacy `assignee: unassigned` defaults from workspace issue files so missing assignees resolve to the owning workspace. |
-| `0012_recent_chat_workspace_preference` | 0.73.0-beta | 2026-07-11 | data/preferences.json, workspaces/workspaces.json, workspaces/state/sessions/*.json | Route Quick Chat to the most recently active durable Chat workspace instead of creating a new daily workspace. |
-| `0013_session_run_source` | 0.74.0-beta | 2026-07-11 | workspaces/state/sessions/*.json | Version Session records for durable headless-run provenance and idempotent return-to-session navigation. |
-| `0014_headless_resume_identity` | 0.80.0-beta | 2026-07-11 | workspaces/state/headless-tasks.json | Assign durable resumeId values to historical headless runs so execution identity and resumable conversation identity remain distinct. |
-| `0015_resume_identity_registry` | 0.80.0-beta | 2026-07-11 | workspaces/state/resume-identities.json, workspaces/state/sessions/*.json | Create the backend resumeId to native runtime session-id registry. |
-| `0016_artifact_provenance_store` | 0.80.0-beta | 2026-07-11 | workspaces/state/artifact-provenance.json | Create the durable product Session to artifact provenance store. |
-| `0017_issue_what_and_comment_sidecars` | 0.80.0-beta | 2026-07-12 | workspaces/<id>/.alice/issues/*.md, workspaces/<id>/.alice/issues/*.comments.json | Make markdown What the sole Issue work definition and move comments into structured per-Issue JSON sidecars. |
-| `0018_issue_assignee_ownership` | 0.80.0-beta | 2026-07-12 | workspaces/<id>/.alice/issues/*.md | Replace Issue execution ownership with one workspace, human, unassigned, or Session assignee. |
-| `0019_issue_session_signatures` | 0.80.0-beta | 2026-07-12 | workspaces/<id>/.alice/issues/*.md | Write Issue ownership as @workspace or an exact @resumeId Session signature. |
-| `0020_headless_issue_trigger` | 0.80.0-beta | 2026-07-12 | workspaces/state/headless-tasks.json | Store the composite Issue trigger separately from a run execution Workspace. |
-| `0021_workspace_departure_catalog` | 0.80.0-beta | 2026-07-12 | workspaces/workspaces.json, workspaces/workspaces/*, workspaces/departed-workspaces/*, workspaces/state/workspace-catalog.json | Move unregistered Workspace directories into a durable departed catalog without deleting them. |
-| `0022_connector_service_config` | 0.81.0-beta | 2026-07-13 | connectors.json, connector-service.json, ports.json | Move external notifications into sealed Connector Service config and retire legacy Web/MCP-Ask connector meanings. |
-| `0023_google_native_credentials` | 0.81.0-beta | 2026-07-16 | ai-provider-manager.json | Route saved Google Gemini credentials through the native API so current AQ authorization keys work. |
-| `0024_pi_native_workspace_config` | 0.82.0-beta | 2026-07-18 | workspaces/workspaces/*/.pi-agent, workspaces/departed-workspaces/*/.pi-agent, Pi user agent directory | Move redirected Pi Workspace homes into Pi's native global-provider and project-settings layers. |
-| `0025_retire_global_compaction_config` | 0.83.0-beta | 2026-07-19 | compaction.json, ai-provider-manager.json | Remove retired global context and compaction limits so model and native Agent runtime semantics remain authoritative. |
-| `0026_agent_conversation_log` | 0.87.0-beta | 2026-07-29 | workspaces/state/agent-conversations.jsonl | Create the private append-only cross-Agent conversation event log. |
-| `0027_repair_snapshot_interval` | 0.87.0-beta | 2026-07-29 | snapshot.json | Repair invalid historical portfolio snapshot intervals before strict duration validation loads them. |
-| `0028_auto_quant_default_workspace` | 0.87.0-beta | 2026-07-30 | data/preferences.json | Add the explicit default Workspace pointer that defines whether AutoQuant is initialized. |
-| `0029_session_native_titles` | 0.87.0-beta | 2026-07-30 | workspaces/state/sessions/*.json | Treat the first Session message as a fallback and reserve the preferred title for native runtime metadata. |
-| `0030_retire_workspace_agent_pins` | 0.87.0-beta | 2026-07-31 | workspaces/workspaces.json, workspaces/state/workspace-catalog.json | Remove per-Workspace adapter allowlists so runtime availability follows the live installation registry. |
-| `0031_pi_local_workspace_provider` | 0.89.1-beta | 2026-08-04 | workspaces/workspaces/*/.pi, workspaces/departed-workspaces/*/.pi, Pi user agent directory/models.json | Move OpenAlice-managed Pi providers from the global model registry into Workspace-local extensions. |
-| `0033_semantic_issue_assignees` | 0.90.0-beta | 2026-08-06 | workspaces/<id>/.alice/issues/*.md | Replace deprecated @workspace/@new Issue aliases with behavior-named assignee tokens. |
-| `0034_quick_chat_recent_launch` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Remember Quick Start runtime, credential, model, and effort as one Session-only launch tuple. |
-| `0035_quick_chat_access_mode` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Distinguish Workspace AI, saved credentials, and native runtime accounts in Quick Start. |
-| `0036_codex_56_subscription_model` | 0.89.3-beta | 2026-08-07 | data/preferences.json | Use the explicit GPT-5.6 Sol slug for native Codex subscription Quick Start. |
-| `0037_workspace_runtime_settings_v2` | 0.89.2-beta | 2026-08-10 | workspaces/workspaces/*/.alice/settings.json, workspaces/departed-workspaces/*/.alice/settings.json | Convert legacy interactive/headless Workspace runtime preferences to scenario-aware settings. |
-| `0038_workspace_runtime_modes` | 0.89.2-beta | 2026-08-10 | workspaces/workspaces/*/.alice/settings.json, workspaces/departed-workspaces/*/.alice/settings.json | Rename Workspace runtime settings from entry surfaces to interactive and headless launch modes. |
+| _No post-baseline migrations yet_ | — | — | — | — |

@@ -356,9 +356,8 @@ assignee: "@new-each-run"
 The Issue's creator provenance is stamped separately in all modes. Workspace
 ownership does not erase who designed the Issue.
 
-Migration `0018_issue_assignee_ownership` removes the former `execution` field
-and converts its meaning into `assignee`; the runtime does not maintain two
-ownership contracts.
+The 0.89.2-beta baseline uses only `assignee`; the runtime does not maintain the
+retired parallel `execution` ownership contract.
 
 Typical questions then resolve without ambiguity:
 

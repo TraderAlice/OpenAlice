@@ -23,6 +23,12 @@ function makeMemoryContext(initial: Record<string, unknown> = {}): {
     configDir(): string {
       return '/virtual/config'
     },
+    userDataHome(): string {
+      return '/virtual'
+    },
+    launcherRoot(): string {
+      return '/virtual/workspaces'
+    },
   }
   return { ctx, files }
 }

@@ -21,6 +21,10 @@ export interface MigrationContext {
   removeJson(filename: string): Promise<void>
   /** Absolute path to the config directory. */
   configDir(): string
+  /** Complete home that owns this journal. */
+  userDataHome(): string
+  /** Workspace root paired with this journal, including an explicit split-root override. */
+  launcherRoot(): string
 }
 
 export interface Migration {

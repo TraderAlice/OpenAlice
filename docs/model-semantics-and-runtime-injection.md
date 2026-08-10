@@ -117,12 +117,10 @@ for creating a product Session. Version 3 stores separate `interactive` and
 
 "Follow recent" means the fixed field is absent. A successful launch updates
 only the recent layer and therefore cannot overwrite a user-pinned default.
-Migration `0037_workspace_runtime_settings_v2` converts version 1 state into
-the version 2 fixed/recent shape. Migration `0038_workspace_runtime_modes`
-then renames the entry-surface keys to durable launch-mode keys without changing
-any preference. Remembered values never become fixed defaults merely because an
-older release stored them. Normal runtime reads accept only the current shape, so legacy-format
-handling remains an upgrade concern rather than a permanent dual-read path.
+The 0.89.2-beta baseline accepts only the current version 3 interactive/headless
+shape; the unreleased version 1/2 development formats are intentionally not a
+permanent dual-read or migration boundary. Remembered values never become fixed
+defaults merely because an older development build stored them.
 Vault choices store only the credential slug and wire shape; keys and resolved
 provider payloads never enter the Workspace file.
 
@@ -222,9 +220,8 @@ native Agent fallback wins. Alice must not add a global context/output ceiling
 or run a parallel automatic compactor. Creation defaults may keep an explicit
 context preference only inside the selected agent/model binding; there is no
 cross-model context default. The retired `compaction.json` contract and
-`workspaceDefaultContextWindow` field are removed by migration
-`0025_retire_global_compaction_config`. Native Agent compaction events remain
-observable UI state, not an Alice policy layer.
+`workspaceDefaultContextWindow` field predate the 0.89.2-beta baseline. Native
+Agent compaction events remain observable UI state, not an Alice policy layer.
 
 ## Registry Ownership
 
