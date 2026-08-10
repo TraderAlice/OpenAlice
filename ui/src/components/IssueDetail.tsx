@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Brain, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
 
 import type { HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -41,7 +41,7 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
-import { AutomationHealthPill, CadencePill, PriorityIndicator } from './IssuesBoard'
+import { AutomationHealthPill, CadencePill, CadenceSummary, PriorityIndicator } from './IssuesBoard'
 import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
@@ -78,10 +78,9 @@ const RUN_STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
 const STATUS_OPTIONS: IssueStatus[] = ['in_progress', 'todo', 'backlog', 'done', 'canceled']
 const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
-// Shared compact control styling for the rail's selects / inline input — the
-// settings `inputClass`, trimmed for the narrow rail.
+// Shared control styling for the Inspector and its configuration dialog.
 const railControl =
-  'min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0'
+  'h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9'
 
 const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
 
@@ -99,22 +98,43 @@ function fmtDuration(ms?: number): string {
 
 // ==================== Properties rail ====================
 
-function PropRow({ label, children }: { label: string; children: ReactNode }) {
+function InspectorField({
+  label,
+  icon,
+  children,
+  className = '',
+}: {
+  label: string
+  icon?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:gap-1">
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="min-w-0 text-right text-[13px] text-foreground max-[359px]:w-full max-[359px]:text-left">{children}</div>
+    <div className={`min-w-0 space-y-1.5 ${className}`}>
+      <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+        {icon}
+        {label}
+      </span>
+      <div className="min-w-0 text-sm text-foreground">{children}</div>
     </div>
   )
 }
 
-/** Editable row: label on the left, an interactive control filling the right. */
-function EditRow({ label, children }: { label: string; children: ReactNode }) {
+function InspectorSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:items-stretch max-[359px]:gap-1">
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 max-[359px]:w-full max-[359px]:justify-start">{children}</div>
-    </div>
+    <section className="border-t border-border/60 px-4 py-4 first:border-t-0">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">{title}</h3>
+      {description && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>}
+      <div className="mt-3">{children}</div>
+    </section>
   )
 }
 
@@ -153,7 +173,7 @@ function AssigneeEditor({
 
   return (
     <select
-      className={railControl}
+      className={`${railControl} w-full`}
       value={value}
       disabled={disabled}
       aria-label={t('issues.detail.assignee')}
@@ -253,7 +273,7 @@ function AgentEditor({
         aria-label={canConfigure
           ? t('issues.detail.configureRuntime', { runtime: effectiveAgent })
           : t('issues.detail.noConfigurableRuntime')}
-        className="min-h-10 min-w-10 shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0"
+        className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:size-9"
       >
         <Settings size={14} aria-hidden />
       </button>
@@ -439,13 +459,15 @@ function IssueAiEditor({
         aria-label={t('issues.detail.aiConfiguration')}
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className="oa-pressable flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md border border-border bg-background px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="oa-pressable grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
       >
+        <KeyRound size={15} className="text-muted-foreground" aria-hidden />
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium text-foreground">{summaryAccess}</span>
           <span className="block truncate text-[11px] text-muted-foreground">{summaryModel} · {summaryEffort}</span>
+          <span className="mt-0.5 block text-[10px] text-muted-foreground/75">{provenance}</span>
         </span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">{provenance}</span>
+        <ChevronRight size={14} className="text-muted-foreground/70" aria-hidden />
       </button>
       <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
@@ -523,24 +545,6 @@ function IssueAiEditor({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function PropertySection({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="rounded-lg border border-border bg-background p-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">{title}</h3>
-      {description && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{description}</p>}
-      <div className="mt-2 divide-y divide-border/60">{children}</div>
-    </section>
   )
 }
 
@@ -672,155 +676,190 @@ function PropertiesRail({
   }, [issue.automationHealth, issue.status, t])
 
   return (
-    <aside id="issue-work-item" className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0">
-      <PropertySection
-        title={t('issues.detail.workItem')}
-        description={t('issues.detail.workItemDescription')}
-      >
-        <EditRow label={t('issues.detail.status')}>
-          <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />
-          <select
-            className={railControl}
-            value={issue.status}
-            disabled={saving}
-            aria-label={t('issues.detail.status')}
-            onChange={(e) => onPatch({ status: e.target.value as IssueStatus })}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {t(`issues.status.${s}`)}
-              </option>
-            ))}
-          </select>
-        </EditRow>
-        <EditRow label={t('issues.detail.priority')}>
-          <PriorityIndicator priority={issue.priority} />
-          <select
-            className={`${railControl} capitalize`}
-            value={issue.priority}
-            disabled={saving}
-            aria-label={t('issues.detail.priority')}
-            onChange={(e) => onPatch({ priority: e.target.value as IssuePriority })}
-          >
-            {PRIORITY_OPTIONS.map((p) => (
-              <option key={p} value={p}>
-                {t(`issues.priority.${p}`)}
-              </option>
-            ))}
-          </select>
-        </EditRow>
-        <EditRow label={t('issues.detail.assignee')}>
-          <AssigneeEditor
-            value={issue.assignee}
-            scheduled={Boolean(issue.when)}
-            sessions={sessions}
-            disabled={saving}
-            onChange={(assignee) => onPatch({ assignee })}
-          />
-        </EditRow>
+    <aside
+      id="issue-work-item"
+      className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0 lg:self-start"
+    >
+      <div className="overflow-hidden rounded-xl border border-border bg-background">
+        <InspectorSection title={t('issues.detail.workItem')}>
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-2">
+            <InspectorField
+              label={t('issues.detail.status')}
+              icon={<meta.Icon size={13} className={meta.className} aria-hidden />}
+            >
+              <select
+                className={`${railControl} w-full`}
+                value={issue.status}
+                disabled={saving}
+                aria-label={t('issues.detail.status')}
+                onChange={(e) => onPatch({ status: e.target.value as IssueStatus })}
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{t(`issues.status.${s}`)}</option>
+                ))}
+              </select>
+            </InspectorField>
+            <InspectorField
+              label={t('issues.detail.priority')}
+              icon={<PriorityIndicator priority={issue.priority} />}
+            >
+              <select
+                className={`${railControl} w-full capitalize`}
+                value={issue.priority}
+                disabled={saving}
+                aria-label={t('issues.detail.priority')}
+                onChange={(e) => onPatch({ priority: e.target.value as IssuePriority })}
+              >
+                {PRIORITY_OPTIONS.map((p) => (
+                  <option key={p} value={p}>{t(`issues.priority.${p}`)}</option>
+                ))}
+              </select>
+            </InspectorField>
+          </div>
+          <InspectorField label={t('issues.detail.assignee')} className="mt-3">
+            <AssigneeEditor
+              value={issue.assignee}
+              scheduled={Boolean(issue.when)}
+              sessions={sessions}
+              disabled={saving}
+              onChange={(assignee) => onPatch({ assignee })}
+            />
+          </InspectorField>
+        </InspectorSection>
+
         {issue.when && (
           <>
-          <PropRow label={t('issues.detail.cadence')}><CadencePill when={issue.when} /></PropRow>
-          {ownerResumeId ? (
-            <PropRow label={t('issues.detail.runtime')}>
-              <span title={t('issues.detail.sessionDeterminesRuntime')}>
-                {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
-              </span>
-            </PropRow>
-          ) : (
-            <EditRow label={t('issues.detail.runtime')}>
-              <AgentEditor
-                value={issue.agent}
-                issueDefaultAgent={issueDefaultAgent}
-                defaultAgent={defaultAgent}
-                options={agentOptions}
-                readiness={agentReadiness}
-                disabled={saving}
-                onChange={(agent) => {
-                  onPatch({
-                    agent,
-                    credential: null,
-                    credentialSource: null,
-                    model: null,
-                    effort: null,
-                  })
-                }}
-                onConfigure={onConfigureAgent}
-              />
-            </EditRow>
-          )}
-          {ownerResumeId ? (
-            <div className="py-2">
-              <span className="text-xs text-muted-foreground">{t('issues.detail.aiConfiguration')}</span>
-              <div className="mt-1.5 flex min-w-0 flex-col gap-0.5 rounded-md border border-border bg-background px-2.5 py-2">
-                <span className="truncate font-medium">
-                  {ownerSession?.runtime?.credentialSource === 'vault'
-                    ? credentialLabel(availableCredentials.find((candidate) => candidate.slug === ownerSession.runtime?.credentialSlug))
-                      || ownerSession.runtime?.credentialSlug
-                      || t('issues.detail.savedAccess')
-                    : t('issues.detail.agentLogin')}
+            <InspectorSection title={t('issues.detail.schedule')}>
+              <CadenceSummary when={issue.when} />
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock size={13} aria-hidden />
+                  {t('issues.detail.nextRun')}
                 </span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {ownerSession?.runtime?.model ?? t('issues.detail.runtimeDecides')} · {ownerSession?.runtime?.reasoningEffort ?? t('issues.detail.runtimeDecides')}
+                <span className="tabular-nums text-foreground">
+                  {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
                 </span>
-                <span className="text-[10px] text-muted-foreground">{t('issues.detail.sessionBinding')}</span>
               </div>
-            </div>
-          ) : (
-            <div className="py-2">
-              <span className="text-xs text-muted-foreground">{t('issues.detail.aiConfiguration')}</span>
-              <div className="mt-1.5 flex min-w-0">
-                <IssueAiEditor
-                  issue={issue}
-                  agent={effectiveAgent}
-                  mode={headlessRuntime}
-                  credentials={availableCredentials}
-                  presets={presets}
-                  loading={credentialsLoading}
-                  disabled={saving}
-                  onApply={onPatch}
-                />
-              </div>
-            </div>
-          )}
-          {agentNeedsCredential && (
-            <p className="py-2 text-right text-[11px] leading-snug text-warning max-[359px]:text-left">
-              {t('issues.detail.aiCredentialMissing')}
-            </p>
-          )}
-          {issue.automationHealth && (
-            <PropRow label={t('issues.detail.health')}>
-              <div className="flex flex-col items-end gap-1 max-[359px]:items-start">
-                <AutomationHealthPill health={issue.automationHealth} />
-                <span className="max-w-44 text-[11px] leading-snug text-muted-foreground max-[359px]:max-w-none">
-                  {automationHealthMessage}
-                </span>
-                {canRetry && (
-                  <button
-                    type="button"
-                    disabled={retrying}
-                    onClick={onRetry}
-                    className="oa-pressable mt-1 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
+            </InspectorSection>
+
+            <InspectorSection title={t('issues.detail.execution')}>
+              <InspectorField label={t('issues.detail.runtime')}>
+                {ownerResumeId ? (
+                  <div
+                    className="flex min-h-9 items-center gap-2 rounded-md border border-border bg-muted/25 px-3 py-2"
+                    title={t('issues.detail.sessionDeterminesRuntime')}
                   >
-                    <RotateCcw size={12} aria-hidden />
-                    {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
-                  </button>
+                    <Cpu size={14} className="text-muted-foreground" aria-hidden />
+                    <span>{ownerSession?.agent ?? t('issues.detail.sessionOwned')}</span>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <AgentEditor
+                      value={issue.agent}
+                      issueDefaultAgent={issueDefaultAgent}
+                      defaultAgent={defaultAgent}
+                      options={agentOptions}
+                      readiness={agentReadiness}
+                      disabled={saving}
+                      onChange={(agent) => {
+                        onPatch({
+                          agent,
+                          credential: null,
+                          credentialSource: null,
+                          model: null,
+                          effort: null,
+                        })
+                      }}
+                      onConfigure={onConfigureAgent}
+                    />
+                  </div>
                 )}
-              </div>
-            </PropRow>
-          )}
-          <PropRow label={t('issues.detail.lastRun')}>
-            {issue.lastFiredAtMs
-              ? formatRelativeTime(issue.lastFiredAtMs)
-              : <span className="text-muted-foreground">{t('issues.detail.never')}</span>}
-          </PropRow>
-          <PropRow label={t('issues.detail.nextRun')}>
-            {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : <span className="text-muted-foreground">—</span>}
-          </PropRow>
+              </InspectorField>
+
+              <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
+                {ownerResumeId ? (
+                  <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-md border border-border bg-muted/25 px-3 py-2.5">
+                    <KeyRound size={15} className="text-muted-foreground" aria-hidden />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-medium">
+                        {ownerSession?.runtime?.credentialSource === 'vault'
+                          ? credentialLabel(availableCredentials.find((candidate) => candidate.slug === ownerSession.runtime?.credentialSlug))
+                            || ownerSession.runtime?.credentialSlug
+                            || t('issues.detail.savedAccess')
+                          : t('issues.detail.agentLogin')}
+                      </span>
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {ownerSession?.runtime?.model ?? t('issues.detail.runtimeDecides')} · {ownerSession?.runtime?.reasoningEffort ?? t('issues.detail.runtimeDecides')}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground/75">{t('issues.detail.sessionBinding')}</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0">
+                    <IssueAiEditor
+                      issue={issue}
+                      agent={effectiveAgent}
+                      mode={headlessRuntime}
+                      credentials={availableCredentials}
+                      presets={presets}
+                      loading={credentialsLoading}
+                      disabled={saving}
+                      onApply={onPatch}
+                    />
+                  </div>
+                )}
+              </InspectorField>
+              {agentNeedsCredential && (
+                <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
+              )}
+            </InspectorSection>
+
+            {issue.automationHealth && (
+              <InspectorSection title={t('issues.detail.runHealth')}>
+                <div className="oa-status-surface rounded-lg bg-muted/25 px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <AutomationHealthPill health={issue.automationHealth} />
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {t('issues.detail.lastRun')} · {issue.lastFiredAtMs
+                        ? formatRelativeTime(issue.lastFiredAtMs)
+                        : t('issues.detail.never')}
+                    </span>
+                  </div>
+                  {automationHealthMessage && (
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{automationHealthMessage}</p>
+                  )}
+                  {(issue.lastFiredAtMs || canRetry) && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {issue.lastFiredAtMs && (
+                        <a
+                          href="#issue-runs"
+                          className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {t('issues.detail.viewLastRun')}
+                        </a>
+                      )}
+                      {canRetry && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={retrying}
+                          onClick={onRetry}
+                          className="border-warning/35 bg-warning/10 text-warning hover:border-warning/60 hover:bg-warning/15 hover:text-warning"
+                        >
+                          <RotateCcw size={12} aria-hidden />
+                          {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </InspectorSection>
+            )}
           </>
         )}
-      </PropertySection>
-      {error && <p className="mt-2 text-[11px] leading-snug text-destructive">{error}</p>}
+      </div>
+      {error && <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error}</p>}
     </aside>
   )
 }
@@ -1703,9 +1742,9 @@ export function IssueDetail({
     })),
   ].filter((record) => Number.isFinite(record.at)).sort((a, b) => a.at - b.at)
   return (
-    <div className="mx-auto max-w-4xl px-4 py-5 md:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-5 md:px-6">
       {backToBoard}
-      <main className="grid min-w-0 gap-x-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+      <main className="grid min-w-0 gap-x-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <header className="min-w-0 lg:col-start-1 lg:row-start-1">
           <div className="mb-1 flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
             <span className="max-w-full break-all font-mono text-[11px] leading-snug text-muted-foreground/70">{id}</span>
