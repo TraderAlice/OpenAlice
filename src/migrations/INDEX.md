@@ -36,3 +36,4 @@ Each row corresponds to one migration in `src/migrations/`. The runner applies p
 | `0034_quick_chat_recent_launch` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Remember Quick Start runtime, credential, model, and effort as one Session-only launch tuple. |
 | `0035_quick_chat_access_mode` | 0.89.3-beta | 2026-08-06 | data/preferences.json | Distinguish Workspace AI, saved credentials, and native runtime accounts in Quick Start. |
 | `0036_codex_56_subscription_model` | 0.89.3-beta | 2026-08-07 | data/preferences.json, workspaces/state/resume-identities.json | Use the explicit GPT-5.6 Sol slug for native Codex subscription Sessions. |
+| `0037_workspace_runtime_settings_v2` | 0.89.2-beta | 2026-08-10 | workspaces/workspaces/*/.alice/settings.json, workspaces/departed-workspaces/*/.alice/settings.json | Convert legacy interactive/headless Workspace runtime preferences to scenario-aware settings. |
