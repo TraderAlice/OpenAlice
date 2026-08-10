@@ -48,7 +48,12 @@ const workspace: Workspace = {
         agents: {
           pi: { accessMode: 'vault', credentialSlug: 'deepseek-1', model: 'deepseek-v4-flash', reasoningEffort: 'high' },
         },
-        recent: { agents: {} },
+        recent: {
+          agent: 'pi',
+          agents: {
+            pi: { accessMode: 'vault', credentialSlug: 'deepseek-1', model: 'deepseek-v4-flash', reasoningEffort: 'high' },
+          },
+        },
       },
       headless: {
         agents: {},
@@ -91,8 +96,14 @@ describe('WorkspaceAIPreferencesPanel', () => {
     expect(screen.getByText('交互式 Session')).toBeTruthy()
     expect(screen.getByText('无头运行')).toBeTruthy()
     expect((screen.getByRole('combobox', { name: '交互式 Session的默认 Agent Runtime' }) as HTMLSelectElement).value).toBe('pi')
-    expect(await screen.findByText('DeepSeek API')).toBeTruthy()
-    expect(screen.getByText('deepseek-v4-flash · high')).toBeTruthy()
+    expect((await screen.findAllByText('DeepSeek API')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('deepseek-v4-flash · high').length).toBeGreaterThan(0)
+    expect(screen.getByRole('option', { name: '跟随最近使用 — Pi' })).toBeTruthy()
+    expect(screen.getByText('最近成功使用的 Runtime')).toBeTruthy()
+    expect(screen.getByText('当前解析为')).toBeTruthy()
+    expect(screen.getByText('固定默认值 · 当前最近使用')).toBeTruthy()
+    expect(screen.getByText('当前最近使用的 Runtime')).toBeTruthy()
+    expect(screen.getAllByText('使用最近设置').length).toBeGreaterThan(0)
 
     const runtime = screen.getByRole('combobox', { name: '无头运行的默认 Agent Runtime' })
     expect((runtime as HTMLSelectElement).value).toBe('')

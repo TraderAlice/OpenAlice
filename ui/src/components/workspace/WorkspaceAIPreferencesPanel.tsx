@@ -467,6 +467,16 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
             const compatibleAgents = mode === 'headless'
               ? runtimeAgents.filter((agent) => agent.capabilities.headless)
               : runtimeAgents
+            const recentAgentId = persistedRuntime[mode].recent.agent
+            const recentAgent = runtimeAgents.find((agent) => agent.id === recentAgentId)
+            const recentAgentName = recentAgent?.displayName ?? recentAgentId
+            const recentSummary = recentAgentId
+              ? preferenceSummary(
+                persistedRuntime[mode].recent.agents[recentAgentId],
+                credentials,
+                t('workspaceSettings.preferences.agentLogin'),
+              )
+              : null
             return (
               <section key={mode} className="overflow-hidden rounded-xl border border-border bg-card">
                 <div className="border-b border-border bg-muted/25 px-4 py-3">
@@ -487,10 +497,29 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                       }))}
                       className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                     >
-                      <option value="">{t('workspaceSettings.preferences.followRecentRuntime')}</option>
+                      <option value="">
+                        {recentAgentName
+                          ? t('workspaceSettings.preferences.followRecentRuntimeResolved', { runtime: recentAgentName })
+                          : t('workspaceSettings.preferences.followRecentRuntime')}
+                      </option>
                       {compatibleAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.displayName}</option>)}
                     </select>
                   </label>
+
+                  {recentAgentName && recentSummary && (
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>
+                        {drafts[mode].defaultAgent
+                          ? t('workspaceSettings.preferences.recentRuntime')
+                          : t('workspaceSettings.preferences.currentlyResolvesTo')}
+                      </span>
+                      <span className="font-medium text-foreground">{recentAgentName}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{recentSummary.access}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{recentSummary.inference}</span>
+                    </div>
+                  )}
 
                   <div className="overflow-hidden rounded-lg border border-border">
                     <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -507,7 +536,13 @@ export function WorkspaceAIPreferencesPanel({ workspace, agents, onSaved, onConf
                           <div className="min-w-0">
                             <div className="truncate text-[12px] font-medium text-foreground">{agent.displayName}</div>
                             <div className="mt-0.5 text-[10px] text-muted-foreground">
-                              {fixed ? t('workspaceSettings.preferences.fixed') : t('workspaceSettings.preferences.recent')}
+                              {fixed
+                                ? agent.id === recentAgentId
+                                  ? t('workspaceSettings.preferences.fixedCurrentRecentRuntime')
+                                  : t('workspaceSettings.preferences.fixed')
+                                : agent.id === recentAgentId
+                                  ? t('workspaceSettings.preferences.currentRecentRuntime')
+                                  : t('workspaceSettings.preferences.usesRecentSettings')}
                             </div>
                           </div>
                           <div className="min-w-0 space-y-1 text-[11px]">
