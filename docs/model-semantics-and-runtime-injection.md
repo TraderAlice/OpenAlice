@@ -117,10 +117,12 @@ for creating a product Session. Version 2 stores separate `askAlice` and
 
 "Follow recent" means the fixed field is absent. A successful launch updates
 only the recent layer and therefore cannot overwrite a user-pinned default.
-Version 1 `interactive` and `headless` entries are read as Ask Alice and Issues
-recent state respectively, then upgraded on the next atomic write. They never
-become fixed defaults merely because an older release remembered them. Vault
-choices store only the credential slug and wire shape; keys and resolved
+Migration `0037_workspace_runtime_settings_v2` converts version 1
+`interactive` and `headless` entries into Ask Alice and Issues recent state.
+They never become fixed defaults merely because an older release remembered
+them. Normal runtime reads accept only the current shape, so legacy-format
+handling remains an upgrade concern rather than a permanent dual-read path.
+Vault choices store only the credential slug and wire shape; keys and resolved
 provider payloads never enter the Workspace file.
 
 A fresh Session resolves that surface/Agent preference together with any

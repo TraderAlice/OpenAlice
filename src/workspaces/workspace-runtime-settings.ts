@@ -58,20 +58,6 @@ export const workspaceRuntimeSettingsSchema = z.object({
   }),
 }).strict()
 
-const workspaceRuntimeSettingsV1Schema = z.object({
-  version: z.literal(1),
-  runtime: z.object({
-    interactive: z.object({
-      recentAgent: runtimeIdSchema.optional(),
-      agents: z.record(runtimeIdSchema, workspaceRuntimePreferenceSchema).default({}),
-    }).strict().default({ agents: {} }),
-    headless: z.object({
-      recentAgent: runtimeIdSchema.optional(),
-      agents: z.record(runtimeIdSchema, workspaceRuntimePreferenceSchema).default({}),
-    }).strict().default({ agents: {} }),
-  }).strict().default({ interactive: { agents: {} }, headless: { agents: {} } }),
-}).strict()
-
 export type WorkspaceRuntimePreference = z.infer<typeof workspaceRuntimePreferenceSchema>
 export type WorkspaceRuntimeSettings = z.infer<typeof workspaceRuntimeSettingsSchema>
 export type WorkspaceRuntimeScenario = keyof WorkspaceRuntimeSettings['runtime']
@@ -87,34 +73,6 @@ export function emptyWorkspaceRuntimeSettings(): WorkspaceRuntimeSettings {
     runtime: {
       askAlice: { agents: {}, recent: { agents: {} } },
       issues: { agents: {}, recent: { agents: {} } },
-    },
-  }
-}
-
-function upgradeV1Settings(
-  legacy: z.infer<typeof workspaceRuntimeSettingsV1Schema>,
-): WorkspaceRuntimeSettings {
-  return {
-    version: 2,
-    runtime: {
-      askAlice: {
-        agents: {},
-        recent: {
-          ...(legacy.runtime.interactive.recentAgent
-            ? { agent: legacy.runtime.interactive.recentAgent }
-            : {}),
-          agents: legacy.runtime.interactive.agents,
-        },
-      },
-      issues: {
-        agents: {},
-        recent: {
-          ...(legacy.runtime.headless.recentAgent
-            ? { agent: legacy.runtime.headless.recentAgent }
-            : {}),
-          agents: legacy.runtime.headless.agents,
-        },
-      },
     },
   }
 }
@@ -141,15 +99,11 @@ export async function readWorkspaceRuntimeSettings(
   }
   const result = workspaceRuntimeSettingsSchema.safeParse(parsed)
   if (result.success) return { ok: true, settings: result.data }
-  const legacy = workspaceRuntimeSettingsV1Schema.safeParse(parsed)
-  if (!legacy.success) {
-    return {
-      ok: false,
-      reason: 'invalid',
-      error: result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),
-    }
+  return {
+    ok: false,
+    reason: 'invalid',
+    error: result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),
   }
-  return { ok: true, settings: upgradeV1Settings(legacy.data) }
 }
 
 export async function writeWorkspaceRuntimeSettings(

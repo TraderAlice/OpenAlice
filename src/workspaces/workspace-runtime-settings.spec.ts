@@ -45,36 +45,6 @@ describe('Workspace runtime settings', () => {
     expect(await readFile(join(dir, WORKSPACE_RUNTIME_SETTINGS_REL), 'utf8')).not.toContain('apiKey')
   })
 
-  it('reads v1 recents as recents without turning them into fixed defaults', async () => {
-    const dir = await fixture()
-    await mkdir(join(dir, '.alice'), { recursive: true })
-    await writeFile(join(dir, WORKSPACE_RUNTIME_SETTINGS_REL), JSON.stringify({
-      version: 1,
-      runtime: {
-        interactive: {
-          recentAgent: 'pi',
-          agents: { pi: { accessMode: 'native', model: 'pi-model' } },
-        },
-        headless: {
-          recentAgent: 'codex',
-          agents: { codex: { accessMode: 'native', model: 'codex-model' } },
-        },
-      },
-    }))
-
-    const read = await readWorkspaceRuntimeSettings(dir)
-    expect(read).toMatchObject({
-      ok: true,
-      settings: {
-        version: 2,
-        runtime: {
-          askAlice: { agents: {}, recent: { agent: 'pi', agents: { pi: { model: 'pi-model' } } } },
-          issues: { agents: {}, recent: { agent: 'codex', agents: { codex: { model: 'codex-model' } } } },
-        },
-      },
-    })
-  })
-
   it('rejects secret-shaped and contradictory native fields', async () => {
     const dir = await fixture()
     await mkdir(join(dir, '.alice'), { recursive: true })

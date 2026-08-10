@@ -73,7 +73,7 @@ export function credentialAccessLabel(credential: AgentLaunchConfigState['creden
     || credential.vendor
 }
 
-function credentialAccessDetail(credential: AgentLaunchConfigState['credential']): string {
+export function credentialAccessDetail(credential: AgentLaunchConfigState['credential']): string {
   if (!credential) return ''
   const label = credential.label?.trim()
   return label && label !== credentialAccessLabel(credential)

@@ -14,7 +14,7 @@
  * deletion + Workspace pivot turned the pre-0.40 data shapes over completely, so
  * pre-0.40 installs rebuild `data/` rather than migrate. The framework stays for
  * future upgrades. Numbering continues FORWARD from the highest id ever shipped
- * (next: 0037) — never reuse a retired id, since existing installs' journals
+ * (next: 0038) — never reuse a retired id, since existing installs' journals
  * recorded the old ones.
  */
 
@@ -48,6 +48,7 @@ import { migration as migration_0033_semantic_issue_assignees } from './0033_sem
 import { migration as migration_0034_quick_chat_recent_launch } from './0034_quick_chat_recent_launch/index.js'
 import { migration as migration_0035_quick_chat_access_mode } from './0035_quick_chat_access_mode/index.js'
 import { migration as migration_0036_codex_56_subscription_model } from './0036_codex_56_subscription_model/index.js'
+import { migration as migration_0037_workspace_runtime_settings_v2 } from './0037_workspace_runtime_settings_v2/index.js'
 
 export const REGISTRY: Migration[] = [
   migration_0008_disable_targetless_cron_jobs,
@@ -79,4 +80,5 @@ export const REGISTRY: Migration[] = [
   migration_0034_quick_chat_recent_launch,
   migration_0035_quick_chat_access_mode,
   migration_0036_codex_56_subscription_model,
+  migration_0037_workspace_runtime_settings_v2,
 ]
