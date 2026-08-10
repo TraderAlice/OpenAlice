@@ -286,15 +286,15 @@ export class WorkspaceCreator {
             ...(projected.model ? { model: projected.model } : {}),
             ...(projected.reasoningEffort ? { reasoningEffort: projected.reasoningEffort } : {}),
           };
-          settings.runtime.interactive.agents[agentId] = preference;
-          settings.runtime.headless.agents[agentId] = preference;
+          settings.runtime.askAlice.agents[agentId] = preference;
+          settings.runtime.issues.agents[agentId] = preference;
           rememberedAgents.push(agentId);
         }
         if (rememberedAgents.length > 0) {
-          const recentAgent = template.defaultAgents.find((agent) => rememberedAgents.includes(agent))
+          const defaultAgent = template.defaultAgents.find((agent) => rememberedAgents.includes(agent))
             ?? rememberedAgents[0]!;
-          settings.runtime.interactive.recentAgent = recentAgent;
-          settings.runtime.headless.recentAgent = recentAgent;
+          settings.runtime.askAlice.defaultAgent = defaultAgent;
+          settings.runtime.issues.defaultAgent = defaultAgent;
           await writeWorkspaceRuntimeSettings(dir, settings);
         }
       }

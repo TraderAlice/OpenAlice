@@ -31,6 +31,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/workspace-ai-preferences.md]] — Separates Agent runtime diagnostics
+  from scenario-aware AI defaults, with fixed Workspace preferences layered
+  over recent successful Ask Alice and Issue launches.
 - [[plans/workspace-runtime-settings.md]] — Adds portable, secret-free
   interactive/headless runtime preferences to each Workspace and demotes native
   project credential injection to an explicit deprecated compatibility export.

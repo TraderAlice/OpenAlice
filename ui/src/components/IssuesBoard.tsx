@@ -25,6 +25,7 @@ import { formatRelativeTime } from '../lib/intl'
 import { useWorkspace } from '../tabs/store'
 import { CenteredLoading } from './StateViews'
 import { STATUS_META } from './issue-status-meta'
+import type { Workspace } from './workspace/api'
 
 // ==================== Cadence pill (lifted from AutomationSchedulesSection) ====================
 
@@ -263,7 +264,7 @@ function agentName(id: string, agents: readonly { id: string; displayName: strin
 
 function resolveAgentRuntime(
   issue: IssueListItem,
-  workspace: object | null,
+  workspace: Workspace | null,
   agents: readonly { id: string; displayName: string; kind?: 'agent' | 'utility' }[],
   issueDefaultAgent: string | null,
   defaultAgent: string | null,
@@ -276,8 +277,14 @@ function resolveAgentRuntime(
   const runtimeIds = agents
     .filter((agent) => agent.kind !== 'utility')
     .map((agent) => agent.id)
-  const issueDefaultId = issueDefaultAgent && runtimeIds.includes(issueDefaultAgent) ? issueDefaultAgent : null
-  const workspaceDefaultId = defaultAgent && runtimeIds.includes(defaultAgent) ? defaultAgent : null
+  const workspaceIssueDefault = workspace.runtimeSettings?.runtime.issues.defaultAgent
+    ?? workspace.runtimeSettings?.runtime.issues.recent.agent
+    ?? null
+  const issueDefaultId = workspaceIssueDefault && runtimeIds.includes(workspaceIssueDefault)
+    ? workspaceIssueDefault
+    : issueDefaultAgent && runtimeIds.includes(issueDefaultAgent) ? issueDefaultAgent : null
+  const legacyWorkspaceDefault = workspace.defaultAgent ?? defaultAgent
+  const workspaceDefaultId = legacyWorkspaceDefault && runtimeIds.includes(legacyWorkspaceDefault) ? legacyWorkspaceDefault : null
   const effectiveDefaultId = issueDefaultId ?? workspaceDefaultId ?? runtimeIds[0] ?? null
   if (issue.agent) {
     return {

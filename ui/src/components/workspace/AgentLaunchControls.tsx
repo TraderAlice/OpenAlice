@@ -66,7 +66,7 @@ const PROVIDER_ACCESS_LABELS: Readonly<Record<string, string>> = {
   longcat: 'LongCat API',
 }
 
-function credentialAccessLabel(credential: AgentLaunchConfigState['credential']): string {
+export function credentialAccessLabel(credential: AgentLaunchConfigState['credential']): string {
   if (!credential) return ''
   return PROVIDER_ACCESS_LABELS[credential.vendor.toLowerCase()]
     || credential.label?.trim()

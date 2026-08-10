@@ -14,6 +14,7 @@ import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import { readWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
 import { emptyAgentSessionRuntime } from '../../workspaces/cli-adapter.js';
+import { readWorkspaceRuntimeSettings } from '../../workspaces/workspace-runtime-settings.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -332,6 +333,15 @@ async function patch(app: any, path: string, body?: unknown) {
   return { status: res.status, body: json as any };
 }
 
+async function put(app: any, path: string, body?: unknown) {
+  const res = await app.request(path, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json().catch(() => null) as any };
+}
+
 async function del(app: any, path: string) {
   const res = await app.request(path, { method: 'DELETE' });
   return { status: res.status, body: await res.json().catch(() => null) as any };
@@ -566,6 +576,53 @@ describe('PATCH /:id/metadata', () => {
       expect((await patch(app, '/ws-1/metadata', { defaultAgent: 'shell' })).status).toBe(400);
       expect((await patch(app, '/ws-1/metadata', { defaultAgent: 'future-runtime' })).status).toBe(400);
       expect(await readWorkspaceMetadata(dir)).toEqual({ ok: false, reason: 'absent' });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('PUT /:id/runtime-settings/:scenario', () => {
+  it('persists secret-free fixed defaults without replacing recent history', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-ai-preferences-'));
+    try {
+      const codex = {
+        id: 'codex',
+        capabilities: { headless: true },
+        composeHeadlessCommand: () => [],
+      };
+      const { app } = build({ meta: { id: 'ws-1', tag: 'stable-tag', dir }, adapters: { codex } });
+      const saved = await put(app, '/ws-1/runtime-settings/issues', {
+        defaultAgent: 'codex',
+        agents: {
+          codex: { accessMode: 'native', model: 'gpt-5.6-terra', reasoningEffort: 'low' },
+        },
+      });
+      expect(saved.status).toBe(200);
+      expect(saved.body.settings.runtime.issues).toMatchObject({
+        defaultAgent: 'codex',
+        agents: { codex: { accessMode: 'native', model: 'gpt-5.6-terra', reasoningEffort: 'low' } },
+        recent: { agents: {} },
+      });
+      expect(await readWorkspaceRuntimeSettings(dir)).toMatchObject({
+        ok: true,
+        settings: { version: 2, runtime: { issues: { defaultAgent: 'codex' } } },
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects non-headless runtimes for the Issues scenario', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'workspace-route-ai-preferences-'));
+    try {
+      const pi = { id: 'pi', capabilities: { headless: false } };
+      const { app } = build({ meta: { id: 'ws-1', dir }, adapters: { pi } });
+      const result = await put(app, '/ws-1/runtime-settings/issues', {
+        defaultAgent: 'pi',
+        agents: {},
+      });
+      expect(result).toMatchObject({ status: 400, body: { error: 'invalid_agent' } });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

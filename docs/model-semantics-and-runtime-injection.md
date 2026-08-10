@@ -107,11 +107,21 @@ resolved value:
 
 ### Workspace settings and durable Session bindings
 
-`.alice/settings.json` is the self-describing, secret-free default for creating
-a product Session. It stores separate `interactive` and `headless` recent
-choices, each with a recent Agent runtime and one credential/model/effort tuple
-per Agent. Vault choices store only the credential slug and wire shape; keys and
-resolved provider payloads never enter the Workspace file.
+`.alice/settings.json` is the self-describing, secret-free policy and fallback
+for creating a product Session. Version 2 stores separate `askAlice` and
+`issues` scenarios. Each scenario owns:
+
+- an optional fixed default Agent runtime;
+- an optional fixed credential/model/effort tuple per Agent runtime; and
+- a separate automatically remembered recent Agent and recent tuple per Agent.
+
+"Follow recent" means the fixed field is absent. A successful launch updates
+only the recent layer and therefore cannot overwrite a user-pinned default.
+Version 1 `interactive` and `headless` entries are read as Ask Alice and Issues
+recent state respectively, then upgraded on the next atomic write. They never
+become fixed defaults merely because an older release remembered them. Vault
+choices store only the credential slug and wire shape; keys and resolved
+provider payloads never enter the Workspace file.
 
 A fresh Session resolves that surface/Agent preference together with any
 explicit credential, model, or effort choice into one immutable, secret-free
@@ -120,19 +130,26 @@ on every launch of that Session:
 interactive TUI, structured Web surface, headless Issue turn, and exact resume.
 It is not a headless-only override.
 
-Fresh Session runtime selection follows the same ownership rule. The optional
-`.alice/workspace.json` `defaultAgent` is the durable default for one Workspace.
-It wins over the legacy installation-wide `workspaceDefaultAgent`; an explicit
-Quick Chat, sidebar, CLI, or API runtime choice wins for that one Session without
-rewriting either default. If neither default resolves to a registered agent
-runtime, Alice falls back to the first registered runtime.
+Fresh Session runtime selection follows the same ownership rule. An explicit
+Quick Chat, sidebar, Issue, CLI, or API runtime choice wins for that one
+Session. Otherwise OpenAlice uses the scenario's fixed Agent, then its recent
+Agent, then the legacy `.alice/workspace.json` `defaultAgent`, then the
+installation-wide `workspaceDefaultAgent`. If none resolves to a registered
+Agent runtime, Alice falls back to the first registered runtime. Issue scenario
+defaults must resolve to a headless-capable Agent.
 
 | Runtime | Workspace preference | Per-process Session projection |
 |---|---|---|
-| Claude Code | `.alice/settings.json` interactive/headless tuple | `--model`, `--effort`, credential env |
-| Codex | `.alice/settings.json` interactive/headless tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
-| opencode | `.alice/settings.json` interactive/headless tuple | `--model`, `--variant`, provider projection |
-| Pi | `.alice/settings.json` interactive/headless tuple | `--model`, `--thinking`, provider projection |
+| Claude Code | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `--effort`, credential env |
+| Codex | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
+| opencode | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `--variant`, provider projection |
+| Pi | `.alice/settings.json` Ask Alice/Issues fixed then recent tuple | `--model`, `--thinking`, provider projection |
+
+Within the selected Agent, each launch dimension resolves from the explicit
+one-launch selection first, then the scenario's fixed tuple, then the matching
+recent tuple, then native runtime state. A fixed tuple is treated as one
+credential/model/effort decision: switching its credential never carries a
+model or effort from a different recent credential invisibly.
 
 An Issue's agent/credential/model/effort fields seed a new Session binding when
 its owner is `@new-then-resume` or `@new-each-run`. The credential field is only an
@@ -273,7 +290,7 @@ saves use transient confirmation instead of a permanent success state.
 This disclosure applies to all four supported Agent runtimes. Claude Code and
 Codex use their native global login and global runtime configuration by default.
 Merely storing a compatible credential in Alice never selects or injects it;
-only an explicit Session selection, Workspace recent preference, or
+only an explicit Session selection, Workspace fixed/recent preference, or
 new-Workspace creation seed overrides the native fallback. The visible values
 come from `.alice/settings.json` and the pending Session binding, never by
 reverse-engineering a native project file in the primary launch path.

@@ -35,11 +35,13 @@ export const demoWorkspace: Workspace = {
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
   sessions: [demoSession],
   runtimeSettings: {
-    version: 1,
+    version: 2,
     runtime: {
-      interactive: {
-        recentAgent: 'pi',
-        agents: {
+      askAlice: {
+        agents: {},
+        recent: {
+          agent: 'pi',
+          agents: {
           pi: {
             accessMode: 'vault',
             credentialSlug: 'openai-1',
@@ -47,9 +49,10 @@ export const demoWorkspace: Workspace = {
             model: 'gpt-5.6-sol',
             reasoningEffort: 'high',
           },
+          },
         },
       },
-      headless: { recentAgent: 'pi', agents: { pi: { accessMode: 'native' } } },
+      issues: { agents: {}, recent: { agent: 'pi', agents: { pi: { accessMode: 'native' } } } },
     },
   },
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },

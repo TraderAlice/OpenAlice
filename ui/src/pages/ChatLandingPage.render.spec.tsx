@@ -110,17 +110,17 @@ function chatWorkspace(): Workspace {
 
 function withInteractivePreference(
   workspace: Workspace,
-  preference: NonNullable<Workspace['runtimeSettings']>['runtime']['interactive']['agents'][string],
+  preference: NonNullable<Workspace['runtimeSettings']>['runtime']['askAlice']['agents'][string],
   agent = 'pi',
 ): Workspace {
   return {
     ...workspace,
     defaultAgent: agent,
     runtimeSettings: {
-      version: 1,
+      version: 2,
       runtime: {
-        interactive: { recentAgent: agent, agents: { [agent]: preference } },
-        headless: { agents: {} },
+        askAlice: { agents: {}, recent: { agent, agents: { [agent]: preference } } },
+        issues: { agents: {}, recent: { agents: {} } },
       },
     },
   }

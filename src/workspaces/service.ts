@@ -45,6 +45,7 @@ import {
 import {
   readWorkspaceRuntimeSettings,
   rememberWorkspaceRuntimeBinding,
+  resolveWorkspaceRuntimeAgent,
   resolveWorkspaceRuntimeSelection,
 } from './workspace-runtime-settings.js';
 import { logger as launcherLogger } from './logger.js';
@@ -857,7 +858,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       throw new Error(`invalid Workspace runtime settings: ${runtimeSettings.error}`);
     }
     return validRegisteredRuntime(runtimeSettings.ok
-        ? runtimeSettings.settings.runtime.headless.recentAgent ?? null
+        ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'issues') ?? null
         : null) ??
       validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
       await resolveDefaultAgentId(wsMeta);
@@ -1074,7 +1075,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       cwd: ws.dir,
       selection: resolveWorkspaceRuntimeSelection(
         read.ok ? read.settings : null,
-        'interactive',
+        'askAlice',
         adapter.id,
         undefined,
       ),
@@ -1322,7 +1323,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             cwd: ws.dir,
             selection: resolveWorkspaceRuntimeSelection(
               runtimeSettings.ok ? runtimeSettings.settings : null,
-              'headless',
+              'issues',
               adapter.id,
               undefined,
             ),
@@ -1399,7 +1400,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           cwd: ws.dir,
           selection: resolveWorkspaceRuntimeSelection(
             read.ok ? read.settings : null,
-            'headless',
+            'issues',
             adapter.id,
             opts.selection,
           ),
@@ -1484,12 +1485,12 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
               rememberRuntime = false;
               void rememberWorkspaceRuntimeBinding({
                 wsDir: ws.dir,
-                surface: 'headless',
+                scenario: 'issues',
                 agent: adapter.id,
                 runtime: sessionRuntime,
               }).catch((err) => launcherLogger.warn('workspace.runtime_preference_write_failed', {
                 wsId: ws.id,
-                surface: 'headless',
+                scenario: 'issues',
                 agent: adapter.id,
                 err,
               }));
@@ -1582,7 +1583,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         cwd: ws.dir,
         selection: resolveWorkspaceRuntimeSelection(
           read.ok ? read.settings : null,
-          'headless',
+          'issues',
           adapter.id,
           selection,
         ),
