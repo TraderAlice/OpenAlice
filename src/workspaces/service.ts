@@ -132,6 +132,7 @@ import {
   type HeadlessTaskTrigger,
 } from './headless-task-registry.js';
 import { ResumeRegistry } from './resume-registry.js';
+import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js';
 import {
   AUTO_QUANT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
@@ -338,6 +339,7 @@ import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
 import { readHarnessSource } from './harness-source.js';
 import {
   createManagerWorkspaceMeta,
+  MANAGER_WORKSPACE_ID,
 } from './manager-workspace.js';
 
 /**
@@ -596,9 +598,22 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'headless-tasks.json'),
     launcherLogger.child({ scope: 'headless-registry' }),
   );
+  const sessionRuntimeStore = new WorkspaceSessionRuntimeStore((wsId) => {
+    if (wsId === MANAGER_WORKSPACE_ID) {
+      return [join(config.launcherRoot, 'state', 'workspace-manager-sessions')];
+    }
+    const directories: string[] = [];
+    const active = registry.get(wsId);
+    if (active) directories.push(join(active.dir, '.alice', 'sessions'));
+    const historical = catalog.get(wsId);
+    if (historical?.departedDir) directories.push(join(historical.departedDir, '.alice', 'sessions'));
+    if (historical) directories.push(join(historical.activeDir, '.alice', 'sessions'));
+    return directories;
+  });
   const resumeRegistry = await ResumeRegistry.load(
     join(config.launcherRoot, 'state', 'resume-identities.json'),
     launcherLogger.child({ scope: 'resume-registry' }),
+    sessionRuntimeStore,
   );
   const provenanceStore = await ArtifactProvenanceStore.load(
     join(config.launcherRoot, 'state', 'artifact-provenance.json'),

@@ -10,7 +10,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import type { Migration } from '../types.js'
 
@@ -61,40 +61,14 @@ function migratedPreferences(value: unknown): unknown | null {
   }
 }
 
-function migratedResumeIdentities(value: unknown): unknown | null {
-  if (!isRecord(value) || !Array.isArray(value['records'])) return null
-  let updated = false
-  const records = value['records'].map((candidate) => {
-    if (!isRecord(candidate) || candidate['agent'] !== 'codex') return candidate
-    const runtimeBinding = candidate['runtimeBinding']
-    if (!isRecord(runtimeBinding) || runtimeBinding['model'] !== LEGACY_MODEL) return candidate
-    const credential = runtimeBinding['credential']
-    if (!isRecord(credential) || credential['source'] !== 'native') return candidate
-    updated = true
-    return {
-      ...candidate,
-      runtimeBinding: {
-        ...runtimeBinding,
-        model: CODEX_SUBSCRIPTION_MODEL,
-      },
-    }
-  })
-  return updated ? { ...value, records } : null
-}
-
 export async function migrateCodex56SubscriptionModel(input: {
   preferencesPath: string
-  resumeIdentitiesPath: string
-}): Promise<{ preferencesUpdated: boolean; sessionsUpdated: boolean }> {
+}): Promise<{ preferencesUpdated: boolean }> {
   const preferences = migratedPreferences(await readJson(input.preferencesPath))
   if (preferences) await writeAtomic(input.preferencesPath, preferences)
 
-  const resumeIdentities = migratedResumeIdentities(await readJson(input.resumeIdentitiesPath))
-  if (resumeIdentities) await writeAtomic(input.resumeIdentitiesPath, resumeIdentities)
-
   return {
     preferencesUpdated: preferences !== null,
-    sessionsUpdated: resumeIdentities !== null,
   }
 }
 
@@ -102,16 +76,13 @@ export const migration: Migration = {
   id: '0036_codex_56_subscription_model',
   appVersion: '0.89.3-beta',
   introducedAt: '2026-08-07',
-  affects: ['data/preferences.json', 'workspaces/state/resume-identities.json'],
-  summary: 'Use the explicit GPT-5.6 Sol slug for native Codex subscription Sessions.',
+  affects: ['data/preferences.json'],
+  summary: 'Use the explicit GPT-5.6 Sol slug for native Codex subscription Quick Start.',
   rationale:
     'The OpenAI API accepts the bare GPT-5.6 alias, while ChatGPT-authenticated Codex rejects it; old Quick Start presets persisted that incompatible alias.',
   up: async (ctx) => {
-    const userDataHome = resolve(ctx.configDir(), '..', '..')
-    const launcherRoot = resolve(process.env['AQ_LAUNCHER_ROOT'] ?? join(userDataHome, 'workspaces'))
     await migrateCodex56SubscriptionModel({
       preferencesPath: join(ctx.configDir(), '..', 'preferences.json'),
-      resumeIdentitiesPath: join(launcherRoot, 'state', 'resume-identities.json'),
     })
   },
 }

@@ -128,10 +128,18 @@ provider payloads never enter the Workspace file.
 
 A fresh Session resolves that surface/Agent preference together with any
 explicit credential, model, or effort choice into one immutable, secret-free
-`SessionRuntimeBinding` owned by its `resumeId`. The binding is then projected
-on every launch of that Session:
+`SessionRuntimeBinding` owned by its `resumeId`. It is written to
+`.alice/sessions/<resumeId>.json` in the owning Workspace. The global resume
+registry stores identity, lifecycle, and native-session mapping only; it
+hydrates the binding from the Workspace file when Alice starts. The binding is
+then projected on every launch of that Session:
 interactive TUI, structured Web surface, headless Issue turn, and exact resume.
 It is not a headless-only override.
+
+The launcher-owned Workspace Manager has no business Workspace checkout. Its
+equivalent binding files live at
+`<launcherRoot>/state/workspace-manager-sessions/<resumeId>.json` so the active
+Workspace-floor root remains free of control-plane artifacts.
 
 Fresh Session runtime selection follows the same ownership rule. Ask Alice,
 the Workspace sidebar, and interactive CLI/API starts use `interactive`;
@@ -396,7 +404,8 @@ contain credentials.
 - `src/workspaces/adapters/index.ts` — built-in adapter registration.
 - `src/workspaces/adapters/` — declared runtime compatibility, native projection, and round-trip parsing.
 - `src/workspaces/adapters/owned-toml-config.ts` — reversible Codex project-scalar ownership.
-- `src/workspaces/resume-registry.ts` — durable product Session identity and immutable runtime binding.
+- `src/workspaces/resume-registry.ts` — durable product Session identity and runtime hydration.
+- `src/workspaces/session-runtime-store.ts` — immutable Workspace-local Session AI configuration.
 - `src/workspaces/schedule/scanner.ts` — Issue selection to fresh Session creation.
 - `src/workspaces/headless-task-registry.ts` — per-turn execution provenance.
 - `ui/src/components/credentials/` — credential/account setup.

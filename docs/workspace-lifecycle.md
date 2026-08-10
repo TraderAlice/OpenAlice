@@ -29,7 +29,7 @@ business desk merely because the user opened management chat.
 ├── departed-workspaces/            retained offboarded checkouts
 └── state/
     ├── workspace-catalog.json      complete lifecycle history
-    ├── resume-identities.json      active and retired Session signatures
+    ├── resume-identities.json      identity, lifecycle, and native mappings
     ├── headless-tasks.json         immutable execution history
     └── artifact-provenance.json    immutable attribution history
 ```
@@ -64,9 +64,10 @@ active -> retired
 `SessionRecord` is only an interactive seat. Removing or pausing one does not
 retire the coworker. `resumeId` is the coworker identity; retirement is stored
 on `ResumeIdentityRecord` and retains the native runtime mapping, run history,
-secret-free runtime binding, Inbox links, and provenance. Restore recalls the
-same binding; it does not re-resolve changed Workspace defaults as a new
-Session choice. A retired Session is not schedulable or resumable.
+Inbox links, and provenance. Its secret-free AI configuration lives with the
+desk at `.alice/sessions/<resumeId>.json`, so offboarding moves it into the
+departed checkout and restore recalls the same binding instead of re-resolving
+changed Workspace defaults. A retired Session is not schedulable or resumable.
 It may carry `successorResumeId` for explicit handoff. OpenAlice never silently
 pretends a successor authored the predecessor's work.
 
@@ -116,9 +117,10 @@ copied into the target.
 
 Purge is deliberately separate and irreversible. It is allowed only after
 offboarding. Purge removes the departed checkout, interactive Session records,
-and Shell scrollback. It retains the Catalog tombstone, retired resumeIds,
-headless run history, Inbox entries, and artifact provenance so historical
-signatures still resolve to “retired/purged,” never “unknown author.”
+Shell scrollback, and the Workspace-local Session AI configuration. It retains
+the Catalog tombstone, retired resumeIds, headless run history, Inbox entries,
+and artifact provenance so historical signatures still resolve to
+“retired/purged,” never “unknown author.”
 
 ## Legacy Migration
 

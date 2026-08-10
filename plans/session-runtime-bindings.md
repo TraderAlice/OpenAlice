@@ -23,6 +23,9 @@ Agent runtime to implement one Session contract.
 
 1. `resumeId` owns one immutable, secret-free Session runtime binding:
    Agent runtime, credential source/reference, model, and reasoning effort.
+   Its configuration belongs to the Workspace at
+   `.alice/sessions/<resumeId>.json`; the global resume registry remains an
+   identity/lifecycle/native-session translation table.
 2. Every Agent adapter must implement the Session runtime projection contract.
    Utility adapters such as Shell are outside it. Unsupported selections fail
    explicitly; omission is not interpreted as missing adapter behavior.
@@ -45,8 +48,8 @@ Agent runtime to implement one Session contract.
 ### 1. Contract and persistence
 
 - [x] Add the secret-free Session binding schema and resolved launch shape.
-- [x] Persist and validate the binding in `ResumeRegistry` with backward
-      compatibility and an idempotent state migration.
+- [x] Persist and validate the binding in the owning Workspace while hydrating
+      it through `ResumeRegistry` for runtime consumers.
 - [x] Make every built-in Agent adapter implement the projection interface.
 
 ### 2. Unified launch and resume
@@ -81,13 +84,16 @@ Agent runtime to implement one Session contract.
 ## Result
 
 Delivered one mandatory adapter contract across Claude Code, Codex, OpenCode,
-and Pi; persisted versioned bindings on `resumeId`; removed the headless-only
+and Pi; persisted versioned bindings on `resumeId` in the owning Workspace;
+kept the global registry identity-only; removed the headless-only
 override seam; and verified the same binding in browser/dev and an isolated
 packaged Electron scheduled-Pi run. Utility Shell Sessions remain explicitly
 outside the Agent runtime binding contract. A follow-up hardening pass made
 legacy binding absence mean native runtime ownership, fixed login-backed
 credential/model selection as one Session launch, and carried the same optional
-model/effort values through Workspace Manager.
+model/effort values through Workspace Manager. Before release, the initial
+global-registry binding shape and its migration were removed rather than kept
+as a permanent compatibility boundary.
 
 ## Completion Criteria
 
