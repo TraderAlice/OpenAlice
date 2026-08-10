@@ -180,6 +180,30 @@ describe('readWorkspaceIssues', () => {
     expect(result.invalid[0]?.error).toMatch(/agent.*credential.*model.*effort/)
   })
 
+  it('distinguishes explicit native login from inherited Workspace access', async () => {
+    await writeIssue('native-login', fm([
+      'title: Native login',
+      'when: { kind: every, every: 30m }',
+      'credentialSource: native',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues[0]?.credentialSource).toBe('native')
+  })
+
+  it('rejects simultaneous native and vault access declarations', async () => {
+    await writeIssue('mixed-access', fm([
+      'title: Mixed access',
+      'credentialSource: native',
+      'credential: openai-primary',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.invalid[0]?.error).toMatch(/mutually exclusive/)
+  })
+
   it('rejects retired execution declarations instead of silently keeping two owner models', async () => {
     await writeIssue('retired', fm([
       'title: Retired owner field',

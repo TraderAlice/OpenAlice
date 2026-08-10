@@ -6,6 +6,7 @@ import {
   issueEffortOptions,
   issueModelOptions,
   issueModelSemantics,
+  resolveIssueAiSelection,
 } from './issue-runtime-options'
 
 const deepSeek: SavedCredential = {
@@ -38,6 +39,37 @@ const presets: Preset[] = [{
 }]
 
 describe('Issue runtime options', () => {
+  const mode = {
+    agents: {},
+    recent: {
+      agent: 'pi',
+      agents: {
+        pi: {
+          accessMode: 'vault' as const,
+          credentialSlug: 'deepseek-1',
+          model: 'deepseek-v4-flash',
+          reasoningEffort: 'high' as const,
+        },
+      },
+    },
+  }
+
+  it('shows the same headless recent tuple that dispatch inherits', () => {
+    expect(resolveIssueAiSelection({ mode, agent: 'pi', issue: {} })).toEqual(expect.objectContaining({
+      accessMode: 'vault',
+      credentialSlug: 'deepseek-1',
+      model: 'deepseek-v4-flash',
+      reasoningEffort: 'high',
+      accessOrigin: 'workspace-recent',
+    }))
+  })
+
+  it('does not inherit a vault model when native login is selected explicitly', () => {
+    expect(resolveIssueAiSelection({ mode, agent: 'pi', issue: { credentialSource: 'native' } }))
+      .toEqual(expect.objectContaining({ accessMode: 'native', accessOrigin: 'issue' }))
+    expect(resolveIssueAiSelection({ mode, agent: 'pi', issue: { credentialSource: 'native' } }).model)
+      .toBeUndefined()
+  })
   it('narrows model suggestions to the selected credential provider', () => {
     expect(issueModelOptions({
       agent: 'pi',

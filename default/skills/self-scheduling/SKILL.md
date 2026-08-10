@@ -43,7 +43,7 @@ You have two equivalent paths, and both write the **same**
    with no separate path.
 2. **Editing the file directly** with your normal file tools. Reach for this when
    you are writing rich markdown **What** or scheduling frontmatter
-  (`when` / `assignee` / `agent` / `credential` / `model` / `effort`) — the CLI verbs cover the board fields, What, and
+  (`when` / `assignee` / `agent` / `credential` / `credentialSource` / `model` / `effort`) — the CLI verbs cover the board fields, What, and
    comments, but the document and schedule shape read most clearly as text. The
    file is always the single source of truth either way.
 
@@ -183,17 +183,19 @@ plain tracked item; add a `when` and it starts firing.
   Session assignee already has an immutable runtime, so Session-owned Issues
   cannot set this.
 - **`credential`** *(optional)* — secret-free OpenAlice vault slug for the
-  fresh Session. Omit it to inherit Workspace/native authentication. Never put
-  a key or endpoint in the Issue file.
+  fresh Session. Never put a key or endpoint in the Issue file.
+- **`credentialSource: native`** *(optional)* — explicitly use the Agent
+  runtime's own login. It cannot be combined with `credential`. Omit both to
+  inherit this Workspace's headless fixed/recent preference.
 - **`model`** *(optional)* — native model id for one scheduled run. Omit it to
   inherit the selected credential, Workspace, or native runtime default.
 - **`effort`** *(optional)* — one-run reasoning effort: `none`, `minimal`,
   `low`, `medium`, `high`, `xhigh`, or `max`. Use a level supported by the
   selected runtime; omit it to inherit.
 
-`agent`, `credential`, `model`, and `effort` are one Session-creation tuple.
+`agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 They are valid only for `@new-then-resume` / `@new-each-run`; an exact `@resumeId` Session owns
-all four. The scheduler freezes explicit values into the fresh Session runtime
+the complete tuple. The scheduler freezes explicit values into the fresh Session runtime
 binding and does not rewrite persistent Workspace configuration.
 
 > **Deprecated assignee aliases:** never write `@workspace` or `@new` in a new

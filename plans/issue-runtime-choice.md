@@ -1,6 +1,6 @@
 # Issue Runtime Choice
 
-Status: Completed
+Status: Completed (refinement delivered after Workspace runtime settings v3)
 
 Owner guides:
 
@@ -32,6 +32,71 @@ model with another provider's endpoint at dispatch.
 6. Issue files and public projections may contain the vault slug but never the
    credential secret, endpoint, or resolved secret-bearing runtime payload.
 
+## 2026-08 Refinement
+
+Workspace runtime settings v3 made the original Issue editor's inheritance
+model stale. Runtime inheritance reads `.alice/settings.json`, but the
+credential/model/effort labels still inspect deprecated native project files.
+An Issue with no explicit launch tuple can therefore advertise one provider
+while the scheduler creates its Session from a different headless preference.
+The flat rail also cannot distinguish “inherit the Workspace” from “explicitly
+use this Agent runtime's own login”.
+
+### Design alternatives
+
+1. **Runtime plus one AI configuration disclosure (selected with the
+   maintainer).** Keep runtime visible, summarize the resolved access/model/
+   effort in one row, and edit the dependency chain in a shared Dialog. This
+   keeps the Work Item scannable while making inheritance provenance explicit.
+2. **Progressive inline rows.** Keep Access, Model, and Effort in the rail and
+   reveal dependent rows after each choice. This is cheaper to implement but
+   leaves operational metadata visually dominant and makes narrow rails busy.
+3. **Raw four-field editor.** Repair only the source and labels. This preserves
+   the current UI but continues to expose implementation structure as four
+   unrelated defaults, so it is rejected.
+
+### Refinement decisions
+
+1. The Issue UI and dispatch path resolve defaults from the same headless
+   Workspace runtime settings: fixed preference, then matching recent
+   preference, then native Agent state. Deprecated compatibility-export files
+   never participate in the primary Issue editor.
+2. A fresh-Session Issue has three AI access intentions: inherit the Workspace,
+   explicitly use native Agent login, or explicitly use one vault credential.
+   Existing `credential: <slug>` remains the vault form; a new secret-free
+   native-source marker represents the explicit native choice. Omission remains
+   inheritance so existing Issue files keep their meaning.
+3. Runtime is a separate execution choice. Access, model, and effort form one
+   dependent AI choice edited in a Dialog through shared shadcn/Base UI
+   primitives. Switching runtime or access clears incompatible dependent
+   overrides atomically.
+4. The collapsed summary shows both the resolved tuple and its provenance:
+   Workspace headless preference, Agent login, or saved access. “Default” is
+   not used without naming the owner of that default.
+5. `@new-each-run` and an unclaimed `@new-then-resume` edit the next fresh
+   Session seed. An exact `@resumeId` owns an immutable Session binding and the
+   Issue surface shows that binding read-only instead of showing editable
+   creation defaults.
+6. Model suggestions remain provider-aware and custom ids remain available.
+   Effort remains independently selectable and comes from registered model
+   semantics or the Agent runtime's declared fallback range.
+
+### Refinement work
+
+- [x] Add explicit native-access semantics to Issue parsing, mutation, tools,
+      projections, audit records, and scheduled fresh-Session selection.
+- [x] Introduce one shared resolver for Issue inherited runtime/AI presentation
+      based on Workspace headless fixed/recent preferences.
+- [x] Replace the rail's Credential/Model/Effort selects with a source-aware AI
+      summary and responsive Dialog; preserve the separate runtime row.
+- [x] Project exact Session bindings into the read-only Issue state.
+- [x] Cover inherit/native/vault transitions, incompatible dependent-field
+      cleanup, scheduler selection, exact-Session immutability, i18n, and demo
+      behavior.
+- [x] Run source and UI typechecks, focused and full tests, the real Issue route,
+      and proportional Electron/package acceptance; then deliver serially to
+      `dev`.
+
 ## Work
 
 - [x] Extend Issue declaration, mutation, projection, tools, audit, and docs
@@ -52,8 +117,10 @@ model with another provider's endpoint at dispatch.
 - `npx tsc --noEmit`
 - `pnpm -C ui exec tsc -b`
 - Focused Issue, scheduler, route, tool, UI, and demo-handler Vitest suites
-- `pnpm test` (476 files and 3,950 tests passed; one file skipped)
-- Real dev and demo Issue routes, including credential-to-model/effort switching
+- `pnpm test` (497 files passed, 4,087 tests passed; one file skipped)
+- `pnpm test:e2e -- --reporter=dot` (4 files and 30 tests passed; one file skipped)
+- Real dev Issue routes for inherited and exact-Session ownership, including
+  credential-to-model/effort narrowing and responsive Dialog presentation
 - `CSC_IDENTITY_AUTO_DISCOVERY=false pnpm electron:smoke:workspace`
 
 ## Completion Criteria

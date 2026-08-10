@@ -449,8 +449,9 @@ export class ScheduleScanner {
 }
 
 function issueRunOverrides(issue: IssueRecord): SessionRuntimeSelection | undefined {
-  if (!issue.credential && !issue.model && !issue.effort) return undefined
+  if (!issue.credential && !issue.credentialSource && !issue.model && !issue.effort) return undefined
   return {
+    ...(issue.credentialSource === 'native' ? { credentialSource: 'native' as const } : {}),
     ...(issue.credential ? { credentialSlug: issue.credential } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { reasoningEffort: issue.effort } : {}),

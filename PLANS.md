@@ -31,6 +31,9 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/issue-runtime-choice.md]] — Aligns scheduled-Issue AI inheritance
+  with Workspace headless preferences and replaces the four-field rail with a
+  source-aware Runtime plus AI configuration flow.
 - [[plans/workspace-ai-preferences.md]] — Reframes durable Workspace AI
   preferences around interactive and headless launch modes, with both modes
   visible together and a one-time version 3 migration.
@@ -55,9 +58,6 @@ the durable truth after it changes.
   assignee tokens with behavior-named canonical values, explicit deprecated
   aliases, and an idempotent Workspace-file migration. Delivered in serial PR
   #990.
-- [[plans/issue-runtime-choice.md]] — Made scheduled Issue launch selection a
-  credential-first flow, narrowed model and effort choices to that provider,
-  and froze the result in the new Session runtime binding.
 - [[plans/session-runtime-bindings.md]] — Made credential source, model, and
   effort a durable product-Session binding projected by every Agent adapter
   across interactive, Web, and headless launch/resume.

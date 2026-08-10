@@ -189,6 +189,27 @@ describe('updateIssueFields', () => {
     expect(issue?.agent).toBeUndefined()
   })
 
+  it('switches atomically between vault access, native login, and inheritance', async () => {
+    await createIssue(dir, { id: 'access', title: 'Access', credential: 'openai-primary' })
+    const native = await updateIssueFields(dir, 'access', { credentialSource: 'native' })
+    expect(native.ok).toBe(true)
+    let { issue } = await readBack('access')
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBe('native')
+
+    const vault = await updateIssueFields(dir, 'access', { credential: 'deepseek-1' })
+    expect(vault.ok).toBe(true)
+    ;({ issue } = await readBack('access'))
+    expect(issue?.credential).toBe('deepseek-1')
+    expect(issue?.credentialSource).toBeUndefined()
+
+    const inherited = await updateIssueFields(dir, 'access', { credential: null, credentialSource: null })
+    expect(inherited.ok).toBe(true)
+    ;({ issue } = await readBack('access'))
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBeUndefined()
+  })
+
   it('changes scheduled ownership without disturbing the schedule', async () => {
     await createIssue(dir, {
       id: 'owned',
@@ -208,6 +229,7 @@ describe('updateIssueFields', () => {
     expect(issue?.assignee).toBe('@resume-kind-owl-abc123')
     expect(issue?.agent).toBeUndefined()
     expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBeUndefined()
     expect(issue?.model).toBeUndefined()
     expect(issue?.effort).toBeUndefined()
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
