@@ -653,7 +653,7 @@ export const zhHant: Resources = {
       fixedDefault: '固定預設值',
       fixedDefaultHelp: '在此再次修改前持續使用這組選擇。',
       nativeAccessHelp: 'Agent 自身登入狀態使用 Runtime 的全域驗證。已儲存的存取方式只記錄憑證參照，密鑰仍保存在 Alice 的憑證庫。',
-      apply: '套用到草稿',
+      apply: '儲存變更',
       saved: '工作區 AI 偏好已儲存。',
     },
     launch: {

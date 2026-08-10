@@ -646,7 +646,7 @@ export const ja: Resources = {
       fixedDefault: '固定デフォルト',
       fixedDefaultHelp: 'ここで変更するまでこの選択を保ちます。',
       nativeAccessHelp: 'Agent のログインは Runtime 自身のグローバル認証を使います。保存済みアクセスは認証情報への参照だけを保持し、秘密は Alice の保管庫に残ります。',
-      apply: '下書きに適用',
+      apply: '変更を保存',
       saved: 'ワークスペースの AI 設定を保存しました。',
     },
     launch: {

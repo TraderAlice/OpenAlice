@@ -657,7 +657,7 @@ export const en = {
       fixedDefault: 'Fixed default',
       fixedDefaultHelp: 'Keep this choice stable until it is changed here.',
       nativeAccessHelp: 'Agent login uses the runtime’s own global authentication. Saved access stores only a credential reference; secrets remain in Alice’s vault.',
-      apply: 'Apply to draft',
+      apply: 'Save changes',
       saved: 'Workspace AI preferences saved.',
     },
     launch: {
