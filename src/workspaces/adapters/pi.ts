@@ -492,12 +492,13 @@ export const piAdapter: CliAdapter = {
     // download missing runtime tools during startup. A user or launcher can
     // still opt into Pi's offline behavior by setting PI_OFFLINE in the base
     // process environment, which composeSpawnInputs preserves.
-    // In particular, never inject PI_CODING_AGENT_DIR: Pi's normal project
-    // settings layer selects the Workspace provider while its user agent dir
-    // continues to own packages, auth, settings, resources, and sessions.
+    // In particular, never inject PI_CODING_AGENT_DIR: Pi's user agent dir
+    // continues to own packages, auth, settings, resources, and sessions. The
+    // project provider layer below is deprecated compatibility state only.
     return {};
   },
 
+  /** @deprecated Native-project compatibility export; managed Sessions use sessionRuntime. */
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
     const shellPath = process.platform === 'win32'
       ? resolveBashPath(process.env, 'win32')
@@ -505,6 +506,7 @@ export const piAdapter: CliAdapter = {
     await writePiWorkspaceConfig(cwd, cred, { shellPath });
   },
 
+  /** @deprecated Compatibility inspection for legacy Session bindings only. */
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
     return readPiWorkspaceConfig(cwd);
   },

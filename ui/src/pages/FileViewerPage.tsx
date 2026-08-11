@@ -56,7 +56,10 @@ export function FileViewerPage({ spec }: Props) {
     if (source === 'tracked') {
       if (returnTrackedName) selectTracked(returnTrackedName)
       setSidebar('tracked')
-      openOrFocus({ kind: 'tracked', params: {} })
+      openOrFocus({
+        kind: 'tracked',
+        params: returnTrackedName ? { entity: returnTrackedName } : {},
+      })
       return
     }
     setSidebar(
@@ -104,7 +107,7 @@ export function FileViewerPage({ spec }: Props) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="max-w-[820px] mx-auto px-6 py-6">
+        <div className="mx-auto max-w-[48rem] px-5 py-8 sm:px-8 sm:py-10 lg:py-12">
           {result === null ? (
             <CenteredLoading />
           ) : (

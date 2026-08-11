@@ -96,3 +96,21 @@ describe('UrlAdopter file provenance', () => {
     expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
   })
 })
+
+describe('UrlAdopter Tracked selection', () => {
+  it('restores a Workspace Issue from query parameters', async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        '/tracked?workspace=workspace-1&issue=power-watch',
+      ]}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'tracked',
+      params: { workspace: 'workspace-1', issue: 'power-watch' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+  })
+})

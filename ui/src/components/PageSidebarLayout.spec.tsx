@@ -6,7 +6,12 @@ import { useMobilePageNavigation, MobilePageNavigationProvider } from '../contex
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import { PageSidebarLayout } from './PageSidebarLayout'
+import {
+  calculatePageSidebarConstraints,
+  calculatePageSidebarOverdrag,
+  PageSidebarLayout,
+  shouldCollapsePageSidebar,
+} from './PageSidebarLayout'
 
 class ResizeObserverStub {
   observe() {}
@@ -36,6 +41,56 @@ afterEach(() => {
 })
 
 describe('PageSidebarLayout', () => {
+  it('applies diminishing resistance and a deliberate overdrag commit boundary', () => {
+    expect(calculatePageSidebarOverdrag(-1)).toBe(0)
+    expect(calculatePageSidebarOverdrag(0)).toBe(0)
+    expect(calculatePageSidebarOverdrag(16)).toBeCloseTo(11.67, 1)
+    expect(calculatePageSidebarOverdrag(40)).toBeCloseTo(22.14, 1)
+    expect(calculatePageSidebarOverdrag(64)).toBeCloseTo(27.69, 1)
+    expect(calculatePageSidebarOverdrag(200)).toBeLessThanOrEqual(34)
+    expect(shouldCollapsePageSidebar(77.9)).toBe(false)
+    expect(shouldCollapsePageSidebar(78)).toBe(true)
+  })
+
+  it('keeps responsive panel minimums feasible while preserving the former content reserve', () => {
+    expect(calculatePageSidebarConstraints(0)).toEqual({
+      navigatorMaxWidth: 420,
+      contentMinWidth: 0,
+    })
+
+    expect(calculatePageSidebarConstraints(616)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 415,
+    })
+    expect(calculatePageSidebarConstraints(700)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 499,
+    })
+    expect(calculatePageSidebarConstraints(701)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 500,
+    })
+    expect(calculatePageSidebarConstraints(941)).toEqual({
+      navigatorMaxWidth: 319,
+      contentMinWidth: 500,
+    })
+    expect(calculatePageSidebarConstraints(1_200)).toEqual({
+      navigatorMaxWidth: 420,
+      contentMinWidth: 500,
+    })
+
+    for (let containerWidth = 201; containerWidth <= 1_600; containerWidth += 7) {
+      const { navigatorMaxWidth, contentMinWidth } = calculatePageSidebarConstraints(containerWidth)
+      const panelBudget = containerWidth - 1
+
+      expect(navigatorMaxWidth).toBeGreaterThanOrEqual(200)
+      expect(navigatorMaxWidth).toBeLessThanOrEqual(420)
+      expect(contentMinWidth).toBeGreaterThanOrEqual(0)
+      expect(contentMinWidth).toBeLessThanOrEqual(500)
+      expect(200 + contentMinWidth).toBeLessThanOrEqual(panelBudget)
+    }
+  })
+
   it('registers its phone navigator into the app context bar without rendering a second bar', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({
@@ -87,7 +142,8 @@ describe('PageSidebarLayout', () => {
     expect(document.activeElement).toBe(contextTrigger)
   })
 
-  it('persists the desktop focus mode and restores the full sidebar', () => {
+  it('persists the desktop focus mode and restores the full sidebar', async () => {
+    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
     const view = render(
       <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
         <div>Market content</div>
@@ -97,17 +153,23 @@ describe('PageSidebarLayout', () => {
     const desktopSidebar = screen.getByTestId('page-sidebar-desktop')
     const expandedSurface = screen.getByTestId('page-sidebar-expanded')
     const collapsedSurface = screen.getByTestId('page-sidebar-collapsed')
+    const separator = screen.getByRole('separator')
     expect(desktopSidebar.getAttribute('data-state')).toBe('expanded')
-    expect(desktopSidebar.getAttribute('style')).toContain('width: 270px')
-    expect(desktopSidebar.className).toContain('transition-[width]')
-    expect(desktopSidebar.className).toContain('motion-reduce:transition-none')
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(separator.getAttribute('data-slot')).toBe('resizable-handle')
+    expect(separator.getAttribute('aria-label')).toBe('Resize Market')
+    expect(separator.className).toContain('w-px')
+    expect(desktopSidebar.className).not.toContain('border-r')
+    expect(separator.tabIndex).toBe(0)
     expect(expandedSurface.hasAttribute('inert')).toBe(false)
     expect(collapsedSurface.hasAttribute('inert')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
+    await waitFor(() => {
+      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
+    })
+    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
     expect(desktopSidebar.getAttribute('data-state')).toBe('collapsed')
-    expect(desktopSidebar.getAttribute('style')).toContain('width: 44px')
     expect(expandedSurface.hasAttribute('inert')).toBe(true)
     expect(collapsedSurface.hasAttribute('inert')).toBe(false)
     expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()
@@ -121,7 +183,9 @@ describe('PageSidebarLayout', () => {
     expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Market' }))
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
+    await waitFor(() => {
+      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
+    })
     expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
     expect(screen.getByTestId('page-sidebar-expanded').hasAttribute('inert')).toBe(false)
     expect(screen.getByText('Market navigation')).toBeTruthy()

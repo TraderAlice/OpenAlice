@@ -34,6 +34,10 @@ import { tmpdir } from 'node:os'
 import { resolve, dirname, join } from 'node:path'
 import { appendFileSync } from 'node:fs'
 import { resolveLaunchCommand } from '../../src/workspaces/win-command.js'
+import {
+  readRuntimeStatus,
+  requestRuntimeControl,
+} from '../../packages/cli/src/server-control.mjs'
 
 const IS_WIN = process.platform === 'win32'
 const BOOT_TIMEOUT_MS = 120_000
@@ -201,11 +205,65 @@ async function main(): Promise<void> {
   // Alice tsx spawn worked → web plugin bound its port.
   await waitFor('Alice listening (alice child spawned)', () => portBound(webPort))
 
-  // Vite pnpm spawn worked → it announces a Local URL.
-  await waitFor('Vite dev server up (vite child spawned)', () => /\[vite\][^\n]*localhost:\d+/i.test(out))
+  // Vite pnpm spawn worked → it announces the stable IPv4 loopback URL that
+  // Guardian exposes to other local surfaces through Runtime discovery.
+  await waitFor('Vite dev server up (vite child spawned)', () => /\[vite\][^\n]*127\.0\.0\.1:\d+/i.test(out))
+  const uiPort = Number(/\[vite\][^\n]*127\.0\.0\.1:(\d+)/i.exec(out)?.[1])
+  if (!uiPort) fail(`could not parse Vite port from output:\n${out.slice(-600)}`)
+
+  // A second process may inspect and open this dev-owned Runtime, but may not
+  // stop or replace it. This is the discovery contract that prevents CLI and
+  // dev surfaces from treating a healthy shared home as an opaque dead end.
+  const discovered = await readRuntimeStatus({ homeRoot: dataHome, timeoutMs: 5_000 })
+  if (discovered.class !== 'owned_elsewhere') {
+    fail(`dev owner classified as ${discovered.class} instead of owned_elsewhere`)
+  }
+  if (discovered.state !== 'running' || discovered.components.alice !== 'ready') {
+    fail(`dev discovery did not report running Alice: ${JSON.stringify(discovered)}`)
+  }
+  if (discovered.owner?.surface !== 'dev' || !discovered.owner.pid) {
+    fail(`dev discovery did not identify its owner: ${JSON.stringify(discovered.owner)}`)
+  }
+  if (discovered.endpoints.web !== `http://127.0.0.1:${uiPort}`) {
+    fail(`dev discovery advertised ${String(discovered.endpoints.web)} instead of Vite ${uiPort}`)
+  }
+  const discoveredWeb = await fetch(`${discovered.endpoints.web}/api/auth/status`)
+  if (!discoveredWeb.ok) {
+    fail(`dev discovery Web endpoint returned HTTP ${discoveredWeb.status}`)
+  }
+  if (!discovered.control.capabilities.includes('runtime.status')) {
+    fail('dev discovery did not advertise runtime.status')
+  }
+  if (discovered.control.capabilities.includes('runtime.stop') || discovered.capabilities.includes('runtime.stop')) {
+    fail('dev discovery incorrectly advertised runtime.stop')
+  }
+  try {
+    await requestRuntimeControl(dataHome, 'runtime.stop')
+    fail('dev Guardian accepted runtime.stop')
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== 'stop_not_supported') throw error
+  }
+  console.log(`✓ CLI discovered dev owner pid=${discovered.owner.pid} at ${discovered.endpoints.web} (read-only)`)
+
+  const duplicate = spawnSync(devCommand, devArgs, {
+    cwd: root,
+    env: childEnv,
+    encoding: 'utf8',
+    timeout: 20_000,
+    shell: IS_WIN && resolvedDev.viaShell,
+  })
+  const duplicateOutput = stripAnsi(`${duplicate.stdout ?? ''}${duplicate.stderr ?? ''}`)
+  if (duplicate.status !== 2 || !/already running|owner\s+→/i.test(duplicateOutput)) {
+    fail(`duplicate dev did not refuse the owned home cleanly (status=${String(duplicate.status)}):\n${duplicateOutput.slice(-600)}`)
+  }
+  const rediscovered = await readRuntimeStatus({ homeRoot: dataHome, timeoutMs: 5_000 })
+  if (rediscovered.owner?.pid !== discovered.owner.pid || rediscovered.state !== 'running') {
+    fail(`duplicate dev disturbed the original owner: ${JSON.stringify(rediscovered)}`)
+  }
+  console.log('✓ duplicate dev refused the writer lock without disturbing discovery')
 
   console.log('\n✅ HARD checks passed — all three children spawned and bound.')
-  summary(`✅ **Guardian boot smoke passed (${process.platform})** — UTA/Alice/Vite all spawned.`)
+  summary(`✅ **Guardian boot smoke passed (${process.platform})** — UTA/Alice/Vite spawned; dev discovery stayed read-only through a duplicate start.`)
 
   // ── SOFT: UTA restart (never fails the run) ───────────────
   // Triggers the same flag Alice touches after a broker-config change. On

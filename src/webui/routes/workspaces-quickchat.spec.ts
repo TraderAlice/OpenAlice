@@ -1,7 +1,7 @@
 /**
- * POST /quick-chat — native runtime authentication plus explicit Workspace
- * overrides. Every agent CLI owns its normal login/provider state; a selected
- * OpenAlice credential is the only path that writes a Workspace configuration.
+ * POST /quick-chat — native runtime authentication plus explicit or remembered
+ * Workspace launch bindings. Managed launches never rewrite native CLI project
+ * configuration.
  *
  * core/config is partial-mocked so we can drive the vault per-test without
  * touching the real ai-provider-manager.json.
@@ -26,6 +26,11 @@ import {
 } from '../../workspaces/chat-workspace-resolver.js';
 import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
 import { writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
+import {
+  emptyWorkspaceRuntimeSettings,
+  readWorkspaceRuntimeSettings,
+  writeWorkspaceRuntimeSettings,
+} from '../../workspaces/workspace-runtime-settings.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -279,9 +284,8 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     expect(result.body.credentials).toEqual([
       expect.objectContaining({
         slug: 'google-1',
-        resolvedModel: 'gemini-3.1-flash-lite',
+        resolvedModel: 'gemini-3.6-flash',
         resolvedReasoning: true,
-        resolvedReasoningEffort: 'minimal',
         resolvedReasoningMode: 'adaptive',
       }),
     ]);
@@ -490,7 +494,6 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', {
       ...config,
       reasoning: true,
-      reasoningEffort: 'medium',
     });
   });
 });
@@ -527,8 +530,97 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
 
     expect(r.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('uses and updates the target Workspace Ask Alice recent binding', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-settings-'));
+    try {
+      const settings = emptyWorkspaceRuntimeSettings();
+      settings.runtime.interactive.recent.agent = 'opencode';
+      settings.runtime.interactive.recent.agents.opencode = {
+        accessMode: 'vault',
+        credentialSlug: 'openai-2',
+        wireShape: 'openai-chat',
+        model: 'remembered-model',
+        reasoningEffort: 'medium',
+      };
+      await writeWorkspaceRuntimeSettings(dir, settings);
+      vi.mocked(readCredentials).mockResolvedValue({
+        'openai-2': { ...openaiKey, apiKey: 'sk-second' },
+      });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const launch = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(launch.status, JSON.stringify(launch.body)).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1]).toMatchObject({
+        agentId: 'opencode',
+        sessionRuntime: {
+          binding: {
+            credential: { source: 'vault', credentialSlug: 'openai-2' },
+            model: 'remembered-model',
+            reasoningEffort: 'medium',
+          },
+          ai: { apiKey: 'sk-second' },
+        },
+      });
+
+      const updated = await readWorkspaceRuntimeSettings(dir);
+      expect(updated).toMatchObject({
+        ok: true,
+        settings: {
+          runtime: {
+            interactive: {
+              recent: {
+                agent: 'opencode',
+                agents: {
+                  opencode: {
+                    accessMode: 'vault',
+                    credentialSlug: 'openai-2',
+                    model: 'remembered-model',
+                    reasoningEffort: 'medium',
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('explicit native access bypasses an existing Workspace provider', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, opencode, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'workspace-key',
+        model: 'workspace-model',
+        wireShape: 'openai-chat',
+      },
+    });
+
+    const result = await quickChat(app, {
+      prompt: 'use my opencode account',
+      agent: 'opencode',
+      credentialSource: 'native',
+      model: 'native-model',
+    });
+
+    expect(result.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toEqual({
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'native-model',
+      },
+      ai: { model: 'native-model', reasoningEffort: null },
+    });
   });
 
   it('honors an explicit credentialSlug pick', async () => {
@@ -537,7 +629,8 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
       'openai-2': { ...openaiKey, apiKey: 'sk-second', lastModel: 'gpt-5.5-mini' },
     });
     const { app, opencode, spawn } = build();
-    await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
+    const launch = await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
+    expect(launch.status, JSON.stringify(launch.body)).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     const runtime = (spawn.mock.calls[0] as any[])[1].sessionRuntime;
     expect(runtime.binding).toMatchObject({
@@ -592,7 +685,7 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
       credentialSlug: 'openai-2',
     });
 
-    expect(r.status).toBe(201);
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toMatchObject({
       binding: {

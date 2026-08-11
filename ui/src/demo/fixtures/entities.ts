@@ -1,4 +1,9 @@
-import type { EntityListItem, EntityDetail } from '../../api/entities'
+import type {
+  EntityListItem,
+  EntityDetail,
+  EntityGraph,
+  EntityGraphArtifactNode,
+} from '../../api/entities'
 import { DEMO_CHAT_WORKSPACE_ID, demoChatWorkspace } from './workspaces'
 
 /**
@@ -84,3 +89,40 @@ export const demoEntityDetail: Record<string, EntityDetail> = {
     ],
   },
 }
+
+/** The demo graph is projected from the same details used by the list/detail
+ * handlers, so the marketing surface exercises shared-note clustering rather
+ * than a hand-authored decorative layout. */
+export const demoEntityGraph: EntityGraph = (() => {
+  const nodes: EntityGraph['nodes'] = demoEntities.map((entity) => ({
+    id: `entity:${encodeURIComponent(entity.name.toLowerCase())}`,
+    kind: 'entity',
+    label: entity.name,
+    entityType: entity.type,
+    description: entity.description,
+    createdAt: entity.createdAt,
+  }))
+  const artifacts = new Map<string, EntityGraphArtifactNode>()
+  const edges: EntityGraph['edges'] = []
+  for (const entity of demoEntities) {
+    const entityId = `entity:${encodeURIComponent(entity.name.toLowerCase())}`
+    for (const backlink of demoEntityDetail[entity.name]?.backlinks ?? []) {
+      const artifactId = `artifact:${encodeURIComponent(backlink.workspaceId)}:${encodeURIComponent(backlink.path)}`
+      if (!artifacts.has(artifactId)) {
+        const issue = backlink.path.startsWith('.alice/issues/') && backlink.path.endsWith('.md')
+        const basename = backlink.path.split('/').at(-1) ?? backlink.path
+        artifacts.set(artifactId, {
+          id: artifactId,
+          kind: 'artifact',
+          label: issue
+            ? backlink.path.slice('.alice/issues/'.length, -'.md'.length)
+            : basename.replace(/\.md$/, ''),
+          artifactType: issue ? 'issue' : 'note',
+          ...backlink,
+        })
+      }
+      edges.push({ id: `${artifactId}->${entityId}`, source: artifactId, target: entityId })
+    }
+  }
+  return { nodes: [...nodes, ...artifacts.values()], edges }
+})()

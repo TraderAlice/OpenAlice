@@ -34,6 +34,27 @@ export const demoWorkspace: Workspace = {
   currentVersion: '0.1.0',
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
   sessions: [demoSession],
+  runtimeSettings: {
+    version: 3,
+    runtime: {
+      interactive: {
+        agents: {},
+        recent: {
+          agent: 'pi',
+          agents: {
+          pi: {
+            accessMode: 'vault',
+            credentialSlug: 'openai-1',
+            wireShape: 'openai-chat',
+            model: 'gpt-5.6-sol',
+            reasoningEffort: 'high',
+          },
+          },
+        },
+      },
+      headless: { agents: {}, recent: { agent: 'pi', agents: { pi: { accessMode: 'native' } } } },
+    },
+  },
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
 

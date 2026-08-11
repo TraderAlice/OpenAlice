@@ -18,10 +18,8 @@ import {
 interface Props {
   readonly wsId: string
   readonly agents: readonly string[]
-  readonly workspaceDefaultAgent?: string | null
-  readonly installationDefaultAgent: string | null
   readonly initialAgent?: string
-  readonly onSaveDefaultAgent: (agent: string | null) => Promise<void>
+  readonly onOpenCompatibilityConfig?: () => void
 }
 
 const RUNTIME_LABELS: Readonly<Record<string, string>> = {
@@ -70,37 +68,18 @@ function CommandTokens({ command }: { readonly command: readonly string[] }) {
 export function WorkspaceLaunchConfigurationPanel({
   wsId,
   agents,
-  workspaceDefaultAgent,
-  installationDefaultAgent,
   initialAgent,
-  onSaveDefaultAgent,
+  onOpenCompatibilityConfig,
 }: Props) {
   const { t } = useTranslation()
-  const agentIds = useMemo(() => [...new Set(agents.filter((id) => id !== 'shell'))], [agents])
   const runtimeIds = useMemo(() => [...new Set([...agents, 'shell'])], [agents])
-  const inheritedDefault = installationDefaultAgent && agentIds.includes(installationDefaultAgent)
-    ? installationDefaultAgent
-    : agentIds[0] ?? ''
-  const storedDefault = workspaceDefaultAgent && agentIds.includes(workspaceDefaultAgent)
-    ? workspaceDefaultAgent
-    : ''
-  const preferred = storedDefault || inheritedDefault || (
-    initialAgent && runtimeIds.includes(initialAgent) ? initialAgent : runtimeIds[0] ?? ''
-  )
+  const preferred = initialAgent && runtimeIds.includes(initialAgent) ? initialAgent : runtimeIds[0] ?? ''
   const [selectedAgent, setSelectedAgent] = useState(preferred)
-  const [defaultAgentDraft, setDefaultAgentDraft] = useState(storedDefault)
-  const [defaultSaving, setDefaultSaving] = useState(false)
-  const [defaultSaved, setDefaultSaved] = useState(false)
-  const [defaultError, setDefaultError] = useState<string | null>(null)
   const [plan, setPlan] = useState<WorkspaceLaunchPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    setDefaultAgentDraft(storedDefault)
-  }, [storedDefault, wsId])
 
   useEffect(() => {
     if (runtimeIds.includes(selectedAgent)) return
@@ -140,20 +119,6 @@ export function WorkspaceLaunchConfigurationPanel({
     setCopied(true)
   }
 
-  const saveDefaultAgent = async () => {
-    setDefaultSaving(true)
-    setDefaultError(null)
-    try {
-      await onSaveDefaultAgent(defaultAgentDraft || null)
-      setDefaultSaved(true)
-      window.setTimeout(() => setDefaultSaved(false), 1800)
-    } catch (cause) {
-      setDefaultError((cause as Error).message)
-    } finally {
-      setDefaultSaving(false)
-    }
-  }
-
   const resolvedDiffers = plan
     ? !sameCommand(plan.launch.composedCommand, plan.launch.resolvedCommand)
     : false
@@ -175,48 +140,6 @@ export function WorkspaceLaunchConfigurationPanel({
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               {t('workspaceSettings.launch.description')}
             </p>
-            <div className="mt-3 rounded-lg border border-border bg-secondary/30 p-3">
-              <label className="block text-xs font-medium text-foreground" htmlFor="workspace-default-agent">
-                {t('workspaceSettings.launch.defaultRuntime')}
-              </label>
-              <select
-                id="workspace-default-agent"
-                value={defaultAgentDraft}
-                onChange={(event) => {
-                  const next = event.target.value
-                  setDefaultAgentDraft(next)
-                  setDefaultSaved(false)
-                  if (next) setSelectedAgent(next)
-                }}
-                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground focus:border-primary focus:outline-none"
-              >
-                <option value="">
-                  {t('workspaceSettings.launch.inheritRuntime', {
-                    runtime: inheritedDefault ? (RUNTIME_LABELS[inheritedDefault] ?? inheritedDefault) : t('workspaceSettings.launch.automaticRuntime'),
-                  })}
-                </option>
-                {agentIds.map((id) => (
-                  <option key={id} value={id}>{RUNTIME_LABELS[id] ?? id}</option>
-                ))}
-              </select>
-              <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground">
-                {t('workspaceSettings.launch.defaultRuntimeHelp')}
-              </p>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="min-h-5 text-[11px]">
-                  {defaultSaved && <span className="text-success">{t('workspaceSettings.launch.defaultSaved')}</span>}
-                  {defaultError && <span className="text-destructive">{defaultError}</span>}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void saveDefaultAgent()}
-                  disabled={defaultSaving || defaultAgentDraft === storedDefault}
-                  className="rounded-md bg-primary px-4 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {defaultSaving ? t('common.saving') : t('common.save')}
-                </button>
-              </div>
-            </div>
           </section>
 
           <section className="border-t border-border pt-4">
@@ -392,6 +315,31 @@ export function WorkspaceLaunchConfigurationPanel({
                 </section>
               )}
             </>
+          )}
+
+          {onOpenCompatibilityConfig && (
+            <section className="border-t border-border pt-4">
+              <div className="rounded-lg border border-warning/25 bg-warning/5 p-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[12px] font-semibold text-foreground">
+                      {t('workspaceSettings.launch.compatibilityTitle')}
+                    </h3>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      {t('workspaceSettings.launch.compatibilityDescription')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onOpenCompatibilityConfig}
+                      className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted"
+                    >
+                      {t('workspaceSettings.launch.openCompatibility')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
           )}
         </div>
       </div>

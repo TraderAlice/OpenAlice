@@ -85,7 +85,7 @@ describe('OnboardingDesignPage', () => {
     expect(await screen.findByRole('heading', { name: '让 Alice 一层一层准备就绪。' })).toBeTruthy()
     expect(screen.getAllByText('Pro · 自动')).toHaveLength(2)
     expect(screen.getByText('4/4 个运行时')).toBeTruthy()
-    expect(screen.getByText('凭证库中有 2 个凭证可注入工作区。')).toBeTruthy()
+    expect(screen.getByText('凭证库中有 2 个凭证可供 Workspace Session 使用。')).toBeTruthy()
     expect(screen.getByText('共 3 个，已启用 3 个，只读 1 个，数据供应账户 3 个。')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '能力图' })).toBeTruthy()
     expect(screen.queryByText('Setup checklist')).toBeNull()

@@ -31,7 +31,7 @@ export function FileContentView({
 function DocBody({ path, content }: { path: string; content: string }): ReactElement {
   const lower = path.toLowerCase()
   if (lower.endsWith('.md') || lower.endsWith('.markdown')) {
-    return <MarkdownContent text={content} />
+    return <MarkdownContent text={content} variant="reading" />
   }
   if (lower.endsWith('.html')) {
     return <HtmlReportView path={path} content={content} />

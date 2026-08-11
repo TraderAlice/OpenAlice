@@ -53,6 +53,8 @@ export interface IssueFieldPatch {
   agent?: string | null
   /** Secret-free vault slug for a fresh scheduled Session; null inherits. */
   credential?: string | null
+  /** Explicit native Agent login; null inherits the Workspace preference. */
+  credentialSource?: 'native' | null
   /** Native model id for one scheduled fire; null inherits Workspace/runtime. */
   model?: string | null
   /** Reasoning effort for one scheduled fire; null inherits Workspace/runtime. */
@@ -73,6 +75,7 @@ export interface CreateIssueInput {
   what?: string
   agent?: string
   credential?: string
+  credentialSource?: 'native'
   model?: string
   effort?: ModelReasoningEffort
   /** @deprecated Compatibility alias for callers written before What became the
@@ -148,8 +151,8 @@ export async function updateIssueFields(
   const data = parseFrontmatterObject(split.frontmatter)
   if (!data) return { ok: false, reason: 'invalid', error: 'frontmatter is not a mapping' }
 
-  // Reading legacy aliases is intentionally compatible, but every write is an
-  // upgrade boundary. Never reserialize a deprecated token after migration 0033.
+  // Reading deprecated aliases is intentionally compatible, but every write is
+  // a normalization boundary. Never reserialize a deprecated token.
   if (typeof data.assignee === 'string' && deprecatedIssueAssigneeReplacement(data.assignee)) {
     data.assignee = current.issue.assignee
   }
@@ -184,6 +187,7 @@ export async function updateIssueFields(
     if (issueAssigneeResumeId(assignee.data)) {
       delete data.agent
       delete data.credential
+      delete data.credentialSource
       delete data.model
       delete data.effort
     }
@@ -204,6 +208,17 @@ export async function updateIssueFields(
       const credential = patch.credential.trim()
       if (!credential) return { ok: false, reason: 'invalid', error: 'credential must be a non-empty vault slug or null' }
       data.credential = credential
+      delete data.credentialSource
+    }
+  }
+  if (patch.credentialSource !== undefined) {
+    if (patch.credentialSource === null) {
+      delete data.credentialSource
+    } else if (patch.credentialSource !== 'native') {
+      return { ok: false, reason: 'invalid', error: 'credentialSource must be native or null' }
+    } else {
+      data.credentialSource = 'native'
+      delete data.credential
     }
   }
   if (patch.model !== undefined) {
@@ -286,6 +301,7 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
   if (input.when !== undefined) data.when = input.when
   if (input.agent !== undefined) data.agent = input.agent
   if (input.credential !== undefined) data.credential = input.credential
+  if (input.credentialSource !== undefined) data.credentialSource = input.credentialSource
   if (input.model !== undefined) data.model = input.model
   if (input.effort !== undefined) data.effort = input.effort
 

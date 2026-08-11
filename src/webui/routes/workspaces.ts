@@ -7,8 +7,10 @@
  */
 
 import { Hono } from 'hono';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
+import { z } from 'zod';
 
 import { probeByWireShape } from '../../workspaces/agent-probe.js';
 import type { WireShape } from '../../ai-providers/preset-catalog.js';
@@ -20,6 +22,7 @@ const DEFAULT_WIRE_BY_AGENT: Record<string, WireShape> = {
   opencode: 'openai-chat',
   pi: 'openai-chat',
 };
+
 import { listDir, PathTraversal, readWorkspaceFile } from '../../workspaces/file-service.js';
 import { gitLog, gitStatus } from '../../workspaces/git-service.js';
 import { logger as launcherLogger } from '../../workspaces/logger.js';
@@ -29,6 +32,7 @@ import {
   sessionPreferredTitle,
   type SessionRecord,
 } from '../../workspaces/session-registry.js';
+import { projectPublicSession, type PublicSession } from '../../workspaces/public-session.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import {
@@ -61,8 +65,16 @@ import {
   SessionRuntimeBindingError,
 } from '../../workspaces/session-runtime-binding.js';
 import {
+  readWorkspaceRuntimeSettings,
+  rememberWorkspaceRuntimeBinding,
+  replaceWorkspaceRuntimeDefaults,
+  resolveWorkspaceRuntimeAgent,
+  resolveWorkspaceRuntimeSelection,
+  workspaceRuntimePreferenceSchema,
+} from '../../workspaces/workspace-runtime-settings.js';
+
+import {
   AgentCredentialError,
-  ensureAgentCredentialReady,
   getAgentCredentialReadiness,
 } from '../../workspaces/agent-credential-readiness.js';
 import { validateTerminalViewAttributes } from '../../workspaces/terminal-view-attributes.js';
@@ -81,10 +93,46 @@ import {
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import {
+  MANAGER_WORKSPACE_ID,
   MANAGER_SYSTEM_PROMPT,
   managerTerminalPrompt,
   managerSkillPath,
 } from '../../workspaces/manager-workspace.js';
+
+const workspaceRuntimeModeDefaultsRequestSchema = z.object({
+  defaultAgent: z.string().trim().min(1).max(64).nullable(),
+  agents: z.record(
+    z.string().trim().min(1).max(64),
+    workspaceRuntimePreferenceSchema,
+  ),
+}).strict();
+
+const workspaceRuntimeDefaultsRequestSchema = z.object({
+  interactive: workspaceRuntimeModeDefaultsRequestSchema,
+  headless: workspaceRuntimeModeDefaultsRequestSchema,
+}).strict();
+
+const pausedSessionRuntimeRequestSchema = z.object({
+  credentialSource: z.enum(['native', 'vault']),
+  credentialSlug: z.string().trim().min(1).max(128).nullable().optional(),
+  model: z.string().trim().min(1).max(256).nullable().optional(),
+  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']).nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.credentialSource === 'vault' && !value.credentialSlug) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['credentialSlug'],
+      message: 'credentialSlug is required for a vault credential',
+    });
+  }
+  if (value.credentialSource === 'native' && value.credentialSlug) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['credentialSlug'],
+      message: 'credentialSlug cannot be combined with native runtime authentication',
+    });
+  }
+});
 
 // The spawn body's `resume` value is an AGENT-side session id, whose shape is
 // adapter-native: uuid for claude/codex/pi, `ses_<base62>` for opencode. This
@@ -177,24 +225,8 @@ interface SpawnedSessionBody {
   readonly title: string | null;
 }
 
-interface PublicSessionBody {
-  readonly id: string;
-  readonly wsId: string;
-  readonly agent: string;
-  readonly name: string;
-  readonly createdAt: string;
-  readonly lastActiveAt: string;
-  readonly state: 'running' | 'paused';
-  readonly surface: 'terminal' | 'webpi';
-  readonly resumeId: string;
-  readonly pid: number | null;
-  readonly startedAt: number | null;
-  readonly title: string | null;
-  readonly sourceRunId: string | null;
-}
-
 type OpenHeadlessSessionResult =
-  | { readonly ok: true; readonly created: boolean; readonly session: PublicSessionBody }
+  | { readonly ok: true; readonly created: boolean; readonly session: PublicSession }
   | { readonly ok: false; readonly status: 400 | 404 | 409 | 500; readonly body: { error: string; message?: string } };
 
 type SpawnSessionResult =
@@ -262,6 +294,7 @@ export function createWorkspaceRoutes(
       readonly initialPrompt?: string;
       readonly title?: string;
       readonly sourceRunId?: string;
+      readonly credentialSource?: 'native';
       readonly credentialSlug?: string;
       readonly model?: string;
       readonly reasoningEffort?: ModelReasoningEffort;
@@ -299,7 +332,28 @@ export function createWorkspaceRoutes(
       return { ok: false, status: 409, body: { error: 'resume_busy', message: 'this conversation already has a running turn' } };
     }
     if (requestedIdentity?.agentSessionId) resume = { sessionId: requestedIdentity.agentSessionId };
-    const agentId = opts.agentId ?? requestedIdentity?.agent ?? await resolveDefaultAgentId(meta);
+    const freshProductSession = !requestedIdentity && meta.id !== MANAGER_WORKSPACE_ID;
+    const runtimeSettings = freshProductSession
+      ? await readWorkspaceRuntimeSettings(meta.dir)
+      : null;
+    if (runtimeSettings && !runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
+      return {
+        ok: false,
+        status: 400,
+        body: { error: 'workspace_runtime_settings_invalid', message: runtimeSettings.error },
+      };
+    }
+    const preferredAskAliceAgent = runtimeSettings?.ok
+      ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'interactive')
+      : undefined;
+    const preferredAskAliceAdapter = preferredAskAliceAgent
+      ? svc.adapters.get(preferredAskAliceAgent)
+      : undefined;
+    const validPreferredAskAliceAgent = preferredAskAliceAgent && preferredAskAliceAdapter &&
+      isAgentRuntime(preferredAskAliceAdapter)
+      ? preferredAskAliceAgent
+      : undefined;
+    const agentId = opts.agentId ?? requestedIdentity?.agent ?? validPreferredAskAliceAgent ?? await resolveDefaultAgentId(meta);
     if (!agentId) {
       return { ok: false, status: 400, body: { error: 'no_agent_runtime', message: 'no agent runtime is registered' } };
     }
@@ -310,7 +364,7 @@ export function createWorkspaceRoutes(
     if (requestedIdentity && requestedIdentity.agent !== adapter.id) {
       return { ok: false, status: 400, body: { error: 'resume_wrong_agent' } };
     }
-    if (requestedIdentity && (opts.credentialSlug || opts.model || opts.reasoningEffort)) {
+    if (requestedIdentity && (opts.credentialSource || opts.credentialSlug || opts.model || opts.reasoningEffort)) {
       return {
         ok: false,
         status: 400,
@@ -323,6 +377,20 @@ export function createWorkspaceRoutes(
     let sessionRuntime: ResolvedSessionRuntimeBinding | undefined;
     if (isAgentRuntime(adapter)) {
       try {
+        const explicitSelection = {
+          ...(opts.credentialSource ? { credentialSource: opts.credentialSource } : {}),
+          ...(opts.credentialSlug ? { credentialSlug: opts.credentialSlug } : {}),
+          ...(opts.model ? { model: opts.model } : {}),
+          ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
+        };
+        const selection = (freshProductSession
+          ? resolveWorkspaceRuntimeSelection(
+              runtimeSettings?.ok ? runtimeSettings.settings : null,
+              'interactive',
+              adapter.id,
+              explicitSelection,
+            )
+          : explicitSelection) ?? {};
         sessionRuntime = requestedIdentity
           ? requestedIdentity.runtimeBinding
             ? await resolveSessionRuntimeBinding({
@@ -334,11 +402,11 @@ export function createWorkspaceRoutes(
           : await createSessionRuntimeBinding({
               adapter,
               cwd: meta.dir,
-              selection: {
-                ...(opts.credentialSlug ? { credentialSlug: opts.credentialSlug } : {}),
-                ...(opts.model ? { model: opts.model } : {}),
-                ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
-              },
+              selection,
+              // Read once at the route boundary so credential resolution and
+              // the launch request share one vault snapshot. Native runtime
+              // auth deliberately avoids touching the vault.
+              ...(selection.credentialSlug ? { credentials: await readCredentials() } : {}),
             });
       } catch (err) {
         if (err instanceof SessionRuntimeBindingError) {
@@ -347,7 +415,7 @@ export function createWorkspaceRoutes(
         launcherLogger.warn('session_runtime.resolve_failed', { id, agent: adapter.id, err });
         return { ok: false, status: 500, body: { error: 'session_runtime_failed', message: (err as Error).message } };
       }
-    } else if (opts.credentialSlug || opts.model || opts.reasoningEffort) {
+    } else if (opts.credentialSource || opts.credentialSlug || opts.model || opts.reasoningEffort) {
       return { ok: false, status: 400, body: { error: 'runtime_selection_unsupported' } };
     }
     try {
@@ -426,6 +494,19 @@ export function createWorkspaceRoutes(
         ...(sessionRuntime ? { sessionRuntime } : {}),
       };
       const session = svc.pool.spawn(id, ctx);
+      if (freshProductSession && sessionRuntime && existsSync(meta.dir)) {
+        await rememberWorkspaceRuntimeBinding({
+          wsDir: meta.dir,
+          mode: 'interactive',
+          agent: adapter.id,
+          runtime: sessionRuntime,
+        }).catch((err) => launcherLogger.warn('workspace.runtime_preference_write_failed', {
+          wsId: id,
+          mode: 'interactive',
+          agent: adapter.id,
+          err,
+        }));
+      }
       launcherLogger.info('workspace.session_spawned', {
         id,
         sessionId: session.recordId,
@@ -460,24 +541,15 @@ export function createWorkspaceRoutes(
     }
   }
 
-  const publicSession = (record: SessionRecord): PublicSessionBody => {
+  const publicSession = (record: SessionRecord): PublicSession => {
     const terminal = svc.pool.get(record.id);
     const browser = svc.webPi?.get(record.id) ?? null;
-    return {
-      id: record.id,
-      wsId: record.wsId,
-      agent: record.agent,
-      name: record.name,
-      createdAt: record.createdAt,
-      lastActiveAt: record.lastActiveAt,
-      state: record.state === 'running' && (terminal || browser) ? 'running' : 'paused',
-      surface: browser ? 'webpi' : (record.surface ?? 'terminal'),
-      resumeId: record.resumeId,
-      pid: terminal?.pid ?? browser?.pid ?? null,
-      startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-      title: sessionPreferredTitle(record) ?? null,
-      sourceRunId: record.sourceRunId ?? null,
-    };
+    const binding = svc.resumeRegistry.get(record.resumeId)?.runtimeBinding;
+    return projectPublicSession(record, {
+      terminal,
+      webPi: browser,
+      runtimeBinding: binding,
+    });
   };
 
   const mappedResumeForRecord = (
@@ -591,6 +663,7 @@ export function createWorkspaceRoutes(
   app.post('/manager/quick-start', async (c) => {
     let prompt: string;
     let agentId: string | undefined;
+    let credentialSource: 'native' | undefined;
     let credentialSlug: string | undefined;
     let model: string | undefined;
     let reasoningEffort: ModelReasoningEffort | undefined;
@@ -607,6 +680,7 @@ export function createWorkspaceRoutes(
       if (typeof fields['credentialSlug'] === 'string' && fields['credentialSlug'].length > 0) {
         credentialSlug = fields['credentialSlug'];
       }
+      if (fields['credentialSource'] === 'native') credentialSource = 'native';
       const rawModel = fields['model'];
       if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
       const rawEffort = fields['reasoningEffort'];
@@ -632,6 +706,7 @@ export function createWorkspaceRoutes(
     }
     const spawned = await spawnInteractiveSession(meta, {
       agentId: resolvedAgentId,
+      ...(credentialSource ? { credentialSource } : {}),
       ...(credentialSlug ? { credentialSlug } : {}),
       ...(model ? { model } : {}),
       ...(reasoningEffort ? { reasoningEffort } : {}),
@@ -674,10 +749,8 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // Detect which vault credential a workspace agent is currently configured
-  // with. A null slug can still be a real hand-edited native config; returning
-  // that distinction is what lets launch surfaces describe Claude/Codex as
-  // truthfully as the loginless runtimes.
+  // Deprecated compatibility inspection for native project config. Managed
+  // launch surfaces use `.alice/settings.json` and do not call this helper.
   const detectWorkspaceCred = async (
     meta: WorkspaceMeta,
     agentId: string,
@@ -1055,6 +1128,67 @@ export function createWorkspaceRoutes(
     }
   });
 
+  app.put('/:id/runtime-settings', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.registry.get(id);
+    if (!meta) return c.json({ error: 'not_found' }, 404);
+    const parsed = workspaceRuntimeDefaultsRequestSchema.safeParse(await safeJson(c));
+    if (!parsed.success) {
+      return c.json({
+        error: 'invalid_runtime_settings',
+        message: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),
+      }, 400);
+    }
+    const validateAgent = (mode: 'interactive' | 'headless', agent: string): string | null => {
+      const adapter = svc.adapters.get(agent);
+      if (!adapter || !isAgentRuntime(adapter)) return `unknown agent runtime: ${agent}`;
+      if (mode === 'headless' && (!adapter.capabilities.headless || !adapter.composeHeadlessCommand)) {
+        return `agent runtime does not support headless launches: ${agent}`;
+      }
+      return null;
+    };
+    const credentials: Record<string, Credential> = await readCredentials().catch(() => ({}));
+    for (const mode of ['interactive', 'headless'] as const) {
+      const modeDefaults = parsed.data[mode];
+      if (modeDefaults.defaultAgent) {
+        const error = validateAgent(mode, modeDefaults.defaultAgent);
+        if (error) return c.json({ error: 'invalid_agent', message: error }, 400);
+      }
+      for (const [agent, preference] of Object.entries(modeDefaults.agents)) {
+        const error = validateAgent(mode, agent);
+        if (error) return c.json({ error: 'invalid_agent', message: error }, 400);
+        if (preference.accessMode === 'vault') {
+          const credential = credentials[preference.credentialSlug];
+          if (!credential) {
+            return c.json({
+              error: 'credential_not_found',
+              message: `credential not found: ${preference.credentialSlug}`,
+            }, 400);
+          }
+          const adapter = svc.adapters.get(agent)!;
+          if (!compatibleCredentials(credentials, adapter).some(([slug]) => slug === preference.credentialSlug)) {
+            return c.json({
+              error: 'credential_incompatible',
+              message: `credential ${preference.credentialSlug} is not compatible with ${agent}`,
+            }, 400);
+          }
+        }
+      }
+    }
+    try {
+      const settings = await replaceWorkspaceRuntimeDefaults({
+        wsDir: meta.dir,
+        runtime: parsed.data,
+      });
+      launcherLogger.info('workspace.runtime_defaults_saved', { id });
+      return c.json({ settings, workspace: await svc.publicMeta(meta) });
+    } catch (err) {
+      launcherLogger.warn('workspace.runtime_defaults_write_failed', { id, err });
+      return c.json({ error: 'write_failed', message: (err as Error).message }, 500);
+    }
+  });
+
   // ── single workspace (offboarding + git/files sub-resources) ─────────────
 
   app.get('/:id/offboarding', async (c) => {
@@ -1390,6 +1524,7 @@ export function createWorkspaceRoutes(
     let resumeId: string | undefined;
     let agentId: string | undefined;
     let initialPrompt: string | undefined;
+    let credentialSource: 'native' | undefined;
     let credentialSlug: string | undefined;
     let model: string | undefined;
     let reasoningEffort: ModelReasoningEffort | undefined;
@@ -1402,6 +1537,7 @@ export function createWorkspaceRoutes(
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       const rawSlug = fields['credentialSlug'];
       if (typeof rawSlug === 'string' && rawSlug.length > 0) credentialSlug = rawSlug;
+      if (fields['credentialSource'] === 'native') credentialSource = 'native';
       const rawModel = fields['model'];
       if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
       const rawEffort = fields['reasoningEffort'];
@@ -1419,6 +1555,7 @@ export function createWorkspaceRoutes(
       ...(agentId !== undefined ? { agentId } : {}),
       ...(resumeId !== undefined ? { resumeId } : {}),
       ...(initialPrompt !== undefined ? { initialPrompt } : {}),
+      ...(credentialSource !== undefined ? { credentialSource } : {}),
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
@@ -1434,6 +1571,7 @@ export function createWorkspaceRoutes(
   app.post('/quick-chat', async (c) => {
     let prompt: string;
     let agentId: string | undefined;
+    let credentialSource: 'native' | undefined;
     let credentialSlug: string | undefined;
     let model: string | undefined;
     let reasoningEffort: ModelReasoningEffort | undefined;
@@ -1449,9 +1587,11 @@ export function createWorkspaceRoutes(
       const rawAgent = fields['agent'];
       if (typeof rawAgent === 'string' && rawAgent.length > 0) agentId = rawAgent;
       // Optional Session-only vault override. Every Agent adapter owns how it
-      // projects the selected credential; omission preserves native auth.
+      // projects the selected credential. Omission keeps normal Workspace /
+      // runtime resolution; credentialSource=native explicitly bypasses it.
       const rawSlug = fields['credentialSlug'];
       if (typeof rawSlug === 'string' && rawSlug.length > 0) credentialSlug = rawSlug;
+      if (fields['credentialSource'] === 'native') credentialSource = 'native';
       const rawModel = fields['model'];
       if (typeof rawModel === 'string' && rawModel.trim().length > 0) model = rawModel.trim();
       const rawEffort = fields['reasoningEffort'];
@@ -1542,6 +1682,7 @@ export function createWorkspaceRoutes(
 
     const spawn = await spawnInteractiveSession(meta, {
       ...(agentId !== undefined ? { agentId } : {}),
+      ...(credentialSource !== undefined ? { credentialSource } : {}),
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
@@ -1599,6 +1740,87 @@ export function createWorkspaceRoutes(
       return c.json({ ok: true, wasRunning });
     });
   }
+
+  app.put('/:id/sessions/:sid/runtime', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
+    if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    if (
+      record.state !== 'paused'
+      || svc.pool.get(token)
+      || svc.webPi?.has(token)
+    ) {
+      return c.json({
+        error: 'session_not_paused',
+        message: 'Pause this Session before changing its credential, model, or effort',
+      }, 409);
+    }
+    const identity = svc.resumeRegistry.get(record.resumeId);
+    if (!identity) {
+      return c.json({
+        error: 'session_identity_missing',
+        message: 'This Session has no durable resume identity',
+      }, 409);
+    }
+    if (identity.lifecycle === 'retired') {
+      return c.json({ error: 'resume_retired', message: 'this Session retired with its Workspace' }, 409);
+    }
+    const adapter = svc.adapters.get(record.agent);
+    if (!adapter || !isAgentRuntime(adapter)) {
+      return c.json({
+        error: 'runtime_selection_unsupported',
+        message: `Session runtime "${record.agent}" does not support managed AI configuration`,
+      }, 400);
+    }
+    const parsed = pausedSessionRuntimeRequestSchema.safeParse(
+      await safeJson(c).catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json({
+        error: 'bad_request',
+        message: parsed.error.issues[0]?.message ?? 'invalid Session AI configuration',
+      }, 400);
+    }
+    try {
+      const resolved = await createSessionRuntimeBinding({
+        adapter,
+        cwd: meta.dir,
+        selection: {
+          ...(parsed.data.credentialSource === 'native'
+            ? { credentialSource: 'native' as const }
+            : { credentialSlug: parsed.data.credentialSlug! }),
+          ...(parsed.data.model ? { model: parsed.data.model } : {}),
+          ...(parsed.data.reasoningEffort
+            ? { reasoningEffort: parsed.data.reasoningEffort }
+            : {}),
+        },
+      });
+      await svc.resumeRegistry.replaceRuntimeBinding({
+        resumeId: record.resumeId,
+        wsId: record.wsId,
+        agent: record.agent,
+        runtimeBinding: resolved.binding,
+      });
+      return c.json({
+        session: projectPublicSession(record, { runtimeBinding: resolved.binding }),
+      });
+    } catch (err) {
+      if (err instanceof SessionRuntimeBindingError) {
+        return c.json({ error: err.code, message: err.message }, 400);
+      }
+      launcherLogger.warn('session_runtime.replace_failed', {
+        id, sessionId: token, agent: record.agent, err,
+      });
+      return c.json({
+        error: 'session_runtime_update_failed',
+        message: (err as Error).message,
+      }, 500);
+    }
+  });
 
   app.post('/:id/sessions/:sid/resume', async (c) => {
     const id = c.req.param('id');
@@ -1809,7 +2031,6 @@ export function createWorkspaceRoutes(
     const adapter = svc.adapters.get('pi');
     if (!adapter) return c.json({ error: 'unknown_agent' }, 500);
     try {
-      await ensureAgentCredentialReady({ meta, agentId: 'pi', adapter, logger: launcherLogger });
       await prepareAgentRuntimeWorkspace(adapter, {
         wsId: id,
         cwd: meta.dir,
@@ -2126,7 +2347,23 @@ export function createWorkspaceRoutes(
     if (agentId && !svc.adapters.get(agentId)) {
       return c.json({ error: 'unknown_agent', message: `no adapter: ${agentId}` }, 400);
     }
-    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? await resolveDefaultAgentId(meta);
+    const runtimeSettings = !resumeIdentity
+      ? await readWorkspaceRuntimeSettings(meta.dir)
+      : null;
+    if (runtimeSettings && !runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
+      return c.json({ error: 'workspace_runtime_settings_invalid', message: runtimeSettings.error }, 400);
+    }
+    const preferredIssuesAgent = runtimeSettings?.ok
+      ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'headless')
+      : undefined;
+    const preferredIssuesAdapter = preferredIssuesAgent
+      ? svc.adapters.get(preferredIssuesAgent)
+      : undefined;
+    const validPreferredIssuesAgent = preferredIssuesAgent && preferredIssuesAdapter &&
+      isAgentRuntime(preferredIssuesAdapter)
+      ? preferredIssuesAgent
+      : undefined;
+    const effectiveAgentId = agentId ?? resumeIdentity?.agent ?? validPreferredIssuesAgent ?? await resolveDefaultAgentId(meta);
     if (!effectiveAgentId) {
       return c.json({ error: 'no_agent_runtime', message: 'no agent runtime is registered' }, 400);
     }
@@ -2201,12 +2438,11 @@ export function createWorkspaceRoutes(
     return c.json({ ok: true, wasRunning });
   });
 
-  // ── agent provider config ────────────────────────────────────────────────
-  // Per-workspace AI provider config lives in CLI-native files inside the
-  // workspace (`.claude/settings.local.json`, `.codex/config.toml`,
-  // `.codex/env.json`). The CLIs read them directly via cwd-discovery /
-  // CODEX_HOME. These routes are pure file IO over the launcher's
-  // path-traversal guard.
+  // ── deprecated native-project compatibility export ─────────────────────
+  // These routes operate on CLI-native files discovered by the runtimes via
+  // cwd/CODEX_HOME. Managed Session defaults live in `.alice/settings.json`;
+  // this file-IO surface remains only for users who deliberately run a CLI
+  // directly inside the Workspace.
 
 
   // Central credential store, surfaced to the workspace AI-config modal. The
@@ -2294,7 +2530,10 @@ export function createWorkspaceRoutes(
     }
   });
 
+  // Deprecated compatibility export API. Managed Sessions do not consult
+  // these native project files for fresh launch defaults.
   app.get('/:id/agent-config', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
     const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
@@ -2315,12 +2554,13 @@ export function createWorkspaceRoutes(
     }
   });
 
-  // Which vault credential this workspace's agent is currently configured with
+  // Which vault credential the deprecated native project export currently contains
   // (slug + effective model/protocol/context), plus any native pre-prompt setup
   // gate the adapter can inspect without changing runtime-owned state.
   // Ordinary detection does not overwrite config. The Pi adapter may perform
   // its one-time legacy `.pi-agent` layout migration before reading.
   app.get('/:id/agent-config/:agent/credential', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
@@ -2397,6 +2637,7 @@ export function createWorkspaceRoutes(
   });
 
   app.put('/:id/agent-config/:agent', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ error: 'not_found' }, 404);
@@ -2448,6 +2689,7 @@ export function createWorkspaceRoutes(
   // Probe live provider with the form state (does NOT touch workspace files —
   // tests exactly what the user sees in the modal, before they hit Save).
   app.post('/:id/agent-config/:agent/test', async (c) => {
+    c.header('Deprecation', 'true');
     const id = c.req.param('id');
     const agent = c.req.param('agent');
     if (!validId(id)) return c.json({ ok: false, error: 'invalid_id' }, 400);
@@ -2492,9 +2734,9 @@ export function createWorkspaceRoutes(
 
 // ── Agent config helpers ────────────────────────────────────────────────────
 
-// AI-provider config IO moved into the CLI adapters (writeAiConfig /
-// readAiConfig on claudeAdapter / codexAdapter). The routes above dispatch
-// through svc.adapters so each CLI owns its own file format.
+// Deprecated native-config export IO lives in the CLI adapters (writeAiConfig /
+// readAiConfig). The compatibility routes above dispatch through svc.adapters
+// so each CLI continues to own its native file format.
 
 function validId(id: string | undefined): id is string {
   return typeof id === 'string' && /^[a-zA-Z0-9_-]+$/.test(id);

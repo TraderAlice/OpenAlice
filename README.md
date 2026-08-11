@@ -169,14 +169,16 @@ suggestion, or implementation proposal changes the product, it gets credited.
 
 <!-- Standouts first. Avatars come free from https://github.com/<handle>.png -->
 <p>
+  <a href="https://github.com/bakabird"><img src="https://github.com/bakabird.png" width="56" height="56" alt="@bakabird" /></a>
   <a href="https://github.com/2233admin"><img src="https://github.com/2233admin.png" width="56" height="56" alt="@2233admin" /></a>
   <a href="https://github.com/lvysssss"><img src="https://github.com/lvysssss.png" width="56" height="56" alt="@lvysssss" /></a>
   <a href="https://github.com/walkonbothsides"><img src="https://github.com/walkonbothsides.png" width="56" height="56" alt="@walkonbothsides" /></a>
   <a href="https://github.com/bakabaka0613"><img src="https://github.com/bakabaka0613.png" width="56" height="56" alt="@bakabaka0613" /></a>
   <a href="https://github.com/JasonWang1124"><img src="https://github.com/JasonWang1124.png" width="56" height="56" alt="@JasonWang1124" /></a>
-  <a href="https://github.com/bakabird"><img src="https://github.com/bakabird.png" width="56" height="56" alt="@bakabird" /></a>
   <a href="https://github.com/rudyll"><img src="https://github.com/rudyll.png" width="56" height="56" alt="@rudyll" /></a>
   <a href="https://github.com/jalilsedna"><img src="https://github.com/jalilsedna.png" width="56" height="56" alt="@jalilsedna" /></a>
+  <a href="https://github.com/dbydd"><img src="https://github.com/dbydd.png" width="56" height="56" alt="@dbydd" /></a>
+  <a href="https://github.com/enderzcx"><img src="https://github.com/enderzcx.png" width="56" height="56" alt="@enderzcx" /></a>
 </p>
 
 **See the full list and what each person shaped**: [CONTRIBUTORS.md](./CONTRIBUTORS.md)

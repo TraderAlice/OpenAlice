@@ -25,6 +25,7 @@ import { formatRelativeTime } from '../lib/intl'
 import { useWorkspace } from '../tabs/store'
 import { CenteredLoading } from './StateViews'
 import { STATUS_META } from './issue-status-meta'
+import type { Workspace } from './workspace/api'
 
 // ==================== Cadence pill (lifted from AutomationSchedulesSection) ====================
 
@@ -153,6 +154,32 @@ export function CadencePill({ when }: { when: ScheduleWhen }) {
   )
 }
 
+/**
+ * Inspector treatment for a schedule. Unlike CadencePill, this deliberately
+ * gives the wall-clock label and timezone their own lines so a narrow details
+ * rail never turns schedule metadata into an oversized wrapping capsule.
+ */
+export function CadenceSummary({ when }: { when: ScheduleWhen }) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex min-w-0 items-start gap-2.5">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Clock size={14} aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium leading-snug text-foreground">
+          {cadenceLabel(when, t)}
+        </span>
+        {when.kind === 'cron' && (
+          <span className="mt-0.5 block break-all text-xs leading-snug text-muted-foreground">
+            {when.timezone ?? t('issues.cadence.localTime')}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
 const AUTOMATION_HEALTH_CLASS: Record<IssueAutomationHealthState, string> = {
   inactive: 'bg-muted text-muted-foreground',
   not_started: 'bg-muted text-muted-foreground',
@@ -263,7 +290,7 @@ function agentName(id: string, agents: readonly { id: string; displayName: strin
 
 function resolveAgentRuntime(
   issue: IssueListItem,
-  workspace: object | null,
+  workspace: Workspace | null,
   agents: readonly { id: string; displayName: string; kind?: 'agent' | 'utility' }[],
   issueDefaultAgent: string | null,
   defaultAgent: string | null,
@@ -276,8 +303,14 @@ function resolveAgentRuntime(
   const runtimeIds = agents
     .filter((agent) => agent.kind !== 'utility')
     .map((agent) => agent.id)
-  const issueDefaultId = issueDefaultAgent && runtimeIds.includes(issueDefaultAgent) ? issueDefaultAgent : null
-  const workspaceDefaultId = defaultAgent && runtimeIds.includes(defaultAgent) ? defaultAgent : null
+  const workspaceIssueDefault = workspace.runtimeSettings?.runtime.headless.defaultAgent
+    ?? workspace.runtimeSettings?.runtime.headless.recent.agent
+    ?? null
+  const issueDefaultId = workspaceIssueDefault && runtimeIds.includes(workspaceIssueDefault)
+    ? workspaceIssueDefault
+    : issueDefaultAgent && runtimeIds.includes(issueDefaultAgent) ? issueDefaultAgent : null
+  const legacyWorkspaceDefault = workspace.defaultAgent ?? defaultAgent
+  const workspaceDefaultId = legacyWorkspaceDefault && runtimeIds.includes(legacyWorkspaceDefault) ? legacyWorkspaceDefault : null
   const effectiveDefaultId = issueDefaultId ?? workspaceDefaultId ?? runtimeIds[0] ?? null
   if (issue.agent) {
     return {

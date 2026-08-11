@@ -196,12 +196,31 @@ export const claudeAdapter: CliAdapter = {
   },
 
   sessionRuntime: {
-    project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
+    project(ctx, runtime: ResolvedSessionRuntimeBinding) {
       const effort = runtime.binding.reasoningEffort;
       if (effort && !CLAUDE_RUN_EFFORTS.has(effort)) {
         throw new Error(`Claude Code cannot use Session effort ${effort}`);
       }
+      // Claude Code applies provider-shaped `env` from user/project/local
+      // settings after inheriting the child process environment. A managed
+      // Vault binding must exclude user and local sources so an unrelated
+      // global login or deprecated `.claude/settings.local.json` export cannot
+      // replace ANTHROPIC_BASE_URL / auth / model after OpenAlice projects the
+      // immutable Session binding. Keep the project source enabled: Claude
+      // owns the native loading semantics for the Workspace's CLAUDE.md and
+      // `.claude/skills`, and treating those files as a synthetic plugin loses
+      // their normal project scope and persona behavior. Explicit `--settings`
+      // supplied by composeCommand still loads, so launcher-owned MCP trust
+      // remains available.
+      //
+      // Native bindings intentionally keep Claude's normal settings chain:
+      // choosing Agent login means the runtime, not OpenAlice, owns provider
+      // discovery and authentication.
+      const managedCredentialArgs = runtime.binding.credential.source === 'vault'
+        ? ['--setting-sources=project']
+        : [];
       const args = [
+        ...managedCredentialArgs,
         ...(runtime.binding.model ? ['--model', runtime.binding.model] : []),
         ...(effort ? ['--effort', effort] : []),
       ];
@@ -355,6 +374,7 @@ export const claudeAdapter: CliAdapter = {
     }
   },
 
+  /** @deprecated Native-project compatibility export; managed Sessions use sessionRuntime. */
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
     const hasAny = cred.baseUrl || cred.apiKey || cred.model || cred.reasoningEffort;
     if (!hasAny) {
@@ -399,6 +419,7 @@ export const claudeAdapter: CliAdapter = {
     });
   },
 
+  /** @deprecated Compatibility inspection for legacy Session bindings only. */
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
     const raw = await readWorkspaceFile(cwd, CLAUDE_SETTINGS_PATH);
     if (raw === null) return null;

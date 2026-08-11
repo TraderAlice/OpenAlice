@@ -37,7 +37,7 @@ assignee: "@new-then-resume"
 when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: codex
 credential: openai-primary
-model: gpt-5.6
+model: gpt-5.6-sol
 effort: high
 ---
 
@@ -70,35 +70,34 @@ The filename stem is the stable issue id. Frontmatter:
   otherwise Workspace/default resolution is used. A Session assignee already
   owns its runtime and cannot be overridden here.
 - `credential` — optional secret-free OpenAlice vault slug for the fresh
-  Session. Omission inherits Workspace/native runtime authentication. The slug
-  selects provider routing; keys and endpoints never enter the Issue file.
+  Session. The slug selects provider routing; keys and endpoints never enter
+  the Issue file.
+- `credentialSource: native` — explicitly use the selected Agent runtime's own
+  login. It is mutually exclusive with `credential`. When both fields are
+  omitted, the Issue inherits that Agent's Workspace **headless** preference
+  (fixed, then recent) rather than inspecting deprecated native-project export
+  files.
 - `model` — optional native model id for this Issue's run. Omission inherits the
   selected credential, Workspace, or native runtime model.
 - `effort` — optional one-run reasoning effort:
   `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
   expose that level; omission inherits its Workspace/native default.
 
-`agent`, `credential`, `model`, and `effort` are one Session-creation tuple.
+`agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the
 vault and are resolved just in time. The scheduler freezes the tuple into the
 new Session's durable runtime binding without rewriting Workspace files. All
-four are forbidden when `assignee` is an exact `@resumeId`, because that
+fields are forbidden when `assignee` is an exact `@resumeId`, because that
 Session owns its runtime conversation. `@new-then-resume` may use them for its first
 dispatch; after it becomes an exact Session owner, the claim rewrite removes
 the tuple.
 
-Migration `0018_issue_assignee_ownership` removes the retired parallel
-`execution` field. It maps `resume` to the former `session:<resumeId>` shape and
-fresh/omitted scheduled ownership to the former `workspace` shape. That history
-is preserved as explicit `@workspace`; the new omission default is `@new`.
-Migration `0019_issue_session_signatures` then writes those owners as
-`@resumeId` / `@workspace`, the same visible signature language used in reports.
-
-Migration `0033_semantic_issue_assignees` retires those ambiguous scheduling
-aliases. `@workspace` is deprecated in favor of `@new-each-run`, and `@new` is
-deprecated in favor of `@new-then-resume`. Readers keep compatibility for
-pre-migration Workspace files, but API, CLI, UI, documentation, and skills must
-reject or avoid the deprecated values; new writes never emit them.
+The 0.89.2-beta baseline has one ownership field and behavior-named scheduling
+tokens. `@workspace` remains a deprecated read alias for `@new-each-run`, and
+`@new` remains a deprecated read alias for `@new-then-resume`; API, CLI, UI,
+documentation, and skills reject or avoid both aliases, and new writes never
+emit them. The retired parallel `execution` contract and `session:<resumeId>`
+storage shape are not supported upgrade inputs after this baseline.
 
 The markdown below frontmatter is the Issue's canonical **What**: the work
 definition humans inspect and edit. For scheduled Issues, Alice sends this exact
@@ -155,8 +154,8 @@ Agents normally use:
 ```bash
 alice-workspace issue list
 alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6 --effort high
-alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6 --effort high
+alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6-sol --effort high
+alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6-sol --effort high
 alice-workspace issue comment --id <id> --text "..."
 ```
 
@@ -400,8 +399,8 @@ provenance store.
 | `src/webui/routes/schedule.ts` | Scheduled projection API |
 | `default/skills/self-scheduling/SKILL.md` | Agent-facing authoring instructions |
 
-The retired `.alice/issue.json` and `.alice/schedule.json` formats are migrated
-by `src/migrations/0010_workspace_issues_to_markdown/`. Do not add a second
+The retired `.alice/issue.json` and `.alice/schedule.json` formats predate the
+0.89.2-beta baseline and are no longer upgrade inputs. Do not add a second
 central schedule store or revive the legacy cron/AgentWork path.
 
 ## Verification

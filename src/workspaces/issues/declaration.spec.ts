@@ -142,7 +142,7 @@ describe('readWorkspaceIssues', () => {
     expect(byId['legacy'].assignee).toBe('@new-then-resume')
   })
 
-  it('reads deprecated assignee aliases as canonical values until migration 0033 runs', async () => {
+  it('reads deprecated assignee aliases without allowing writers to emit them', async () => {
     await writeIssue('old-each', fm([
       'title: Old each-run policy',
       'assignee: "@workspace"',
@@ -178,6 +178,30 @@ describe('readWorkspaceIssues', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.invalid[0]?.error).toMatch(/agent.*credential.*model.*effort/)
+  })
+
+  it('distinguishes explicit native login from inherited Workspace access', async () => {
+    await writeIssue('native-login', fm([
+      'title: Native login',
+      'when: { kind: every, every: 30m }',
+      'credentialSource: native',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues[0]?.credentialSource).toBe('native')
+  })
+
+  it('rejects simultaneous native and vault access declarations', async () => {
+    await writeIssue('mixed-access', fm([
+      'title: Mixed access',
+      'credentialSource: native',
+      'credential: openai-primary',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.invalid[0]?.error).toMatch(/mutually exclusive/)
   })
 
   it('rejects retired execution declarations instead of silently keeping two owner models', async () => {

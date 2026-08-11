@@ -6,6 +6,35 @@
 
 import type { ModelReasoningEffort, ModelReasoningMode, WireShape } from '../../api'
 
+export interface WorkspaceRuntimePreference {
+  readonly accessMode: 'native' | 'vault'
+  readonly credentialSlug?: string
+  readonly wireShape?: WireShape
+  readonly model?: string
+  readonly reasoningEffort?: ModelReasoningEffort
+}
+
+export interface WorkspaceRuntimeRecentSettings {
+  readonly agent?: string
+  readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
+}
+
+export interface WorkspaceRuntimeModeSettings {
+  readonly defaultAgent?: string
+  readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
+  readonly recent: WorkspaceRuntimeRecentSettings
+}
+
+export type WorkspaceRuntimeMode = 'interactive' | 'headless'
+
+export interface WorkspaceRuntimeSettings {
+  readonly version: 3
+  readonly runtime: {
+    readonly interactive: WorkspaceRuntimeModeSettings
+    readonly headless: WorkspaceRuntimeModeSettings
+  }
+}
+
 export interface Workspace {
   readonly id: string;
   readonly tag: string;
@@ -48,10 +77,10 @@ export interface Workspace {
    */
   readonly sessions: readonly SessionRecord[];
   /**
-   * Whether the workspace has UI-saved AI provider overrides for each
-   * agent. claude = `.claude/settings.local.json` exists; codex = `.codex/`
-   * dir; opencode = `opencode.json`; pi = `.pi/settings.json`. Surfaced in the
-   * Overview dashboard.
+   * Whether deprecated native-project compatibility config exists for each
+   * Agent runtime. Kept for API compatibility and advanced diagnostics; this
+   * is not a managed Session default and is not surfaced in primary menus.
+   * @deprecated Use `runtimeSettings` for managed Session defaults.
    */
   readonly agentOverride?: {
     readonly claude: boolean;
@@ -59,6 +88,9 @@ export interface Workspace {
     readonly opencode: boolean;
     readonly pi: boolean;
   };
+  /** Secret-free, Workspace-owned recent launch choices from `.alice/settings.json`. */
+  readonly runtimeSettings?: WorkspaceRuntimeSettings;
+  readonly runtimeSettingsError?: string;
 }
 
 export interface CreateError {
@@ -655,6 +687,13 @@ export interface SessionRecord {
   readonly title: string | null;
   /** Headless run this stable Alice Session was materialized from. */
   readonly sourceRunId?: string | null;
+  /** Secret-free launch semantics pinned to this resumable Session. */
+  readonly runtime?: {
+    readonly credentialSource: 'native' | 'vault' | 'workspace';
+    readonly credentialSlug?: string;
+    readonly model?: string;
+    readonly reasoningEffort?: ModelReasoningEffort;
+  };
 }
 
 export interface SpawnedSession {
@@ -707,6 +746,7 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly active: boolean;
   readonly runtime?: {
     readonly credentialSource: 'native' | 'vault' | 'workspace';
+    readonly credentialSlug?: string;
     readonly model?: string;
     readonly reasoningEffort?: ModelReasoningEffort;
   };
@@ -883,8 +923,10 @@ export async function quickStartWorkspaceManager(
   credentialSlug?: string,
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
+  credentialSource?: 'native',
 ): Promise<ManagerQuickStartResult> {
   const request: Record<string, unknown> = { prompt, agent };
+  if (credentialSource !== undefined) request['credentialSource'] = credentialSource;
   if (credentialSlug !== undefined) request['credentialSlug'] = credentialSlug;
   if (model) request['model'] = model;
   if (reasoningEffort) request['reasoningEffort'] = reasoningEffort;
@@ -913,9 +955,10 @@ export class QuickChatError extends Error {
  * Quick-chat launch — the "type a message → you're in" front door. One POST
  * reuses-or-creates the chat workspace and spawns a fresh session seeded with
  * `prompt`; the returned `session.sessionId` is what the caller attaches to.
- * Credential, model, and effort are independent optional Session overrides.
- * Omitting a credential leaves authentication/provider discovery to the
- * runtime; choosing one never rewrites the Workspace merely to launch.
+ * AI access, model, and effort are independent optional Session overrides.
+ * Omitting access keeps normal Workspace/runtime resolution; an explicit
+ * native source bypasses Workspace provider files, while a selected vault
+ * credential never rewrites the Workspace merely to launch.
  */
 export async function quickChat(
   prompt: string,
@@ -925,8 +968,10 @@ export async function quickChat(
   template?: 'chat' | 'auto-quant-v2',
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
+  credentialSource?: 'native',
 ): Promise<QuickChatResult> {
   const body: Record<string, unknown> = { prompt };
+  if (credentialSource !== undefined) body['credentialSource'] = credentialSource;
   if (agent !== undefined) body['agent'] = agent;
   if (credentialSlug !== undefined) body['credentialSlug'] = credentialSlug;
   if (targetWsId !== undefined) body['targetWsId'] = targetWsId;
@@ -972,6 +1017,39 @@ export async function resumeSession(
     throw new Error(body?.message ?? body?.error ?? `resume session failed: ${res.status}`);
   }
   return (await res.json()) as SpawnedSession;
+}
+
+export interface PausedSessionRuntimeUpdate {
+  readonly credentialSource: 'native' | 'vault';
+  readonly credentialSlug?: string | null;
+  readonly model?: string | null;
+  readonly reasoningEffort?: ModelReasoningEffort | null;
+}
+
+/** Replace one paused Session's secret-free AI binding. The Session remains
+ * paused; the next resume projects this binding into the native runtime. */
+export async function updatePausedSessionRuntime(
+  wsId: string,
+  sessionId: string,
+  update: PausedSessionRuntimeUpdate,
+): Promise<SessionRecord> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/runtime`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(update),
+    },
+  );
+  const body = (await res.json().catch(() => null)) as {
+    session?: SessionRecord;
+    error?: string;
+    message?: string;
+  } | null;
+  if (!res.ok || !body?.session) {
+    throw new Error(body?.message ?? body?.error ?? `Session AI configuration update failed: ${res.status}`);
+  }
+  return body.session;
 }
 
 export async function openWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
@@ -1165,6 +1243,28 @@ export async function updateWorkspaceMetadata(
   }
   const body = (await res.json()) as { workspace: Workspace };
   return body.workspace;
+}
+
+export async function updateWorkspaceRuntimeDefaults(
+  id: string,
+  input: Readonly<Record<WorkspaceRuntimeMode, {
+    readonly defaultAgent: string | null
+    readonly agents: Readonly<Record<string, WorkspaceRuntimePreference>>
+  }>>,
+): Promise<Workspace> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(id)}/runtime-settings`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  )
+  const body = await res.json().catch(() => null) as { workspace?: Workspace; message?: string } | null
+  if (!res.ok || !body?.workspace) {
+    throw new Error(body?.message ?? `update Workspace AI preferences failed: ${res.status}`)
+  }
+  return body.workspace
 }
 
 /**

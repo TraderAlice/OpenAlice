@@ -429,7 +429,7 @@ to `master` or release, every applicable gate must be complete and green.
 |---|---|
 | Entry path, startup, onboarding, auth | Isolated first-run verification; keep a recovery/kill path for broad behavioral changes |
 | Trading, broker writes, UTA permissions | Relevant demo/paper scenarios from `docs/uta-live-testing.md`; leave accounts flat |
-| Persisted data | Idempotent migration + spec + regenerated migration index + backup behavior |
+| Persisted data | Establish whether the old shape shipped. If yes: idempotent migration + spec + regenerated index + backup behavior. If no: direct replacement and isolated-state verification. |
 | Desktop, Guardian, PTY, IPC, managed runtimes | Matching dev/Electron/package smoke on affected platforms |
 | UI/API contracts | Strict UI types, real browser route, and matching demo handler |
 | CLI bootstrap installer | Follow [CLI installer](cli-installer.md); run local `pnpm test:install:docker` against the real download path before release |

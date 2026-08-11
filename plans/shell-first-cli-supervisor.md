@@ -331,6 +331,8 @@ and verification before the next dependent branch starts from updated `dev`.
 - [x] Add read-only Doctor checks for provenance, Node/runtime requirements,
   ownership, ports, components, update metadata, and source/bundle integrity.
 - [x] Exercise old-client/new-server and new-client/old-server fixtures.
+- [x] Publish one read-only discovery contract from dev and built Guardians so
+  foreign surfaces can inspect/open an owner without gaining stop authority.
 
 ### 3. TypeScript CLI application shell and PTY harness
 
@@ -539,7 +541,7 @@ source-tool planning.
 | `up` from running | Idempotent verified endpoint; no signal |
 | shell/TUI detach | Runtime remains alive |
 | `run` interrupted | Self-owned Runtime stops cleanly |
-| Electron owner | Inspect/open allowed; down refused |
+| Electron owner | Ownership visible; browser handoff planned; down refused |
 | takeover | Guardian recovery ordering only |
 | foreign machine | Never reclaimed from heartbeat |
 | JSON status | Stable absent/starting/running/degraded/incompatible/stopping schema |
@@ -797,3 +799,9 @@ This plan is complete only when:
   generation embeds `stable`, human `--version` remains pinned, legacy v1
   metadata remains readable, and the release-installer transformation plus
   stable-ref install/check path have dedicated regression coverage.
+- 2026-08-07: Closed the dev-owner discovery gap. Source `pnpm dev` now
+  publishes the same private `runtime.status` envelope as built Guardians,
+  including its owner, Vite endpoint, source provenance, and
+  component health, while deliberately omitting `runtime.stop`. The real dev
+  smoke proves CLI discovery, rejected stop, duplicate-writer refusal, and
+  survival of the original owner in one isolated journey.

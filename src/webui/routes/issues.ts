@@ -146,6 +146,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       assignee?: string
       agent?: string | null
       credential?: string | null
+      credentialSource?: 'native' | null
       model?: string | null
       effort?: ModelReasoningEffort | null
       what?: string
@@ -225,6 +226,16 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         return c.json({ error: 'invalid_credential', message: 'credential must be a vault slug or null' }, 400)
       } else {
         patch.credential = raw.trim()
+      }
+    }
+    if ('credentialSource' in fields) {
+      const raw = fields['credentialSource']
+      if (raw === null || raw === '') {
+        patch.credentialSource = null
+      } else if (raw !== 'native') {
+        return c.json({ error: 'invalid_credential_source', message: 'credentialSource must be native or null' }, 400)
+      } else {
+        patch.credentialSource = 'native'
       }
     }
     if ('model' in fields) {

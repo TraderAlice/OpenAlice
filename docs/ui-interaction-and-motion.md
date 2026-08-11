@@ -45,6 +45,33 @@ Avoid duplicating these layers inside the focused view. A page navigator should
 not be restyled as a stack of cards, and a detail surface should not create a
 second page shell inside itself.
 
+Launch-surface example prompts are compact capability navigation, not generic
+chatbot filler. Their visible titles should stay scannable while the inserted
+prompt carries the evidence, freshness, persistence, and permission boundaries
+needed for the real task. Prefer a small rotating set over a wall of commands.
+
+### Long-form Markdown
+
+`MarkdownContent` owns one parser and interaction contract with two deliberate
+presentation densities. The default variant stays compact for chat, comments,
+runtime output, and small previews. Durable reports and Issue documents use the
+`reading` variant: a restrained reading measure, stronger heading hierarchy,
+more paragraph rhythm, and document-owned horizontal scrolling for wide tables.
+
+Route Markdown files through `FileContentView` so Tracked artifacts, Inbox
+attachments, and Workspace file views retain the same reading treatment. Do not
+fork Markdown parsing or recreate feature-local heading, list, table, quote, and
+code styles. Long documents remain the dominant page surface rather than being
+wrapped in a decorative card; surrounding shell chrome supplies the context.
+
+Treat the generated Markdown body as a stable DOM island. Live Workspace,
+Manager, Inbox, and provenance state may update the surrounding interaction
+layer, but an unchanged HTML string must preserve the existing report nodes so
+selection, browser translation, find-in-page, and extension annotations remain
+intact. Polling stores must reconcile identical JSON snapshots before
+publication, and content renderers that only need a Workspace action should use
+the action-only hook instead of subscribing to the complete Workspace state.
+
 ### Responsive Behavior
 
 Narrow layouts are a change in information hierarchy, not a compressed desktop.
@@ -137,6 +164,53 @@ keyboard navigation, outside dismissal, scroll locking, and focus return.
 - Delete superseded event plumbing during migration. A component is not
   migrated if its old global Escape/outside-click/focus-loop implementation is
   still running beside the primitive.
+- Shared split layouts use the checked-in shadcn Resizable primitive for their
+  separator, pointer/touch capture, and keyboard resizing. Product adapters
+  such as `PageSidebarLayout` continue to own route content, responsive mode,
+  collapse affordances, and persisted preferences; they must not add a second
+  visible border or parallel document-level drag listeners beside the shared
+  separator. Responsive min/max values must be derived from the measured split
+  group rather than the window: app-shell chrome sits outside that group. Keep
+  the complete constraint set feasible at every supported width; when there is
+  not enough room for both preferred minimums, preserve the navigator minimum
+  and give the working view the measured remainder instead of sending mutually
+  impossible hard minimums to the primitive. Treat the primitive's applied
+  panel geometry as the authority for which expanded or collapsed surface is
+  interactive; input-source bookkeeping may decide whether a settled width is
+  persisted, but must never gate `aria-hidden`, `inert`, or collapse-state
+  synchronization. Capture resize intent at the split-group boundary so the
+  separator's enlarged fine/coarse pointer target behaves like its visible
+  one-pixel rule. Persist keyboard changes from the settled layout map rather
+  than a pre-paint DOM width, which can lag one key press behind. Direct pointer
+  resizing must stay attached to the cursor above the navigator minimum. Below
+  that minimum, keep the primitive layout and internal content measure fixed,
+  show only a bounded damped overdrag, and spring back on release before the
+  primitive's native collapsed-state midpoint. Arm the shared motion token as
+  that midpoint is crossed so the 200px-to-44px commit retains spatial
+  continuity without squeezing the navigator's controls or making ordinary
+  width changes feel lazy. Do not toggle the primitive's `collapsible`
+  metadata during an active pointer transaction; its native midpoint remains
+  the single collapse boundary.
+  Keep geometry transactions single-owner: native pointer and keyboard
+  interactions settle through the primitive, while a product collapse or
+  restore affordance issues exactly one imperative geometry call. Product
+  effects may reconcile applied geometry with persisted intent, but must not
+  repeat the same collapse/expand transaction. Because pixel constraint changes
+  can re-register v4 Panels after the group's settled callback, validate both
+  the settled layout and the final Panel ResizeObserver result; reject and
+  repair one-panel `100%` layouts instead of persisting them. A spring cleanup
+  timer begins only after release. When a new drag interrupts a returning
+  spring, cancel that timer and freeze the currently painted edge before
+  resuming direct manipulation so the handle never snaps away from the pointer.
+  Registration inputs such as `defaultSize` must remain stable during a held
+  pointer transaction; crossing a collapse midpoint is applied state, not a
+  reason to unregister and rebuild the Panel. If the product tracks gesture
+  state outside the primitive, capture that pointer at the split-group boundary
+  so an out-of-bounds release cannot strand it. A final invariant observer must
+  compare the painted navigator and content flex items, not only the primitive's
+  internal size callback. If those surfaces diverge into an impossible
+  `100%`/`0%` pair, rebuild one coherent group snapshot from the last valid
+  preference; repeating an already-satisfied internal resize is not recovery.
 
 The `@/` alias resolves to `ui/src` in Vite, TypeScript, and the UI Vitest
 project. Backend tests keep their existing root `@` alias.

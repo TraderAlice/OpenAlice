@@ -18,8 +18,10 @@ The default packaged path is:
 
 1. OpenAlice supplies a managed Pi runtime.
 2. The user configures an API-key credential in **Settings → AI Provider**.
-3. OpenAlice injects that credential into the Workspace's Pi config.
-4. Pi starts with the OpenAlice CLIs and shared skills already available.
+3. The Workspace records that secret-free credential reference, model, and
+   effort preference in `.alice/settings.json`.
+4. OpenAlice resolves the secret just in time and projects it into each Pi
+   process; Pi starts with the OpenAlice CLIs and shared skills available.
 
 The runtime and the model credential are separate requirements. Bundling Pi
 removes the CLI/toolchain prerequisite; it does not bundle a model account or
@@ -75,34 +77,27 @@ while confirmed gateway endpoints can use `Authorization: Bearer` without also
 emitting a conflicting API-key header. Old Workspace defaults without an
 explicit protocol keep the runtime preference order for backward compatibility.
 
-**Settings → AI Provider → Default Workspace credentials** owns creation-time
-defaults only: per-agent credential, optional protocol, and the opencode/Pi
-context limit. The context default is 256K so users do not cross common
-higher-price tiers implicitly. Changing these settings never rewrites an
-existing Workspace; that Workspace's settings modal remains the explicit
-override surface.
+**Settings → AI Provider → Default Workspace credentials** is a deprecated
+installation-level creation seed. New Workspaces translate it into secret-free
+runtime preferences; changing it never rewrites an existing Workspace. Normal
+users choose native auth or a vault credential on the launch surface, and the
+accepted choice becomes that Workspace's recent preference.
 
 Credential access and model semantics are separate inputs. Known model ids
 resolve reasoning behavior and advertised limits from the offline registry;
-the injector caps the selected context policy at the model maximum and leaves
-effort to the native runtime. Only unknown/free-typed models expose an advanced
+the Session binding resolver caps the selected context policy at the model
+maximum and leaves effort to the native runtime. Only unknown/free-typed models expose an advanced
 reasoning override, and creation defaults bind that assertion to the exact
 model id so it cannot leak across a later model change. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for the full contract.
 
-Quick Chat must summarize the launch configuration behind its credential pill:
-the effective model ID and every context limit actually declared by the native
-project config are visible before Send. For an existing Workspace these values
-come from its CLI-native config; selecting a different Pi/opencode credential
-previews the model that credential will inject and the global context default.
-Claude Code and Codex Workspace overrides show their model but omit context
-because those native project files do not declare one. The adjacent adjustment
-action opens that Workspace's AI injector for all four runtimes, and falls back
-to AI Provider settings before the first Workspace has been created. Saving the
-Workspace modal refreshes this summary without requiring a page reload.
-Their default remains the CLI's own global login and configuration: Alice never
-chooses the first compatible vault credential simply because one exists. Only
-an explicit Workspace binding or creation default opts into injection.
+Quick Chat summarizes the exact pending binding behind its credential/model
+controls. For an existing Workspace these values come from its interactive
+recent preference in `.alice/settings.json`; selecting another credential,
+model, or effort updates the file only after the fresh Session is accepted for
+launch. Native auth is always a valid explicit choice, including for Pi and
+opencode when the user has configured them globally. Native project config
+export remains available only under the deprecated compatibility section.
 
 Claude Code can place global onboarding and per-project trust screens before an
 interactive seeded prompt even after the same Workspace passes a headless
@@ -466,12 +461,15 @@ default. Both managed files are excluded from git. Do not restore a duplicate
 `.pi/skills/` copy: current Pi discovers the shared `.agents/skills/` tree from
 the Workspace working directory.
 
-Provider injection into shared native JSON config is node-owned, not
-file-owned. Claude Code's `.claude/settings.local.json` and opencode's
+The deprecated provider export into shared native JSON config is node-owned,
+not file-owned. Claude Code's `.claude/settings.local.json` and opencode's
 `opencode.json` preserve unknown/user keys and use their adjacent OpenAlice
 rollback sidecars for conflict-aware reset. Keep all native provider config and
 rollback paths, plus OpenCode's generated `tui.json`, in `_common.mjs`'s local
-git excludes.
+git excludes. Alice never reads this export to resolve a fresh managed binding
+or readiness probe. A native CLI can still discover a retained project file
+through its own config precedence, which is why the compatibility UI is explicit
+and warns before writing it.
 
 ## Packaging Invariants
 

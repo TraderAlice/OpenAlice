@@ -101,9 +101,9 @@ docs/                          owner guides and contributor documentation
 
 The model execution loop is not in `src/ai-providers/`. Native coding-agent
 CLIs own their model loops. Alice's provider catalog describes credential and
-wire suggestions plus curated model semantics; Workspace credential injection
+wire suggestions plus curated model semantics; a Workspace Session binding
 combines credential access, model selection, and those semantics before each
-adapter projects the result into the target CLI's native configuration. Follow
+adapter projects the result into one target CLI process. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for that boundary.
 
 ## Workspace Architecture
@@ -137,6 +137,28 @@ Do not reintroduce date-based automatic Chat Workspaces. A date is not a
 context boundary, and new daily repositories strand files, issues, git history,
 and agent configuration in yesterday's Workspace.
 
+Tracked is a global, file-backed index over those durable Workspaces:
+
+- `EntityStore` persists only deliberately registered asset/topic anchors.
+- `entity-backlinks.ts` scans authored `[[name]]` links in Workspace Markdown
+  and Issue notes; prose is never inferred into an edge.
+- the Tracked sidebar combines those global asset/topic anchors with the live
+  Workspace Issue index. Issues keep their canonical `workspaceId + issueId`
+  identity, render their complete Markdown body without the work-item controls,
+  and open the canonical Issues detail surface through the explicit Details
+  action; they are never copied into `EntityStore`. The active entity or Issue
+  is encoded in `/tracked` query parameters so refresh and browser Back restore
+  the same selection while retaining one Tracked tab.
+- the relationship graph is a read-time projection of those two canonical
+  sources. Shared notes bridge every registered entity they reference, while
+  unlinked entities and Issues remain visible. Selecting either an entity or
+  an Issue preserves the current Detail/Graph mode; in Graph mode both focus
+  their existing graph node and defer navigation to the preview's explicit
+  Details action. The graph has no second persisted index or layout state to
+  migrate.
+- opening a graph material node keeps the same Tracked provenance and return
+  path as opening it from the backlink detail list.
+
 AutoQuant uses the same durable Workspace boundary with a stricter entry rule:
 
 - `autoQuant.defaultWorkspaceId` in `data/preferences.json` is the readiness
@@ -155,6 +177,8 @@ Load-bearing paths:
 - `src/workspaces/service.ts` — Workspace lifecycle and composition.
 - `src/workspaces/session-pool.ts` — PTY process ownership.
 - `src/workspaces/session-registry.ts` — durable session metadata.
+- `src/workspaces/workspace-runtime-settings.ts` — versioned, secret-free
+  `.alice/settings.json` launch preferences.
 - `src/workspaces/scrollback-store.ts` — terminal replay.
 - `src/workspaces/template-registry.ts` — template declarations.
 - `src/workspaces/template-upgrade.ts` — reviewed managed-asset reconciliation
@@ -201,20 +225,23 @@ catalog in `template.json`; creation records the chosen immutable source in
 Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
 project skills are copied to `.agents/skills/` and Claude-specific discovery to
-`.claude/skills/`. Pi registers an OpenAlice-managed provider through the
-Workspace-local `.pi/extensions/openalice-provider.ts` and selects it through
-`.pi/settings.json`; the sensitive provider definition and rollback state stay
-in `.pi/openalice-provider.json`. The shared runtime lifecycle also gives
+`.claude/skills/`. Managed Session provider/model/effort selection comes from
+`.alice/settings.json`, is frozen into `.alice/sessions/<resumeId>.json`, and
+is projected into the child process by the adapter. Pi's deprecated native-config export
+registers an OpenAlice-managed provider through the Workspace-local
+`.pi/extensions/openalice-provider.ts` and selects it through `.pi/settings.json`;
+the sensitive provider definition and rollback state stay in
+`.pi/openalice-provider.json`. The shared runtime lifecycle also gives
 Workspaces without an explicit Pi theme the native `light/dark` automatic pair.
 OpenAlice never writes Pi's global model registry, redirects Pi away from its
 native global packages/settings/auth/sessions, or replaces an explicit Pi
 project theme.
-OpenCode keeps provider configuration in `opencode.json` and TUI configuration
-in its native `tui.json` project layer. The runtime lifecycle selects the
+OpenCode's deprecated provider export stays in `opencode.json`; TUI configuration
+remains in its native `tui.json` project layer. The runtime lifecycle selects the
 native `system` theme only when the project has no explicit OpenCode TUI or
 legacy theme config. Codex needs no project theme setting: it derives its
 palette directly from the terminal's OSC 10/11 replies.
-Claude Code and opencode keep reversible OpenAlice ownership metadata in
+The deprecated Claude Code and opencode exports keep reversible OpenAlice ownership metadata in
 `.claude/openalice-provider.json` and `.opencode/openalice-provider.json` so
 provider reset preserves unrelated native settings. Those files are sensitive
 and excluded from the Workspace repository.
@@ -308,9 +335,11 @@ Overrides:
 
 `data/` is the portable backup/migration unit. `sealing.key` deliberately
 lives beside it so a copied data directory does not carry its decryption key.
-Any upgrade-time transformation of persisted state belongs in
+The active migration chain starts after the 0.89.2-beta baseline. A
+transformation for a persisted shape that has shipped belongs in
 `src/migrations/`, must be idempotent, and must declare affected paths for the
-generated `src/migrations/INDEX.md`.
+generated `src/migrations/INDEX.md`. Unreleased development shapes are replaced
+directly and do not become permanent compatibility code.
 
 ## Change Routing
 

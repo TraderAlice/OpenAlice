@@ -13,7 +13,7 @@ import {
 
 import { prepareAgentRuntimeWorkspace, type AdapterRegistry } from './cli-adapter.js';
 import { injectWorkspaceContext } from './context-injector.js';
-import { injectWorkspaceCredentials } from './credential-injection.js';
+import { credentialToWorkspaceAiCred } from './credential-injection.js';
 import type { Logger } from './logger.js';
 import { generatePetnameId } from './petname-id.js';
 import type {
@@ -24,6 +24,11 @@ import type {
 } from './template-registry.js';
 import { initializeWorkspaceTemplateState } from './template-upgrade.js';
 import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
+import {
+  emptyWorkspaceRuntimeSettings,
+  writeWorkspaceRuntimeSettings,
+  type WorkspaceRuntimePreference,
+} from './workspace-runtime-settings.js';
 
 export interface BootstrapEnv {
   /**
@@ -241,6 +246,62 @@ export class WorkspaceCreator {
         message: `context injection failed: ${(err as Error).message}`,
       };
     }
+
+    // Seed the Workspace-owned, secret-free launch preferences before the
+    // launcher baseline commit. Unlike the deprecated native CLI export, this
+    // file is part of the Workspace's self-description and is safe to track.
+    // The template still wins over installation defaults per runtime.
+    try {
+      const userDefaults = await readWorkspaceCredentialDefaults();
+      const effective: Record<string, AgentCredentialDecl> = {
+        ...userDefaults,
+        ...(template.agentCredentials ?? {}),
+      };
+      if (Object.keys(effective).length > 0) {
+        const credentials = await readCredentials();
+        const settings = emptyWorkspaceRuntimeSettings();
+        const rememberedAgents: string[] = [];
+        for (const [agentId, decl] of Object.entries(effective)) {
+          const adapter = this.opts.adapterRegistry.get(agentId);
+          const credential = credentials[decl.credentialSlug];
+          if (!adapter || !credential) {
+            log.warn('workspace.runtime_settings_seed_skipped', {
+              agentId,
+              reason: adapter ? 'credential_not_found' : 'adapter_not_found',
+            });
+            continue;
+          }
+          const projected = credentialToWorkspaceAiCred(credential, adapter, decl);
+          if (!projected) {
+            log.warn('workspace.runtime_settings_seed_skipped', {
+              agentId,
+              reason: 'credential_incompatible',
+            });
+            continue;
+          }
+          const preference: WorkspaceRuntimePreference = {
+            accessMode: 'vault',
+            credentialSlug: decl.credentialSlug,
+            ...(projected.wireShape ? { wireShape: projected.wireShape } : {}),
+            ...(projected.model ? { model: projected.model } : {}),
+            ...(projected.reasoningEffort ? { reasoningEffort: projected.reasoningEffort } : {}),
+          };
+          settings.runtime.interactive.agents[agentId] = preference;
+          settings.runtime.headless.agents[agentId] = preference;
+          rememberedAgents.push(agentId);
+        }
+        if (rememberedAgents.length > 0) {
+          const defaultAgent = template.defaultAgents.find((agent) => rememberedAgents.includes(agent))
+            ?? rememberedAgents[0]!;
+          settings.runtime.interactive.defaultAgent = defaultAgent;
+          settings.runtime.headless.defaultAgent = defaultAgent;
+          await writeWorkspaceRuntimeSettings(dir, settings);
+        }
+      }
+    } catch (err) {
+      log.warn('workspace.runtime_settings_seed_failed', { err });
+    }
+
     try {
       await commitInitial(dir, `${templateName}: ${tag}`);
     } catch (err) {
@@ -269,35 +330,6 @@ export class WorkspaceCreator {
       } catch (err) {
         log.warn('adapter.prepare_workspace_failed', { agent: a, err });
       }
-    }
-
-    // Credential seeding — runs POST-commit so the secret never lands in the
-    // initial commit (the adapter config files are kept out of git by
-    // `_common.sh`'s excludes; post-commit is the belt-and-braces). The source
-    // is the user's per-agent workspace defaults (Settings › AI Provider) merged
-    // with any template-declared `agentCredentials` — the template wins per agent
-    // (explicit per-template intent), though in practice no in-repo template
-    // declares them, so the user defaults are the effective source. Best-effort:
-    // a miss (dangling slug or incompatible wire) warns + skips,
-    // the workspace stays usable.
-    try {
-      const userDefaults = await readWorkspaceCredentialDefaults();
-      const effective: Record<string, AgentCredentialDecl> = {
-        ...userDefaults,
-        ...(template.agentCredentials ?? {}),
-      };
-      if (Object.keys(effective).length > 0) {
-        const credentials = await readCredentials();
-        await injectWorkspaceCredentials({
-          dir,
-          agentCredentials: effective,
-          adapterRegistry: this.opts.adapterRegistry,
-          credentials,
-          logger: log,
-        });
-      }
-    } catch (err) {
-      log.warn('cred_inject.failed', { err });
     }
 
     const workspace: WorkspaceMeta = {

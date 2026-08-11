@@ -15,11 +15,11 @@
 
 import { readFile, writeFile, mkdir, unlink, cp } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Migration, MigrationContext, ConfigMeta } from './types.js'
 import { REGISTRY } from './registry.js'
-import { dataPath } from '@/core/paths.js'
+import { dataPath, userDataHome } from '@/core/paths.js'
 
 const CONFIG_DIR = dataPath('config')
 const BACKUP_DIR = dataPath('_backup')
@@ -66,6 +66,12 @@ export function makeDefaultContext(): MigrationContext {
     },
     configDir(): string {
       return CONFIG_DIR
+    },
+    userDataHome(): string {
+      return userDataHome
+    },
+    launcherRoot(): string {
+      return resolve(process.env['AQ_LAUNCHER_ROOT'] ?? join(userDataHome, 'workspaces'))
     },
   }
 }

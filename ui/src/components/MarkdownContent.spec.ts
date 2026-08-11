@@ -53,4 +53,17 @@ describe('renderMarkdownHtml', () => {
     expect(html).toContain('data-resume-id="resume-kind-owl-abc123"')
     expect(html).toContain('<code>@resume-example</code>')
   })
+
+  it('wraps wide tables in a document-owned horizontal scroll surface', () => {
+    const html = renderMarkdownHtml('| Name | Value |\n| --- | --- |\n| Revenue | $42 |')
+
+    expect(html).toContain('<div class="markdown-table-shell"><table>')
+    expect(html).toContain('</table></div>')
+  })
+
+  it('keeps code-copy controls inert when markdown is rendered inside a form', () => {
+    const html = renderMarkdownHtml('```ts\nconst answer = 42\n```')
+
+    expect(html).toContain('<button type="button" class="code-copy-btn"')
+  })
 })

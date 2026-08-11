@@ -88,7 +88,7 @@ export function UrlAdopter() {
         <Route path="/inbox" element={<AdoptStatic spec={{ kind: 'inbox', params: {} }} />} />
 
         {/* Tracked (entity index) */}
-        <Route path="/tracked" element={<AdoptStatic spec={{ kind: 'tracked', params: {} }} />} />
+        <Route path="/tracked" element={<AdoptTracked />} />
         <Route path="/tracked/files/:wsId/:path" element={<AdoptTrackedFileViewer />} />
         <Route path="/tracked/issues/:wsId/:id" element={<AdoptTrackedIssueDetail />} />
 
@@ -178,6 +178,23 @@ function AdoptIssueDetail() {
   const { wsId, id } = useParams<{ wsId: string; id: string }>()
   if (!wsId || !id) return <Navigate to="/issues" replace />
   return <AdoptStatic spec={{ kind: 'issue-detail', params: { wsId, id } }} />
+}
+
+function AdoptTracked() {
+  const [search] = useSearchParams()
+  const entity = search.get('entity')?.trim() || undefined
+  const workspace = search.get('workspace')?.trim() || undefined
+  const issue = search.get('issue')?.trim() || undefined
+  return (
+    <AdoptStatic
+      spec={{
+        kind: 'tracked',
+        params: entity
+          ? { entity }
+          : workspace && issue ? { workspace, issue } : {},
+      }}
+    />
+  )
 }
 
 function AdoptTrackedIssueDetail() {

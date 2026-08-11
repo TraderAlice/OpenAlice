@@ -204,19 +204,25 @@ describe('IssueDetail property controls', () => {
 
     const status = screen.getByRole('combobox', { name: 'Status' })
     expect(status).toBeTruthy()
-    expect(status.className).toContain('min-h-10')
-    expect(screen.getByText('Status').parentElement?.className).toContain('max-[359px]:flex-col')
+    expect(status.className).toContain('h-10')
+    expect(status.className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Assignee' }).className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('min-h-10')
-    const credential = screen.getByRole('combobox', { name: 'Run credential' }) as HTMLSelectElement
+    expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('size-10')
+    expect(screen.getByRole('heading', { level: 3, name: 'Schedule' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 3, name: 'Execution' })).toBeTruthy()
+    expect(screen.getByText('America/New_York').className).toContain('break-all')
+    expect(screen.getByRole('button', { name: 'AI configuration' }).textContent)
+      .toContain('Runtime managed')
+    fireEvent.click(screen.getByRole('button', { name: 'AI configuration' }))
+    const credential = screen.getByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
     const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
-    const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
+    const effort = screen.getByRole('combobox', { name: 'Effort' }) as HTMLSelectElement
     await waitFor(() => {
-      expect(credential.selectedOptions[0]?.textContent).toBe('Workspace default · LongCat primary')
-      expect(model.selectedOptions[0]?.textContent).toBe('Default · LongCat-2.0')
-      expect(effort.selectedOptions[0]?.textContent).toBe('Default · thinking on')
+      expect(credential.value).toBe('inherit')
+      expect(model.selectedOptions[0]?.textContent).toBe('Default · runtime managed')
+      expect(effort.selectedOptions[0]?.textContent).toBe('Runtime managed')
     })
 
     fireEvent.change(model, { target: { value: 'custom' } })
@@ -226,11 +232,12 @@ describe('IssueDetail property controls', () => {
   it('chooses a credential before narrowing model and effort options', async () => {
     scheduledIssue.issue.credential = 'deepseek-1'
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
-    const credential = await screen.findByRole('combobox', { name: 'Run credential' }) as HTMLSelectElement
+    fireEvent.click(await screen.findByRole('button', { name: 'AI configuration' }))
+    const credential = screen.getByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
     const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
-    const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
+    const effort = screen.getByRole('combobox', { name: 'Effort' }) as HTMLSelectElement
     await waitFor(() => {
-      expect(credential.value).toBe('deepseek-1')
+      expect(credential.value).toBe('vault:deepseek-1')
       expect(Array.from(model.options).map((option) => option.value)).toContain('deepseek-v4-flash')
       expect(Array.from(model.options).map((option) => option.value)).not.toContain('LongCat-2.0')
       expect(Array.from(effort.options).map((option) => option.value))

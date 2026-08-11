@@ -17,10 +17,12 @@ import type {
   AgentConfigBundle,
   AgentId,
   DepartedWorkspace,
+  PausedSessionRuntimeUpdate,
   SessionRecord,
   WebPiSnapshot,
   Workspace,
   WorkspaceMetadataPatch,
+  WorkspaceRuntimePreference,
 } from '../../components/workspace/api'
 
 const demoManagerSession = {
@@ -704,6 +706,41 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json({ workspace })
   }),
+  http.put('/api/workspaces/:id/runtime-settings', async ({ params, request }) => {
+    const index = demoWorkspaces.findIndex((workspace) => workspace.id === String(params.id))
+    if (index < 0) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    type ModeInput = {
+      defaultAgent?: string | null
+      agents?: Record<string, WorkspaceRuntimePreference>
+    }
+    const body = (await request.json().catch(() => ({}))) as {
+      interactive?: ModeInput
+      headless?: ModeInput
+    }
+    if (!body.interactive || !body.headless) {
+      return HttpResponse.json({ error: 'invalid_runtime_settings' }, { status: 400 })
+    }
+    const workspace = demoWorkspaces[index]!
+    const currentSettings = workspace.runtimeSettings ?? {
+      version: 3 as const,
+      runtime: {
+        interactive: { agents: {}, recent: { agents: {} } },
+        headless: { agents: {}, recent: { agents: {} } },
+      },
+    }
+    const mode = (name: 'interactive' | 'headless') => ({
+      ...(body[name]?.defaultAgent ? { defaultAgent: body[name].defaultAgent } : {}),
+      agents: body[name]?.agents ?? {},
+      recent: currentSettings.runtime[name].recent,
+    })
+    const nextSettings = {
+      version: 3 as const,
+      runtime: { interactive: mode('interactive'), headless: mode('headless') },
+    }
+    const nextWorkspace = { ...workspace, runtimeSettings: nextSettings }
+    demoWorkspaces[index] = nextWorkspace
+    return HttpResponse.json({ settings: nextSettings, workspace: nextWorkspace })
+  }),
 
   http.get('/api/workspaces/templates', () => HttpResponse.json({ templates: demoTemplates })),
   http.get('/api/workspaces/templates/:name/readme', () =>
@@ -716,10 +753,10 @@ export const workspacesHandlers = [
       // probe, so present everything as installed (a clean showcase, not a
       // "go install things" prompt).
       agents: [
-        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
-        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
-        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
-        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
+        { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
+        { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
+        { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
+        { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
       ],
     }),
   ),
@@ -806,7 +843,7 @@ export const workspacesHandlers = [
   http.get('/api/workspaces/credentials', () =>
     HttpResponse.json({
       credentials: [
-        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': 'https://api.openai.com/v1' }, lastModel: 'gpt-5.6', resolvedModel: 'gpt-5.6', apiKey: 'demo-openai-key-not-secret' },
+        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-chat': 'https://api.openai.com/v1' }, lastModel: 'gpt-5.6-sol', resolvedModel: 'gpt-5.6-sol', apiKey: 'demo-openai-key-not-secret' },
         { slug: 'minimax-1', vendor: 'minimax', label: 'MiniMax', authType: 'api-key', wires: { 'openai-chat': 'https://api.minimax.io/v1' }, lastModel: 'MiniMax-M2.1', resolvedModel: 'MiniMax-M2.1', apiKey: 'demo-minimax-key-not-secret' },
       ],
     }),
@@ -1020,6 +1057,44 @@ export const workspacesHandlers = [
     )
   }),
   http.post('/api/workspaces/:id/sessions/:sid/pause', () => HttpResponse.json(true)),
+  http.put('/api/workspaces/:id/sessions/:sid/runtime', async ({ params, request }) => {
+    const workspaceIndex = demoWorkspaces.findIndex((candidate) => candidate.id === String(params.id))
+    const workspace = workspaceIndex >= 0 ? demoWorkspaces[workspaceIndex] : undefined
+    const sessionIndex = workspace?.sessions.findIndex((candidate) => candidate.id === String(params.sid)) ?? -1
+    const session = sessionIndex >= 0 ? workspace?.sessions[sessionIndex] : undefined
+    if (!workspace || !session) {
+      return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    }
+    if (session.state !== 'paused') {
+      return HttpResponse.json({
+        error: 'session_not_paused',
+        message: 'Pause this Session before changing its credential, model, or effort',
+      }, { status: 409 })
+    }
+    const body = await request.json().catch(() => ({})) as Partial<PausedSessionRuntimeUpdate>
+    if (
+      (body.credentialSource !== 'native' && body.credentialSource !== 'vault')
+      || (body.credentialSource === 'vault' && !body.credentialSlug)
+    ) {
+      return HttpResponse.json({ error: 'bad_request' }, { status: 400 })
+    }
+    const updatedSession: SessionRecord = {
+      ...session,
+      runtime: {
+        credentialSource: body.credentialSource,
+        ...(body.credentialSource === 'vault' ? { credentialSlug: body.credentialSlug! } : {}),
+        ...(body.model ? { model: body.model } : {}),
+        ...(body.reasoningEffort ? { reasoningEffort: body.reasoningEffort } : {}),
+      },
+    }
+    demoWorkspaces[workspaceIndex] = {
+      ...workspace,
+      sessions: workspace.sessions.map((candidate, index) => (
+        index === sessionIndex ? updatedSession : candidate
+      )),
+    }
+    return HttpResponse.json({ session: updatedSession })
+  }),
   http.post('/api/workspaces/:id/sessions/:sid/resume', () => HttpResponse.json(null)),
   http.delete('/api/workspaces/:id/sessions/:sid', ({ params }) => {
     const wsId = String(params.id)

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { Check, ChevronRight, CircleAlert, CircleDashed, LoaderCircle, Send, Square } from 'lucide-react'
 
 import { MarkdownContent } from '../MarkdownContent'
+import { Textarea } from '@/components/ui/textarea'
 import {
   abortWebPiSession,
   getWebPiSession,
@@ -185,7 +186,7 @@ export function WebPiView({ wsId, sessionId, label, onSessionLost }: Props): Rea
 
       <div className="webpi-composer-wrap">
         <div className="webpi-composer">
-          <textarea
+          <Textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {

@@ -55,6 +55,39 @@ describe('preferences routes', () => {
     expect(remember).toHaveBeenCalledWith('pi', 'minimax-1')
   })
 
+  it('persists the complete recent launch tuple for Quick Start', async () => {
+    const remember = vi.fn(async (launch) => ({
+      lastCredentialByAgent: { pi: launch.credentialSlug! },
+      recentChatWorkspaceId: null,
+      recentLaunch: launch,
+    }))
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: vi.fn(),
+      rememberQuickChatLaunch: remember,
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    })
+    const legacyLaunch = {
+      agent: 'pi',
+      credentialSlug: 'deepseek-1',
+      model: 'deepseek-v4-flash',
+      reasoningEffort: 'high',
+    }
+    const normalizedLaunch = { ...legacyLaunch, accessMode: 'vault' }
+
+    const response = await app.request('/quick-chat/recent-launch', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(legacyLaunch),
+    })
+
+    expect(response.status).toBe(200)
+    expect(remember).toHaveBeenCalledWith(normalizedLaunch)
+    expect(await response.json()).toMatchObject({ recentLaunch: normalizedLaunch })
+  })
+
   it('accepts a future workspace-required adapter without changing the route schema', async () => {
     const futureAdapter: CliAdapter = {
       id: 'future',

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Credential } from '@/core/config.js'
@@ -74,6 +76,44 @@ describe('durable Session runtime binding', () => {
     expect(readAiConfig).not.toHaveBeenCalled()
   })
 
+  it('explicit native access bypasses an existing Workspace provider', async () => {
+    const readAiConfig = vi.fn(async (): Promise<WorkspaceAiCred> => ({
+      apiKey: 'workspace-secret-that-must-not-be-read',
+      model: 'workspace-model',
+      wireShape: 'openai-responses',
+    }))
+    const adapter = fakeAdapter(readAiConfig)
+
+    await expect(createSessionRuntimeBinding({
+      adapter,
+      cwd: '/workspace',
+      selection: {
+        credentialSource: 'native',
+        model: 'native-model',
+        reasoningEffort: 'high',
+      },
+      credentials: { 'openai-1': openai },
+    })).resolves.toEqual({
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'native-model',
+        reasoningEffort: 'high',
+      },
+      ai: { model: 'native-model', reasoningEffort: 'high' },
+    })
+    expect(readAiConfig).not.toHaveBeenCalled()
+  })
+
+  it('rejects a conflicting native and vault credential selection', async () => {
+    await expect(createSessionRuntimeBinding({
+      adapter: fakeAdapter(vi.fn(async () => null)),
+      cwd: '/workspace',
+      selection: { credentialSource: 'native', credentialSlug: 'openai-1' },
+      credentials: { 'openai-1': openai },
+    })).rejects.toMatchObject({ code: 'credential_selection_conflict' })
+  })
+
   it('persists a vault reference and resolved model without persisting its key', async () => {
     const resolved = await createSessionRuntimeBinding({
       adapter: codexAdapter,
@@ -105,28 +145,47 @@ describe('durable Session runtime binding', () => {
     expect(resumed.ai?.apiKey).toBe('rotated-key')
   })
 
-  it('treats native login as an explicit source and freezes project model preferences', async () => {
-    const adapter = fakeAdapter(async () => ({ model: 'native-model', reasoningEffort: 'medium' }))
+  it('keeps effort absent when a vault model is resolved without an explicit effort', async () => {
+    const resolved = await createSessionRuntimeBinding({
+      adapter: codexAdapter,
+      cwd: '/workspace',
+      selection: { credentialSlug: 'openai-1' },
+      credentials: { 'openai-1': openai },
+    })
+
+    expect(resolved.binding.model).toBe('gpt-5.6-terra')
+    expect(resolved.binding).not.toHaveProperty('reasoningEffort')
+    expect(resolved.ai?.model).toBe('gpt-5.6-terra')
+    expect(resolved.ai).not.toHaveProperty('reasoningEffort')
+  })
+
+  it('treats native login as the fresh default without reading project config', async () => {
+    const read = vi.fn(async () => ({ model: 'native-model', reasoningEffort: 'medium' }) as WorkspaceAiCred)
+    const adapter = fakeAdapter(read)
     await expect(createSessionRuntimeBinding({ adapter, cwd: '/workspace', credentials: {} }))
       .resolves.toMatchObject({
         binding: {
           credential: { source: 'native' },
-          model: 'native-model',
-          reasoningEffort: 'medium',
         },
       })
+    expect(read).not.toHaveBeenCalled()
   })
 
-  it('refuses to silently resume through a replaced untracked Workspace provider', async () => {
-    const read = vi.fn(async (): Promise<WorkspaceAiCred> => ({
+  it('still refuses to silently resume a persisted legacy Workspace provider after replacement', async () => {
+    const original: WorkspaceAiCred = {
       baseUrl: 'https://gateway.test/v1',
       apiKey: 'first-key',
       wireShape: 'openai-responses',
       model: 'private-model',
-    }))
+    }
+    const fingerprint = createHash('sha256').update(JSON.stringify({
+      baseUrl: original.baseUrl,
+      apiKey: original.apiKey,
+      wireShape: original.wireShape,
+      authMode: null,
+    })).digest('hex')
+    const read = vi.fn(async (): Promise<WorkspaceAiCred> => original)
     const adapter = fakeAdapter(read)
-    const created = await createSessionRuntimeBinding({ adapter, cwd: '/workspace', credentials: {} })
-    expect(created.binding.credential.source).toBe('workspace')
 
     read.mockResolvedValue({
       baseUrl: 'https://gateway.test/v1',
@@ -137,7 +196,11 @@ describe('durable Session runtime binding', () => {
     await expect(resolveSessionRuntimeBinding({
       adapter,
       cwd: '/workspace',
-      binding: created.binding,
+      binding: {
+        version: 1,
+        credential: { source: 'workspace', fingerprint },
+        model: original.model ?? undefined,
+      },
       credentials: {},
     })).rejects.toMatchObject({
       code: 'workspace_binding_changed',
@@ -222,12 +285,64 @@ describe('built-in Agent Session runtime projection', () => {
 
   it('projects the native model and effort flags on every launch surface', () => {
     expect(claudeAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
-      .toEqual(['--model', 'session-model', '--effort', 'high'])
+      .toEqual([
+        '--setting-sources=project',
+        '--model',
+        'session-model',
+        '--effort',
+        'high',
+      ])
     expect(codexAdapter.sessionRuntime!.project(ctx, runtime).headlessArgs)
       .toContain('model_reasoning_effort="high"')
     expect(opencodeAdapter.sessionRuntime!.project(ctx, runtime).headlessArgs)
       .toContain('--variant')
     expect(piAdapter.sessionRuntime!.project(ctx, runtime).webArgs)
       .toContain('--extension')
+  })
+
+  it.each([
+    [claudeAdapter, '--effort'],
+    [codexAdapter, 'model_reasoning_effort'],
+    [opencodeAdapter, '--variant'],
+    [piAdapter, '--thinking'],
+  ] as const)(
+    '$id does not synthesize an effort flag when an explicit model omits effort',
+    (adapter, effortFlag) => {
+      const native = createNativeSessionRuntimeBinding({
+        adapter,
+        selection: { model: 'native-model-override' },
+      })
+      const projected = adapter.sessionRuntime!.project(ctx, native)
+      const serializedArgs = [
+        ...projected.interactiveArgs,
+        ...projected.headlessArgs,
+        ...(projected.webArgs ?? []),
+      ].join(' ')
+
+      expect(serializedArgs).toContain('native-model-override')
+      expect(serializedArgs).not.toContain(effortFlag)
+    },
+  )
+
+  it('keeps only Claude project settings for OpenAlice-managed credentials', () => {
+    const managed = claudeAdapter.sessionRuntime!.project(ctx, runtime)
+    for (const args of [managed.interactiveArgs, managed.headlessArgs, managed.webArgs]) {
+      expect(args).toContain('--setting-sources=project')
+      expect(args).not.toContain('--plugin-dir')
+    }
+
+    const native = createNativeSessionRuntimeBinding({
+      adapter: claudeAdapter,
+      selection: { model: 'native-model-override', reasoningEffort: 'medium' },
+    })
+    const projectedNative = claudeAdapter.sessionRuntime!.project(ctx, native)
+    for (const args of [
+      projectedNative.interactiveArgs,
+      projectedNative.headlessArgs,
+      projectedNative.webArgs,
+    ]) {
+      expect(args).not.toContain('--setting-sources=project')
+      expect(args).not.toContain('--plugin-dir')
+    }
   })
 })

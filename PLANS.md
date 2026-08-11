@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
+  healthy dev/CLI Runtime already owning the selected data location and hand
+  the user to its verified browser UI without takeover.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
@@ -28,13 +31,37 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/0892-migration-baseline.md]] — Retires the development-era 0001–0038
+  migration chain, establishes 0.89.2-beta as the persisted-state baseline, and
+  prevents isolated tests from combining a temporary journal with a live
+  Workspace root.
+- [[plans/issue-runtime-choice.md]] — Aligns scheduled-Issue AI inheritance
+  with Workspace headless preferences and replaces the four-field rail with a
+  source-aware Runtime plus AI configuration flow.
+- [[plans/workspace-ai-preferences.md]] — Reframes durable Workspace AI
+  preferences around interactive and headless launch modes, with both modes
+  visible together and a one-time version 3 migration.
+- [[plans/workspace-runtime-settings.md]] — Adds portable, secret-free
+  interactive/headless runtime preferences to each Workspace and demotes native
+  project credential injection to an explicit deprecated compatibility export.
+- [[plans/static-markdown-content-stability.md]] — Keeps Inbox and Tracked
+  Markdown DOM stable across unchanged Workspace Manager and Inbox polling so
+  text selection, browser translation, and report interactions survive.
+  Delivered for topic review in Draft PR #1030.
+- [[plans/shadcn-resizable-page-sidebar.md]] — Replaced the hand-written
+  page-sidebar rail with shadcn Resizable and closed its responsive,
+  threshold-motion, resisted-overdrag, repeat-cycle, and rapid-reversal
+  contracts in Draft PR #1025.
+- [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
+  local relationship graph derived from Tracked entities and authored Workspace
+  backlinks, with provenance-preserving material navigation.
+- [[plans/quick-start-launch-context.md]] — Reframed Quick Start as a compact
+  launch context: Workspace and Agent runtime sit outside the composer, while
+  human-readable AI access, model, and effort choices remain inside it.
 - [[plans/semantic-issue-assignees.md]] — Replaced ambiguous scheduled-Issue
   assignee tokens with behavior-named canonical values, explicit deprecated
   aliases, and an idempotent Workspace-file migration. Delivered in serial PR
   #990.
-- [[plans/issue-runtime-choice.md]] — Made scheduled Issue launch selection a
-  credential-first flow, narrowed model and effort choices to that provider,
-  and froze the result in the new Session runtime binding.
 - [[plans/session-runtime-bindings.md]] — Made credential source, model, and
   effort a durable product-Session binding projected by every Agent adapter
   across interactive, Web, and headless launch/resume.

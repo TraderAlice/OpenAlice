@@ -51,6 +51,7 @@ export interface ScheduleSnapshotTask {
   assignee: string
   agent?: string
   credential?: string
+  credentialSource?: 'native'
   model?: string
   effort?: ModelReasoningEffort
   /** False once the owning issue reaches a terminal status (done/canceled). */
@@ -109,6 +110,7 @@ export function snapshotScheduledIssue(
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
     ...(issue.credential ? { credential: issue.credential } : {}),
+    ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     enabled: !isTerminalStatus(issue.status),

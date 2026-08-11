@@ -36,13 +36,18 @@ import {
   type ResolvedSessionRuntimeBinding,
 } from './cli-adapter.js';
 import { loadConfig, type ServerConfig } from './config.js';
-import { ensureAgentCredentialReady } from './agent-credential-readiness.js';
 import {
   createNativeSessionRuntimeBinding,
   createSessionRuntimeBinding,
   resolveSessionRuntimeBinding,
   type SessionRuntimeSelection,
 } from './session-runtime-binding.js';
+import {
+  readWorkspaceRuntimeSettings,
+  rememberWorkspaceRuntimeBinding,
+  resolveWorkspaceRuntimeAgent,
+  resolveWorkspaceRuntimeSelection,
+} from './workspace-runtime-settings.js';
 import { logger as launcherLogger } from './logger.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
 import { headlessTaskStatus, runHeadlessTask, type HeadlessTaskResult } from './headless-task.js';
@@ -127,6 +132,7 @@ import {
   type HeadlessTaskTrigger,
 } from './headless-task-registry.js';
 import { ResumeRegistry } from './resume-registry.js';
+import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js';
 import {
   AUTO_QUANT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
@@ -308,9 +314,9 @@ import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import {
   SessionRegistry,
-  sessionPreferredTitle,
   type SessionRecord,
 } from './session-registry.js';
+import { projectPublicSession } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
@@ -333,6 +339,7 @@ import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
 import { readHarnessSource } from './harness-source.js';
 import {
   createManagerWorkspaceMeta,
+  MANAGER_WORKSPACE_ID,
 } from './manager-workspace.js';
 
 /**
@@ -591,9 +598,22 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'headless-tasks.json'),
     launcherLogger.child({ scope: 'headless-registry' }),
   );
+  const sessionRuntimeStore = new WorkspaceSessionRuntimeStore((wsId) => {
+    if (wsId === MANAGER_WORKSPACE_ID) {
+      return [join(config.launcherRoot, 'state', 'workspace-manager-sessions')];
+    }
+    const directories: string[] = [];
+    const active = registry.get(wsId);
+    if (active) directories.push(join(active.dir, '.alice', 'sessions'));
+    const historical = catalog.get(wsId);
+    if (historical?.departedDir) directories.push(join(historical.departedDir, '.alice', 'sessions'));
+    if (historical) directories.push(join(historical.activeDir, '.alice', 'sessions'));
+    return directories;
+  });
   const resumeRegistry = await ResumeRegistry.load(
     join(config.launcherRoot, 'state', 'resume-identities.json'),
     launcherLogger.child({ scope: 'resume-registry' }),
+    sessionRuntimeStore,
   );
   const provenanceStore = await ArtifactProvenanceStore.load(
     join(config.launcherRoot, 'state', 'artifact-provenance.json'),
@@ -843,13 +863,21 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   };
 
   /**
-   * Default for scheduled issues with no frontmatter `agent`: issue-specific
-   * setting first, then the target Workspace Session default, installation
-   * fallback, and finally the first registered runtime.
+   * Default for scheduled issues with no frontmatter `agent`: the Workspace's
+   * headless recent runtime first, then the legacy installation Issue default,
+   * its Session default, and finally the first registered runtime.
    */
-  const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> =>
-    validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
-    await resolveDefaultAgentId(wsMeta);
+  const resolveIssueDefaultAgentId = async (wsMeta: WorkspaceMeta): Promise<string | undefined> => {
+    const runtimeSettings = await readWorkspaceRuntimeSettings(wsMeta.dir);
+    if (!runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
+      throw new Error(`invalid Workspace runtime settings: ${runtimeSettings.error}`);
+    }
+    return validRegisteredRuntime(runtimeSettings.ok
+        ? resolveWorkspaceRuntimeAgent(runtimeSettings.settings, 'headless') ?? null
+        : null) ??
+      validRegisteredRuntime(await readIssueDefaultAgent().catch(() => null)) ??
+      await resolveDefaultAgentId(wsMeta);
+  };
 
   /**
    * Single source of truth for "given a workspace + adapter + resume intent,
@@ -1053,21 +1081,37 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     source: AgentRuntimeReadinessSource,
   ) => {
     const ws = await prepareRuntimeReadinessWorkspace(adapter);
-    let effectiveSource = source;
-    if (adapter.readAiConfig) {
-      try {
-        if (await adapter.readAiConfig(ws.dir)) effectiveSource = 'workspace-override';
-      } catch (error) {
-        launcherLogger.warn('agent_runtime_readiness.workspace_config_read_failed', {
-          agent: adapter.id,
-          error,
-        });
-      }
+    const read = await readWorkspaceRuntimeSettings(ws.dir);
+    if (!read.ok && read.reason === 'invalid') {
+      throw new Error(`invalid Workspace runtime settings: ${read.error}`);
     }
-    const { cwd, env } = composeSpawnInputs(ws, adapter, undefined);
+    const sessionRuntime = await createSessionRuntimeBinding({
+      adapter,
+      cwd: ws.dir,
+      selection: resolveWorkspaceRuntimeSelection(
+        read.ok ? read.settings : null,
+        'interactive',
+        adapter.id,
+        undefined,
+      ),
+    });
+    const effectiveSource: AgentRuntimeReadinessSource =
+      sessionRuntime.binding.credential.source === 'vault' ? 'launcher-vault' : source;
+    const { cwd, env, sessionRuntimeProjection } = composeSpawnInputs(
+      ws,
+      adapter,
+      undefined,
+      undefined,
+      undefined,
+      sessionRuntime,
+    );
     const command = adapter.composeHeadlessCommand?.(
       config.command,
-      { cwd, env },
+      {
+        cwd,
+        env,
+        ...(sessionRuntimeProjection ? { sessionRuntime: sessionRuntimeProjection } : {}),
+      },
       RUNTIME_READINESS_PROMPT,
     );
     if (!command) return null;
@@ -1279,18 +1323,35 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       operationLease.release();
     };
     try {
-      await ensureAgentCredentialReady({
-        meta: ws,
-        agentId: adapter.id,
-        adapter,
-        logger: launcherLogger,
-      });
       await prepareAgentRuntimeWorkspace(adapter, {
         wsId: ws.id,
         cwd: ws.dir,
         launcherRepoRoot: config.launcherRepoRoot,
       });
-      const { command, cwd, env, transcriptDir } = composeSpawnInputs(ws, adapter, resume);
+      const runtimeSettings = await readWorkspaceRuntimeSettings(ws.dir);
+      if (!runtimeSettings.ok && runtimeSettings.reason === 'invalid') {
+        throw new Error(`invalid Workspace runtime settings: ${runtimeSettings.error}`);
+      }
+      const sessionRuntime = isAgentRuntime(adapter)
+        ? await createSessionRuntimeBinding({
+            adapter,
+            cwd: ws.dir,
+            selection: resolveWorkspaceRuntimeSelection(
+              runtimeSettings.ok ? runtimeSettings.settings : null,
+              'headless',
+              adapter.id,
+              undefined,
+            ),
+          })
+        : undefined;
+      const { command, cwd, env, transcriptDir } = composeSpawnInputs(
+        ws,
+        adapter,
+        resume,
+        undefined,
+        undefined,
+        sessionRuntime,
+      );
       return await runHeadlessProbe({
         command,
         cwd,
@@ -1323,6 +1384,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       onSessionId?: (id: string) => void;
       selection?: SessionRuntimeSelection;
       sessionRuntime?: ResolvedSessionRuntimeBinding;
+      /** Record this supplied binding only after a fresh child actually spawns. */
+      rememberRuntime?: boolean;
     } = {},
   ): Promise<HeadlessTaskResult> => {
     const operationLease = workspaceOperationGuard.acquire(ws.id, 'headless-run');
@@ -1340,11 +1403,25 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (!adapter.capabilities.headless || !adapter.composeHeadlessCommand) {
         throw new Error(`adapter "${adapter.id}" has no headless mode`);
       }
-      const sessionRuntime = opts.sessionRuntime ?? await createSessionRuntimeBinding({
-        adapter,
-        cwd: ws.dir,
-        selection: opts.selection,
-      });
+      let sessionRuntime = opts.sessionRuntime;
+      let rememberRuntime = opts.rememberRuntime === true;
+      if (!sessionRuntime) {
+        const read = await readWorkspaceRuntimeSettings(ws.dir);
+        if (!read.ok && read.reason === 'invalid') {
+          throw new Error(`invalid Workspace runtime settings: ${read.error}`);
+        }
+        sessionRuntime = await createSessionRuntimeBinding({
+          adapter,
+          cwd: ws.dir,
+          selection: resolveWorkspaceRuntimeSelection(
+            read.ok ? read.settings : null,
+            'headless',
+            adapter.id,
+            opts.selection,
+          ),
+        });
+        rememberRuntime = true;
+      }
       await prepareAgentRuntimeWorkspace(adapter, {
         wsId: ws.id,
         cwd: ws.dir,
@@ -1419,6 +1496,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           ...(opts.onSessionId ? { onSessionId: opts.onSessionId } : {}),
           onChildSpawned: (child) => {
             activityLease.attach(child);
+            if (rememberRuntime && existsSync(ws.dir)) {
+              rememberRuntime = false;
+              void rememberWorkspaceRuntimeBinding({
+                wsDir: ws.dir,
+                mode: 'headless',
+                agent: adapter.id,
+                runtime: sessionRuntime,
+              }).catch((err) => launcherLogger.warn('workspace.runtime_preference_write_failed', {
+                wsId: ws.id,
+                mode: 'headless',
+                agent: adapter.id,
+                err,
+              }));
+            }
             // From here process-backed activity closes the race; directory
             // reviews may proceed and explain this exact run as the blocker.
             releaseStartLease();
@@ -1498,10 +1589,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         ? await resolveSessionRuntimeBinding({ adapter, cwd: ws.dir, binding: identity.runtimeBinding })
         : createNativeSessionRuntimeBinding({ adapter });
     } else {
+      const read = await readWorkspaceRuntimeSettings(ws.dir);
+      if (!read.ok && read.reason === 'invalid') {
+        throw new Error(`invalid Workspace runtime settings: ${read.error}`);
+      }
       sessionRuntime = await createSessionRuntimeBinding({
         adapter,
         cwd: ws.dir,
-        selection,
+        selection: resolveWorkspaceRuntimeSelection(
+          read.ok ? read.settings : null,
+          'headless',
+          adapter.id,
+          selection,
+        ),
       });
     }
     let rec: HeadlessTaskRecord;
@@ -1560,6 +1660,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       resumeId: rec.resumeId,
       ...(nativeResume ? { resume: nativeResume } : {}),
       sessionRuntime,
+      ...(!resumeId ? { rememberRuntime: true } : {}),
       onSessionId: (id) => {
         void Promise.all([
           headlessTasks.setAgentSessionId(rec.taskId, id),
@@ -2326,31 +2427,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
 
   const publicMeta = async (w: WorkspaceMeta): Promise<unknown> => {
     const metadata = await readWorkspaceMetadata(w.dir);
+    const runtimeSettings = await readWorkspaceRuntimeSettings(w.dir);
     const harnessSource = await readHarnessSource(w.dir);
     await sessionRegistry.ensureLoaded(w.id).catch(() => undefined);
     void refreshSessionTitles(w);
-    const sessions = sessionRegistry.listFor(w.id).map((r) => {
-      const terminal = pool.get(r.id);
-      const browser = webPi.get(r.id);
-      return {
-        id: r.id,
-        wsId: r.wsId,
-        agent: r.agent,
-        name: r.name,
-        createdAt: r.createdAt,
-        lastActiveAt: r.lastActiveAt,
-        state: r.state === 'running' && (terminal || browser) ? 'running' : 'paused',
-        surface: browser ? 'webpi' : (r.surface ?? 'terminal'),
-        resumeId: r.resumeId,
-        pid: terminal?.pid ?? browser?.pid ?? null,
-        startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-        title: sessionPreferredTitle(r) ?? null,
-        sourceRunId: r.sourceRunId ?? null,
-      };
-    });
-    // Workspace AI provider override signals — read by the Overview
-    // dashboard for the "⚙ Workspace override" footer per card. Cheap
-    // (single statSync each) so it's safe on the regular list poll.
+    const sessions = sessionRegistry.listFor(w.id).map((record) =>
+      projectPublicSession(record, {
+        terminal: pool.get(record.id),
+        webPi: webPi.get(record.id),
+        runtimeBinding: resumeRegistry.get(record.resumeId)?.runtimeBinding,
+      }),
+    );
+    // Deprecated native-project compatibility-export signals. Retained in the
+    // public contract for advanced diagnostics; managed Session defaults come
+    // from `runtimeSettings` and primary UI surfaces do not expose these files.
     const agentOverride = {
       claude: existsSync(join(w.dir, '.claude', 'settings.local.json')),
       codex: existsSync(join(w.dir, '.codex')),
@@ -2379,6 +2469,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...w,
       ...(metadata.ok ? metadata.metadata : {}),
       ...(!metadata.ok && metadata.reason === 'invalid' ? { metadataError: metadata.error } : {}),
+      ...(runtimeSettings.ok ? { runtimeSettings: runtimeSettings.settings } : {}),
+      ...(!runtimeSettings.ok && runtimeSettings.reason === 'invalid'
+        ? { runtimeSettingsError: runtimeSettings.error }
+        : {}),
       ...(harnessSource ? { harnessSource } : {}),
       sessions,
       agentOverride,

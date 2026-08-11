@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
+import { useWorkspaceSessionData } from '../hooks/useWorkspaceData'
 import { useWorkspace } from '../tabs/store'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
@@ -40,12 +41,12 @@ export function WorkspacePage({ spec, visible }: Props) {
   const wsId = spec.params.wsId
   const sessionId = spec.params.sessionId ?? null
   const source = spec.params.source
-
-  const workspace = ctx.workspaces.find((w) => w.id === wsId)
-  const sessions = workspace?.sessions ?? []
-  const activeRecord = sessionId
-    ? sessions.find((s) => s.id === sessionId) ?? null
-    : null
+  const {
+    workspace,
+    sessions,
+    session: activeRecord,
+    updateRuntime,
+  } = useWorkspaceSessionData(wsId, sessionId)
   const effectiveDefaultAgent = workspace?.defaultAgent ?? ctx.defaultAgent
   const defaultAgentEnabled =
     effectiveDefaultAgent !== null &&
@@ -100,6 +101,8 @@ export function WorkspacePage({ spec, visible }: Props) {
     !import.meta.env.VITE_DEMO_MODE &&
     activeRecord?.state === 'running' &&
     (activeRecord.surface ?? 'terminal') === 'terminal'
+  const pausedCanvas = activeRecord?.state === 'paused'
+  const workspaceCanvas = terminalCanvas || pausedCanvas
   const workspaceActions = (
     <>
       {activeRecord?.agent === 'pi' && activeRecord.state === 'running' && (
@@ -143,7 +146,7 @@ export function WorkspacePage({ spec, visible }: Props) {
   // holds for the active path); when sessionId is null, the empty
   // state needs the full list to render resume/continue cards.
   return (
-    <div className={`workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? ' is-terminal-canvas' : ''}`}>
+    <div className={`workspaces-root workspace-page-shell flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${terminalCanvas ? ' is-terminal-canvas' : ''}${pausedCanvas ? ' is-paused-canvas' : ''}`}>
       {/* Library, paused, WebPi, and demo surfaces keep a page-level header.
        * A live TUI promotes these actions into the terminal's own titlebar so
        * the primary canvas does not sit inside a second shell. */}
@@ -168,17 +171,19 @@ export function WorkspacePage({ spec, visible }: Props) {
         </div>
       )}
 
-      <div className={`flex min-h-0 min-w-0 flex-1 flex-col${terminalCanvas ? '' : ' p-3'}`}>
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col${workspaceCanvas ? '' : ' p-3'}`}>
         <WorkspaceView
           wsId={wsId}
           sessionId={sessionId}
           {...(source ? { source } : {})}
           activeRecord={activeRecord}
-          sessions={workspace.sessions}
+          sessions={sessions}
+          agents={ctx.agents}
           label={workspaceName}
           terminalHeaderActions={terminalCanvas ? workspaceActions : undefined}
           onSpawnFresh={spawnDefault}
           onResume={(id) => ctx.resumeSession(wsId, id, source)}
+          onUpdateSessionRuntime={(_id, update) => updateRuntime(update).then(() => undefined)}
           onOpenWebPi={(id) => ctx.openWebPiSession(wsId, id, source)}
           onSelectSession={(id) => {
             // Running session — already alive on the server, just

@@ -112,6 +112,18 @@ describe('WebPi transcript scrolling', () => {
 })
 
 describe('WebPi composer keyboard submission', () => {
+  it('uses the shared content-sized textarea so multiline prompts grow until the CSS cap', async () => {
+    mocks.getWebPiSession.mockResolvedValue(snapshot('idle'))
+    render(
+      <WebPiView wsId="workspace-manager" sessionId="p1" onSessionLost={vi.fn()} />,
+    )
+
+    const composer = await screen.findByPlaceholderText('Message Pi…')
+    expect(composer.getAttribute('data-slot')).toBe('textarea')
+    expect(composer.className).toContain('field-sizing-content')
+    expect(composer.getAttribute('rows')).toBe('1')
+  })
+
   it('does not submit when Enter confirms an IME composition candidate', async () => {
     mocks.getWebPiSession.mockResolvedValue(snapshot('idle'))
     render(

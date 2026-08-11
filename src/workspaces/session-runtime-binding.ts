@@ -12,7 +12,6 @@ import type {
 } from './cli-adapter.js'
 import {
   credentialToWorkspaceAiCred,
-  matchCredentialByApiKey,
   resolveInjectionModel,
 } from './credential-injection.js'
 
@@ -21,6 +20,7 @@ export class SessionRuntimeBindingError extends Error {
     readonly code:
       | 'credential_not_found'
       | 'credential_incompatible'
+      | 'credential_selection_conflict'
       | 'workspace_binding_missing'
       | 'workspace_binding_changed'
       | 'adapter_contract_missing',
@@ -33,6 +33,8 @@ export class SessionRuntimeBindingError extends Error {
 
 /** Optional choices captured exactly once when a product Session is created. */
 export interface SessionRuntimeSelection {
+  /** Explicitly bypass Workspace/provider files and use the runtime's own auth. */
+  readonly credentialSource?: 'native'
   readonly credentialSlug?: string
   readonly model?: string
   readonly reasoningEffort?: SessionRuntimeBinding['reasoningEffort']
@@ -50,7 +52,7 @@ export interface SessionRuntimeSelection {
  */
 export function createNativeSessionRuntimeBinding(input: {
   readonly adapter: CliAdapter
-  readonly selection?: Omit<SessionRuntimeSelection, 'credentialSlug'>
+  readonly selection?: Omit<SessionRuntimeSelection, 'credentialSlug' | 'credentialSource'>
 }): ResolvedSessionRuntimeBinding {
   assertedAgentContract(input.adapter)
   const selection = input.selection ?? {}
@@ -144,7 +146,13 @@ function resolveVault(
   return { binding, ai }
 }
 
-/** Resolve and freeze a fresh product Session's launch selection. */
+/**
+ * Resolve and freeze a fresh product Session's launch selection.
+ *
+ * Workspace-owned defaults are merged by the caller before this boundary.
+ * Native project files are deliberately not inspected here: managed Sessions
+ * must not acquire an invisible credential/model from a compatibility export.
+ */
 export async function createSessionRuntimeBinding(input: {
   readonly adapter: CliAdapter
   readonly cwd: string
@@ -153,6 +161,21 @@ export async function createSessionRuntimeBinding(input: {
 }): Promise<ResolvedSessionRuntimeBinding> {
   assertedAgentContract(input.adapter)
   const selection = input.selection ?? {}
+  if (selection.credentialSource === 'native') {
+    if (selection.credentialSlug) {
+      throw new SessionRuntimeBindingError(
+        'credential_selection_conflict',
+        'Native runtime authentication cannot be combined with a vault credential',
+      )
+    }
+    return createNativeSessionRuntimeBinding({
+      adapter: input.adapter,
+      selection: {
+        ...(selection.model ? { model: selection.model } : {}),
+        ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+      },
+    })
+  }
   if (selection.credentialSlug) {
     const credentials = input.credentials ?? await readCredentials()
     return resolveVault(input.adapter, credentials, selection.credentialSlug, {
@@ -160,42 +183,7 @@ export async function createSessionRuntimeBinding(input: {
       ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
     })
   }
-
-  const workspace = await input.adapter.readAiConfig?.(input.cwd).catch(() => null) ?? null
-  if (!workspace) {
-    return createNativeSessionRuntimeBinding({ adapter: input.adapter, selection })
-  }
-
-  const selectedModel = selection.model ?? workspace.model ?? undefined
-  const selectedEffort = selection.reasoningEffort ?? workspace.reasoningEffort ?? undefined
-  if (!workspace.apiKey && !workspace.baseUrl) {
-    const binding: SessionRuntimeBinding = {
-      version: 1,
-      credential: { source: 'native' },
-      ...modelFields(selectedModel, selectedEffort),
-    }
-    return { binding, ai: { ...workspace, model: selectedModel ?? null, reasoningEffort: selectedEffort ?? null } }
-  }
-
-  const credentials = input.credentials ?? await readCredentials()
-  const slug = matchCredentialByApiKey(credentials as Record<string, Credential>, workspace.apiKey)
-  if (slug) {
-    return resolveVault(input.adapter, credentials, slug, {
-      ...(workspace.wireShape ? { requestedWireShape: workspace.wireShape } : {}),
-      ...(selectedModel ? { model: selectedModel } : {}),
-      ...(selectedEffort ? { reasoningEffort: selectedEffort } : {}),
-    })
-  }
-
-  const ai = { ...workspace, model: selectedModel ?? null, reasoningEffort: selectedEffort ?? null }
-  return {
-    binding: {
-      version: 1,
-      credential: { source: 'workspace', fingerprint: providerFingerprint(ai) },
-      ...modelFields(selectedModel, selectedEffort),
-    },
-    ai,
-  }
+  return createNativeSessionRuntimeBinding({ adapter: input.adapter, selection })
 }
 
 /** Resolve a persisted binding without changing its credential/model choices. */

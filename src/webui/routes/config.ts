@@ -108,7 +108,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   // ==================== Credential Vault ====================
   //
-  // Alice's central api-key credentials — the set injected into workspaces.
+  // Alice's central api-key credentials — resolved into per-process Session
+  // bindings when a Workspace launch explicitly selects one.
   // Subscription logins (claude login / codex login) are NOT stored here; they
   // live in the CLI's own auth. The list never returns the raw key (only
   // whether one is set); Test runs the lightweight probe, not the in-process
@@ -242,10 +243,9 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   // ============ Default Workspace Credentials (per-agent) ============
   //
-  // The user-level "inject my usual key on every new workspace" setting. A
-  // per-agent map of {credentialSlug, model?} that the workspace creator seeds
-  // into each new workspace's file-based AI config at create time — sparing the
-  // user the per-workspace AI-config modal. References the vault above.
+  // Deprecated installation-level creation seeds. The Workspace creator
+  // translates this per-agent map into secret-free `.alice/settings.json`
+  // preferences; it no longer writes native CLI project configuration.
 
   /**
    * GET /workspace-credential-defaults — the current per-agent defaults plus,

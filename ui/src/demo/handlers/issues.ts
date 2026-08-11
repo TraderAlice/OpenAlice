@@ -35,6 +35,7 @@ const MODEL_REASONING_EFFORTS = [
   'high',
   'xhigh',
   'max',
+  'ultra',
 ] as const satisfies readonly ModelReasoningEffort[]
 
 const COMMENT_MAX = 16_000
@@ -72,6 +73,7 @@ export const issuesHandlers = [
       assignee?: unknown
       agent?: unknown
       credential?: unknown
+      credentialSource?: unknown
       model?: unknown
       effort?: unknown
       what?: unknown
@@ -86,6 +88,7 @@ export const issuesHandlers = [
       assignee?: string
       agent?: string | null
       credential?: string | null
+      credentialSource?: 'native' | null
       model?: string | null
       effort?: ModelReasoningEffort | null
       what?: string
@@ -130,6 +133,15 @@ export const issuesHandlers = [
         patch.credential = body.credential.trim()
       }
     }
+    if (body.credentialSource !== undefined) {
+      if (body.credentialSource === null || body.credentialSource === '') {
+        patch.credentialSource = null
+      } else if (body.credentialSource !== 'native') {
+        return HttpResponse.json({ error: 'invalid_credential_source' }, { status: 400 })
+      } else {
+        patch.credentialSource = 'native'
+      }
+    }
     if (body.model !== undefined) {
       if (body.model === null || body.model === '') {
         patch.model = null
@@ -160,6 +172,7 @@ export const issuesHandlers = [
       patch.assignee === undefined &&
       patch.agent === undefined
       && patch.credential === undefined
+      && patch.credentialSource === undefined
       && patch.model === undefined
       && patch.effort === undefined
       && patch.what === undefined

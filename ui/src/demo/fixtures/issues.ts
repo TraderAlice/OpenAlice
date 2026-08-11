@@ -540,7 +540,17 @@ export function demoIssueUpdate(
   }
   if (patch.credential !== undefined) {
     if (patch.credential === null) delete boardIssue.credential
-    else boardIssue.credential = patch.credential
+    else {
+      boardIssue.credential = patch.credential
+      delete boardIssue.credentialSource
+    }
+  }
+  if (patch.credentialSource !== undefined) {
+    if (patch.credentialSource === null) delete boardIssue.credentialSource
+    else {
+      boardIssue.credentialSource = patch.credentialSource
+      delete boardIssue.credential
+    }
   }
   if (patch.effort !== undefined) {
     if (patch.effort === null) delete boardIssue.effort

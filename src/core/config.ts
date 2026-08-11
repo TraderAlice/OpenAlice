@@ -115,7 +115,7 @@ export type CredentialAuthType = z.infer<typeof credentialAuthTypeEnum>
  * The wire protocol the credential's endpoint speaks. Load-bearing, NOT
  * derivable from baseUrl alone — OpenAI Chat Completions and Responses share
  * one base URL (api.openai.com/v1), so only this field distinguishes them. Also
- * tells injection how to configure the consuming adapter. Mirrors the
+ * tells runtime projection how to configure the consuming adapter. Mirrors the
  * `WireShape` union in ai-providers/preset-catalog.ts (kept in sync by hand;
  * core must not depend on the ai-providers layer).
  */
@@ -139,7 +139,7 @@ export const credentialSchema = z.object({
    * = the shape's official endpoint). A provider exposes the SAME key behind
    * several incompatible shapes that differ only by endpoint (GLM: anthropic at
    * /api/anthropic, openai-chat at /api/paas/v4), so one credential declares all
-   * of them — "wire capabilities" — and injection picks the one the target agent
+   * of them — "wire capabilities" — and projection picks the one the target agent
    * speaks. Fill the key once.
    */
   wires: z.partialRecord(credentialWireShapeEnum, z.string()).optional(),
@@ -150,8 +150,8 @@ export const credentialSchema = z.object({
   /**
    * The last model run against this key — a credential carries no model of its
    * own (model is always a per-use choice), so quick-chat and the per-workspace
-   * config remember the user's last pick here to spare them re-typing it. Set on
-   * every config write that knows the slug; read as the injection default
+   * settings remember the user's last pick here to spare them re-typing it. Set
+   * after accepted uses that know the slug; read as the launch default
    * (falling back to the vendor's catalog flagship when absent). Optional ⇒ no
    * migration; an old cred just has no remembered model until next write.
    */
@@ -171,14 +171,16 @@ export function credentialWires(cred: Credential): Partial<Record<CredentialWire
 }
 
 /**
- * A user-level default that seeds a freshly-created workspace's per-agent AI
- * config from a vault credential — the "inject my usual key on every launch"
- * setting. Keyed by agentId (`claude` / `codex` / `opencode` / `pi`).
+ * A legacy user-level default retained for migration and compatibility. New
+ * Workspaces translate it into secret-free `.alice/settings.json` launch
+ * preferences; they do not write secrets into native CLI project files.
+ * Keyed by agentId (`claude` / `codex` / `opencode` / `pi`).
  * `credentialSlug` points into `credentials`; `model` is the optional run model
  * (absent ⇒ resolved from the cred's `lastModel`, then the vendor flagship).
  * Structurally a superset-compatible mirror of the workspaces layer's
- * `AgentCredentialDecl`, so the creator can merge the two and feed
- * `injectWorkspaceCredentials` directly.
+ * `AgentCredentialDecl`.
+ *
+ * @deprecated Prefer Workspace-local recent launch preferences.
  */
 export const workspaceCredentialDefaultSchema = z.object({
   credentialSlug: z.string(),
@@ -205,11 +207,14 @@ export const aiProviderSchema = z.object({
    */
   credentials: z.record(z.string(), credentialSchema).default({}),
   /**
-   * Per-agent default credential seeded into EVERY new workspace at create time
+   * Legacy per-agent default translated into each new Workspace's secret-free
+   * runtime settings at create time
    * (agentId → {credentialSlug, model?}). The user-level counterpart to a
    * template's `agentCredentials`: set a default cred per agent once and skip the
-   * per-workspace AI-config modal on each launch. References slugs in
-   * `credentials`; a dangling slug is loud-skipped at injection, never fatal.
+   * per-Workspace selection on first launch. References slugs in `credentials`;
+   * a dangling slug is loud-skipped, never fatal.
+   *
+   * @deprecated Existing values are honored as creation seeds only.
    */
   workspaceCredentialDefaults: z.record(z.string(), workspaceCredentialDefaultSchema).default({}),
   /**
@@ -701,8 +706,9 @@ export async function readUTAsConfig(): Promise<UTAConfig[]> {
     return []
   }
 
-  // Sealed envelope — the normal at-rest shape. A plain array is the legacy
-  // plaintext form: still readable (migration 0009 reseals it at boot).
+  // Sealed envelope — the normal at-rest shape. A plain array remains readable
+  // for manual recovery, but the 0.89.2-beta baseline no longer runs a legacy
+  // boot migration; the next explicit account save writes the sealed shape.
   if (isSealedEnvelope(raw)) {
     try {
       raw = await unseal(raw)

@@ -311,9 +311,20 @@ Human `status` reports:
 - Alice, UTA, and Connector state;
 - source launch root and safe diagnostic detail when available.
 
-An Electron-owned or dev-owned Runtime may be inspected and opened, but
-`down` refuses it. Only a matching `cli-server` that advertises
-`runtime.stop` accepts the stop transaction.
+Dev-owned Runtimes may be inspected and opened; Electron owners are still
+identifiable through ownership evidence but do not yet advertise a browser
+handoff endpoint. `down` refuses both. Only a matching `cli-server` that
+advertises `runtime.stop` accepts the stop transaction. The Electron browser
+handoff is tracked in [[plans/electron-runtime-browser-handoff.md]].
+
+Source dev and built Guardian entries publish the same private, local
+`runtime.status` contract. In particular, `pnpm dev` advertises its owner PID,
+source root, Vite Web endpoint, and Alice/UTA/Connector health. A second
+process targeting that complete home therefore remains useful for read-only
+`status`, Doctor, and `open` operations even though a second writer start still
+exits with the existing-owner diagnostic. Dev owners never advertise
+`runtime.stop`; stopping, takeover, and process-tree replacement stay with the
+owning surface.
 
 ## Control Compatibility
 
@@ -429,6 +440,8 @@ completion; detailed shell installation remains user-owned.
 - `packages/cli/src/server-control.mjs` — local control client and normalized
   status.
 - `scripts/guardian/control-server.mjs` — Guardian control server.
+- `packages/guardian-runtime/src/{control-server,runtime-status}.ts` — shared
+  local discovery transport and status envelope for Guardian owners.
 - `scripts/guardian/prod.mjs` — built Runtime owner/status source.
 - `packages/cli/src/lifecycle{,-command}.spec.mjs` — lifecycle and presentation
   contracts.
@@ -436,6 +449,21 @@ completion; detailed shell installation remains user-owned.
   contracts.
 
 ## Verification
+
+Run the repository's TypeScript CLI entry directly when developing or
+dogfooding the Supervisor. Bare `pnpm cli` opens the real interactive TUI; any
+following arguments are passed through to the same command surface:
+
+```bash
+pnpm cli
+pnpm cli status --json
+pnpm cli doctor
+pnpm test:cli
+```
+
+This source entry does not install or copy a CLI payload. When `pnpm dev`
+already owns the selected home, the TUI and read-only commands discover that
+live Runtime rather than starting or replacing another owner.
 
 For command-only changes:
 
