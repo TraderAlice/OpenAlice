@@ -143,7 +143,7 @@ export interface FormState {
   contextWindow: number | null
   /** null = let registry/runtime decide; boolean = unknown-model override. */
   reasoning: boolean | null
-  /** null = fill from the registered model default when one is known. */
+  /** null = do not write an effort override. Registered defaults stay descriptive only. */
   reasoningEffort: ModelReasoningEffort | null
   /** The wire protocol — drives the test + how the adapter is configured. */
   wireShape: WireShape
@@ -1112,7 +1112,7 @@ export function WorkspaceAIConfigModal({
                 </label>
                 <select
                   aria-label={t('workspaceSettings.ai.reasoningEffortLabel', { agent: TAB_LABEL[tab] })}
-                  value={form.reasoningEffort ?? selectedModelSemantics?.reasoning?.defaultEffort ?? ''}
+                  value={form.reasoningEffort ?? ''}
                   onChange={(event) => setForm({
                     ...form,
                     reasoningEffort: event.target.value
@@ -1121,9 +1121,7 @@ export function WorkspaceAIConfigModal({
                   })}
                   className={inputClass}
                 >
-                  {!selectedModelSemantics?.reasoning?.defaultEffort && (
-                    <option value="">{t('workspaceSettings.ai.runtimeDefaultOption')}</option>
-                  )}
+                  <option value="">{t('workspaceSettings.ai.effortNotSpecified')}</option>
                   {supportedReasoningEfforts.map((effort) => (
                     <option key={effort} value={effort}>
                       {effort}{effort === selectedModelSemantics?.reasoning?.defaultEffort
@@ -1137,7 +1135,6 @@ export function WorkspaceAIConfigModal({
                     ? t('workspaceSettings.ai.reasoningEffortHelp', {
                       runtime: TAB_LABEL[tab],
                       defaultEffort: selectedModelSemantics.reasoning.defaultEffort,
-                      effort: form.reasoningEffort ?? selectedModelSemantics.reasoning.defaultEffort,
                     })
                     : t('workspaceSettings.ai.reasoningEffortUnknownHelp', { runtime: TAB_LABEL[tab] })}
                 </p>

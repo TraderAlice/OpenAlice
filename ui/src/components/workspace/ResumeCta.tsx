@@ -263,7 +263,7 @@ function sessionRuntimeFacts(record: SessionRecord): readonly { label: string; v
     {
       label: 'Effort',
       value: runtime
-        ? runtime.reasoningEffort ? `${runtime.reasoningEffort} reasoning` : 'Runtime default'
+        ? runtime.reasoningEffort ? `${runtime.reasoningEffort} reasoning` : 'Not specified'
         : 'Unknown',
     },
   ];

@@ -88,6 +88,13 @@ describe('model semantics registry', () => {
       .toEqual(resolveModelSemantics('minimax', 'MiniMax-M2.5'))
   })
 
+  it('records MiniMax M3 as adaptive 1M reasoning without inventing effort tiers', () => {
+    expect(resolveModelSemantics('minimax', 'MiniMax-M3')).toEqual({
+      contextWindow: 1_000_000,
+      reasoning: { mode: 'adaptive', interleaved: true },
+    })
+  })
+
   it('registers every built-in vendor injection default', () => {
     for (const [vendor, model] of Object.entries(DEFAULT_MODEL_BY_VENDOR)) {
       expect(resolveModelSemantics(vendor, model), `${vendor}/${model}`).not.toBeNull()

@@ -684,7 +684,6 @@ export function useAgentLaunchConfig({
   const effectiveModel = launchModel ?? defaultModel
   const selectedModelSemantics = runtimeModelSemantics(effectiveModel, modelOptions)
   const launchReasoningEffort = selectedReasoningEffort
-    ?? (launchModel ? selectedModelSemantics?.reasoning?.defaultEffort : undefined)
   const effortOptions = runtimeEffortOptions({
     agent: effectiveAgent,
     semantics: selectedModelSemantics,
@@ -697,13 +696,7 @@ export function useAgentLaunchConfig({
         ...(selectedModelSemantics?.reasoning?.mode ?? baseAiDetails?.reasoningMode
           ? { reasoningMode: selectedModelSemantics?.reasoning?.mode ?? baseAiDetails?.reasoningMode }
           : {}),
-        ...(launchReasoningEffort
-          ? { reasoningEffort: launchReasoningEffort }
-          : selectedModelSemantics?.reasoning?.defaultEffort
-            ? { reasoningEffort: selectedModelSemantics.reasoning.defaultEffort }
-            : baseAiDetails?.reasoningEffort
-              ? { reasoningEffort: baseAiDetails.reasoningEffort }
-              : {}),
+        ...(launchReasoningEffort ? { reasoningEffort: launchReasoningEffort } : {}),
         source: 'new-injection' as const,
       }
     : baseAiDetails

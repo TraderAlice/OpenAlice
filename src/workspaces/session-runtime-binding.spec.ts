@@ -145,6 +145,20 @@ describe('durable Session runtime binding', () => {
     expect(resumed.ai?.apiKey).toBe('rotated-key')
   })
 
+  it('keeps effort absent when a vault model is resolved without an explicit effort', async () => {
+    const resolved = await createSessionRuntimeBinding({
+      adapter: codexAdapter,
+      cwd: '/workspace',
+      selection: { credentialSlug: 'openai-1' },
+      credentials: { 'openai-1': openai },
+    })
+
+    expect(resolved.binding.model).toBe('gpt-5.6-terra')
+    expect(resolved.binding).not.toHaveProperty('reasoningEffort')
+    expect(resolved.ai?.model).toBe('gpt-5.6-terra')
+    expect(resolved.ai).not.toHaveProperty('reasoningEffort')
+  })
+
   it('treats native login as the fresh default without reading project config', async () => {
     const read = vi.fn(async () => ({ model: 'native-model', reasoningEffort: 'medium' }) as WorkspaceAiCred)
     const adapter = fakeAdapter(read)
@@ -287,6 +301,30 @@ describe('built-in Agent Session runtime projection', () => {
     expect(piAdapter.sessionRuntime!.project(ctx, runtime).webArgs)
       .toContain('--extension')
   })
+
+  it.each([
+    [claudeAdapter, '--effort'],
+    [codexAdapter, 'model_reasoning_effort'],
+    [opencodeAdapter, '--variant'],
+    [piAdapter, '--thinking'],
+  ] as const)(
+    '$id does not synthesize an effort flag when an explicit model omits effort',
+    (adapter, effortFlag) => {
+      const native = createNativeSessionRuntimeBinding({
+        adapter,
+        selection: { model: 'native-model-override' },
+      })
+      const projected = adapter.sessionRuntime!.project(ctx, native)
+      const serializedArgs = [
+        ...projected.interactiveArgs,
+        ...projected.headlessArgs,
+        ...(projected.webArgs ?? []),
+      ].join(' ')
+
+      expect(serializedArgs).toContain('native-model-override')
+      expect(serializedArgs).not.toContain(effortFlag)
+    },
+  )
 
   it('isolates Claude settings and restores Workspace skills only for OpenAlice-managed credentials', () => {
     const managed = claudeAdapter.sessionRuntime!.project(ctx, runtime)

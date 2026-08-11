@@ -91,13 +91,14 @@ and skill discovery chain in control, whether it resolves from login,
 environment, user settings, or local project files. Launcher-owned explicit
 `--settings` remain available in both modes.
 
-OpenAlice projects a registered provider default when the exact model contract
-publishes one. This makes a Workspace binding deterministic across Agent
-runtimes without inventing policy: an explicit Workspace preference wins, then
-the registered model default, and only an unknown or undocumented value falls
-back to the Agent's native behavior. A model that documents only a thinking
-switch (for example LongCat 2.0) keeps `defaultEnabled` separate and never
-receives a fabricated effort tier.
+A registered provider default is descriptive model metadata, not an implicit
+Session launch parameter. OpenAlice may label that default in selection help,
+but it persists and projects an effort only when a Workspace preference, Issue,
+or one-launch choice explicitly selects one. Omitted effort stays omitted all
+the way through the Session binding and adapter so the selected model/provider
+may apply its own behavior. A model that documents only a thinking switch (for
+example LongCat 2.0) keeps `defaultEnabled` separate and never receives a
+fabricated effort tier.
 
 Wire selection normally follows the same rule: an explicit Workspace or
 creation-default protocol wins. A registered runtime incompatibility is the
@@ -174,7 +175,9 @@ Within the selected Agent, each launch dimension resolves from the explicit
 one-launch selection first, then the mode's fixed tuple, then the matching
 recent tuple, then native runtime state. A fixed tuple is treated as one
 credential/model/effort decision: switching its credential never carries a
-model or effort from a different recent credential invisibly.
+model or effort from a different recent credential invisibly. Registry
+`defaultEffort` metadata is not another resolution layer: when none of those
+sources explicitly selects an effort, the binding omits it.
 
 An Issue's agent/credential-or-credentialSource/model/effort fields seed a new
 Session binding when its owner is `@new-then-resume` or `@new-each-run`.
@@ -282,9 +285,10 @@ compatibility, and Workspace launch must not depend on a live catalog fetch.
 ## User Experience
 
 For a registered model, the normal flow asks for account/region/key/model and
-derives capability fields automatically. The UI shows the resolved effort and
-marks the registered default instead of hiding it behind “runtime default.” It
-must not require a reasoning checkbox or context-window guess for known facts.
+derives capability fields automatically. The UI shows the explicit effort, or
+clearly says that effort is not specified; provider defaults may appear as
+descriptive help but must not masquerade as persisted Session input. It must not
+require a reasoning checkbox or context-window guess for known facts.
 When the provider publishes no effort tiers, the UI shows the actual thinking
 policy (on/off/required/unknown) rather than rendering an empty effort control.
 
@@ -437,7 +441,8 @@ Tests for this subsystem must cover:
 - exact ids and declared aliases resolve, while unknown ids remain unknown;
 - omitted semantic fields do not become false during serialization;
 - registered reasoning models reach Pi and opencode without a manual toggle;
-- registered effort defaults round-trip through all four native runtimes;
+- explicit effort choices round-trip through all four native runtimes;
+- omitted effort remains absent even when the selected model publishes a default;
 - provider-only thinking switches never become fabricated effort values;
 - non-reasoning and unknown models do not receive fabricated capabilities;
 - model changes cannot retain a capability override for the previous id;

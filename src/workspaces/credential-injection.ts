@@ -164,7 +164,7 @@ export interface CredentialInjectionOverrides {
   contextWindow?: number | null
   /** Unknown-model override for Pi/opencode. Registered model facts win. */
   reasoning?: boolean | null
-  /** Explicit effort override. Known model defaults are filled by the registry. */
+  /** Explicit effort override. Omission stays omitted; provider defaults are metadata, not launch input. */
   reasoningEffort?: WorkspaceAiCred['reasoningEffort']
   /** Anthropic wire only — which header carries the key. Defaults via baseUrl heuristic. */
   authMode?: 'x-api-key' | 'bearer'
@@ -250,9 +250,6 @@ export function applyRegisteredModelSemantics(
   if (registration?.reasoning) {
     const reasoning = modelSupportsReasoning(semantics)
     if (reasoning !== null) next.reasoning = reasoning
-  }
-  if (!next.reasoningEffort && semantics.reasoning?.defaultEffort) {
-    next.reasoningEffort = semantics.reasoning.defaultEffort
   }
   return next
 }

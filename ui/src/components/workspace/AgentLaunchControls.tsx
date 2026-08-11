@@ -213,23 +213,7 @@ function AgentLaunchEffortEditor({
   const options = current && !config.effortOptions.includes(current)
     ? [current, ...config.effortOptions]
     : config.effortOptions
-  const details = config.aiDetails
-  const resolvedDefault = details?.reasoningEffort
-    ? t('chatLanding.reasoningEffortSummary', { effort: details.reasoningEffort })
-    : details?.reasoningMode === 'required'
-      ? t('chatLanding.reasoningRequiredSummary')
-      : details?.reasoningMode === 'adaptive'
-        ? t('chatLanding.reasoningAdaptiveSummary')
-        : details?.reasoningMode === 'none' || details?.reasoning === false
-          ? t('chatLanding.reasoningDisabledSummary')
-          : details?.reasoning === true
-            ? t('chatLanding.reasoningEnabledSummary')
-            : details?.reasoningMode === 'optional'
-              ? t('chatLanding.reasoningOptionalSummary')
-              : t('chatLanding.reasoningRuntimeSummary')
-  const defaultLabel = details
-    ? t('chatLanding.defaultEffortValue', { effort: resolvedDefault })
-    : t('chatLanding.defaultEffort')
+  const defaultLabel = t('chatLanding.effortNotSpecified')
   return (
     <label className={`relative inline-flex min-w-0 items-center rounded-md bg-muted text-[11px] text-muted-foreground focus-within:ring-1 focus-within:ring-primary/50 ${labeled ? 'min-h-12 w-full max-w-none sm:w-auto sm:max-w-[190px]' : 'min-h-8 max-w-[190px]'}`}>
       <BrainCircuit className={`pointer-events-none absolute left-2.5 h-3 w-3 shrink-0 ${labeled ? 'top-6' : ''}`} />
@@ -271,10 +255,14 @@ function AgentLaunchInferenceMenu({
   const [customModelDraft, setCustomModelDraft] = useState('')
 
   const details = config.aiDetails
+  const effortOptions = config.selectedReasoningEffort
+    && !config.effortOptions.includes(config.selectedReasoningEffort)
+    ? [config.selectedReasoningEffort, ...config.effortOptions]
+    : config.effortOptions
   const resolvedEffort = config.launchReasoningEffort
     ? t('chatLanding.reasoningEffortSummary', { effort: config.launchReasoningEffort })
-    : details?.reasoningEffort
-      ? t('chatLanding.reasoningEffortSummary', { effort: details.reasoningEffort })
+    : effortOptions.length > 0
+      ? t('chatLanding.effortNotSpecified')
       : details?.reasoningMode === 'required'
         ? t('chatLanding.reasoningRequiredSummary')
         : details?.reasoningMode === 'adaptive'
@@ -285,16 +273,12 @@ function AgentLaunchInferenceMenu({
               ? t('chatLanding.reasoningEnabledSummary')
               : details?.reasoningMode === 'optional'
                 ? t('chatLanding.reasoningOptionalSummary')
-                : t('chatLanding.reasoningRuntimeSummary')
+                : t('chatLanding.effortNotSpecified')
   const resolvedModel = config.launchModel
     ?? config.defaultModel
     ?? t('chatLanding.runtimeDefaultModel')
   const modelValue = config.launchModel ?? ''
   const effortValue = config.selectedReasoningEffort ?? ''
-  const effortOptions = config.selectedReasoningEffort
-    && !config.effortOptions.includes(config.selectedReasoningEffort)
-    ? [config.selectedReasoningEffort, ...config.effortOptions]
-    : config.effortOptions
   const knownModels = config.modelOptions.filter((model) => model.id !== config.defaultModel)
   const customCurrentModel = config.launchModel
     && !config.modelOptions.some((model) => model.id === config.launchModel)
@@ -412,7 +396,7 @@ function AgentLaunchInferenceMenu({
               >
                 <DropdownMenuRadioItem value="" closeOnClick={false} className="min-h-9 px-2.5 pr-8 text-[12px]">
                   <span className="min-w-0 flex-1 truncate">
-                    {t('chatLanding.defaultEffortValue', { effort: resolvedEffort })}
+                    {t('chatLanding.effortNotSpecified')}
                   </span>
                 </DropdownMenuRadioItem>
                 {effortOptions.map((effort) => (

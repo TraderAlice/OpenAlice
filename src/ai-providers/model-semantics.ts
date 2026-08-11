@@ -7,8 +7,9 @@
  *
  * Runtime-specific request knobs do not belong here. `reasoning` records the
  * model contract; Pi/opencode project that contract into their native custom-
- * model capability bit, while every adapter projects a resolved effort into
- * its own native field only when the registry or user supplies one.
+ * model capability bit, while every adapter projects effort into its own
+ * native field only when the user explicitly selects one. A documented
+ * provider default is descriptive metadata, never an implicit launch value.
  */
 
 export type ModelReasoningMode = 'none' | 'optional' | 'adaptive' | 'required'
@@ -80,9 +81,9 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - OpenAI model/reasoning guides: https://developers.openai.com/api/docs/guides/latest-model
  * - Anthropic extended/adaptive thinking: https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
  * - Gemini thinking: https://ai.google.dev/gemini-api/docs/generate-content/thinking
- * - MiniMax Anthropic API: https://platform.minimax.io/docs/api-reference/text-anthropic-api
- * - MiniMax OpenAI `reasoning_split`: https://platform.minimax.io/docs/api-reference/text-openai-api
- * - Kimi K3/reasoning effort: https://platform.kimi.ai/docs/guide/kimi-k3-quickstart
+ * - MiniMax M3/Anthropic API: https://platform.minimax.io/docs/api-reference/text-chat-anthropic
+ * - MiniMax OpenAI `reasoning_split`: https://platform.minimax.io/docs/api-reference/text-chat-openai
+ * - Kimi K3/reasoning effort: https://www.kimi.com/help/kimi-api/api-model-selection
  * - DeepSeek models/limits: https://api-docs.deepseek.com/quick_start/pricing
  * - DeepSeek thinking: https://api-docs.deepseek.com/guides/thinking_mode
  * - LongCat Chat API: https://longcat.chat/platform/docs/api/chat.html

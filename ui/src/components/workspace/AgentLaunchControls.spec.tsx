@@ -261,7 +261,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     expect(credentialTrigger.className).toContain('w-full')
     expect(inferenceTrigger.className).toContain('w-full')
     expect(inferenceTrigger.textContent).toContain('gpt-5')
-    expect(inferenceTrigger.textContent).toContain('Reasoning managed by runtime')
+    expect(inferenceTrigger.textContent).toContain('Effort not specified')
   })
 
   it('combines model and reasoning into a nested toolbar menu', async () => {
@@ -284,6 +284,7 @@ describe('AgentLaunchSelectors keyboard menus', () => {
             reasoningMode: 'adaptive',
             source: 'new-injection',
           },
+          launchReasoningEffort: 'high',
           selectModel,
           selectReasoningEffort,
         })}

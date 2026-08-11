@@ -286,7 +286,6 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
         slug: 'google-1',
         resolvedModel: 'gemini-3.1-flash-lite',
         resolvedReasoning: true,
-        resolvedReasoningEffort: 'minimal',
         resolvedReasoningMode: 'adaptive',
       }),
     ]);
@@ -495,7 +494,6 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', {
       ...config,
       reasoning: true,
-      reasoningEffort: 'medium',
     });
   });
 });
