@@ -11,6 +11,7 @@ interface WorkflowStep {
 
 interface WorkflowJob {
   needs?: string | string[]
+  'timeout-minutes'?: number
   steps?: WorkflowStep[]
   strategy?: {
     matrix?: {
@@ -36,6 +37,11 @@ function needs(job: WorkflowJob): string[] {
 }
 
 describe('Release workflow critical path', () => {
+  it('bounds native candidate jobs without weakening downstream gates', () => {
+    expect(workflow.jobs['build-desktop']['timeout-minutes']).toBe(45)
+    expect(workflow.jobs['build-broker-packs']['timeout-minutes']).toBe(30)
+  })
+
   it('builds native Broker Packs outside the desktop package jobs', () => {
     const desktop = workflow.jobs['build-desktop']
     const brokerPacks = workflow.jobs['build-broker-packs']
