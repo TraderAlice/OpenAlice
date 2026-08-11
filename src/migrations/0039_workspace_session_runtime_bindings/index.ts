@@ -3,7 +3,6 @@ import { dirname, join } from 'node:path'
 
 import type { SessionRuntimeBinding } from '../../workspaces/cli-adapter.js'
 import { MANAGER_WORKSPACE_ID } from '../../workspaces/manager-workspace.js'
-import { parseSessionRuntimeBinding } from '../../workspaces/session-runtime-binding.js'
 import type { Migration } from '../types.js'
 
 interface LegacyResumeRecord extends Record<string, unknown> {
@@ -23,6 +22,53 @@ interface WorkspaceLocation {
 }
 
 const RESUME_REGISTRY_REL = join('state', 'resume-identities.json')
+const WIRE_SHAPES = new Set(['anthropic', 'google-generative-ai', 'openai-chat', 'openai-responses'])
+const REASONING_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'])
+
+/**
+ * Parse the frozen 0.89.2 binding shape without importing the live Session
+ * resolver. Migration metadata is loaded before Workspace packages are built
+ * in a clean install, so migrations must not pull that runtime dependency
+ * graph into `pnpm build:migration-index`.
+ */
+function parseLegacyRuntimeBinding(value: unknown): SessionRuntimeBinding | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  if (record['version'] !== 1) return null
+  const rawCredential = record['credential']
+  if (!rawCredential || typeof rawCredential !== 'object' || Array.isArray(rawCredential)) return null
+  const credential = rawCredential as Record<string, unknown>
+  let parsedCredential: SessionRuntimeBinding['credential']
+  if (credential['source'] === 'native') {
+    parsedCredential = { source: 'native' }
+  } else if (
+    credential['source'] === 'vault'
+    && typeof credential['credentialSlug'] === 'string'
+    && WIRE_SHAPES.has(String(credential['wireShape']))
+  ) {
+    parsedCredential = {
+      source: 'vault',
+      credentialSlug: credential['credentialSlug'],
+      wireShape: credential['wireShape'] as Extract<SessionRuntimeBinding['credential'], { source: 'vault' }>['wireShape'],
+    }
+  } else if (credential['source'] === 'workspace' && typeof credential['fingerprint'] === 'string') {
+    parsedCredential = { source: 'workspace', fingerprint: credential['fingerprint'] }
+  } else {
+    return null
+  }
+  const model = record['model']
+  const reasoningEffort = record['reasoningEffort']
+  if (model !== undefined && typeof model !== 'string') return null
+  if (reasoningEffort !== undefined && !REASONING_EFFORTS.has(String(reasoningEffort))) return null
+  return {
+    version: 1,
+    credential: parsedCredential,
+    ...(typeof model === 'string' && model.length > 0 ? { model } : {}),
+    ...(typeof reasoningEffort === 'string'
+      ? { reasoningEffort: reasoningEffort as SessionRuntimeBinding['reasoningEffort'] }
+      : {}),
+  }
+}
 
 function assertedFileName(resumeId: string): string {
   if (!resumeId || resumeId === '.' || resumeId === '..' || /[\\/\0]/u.test(resumeId)) {
@@ -55,7 +101,7 @@ function parseLegacyRegistry(value: unknown): LegacyResumeRegistry | null {
     ) {
       throw new Error('resume-identities.json contains an invalid record')
     }
-    const runtimeBinding = parseSessionRuntimeBinding(record['runtimeBinding'])
+    const runtimeBinding = parseLegacyRuntimeBinding(record['runtimeBinding'])
     if (record['runtimeBinding'] !== undefined && !runtimeBinding) {
       throw new Error('resume-identities.json contains an invalid Session runtime binding')
     }
