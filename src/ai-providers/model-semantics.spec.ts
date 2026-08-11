@@ -55,6 +55,27 @@ describe('model semantics registry', () => {
     })
   })
 
+  it('records current Anthropic and Gemini defaults with their native effort contracts', () => {
+    expect(resolveModelSemantics('anthropic', 'claude-opus-5')).toMatchObject({
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+        defaultEffort: 'high',
+      },
+    })
+    expect(resolveModelSemantics('google', 'gemini-3.6-flash')).toMatchObject({
+      contextWindow: 1_048_576,
+      maxOutputTokens: 65_536,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['medium', 'high'],
+        defaultEffort: 'medium',
+      },
+    })
+  })
+
   it('describes registered runtime facts compactly', () => {
     expect(describeModelSemantics(resolveModelSemantics('deepseek', 'deepseek-v4-pro')))
       .toBe('Reasoning optional · default effort high · interleaved thinking · 1M context')

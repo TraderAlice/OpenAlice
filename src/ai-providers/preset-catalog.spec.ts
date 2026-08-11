@@ -8,6 +8,7 @@ import {
   DEEPSEEK,
   DEFAULT_MODEL_BY_VENDOR,
   GEMINI,
+  GLM,
   KIMI,
   LONGCAT,
   MINIMAX,
@@ -42,15 +43,22 @@ describe('credential form catalog', () => {
     })).toMatchObject({ model: 'default' });
   });
 
-  it('offers current Anthropic API tiers while keeping Opus as the complex-agent default', () => {
+  it('offers current Anthropic API tiers while keeping the latest Opus as the complex-agent default', () => {
     expect(CLAUDE_API.models?.map((model) => model.id)).toEqual([
       'claude-fable-5',
-      'claude-opus-4-8',
+      'claude-opus-5',
       'claude-sonnet-5',
       'claude-haiku-4-5',
+      'claude-opus-4-8',
       'claude-sonnet-4-6',
     ]);
-    expect(DEFAULT_MODEL_BY_VENDOR['anthropic']).toBe('claude-opus-4-8');
+    expect(DEFAULT_MODEL_BY_VENDOR['anthropic']).toBe('claude-opus-5');
+    expect(CLAUDE_API.models?.find((model) => model.id === 'claude-opus-5')?.semantics)
+      .toMatchObject({
+        contextWindow: 1_000_000,
+        maxOutputTokens: 128_000,
+        reasoning: { efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high' },
+      });
   });
 
   it('offers the GPT 5.6 family to Codex subscriptions and OpenAI API keys', () => {
@@ -77,6 +85,8 @@ describe('credential form catalog', () => {
 
   it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {
     expect(GEMINI.models?.map((model) => model.id)).toEqual([
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
       'gemini-3.5-flash',
       'gemini-3.1-pro-preview',
       'gemini-3.1-flash-lite',
@@ -84,6 +94,13 @@ describe('credential form catalog', () => {
       'gemini-2.5-flash',
       'gemini-2.5-flash-lite',
     ]);
+    expect(DEFAULT_MODEL_BY_VENDOR['google']).toBe('gemini-3.6-flash');
+    expect(GEMINI.models?.find((model) => model.id === 'gemini-3.6-flash')?.semantics)
+      .toMatchObject({
+        contextWindow: 1_048_576,
+        maxOutputTokens: 65_536,
+        reasoning: { efforts: ['medium', 'high'], defaultEffort: 'medium' },
+      });
   });
 
   it('offers the stable DeepSeek V4 API ids with registered semantics', () => {
@@ -116,6 +133,20 @@ describe('credential form catalog', () => {
         interleaved: true,
       },
     });
+  });
+
+  it('pins the audited flagship default for every built-in API-key provider', () => {
+    expect(DEFAULT_MODEL_BY_VENDOR).toEqual({
+      anthropic: 'claude-opus-5',
+      openai: 'gpt-5.6-sol',
+      google: 'gemini-3.6-flash',
+      minimax: 'MiniMax-M3',
+      glm: 'glm-5.2',
+      kimi: 'kimi-k3',
+      deepseek: 'deepseek-v4-pro',
+      longcat: 'LongCat-2.0',
+    });
+    expect(GLM.models?.map((model) => model.id)).toContain('glm-5.2');
   });
 
   it('offers MiniMax M3 as an adaptive 1M model without fabricated effort tiers', () => {
