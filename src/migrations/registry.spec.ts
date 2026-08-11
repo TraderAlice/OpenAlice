@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -19,7 +21,7 @@ describe('migration baseline', () => {
   it('runs unit tests inside one isolated complete home', () => {
     const home = process.env['OPENALICE_HOME']
     expect(home).toBeTruthy()
-    expect(process.env['AQ_LAUNCHER_ROOT']).toBe(`${home}/workspaces`)
-    expect(process.env['OPENALICE_GLOBAL_DIR']).toBe(`${home}/global`)
+    expect(process.env['AQ_LAUNCHER_ROOT']).toBe(join(home!, 'workspaces'))
+    expect(process.env['OPENALICE_GLOBAL_DIR']).toBe(join(home!, 'global'))
   })
 })
