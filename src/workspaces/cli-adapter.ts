@@ -179,9 +179,11 @@ export type SessionCredentialBinding =
     }
 
 /**
- * Immutable launch selection owned by a product `resumeId`. Omitted model or
- * effort means the selected credential/runtime's own default, not that an
- * adapter may skip implementing Session projection.
+ * Immutable launch selection owned by a product `resumeId`. Omitted model
+ * delegates model selection to the credential/runtime. Omitted effort means
+ * exactly "not specified": it remains absent from adapter argv/config even
+ * when the selected model publishes a provider default. An adapter still must
+ * implement Session projection for this valid empty dimension.
  */
 export interface SessionRuntimeBinding {
   readonly version: 1

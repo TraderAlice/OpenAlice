@@ -10,6 +10,7 @@ import {
   GEMINI,
   KIMI,
   LONGCAT,
+  MINIMAX,
 } from './preset-catalog.js';
 import { BUILTIN_PRESETS } from './presets.js';
 
@@ -114,6 +115,14 @@ describe('credential form catalog', () => {
         defaultEffort: 'max',
         interleaved: true,
       },
+    });
+  });
+
+  it('offers MiniMax M3 as an adaptive 1M model without fabricated effort tiers', () => {
+    expect(DEFAULT_MODEL_BY_VENDOR['minimax']).toBe('MiniMax-M3');
+    expect(MINIMAX.models?.find((model) => model.id === 'MiniMax-M3')?.semantics).toEqual({
+      contextWindow: 1_000_000,
+      reasoning: { mode: 'adaptive', interleaved: true },
     });
   });
 

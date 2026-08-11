@@ -710,11 +710,10 @@ describe('ChatLandingPage AI source disclosure', () => {
     ))
   })
 
-  it('projects a registered Workspace model preference into the new Session launch', async () => {
+  it('keeps effort absent when a registered Workspace model preference omits it', async () => {
     workspaces = [withInteractivePreference(chatWorkspace(), {
       accessMode: 'native',
       model: 'gpt-5.6-sol',
-      reasoningEffort: 'high',
     }, 'codex')]
     mocks.useWorkspaces.mockImplementation(() => ({
       ...context(workspaces),
@@ -769,7 +768,7 @@ describe('ChatLandingPage AI source disclosure', () => {
 
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
-    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('high reasoning')
+    expect((await findInferenceTrigger('gpt-5.6-sol')).textContent).toContain('Effort not specified')
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use model defaults.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
@@ -780,7 +779,7 @@ describe('ChatLandingPage AI source disclosure', () => {
       'chat-1',
       'chat',
       'gpt-5.6-sol',
-      'high',
+      undefined,
       'native',
     ))
   })
@@ -811,10 +810,10 @@ describe('ChatLandingPage AI source disclosure', () => {
     expect(screen.queryByText('Workspace settings stay unchanged')).toBeNull()
     expect(await findInferenceTrigger('gemini-3.1-flash-lite')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Configure workspace AI' })).toBeNull()
-    expectDefaultEffort('minimal reasoning')
+    expectDefaultEffort('Effort not specified')
   })
 
-  it('shows a required reasoning policy when the provider has no effort tiers', async () => {
+  it('keeps effort unspecified when a required reasoning model exposes no effort tiers', async () => {
     mocks.listAgentCredentials.mockResolvedValue([{
       slug: 'kimi-1',
       vendor: 'kimi',
@@ -834,7 +833,7 @@ describe('ChatLandingPage AI source disclosure', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     await findInferenceTrigger('kimi-k2.7-code')
-    expectDefaultEffort('Reasoning always on')
+    expectDefaultEffort('Effort not specified')
   })
 
   it('keeps an in-progress provider choice when polling replaces equivalent Workspace settings', async () => {

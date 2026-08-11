@@ -43,6 +43,21 @@ describe('ResumeCta runtime facts', () => {
     expect(screen.getByText('high reasoning')).toBeTruthy()
   })
 
+  it('shows an explicit model with omitted effort as not specified', () => {
+    render(<ResumeCta
+      record={record({
+        credentialSource: 'vault',
+        credentialSlug: 'minimax-1',
+        model: 'MiniMax-M3',
+      })}
+      onResume={vi.fn(async () => {})}
+    />)
+
+    expect(screen.getByText('MiniMax-M3')).toBeTruthy()
+    expect(screen.getByText('Not specified')).toBeTruthy()
+    expect(screen.queryByText('Runtime default')).toBeNull()
+  })
+
   it('does not mislabel missing historical metadata as Runtime defaults', () => {
     render(<ResumeCta
       record={record()}

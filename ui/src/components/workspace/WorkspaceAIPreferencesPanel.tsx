@@ -258,7 +258,7 @@ function RuntimePreferenceFields({
               aria-label={t('chatLanding.selectEffort')}
               className="min-w-0 flex-1 appearance-none bg-transparent py-2 pr-5 text-[12px] text-foreground outline-none"
             >
-              <option value="">{t('chatLanding.defaultEffort')}</option>
+              <option value="">{t('chatLanding.effortNotSpecified')}</option>
               {effortOptions.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" />
