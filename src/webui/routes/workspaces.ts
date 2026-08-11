@@ -383,6 +383,14 @@ export function createWorkspaceRoutes(
           ...(opts.model ? { model: opts.model } : {}),
           ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
         };
+        const selection = (freshProductSession
+          ? resolveWorkspaceRuntimeSelection(
+              runtimeSettings?.ok ? runtimeSettings.settings : null,
+              'interactive',
+              adapter.id,
+              explicitSelection,
+            )
+          : explicitSelection) ?? {};
         sessionRuntime = requestedIdentity
           ? requestedIdentity.runtimeBinding
             ? await resolveSessionRuntimeBinding({
@@ -394,14 +402,11 @@ export function createWorkspaceRoutes(
           : await createSessionRuntimeBinding({
               adapter,
               cwd: meta.dir,
-              selection: freshProductSession
-                ? resolveWorkspaceRuntimeSelection(
-                    runtimeSettings?.ok ? runtimeSettings.settings : null,
-                    'interactive',
-                    adapter.id,
-                    explicitSelection,
-                  )
-                : explicitSelection,
+              selection,
+              // Read once at the route boundary so credential resolution and
+              // the launch request share one vault snapshot. Native runtime
+              // auth deliberately avoids touching the vault.
+              ...(selection.credentialSlug ? { credentials: await readCredentials() } : {}),
             });
       } catch (err) {
         if (err instanceof SessionRuntimeBindingError) {
