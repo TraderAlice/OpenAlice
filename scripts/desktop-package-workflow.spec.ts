@@ -16,6 +16,7 @@ interface WorkflowJob {
 }
 
 interface Workflow {
+  on?: Record<string, unknown>
   concurrency?: {
     group?: string
     'cancel-in-progress'?: boolean
@@ -29,6 +30,12 @@ const workflow = YAML.parse(
 ) as Workflow
 
 describe('Desktop Package Smoke workflow critical path', () => {
+  it('keeps manual and pull-request coverage without duplicating master releases', () => {
+    expect(workflow.on).toHaveProperty('workflow_dispatch')
+    expect(workflow.on).toHaveProperty('pull_request')
+    expect(workflow.on).not.toHaveProperty('push')
+  })
+
   it('cancels superseded runs for the same pull request or ref', () => {
     expect(workflow.concurrency).toEqual({
       group: 'desktop-package-smoke-${{ github.event.pull_request.number || github.ref }}',

@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/release-feedback-reliability.md]] — Makes packaged release failures
+  deterministic and diagnostic first, then removes desktop matrix fan-in and
+  reuses trusted promotion evidence without weakening release gates.
 - [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
   healthy dev/CLI Runtime already owning the selected data location and hand
   the user to its verified browser UI without takeover.

@@ -110,6 +110,10 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       let output = ''
       let attachedResolve
       let attachedReject
+      let shellReadyResolve
+      let shellReadyReject
+      let helperReadyResolve
+      let helperReadyReject
       let markerResolve
       let markerReject
       let scheduledResolve
@@ -120,6 +124,14 @@ export async function runRendererWorkspaceAcceptanceSmoke(
         attachedResolve = resolve
         attachedReject = reject
       })
+      const shellReady = new Promise((resolve, reject) => {
+        shellReadyResolve = resolve
+        shellReadyReject = reject
+      })
+      const helperReady = new Promise((resolve, reject) => {
+        helperReadyResolve = resolve
+        helperReadyReject = reject
+      })
       const marker = new Promise((resolve, reject) => {
         markerResolve = resolve
         markerReject = reject
@@ -129,7 +141,9 @@ export async function runRendererWorkspaceAcceptanceSmoke(
         scheduledReject = reject
       })
       const attachedTimer = setTimeout(() => attachedReject(new Error('PTY attached timeout')), 10000)
-      const markerTimer = setTimeout(() => markerReject(new Error('Workspace CLI contract timeout: ' + output.slice(-4000))), 20000)
+      let shellReadyTimer = null
+      let helperReadyTimer = null
+      let markerTimer = null
       connectionId = bridge.connect({ sessionId, cols: 120, rows: 32 })
       const offMessage = bridge.onMessage(connectionId, (msg) => {
         if (msg.type === 'control') {
@@ -145,6 +159,14 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           return
         }
         output += decode(msg.data)
+        if (output.includes('__OPENALICE_SHELL_READY__')) {
+          if (shellReadyTimer) clearTimeout(shellReadyTimer)
+          shellReadyResolve(output)
+        }
+        if (output.includes('__OPENALICE_STEP_HELPER_READY__')) {
+          if (helperReadyTimer) clearTimeout(helperReadyTimer)
+          helperReadyResolve(output)
+        }
         if (output.includes('__OPENALICE_CLI_ENV_OK__')) checks.cliEnvironmentInjected = true
         if (output.includes('__OPENALICE_CLI_MANIFESTS_OK__')) checks.allCliManifestsLoaded = true
         if (output.includes('__OPENALICE_GIT_OK__')) checks.gitReady = true
@@ -153,7 +175,7 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           markerReject(new Error('Workspace CLI contract step failed: ' + output.slice(-4000)))
         }
         if (output.includes(shellMarker)) {
-          clearTimeout(markerTimer)
+          if (markerTimer) clearTimeout(markerTimer)
           markerResolve(output)
         }
         if (output.includes('__OPENALICE_SCHEDULED_ISSUE_OK__')) {
@@ -164,6 +186,8 @@ export async function runRendererWorkspaceAcceptanceSmoke(
       const offClose = bridge.onClose(connectionId, (event) => {
         const error = new Error('PTY closed before Workspace CLI contract completed: ' + event.code + ' ' + event.reason)
         attachedReject(error)
+        shellReadyReject(error)
+        helperReadyReject(error)
         markerReject(error)
         if (scheduledPending) scheduledReject(error)
       })
@@ -195,10 +219,30 @@ export async function runRendererWorkspaceAcceptanceSmoke(
           // Split the sentinel so terminal command echo cannot satisfy it.
           "printf '__OPENALICE_%s_OK__\\\\n' 'WORKSPACE_CLI_CONTRACT'",
         ].join(' && ')
-        // Keep each PTY write below the Windows ConPTY input boundary. The
-        // helper is a separate shell line so adding diagnostics cannot
-        // truncate the contract's trailing carriage return.
-        bridge.send(connectionId, new TextEncoder().encode(stepHelper + '\\r'))
+        // PTY attachment means the bridge is connected, not that the login
+        // shell has drawn its prompt or can safely consume multiple writes.
+        // Advance one acknowledged line at a time so a slow Intel runner (or
+        // ConPTY) cannot splice the helper and contract into one command.
+        shellReadyTimer = setTimeout(
+          () => shellReadyReject(new Error('Workspace shell-ready timeout: ' + output.slice(-4000))),
+          10000,
+        )
+        bridge.send(connectionId, new TextEncoder().encode(
+          "printf '__OPENALICE_%s_READY__\\\\n' 'SHELL'\\r",
+        ))
+        await shellReady
+        helperReadyTimer = setTimeout(
+          () => helperReadyReject(new Error('Workspace CLI helper-ready timeout: ' + output.slice(-4000))),
+          10000,
+        )
+        bridge.send(connectionId, new TextEncoder().encode(
+          stepHelper + "; printf '__OPENALICE_%s_READY__\\\\n' 'STEP_HELPER'\\r",
+        ))
+        await helperReady
+        markerTimer = setTimeout(
+          () => markerReject(new Error('Workspace CLI contract timeout: ' + output.slice(-4000))),
+          20000,
+        )
         bridge.send(connectionId, new TextEncoder().encode(command + '\\r'))
         await marker
         const scheduledAt = new Date(Date.now() + 1500).toISOString()

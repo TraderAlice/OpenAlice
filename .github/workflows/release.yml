@@ -96,6 +96,7 @@ jobs:
   build-desktop:
     needs: release
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -387,6 +388,7 @@ jobs:
     name: Build Broker Packs (${{ matrix.os }}, ${{ matrix.arch }})
     needs: release
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

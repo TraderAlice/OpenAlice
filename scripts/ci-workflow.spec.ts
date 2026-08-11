@@ -11,6 +11,7 @@ interface WorkflowStep {
 interface WorkflowJob {
   if?: string
   needs?: string | string[]
+  'timeout-minutes'?: number
   steps?: WorkflowStep[]
 }
 
@@ -44,5 +45,9 @@ describe('CI workflow fast failure lanes', () => {
     expect(aggregate.steps?.map((step) => step.name)).toContain(
       'Require successful build and test lanes',
     )
+  })
+
+  it('bounds cross-platform runners even when a step never reports completion', () => {
+    expect(workflow.jobs['cross-platform-test']['timeout-minutes']).toBe(30)
   })
 })
