@@ -26,8 +26,10 @@ for (const path of [
   'services/uta/dist',
   'services/connector/dist',
   'packages/guardian-runtime/dist',
+  'packages/guardian-runtime/src',
   'scripts/guardian',
   'node_modules',
+  'node_modules/@traderalice/guardian-runtime',
 ]) {
   await mkdir(join(runtimeRoot, path), { recursive: true })
 }
@@ -42,6 +44,13 @@ const files = new Map([
   ['services/uta/dist/uta.js', 'export {}\n'],
   ['services/connector/dist/connector.cjs', 'module.exports = {}\n'],
   ['packages/guardian-runtime/dist/index.js', 'export {}\n'],
+  ['node_modules/@traderalice/guardian-runtime/package.json', JSON.stringify({
+    name: '@traderalice/guardian-runtime',
+    type: 'module',
+    exports: './index.js',
+  }) + '\n'],
+  ['node_modules/@traderalice/guardian-runtime/index.js',
+    "export * from '../../../packages/guardian-runtime/src/control-server.ts'\n"],
   ['scripts/guardian/prod-ports.mjs', 'export {}\n'],
   ['node_modules/.keep', 'fixture\n'],
   ['package.json', JSON.stringify({
@@ -54,6 +63,14 @@ const files = new Map([
 for (const [path, content] of files) {
   await writeFile(join(runtimeRoot, path), content)
 }
+// The remote fixture is built without installing the monorepo. Package the
+// current dependency-free control-server source directly; supported Node 22
+// releases strip its TypeScript types at load time. This keeps the fixture's
+// package boundary aligned with the real deployed production closure.
+await writeFile(
+  join(runtimeRoot, 'packages/guardian-runtime/src/control-server.ts'),
+  await readFile(join(fixtureRoot, 'packages/guardian-runtime/src/control-server.ts')),
+)
 await writeFile(
   join(runtimeRoot, 'scripts/guardian/prod.mjs'),
   await readFile(join(fixtureRoot, 'OpenAlice/scripts/guardian/prod.mjs')),
