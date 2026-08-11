@@ -555,7 +555,7 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
       const { app, spawn } = build({ workspaces: [workspace] });
 
       const launch = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
-      expect(launch.status).toBe(201);
+      expect(launch.status, JSON.stringify(launch.body)).toBe(201);
       expect((spawn.mock.calls[0] as any[])[1]).toMatchObject({
         agentId: 'opencode',
         sessionRuntime: {
@@ -629,7 +629,8 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
       'openai-2': { ...openaiKey, apiKey: 'sk-second', lastModel: 'gpt-5.5-mini' },
     });
     const { app, opencode, spawn } = build();
-    await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
+    const launch = await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
+    expect(launch.status, JSON.stringify(launch.body)).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     const runtime = (spawn.mock.calls[0] as any[])[1].sessionRuntime;
     expect(runtime.binding).toMatchObject({
@@ -684,7 +685,7 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
       credentialSlug: 'openai-2',
     });
 
-    expect(r.status).toBe(201);
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toMatchObject({
       binding: {

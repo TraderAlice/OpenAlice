@@ -11,4 +11,4 @@ Each row below corresponds to an active migration in `src/migrations/`. The runn
 
 | ID | App Version | Date | Affects | Summary |
 |----|-------------|------|---------|---------|
-| _No post-baseline migrations yet_ | — | — | — | — |
+| `0039_workspace_session_runtime_bindings` | 0.89.3-beta | 2026-08-11 | workspaces/state/resume-identities.json, workspaces/state/workspace-manager-sessions/*.json, workspaces/workspaces/*/.alice/sessions/*.json, workspaces/departed-workspaces/*/.alice/sessions/*.json | Move 0.89.2 Session AI bindings from the launcher identity registry into their owning Workspaces. |

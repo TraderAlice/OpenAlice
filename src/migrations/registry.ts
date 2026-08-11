@@ -7,11 +7,15 @@
  * are seeded directly from current schemas and defaults instead.
  *
  * Keep future entries in numeric order and never reuse a retired id. The next
- * migration id is 0039. `pnpm build:migration-index` regenerates INDEX.md.
+ * migration id is exported below. `pnpm build:migration-index` regenerates INDEX.md.
  */
 
 import type { Migration } from './types.js'
-export const MIGRATION_BASELINE = '0.89.2-beta'
-export const NEXT_MIGRATION_NUMBER = 39
+import { migration as migration_0039_workspace_session_runtime_bindings } from './0039_workspace_session_runtime_bindings/index.js'
 
-export const REGISTRY: Migration[] = []
+export const MIGRATION_BASELINE = '0.89.2-beta'
+export const NEXT_MIGRATION_NUMBER = 40
+
+export const REGISTRY: Migration[] = [
+  migration_0039_workspace_session_runtime_bindings,
+]

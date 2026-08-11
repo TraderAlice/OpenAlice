@@ -14,6 +14,7 @@ COPY scripts/install-smoke/static-server.mjs /fixture/static-server.mjs
 COPY scripts/install-smoke/fake-npm.sh /fixture/fake-npm.sh
 COPY scripts/install-smoke/fake-pi-tui.mjs /fixture/fake-pi-tui.mjs
 COPY scripts/install-smoke/pi-assets /fixture/pi-assets
+COPY packages/guardian-runtime/src/control-server.ts /fixture/packages/guardian-runtime/src/control-server.ts
 COPY scripts/guardian/control-server.mjs /fixture/OpenAlice/scripts/guardian/control-server.mjs
 COPY scripts/remote-smoke/fixture-guardian.mjs /fixture/OpenAlice/scripts/guardian/prod.mjs
 COPY scripts/remote-smoke/fixture-package.json /fixture/OpenAlice/package.json
