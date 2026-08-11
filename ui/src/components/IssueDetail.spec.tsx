@@ -214,15 +214,15 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Execution' })).toBeTruthy()
     expect(screen.getByText('America/New_York').className).toContain('break-all')
     expect(screen.getByRole('button', { name: 'AI configuration' }).textContent)
-      .toContain('Agent login')
+      .toContain('Runtime managed')
     fireEvent.click(screen.getByRole('button', { name: 'AI configuration' }))
     const credential = screen.getByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
     const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
     const effort = screen.getByRole('combobox', { name: 'Effort' }) as HTMLSelectElement
     await waitFor(() => {
       expect(credential.value).toBe('inherit')
-      expect(model.selectedOptions[0]?.textContent).toBe('Default · runtime decides')
-      expect(effort.selectedOptions[0]?.textContent).toBe('Runtime decides')
+      expect(model.selectedOptions[0]?.textContent).toBe('Default · runtime managed')
+      expect(effort.selectedOptions[0]?.textContent).toBe('Runtime managed')
     })
 
     fireEvent.change(model, { target: { value: 'custom' } })

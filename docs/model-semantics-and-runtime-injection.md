@@ -81,9 +81,11 @@ Claude Code managed-Vault launches pass an empty `--setting-sources=` selection
 before projecting the Session's endpoint, credential, model, and effort. Claude
 otherwise reapplies provider-shaped `env` from user/project/local settings after
 inheriting the child environment, which can silently replace an immutable
-Session binding. Native-login bindings do not use this isolation: selecting the
-Agent login deliberately leaves Claude's normal global configuration chain in
-control. Launcher-owned explicit `--settings` remain available in both modes.
+Session binding. Runtime-managed bindings do not use this isolation: OpenAlice
+deliberately leaves Claude's complete authentication and configuration chain in
+control, whether it resolves from login, environment, user settings, or local
+project files. Launcher-owned explicit `--settings` remain available in both
+modes.
 
 OpenAlice projects a registered provider default when the exact model contract
 publishes one. This makes a Workspace binding deterministic across Agent
@@ -172,7 +174,8 @@ model or effort from a different recent credential invisibly.
 
 An Issue's agent/credential-or-credentialSource/model/effort fields seed a new
 Session binding when its owner is `@new-then-resume` or `@new-each-run`.
-`credentialSource: native` explicitly selects the Agent login; `credential` is
+`credentialSource: native` explicitly returns management to the Agent runtime;
+`credential` is
 only an OpenAlice-vault slug. Omitting both inherits the Workspace headless
 tuple. Neither form ever contains a key or endpoint. Once an exact
 `@resumeId` exists, those fields cannot replace its credential source, model, or
@@ -190,19 +193,19 @@ the credential source, model, and effort that will be replayed before resuming;
 they must never expose resolved keys, endpoints, or native runtime identifiers.
 
 Credential, model, and effort are independent optional launch dimensions. A
-native credential binding means OpenAlice injects no managed key or endpoint;
-the Agent runtime owns authentication and provider discovery through its normal
-login/config chain. That native binding may still carry a process-level model
-or effort override. A native binding with neither override is also valid and
-must still traverse the adapter projection seam, even when the resulting
-projection is empty.
+runtime-managed credential binding means OpenAlice injects no managed key,
+endpoint, or provider configuration; the Agent runtime owns authentication and
+provider discovery through its complete native chain. That binding may still
+carry a process-level model or effort override. A binding with neither override
+is also valid and must still traverse the adapter projection seam, even when the
+resulting projection is empty.
 
 Compact launch surfaces may present model and effort through one disclosure,
 but the nested choices must remain independently selectable and preserve the
 credential-to-model-to-effort dependency order. Free-typed model ids remain
 available because registry suggestions are not an allowlist. Credential menus
 should state which runtime is receiving AI access before listing Workspace,
-native-login, and saved-vault choices.
+runtime-managed, and saved-vault choices.
 
 Legacy resume identities that predate this binding contract are upgraded to an
 explicit native binding on their next activation. They must not inspect and
@@ -324,7 +327,7 @@ advisory and fail-open; it never becomes a fabricated ready/not-ready fact.
 
 The test-before-save gate follows the same boundary as the probe. Changes to a
 managed key, endpoint, wire shape, authentication mode, or its model require a
-fresh probe. A Codex/Claude native-login binding with no OpenAlice-managed key
+fresh probe. A Codex/Claude runtime-managed binding with no OpenAlice-managed key
 or endpoint has no HTTP credential for the modal to probe: model/effort-only
 changes save directly and are validated by the native runtime at launch.
 Context-window, reasoning capability, and reasoning effort are also local
@@ -335,7 +338,8 @@ saves must acknowledge completion in the UI.
 
 ## Native Authentication and Explicit Overrides
 
-Claude Code, Codex, OpenCode, and Pi all own native login or provider state.
+Claude Code, Codex, OpenCode, and Pi can all own their complete authentication
+and provider-configuration state.
 OpenAlice launches them against that state by default and must not require an
 OpenAlice-vault credential merely because a Workspace has no managed provider
 binding. Runtime readiness probes exercise the selected Workspace runtime
@@ -438,7 +442,7 @@ Tests for this subsystem must cover:
 - sensitive rollback sidecars remain excluded from git alongside native provider config.
 - readiness probes never create or replace a Workspace provider binding;
 - diagnostic readiness failures never block an ordinary native launch or resume;
-- missing OpenAlice credentials never block a native-login-capable runtime;
+- missing OpenAlice credentials never block a runtime that can manage its own access;
 - failed interactive resumes return a visible error and remain retryable.
 
 ## Registry Maintenance

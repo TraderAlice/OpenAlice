@@ -497,7 +497,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
     await waitFor(() => expect(mocks.listAgentCredentials).toHaveBeenCalled())
-    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Use Pi account')
+    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Managed by Pi')
     expect(screen.queryByText('Gemini')).toBeNull()
     expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).placeholder)
       .not.toContain('gemini-3.1-flash-lite')
