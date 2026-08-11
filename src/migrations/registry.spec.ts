@@ -11,11 +11,9 @@ import {
 describe('migration baseline', () => {
   it('keeps retired development migrations out of the runtime registry', () => {
     expect(MIGRATION_BASELINE).toBe('0.89.2-beta')
-    expect(NEXT_MIGRATION_NUMBER).toBe(39)
-    expect(REGISTRY.every((migration) => {
-      const numericPrefix = Number.parseInt(migration.id.slice(0, 4), 10)
-      return Number.isInteger(numericPrefix) && numericPrefix >= NEXT_MIGRATION_NUMBER
-    })).toBe(true)
+    expect(NEXT_MIGRATION_NUMBER).toBe(40)
+    expect(REGISTRY.map((migration) => Number.parseInt(migration.id.slice(0, 4), 10)))
+      .toEqual([39])
   })
 
   it('runs unit tests inside one isolated complete home', () => {
