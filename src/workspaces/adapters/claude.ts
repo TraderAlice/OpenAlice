@@ -196,7 +196,7 @@ export const claudeAdapter: CliAdapter = {
   },
 
   sessionRuntime: {
-    project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
+    project(ctx, runtime: ResolvedSessionRuntimeBinding) {
       const effort = runtime.binding.reasoningEffort;
       if (effort && !CLAUDE_RUN_EFFORTS.has(effort)) {
         throw new Error(`Claude Code cannot use Session effort ${effort}`);
@@ -207,14 +207,19 @@ export const claudeAdapter: CliAdapter = {
       // otherwise an unrelated global login (or a deprecated project export)
       // can replace ANTHROPIC_BASE_URL / auth / model after OpenAlice projects
       // this immutable Session binding. `--setting-sources=` is Claude Code's
-      // empty-source form. Explicit `--settings` supplied by composeCommand
-      // still loads, so launcher-owned MCP trust remains available.
+      // empty-source form. It also disables Claude's ordinary project-skill
+      // discovery, so expose the Workspace `.claude` directory explicitly as
+      // a local plugin. Plugin loading does not re-enable project/user settings
+      // and therefore preserves both the immutable Vault binding and the
+      // Workspace's bundled skills. Explicit `--settings` supplied by
+      // composeCommand still loads, so launcher-owned MCP trust remains
+      // available.
       //
       // Native bindings intentionally keep Claude's normal settings chain:
       // choosing Agent login means the runtime, not OpenAlice, owns provider
       // discovery and authentication.
       const managedCredentialArgs = runtime.binding.credential.source === 'vault'
-        ? ['--setting-sources=']
+        ? ['--setting-sources=', '--plugin-dir', join(ctx.cwd, '.claude')]
         : [];
       const args = [
         ...managedCredentialArgs,

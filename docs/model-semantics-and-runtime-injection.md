@@ -81,11 +81,15 @@ Claude Code managed-Vault launches pass an empty `--setting-sources=` selection
 before projecting the Session's endpoint, credential, model, and effort. Claude
 otherwise reapplies provider-shaped `env` from user/project/local settings after
 inheriting the child environment, which can silently replace an immutable
-Session binding. Runtime-managed bindings do not use this isolation: OpenAlice
-deliberately leaves Claude's complete authentication and configuration chain in
-control, whether it resolves from login, environment, user settings, or local
-project files. Launcher-owned explicit `--settings` remain available in both
-modes.
+Session binding. Because the empty source selection also disables ordinary
+project-skill discovery, OpenAlice-managed launches explicitly load the
+Workspace `.claude` directory as a local plugin. This restores the Workspace's
+skills under Claude's plugin-scoped namespace without re-enabling user or
+project settings. Runtime-managed bindings do not use either override:
+OpenAlice deliberately leaves Claude's complete authentication, configuration,
+and skill discovery chain in control, whether it resolves from login,
+environment, user settings, or local project files. Launcher-owned explicit
+`--settings` remain available in both modes.
 
 OpenAlice projects a registered provider default when the exact model contract
 publishes one. This makes a Workspace binding deterministic across Agent
