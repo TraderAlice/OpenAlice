@@ -17,7 +17,9 @@ export interface ResumeIdentityRecord {
   readonly resumeId: string
   readonly wsId: string
   readonly agent: string
-  /** Runtime-only hydration of the immutable Workspace-owned AI config. */
+  /** Runtime-only hydration of the Workspace-owned AI config. Launch paths
+   * keep it immutable; a paused Session may replace it through the explicit
+   * edit boundary. */
   runtimeBinding?: SessionRuntimeBinding
   agentSessionId?: string
   latestTaskId?: string
@@ -194,6 +196,33 @@ export class ResumeRegistry {
     record.agentSessionId = agentSessionId
     record.updatedAt = Date.now()
     await this.flush()
+  }
+
+  async replaceRuntimeBinding(input: {
+    resumeId: string
+    wsId: string
+    agent: string
+    runtimeBinding: SessionRuntimeBinding
+    now?: number
+  }): Promise<ResumeIdentityRecord> {
+    const record = this.records.get(input.resumeId)
+    if (!record) throw new Error(`resume identity ${input.resumeId} was not found`)
+    if (record.wsId !== input.wsId || record.agent !== input.agent) {
+      throw new Error(`resume identity ${input.resumeId} belongs to ${record.wsId}/${record.agent}`)
+    }
+    if (record.lifecycle === 'retired') {
+      throw new Error(`resume identity ${input.resumeId} is retired`)
+    }
+    await this.runtimeBindings.replace({
+      wsId: input.wsId,
+      resumeId: input.resumeId,
+      agent: input.agent,
+      binding: input.runtimeBinding,
+    })
+    record.runtimeBinding = input.runtimeBinding
+    record.updatedAt = input.now ?? Date.now()
+    await this.flush()
+    return record
   }
 
   async retireWorkspace(

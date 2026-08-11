@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { renderHook } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Workspace } from '../components/workspace/api'
@@ -9,7 +9,13 @@ import { useWorkspaceData, useWorkspaceSessionData } from './useWorkspaceData'
 
 const mocks = vi.hoisted(() => ({
   context: null as WorkspacesContextValue | null,
+  updatePausedSessionRuntime: vi.fn(),
 }))
+
+vi.mock('../components/workspace/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/workspace/api')>()
+  return { ...actual, updatePausedSessionRuntime: mocks.updatePausedSessionRuntime }
+})
 
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => {
@@ -62,6 +68,7 @@ function context(overrides: Partial<WorkspacesContextValue> = {}): WorkspacesCon
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.context = context()
+  mocks.updatePausedSessionRuntime.mockResolvedValue(workspace().sessions[0])
 })
 
 describe('Workspace data hooks', () => {
@@ -99,5 +106,30 @@ describe('Workspace data hooks', () => {
     )
 
     expect(result.current.session).toBeNull()
+  })
+
+  it('updates a paused Session through the domain hook and refreshes the snapshot', async () => {
+    const { result } = renderHook(() =>
+      useWorkspaceSessionData('workspace-1', 'session-1'),
+    )
+
+    await act(async () => {
+      await result.current.updateRuntime({
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'low',
+      })
+    })
+
+    expect(mocks.updatePausedSessionRuntime).toHaveBeenCalledWith(
+      'workspace-1',
+      'session-1',
+      {
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'low',
+      },
+    )
+    expect(refresh).toHaveBeenCalledOnce()
   })
 })

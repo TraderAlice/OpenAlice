@@ -358,9 +358,12 @@ Choosing an OpenAlice credential is an explicit override. A fresh Session may
 bind that vault reference without writing it into the Workspace or changing the
 runtime's global state. An absent choice means
 “use the runtime default”; it does not mean “pick any compatible credential.”
-Existing Session bindings remain authoritative until that Session is retired,
-and OpenAlice never imports a runtime-global secret into its vault or a
-Workspace.
+Existing Session bindings remain authoritative until that Session is retired
+or the user explicitly replaces the binding while it is paused. A paused edit
+updates the secret-free `.alice/sessions/<resumeId>.json` reference without
+waking the Session; the replacement credential, model, and effort take effect
+on its next resume. OpenAlice never imports a runtime-global secret into its
+vault or a Workspace.
 
 Native “global” state follows the runtime actually launched. A source or
 user-installed Pi uses its own normal global agent directory. Packaged managed
@@ -420,7 +423,7 @@ contain credentials.
 - `src/workspaces/adapters/` — declared runtime compatibility, native projection, and round-trip parsing.
 - `src/workspaces/adapters/owned-toml-config.ts` — reversible Codex project-scalar ownership.
 - `src/workspaces/resume-registry.ts` — durable product Session identity and runtime hydration.
-- `src/workspaces/session-runtime-store.ts` — immutable Workspace-local Session AI configuration.
+- `src/workspaces/session-runtime-store.ts` — Workspace-local Session AI configuration and explicit paused replacement.
 - `src/workspaces/schedule/scanner.ts` — Issue selection to fresh Session creation.
 - `src/workspaces/headless-task-registry.ts` — per-turn execution provenance.
 - `ui/src/components/credentials/` — credential/account setup.

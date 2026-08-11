@@ -17,6 +17,7 @@ import type {
   AgentConfigBundle,
   AgentId,
   DepartedWorkspace,
+  PausedSessionRuntimeUpdate,
   SessionRecord,
   WebPiSnapshot,
   Workspace,
@@ -1056,6 +1057,44 @@ export const workspacesHandlers = [
     )
   }),
   http.post('/api/workspaces/:id/sessions/:sid/pause', () => HttpResponse.json(true)),
+  http.put('/api/workspaces/:id/sessions/:sid/runtime', async ({ params, request }) => {
+    const workspaceIndex = demoWorkspaces.findIndex((candidate) => candidate.id === String(params.id))
+    const workspace = workspaceIndex >= 0 ? demoWorkspaces[workspaceIndex] : undefined
+    const sessionIndex = workspace?.sessions.findIndex((candidate) => candidate.id === String(params.sid)) ?? -1
+    const session = sessionIndex >= 0 ? workspace?.sessions[sessionIndex] : undefined
+    if (!workspace || !session) {
+      return HttpResponse.json({ error: 'not_found' }, { status: 404 })
+    }
+    if (session.state !== 'paused') {
+      return HttpResponse.json({
+        error: 'session_not_paused',
+        message: 'Pause this Session before changing its credential, model, or effort',
+      }, { status: 409 })
+    }
+    const body = await request.json().catch(() => ({})) as Partial<PausedSessionRuntimeUpdate>
+    if (
+      (body.credentialSource !== 'native' && body.credentialSource !== 'vault')
+      || (body.credentialSource === 'vault' && !body.credentialSlug)
+    ) {
+      return HttpResponse.json({ error: 'bad_request' }, { status: 400 })
+    }
+    const updatedSession: SessionRecord = {
+      ...session,
+      runtime: {
+        credentialSource: body.credentialSource,
+        ...(body.credentialSource === 'vault' ? { credentialSlug: body.credentialSlug! } : {}),
+        ...(body.model ? { model: body.model } : {}),
+        ...(body.reasoningEffort ? { reasoningEffort: body.reasoningEffort } : {}),
+      },
+    }
+    demoWorkspaces[workspaceIndex] = {
+      ...workspace,
+      sessions: workspace.sessions.map((candidate, index) => (
+        index === sessionIndex ? updatedSession : candidate
+      )),
+    }
+    return HttpResponse.json({ session: updatedSession })
+  }),
   http.post('/api/workspaces/:id/sessions/:sid/resume', () => HttpResponse.json(null)),
   http.delete('/api/workspaces/:id/sessions/:sid', ({ params }) => {
     const wsId = String(params.id)

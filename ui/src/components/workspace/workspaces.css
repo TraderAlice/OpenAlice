@@ -1419,6 +1419,12 @@ button.files-row:focus-visible {
   color: var(--foreground);
 }
 
+.resume-cta-btn.is-config {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+}
+
 /* WebPi is deliberately a surface inside the existing terminal slot. */
 .webpi-shell {
   position: relative;
