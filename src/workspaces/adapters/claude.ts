@@ -203,23 +203,21 @@ export const claudeAdapter: CliAdapter = {
       }
       // Claude Code applies provider-shaped `env` from user/project/local
       // settings after inheriting the child process environment. A managed
-      // Vault binding must therefore exclude every implicit settings source;
-      // otherwise an unrelated global login (or a deprecated project export)
-      // can replace ANTHROPIC_BASE_URL / auth / model after OpenAlice projects
-      // this immutable Session binding. `--setting-sources=` is Claude Code's
-      // empty-source form. It also disables Claude's ordinary project-skill
-      // discovery, so expose the Workspace `.claude` directory explicitly as
-      // a local plugin. Plugin loading does not re-enable project/user settings
-      // and therefore preserves both the immutable Vault binding and the
-      // Workspace's bundled skills. Explicit `--settings` supplied by
-      // composeCommand still loads, so launcher-owned MCP trust remains
-      // available.
+      // Vault binding must exclude user and local sources so an unrelated
+      // global login or deprecated `.claude/settings.local.json` export cannot
+      // replace ANTHROPIC_BASE_URL / auth / model after OpenAlice projects the
+      // immutable Session binding. Keep the project source enabled: Claude
+      // owns the native loading semantics for the Workspace's CLAUDE.md and
+      // `.claude/skills`, and treating those files as a synthetic plugin loses
+      // their normal project scope and persona behavior. Explicit `--settings`
+      // supplied by composeCommand still loads, so launcher-owned MCP trust
+      // remains available.
       //
       // Native bindings intentionally keep Claude's normal settings chain:
       // choosing Agent login means the runtime, not OpenAlice, owns provider
       // discovery and authentication.
       const managedCredentialArgs = runtime.binding.credential.source === 'vault'
-        ? ['--setting-sources=', '--plugin-dir', join(ctx.cwd, '.claude')]
+        ? ['--setting-sources=project']
         : [];
       const args = [
         ...managedCredentialArgs,

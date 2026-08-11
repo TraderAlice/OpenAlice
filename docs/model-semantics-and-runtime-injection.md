@@ -77,19 +77,18 @@ Writing the same values into native project files is a deprecated compatibility
 export for users who intentionally start the CLI outside OpenAlice. It is not a
 managed Session default, readiness gate, or launch-time fallback.
 
-Claude Code managed-Vault launches pass an empty `--setting-sources=` selection
+Claude Code managed-Vault launches select only the `project` settings source
 before projecting the Session's endpoint, credential, model, and effort. Claude
-otherwise reapplies provider-shaped `env` from user/project/local settings after
+otherwise reapplies provider-shaped `env` from user and local settings after
 inheriting the child environment, which can silently replace an immutable
-Session binding. Because the empty source selection also disables ordinary
-project-skill discovery, OpenAlice-managed launches explicitly load the
-Workspace `.claude` directory as a local plugin. This restores the Workspace's
-skills under Claude's plugin-scoped namespace without re-enabling user or
-project settings. Runtime-managed bindings do not use either override:
-OpenAlice deliberately leaves Claude's complete authentication, configuration,
-and skill discovery chain in control, whether it resolves from login,
-environment, user settings, or local project files. Launcher-owned explicit
-`--settings` remain available in both modes.
+Session binding. Keeping the project source enabled preserves Claude's native
+Workspace `CLAUDE.md` persona and `.claude/skills` discovery without importing
+an unrelated global login or deprecated `.claude/settings.local.json` export.
+Runtime-managed bindings do not restrict the source chain: OpenAlice deliberately
+leaves Claude's complete authentication, configuration, and skill discovery in
+control, whether it resolves from login, environment, user settings, or local
+project files. Launcher-owned explicit `--settings` remain available in both
+modes.
 
 A registered provider default is descriptive model metadata, not an implicit
 Session launch parameter. OpenAlice may label that default in selection help,
