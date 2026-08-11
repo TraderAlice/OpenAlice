@@ -545,7 +545,7 @@ describe('ChatLandingPage keyboard submission', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     expect((await screen.findByRole('button', { name: 'Model and reasoning' })).textContent)
-      .toContain('Runtime default model')
+      .toContain('Model managed by runtime')
     fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /deepseek-1/ }))
     expect(await findInferenceTrigger('deepseek-v4-flash')).toBeTruthy()
@@ -631,10 +631,10 @@ describe('ChatLandingPage AI source disclosure', () => {
     render(<ChatLandingPage spec={{ params: { targetWsId: 'chat-1' } }} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'AI access' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /Use Pi account/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Managed by Pi/ }))
     expect(mocks.rememberQuickChatLaunch).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Model and reasoning' }).textContent)
-      .toContain('Runtime default model')
+      .toContain('Model managed by runtime')
 
     fireEvent.change(screen.getByPlaceholderText('Ask Alice…'), { target: { value: 'Use my account.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))

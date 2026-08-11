@@ -143,8 +143,8 @@ describe('WorkspaceAIPreferencesPanel', () => {
     expect(screen.getByRole('combobox', { name: '思考强度' })).toBeTruthy()
 
     fireEvent.click(access)
-    expect(await screen.findByText('Codex 要如何访问 AI？')).toBeTruthy()
-    expect(screen.getByRole('menuitemradio', { name: /使用 Codex 账号/ })).toBeTruthy()
+    expect(await screen.findByText('由谁管理 Codex 的 AI 访问？')).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: /由 Codex 管理/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek API/ }))
     await waitFor(() => expect(screen.queryByRole('menuitemradio', { name: /DeepSeek API/ })).toBeNull())
 
