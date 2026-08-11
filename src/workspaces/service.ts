@@ -314,9 +314,9 @@ import { ScrollbackStore } from './scrollback-store.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import {
   SessionRegistry,
-  sessionPreferredTitle,
   type SessionRecord,
 } from './session-registry.js';
+import { projectPublicSession } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
 import { TemplateRegistry } from './template-registry.js';
@@ -2431,25 +2431,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const harnessSource = await readHarnessSource(w.dir);
     await sessionRegistry.ensureLoaded(w.id).catch(() => undefined);
     void refreshSessionTitles(w);
-    const sessions = sessionRegistry.listFor(w.id).map((r) => {
-      const terminal = pool.get(r.id);
-      const browser = webPi.get(r.id);
-      return {
-        id: r.id,
-        wsId: r.wsId,
-        agent: r.agent,
-        name: r.name,
-        createdAt: r.createdAt,
-        lastActiveAt: r.lastActiveAt,
-        state: r.state === 'running' && (terminal || browser) ? 'running' : 'paused',
-        surface: browser ? 'webpi' : (r.surface ?? 'terminal'),
-        resumeId: r.resumeId,
-        pid: terminal?.pid ?? browser?.pid ?? null,
-        startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-        title: sessionPreferredTitle(r) ?? null,
-        sourceRunId: r.sourceRunId ?? null,
-      };
-    });
+    const sessions = sessionRegistry.listFor(w.id).map((record) =>
+      projectPublicSession(record, {
+        terminal: pool.get(record.id),
+        webPi: webPi.get(record.id),
+        runtimeBinding: resumeRegistry.get(record.resumeId)?.runtimeBinding,
+      }),
+    );
     // Deprecated native-project compatibility-export signals. Retained in the
     // public contract for advanced diagnostics; managed Session defaults come
     // from `runtimeSettings` and primary UI surfaces do not expose these files.

@@ -32,6 +32,7 @@ import {
   sessionPreferredTitle,
   type SessionRecord,
 } from '../../workspaces/session-registry.js';
+import { projectPublicSession, type PublicSession } from '../../workspaces/public-session.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import {
@@ -202,30 +203,8 @@ interface SpawnedSessionBody {
   readonly title: string | null;
 }
 
-interface PublicSessionBody {
-  readonly id: string;
-  readonly wsId: string;
-  readonly agent: string;
-  readonly name: string;
-  readonly createdAt: string;
-  readonly lastActiveAt: string;
-  readonly state: 'running' | 'paused';
-  readonly surface: 'terminal' | 'webpi';
-  readonly resumeId: string;
-  readonly pid: number | null;
-  readonly startedAt: number | null;
-  readonly title: string | null;
-  readonly sourceRunId: string | null;
-  readonly runtime?: {
-    readonly credentialSource: 'native' | 'vault' | 'workspace';
-    readonly credentialSlug?: string;
-    readonly model?: string;
-    readonly reasoningEffort?: ModelReasoningEffort;
-  };
-}
-
 type OpenHeadlessSessionResult =
-  | { readonly ok: true; readonly created: boolean; readonly session: PublicSessionBody }
+  | { readonly ok: true; readonly created: boolean; readonly session: PublicSession }
   | { readonly ok: false; readonly status: 400 | 404 | 409 | 500; readonly body: { error: string; message?: string } };
 
 type SpawnSessionResult =
@@ -535,37 +514,15 @@ export function createWorkspaceRoutes(
     }
   }
 
-  const publicSession = (record: SessionRecord): PublicSessionBody => {
+  const publicSession = (record: SessionRecord): PublicSession => {
     const terminal = svc.pool.get(record.id);
     const browser = svc.webPi?.get(record.id) ?? null;
     const binding = svc.resumeRegistry.get(record.resumeId)?.runtimeBinding;
-    return {
-      id: record.id,
-      wsId: record.wsId,
-      agent: record.agent,
-      name: record.name,
-      createdAt: record.createdAt,
-      lastActiveAt: record.lastActiveAt,
-      state: record.state === 'running' && (terminal || browser) ? 'running' : 'paused',
-      surface: browser ? 'webpi' : (record.surface ?? 'terminal'),
-      resumeId: record.resumeId,
-      pid: terminal?.pid ?? browser?.pid ?? null,
-      startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
-      title: sessionPreferredTitle(record) ?? null,
-      sourceRunId: record.sourceRunId ?? null,
-      ...(binding
-        ? {
-            runtime: {
-              credentialSource: binding.credential.source,
-              ...(binding.credential.source === 'vault'
-                ? { credentialSlug: binding.credential.credentialSlug }
-                : {}),
-              ...(binding.model ? { model: binding.model } : {}),
-              ...(binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
-            },
-          }
-        : {}),
-    };
+    return projectPublicSession(record, {
+      terminal,
+      webPi: browser,
+      runtimeBinding: binding,
+    });
   };
 
   const mappedResumeForRecord = (

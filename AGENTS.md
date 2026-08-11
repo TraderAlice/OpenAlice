@@ -288,5 +288,9 @@ the tagline, pillars, or other marketing copy.
   `ui/src/components/ui/`. Extend that layer before hand-rolling portals,
   positioning, focus, dismissal, keyboard behavior, or bespoke control styling
   inside a feature component.
+- Frontend reads of backend-owned data must go through a domain hook rather
+  than calling an API or reaching into a transport/polling context from a
+  feature component. Keep presentation components prop-driven, and cover each
+  data hook with unit tests for its selection plus loading/error semantics.
 - Prefer structured Workspace launcher logs; the main process currently uses
   `console` and does not have a universal pino sink.

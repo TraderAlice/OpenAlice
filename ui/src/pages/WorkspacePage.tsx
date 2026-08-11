@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import '@xterm/xterm/css/xterm.css'
 
 import { useWorkspaces } from '../contexts/workspaces-context'
+import { useWorkspaceSessionData } from '../hooks/useWorkspaceData'
 import { useWorkspace } from '../tabs/store'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
 import { WorkspaceView } from '../components/workspace/WorkspaceView'
@@ -40,12 +41,11 @@ export function WorkspacePage({ spec, visible }: Props) {
   const wsId = spec.params.wsId
   const sessionId = spec.params.sessionId ?? null
   const source = spec.params.source
-
-  const workspace = ctx.workspaces.find((w) => w.id === wsId)
-  const sessions = workspace?.sessions ?? []
-  const activeRecord = sessionId
-    ? sessions.find((s) => s.id === sessionId) ?? null
-    : null
+  const {
+    workspace,
+    sessions,
+    session: activeRecord,
+  } = useWorkspaceSessionData(wsId, sessionId)
   const effectiveDefaultAgent = workspace?.defaultAgent ?? ctx.defaultAgent
   const defaultAgentEnabled =
     effectiveDefaultAgent !== null &&
@@ -176,7 +176,7 @@ export function WorkspacePage({ spec, visible }: Props) {
           sessionId={sessionId}
           {...(source ? { source } : {})}
           activeRecord={activeRecord}
-          sessions={workspace.sessions}
+          sessions={sessions}
           label={workspaceName}
           terminalHeaderActions={terminalCanvas ? workspaceActions : undefined}
           onSpawnFresh={spawnDefault}
