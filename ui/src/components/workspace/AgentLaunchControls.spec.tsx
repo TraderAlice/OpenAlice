@@ -177,7 +177,11 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
 
-    await user.keyboard('{ArrowDown}{End}{Enter}')
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Managed by OpenCode/ }))
+    await user.keyboard('{End}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
+    await user.keyboard('{Enter}')
     expect(selectCredential).toHaveBeenCalledWith('backup')
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
@@ -239,6 +243,25 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
     expect(trigger.textContent).toContain('DeepSeek API')
     expect(trigger.textContent).toContain('deepseek-1')
+  })
+
+  it('renders paused-session settings as two full-width rows', () => {
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig()}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+        toolbar
+        layout="settings"
+      />,
+    )
+
+    const credentialTrigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
+    const inferenceTrigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
+    expect(credentialTrigger.className).toContain('w-full')
+    expect(inferenceTrigger.className).toContain('w-full')
+    expect(inferenceTrigger.textContent).toContain('gpt-5')
+    expect(inferenceTrigger.textContent).toContain('Reasoning managed by runtime')
   })
 
   it('combines model and reasoning into a nested toolbar menu', async () => {

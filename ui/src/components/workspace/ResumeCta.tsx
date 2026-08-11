@@ -1,12 +1,20 @@
 import { useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Bot, ChevronDown, SquareTerminal } from 'lucide-react';
+import { Bot, ChevronDown, Settings2, SquareTerminal } from 'lucide-react';
 
-import type { SessionRecord } from './api';
+import { SessionRuntimeEditorDialog } from './SessionRuntimeEditorDialog';
+import type {
+  AgentInfo,
+  PausedSessionRuntimeUpdate,
+  SessionRecord,
+} from './api';
 
 export interface ResumeCtaProps {
   readonly record: SessionRecord;
+  readonly agents?: readonly AgentInfo[];
+  readonly workspaceId?: string;
+  readonly onUpdateRuntime?: (update: PausedSessionRuntimeUpdate) => Promise<void>;
   readonly onResume: () => Promise<void>;
   readonly onOpenWebPi?: () => Promise<void>;
 }
@@ -32,6 +40,7 @@ export interface ResumeCtaProps {
  */
 export function ResumeCta(props: ResumeCtaProps): ReactElement {
   const [resuming, setResuming] = useState<'terminal' | 'webpi' | null>(null);
+  const [runtimeEditorOpen, setRuntimeEditorOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const r = props.record;
   const sessionTitle = r.title?.trim() || r.name;
@@ -77,6 +86,18 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             </dl>
 
             <div className="resume-cta-actions">
+              {props.agents && props.workspaceId && props.onUpdateRuntime && r.agent !== 'shell' && (
+                <button
+                  type="button"
+                  className="resume-cta-btn is-config oa-pressable"
+                  onClick={() => setRuntimeEditorOpen(true)}
+                  disabled={resuming !== null}
+                  aria-label="Change Session AI configuration"
+                >
+                  <Settings2 size={14} strokeWidth={2.1} aria-hidden="true" />
+                  <span>Change AI</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="resume-cta-btn oa-pressable"
@@ -137,6 +158,16 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
           </details>
         </section>
       </div>
+      {props.agents && props.workspaceId && props.onUpdateRuntime && (
+        <SessionRuntimeEditorDialog
+          open={runtimeEditorOpen}
+          onOpenChange={setRuntimeEditorOpen}
+          record={r}
+          agents={props.agents}
+          workspaceId={props.workspaceId}
+          onSave={props.onUpdateRuntime}
+        />
+      )}
     </div>
   );
 }

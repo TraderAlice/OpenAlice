@@ -112,6 +112,28 @@ const workspaceRuntimeDefaultsRequestSchema = z.object({
   headless: workspaceRuntimeModeDefaultsRequestSchema,
 }).strict();
 
+const pausedSessionRuntimeRequestSchema = z.object({
+  credentialSource: z.enum(['native', 'vault']),
+  credentialSlug: z.string().trim().min(1).max(128).nullable().optional(),
+  model: z.string().trim().min(1).max(256).nullable().optional(),
+  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']).nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.credentialSource === 'vault' && !value.credentialSlug) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['credentialSlug'],
+      message: 'credentialSlug is required for a vault credential',
+    });
+  }
+  if (value.credentialSource === 'native' && value.credentialSlug) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['credentialSlug'],
+      message: 'credentialSlug cannot be combined with native runtime authentication',
+    });
+  }
+});
+
 // The spawn body's `resume` value is an AGENT-side session id, whose shape is
 // adapter-native: uuid for claude/codex/pi, `ses_<base62>` for opencode. This
 // looser shape applies ONLY to the resume intent passed through to the adapter's
@@ -1713,6 +1735,87 @@ export function createWorkspaceRoutes(
       return c.json({ ok: true, wasRunning });
     });
   }
+
+  app.put('/:id/sessions/:sid/runtime', async (c) => {
+    const id = c.req.param('id');
+    const token = c.req.param('sid');
+    if (!validId(id) || !validId(token)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
+    if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+    const record = svc.sessionRegistry.get(id, token);
+    if (!record) return c.json({ error: 'not_found' }, 404);
+    if (
+      record.state !== 'paused'
+      || svc.pool.get(token)
+      || svc.webPi?.has(token)
+    ) {
+      return c.json({
+        error: 'session_not_paused',
+        message: 'Pause this Session before changing its credential, model, or effort',
+      }, 409);
+    }
+    const identity = svc.resumeRegistry.get(record.resumeId);
+    if (!identity) {
+      return c.json({
+        error: 'session_identity_missing',
+        message: 'This Session has no durable resume identity',
+      }, 409);
+    }
+    if (identity.lifecycle === 'retired') {
+      return c.json({ error: 'resume_retired', message: 'this Session retired with its Workspace' }, 409);
+    }
+    const adapter = svc.adapters.get(record.agent);
+    if (!adapter || !isAgentRuntime(adapter)) {
+      return c.json({
+        error: 'runtime_selection_unsupported',
+        message: `Session runtime "${record.agent}" does not support managed AI configuration`,
+      }, 400);
+    }
+    const parsed = pausedSessionRuntimeRequestSchema.safeParse(
+      await safeJson(c).catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json({
+        error: 'bad_request',
+        message: parsed.error.issues[0]?.message ?? 'invalid Session AI configuration',
+      }, 400);
+    }
+    try {
+      const resolved = await createSessionRuntimeBinding({
+        adapter,
+        cwd: meta.dir,
+        selection: {
+          ...(parsed.data.credentialSource === 'native'
+            ? { credentialSource: 'native' as const }
+            : { credentialSlug: parsed.data.credentialSlug! }),
+          ...(parsed.data.model ? { model: parsed.data.model } : {}),
+          ...(parsed.data.reasoningEffort
+            ? { reasoningEffort: parsed.data.reasoningEffort }
+            : {}),
+        },
+      });
+      await svc.resumeRegistry.replaceRuntimeBinding({
+        resumeId: record.resumeId,
+        wsId: record.wsId,
+        agent: record.agent,
+        runtimeBinding: resolved.binding,
+      });
+      return c.json({
+        session: projectPublicSession(record, { runtimeBinding: resolved.binding }),
+      });
+    } catch (err) {
+      if (err instanceof SessionRuntimeBindingError) {
+        return c.json({ error: err.code, message: err.message }, 400);
+      }
+      launcherLogger.warn('session_runtime.replace_failed', {
+        id, sessionId: token, agent: record.agent, err,
+      });
+      return c.json({
+        error: 'session_runtime_update_failed',
+        message: (err as Error).message,
+      }, 500);
+    }
+  });
 
   app.post('/:id/sessions/:sid/resume', async (c) => {
     const id = c.req.param('id');

@@ -45,6 +45,7 @@ export function WorkspacePage({ spec, visible }: Props) {
     workspace,
     sessions,
     session: activeRecord,
+    updateRuntime,
   } = useWorkspaceSessionData(wsId, sessionId)
   const effectiveDefaultAgent = workspace?.defaultAgent ?? ctx.defaultAgent
   const defaultAgentEnabled =
@@ -177,10 +178,12 @@ export function WorkspacePage({ spec, visible }: Props) {
           {...(source ? { source } : {})}
           activeRecord={activeRecord}
           sessions={sessions}
+          agents={ctx.agents}
           label={workspaceName}
           terminalHeaderActions={terminalCanvas ? workspaceActions : undefined}
           onSpawnFresh={spawnDefault}
           onResume={(id) => ctx.resumeSession(wsId, id, source)}
+          onUpdateSessionRuntime={(_id, update) => updateRuntime(update).then(() => undefined)}
           onOpenWebPi={(id) => ctx.openWebPiSession(wsId, id, source)}
           onSelectSession={(id) => {
             // Running session — already alive on the server, just

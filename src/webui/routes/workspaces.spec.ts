@@ -43,6 +43,9 @@ function build(
     workspaceAbsorbs?: any;
     availability?: Record<string, { installed: boolean; path: string | null }>;
     spawnPlan?: any;
+    sessionRecord?: any;
+    runtimeBinding?: any;
+    poolLive?: any;
   } = {},
 ) {
   const claude = {
@@ -73,6 +76,12 @@ function build(
     checkedAt: null,
   };
   const getAgentRuntimeReadiness = vi.fn(() => runtimeReadiness);
+  const replaceRuntimeBinding = vi.fn(async (input: any) => ({
+    resumeId: input.resumeId,
+    wsId: input.wsId,
+    agent: input.agent,
+    runtimeBinding: input.runtimeBinding,
+  }));
   const probeAgentRuntimeReadiness = vi.fn(async () => ({
     ...runtimeReadiness,
     overallReady: true,
@@ -143,8 +152,22 @@ function build(
     runHeadlessTask,
     dispatchHeadlessTask,
     resumeRegistry: {
-      get: vi.fn(() => opts.resumeIdentity ?? null),
+      get: vi.fn(() => opts.resumeIdentity ?? (opts.sessionRecord ? {
+        resumeId: opts.sessionRecord.resumeId,
+        wsId: opts.sessionRecord.wsId,
+        agent: opts.sessionRecord.agent,
+        lifecycle: 'active',
+        runtimeBinding: opts.runtimeBinding ?? null,
+      } : null)),
       ensure: vi.fn(async (input: any) => ({ resumeId: input.resumeId ?? 'resume-1', ...input })),
+      replaceRuntimeBinding,
+    },
+    sessionRegistry: {
+      get: vi.fn(() => opts.sessionRecord),
+      update: vi.fn(async () => undefined),
+    },
+    pool: {
+      get: vi.fn(() => opts.poolLive),
     },
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
@@ -171,6 +194,7 @@ function build(
     lifecycle,
     templateUpgrades,
     workspaceAbsorbs,
+    replaceRuntimeBinding,
   };
 }
 
@@ -918,6 +942,98 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(opened.status).toBe(409);
     expect(opened.body.error).toBe('run_still_running');
     expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /:id/sessions/:sid/runtime', () => {
+  const TOKEN = 'claude-sunny-amber-spring';
+  const pausedRecord = {
+    id: TOKEN,
+    resumeId: 'resume-session-runtime',
+    wsId: 'ws-1',
+    agent: 'claude',
+    name: 'c1',
+    createdAt: '2026-08-11T00:00:00.000Z',
+    lastActiveAt: '2026-08-11T00:01:00.000Z',
+    state: 'paused',
+    surface: 'terminal',
+  };
+  const adapter = {
+    id: 'claude',
+    displayName: 'Claude Code',
+    capabilities: {
+      aiProvider: {
+        credentialSource: 'runtime-or-workspace',
+        wirePreference: ['anthropic'],
+      },
+    },
+    sessionRuntime: emptyAgentSessionRuntime,
+  };
+
+  it('replaces the persisted binding for a paused Session without resuming it', async () => {
+    const { app, replaceRuntimeBinding } = build({
+      sessionRecord: pausedRecord,
+      adapters: { claude: adapter },
+    });
+
+    const result = await put(app, `/ws-1/sessions/${TOKEN}/runtime`, {
+      credentialSource: 'native',
+      model: 'claude-sonnet-4-5',
+      reasoningEffort: 'low',
+    });
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        session: {
+          id: TOKEN,
+          state: 'paused',
+          runtime: {
+            credentialSource: 'native',
+            model: 'claude-sonnet-4-5',
+            reasoningEffort: 'low',
+          },
+        },
+      },
+    });
+    expect(replaceRuntimeBinding).toHaveBeenCalledWith(expect.objectContaining({
+      resumeId: 'resume-session-runtime',
+      runtimeBinding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'low',
+      },
+    }));
+  });
+
+  it('rejects edits while the Session is running', async () => {
+    const { app, replaceRuntimeBinding } = build({
+      sessionRecord: { ...pausedRecord, state: 'running' },
+      adapters: { claude: adapter },
+      poolLive: { pid: 42 },
+    });
+
+    const result = await put(app, `/ws-1/sessions/${TOKEN}/runtime`, {
+      credentialSource: 'native',
+    });
+
+    expect(result).toMatchObject({ status: 409, body: { error: 'session_not_paused' } });
+    expect(replaceRuntimeBinding).not.toHaveBeenCalled();
+  });
+
+  it('requires a saved credential when vault management is selected', async () => {
+    const { app, replaceRuntimeBinding } = build({
+      sessionRecord: pausedRecord,
+      adapters: { claude: adapter },
+    });
+
+    const result = await put(app, `/ws-1/sessions/${TOKEN}/runtime`, {
+      credentialSource: 'vault',
+    });
+
+    expect(result).toMatchObject({ status: 400, body: { error: 'bad_request' } });
+    expect(replaceRuntimeBinding).not.toHaveBeenCalled();
   });
 });
 

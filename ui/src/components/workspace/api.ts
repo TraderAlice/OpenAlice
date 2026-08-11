@@ -1019,6 +1019,39 @@ export async function resumeSession(
   return (await res.json()) as SpawnedSession;
 }
 
+export interface PausedSessionRuntimeUpdate {
+  readonly credentialSource: 'native' | 'vault';
+  readonly credentialSlug?: string | null;
+  readonly model?: string | null;
+  readonly reasoningEffort?: ModelReasoningEffort | null;
+}
+
+/** Replace one paused Session's secret-free AI binding. The Session remains
+ * paused; the next resume projects this binding into the native runtime. */
+export async function updatePausedSessionRuntime(
+  wsId: string,
+  sessionId: string,
+  update: PausedSessionRuntimeUpdate,
+): Promise<SessionRecord> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/runtime`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(update),
+    },
+  );
+  const body = (await res.json().catch(() => null)) as {
+    session?: SessionRecord;
+    error?: string;
+    message?: string;
+  } | null;
+  if (!res.ok || !body?.session) {
+    throw new Error(body?.message ?? body?.error ?? `Session AI configuration update failed: ${res.status}`);
+  }
+  return body.session;
+}
+
 export async function openWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/open`,

@@ -24,6 +24,12 @@ export interface SessionRuntimeBindingStore {
     readonly agent: string
     readonly binding: SessionRuntimeBinding
   }): Promise<void>
+  replace(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+    readonly binding: SessionRuntimeBinding
+  }): Promise<void>
 }
 
 function assertedFileName(resumeId: string): string {
@@ -107,6 +113,20 @@ export class WorkspaceSessionRuntimeStore implements SessionRuntimeBindingStore 
     await next
   }
 
+  /** Explicit paused-Session edit boundary. Normal launch paths keep using
+   * `ensure()` so an existing Session can never change its AI binding merely
+   * because a later launch supplied different defaults. */
+  async replace(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+    readonly binding: SessionRuntimeBinding
+  }): Promise<void> {
+    const next = this.writeChain.then(() => this.writeNow(input))
+    this.writeChain = next.catch(() => undefined)
+    await next
+  }
+
   private async ensureNow(input: {
     readonly wsId: string
     readonly resumeId: string
@@ -121,6 +141,15 @@ export class WorkspaceSessionRuntimeStore implements SessionRuntimeBindingStore 
       return
     }
 
+    await this.writeNow(input)
+  }
+
+  private async writeNow(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+    readonly binding: SessionRuntimeBinding
+  }): Promise<void> {
     const [path] = this.paths(input.wsId, input.resumeId)
     if (!path) throw new Error(`Workspace ${input.wsId} is unavailable for Session AI config storage`)
     const directory = dirname(path)

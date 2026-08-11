@@ -59,6 +59,23 @@ describe('WorkspaceSessionRuntimeStore', () => {
     })).rejects.toThrow(/different runtime binding/)
   })
 
+  it('atomically replaces a binding only through the explicit edit boundary', async () => {
+    await store.ensure({ wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex', binding })
+    const replacement: SessionRuntimeBinding = {
+      version: 1,
+      credential: { source: 'native' },
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'low',
+    }
+
+    await store.replace({
+      wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex', binding: replacement,
+    })
+
+    expect(await store.read({ wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex' }))
+      .toEqual(replacement)
+  })
+
   it('serializes competing first writes so only one binding wins', async () => {
     const results = await Promise.allSettled([
       store.ensure({ wsId: 'ws-1', resumeId: 'resume-race', agent: 'codex', binding }),

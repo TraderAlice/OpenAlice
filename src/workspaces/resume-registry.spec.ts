@@ -82,6 +82,39 @@ describe('ResumeRegistry', () => {
     expect(raw).not.toContain('sk-secret')
   })
 
+  it('replaces a paused Session binding only through the explicit registry boundary', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    await registry.ensure({
+      resumeId: 'resume-runtime-edit',
+      wsId: 'ws-1',
+      agent: 'claude',
+      runtimeBinding: { version: 1, credential: { source: 'native' } },
+      now: 1,
+    })
+    const replacement = {
+      version: 1 as const,
+      credential: {
+        source: 'vault' as const,
+        credentialSlug: 'deepseek-1',
+        wireShape: 'anthropic' as const,
+      },
+      model: 'deepseek-v4-flash',
+      reasoningEffort: 'high' as const,
+    }
+
+    const updated = await registry.replaceRuntimeBinding({
+      resumeId: 'resume-runtime-edit',
+      wsId: 'ws-1',
+      agent: 'claude',
+      runtimeBinding: replacement,
+      now: 2,
+    })
+
+    expect(updated).toMatchObject({ runtimeBinding: replacement, updatedAt: 2 })
+    expect((await ResumeRegistry.load(path, noopLogger, runtimeStore))
+      .get('resume-runtime-edit')?.runtimeBinding).toEqual(replacement)
+  })
+
   it('keeps legacy UUID identities valid without rewriting them', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const legacyId = '550e8400-e29b-41d4-a716-446655440000'

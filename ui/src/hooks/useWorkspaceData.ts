@@ -1,6 +1,11 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
-import type { SessionRecord, Workspace } from '../components/workspace/api'
+import {
+  updatePausedSessionRuntime,
+  type PausedSessionRuntimeUpdate,
+  type SessionRecord,
+  type Workspace,
+} from '../components/workspace/api'
 import { useWorkspaces } from '../contexts/workspaces-context'
 
 export interface WorkspaceDataSnapshot {
@@ -13,6 +18,7 @@ export interface WorkspaceDataSnapshot {
 
 export interface WorkspaceSessionDataSnapshot extends WorkspaceDataSnapshot {
   readonly session: SessionRecord | null
+  updateRuntime(update: PausedSessionRuntimeUpdate): Promise<SessionRecord>
 }
 
 /**
@@ -48,6 +54,15 @@ export function useWorkspaceSessionData(
       : null,
     [sessionId, workspace.sessions],
   )
+  const updateRuntime = useCallback(async (update: PausedSessionRuntimeUpdate) => {
+    if (!sessionId) throw new Error('No Session is selected')
+    const updated = await updatePausedSessionRuntime(workspaceId, sessionId, update)
+    await workspace.refresh()
+    return updated
+  }, [sessionId, workspace, workspaceId])
 
-  return useMemo(() => ({ ...workspace, session }), [session, workspace])
+  return useMemo(
+    () => ({ ...workspace, session, updateRuntime }),
+    [session, updateRuntime, workspace],
+  )
 }
