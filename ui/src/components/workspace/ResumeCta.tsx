@@ -228,16 +228,19 @@ function sessionRuntimeFacts(record: SessionRecord): readonly { label: string; v
   const runtime = record.runtime;
   return [
     { label: 'Credential', value: credentialDisplay(runtime) },
-    { label: 'Model', value: runtime?.model?.trim() || 'Runtime default' },
+    { label: 'Model', value: runtime ? runtime.model?.trim() || 'Runtime default' : 'Unknown' },
     {
       label: 'Effort',
-      value: runtime?.reasoningEffort ? `${runtime.reasoningEffort} reasoning` : 'Runtime default',
+      value: runtime
+        ? runtime.reasoningEffort ? `${runtime.reasoningEffort} reasoning` : 'Runtime default'
+        : 'Unknown',
     },
   ];
 }
 
 function credentialDisplay(runtime: SessionRecord['runtime']): string {
-  if (!runtime || runtime.credentialSource === 'native') return 'Runtime login';
+  if (!runtime) return 'Unknown';
+  if (runtime.credentialSource === 'native') return 'Runtime login';
   if (runtime.credentialSource === 'workspace') return 'Workspace config';
   return runtime.credentialSlug?.trim() || 'Saved credential';
 }
