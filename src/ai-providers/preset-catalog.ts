@@ -138,18 +138,19 @@ export const CLAUDE_API: PresetDef = {
   description: 'Pay per token via Anthropic API',
   category: 'official',
   defaultName: 'Claude (API Key)',
-  hint: 'Model is switchable here or from the profile list anytime. Opus is the recommended complex-agent default; Sonnet balances capability and cost, while Fable is the highest-capability premium tier.',
+  hint: 'Model is switchable here or from the profile list anytime. Opus 5 is the recommended complex-agent default; Sonnet balances capability and cost, while Fable is the highest-capability premium tier.',
   zodSchema: z.object({
     backend: z.literal('agent-sdk'),
     loginMethod: z.literal('api-key'),
-    model: z.string().default('claude-opus-4-8').describe('Model'),
+    model: z.string().default('claude-opus-5').describe('Model'),
     apiKey: z.string().min(1).describe('Anthropic API key'),
   }),
   models: withModelSemantics('anthropic', [
     { id: 'claude-fable-5', label: 'Claude Fable 5 (Highest capability)' },
-    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (Complex agents)' },
+    { id: 'claude-opus-5', label: 'Claude Opus 5 (Complex agents)' },
     { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (Balanced)' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Fastest)' },
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (Previous generation)' },
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Previous generation)' },
   ]),
   regions: [{ id: 'official', label: 'Official (api.anthropic.com)', wires: { anthropic: '' } }],
@@ -157,7 +158,7 @@ export const CLAUDE_API: PresetDef = {
     apiKeyLabel: 'Anthropic API key',
     apiKeyPlaceholder: 'sk-ant-...',
     apiKeyHelp: 'Use a key from Anthropic Console. Claude Pro/Max is a separate Claude Code login and does not belong in this field.',
-    modelHelp: 'Choose an Anthropic API model ID, or paste another exact ID. Opus 4.8 stays the complex-agent default; Fable 5 is the premium capability tier and Sonnet 5 is the balanced tier.',
+    modelHelp: 'Choose an Anthropic API model ID, or paste another exact ID. Opus 5 is the complex-agent default; Fable 5 is the premium capability tier and Sonnet 5 is the balanced tier.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -238,13 +239,15 @@ export const GEMINI: PresetDef = {
   zodSchema: z.object({
     backend: z.literal('vercel-ai-sdk'),
     provider: z.literal('google'),
-    model: z.string().default('gemini-3.1-flash-lite').describe('Model'),
+    model: z.string().default('gemini-3.6-flash').describe('Model'),
     apiKey: z.string().min(1).describe('Google AI API key'),
   }),
   models: withModelSemantics('google', [
-    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Stable)' },
-    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Preview, paid)' },
-    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Stable)' },
+    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Agentic default)' },
+    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (Fastest / economical)' },
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Previous generation)' },
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Previous preview, paid)' },
+    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Previous generation)' },
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Previous generation)' },
     { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Previous generation)' },
     { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (Previous generation)' },
@@ -257,7 +260,7 @@ export const GEMINI: PresetDef = {
     apiKeyLabel: 'Google AI API key',
     apiKeyPlaceholder: 'AQ... or AIza...',
     apiKeyHelp: 'Use a Gemini API key from Google AI Studio. Current AQ authorization keys and legacy AIza keys are both supported.',
-    modelHelp: 'Choose a general-purpose Gemini model available to this project, or paste another exact model ID. Flash-Lite stays the conservative default; Gemini 3.5 Flash is the current stable agentic/coding tier and Gemini 3.1 Pro Preview requires paid access.',
+    modelHelp: 'Choose a general-purpose Gemini model available to this project, or paste another exact model ID. Gemini 3.6 Flash is the current balanced agentic default; Gemini 3.5 Flash-Lite favors throughput and cost.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -504,9 +507,9 @@ export const PRESET_CATALOG: PresetDef[] = [
  * falls back to "let the runtime decide".
  */
 export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
-  anthropic: 'claude-opus-4-8',
+  anthropic: 'claude-opus-5',
   openai: 'gpt-5.6-sol',
-  google: 'gemini-3.1-flash-lite',
+  google: 'gemini-3.6-flash',
   minimax: 'MiniMax-M3',
   glm: 'glm-5.2',
   kimi: 'kimi-k3',

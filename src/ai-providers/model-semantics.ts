@@ -79,8 +79,8 @@ const GEMINI_3_CONTEXT = 1_048_576
  * Facts are sourced from provider documentation and live compatibility checks:
  *
  * - OpenAI model/reasoning guides: https://developers.openai.com/api/docs/guides/latest-model
- * - Anthropic extended/adaptive thinking: https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
- * - Gemini thinking: https://ai.google.dev/gemini-api/docs/generate-content/thinking
+ * - Anthropic Opus 5 and effort: https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5
+ * - Gemini latest models/thinking: https://ai.google.dev/gemini-api/docs/latest-model
  * - MiniMax M3/Anthropic API: https://platform.minimax.io/docs/api-reference/text-chat-anthropic
  * - MiniMax OpenAI `reasoning_split`: https://platform.minimax.io/docs/api-reference/text-chat-openai
  * - Kimi K3/reasoning effort: https://www.kimi.com/help/kimi-api/api-model-selection
@@ -106,6 +106,16 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
     'claude-opus-4-8': {
       contextWindow: 1_000_000,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    },
+    'claude-opus-5': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
       reasoning: {
         mode: 'adaptive',
         efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -161,6 +171,24 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
     },
   },
   google: {
+    'gemini-3.6-flash': {
+      contextWindow: GEMINI_3_CONTEXT,
+      maxOutputTokens: 65_536,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['medium', 'high'],
+        defaultEffort: 'medium',
+      },
+    },
+    'gemini-3.5-flash-lite': {
+      contextWindow: GEMINI_3_CONTEXT,
+      maxOutputTokens: 65_536,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['minimal', 'medium', 'high'],
+        defaultEffort: 'minimal',
+      },
+    },
     'gemini-3.5-flash': {
       contextWindow: GEMINI_3_CONTEXT,
       maxOutputTokens: 65_536,
