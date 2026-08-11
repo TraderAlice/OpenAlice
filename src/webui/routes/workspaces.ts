@@ -97,6 +97,10 @@ import {
   managerTerminalPrompt,
   managerSkillPath,
 } from '../../workspaces/manager-workspace.js';
+import {
+  projectSessionAgentActivity,
+  type SessionAgentActivity,
+} from '../../workspaces/session-activity.js';
 
 const workspaceRuntimeModeDefaultsRequestSchema = z.object({
   defaultAgent: z.string().trim().min(1).max(64).nullable(),
@@ -216,6 +220,7 @@ interface PublicSessionBody {
   readonly startedAt: number | null;
   readonly title: string | null;
   readonly sourceRunId: string | null;
+  readonly activity: SessionAgentActivity;
   readonly runtime?: {
     readonly credentialSource: 'native' | 'vault' | 'workspace';
     readonly credentialSlug?: string;
@@ -553,6 +558,11 @@ export function createWorkspaceRoutes(
       startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
       title: sessionPreferredTitle(record) ?? null,
       sourceRunId: record.sourceRunId ?? null,
+      activity: projectSessionAgentActivity({
+        terminal: terminal?.agentActivity,
+        browser,
+        lastActiveAt: record.lastActiveAt,
+      }),
       ...(binding
         ? {
             runtime: {

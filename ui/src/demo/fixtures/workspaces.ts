@@ -21,6 +21,7 @@ const demoSession: SessionRecord = {
   pid: 0,
   startedAt: Date.now(),
   title: "What jumped out from Apple's Q1 earnings?",
+  activity: { phase: 'waiting', observedAt: Date.now() },
 }
 
 export const demoWorkspace: Workspace = {
@@ -84,6 +85,7 @@ const demoChatSessions: SessionRecord[] = [
     pid: 0,
     startedAt: Date.now(),
     title: "What's moving in semiconductors today?",
+    activity: { phase: 'waiting', observedAt: Date.now() },
   },
   {
     id: 'demo-chat-x1',
@@ -97,6 +99,7 @@ const demoChatSessions: SessionRecord[] = [
     pid: 0,
     startedAt: Date.now(),
     title: 'Build a thesis on NVDA',
+    activity: { phase: 'working', observedAt: Date.now() },
   },
   {
     id: 'demo-chat-o1',

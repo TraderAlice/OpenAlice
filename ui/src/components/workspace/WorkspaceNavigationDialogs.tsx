@@ -20,6 +20,12 @@ import { formatRelativeTime } from '../../lib/intl'
 import type { SessionRecord, Workspace } from './api'
 import { workspaceDisplayName, workspaceDisplayTitle } from './display'
 import { orderSessionsForSidebar } from './sidebar-order'
+import {
+  sessionActivityDot,
+  sessionActivityLabelKey,
+  sessionActivityTone,
+  sessionPresentationPhase,
+} from './session-activity-ui'
 
 interface DialogFocusProps {
   restoreFocusRef?: RefObject<HTMLElement | null>
@@ -272,6 +278,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
               {visibleSessions.map(({ workspace, session }) => {
                 const title = session.title?.trim() || session.name
                 const active = workspace.id === props.currentWorkspaceId && session.id === props.activeSessionId
+                const activityPhase = sessionPresentationPhase(session)
                 return (
                   <li key={`${workspace.id}:${session.id}`}>
                     <button
@@ -298,13 +305,9 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                           <span>{formatRelativeTime(session.lastActiveAt)}</span>
                         </span>
                       </span>
-                      <span className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-medium sm:inline-flex ${
-                        session.state === 'running'
-                          ? 'bg-success/10 text-success'
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${session.state === 'running' ? 'bg-success' : 'bg-muted-foreground/45'}`} aria-hidden />
-                        {session.state === 'running' ? t('workspace.filterRunning') : t('workspace.paused')}
+                      <span className={`hidden shrink-0 items-center gap-1.5 rounded-full bg-muted px-2 py-1 text-[10px] font-medium sm:inline-flex ${sessionActivityTone(activityPhase)}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${sessionActivityDot(activityPhase)}`} aria-hidden />
+                        {t(sessionActivityLabelKey(activityPhase))}
                       </span>
                       <Clock3 size={14} strokeWidth={2} className="shrink-0 text-muted-foreground/50" aria-hidden />
                     </button>

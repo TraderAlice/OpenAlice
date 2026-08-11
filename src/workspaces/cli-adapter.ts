@@ -289,6 +289,8 @@ export interface CliAdapter {
      * set this; `shell` does not (no agent-turn concept).
      */
     readonly headless?: boolean;
+    /** Native interactive turns publish private terminal activity frames. */
+    readonly interactiveActivity?: 'terminal-osc-v1';
     /**
      * Native AI-provider projection contract. Shared credential/model logic
      * consumes this declaration instead of branching on adapter ids. Omit for

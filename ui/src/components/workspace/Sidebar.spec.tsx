@@ -212,4 +212,34 @@ describe('SessionRow actions', () => {
     expect(main.parentElement?.className).toContain('oa-session-row')
     expect(main.parentElement?.getAttribute('data-active')).toBe('true')
   })
+
+  it('presents Agent activity independently from a live PTY lifecycle', () => {
+    const { rerender } = render(
+      <SessionRow
+        session={{ ...session, activity: { phase: 'waiting', observedAt: 10 } }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Ready').className).toContain('bg-success')
+    expect(screen.queryByLabelText('Working')).toBeNull()
+
+    rerender(
+      <SessionRow
+        session={{ ...session, activity: { phase: 'working', observedAt: 20 } }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Working').className).toContain('bg-primary')
+    expect(screen.queryByLabelText('Ready')).toBeNull()
+  })
 })

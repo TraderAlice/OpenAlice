@@ -61,7 +61,7 @@ describe('OverviewCard', () => {
     )
 
     const workspaceButton = screen.getByRole('button', { name: 'Research desk' })
-    const sessionButton = screen.getByRole('button', { name: 'x1 running' })
+    const sessionButton = screen.getByRole('button', { name: 'x1 Live' })
     expect(workspaceButton.tagName).toBe('BUTTON')
     expect(sessionButton.tagName).toBe('BUTTON')
     workspaceButton.focus()
@@ -103,10 +103,10 @@ describe('OverviewCard', () => {
       />,
     )
 
-    expect(screen.getAllByRole('button', { name: / (running|paused)$/ })).toHaveLength(5)
+    expect(screen.getAllByRole('button', { name: / (Live|paused)$/ })).toHaveLength(5)
     expect(screen.getByRole('button', { name: 'x5 paused' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'x6 paused' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'x1 running' }).className).toContain('min-h-10')
+    expect(screen.getByRole('button', { name: 'x1 Live' }).className).toContain('min-h-10')
     expect(screen.getByRole('button', { name: 'x3 paused' }).closest('li')?.className)
       .toContain('hidden sm:list-item')
 
@@ -142,7 +142,28 @@ describe('OverviewCard', () => {
     const viewAll = screen.getByRole('button', { name: 'View all 3 sessions' })
     expect(viewAll.closest('li')?.className).toContain('sm:hidden')
     expect(viewAll.textContent).toContain('+1')
-    expect(screen.getByRole('button', { name: 'x3 running' }).closest('li')?.className)
+    expect(screen.getByRole('button', { name: 'x3 Live' }).closest('li')?.className)
       .toContain('hidden sm:list-item')
+  })
+
+  it('labels a live waiting Session as ready instead of working', () => {
+    render(
+      <OverviewCard
+        workspace={{
+          ...workspace,
+          sessions: [{
+            ...workspace.sessions[0]!,
+            activity: { phase: 'waiting', observedAt: 10 },
+          }],
+        }}
+        lastCommit={null}
+        onOpen={() => undefined}
+        onOpenSession={() => undefined}
+      />,
+    )
+
+    const sessionButton = screen.getByRole('button', { name: 'x1 Ready' })
+    expect(screen.getByText('Ready').className).toContain('text-success')
+    expect(sessionButton).toBeTruthy()
   })
 })

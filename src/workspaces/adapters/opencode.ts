@@ -25,6 +25,7 @@ const OPENCODE_CONFIG_PATH = 'opencode.json';
 const OPENCODE_TUI_CONFIG_PATH = 'tui.json';
 const OPENCODE_TUI_CONFIGC_PATH = 'tui.jsonc';
 const OPENCODE_BINDING_STATE_PATH = '.opencode/openalice-provider.json';
+const OPENCODE_ACTIVITY_PLUGIN_PATH = '.opencode/plugins/openalice-session-activity.js';
 const OPENCODE_PROVIDER_NAME = 'workspace';
 const OPENCODE_SESSION_PROVIDER_NAME = 'openalice-session';
 const OPENCODE_SYSTEM_THEME = 'system';
@@ -34,6 +35,36 @@ const OPENCODE_OWNED_PATHS = [
   ['model'],
 ] as const;
 const DEFAULT_OUTPUT_TOKENS = 16_384;
+
+const OPENCODE_ACTIVITY_PLUGIN_SOURCE = `// @openalice-managed session-activity v1
+const OSC = 6973
+
+function emitActivity(phase) {
+  const sessionId = process.env.AQ_SESSION_ID
+  if (!sessionId || !/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) return
+  process.stdout.write(\`\\x1b]\${OSC};openalice-session-activity;v=1;session=\${sessionId};phase=\${phase}\\x1b\\\\\`)
+}
+
+export const OpenAliceSessionActivity = async () => {
+  emitActivity('waiting')
+  return {
+    event: async ({ event }) => {
+      if (event.type === 'session.idle') {
+        emitActivity('waiting')
+        return
+      }
+      if (event.type === 'session.error') {
+        emitActivity('failed')
+        return
+      }
+      if (event.type !== 'session.status') return
+      const status = event.properties?.status?.type
+      if (status === 'busy' || status === 'retry') emitActivity('working')
+      if (status === 'idle') emitActivity('waiting')
+    },
+  }
+}
+`;
 
 const openCodeSessionRowsInFlight = new Map<string, Promise<readonly Record<string, unknown>[]>>();
 
@@ -188,7 +219,7 @@ function parseJsonRecord(raw: string | null): Record<string, unknown> | null {
   }
 }
 
-async function ensureOpenCodeTuiConfigExcluded(cwd: string): Promise<void> {
+async function ensureOpenCodeLocalPathsExcluded(cwd: string): Promise<void> {
   // OpenAlice workspaces are Git repositories, but adapter tests and external
   // callers may prepare a plain directory. Do not manufacture a partial .git.
   try {
@@ -198,9 +229,23 @@ async function ensureOpenCodeTuiConfigExcluded(cwd: string): Promise<void> {
   }
   const path = '.git/info/exclude';
   const current = await readWorkspaceFile(cwd, path) ?? '';
-  if (current.split(/\r?\n/).includes(OPENCODE_TUI_CONFIG_PATH)) return;
+  const lines = current.split(/\r?\n/);
+  const additions = [OPENCODE_TUI_CONFIG_PATH, OPENCODE_ACTIVITY_PLUGIN_PATH]
+    .filter((entry) => !lines.includes(entry));
+  if (additions.length === 0) return;
   const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
-  await writeWorkspaceFile(cwd, path, `${current}${separator}${OPENCODE_TUI_CONFIG_PATH}\n`);
+  await writeWorkspaceFile(cwd, path, `${current}${separator}${additions.join('\n')}\n`);
+}
+
+async function syncOpenCodeSessionActivityPlugin(cwd: string): Promise<void> {
+  const current = await readWorkspaceFile(cwd, OPENCODE_ACTIVITY_PLUGIN_PATH);
+  if (current !== null && !current.startsWith('// @openalice-managed session-activity ')) {
+    // A same-name user plugin is extraordinarily unlikely, but still belongs
+    // to the user. Preserve it instead of claiming the path.
+    return;
+  }
+  if (current === OPENCODE_ACTIVITY_PLUGIN_SOURCE) return;
+  await writeWorkspaceFile(cwd, OPENCODE_ACTIVITY_PLUGIN_PATH, OPENCODE_ACTIVITY_PLUGIN_SOURCE);
 }
 
 /**
@@ -211,7 +256,7 @@ async function ensureOpenCodeTuiConfigExcluded(cwd: string): Promise<void> {
  * remains user-owned.
  */
 export async function syncOpenCodeWorkspaceTheme(cwd: string): Promise<boolean> {
-  await ensureOpenCodeTuiConfigExcluded(cwd);
+  await ensureOpenCodeLocalPathsExcluded(cwd);
 
   // A JSONC project file is user-owned. Avoid creating a competing tui.json
   // because OpenCode accepts both and their same-directory ordering is native.
@@ -296,6 +341,7 @@ export const opencodeAdapter: CliAdapter = {
     // `opencode --session <id>` (composeCommand) resumes by id.
     transcriptDiscovery: 'subprocess',
     headless: true,
+    interactiveActivity: 'terminal-osc-v1',
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
@@ -346,6 +392,7 @@ export const opencodeAdapter: CliAdapter = {
   lifecycle: {
     async prepareWorkspace({ cwd }): Promise<void> {
       await syncOpenCodeWorkspaceTheme(cwd);
+      await syncOpenCodeSessionActivityPlugin(cwd);
     },
   },
 

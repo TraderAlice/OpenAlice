@@ -9,6 +9,7 @@ import {
   type TerminalViewAttributeResponder,
 } from './terminal-view-attribute-responder.js'
 import type { TerminalViewAttributes } from './terminal-view-attributes.js'
+import { SESSION_ACTIVITY_OSC } from './session-activity.js'
 
 // This beta is published as CommonJS even though its declaration file exposes
 // named exports. Native Node ESM therefore sees the package as one default
@@ -30,6 +31,8 @@ export interface HeadlessTerminalSnapshotOptions {
   readonly rows: number
   readonly scrollbackRows?: number
   readonly onQueryReply?: (reply: string) => void
+  /** Receive OpenAlice-private adapter activity frames while consuming them. */
+  readonly onSessionActivity?: (payload: string) => void
 }
 
 export interface HeadlessTerminalWriteOptions {
@@ -89,6 +92,10 @@ export class HeadlessTerminalSnapshot {
       },
     })
     this.installColorSchemeUpdateTracking()
+    this.terminal.parser.registerOscHandler(SESSION_ACTIVITY_OSC, (payload) => {
+      options.onSessionActivity?.(payload)
+      return true
+    })
   }
 
   write(data: string | Uint8Array, options: HeadlessTerminalWriteOptions = {}): void {

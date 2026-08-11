@@ -47,6 +47,23 @@ describe('demo WebPi Session handlers', () => {
       phase: 'idle',
     })
     expect(JSON.stringify(aapl.snapshot.messages)).toContain('Services growth decelerating')
+
+    const workspaces = await fetch(`${baseUrl}/api/workspaces`).then((response) => response.json())
+    const chat = workspaces.workspaces.find(
+      (workspace: { id: string }) => workspace.id === DEMO_CHAT_WORKSPACE_ID,
+    )
+    expect(chat.sessions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: DEMO_CHAT_SESSION_ID,
+        state: 'running',
+        activity: expect.objectContaining({ phase: 'waiting' }),
+      }),
+      expect.objectContaining({
+        id: 'demo-chat-x1',
+        state: 'running',
+        activity: expect.objectContaining({ phase: 'working' }),
+      }),
+    ]))
   })
 
   it('honors revisions and scopes simulated follow-ups to the selected Session', async () => {
@@ -93,6 +110,10 @@ describe('demo WebPi Session handlers', () => {
     expect(response.status).toBe(201)
     expect(body.session).toMatchObject({ agent: 'pi', surface: 'webpi' })
     expect(body.workspace.sessions.some((session: { id: string }) => session.id === body.session.sessionId)).toBe(true)
+    expect(body.workspace.sessions).toContainEqual(expect.objectContaining({
+      id: body.session.sessionId,
+      activity: expect.objectContaining({ phase: 'waiting' }),
+    }))
 
     const snapshotResponse = await fetch(
       `${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/sessions/${body.session.sessionId}/webpi`,
@@ -106,6 +127,9 @@ describe('demo WebPi Session handlers', () => {
     const chatWorkspace = workspaceList.workspaces.find(
       (workspace: { id: string }) => workspace.id === DEMO_CHAT_WORKSPACE_ID,
     )
-    expect(chatWorkspace.sessions.some((session: { id: string }) => session.id === body.session.sessionId)).toBe(true)
+    expect(chatWorkspace.sessions).toContainEqual(expect.objectContaining({
+      id: body.session.sessionId,
+      activity: expect.objectContaining({ phase: 'waiting' }),
+    }))
   })
 })

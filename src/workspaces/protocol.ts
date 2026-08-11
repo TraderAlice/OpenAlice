@@ -17,6 +17,7 @@ import {
   validateTerminalViewAttributes,
   type TerminalViewAttributes,
 } from './terminal-view-attributes.js';
+import type { SessionAgentActivity } from './session-activity.js';
 
 // ── client → server ─────────────────────────────────────────────────────────
 
@@ -63,6 +64,8 @@ export interface AttachedMessage {
   readonly kittyKeyboardFlags: number;
   /** Whether the live TUI subscribed to Contour/Kitty color-scheme updates. */
   readonly colorSchemeUpdatesSubscribed: boolean;
+  /** Latest native Agent work state, independent from PTY lifecycle. */
+  readonly activity: SessionAgentActivity;
 }
 
 export interface CursorMessage {
@@ -93,9 +96,15 @@ export interface ExitMessage {
   readonly signal: number | null;
 }
 
+export interface ActivityMessage {
+  readonly type: 'activity';
+  readonly activity: SessionAgentActivity;
+}
+
 export type ServerControlMessage =
   | AttachedMessage
   | CursorMessage
+  | ActivityMessage
   | LifecycleMessage
   | ExitMessage;
 

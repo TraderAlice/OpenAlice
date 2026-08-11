@@ -19,6 +19,7 @@ import * as pty from 'node-pty';
 import { PersistentSession, type PersistentSessionOptions } from './persistent-session.js';
 import type { Logger } from './logger.js';
 import type { TerminalViewAttributes } from './terminal-view-attributes.js';
+import { encodeSessionActivityOsc } from './session-activity.js';
 
 vi.mock('node-pty', () => ({ spawn: vi.fn() }));
 
@@ -269,6 +270,85 @@ describe('PersistentSession backpressure / socket-drop deadlock', () => {
       .filter((data): data is Buffer => Buffer.isBuffer(data));
     expect(binaryFrames).toEqual([raw]);
 
+    session.dispose('test');
+  });
+
+  it('preserves a Quick Chat first reply across late attach and WebSocket reconnect', () => {
+    const session = new PersistentSession(makeOptions());
+
+    // Quick Chat can submit its seed prompt before the terminal renderer is
+    // mounted. The first assistant response therefore arrives with no socket.
+    term.emitData(Buffer.from('Assistant: first reply\r\n'));
+
+    const first = new FakeWs();
+    session.attach(first as never, 80, 24, undefined);
+    const firstReplay = first.send.mock.calls
+      .map(([data]) => data)
+      .filter((data): data is Buffer => Buffer.isBuffer(data))
+      .map((data) => data.toString('utf8'))
+      .join('');
+    expect(firstReplay).toContain('Assistant: first reply');
+
+    // Output produced after the renderer disconnects must be reflected in the
+    // authoritative headless screen restored by a fresh cold attach.
+    first.emit('close');
+    term.emitData(Buffer.from('Assistant: follow-up while disconnected\r\n'));
+
+    const second = new FakeWs();
+    session.attach(second as never, 80, 24, undefined);
+    const reconnectReplay = second.send.mock.calls
+      .map(([data]) => data)
+      .filter((data): data is Buffer => Buffer.isBuffer(data))
+      .map((data) => data.toString('utf8'))
+      .join('');
+    expect(reconnectReplay).toContain('Assistant: first reply');
+    expect(reconnectReplay).toContain('Assistant: follow-up while disconnected');
+
+    session.dispose('test');
+  });
+
+  it('publishes native activity separately and replays the latest state on reconnect', () => {
+    const session = new PersistentSession(makeOptions({ initialAgentActivity: 'starting' }));
+    const first = new FakeWs();
+    session.attach(first as never, 80, 24, undefined);
+
+    expect(JSON.parse(first.send.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      type: 'attached',
+      activity: { phase: 'starting' },
+    });
+
+    term.emitData(Buffer.from(encodeSessionActivityOsc('rec-1', 'working')));
+    expect(session.agentActivity.phase).toBe('working');
+    expect(first.send.mock.calls.map(([data]) => data).filter((data) => typeof data === 'string'))
+      .toContainEqual(expect.stringContaining('"type":"activity"'));
+
+    first.emit('close');
+    term.emitData(Buffer.from(encodeSessionActivityOsc('rec-1', 'waiting')));
+    const second = new FakeWs();
+    session.attach(second as never, 80, 24, undefined);
+
+    expect(JSON.parse(second.send.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      type: 'attached',
+      activity: { phase: 'waiting' },
+    });
+    session.dispose('test');
+  });
+
+  it('ignores activity frames authored for another Session', () => {
+    const session = new PersistentSession(makeOptions({ initialAgentActivity: 'starting' }));
+    term.emitData(Buffer.from(encodeSessionActivityOsc('other-session', 'waiting')));
+
+    expect(session.agentActivity.phase).toBe('starting');
+    session.dispose('test');
+  });
+
+  it('keeps transcript identity capture independent from Agent activity', () => {
+    const session = new PersistentSession(makeOptions({ initialAgentActivity: 'working' }));
+
+    session.setAgentSessionId('native-conversation-id');
+
+    expect(session.agentSessionId).toBe('native-conversation-id');
+    expect(session.agentActivity.phase).toBe('working');
     session.dispose('test');
   });
 });

@@ -4,6 +4,11 @@ import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Spa
 import { useTranslation } from 'react-i18next'
 import type { GitLogEntry, Workspace } from './api'
 import { workspaceDisplayName, workspaceDisplayTitle } from './display'
+import {
+  sessionActivityLabelKey,
+  sessionActivityTone,
+  sessionPresentationPhase,
+} from './session-activity-ui'
 
 /**
  * Single-workspace card for the Workspaces Overview dashboard. Variant B
@@ -133,7 +138,7 @@ export function OverviewCard({
                 >
                   <button
                     type="button"
-                    aria-label={`${s.name} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
+                    aria-label={`${s.name} ${t(sessionActivityLabelKey(sessionPresentationPhase(s)))}`}
                     onClick={() => onOpenSession(s.id)}
                     className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
                   >
@@ -141,12 +146,8 @@ export function OverviewCard({
                       <AgentGlyph agent={s.agent} />
                     </span>
                     <span className="font-mono text-[11px] tabular-nums">{s.name}</span>
-                    <span
-                      className={`text-[11px] ${
-                        s.state === 'running' ? 'text-success' : 'text-muted-foreground'
-                      }`}
-                    >
-                      {t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}
+                    <span className={`text-[11px] ${sessionActivityTone(sessionPresentationPhase(s))}`}>
+                      {t(sessionActivityLabelKey(sessionPresentationPhase(s)))}
                     </span>
                     <ChevronRight
                       size={10}

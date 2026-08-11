@@ -231,6 +231,7 @@ export const piAdapter: CliAdapter = {
     // immune to pi's lazy transcript write.
     assignsSessionId: true,
     headless: true,
+    interactiveActivity: 'terminal-osc-v1',
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'],
@@ -253,11 +254,9 @@ export const piAdapter: CliAdapter = {
       const ai = runtime.ai;
       const customProvider = !!ai && !!(ai.apiKey || ai.baseUrl);
       const model = runtime.binding.model;
-      const args = [
+      const selectionArgs = [
         ...(customProvider
           ? [
-              '--extension',
-              join(cliBinPath(), 'pi-session-provider.ts'),
               '--provider', PI_SESSION_PROVIDER_ID,
             ]
           : []),
@@ -266,6 +265,11 @@ export const piAdapter: CliAdapter = {
           ? ['--thinking', runtime.binding.reasoningEffort === 'none' ? 'off' : runtime.binding.reasoningEffort]
           : []),
       ];
+      const interactiveArgs = [
+        '--extension',
+        join(cliBinPath(), 'pi-session-provider.ts'),
+        ...selectionArgs,
+      ];
       const env: Record<string, string> = {};
       if (customProvider && ai) {
         env[PI_SESSION_PROVIDER_ENV] = JSON.stringify({
@@ -273,7 +277,14 @@ export const piAdapter: CliAdapter = {
           provider: buildPiProvider(ctx.cwd, ai),
         });
       }
-      return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
+      // Activity OSC frames belong only to the terminal TUI. JSON headless and
+      // WebPi RPC surfaces keep their machine-readable stdout uncontaminated.
+      return {
+        env,
+        interactiveArgs,
+        headlessArgs: selectionArgs,
+        webArgs: selectionArgs,
+      };
     },
   },
 

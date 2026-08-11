@@ -311,6 +311,7 @@ export function launchEnvironmentDisclosure(
   return out;
 }
 import { ScrollbackStore } from './scrollback-store.js';
+import { projectSessionAgentActivity } from './session-activity.js';
 import { SessionPool, type SessionFactoryContext } from './session-pool.js';
 import {
   SessionRegistry,
@@ -2243,6 +2244,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           replayBufferBytes: config.replayBufferBytes,
           highWatermarkBytes: config.bpHighWatermarkBytes,
           lowWatermarkBytes: config.bpLowWatermarkBytes,
+          initialAgentActivity: adapter.capabilities.interactiveActivity
+            ? isFresh && !!ctx.initialPrompt ? 'starting' : 'waiting'
+            : 'unavailable',
           ...(ctx.initialReplayBytes ? { initialReplayBytes: ctx.initialReplayBytes } : {}),
         },
         adapter,
@@ -2448,6 +2452,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         startedAt: terminal?.startedAt ?? browser?.startedAt ?? null,
         title: sessionPreferredTitle(r) ?? null,
         sourceRunId: r.sourceRunId ?? null,
+        activity: projectSessionAgentActivity({
+          terminal: terminal?.agentActivity,
+          browser,
+          lastActiveAt: r.lastActiveAt,
+        }),
       };
     });
     // Deprecated native-project compatibility-export signals. Retained in the

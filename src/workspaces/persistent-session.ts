@@ -13,6 +13,11 @@ import {
   terminalColorSchemeUpdateSequence,
   type TerminalViewAttributes,
 } from './terminal-view-attributes.js';
+import {
+  parseSessionActivityOsc,
+  type SessionAgentActivity,
+  type SessionAgentActivityPhase,
+} from './session-activity.js';
 
 export interface PersistentSessionOptions {
   /** The workspace this session belongs to (for routing, logging, cwd context). */
@@ -33,6 +38,8 @@ export interface PersistentSessionOptions {
   readonly onDisposed: () => void;
   readonly initialTerminalViewAttributes?: TerminalViewAttributes;
   readonly onTerminalViewAttributes?: (attributes: TerminalViewAttributes) => void;
+  /** Initial transient work state. Never persisted in SessionRegistry. */
+  readonly initialAgentActivity?: SessionAgentActivityPhase;
   /**
    * V3.S5 — bytes prepended to the ReplayBuffer before the PTY spawns. Used
    * by shell resume: the prior session's scrollback is pushed back into the
@@ -120,6 +127,7 @@ export class PersistentSession {
    */
   private firstExit: { code: number; signal: number | null } | null = null;
   private exitWaiters: Set<(info: { code: number; signal: number | null }) => void> = new Set();
+  private _agentActivity: SessionAgentActivity;
 
   constructor(opts: PersistentSessionOptions) {
     this.opts = opts;
@@ -136,11 +144,16 @@ export class PersistentSession {
     }
     this.currentCols = clamp(opts.initialCols, 1, MAX_DIM);
     this.currentRows = clamp(opts.initialRows, 1, MAX_DIM);
+    this._agentActivity = {
+      phase: opts.initialAgentActivity ?? 'unavailable',
+      observedAt: Date.now(),
+    };
 
     this.headless = new HeadlessTerminalSnapshot({
       cols: this.currentCols,
       rows: this.currentRows,
       onQueryReply: (reply) => this.onHeadlessQueryReply(reply),
+      onSessionActivity: (payload) => this.onSessionActivity(payload),
     });
     if (opts.initialTerminalViewAttributes) {
       this.terminalViewAttributes = opts.initialTerminalViewAttributes;
@@ -219,6 +232,7 @@ export class PersistentSession {
       code: exitCode,
       signal,
     });
+    this.setAgentActivity(exitCode === 0 ? 'stopped' : 'failed');
 
     const now = Date.now();
     this.respawnTimes = this.respawnTimes.filter((t) => now - t < RESPAWN_WINDOW_MS);
@@ -242,6 +256,7 @@ export class PersistentSession {
     if (this.disposed) return;
     try {
       this.term = this.spawnChild();
+      this.setAgentActivity('starting');
       this.log.info('session.respawned', { pid: this.term.pid });
       this.sendControl({ type: 'lifecycle', kind: 'child-respawn', pid: this.term.pid });
     } catch (err) {
@@ -281,6 +296,10 @@ export class PersistentSession {
 
   get startedAt(): number {
     return this._startedAt;
+  }
+
+  get agentActivity(): SessionAgentActivity {
+    return this._agentActivity;
   }
 
   /**
@@ -421,6 +440,7 @@ export class PersistentSession {
       scrollbackTruncated,
       kittyKeyboardFlags: this.headless.getKittyKeyboardFlags(),
       colorSchemeUpdatesSubscribed: this.headless.getColorSchemeUpdatesSubscribed(),
+      activity: this._agentActivity,
     };
     ws.send(JSON.stringify(attached));
     this.lastCursorSeq = slice.tailSeq;
@@ -461,6 +481,7 @@ export class PersistentSession {
 
   dispose(reason: string): void {
     if (this.disposed) return;
+    this.setAgentActivity('stopped');
     this.disposed = true;
     if (this.cursorTimer) {
       clearInterval(this.cursorTimer);
@@ -555,6 +576,23 @@ export class PersistentSession {
     } catch (err) {
       this.log.warn('session.headless_reply_error', { err });
     }
+  }
+
+  private onSessionActivity(payload: string): void {
+    if (this.disposed) return;
+    const phase = parseSessionActivityOsc(payload, this.opts.recordId);
+    if (!phase) {
+      this.log.warn('session.activity_frame_ignored');
+      return;
+    }
+    this.setAgentActivity(phase);
+  }
+
+  private setAgentActivity(phase: SessionAgentActivityPhase): void {
+    if (this._agentActivity.phase === phase) return;
+    this._agentActivity = { phase, observedAt: Date.now() };
+    this.log.event('session.activity_changed', { phase });
+    this.sendControl({ type: 'activity', activity: this._agentActivity });
   }
 
   private onWsMessage(ws: WebSocket, raw: unknown, isBinary: boolean): void {
