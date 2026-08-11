@@ -201,7 +201,23 @@ export const claudeAdapter: CliAdapter = {
       if (effort && !CLAUDE_RUN_EFFORTS.has(effort)) {
         throw new Error(`Claude Code cannot use Session effort ${effort}`);
       }
+      // Claude Code applies provider-shaped `env` from user/project/local
+      // settings after inheriting the child process environment. A managed
+      // Vault binding must therefore exclude every implicit settings source;
+      // otherwise an unrelated global login (or a deprecated project export)
+      // can replace ANTHROPIC_BASE_URL / auth / model after OpenAlice projects
+      // this immutable Session binding. `--setting-sources=` is Claude Code's
+      // empty-source form. Explicit `--settings` supplied by composeCommand
+      // still loads, so launcher-owned MCP trust remains available.
+      //
+      // Native bindings intentionally keep Claude's normal settings chain:
+      // choosing Agent login means the runtime, not OpenAlice, owns provider
+      // discovery and authentication.
+      const managedCredentialArgs = runtime.binding.credential.source === 'vault'
+        ? ['--setting-sources=']
+        : [];
       const args = [
+        ...managedCredentialArgs,
         ...(runtime.binding.model ? ['--model', runtime.binding.model] : []),
         ...(effort ? ['--effort', effort] : []),
       ];
