@@ -271,12 +271,28 @@ describe('built-in Agent Session runtime projection', () => {
 
   it('projects the native model and effort flags on every launch surface', () => {
     expect(claudeAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
-      .toEqual(['--model', 'session-model', '--effort', 'high'])
+      .toEqual(['--setting-sources=', '--model', 'session-model', '--effort', 'high'])
     expect(codexAdapter.sessionRuntime!.project(ctx, runtime).headlessArgs)
       .toContain('model_reasoning_effort="high"')
     expect(opencodeAdapter.sessionRuntime!.project(ctx, runtime).headlessArgs)
       .toContain('--variant')
     expect(piAdapter.sessionRuntime!.project(ctx, runtime).webArgs)
       .toContain('--extension')
+  })
+
+  it('isolates Claude settings only for OpenAlice-managed credentials', () => {
+    const managed = claudeAdapter.sessionRuntime!.project(ctx, runtime)
+    expect(managed.interactiveArgs).toContain('--setting-sources=')
+    expect(managed.headlessArgs).toContain('--setting-sources=')
+    expect(managed.webArgs).toContain('--setting-sources=')
+
+    const native = createNativeSessionRuntimeBinding({
+      adapter: claudeAdapter,
+      selection: { model: 'native-model-override', reasoningEffort: 'medium' },
+    })
+    const projectedNative = claudeAdapter.sessionRuntime!.project(ctx, native)
+    expect(projectedNative.interactiveArgs).not.toContain('--setting-sources=')
+    expect(projectedNative.headlessArgs).not.toContain('--setting-sources=')
+    expect(projectedNative.webArgs).not.toContain('--setting-sources=')
   })
 })

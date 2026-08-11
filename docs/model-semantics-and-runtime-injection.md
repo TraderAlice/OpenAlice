@@ -77,6 +77,14 @@ Writing the same values into native project files is a deprecated compatibility
 export for users who intentionally start the CLI outside OpenAlice. It is not a
 managed Session default, readiness gate, or launch-time fallback.
 
+Claude Code managed-Vault launches pass an empty `--setting-sources=` selection
+before projecting the Session's endpoint, credential, model, and effort. Claude
+otherwise reapplies provider-shaped `env` from user/project/local settings after
+inheriting the child environment, which can silently replace an immutable
+Session binding. Native-login bindings do not use this isolation: selecting the
+Agent login deliberately leaves Claude's normal global configuration chain in
+control. Launcher-owned explicit `--settings` remain available in both modes.
+
 OpenAlice projects a registered provider default when the exact model contract
 publishes one. This makes a Workspace binding deterministic across Agent
 runtimes without inventing policy: an explicit Workspace preference wins, then
