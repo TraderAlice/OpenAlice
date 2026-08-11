@@ -286,9 +286,7 @@ describe('built-in Agent Session runtime projection', () => {
   it('projects the native model and effort flags on every launch surface', () => {
     expect(claudeAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
       .toEqual([
-        '--setting-sources=',
-        '--plugin-dir',
-        '/workspace/.claude',
+        '--setting-sources=project',
         '--model',
         'session-model',
         '--effort',
@@ -326,12 +324,11 @@ describe('built-in Agent Session runtime projection', () => {
     },
   )
 
-  it('isolates Claude settings and restores Workspace skills only for OpenAlice-managed credentials', () => {
+  it('keeps only Claude project settings for OpenAlice-managed credentials', () => {
     const managed = claudeAdapter.sessionRuntime!.project(ctx, runtime)
     for (const args of [managed.interactiveArgs, managed.headlessArgs, managed.webArgs]) {
-      expect(args).toContain('--setting-sources=')
-      expect(args).toContain('--plugin-dir')
-      expect(args).toContain('/workspace/.claude')
+      expect(args).toContain('--setting-sources=project')
+      expect(args).not.toContain('--plugin-dir')
     }
 
     const native = createNativeSessionRuntimeBinding({
@@ -344,9 +341,8 @@ describe('built-in Agent Session runtime projection', () => {
       projectedNative.headlessArgs,
       projectedNative.webArgs,
     ]) {
-      expect(args).not.toContain('--setting-sources=')
+      expect(args).not.toContain('--setting-sources=project')
       expect(args).not.toContain('--plugin-dir')
-      expect(args).not.toContain('/workspace/.claude')
     }
   })
 })
