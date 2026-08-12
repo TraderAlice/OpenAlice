@@ -59,14 +59,16 @@ isolates failure and persisted state, and matches normal single-project use.
   and frontend endpoint through runtime discovery.
 - `Open`, `Switch current window`, and `Stop` are distinct actions. Opening B
   never implicitly stops A.
-- The current AliceProject identity is continuously visible but quiet. Detailed
-  paths, ownership, and lifecycle controls live in a project manager/dialog.
+- The current AliceProject identity is available in the top-level About area of
+  Settings > General, next to the installation and runtime identity. Detailed
+  ownership and lifecycle controls remain the responsibility of a future
+  project manager/dialog rather than persistent navigation chrome.
 - Browser windows attach to the selected project's own origin. Electron app
   mode remains `app://` and exposes the current project through its preload
   bridge; it does not silently fall back to localhost.
-- Narrow layouts show project name plus status. Paths and secondary metadata
-  wrap or move into details; controls remain keyboard accessible with explicit
-  labels and focus behavior.
+- Narrow layouts stack installation and project identity without clipping.
+  Paths wrap inside their own fields; controls remain keyboard accessible with
+  explicit labels and focus behavior.
 
 ## Persistence and compatibility
 

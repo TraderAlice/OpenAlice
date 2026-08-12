@@ -125,11 +125,11 @@ reads the same shape through authenticated HTTP.
 
 ## Display contract
 
-The shell and renderer continuously identify the current AliceProject without
+The renderer identifies the current AliceProject in Settings > General without
 turning this low-frequency boundary into primary Workspace navigation. The
-compact shell affordance shows name plus health and opens details containing
-the stable id, home, and application root. Paths wrap inside details and are
-not used as the main label.
+About OpenAlice area shows the project name, health, stable id, home, and
+application root alongside the current installation identity. Paths wrap inside
+their own fields and are not used as the main label.
 
 Frontend components must consume the project through `useAliceProject`; they
 must not call the HTTP route or Electron bridge directly. The hook owns

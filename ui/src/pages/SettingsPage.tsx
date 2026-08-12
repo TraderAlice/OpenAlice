@@ -822,6 +822,9 @@ function SettingsSection() {
 
   return (
     <div className="mx-auto w-full max-w-[1100px]">
+      {/* Installation + current AliceProject identity */}
+      <AboutOpenAliceSection />
+
       {/* Appearance */}
       <AppearanceSection />
 
@@ -839,8 +842,6 @@ function SettingsSection() {
         <PersonaEditor />
       </ConfigSection>
 
-      {/* Runtime version + manual update entry point */}
-      <AboutOpenAliceSection />
     </div>
   )
 }

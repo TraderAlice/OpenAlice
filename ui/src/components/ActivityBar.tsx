@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
 import { NAV_SECTIONS } from './activity-navigation'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import { AliceProjectIndicator } from './AliceProjectIndicator'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -232,10 +231,6 @@ export function ActivityBar({
             )
           })}
         </nav>
-
-        <div className={`shrink-0 border-t border-border/80 ${compactRail ? 'flex justify-center px-2 py-1.5' : narrowRail ? 'px-2 py-1.5' : 'px-3 py-2'}`}>
-          <AliceProjectIndicator compact={compactRail} />
-        </div>
 
         {/* Footer — global icon controls pinned to the bottom of the rail. */}
         <div className={`shrink-0 flex items-center ${compactRail ? `${denseRail ? 'py-2 md:py-0.5 md:gap-px' : 'py-2 md:gap-1'} px-4 md:flex-col md:items-center md:px-2` : `${narrowRail ? 'px-3' : 'px-4'} border-t border-border py-1.5 justify-between gap-2`}`}>
