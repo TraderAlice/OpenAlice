@@ -1,6 +1,6 @@
 # AliceProject Foundation
 
-Status: Active
+Status: Completed in Draft PR [#1063](https://github.com/TraderAlice/OpenAlice/pull/1063)
 
 Owner guides: [[docs/alice-project.md]], [[docs/project-structure.md]], [[docs/cli-supervisor.md]],
 [[docs/data-locations.md]], [[docs/local-runtime.md]],
@@ -101,7 +101,7 @@ status remains derived from the Guardian that owns that home.
   longer accurate.
 - [x] Complete typecheck, unit, Guardian recovery, browser, Electron PTY, and
   disposable packaged verification appropriate to the touched surfaces.
-- [ ] Publish one autonomous-topic Draft PR to `dev` with the required workflow,
+- [x] Publish one autonomous-topic Draft PR to `dev` with the required workflow,
   theme, area, and deep-review labels; leave it unmerged for maintainer acceptance.
 
 ## Verification matrix
