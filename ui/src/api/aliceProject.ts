@@ -6,6 +6,7 @@ export interface AliceProject {
   readonly displayName: string
   readonly home: string
   readonly appRoot: string | null
+  readonly product?: 'trader' | 'nano'
 }
 
 export const aliceProjectApi = {

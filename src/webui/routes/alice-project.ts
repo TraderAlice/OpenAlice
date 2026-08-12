@@ -1,5 +1,8 @@
 import { Hono } from 'hono'
-import { resolveAliceProjectIdentity } from '@traderalice/guardian-runtime'
+import {
+  readAliceProjectProduct,
+  resolveAliceProjectIdentity,
+} from '@traderalice/guardian-runtime'
 import { appResourcesHome, userDataHome } from '../../core/paths.js'
 
 export interface AliceProjectRouteOptions {
@@ -18,15 +21,22 @@ export function createAliceProjectRoutes(
 ) {
   const app = new Hono()
 
-  app.get('/', (c) => c.json({
-    project: resolveAliceProjectIdentity({
-      home: options.home ?? userDataHome,
+  app.get('/', async (c) => {
+    const home = options.home ?? userDataHome
+    const identity = resolveAliceProjectIdentity({
+      home,
       appRoot: options.appRoot === undefined
         ? appResourcesHome
         : options.appRoot,
       env: options.env,
-    }),
-  }))
+    })
+    return c.json({
+      project: {
+        ...identity,
+        product: await readAliceProjectProduct(home),
+      },
+    })
+  })
 
   return app
 }

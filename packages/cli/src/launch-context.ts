@@ -41,6 +41,8 @@ export interface MachineSupervisorConfig {
 export interface AliceProjectLaunchConfig extends LaunchConfigValues {
   name?: string
   displayName?: string
+  /** Immutable product birth. Omitted means trader. */
+  product?: 'trader' | 'nano'
 }
 
 export interface TuiLaunchFlags extends LaunchConfigValues {

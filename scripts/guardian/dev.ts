@@ -28,6 +28,7 @@ import {
   buildGuardianRuntimeStatus,
   aliceProjectEnvironment,
   resolveAliceProjectIdentity,
+  readAliceProjectProduct,
   type RuntimeProcessLock,
 } from '../../packages/guardian-runtime/src/index.js'
 import {
@@ -130,12 +131,13 @@ async function main(): Promise<void> {
   }
 
   const initialMode = await resolveGuardianTradingMode(process.env, dataHome)
-  const liteMode = initialMode.mode === 'lite'
+  const projectProduct = await readAliceProjectProduct(dataHome)
+  const skipUta = projectProduct === 'nano' || initialMode.mode === 'lite'
   let connectorEnabled = await readConnectorServiceEnabled(dataHome)
 
   // env (OPENALICE_*_PORT) > data/config/ports.json > default+probe.
   const ports = await planPorts(resolvePortConfig(process.env, await readPortsFile(dataHome)), {
-    skipUta: liteMode,
+    skipUta,
     skipConnector: !connectorEnabled,
   })
   const flagPath = resolve(dataHome, 'data/control/restart-uta.flag')
@@ -144,7 +146,7 @@ async function main(): Promise<void> {
   const connectorUrl = `http://127.0.0.1:${ports.connectorPort}`
   const backendHotReload = isBackendHotReloadEnabled(process.env)
   let aliceStatus = 'starting'
-  let utaStatus = liteMode ? 'disabled' : 'starting'
+  let utaStatus = skipUta ? 'disabled' : 'starting'
   let connectorStatus = connectorEnabled ? 'starting' : 'disabled'
   let alice: ChildProcess | null = null
   let uta: OptionalServiceController | null = null
@@ -171,7 +173,8 @@ async function main(): Promise<void> {
   console.log(`[guardian] data     →  ${dataHome}`)
   console.log(`[guardian] project  →  ${aliceProject.displayName} (${aliceProject.id})`)
   console.log(`[guardian] app      →  ${process.cwd()}`)
-  console.log(`[guardian] UTA      →  ${liteMode ? 'disabled (trading mode lite)' : utaUrl}`)
+  console.log(`[guardian] product  →  ${projectProduct}`)
+  console.log(`[guardian] UTA      →  ${skipUta ? (projectProduct === 'nano' ? 'disabled (NanoAlice)' : 'disabled (trading mode lite)') : utaUrl}`)
   console.log(`[guardian] Connector→  ${connectorEnabled ? connectorUrl : 'disabled'}`)
   console.log(`[guardian] Alice    →  http://localhost:${ports.webPort}`)
   console.log(`[guardian] Tools    →  http://127.0.0.1:${ports.mcpPort}/cli`)
@@ -241,6 +244,7 @@ async function main(): Promise<void> {
     OPENALICE_GUARDIAN_STARTED_AT: String(guardianStartedAt),
     ...(managedToolchainPath ? { OPENALICE_MANAGED_TOOLCHAIN_PATH: managedToolchainPath } : {}),
     ...(takeover ? { OPENALICE_TAKEOVER: '1' } : {}),
+    ...(projectProduct === 'nano' ? { OPENALICE_PROJECT_PRODUCT: 'nano', OPENALICE_UTA_DISABLED: '1' } : {}),
   }
 
   // ── UTA spec (re-used by Guardian for restart) ────────────
@@ -263,7 +267,7 @@ async function main(): Promise<void> {
       })
     return new OptionalServiceController(utaSpec, `${utaUrl}/__uta/health`, utaInitial)
   }
-  if (!liteMode) {
+  if (!skipUta) {
     uta = spawnUTAController()
   }
 
@@ -375,9 +379,10 @@ async function main(): Promise<void> {
     onTrigger: () => {
       void (async () => {
         const mode = await resolveGuardianTradingMode(process.env, dataHome)
-        if (mode.mode === 'lite') {
+        const product = await readAliceProjectProduct(dataHome)
+        if (product === 'nano' || mode.mode === 'lite') {
           if (uta) {
-            console.log('[guardian] trading mode lite — stopping UTA')
+            console.log(`[guardian] ${product === 'nano' ? 'NanoAlice' : 'trading mode lite'} — stopping UTA`)
             cascade.expectExit(uta.process)
             try { uta.process.kill('SIGTERM') } catch { /* noop */ }
             uta = null

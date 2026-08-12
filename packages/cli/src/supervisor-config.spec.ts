@@ -315,25 +315,41 @@ describe('Supervisor configuration', () => {
     expect(saved.defaultProject).toBeUndefined()
     expect(saved.projects.research.home).toBe(researchHome)
     expect((await stat(researchHome)).isDirectory()).toBe(true)
+    expect(saved.projects.research.product).toBeUndefined()
+  })
 
-    await rm(researchHome, {
-      recursive: true,
-      force: true,
-    })
-    await expect(persistSelectedSupervisorAliceProject(
-      context,
-      'research',
-      { homeDir, cwd: root, platform: 'linux' },
-    )).rejects.toThrow(/Registered complete home .* is missing/)
-    expect(JSON.parse(
-      await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'),
-    ).defaultProject).toBeUndefined()
-    await expect(resolveStoredLaunchContext({ instance: 'research' }, {
+  it('stamps NanoAlice product on create and does not rewrite it later', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-nano-'))
+    temporaryPaths.push(root)
+    const homeDir = join(root, 'user')
+    const context = await resolveStoredLaunchContext({}, {
       homeDir,
       cwd: root,
       platform: 'linux',
-      env: { XDG_CONFIG_HOME: configRoot },
-    })).rejects.toThrow(/Registered complete home .* is missing/)
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    await createSupervisorAliceProject(
+      context,
+      'office',
+      join(root, 'office-home'),
+      { homeDir, cwd: root, platform: 'linux', product: 'nano' },
+    )
+    const officeHome = await realpath(join(root, 'office-home'))
+    const { aliceProjectProductStampPath } = await import('./alice-project-product.ts')
+    expect(JSON.parse(await readFile(aliceProjectProductStampPath(officeHome), 'utf8'))).toEqual({
+      version: 1,
+      product: 'nano',
+    })
+    const selected = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    await persistAliceProjectLaunchConfig(selected, { port: 48_010 })
+    const saved = JSON.parse(await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'))
+    expect(saved.projects.office.product).toBe('nano')
+    expect(saved.projects.office.port).toBe(48_010)
   })
 
   it('rejects duplicate, overlapping, and home-less named AliceProjects', async () => {
