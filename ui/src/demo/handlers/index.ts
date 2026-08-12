@@ -3,7 +3,6 @@ import { tradingHandlers } from './trading'
 import { workspacesHandlers } from './workspaces'
 import { inboxHandlers } from './inbox'
 import { entitiesHandlers } from './entities'
-import { personaHeartbeatHandlers } from './personaHeartbeat'
 import { scheduleHandlers } from './schedule'
 import { issuesHandlers } from './issues'
 import { wikilinkHandlers } from './wikilink'
@@ -29,7 +28,6 @@ export const handlers = [
   ...workspacesHandlers,
   ...inboxHandlers,
   ...entitiesHandlers,
-  ...personaHeartbeatHandlers,
   ...scheduleHandlers,
   ...issuesHandlers,
   ...wikilinkHandlers,

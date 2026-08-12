@@ -8,11 +8,12 @@ contract, discoverable skills, and the live CLI surface.
 
 ### 1. Always-loaded contract
 
-`src/workspaces/templates/<template>/files/instruction.md` is composed with the
-Alice persona and written to both `CLAUDE.md` and `AGENTS.md` by
-`src/workspaces/context-injector.ts`.
+`src/workspaces/templates/<template>/files/instruction.md` is written to both
+`CLAUDE.md` and `AGENTS.md` by `src/workspaces/context-injector.ts`. The Chat
+template owns Alice's baseline identity directly in this file; there is no
+mutable installation-wide persona source.
 
-Templates may opt out of this persona layer with `injectPersona: false`.
+Templates may opt out of this instruction layer with `injectInstructions: false`.
 AutoQuant V2 does so to preserve the upstream `AGENTS.md`; OpenAlice adds only
 discoverable collaboration/data/trading skills alongside it.
 

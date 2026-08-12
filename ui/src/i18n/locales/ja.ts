@@ -289,10 +289,6 @@ export const ja: Resources = {
   },
   settings: {
     title: '設定',
-    tab: {
-      settings: '設定',
-      tools: 'ツール',
-    },
     language: {
       title: '言語',
       description: 'インターフェースの言語。すぐに反映されます。',
@@ -437,8 +433,10 @@ export const ja: Resources = {
     },
     category: {
       general: '一般',
+      appearance: '外観',
       aiProvider: 'AI プロバイダー',
       agentPermissions: 'エージェント権限',
+      tools: 'ツール',
       trading: '取引',
       issues: 'イシュー',
       connectors: 'コネクター',
@@ -485,17 +483,6 @@ export const ja: Resources = {
         description: 'エージェントが手動承認なしで commit 済みのブローカー書き込みを実行できるか。',
         proOnly: '現在の取引モードではブローカー書き込みがブロックされます。このスイッチは Pro モードでのみ実行に反映されます。',
       },
-    },
-    persona: {
-      title: 'ペルソナ',
-      description: 'Alice の性格と振る舞いを定義するシステムプロンプト。変更は次回のサーバー再起動時に反映されます。',
-      loadError: 'ペルソナの読み込みに失敗しました',
-      saveError: '保存に失敗しました',
-      loading: '読み込み中…',
-      saving: '保存中…',
-      save: '保存',
-      saved: '保存しました',
-      unsaved: '未保存の変更があります',
     },
     tools: {
       summary: '{{groups}} グループ {{tools}} ツール——変更は次回の AI リクエストで反映されます',

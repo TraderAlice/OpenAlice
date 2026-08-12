@@ -105,7 +105,6 @@ attack target** — it sends real orders to brokers.
 | `GET` | `/api/agent-status/*` | running agent state |
 | `GET` | `/api/news/*` | news archive |
 | `GET` | `/api/market/*` | aggregator market search |
-| `GET` | `/api/persona` | persona text |
 | `GET` | `/api/notifications` | notifications store |
 | `GET/POST` | `/api/inbox/*` | workspace inbox |
 | `GET/POST` | `/api/market-data/*` | market data wrapper |

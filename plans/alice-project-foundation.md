@@ -99,6 +99,12 @@ status remains derived from the Guardian that owns that home.
   the real product surface using shared shadcn/Base UI primitives.
 - [x] Align Electron data-location startup language and handoff behavior with
   AliceProject while preserving complete-home recovery and app-mode transport.
+- [x] Reframe Settings around explicit General, Appearance, and Tools
+  categories: General owns installation/AliceProject identity and local runtime
+  settings, while visual preferences and tool policy have dedicated routes.
+- [x] Retire the installation-wide Persona editor and `/api/persona` transport;
+  freeze Alice's current baseline identity into the Chat template instruction
+  that is durably copied into each new Workspace.
 - [x] Update owner guides and public CLI help where the old Instance term is no
   longer accurate.
 - [x] Complete typecheck, unit, Guardian recovery, browser, Electron PTY, and

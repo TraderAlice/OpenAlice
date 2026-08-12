@@ -1,5 +1,3 @@
-import { readFile, writeFile, mkdir } from 'fs/promises'
-import { dirname } from 'path'
 import {
   acquireOpenAliceRuntimeLocks,
   takeoverRequested,
@@ -10,7 +8,7 @@ import {
 // runs go through headless workspace dispatch (cron → workspace).
 import { loadConfig, readMarketDataConfig } from './core/config.js'
 import { printLegacyDataNotice } from './core/legacy-data-notice.js'
-import { dataPath, defaultPath, userDataHome } from '@/core/paths.js'
+import { userDataHome } from '@/core/paths.js'
 import { resolveLauncherRoot } from '@/workspaces/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
@@ -73,11 +71,6 @@ import { createToolCallLog } from './core/tool-call-log.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
 
-// ==================== Persistence paths ====================
-
-const PERSONA_FILE = dataPath('brain', 'persona.md')
-const PERSONA_DEFAULT = defaultPath('persona.default.md')
-
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 let runtimeLock: OpenAliceRuntimeLock | null = null
 
@@ -85,17 +78,6 @@ async function releaseRuntimeLock(): Promise<void> {
   const current = runtimeLock
   runtimeLock = null
   await current?.release()
-}
-
-/** Read a file, copying from default if it doesn't exist yet. */
-async function readWithDefault(target: string, defaultFile: string): Promise<string> {
-  try { return await readFile(target, 'utf-8') } catch { /* not found — copy default */ }
-  try {
-    const content = await readFile(defaultFile, 'utf-8')
-    await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, content)
-    return content
-  } catch { return '' }
 }
 
 async function main() {
@@ -166,11 +148,6 @@ async function main() {
     unavailableReason: () => liteUnavailableReason(currentTradingModePolicy()),
     readonlyMutationReason: () => readonlyMutationReason(currentTradingModePolicy()),
   })
-
-  // ==================== Persona ====================
-  // The persona file is seeded on first run so the user has an editable
-  // override (consumed by the workspace context-injector).
-  await readWithDefault(PERSONA_FILE, PERSONA_DEFAULT)
 
   // ==================== News Collector Store ====================
 

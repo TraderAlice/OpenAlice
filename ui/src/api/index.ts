@@ -9,7 +9,6 @@ import { tradingApi } from './trading'
 import { marketDataApi } from './openbb'
 import { toolsApi } from './tools'
 import { agentStatusApi } from './agentStatus'
-import { personaApi } from './persona'
 import { newsApi } from './news'
 import { marketApi } from './market'
 import { inboxApi } from './inbox'
@@ -29,7 +28,6 @@ export const api = {
   marketData: marketDataApi,
   tools: toolsApi,
   agentStatus: agentStatusApi,
-  persona: personaApi,
   news: newsApi,
   market: marketApi,
   inbox: inboxApi,

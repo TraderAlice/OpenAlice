@@ -91,7 +91,7 @@ describe('resolveTemplateSource', () => {
     version: '1.0.0',
     defaultAgents: ['codex'],
     injectTools: true,
-    injectPersona: false,
+    injectInstructions: false,
     bundledSkills: [],
     source: {
       repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',

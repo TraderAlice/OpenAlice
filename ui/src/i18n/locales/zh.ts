@@ -288,10 +288,6 @@ export const zh: Resources = {
   },
   settings: {
     title: '设置',
-    tab: {
-      settings: '设置',
-      tools: '工具',
-    },
     language: {
       title: '语言',
       description: '界面语言，立即生效。',
@@ -436,8 +432,10 @@ export const zh: Resources = {
     },
     category: {
       general: '通用',
+      appearance: '外观',
       aiProvider: 'AI 提供方',
       agentPermissions: '智能体权限',
+      tools: '工具',
       trading: '交易',
       issues: '议题',
       connectors: '连接器',
@@ -484,17 +482,6 @@ export const zh: Resources = {
         description: '控制智能体是否可以绕过人工审批，直接执行已 commit 的券商写入。',
         proOnly: '当前交易模式仍会阻止券商写入。这个开关只有在 Pro 模式执行时才会真正生效。',
       },
-    },
-    persona: {
-      title: '人设',
-      description: '定义 Alice 个性与行为的系统提示词。更改在下次服务器重启后生效。',
-      loadError: '加载人设失败',
-      saveError: '保存失败',
-      loading: '加载中…',
-      saving: '保存中…',
-      save: '保存',
-      saved: '已保存',
-      unsaved: '有未保存的更改',
     },
     tools: {
       summary: '{{groups}} 个分组共 {{tools}} 个工具——更改在下次 AI 请求时生效',

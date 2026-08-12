@@ -1,3 +1,5 @@
+import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { createAliceProjectRoutes } from './alice-project.js'
@@ -19,8 +21,8 @@ describe('AliceProject routes', () => {
         id: expect.stringMatching(/^alice-project-/),
         key: 'research',
         displayName: 'Research AliceProject',
-        home: '/tmp/openalice-project-a',
-        appRoot: '/tmp/openalice-source-a',
+        home: resolve('/tmp/openalice-project-a'),
+        appRoot: resolve('/tmp/openalice-source-a'),
       },
     })
   })

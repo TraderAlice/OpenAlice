@@ -296,10 +296,6 @@ export const zhHant: Resources = {
   },
   settings: {
     title: '設定',
-    tab: {
-      settings: '設定',
-      tools: '工具',
-    },
     language: {
       title: '語言',
       description: '介面語言，立即生效。',
@@ -444,8 +440,10 @@ export const zhHant: Resources = {
     },
     category: {
       general: '一般',
+      appearance: '外觀',
       aiProvider: 'AI 供應方',
       agentPermissions: '智慧體權限',
+      tools: '工具',
       trading: '交易',
       issues: '議題',
       connectors: '連接器',
@@ -492,17 +490,6 @@ export const zhHant: Resources = {
         description: '控制智慧體是否可以略過人工核准，直接執行已 commit 的券商寫入。',
         proOnly: '目前交易模式仍會阻止券商寫入。這個開關只有在 Pro 模式執行時才會真正生效。',
       },
-    },
-    persona: {
-      title: '人設',
-      description: '定義 Alice 個性與行為的系統提示詞。變更會在下次伺服器重新啟動後生效。',
-      loadError: '載入人設失敗',
-      saveError: '儲存失敗',
-      loading: '載入中…',
-      saving: '儲存中…',
-      save: '儲存',
-      saved: '已儲存',
-      unsaved: '有未儲存的變更',
     },
     tools: {
       summary: '{{groups}} 個分組共 {{tools}} 個工具——變更會在下次 AI 請求時生效',

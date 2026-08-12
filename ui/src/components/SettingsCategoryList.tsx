@@ -1,13 +1,26 @@
 import { useTranslation } from 'react-i18next'
-import { SlidersHorizontal, Bot, ShieldCheck, CandlestickChart, ListChecks, Plug, LineChart, Newspaper } from 'lucide-react'
+import {
+  Bot,
+  CandlestickChart,
+  LineChart,
+  ListChecks,
+  Newspaper,
+  Palette,
+  Plug,
+  ShieldCheck,
+  SlidersHorizontal,
+  Wrench,
+} from 'lucide-react'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
 
 const CATEGORIES = [
   { labelKey: 'settings.category.general',     category: 'general',        Icon: SlidersHorizontal },
+  { labelKey: 'settings.category.appearance',  category: 'appearance',     Icon: Palette },
   { labelKey: 'settings.category.aiProvider',  category: 'ai-provider',    Icon: Bot },
   { labelKey: 'settings.category.agentPermissions', category: 'agent-permissions', Icon: ShieldCheck },
+  { labelKey: 'settings.category.tools',       category: 'tools',          Icon: Wrench },
   { labelKey: 'settings.category.trading',     category: 'trading',        Icon: CandlestickChart },
   { labelKey: 'settings.category.issues',      category: 'issues',         Icon: ListChecks },
   { labelKey: 'settings.category.connectors',  category: 'connectors',     Icon: Plug },

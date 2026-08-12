@@ -68,7 +68,6 @@ Routes mounted in `src/webui/plugin.ts` (browsing for endpoints):
 /api/agent-status      ongoing agent run status
 /api/news              news archive
 /api/market            market search aggregator
-/api/persona           persona file
 /api/notifications     notifications store
 /api/inbox             workspace inbox
 /api/version           build version + update check

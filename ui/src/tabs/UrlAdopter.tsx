@@ -66,8 +66,10 @@ export function UrlAdopter() {
 
         {/* Settings — one entry per category */}
         <Route path="/settings" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'general' } }} />} />
+        <Route path="/settings/appearance" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'appearance' } }} />} />
         <Route path="/settings/ai-provider" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'ai-provider' } }} />} />
         <Route path="/settings/agent-permissions" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'agent-permissions' } }} />} />
+        <Route path="/settings/tools" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'tools' } }} />} />
         <Route path="/settings/trading" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'trading' } }} />} />
         <Route path="/settings/issues" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'issues' } }} />} />
         <Route path="/settings/mcp" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'mcp' } }} />} />
@@ -117,7 +119,7 @@ export function UrlAdopter() {
         <Route path="/market-data" element={<Navigate to="/settings/market-data" replace />} />
         <Route path="/news-collector" element={<Navigate to="/settings/news-collector" replace />} />
         <Route path="/data-sources" element={<Navigate to="/settings/market-data" replace />} />
-        <Route path="/tools" element={<Navigate to="/settings" replace />} />
+        <Route path="/tools" element={<Navigate to="/settings/tools" replace />} />
         <Route path="/uta/:id" element={<RedirectUtaDetail />} />
 
         {/* Unknown URL → Inbox */}

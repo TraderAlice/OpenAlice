@@ -300,10 +300,6 @@ export const en = {
   },
   settings: {
     title: 'Settings',
-    tab: {
-      settings: 'Settings',
-      tools: 'Tools',
-    },
     language: {
       title: 'Language',
       description: 'Interface language. Takes effect immediately.',
@@ -448,8 +444,10 @@ export const en = {
     },
     category: {
       general: 'General',
+      appearance: 'Appearance',
       aiProvider: 'AI Provider',
       agentPermissions: 'Agent Permissions',
+      tools: 'Tools',
       trading: 'Trading',
       issues: 'Issues',
       connectors: 'Connectors',
@@ -496,17 +494,6 @@ export const en = {
         description: 'Whether agents may execute committed broker writes without manual approval.',
         proOnly: 'Current trading mode still blocks broker writes. This switch only takes effect for execution in Pro mode.',
       },
-    },
-    persona: {
-      title: 'Persona',
-      description: "The system prompt that defines Alice's personality and behavior. Changes take effect on next server restart.",
-      loadError: 'Failed to load persona',
-      saveError: 'Failed to save',
-      loading: 'Loading...',
-      saving: 'Saving...',
-      save: 'Save',
-      saved: 'Saved',
-      unsaved: 'Unsaved changes',
     },
     tools: {
       summary: '{{tools}} tools in {{groups}} groups — changes apply on next AI request',
