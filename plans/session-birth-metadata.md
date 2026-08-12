@@ -26,7 +26,7 @@ quick-chat / Issue recruit / agent conversation / manual headless.
 - [x] Headless dispatch + Issue scanner + conversation control
 - [x] Session Directory + owner-guide note
 - [x] Verification (`tsc` + targeted tests)
-- [ ] Draft PR labelled for parallel audit (do not merge)
+- [x] Draft PR labelled for parallel audit (do not merge) — #1064
 
 ## Residual risk
 
