@@ -14,6 +14,7 @@ const actions = vi.hoisted(() => ({
   pauseSession: vi.fn(async () => undefined),
   resumeSession: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
+  setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
 }))
 
 vi.mock('../../tabs/store', () => ({
@@ -89,7 +90,7 @@ function context(): WorkspacesContextValue {
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
-    setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
+    setAutoQuantDefaultWorkspace: actions.setAutoQuantDefaultWorkspace,
     quickChat: vi.fn(async () => session.id),
     pauseSession: actions.pauseSession,
     resumeSession: actions.resumeSession,
@@ -125,6 +126,7 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
       kind: 'workspace',
       params: { wsId: workspace.id, sessionId: session.id, source: 'auto-quant' },
     })
+    expect(actions.setAutoQuantDefaultWorkspace).not.toHaveBeenCalled()
 
     const more = screen.getByRole('button', { name: `More actions for ${sessionTitle}` })
     more.focus()
