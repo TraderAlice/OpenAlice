@@ -1,6 +1,7 @@
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from './headless-task-registry.js'
 import type { ResumeIdentityRecord } from './resume-registry.js'
 import { sessionPreferredTitle, type SessionRecord } from './session-registry.js'
+import type { SessionCreatedBy } from './session-metadata.js'
 import type { ModelReasoningEffort } from '@/ai-providers/model-semantics.js'
 
 export interface WorkspaceSessionDirectoryEntry {
@@ -12,6 +13,8 @@ export interface WorkspaceSessionDirectoryEntry {
   successorResumeId?: string
   resumable: boolean
   active: boolean
+  /** Secret-free birth stamp when this product Session was first allocated. */
+  createdBy?: SessionCreatedBy
   runtime?: {
     credentialSource: 'native' | 'vault' | 'workspace'
     credentialSlug?: string
@@ -65,6 +68,7 @@ export function buildWorkspaceSessionDirectory(input: {
         ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
         resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
         active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
+        ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
         ...(identity.runtimeBinding
           ? {
               runtime: {

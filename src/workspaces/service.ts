@@ -42,6 +42,8 @@ import {
   resolveSessionRuntimeBinding,
   type SessionRuntimeSelection,
 } from './session-runtime-binding.js';
+import type { SessionCreatedBy } from './session-metadata.js';
+import { sessionMetadata } from './session-metadata.js';
 import {
   readWorkspaceRuntimeSettings,
   rememberWorkspaceRuntimeBinding,
@@ -492,6 +494,8 @@ export interface WorkspaceService {
     selection?: SessionRuntimeSelection,
     /** Cross-Agent message metadata for the independent conversation log. */
     conversation?: AgentConversationDispatch,
+    /** Birth stamp when this dispatch allocates a new product Session. */
+    createdBy?: SessionCreatedBy,
   ): Promise<{ taskId: string; resumeId: string }>;
   /** Read-only scheduling projection of every workspace's `.alice/issues/`
    *  directory (scheduled issues only) + each task's last-fired marker and
@@ -1542,6 +1546,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     inquiry?: HeadlessTaskInquiry,
     selection?: SessionRuntimeSelection,
     conversation?: AgentConversationDispatch,
+    /** Birth stamp when this dispatch allocates a new product Session. */
+    createdBy?: SessionCreatedBy,
   ): Promise<{ taskId: string; resumeId: string }> => {
     if (catalog.get(ws.id)?.lifecycle !== 'active') {
       throw new Error(`workspace is not active: ${ws.id}`);
@@ -1608,11 +1614,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     try {
       // ResumeRegistry is the sole allocator for product conversation ids.
       // HeadlessTaskRegistry only records executions against that identity.
+      // Birth metadata is first-write-wins inside ensure(); only pass it when
+      // this dispatch is allocating a fresh product Session.
       const identity = await resumeRegistry.ensure({
         ...(resumeId ? { resumeId } : {}),
         wsId: ws.id,
         agent: adapter.id,
         runtimeBinding: sessionRuntime.binding,
+        ...(!resumeId && createdBy ? { metadata: sessionMetadata(createdBy) } : {}),
       });
       if (catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new Error(`workspace stopped accepting work during dispatch: ${ws.id}`);

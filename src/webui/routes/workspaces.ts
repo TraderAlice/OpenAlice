@@ -64,6 +64,8 @@ import {
   resolveSessionRuntimeBinding,
   SessionRuntimeBindingError,
 } from '../../workspaces/session-runtime-binding.js';
+import type { SessionCreatedBy } from '../../workspaces/session-metadata.js';
+import { sessionMetadata } from '../../workspaces/session-metadata.js';
 import {
   readWorkspaceRuntimeSettings,
   rememberWorkspaceRuntimeBinding,
@@ -298,6 +300,8 @@ export function createWorkspaceRoutes(
       readonly credentialSlug?: string;
       readonly model?: string;
       readonly reasoningEffort?: ModelReasoningEffort;
+      /** Birth stamp when allocating a new product Session (omit when resuming). */
+      readonly createdBy?: SessionCreatedBy;
     },
   ): Promise<SpawnSessionResult> {
     const id = meta.id;
@@ -456,6 +460,10 @@ export function createWorkspaceRoutes(
         agent: adapter.id,
         ...(resume && resume !== 'last' ? { agentSessionId: resume.sessionId } : {}),
         ...(sessionRuntime ? { runtimeBinding: sessionRuntime.binding } : {}),
+        // Birth is first-write-wins; only stamp when allocating a new identity.
+        ...(!opts.resumeId && opts.createdBy
+          ? { metadata: sessionMetadata(opts.createdBy) }
+          : {}),
       });
     } catch (err) {
       releaseClaim();
@@ -712,6 +720,7 @@ export function createWorkspaceRoutes(
       ...(reasoningEffort ? { reasoningEffort } : {}),
       ...(resolvedAgentId === 'pi' ? {} : { initialPrompt: managerTerminalPrompt(prompt) }),
       title: prompt,
+      createdBy: { kind: 'interactive', surface: 'manager' },
     });
     if (!spawned.ok) return c.json(spawned.body, spawned.status as 400 | 409 | 500);
 
@@ -1559,6 +1568,10 @@ export function createWorkspaceRoutes(
       ...(credentialSlug !== undefined ? { credentialSlug } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+      // Resume reuses an existing product Session; only fresh spawns stamp birth.
+      ...(resumeId === undefined
+        ? { createdBy: { kind: 'interactive' as const, surface: 'spawn' as const } }
+        : {}),
     });
     if (!result.ok) return c.json(result.body, result.status as 400 | 500);
     return c.json(result.session, 201);
@@ -1687,6 +1700,10 @@ export function createWorkspaceRoutes(
       ...(model !== undefined ? { model } : {}),
       ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
       initialPrompt: prompt,
+      createdBy: {
+        kind: 'interactive',
+        surface: templateName === 'auto-quant-v2' ? 'auto-quant' : 'quick-chat',
+      },
     });
     if (!spawn.ok) return c.json(spawn.body, spawn.status as 400 | 500);
     return c.json({ workspace: await svc.publicMeta(meta), session: spawn.session }, 201);
@@ -2397,7 +2414,18 @@ export function createWorkspaceRoutes(
     try {
       const dispatched = resumeId
         ? await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs, undefined, resumeId)
-        : await svc.dispatchHeadlessTask(meta, adapter, prompt, timeoutMs);
+        : await svc.dispatchHeadlessTask(
+            meta,
+            adapter,
+            prompt,
+            timeoutMs,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            { kind: 'headless', surface: 'api' },
+          );
       return c.json({ ...dispatched, status: 'running' }, 202);
     } catch (err) {
       if (err instanceof HeadlessCapacityError) {

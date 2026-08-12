@@ -13,12 +13,13 @@ function build(opts: { assignee?: string } = {}) {
     _meta: unknown,
     _adapter: unknown,
     _prompt: string,
-    _timeout: number,
+    _timeout?: number,
     _issueId?: string,
     _resumeId?: string,
     _inquiry?: HeadlessTaskInquiry,
     _overrides?: unknown,
     _conversation?: unknown,
+    _createdBy?: unknown,
   ) => ({ taskId: 'run-new', resumeId: _resumeId ?? 'resume-new' }))
   const list = vi.fn((_filters: unknown) => [] as HeadlessTaskRecord[])
   const svc = {
@@ -82,7 +83,22 @@ describe('business inquiry routes', () => {
         deliveredPrompt: 'Why?',
         promptMode: 'plain',
       }),
+      undefined,
     )
+  })
+
+  it('stamps conversation birth for an unattributed Inbox reconstruction', async () => {
+    const { app, inboxStore, dispatchHeadlessTask } = build()
+    const entry = await inboxStore.append({ workspaceId: 'ws-1', comments: 'manual note' })
+    await app.request(`/inbox/${entry.id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'Recover context' }),
+    })
+    expect(dispatchHeadlessTask.mock.calls[0]?.[9]).toMatchObject({
+      kind: 'conversation',
+      caller: { kind: 'human' },
+      reason: 'missing-origin',
+      subject: { kind: 'inbox', entryId: entry.id },
+    })
   })
 
   it('keeps reconstruction provenance without changing an unattributed Inbox prompt by default', async () => {

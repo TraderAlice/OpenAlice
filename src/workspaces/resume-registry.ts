@@ -11,6 +11,8 @@ import { dirname } from 'node:path'
 import type { Logger } from './logger.js'
 import { generateResumeId } from './resume-id.js'
 import type { SessionRuntimeBinding } from './cli-adapter.js'
+import type { SessionMetadata } from './session-metadata.js'
+import { parseSessionMetadata } from './session-metadata.js'
 import type { SessionRuntimeBindingStore } from './session-runtime-store.js'
 
 export interface ResumeIdentityRecord {
@@ -30,6 +32,11 @@ export interface ResumeIdentityRecord {
   retiredAt?: number
   retirementReason?: string
   successorResumeId?: string
+  /**
+   * Immutable product bag (birth first). Written only when the identity is
+   * created; later ensure() calls never rewrite it. Historical records omit it.
+   */
+  metadata?: SessionMetadata
 }
 
 export class ResumeRegistry {
@@ -73,6 +80,7 @@ export class ResumeRegistry {
           resumeId: record['resumeId'],
           agent: record['agent'],
         })
+        const metadata = parseSessionMetadata(record['metadata'])
         this.records.set(record['resumeId'], {
           resumeId: record['resumeId'],
           wsId: record['wsId'],
@@ -96,6 +104,7 @@ export class ResumeRegistry {
           ...(typeof record['successorResumeId'] === 'string'
             ? { successorResumeId: record['successorResumeId'] }
             : {}),
+          ...(metadata ? { metadata } : {}),
         })
       }
     } catch (err) {
@@ -130,6 +139,8 @@ export class ResumeRegistry {
     agentSessionId?: string
     latestTaskId?: string
     runtimeBinding?: SessionRuntimeBinding
+    /** Birth bag for a newly allocated identity. Ignored when resuming existing. */
+    metadata?: SessionMetadata
     now?: number
   }): Promise<ResumeIdentityRecord> {
     const resumeId = input.resumeId ?? generateResumeId({
@@ -161,6 +172,8 @@ export class ResumeRegistry {
       }
       if (input.agentSessionId) existing.agentSessionId = input.agentSessionId
       if (input.latestTaskId) existing.latestTaskId = input.latestTaskId
+      // metadata.createdBy is first-write-wins: never rewrite on ensure of an
+      // existing identity, even when callers pass a different stamp.
       existing.updatedAt = input.now ?? Date.now()
       await this.flush()
       return existing
@@ -184,6 +197,7 @@ export class ResumeRegistry {
       ...(input.agentSessionId ? { agentSessionId: input.agentSessionId } : {}),
       ...(input.latestTaskId ? { latestTaskId: input.latestTaskId } : {}),
       ...(input.runtimeBinding ? { runtimeBinding: input.runtimeBinding } : {}),
+      ...(input.metadata ? { metadata: input.metadata } : {}),
     }
     this.records.set(resumeId, record)
     await this.flush()
