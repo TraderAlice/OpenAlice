@@ -21,8 +21,6 @@ the durable truth after it changes.
 
 ## Active
 
-- [[plans/nano-alice.md]] — AliceProject birth product (Trader vs Nano) via
-  `openalice create alice-project`; Nano homes never start UTA.
 - [[plans/release-feedback-reliability.md]] — Makes packaged release failures
   deterministic and diagnostic first, then removes desktop matrix fan-in and
   reuses trusted promotion evidence without weakening release gates.
@@ -36,6 +34,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/nano-alice.md]] — Adds immutable AliceProject product birth through
+  `openalice create alice-project`, with atomic first-writer ownership and a
+  Guardian contract that never starts UTA for Nano homes. Accepted and
+  delivered in PR #1065.
 - [[plans/session-birth-metadata.md]] — Stamps immutable product-Session
   `metadata.createdBy` at allocation so interactive, Issue, conversation, and
   headless births are distinguishable without inventing execution-level origin.
