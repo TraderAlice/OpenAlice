@@ -21,8 +21,9 @@ import {
 } from './lifecycle.mjs'
 import {
   buildManagedPiEnv,
+  buildAliceProjectEnv,
   resolveLaunchContext,
-  type InstanceLaunchConfig,
+  type AliceProjectLaunchConfig,
   type LaunchConfigValues,
   type MachineSupervisorConfig,
   type ResolvedLaunchContext,
@@ -40,18 +41,18 @@ import {
 } from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
 import {
-  createSupervisorInstance,
-  persistInstanceLaunchConfig,
+  createSupervisorAliceProject,
+  persistAliceProjectLaunchConfig,
   persistMachineLaunchConfig,
-  persistSelectedSupervisorInstance,
-  readInstanceLaunchConfig,
+  persistSelectedSupervisorAliceProject,
+  readAliceProjectLaunchConfig,
   readMachineLaunchConfig,
-  readSupervisorInstanceRegistry,
+  readSupervisorAliceProjectRegistry,
   isStoredHomeUnavailableError,
   resolveAvailableStoredLaunchContext,
   resolveStoredLaunchContext,
-  validateSupervisorInstanceName,
-  type SupervisorInstanceRegistry,
+  validateSupervisorAliceProjectKey,
+  type SupervisorAliceProjectRegistry,
 } from './supervisor-config.ts'
 import {
   checkForUpdate,
@@ -62,7 +63,7 @@ const SILENT_OUTPUT = Object.freeze({ write: () => true })
 const INHERIT_SETTING = 'Inherit'
 const ENABLED_SETTING = 'Enabled'
 const DISABLED_SETTING = 'Disabled'
-const INSTANCE_SCOPE = 'This instance'
+const PROJECT_SCOPE = 'This AliceProject'
 const MACHINE_SCOPE = 'Machine defaults'
 
 interface RuntimeSummary {
@@ -158,7 +159,7 @@ export interface SupervisorTuiDependencies {
     flags: TuiLaunchFlags,
   ) => ResolvedLaunchContext | Promise<ResolvedLaunchContext>
   findSource?: (startPath: string) => Promise<string>
-  configureInstance?: (
+  configureProject?: (
     context: ResolvedLaunchContext,
     patch: LaunchConfigValues,
   ) => Promise<ResolvedLaunchContext>
@@ -166,20 +167,20 @@ export interface SupervisorTuiDependencies {
     context: ResolvedLaunchContext,
     patch: LaunchConfigValues,
   ) => Promise<ResolvedLaunchContext>
-  loadInstanceConfig?: (
+  loadProjectConfig?: (
     context: ResolvedLaunchContext,
-  ) => Promise<InstanceLaunchConfig>
+  ) => Promise<AliceProjectLaunchConfig>
   loadMachineConfig?: (
     context: ResolvedLaunchContext,
   ) => Promise<LaunchConfigValues>
-  loadInstanceRegistry?: (
+  loadProjectRegistry?: (
     context: ResolvedLaunchContext,
-  ) => Promise<SupervisorInstanceRegistry>
-  selectInstance?: (
+  ) => Promise<SupervisorAliceProjectRegistry>
+  selectProject?: (
     context: ResolvedLaunchContext,
     name: string,
   ) => Promise<ResolvedLaunchContext>
-  createInstance?: (
+  createProject?: (
     context: ResolvedLaunchContext,
     name: string,
     home: string,
@@ -187,7 +188,7 @@ export interface SupervisorTuiDependencies {
   prepareManagedSource?: () => Promise<ManagedSourceResult>
   inspectManagedSource?: () => Promise<ManagedSourcePlan>
   machineConfig?: MachineSupervisorConfig | null
-  instanceConfig?: InstanceLaunchConfig | null
+  projectConfig?: AliceProjectLaunchConfig | null
   loadTui?: typeof loadPiTui
   version?: string
   channel?: string
@@ -221,12 +222,12 @@ export async function runSupervisorTui(
 
   const resolveContext = dependencies.resolveContext
     ?? ((flags: TuiLaunchFlags) => {
-      if (dependencies.machineConfig || dependencies.instanceConfig) {
+      if (dependencies.machineConfig || dependencies.projectConfig) {
         return resolveLaunchContext({
           flags,
           env: dependencies.env,
           machineConfig: dependencies.machineConfig,
-          instanceConfig: dependencies.instanceConfig,
+          projectConfig: dependencies.projectConfig,
         })
       }
       return resolveStoredLaunchContext(flags, { env: dependencies.env })
@@ -237,13 +238,15 @@ export async function runSupervisorTui(
     context = await resolveContext(launchFlags)
   } catch (error: unknown) {
     const env = dependencies.env ?? process.env
-    const explicitSelection = launchFlags.instance !== undefined
+    const explicitSelection = launchFlags.project !== undefined
+      || launchFlags.instance !== undefined
       || launchFlags.home !== undefined
+      || env['OPENALICE_PROJECT'] !== undefined
       || env['OPENALICE_INSTANCE'] !== undefined
       || env['OPENALICE_HOME'] !== undefined
     const customResolution = dependencies.resolveContext !== undefined
       || dependencies.machineConfig !== undefined
-      || dependencies.instanceConfig !== undefined
+      || dependencies.projectConfig !== undefined
     if (
       explicitSelection
       || customResolution
@@ -254,7 +257,7 @@ export async function runSupervisorTui(
     context = await resolveAvailableStoredLaunchContext({
       env: dependencies.env,
     })
-    startupNotice = storedHomeRecoveryNotice(error, context.instance)
+    startupNotice = storedHomeRecoveryNotice(error, context.project)
   }
   let services = createServices(dependencies, context)
   let runtime: RuntimeSummary | null = null
@@ -278,11 +281,11 @@ export async function runSupervisorTui(
   let actionRunning = false
   let sourcePromptActive = false
   let settingsActive = false
-  let instancesActive = false
+  let projectsActive = false
   let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
-  let closeInstances: (() => void) | null = null
+  let closeProjects: (() => void) | null = null
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
@@ -300,8 +303,8 @@ export async function runSupervisorTui(
     onSettings: () => {
       void openSettings()
     },
-    onInstances: () => {
-      void openInstances()
+    onProjects: () => {
+      void openProjects()
     },
     onRequestManagedSource: () => {
       void requestManagedSource('start')
@@ -314,17 +317,17 @@ export async function runSupervisorTui(
   ui.addChild(screen)
 
   const findSource = dependencies.findSource ?? findOpenAliceRoot
-  const configureInstance = dependencies.configureInstance ?? (async (
+  const configureProject = dependencies.configureProject ?? (async (
     currentContext,
     patch,
   ) => {
-    await persistInstanceLaunchConfig(currentContext, patch)
+    await persistAliceProjectLaunchConfig(currentContext, patch)
     return resolveStoredLaunchContext(launchFlags, {
       env: dependencies.env,
     })
   })
-  const loadInstanceConfig = dependencies.loadInstanceConfig
-    ?? readInstanceLaunchConfig
+  const loadProjectConfig = dependencies.loadProjectConfig
+    ?? readAliceProjectLaunchConfig
   const loadMachineConfig = dependencies.loadMachineConfig
     ?? readMachineLaunchConfig
   const configureMachine = dependencies.configureMachine ?? (async (
@@ -336,23 +339,23 @@ export async function runSupervisorTui(
       env: dependencies.env,
     })
   })
-  const loadInstanceRegistry = dependencies.loadInstanceRegistry
-    ?? readSupervisorInstanceRegistry
-  const selectInstance = dependencies.selectInstance ?? (async (
+  const loadProjectRegistry = dependencies.loadProjectRegistry
+    ?? readSupervisorAliceProjectRegistry
+  const selectProject = dependencies.selectProject ?? (async (
     currentContext,
     name,
   ) => {
-    await persistSelectedSupervisorInstance(currentContext, name)
+    await persistSelectedSupervisorAliceProject(currentContext, name)
     return resolveStoredLaunchContext(launchFlags, {
       env: dependencies.env,
     })
   })
-  const createInstance = dependencies.createInstance ?? (async (
+  const createProject = dependencies.createProject ?? (async (
     currentContext,
     name,
     home,
   ) => {
-    await createSupervisorInstance(currentContext, name, home)
+    await createSupervisorAliceProject(currentContext, name, home)
     return resolveStoredLaunchContext(launchFlags, {
       env: dependencies.env,
     })
@@ -532,7 +535,7 @@ export async function runSupervisorTui(
     })
     try {
       const result = await prepareManaged()
-      const nextContext = await configureInstance(context, {
+      const nextContext = await configureProject(context, {
         appDir: result.appDir,
       })
       context = nextContext
@@ -561,7 +564,7 @@ export async function runSupervisorTui(
     if (
       sourcePromptActive
       || settingsActive
-      || instancesActive
+      || projectsActive
       || actionRunning
     ) return
     const source = context.provenance.appDir.source
@@ -577,7 +580,7 @@ export async function runSupervisorTui(
     const input = new (class extends piTui.Input {
       detail = reason
         ? `Start needs an OpenAlice source checkout. ${reason}`
-        : 'Choose the OpenAlice source checkout for this instance.'
+        : 'Choose the OpenAlice source checkout for this AliceProject.'
 
       setDetail(detail: string): void {
         this.detail = detail
@@ -593,7 +596,7 @@ export async function runSupervisorTui(
           '',
           ...super.render(width),
           '',
-          'Enter  Save for this instance and start',
+          'Enter  Save for this AliceProject and start',
           'Esc    Cancel',
         ]
       }
@@ -630,7 +633,7 @@ export async function runSupervisorTui(
       void (async () => {
         try {
           const appDir = await findSource(requested)
-          const nextContext = await configureInstance(context, { appDir })
+          const nextContext = await configureProject(context, { appDir })
           context = nextContext
           services = createServices(dependencies, context)
           screen.update({
@@ -654,25 +657,25 @@ export async function runSupervisorTui(
     if (
       settingsActive
       || sourcePromptActive
-      || instancesActive
+      || projectsActive
       || actionRunning
     ) return
     actionRunning = true
     screen.update({
-      busy: 'Loading instance settings',
+      busy: 'Loading AliceProject settings',
       notice: undefined,
       diagnostic: undefined,
     })
-    let storedInstance: InstanceLaunchConfig
+    let storedProject: AliceProjectLaunchConfig
     let storedMachine: LaunchConfigValues
     try {
-      ;[storedInstance, storedMachine] = await Promise.all([
-        loadInstanceConfig(context),
+      ;[storedProject, storedMachine] = await Promise.all([
+        loadProjectConfig(context),
         loadMachineConfig(context),
       ])
     } catch (error: unknown) {
       screen.update({
-        diagnostic: `Could not load instance settings: ${safeError(error)}`,
+        diagnostic: `Could not load AliceProject settings: ${safeError(error)}`,
       })
       return
     } finally {
@@ -683,8 +686,8 @@ export async function runSupervisorTui(
 
     settingsActive = true
     let saving = false
-    let scope: typeof INSTANCE_SCOPE | typeof MACHINE_SCOPE = INSTANCE_SCOPE
-    let message = 'Changes apply to this instance. Env vars and command options remain locked.'
+    let scope: typeof PROJECT_SCOPE | typeof MACHINE_SCOPE = PROJECT_SCOPE
+    let message = 'Changes apply to this AliceProject. Environment and command-line overrides remain locked.'
     const items: SettingItem[] = []
     let settings: InstanceType<typeof piTui.SettingsList>
 
@@ -750,7 +753,7 @@ export async function runSupervisorTui(
     }
 
     const syncItems = () => {
-      const stored = scope === INSTANCE_SCOPE ? storedInstance : storedMachine
+      const stored = scope === PROJECT_SCOPE ? storedProject : storedMachine
       const editingMachine = scope === MACHINE_SCOPE
       const runtimeStopped = screen.snapshot.runtime?.class === 'absent'
       const homeLocked = editingMachine
@@ -771,8 +774,8 @@ export async function runSupervisorTui(
       const portEditable = !portLocked
         && (runtimeStopped || !portAffectsRunning)
       const layerDescription = editingMachine
-        ? 'Default for instances that do not set their own value.'
-        : `Overrides machine defaults for instance "${context.instance}".`
+        ? 'Default for AliceProjects that do not set their own value.'
+        : `Overrides machine defaults for AliceProject "${context.aliceProject.displayName}".`
       const homeItem: SettingItem = {
         id: 'home',
         label: 'Data home',
@@ -786,27 +789,27 @@ export async function runSupervisorTui(
             homeEditable
               ? (
                   editingMachine
-                    ? 'Default data home for the implicit "default" instance. Blank uses ~/.openalice.'
-                    : context.instance === 'default'
-                    ? 'Where this instance keeps settings, credentials, and local state. Blank uses the inherited location.'
-                    : 'Where this named instance keeps its separate settings, credentials, and local state.'
+                    ? 'Default complete home for the implicit AliceProject. Blank uses ~/.openalice.'
+                    : context.project === 'default'
+                    ? 'Where this AliceProject keeps settings, credentials, workspaces, and runtime state. Blank uses the inherited location.'
+                    : 'Where this named AliceProject keeps its separate settings, credentials, workspaces, and runtime state.'
                 )
-              : 'Stop OpenAlice before changing the data-home layer used by this running instance.'
+              : 'Stop OpenAlice before changing the complete home used by this running AliceProject.'
           ),
       }
       if (homeEditable) {
         homeItem.submenu = (_currentValue, done) => inputSubmenu(
-          editingMachine ? 'Set machine-default data home' : 'Set instance data home',
+          editingMachine ? 'Set machine-default complete home' : 'Set AliceProject complete home',
           stored.home ?? '',
           (value) => (
-            !editingMachine && context.instance !== 'default' && value === ''
-              ? 'Named instances require an explicit data home.'
+            !editingMachine && context.project !== 'default' && value === ''
+              ? 'Named AliceProjects require an explicit complete home.'
               : undefined
           ),
           done,
-          editingMachine || context.instance === 'default'
+          editingMachine || context.project === 'default'
             ? 'Leave blank to inherit from the next lower-priority layer.'
-            : 'Named instances require a separate data home.',
+            : 'Named AliceProjects require a separate complete home.',
         )
       }
       const portItem: SettingItem = {
@@ -821,12 +824,12 @@ export async function runSupervisorTui(
           ?? (
             portEditable
               ? `${layerDescription} Blank chooses an available port automatically.`
-              : 'Stop OpenAlice before changing the browser-port layer used by this running instance.'
+              : 'Stop OpenAlice before changing the browser port used by this running AliceProject.'
           ),
       }
       if (portEditable) {
         portItem.submenu = (_currentValue, done) => inputSubmenu(
-          editingMachine ? 'Set machine-default browser port' : 'Set instance browser port',
+          editingMachine ? 'Set machine-default browser port' : 'Set AliceProject browser port',
           stored.port?.toString() ?? '',
           validatePortSetting,
           done,
@@ -841,7 +844,7 @@ export async function runSupervisorTui(
             ? machineBooleanSettingValue(stored.updateChecks)
             : booleanSettingValue(stored.updateChecks),
         description: updatesLocked
-          ?? `${layerDescription} Current instance resolves to ${context.updateChecks ? 'enabled' : 'disabled'}.`,
+          ?? `${layerDescription} This AliceProject currently resolves to ${context.updateChecks ? 'enabled' : 'disabled'}.`,
       }
       if (!updatesLocked) {
         updateItem.values = [
@@ -868,10 +871,10 @@ export async function runSupervisorTui(
           id: 'scope',
           label: 'Editing',
           currentValue: scope,
-          values: [INSTANCE_SCOPE, MACHINE_SCOPE],
+          values: [PROJECT_SCOPE, MACHINE_SCOPE],
           description: editingMachine
-            ? 'Machine defaults are inherited by instances without their own value.'
-            : 'Instance values override machine defaults. Env vars and command options remain higher priority.',
+            ? 'Machine defaults are inherited by AliceProjects without their own value.'
+            : 'AliceProject values override machine defaults. Environment and command-line values remain higher priority.',
         },
         homeItem,
         portItem,
@@ -881,7 +884,7 @@ export async function runSupervisorTui(
           id: 'config',
           label: 'Advanced config',
           currentValue: join(context.supervisorRoot, 'config.json'),
-          description: 'Read-only location for machine defaults and named-instance settings.',
+          description: 'Read-only location for machine defaults and named AliceProject settings.',
         },
       )
     }
@@ -903,13 +906,13 @@ export async function runSupervisorTui(
     ): Promise<void> => {
       if (saving) return
       if (id === 'scope') {
-        scope = newValue === MACHINE_SCOPE ? MACHINE_SCOPE : INSTANCE_SCOPE
+        scope = newValue === MACHINE_SCOPE ? MACHINE_SCOPE : PROJECT_SCOPE
         syncItems()
         updateDisplayedValues()
         setMessage(
           scope === MACHINE_SCOPE
-            ? 'Editing machine defaults. Instance, env, and command layers remain above them.'
-            : `Editing instance "${context.instance}". Env and command layers remain above it.`,
+            ? 'Editing machine defaults. AliceProject, environment, and command-line layers remain above them.'
+            : `Editing AliceProject "${context.aliceProject.displayName}". Environment and command-line layers remain above it.`,
         )
         return
       }
@@ -952,15 +955,15 @@ export async function runSupervisorTui(
             }
       saving = true
       actionRunning = true
-      const layerLabel = editingMachine ? 'machine default' : `instance "${context.instance}"`
+      const layerLabel = editingMachine ? 'machine default' : `AliceProject "${context.aliceProject.displayName}"`
       setMessage(`Saving ${settingLabel(field)} for ${layerLabel}…`)
       try {
         context = editingMachine
           ? await configureMachine(context, patch)
-          : await configureInstance(context, patch)
+          : await configureProject(context, patch)
         services = createServices(dependencies, context)
-        ;[storedInstance, storedMachine] = await Promise.all([
-          loadInstanceConfig(context),
+        ;[storedProject, storedMachine] = await Promise.all([
+          loadProjectConfig(context),
           loadMachineConfig(context),
         ])
         syncItems()
@@ -999,7 +1002,7 @@ export async function runSupervisorTui(
     const panel = new (class implements Component {
       render(width: number): string[] {
         return [
-          `OpenAlice setup · ${context.instance}`,
+          `OpenAlice setup · ${context.aliceProject.displayName}`,
           '─'.repeat(Math.max(1, width)),
           '',
           ...settings.render(width),
@@ -1026,25 +1029,25 @@ export async function runSupervisorTui(
     overlay.focus()
   }
 
-  async function openInstances(): Promise<void> {
+  async function openProjects(): Promise<void> {
     if (
-      instancesActive
+      projectsActive
       || sourcePromptActive
       || settingsActive
       || actionRunning
     ) return
     actionRunning = true
     screen.update({
-      busy: 'Loading instances',
+      busy: 'Loading AliceProjects',
       notice: undefined,
       diagnostic: undefined,
     })
-    let registry: SupervisorInstanceRegistry
+    let registry: SupervisorAliceProjectRegistry
     try {
-      registry = await loadInstanceRegistry(context)
+      registry = await loadProjectRegistry(context)
     } catch (error: unknown) {
       screen.update({
-        diagnostic: `Could not load instances: ${safeError(error)}`,
+        diagnostic: `Could not load AliceProjects: ${safeError(error)}`,
       })
       return
     } finally {
@@ -1053,20 +1056,23 @@ export async function runSupervisorTui(
     }
     if (!active) return
 
-    instancesActive = true
+    projectsActive = true
     let changing = false
-    let message = 'Selecting an instance also makes it the next bare-start default.'
+    let message = 'Selecting an AliceProject also makes it the next bare-start default.'
     const lock = instanceSelectionOverrideLock(context)
     if (lock) message = lock
-    const createValue = '__create_instance__'
-    const visibleInstances = registry.instances.some(
-      (entry) => entry.name === context.instance,
+    const createValue = '__create_alice_project__'
+    const visibleInstances = registry.projects.some(
+      (entry) => entry.key === context.project,
     )
-      ? registry.instances
+      ? registry.projects
       : [
-          ...registry.instances,
+          ...registry.projects,
           {
-            name: context.instance,
+            id: context.aliceProject.id,
+            key: context.project,
+            name: context.project,
+            displayName: context.aliceProject.displayName,
             home: context.home,
             port: context.port,
             portAutomatic: context.provenance.port.source === 'default',
@@ -1074,10 +1080,10 @@ export async function runSupervisorTui(
           },
         ]
     const items: SelectItem[] = visibleInstances.map((entry) => ({
-      value: entry.name,
+      value: entry.key,
       label: [
-        entry.name,
-        entry.name === context.instance ? 'current' : undefined,
+        entry.displayName,
+        entry.key === context.project ? 'current' : undefined,
         entry.isDefault ? 'default' : undefined,
       ].filter(Boolean).join(' · '),
       description: `${entry.home} · Web ${entry.portAutomatic ? `auto from ${entry.port}` : entry.port}`,
@@ -1085,8 +1091,8 @@ export async function runSupervisorTui(
     if (!lock) {
       items.push({
         value: createValue,
-        label: '+ Create instance…',
-        description: 'Register a separate data home and select it.',
+        label: '+ Create AliceProject…',
+        description: 'Register a separate complete home and select it.',
       })
     }
 
@@ -1102,7 +1108,7 @@ export async function runSupervisorTui(
       maxPrimaryColumnWidth: 32,
     })
     const selectedIndex = items.findIndex(
-      (item) => item.value === context.instance,
+      (item) => item.value === context.project,
     )
     list.setSelectedIndex(Math.max(0, selectedIndex))
     let component: Component = list
@@ -1111,10 +1117,10 @@ export async function runSupervisorTui(
       message = next
       ui.requestRender()
     }
-    const close = (notice = 'Instance selection closed.') => {
-      if (!instancesActive) return
-      instancesActive = false
-      closeInstances = null
+    const close = (notice = 'AliceProject selection closed.') => {
+      if (!projectsActive) return
+      projectsActive = false
+      closeProjects = null
       overlay.hide()
       ui.setShowHardwareCursor(false)
       screen.update({ notice })
@@ -1122,7 +1128,7 @@ export async function runSupervisorTui(
     const showList = () => {
       ui.setShowHardwareCursor(false)
       component = list
-      setMessage(lock ?? 'Selecting an instance also makes it the next bare-start default.')
+      setMessage(lock ?? 'Selecting an AliceProject also makes it the next bare-start default.')
     }
     const activateContext = async (
       operation: () => Promise<ResolvedLaunchContext>,
@@ -1131,7 +1137,7 @@ export async function runSupervisorTui(
       if (changing) return
       changing = true
       actionRunning = true
-      setMessage('Switching instance…')
+      setMessage('Switching AliceProject…')
       try {
         const next = await operation()
         context = next
@@ -1143,7 +1149,7 @@ export async function runSupervisorTui(
         })
         close(notice(next))
       } catch (error: unknown) {
-        setMessage(`Could not switch instance: ${safeError(error)}`)
+        setMessage(`Could not switch AliceProject: ${safeError(error)}`)
       } finally {
         actionRunning = false
         changing = false
@@ -1151,15 +1157,15 @@ export async function runSupervisorTui(
       }
     }
     const showCreateHomeInput = (name: string) => {
-      const defaultHome = registry.instances.find(
-        (entry) => entry.name === 'default',
+      const defaultHome = registry.projects.find(
+        (entry) => entry.key === 'default',
       )?.home ?? context.home
       const suggestedHome = join(
         dirname(defaultHome),
         `.openalice-${name}`,
       )
       const input = new (class extends piTui.Input {
-        detail = 'Use a separate data home. An empty directory is prepared when registered.'
+        detail = 'Use a separate complete home. An empty directory is prepared when registered.'
 
         setDetail(next: string): void {
           this.detail = next
@@ -1169,9 +1175,9 @@ export async function runSupervisorTui(
 
         override render(width: number): string[] {
           return [
-            `Create instance · ${name}`,
+            `Create AliceProject · ${name}`,
             '',
-            'Data home',
+            'Complete home',
             ...super.render(width),
             '',
             sanitize(this.detail),
@@ -1190,16 +1196,16 @@ export async function runSupervisorTui(
       input.onSubmit = (value) => {
         const home = value.trim()
         if (!home) {
-          input.setDetail('Enter a data home for this instance.')
+          input.setDetail('Enter a complete home for this AliceProject.')
           return
         }
         void activateContext(
-          () => createInstance(context, name, home),
-          (next) => `Created and selected instance ${next.instance}.`,
+          () => createProject(context, name, home),
+          (next) => `Created and selected AliceProject ${next.aliceProject.displayName}.`,
         )
       }
       component = input
-      setMessage('The new instance owns only its registry entry; its data is never copied or deleted.')
+      setMessage('The new AliceProject owns only its registry entry; existing data is never copied or deleted.')
     }
     const showCreateNameInput = () => {
       const input = new (class extends piTui.Input {
@@ -1213,9 +1219,9 @@ export async function runSupervisorTui(
 
         override render(width: number): string[] {
           return [
-            'Create instance',
+            'Create AliceProject',
             '',
-            'Instance name',
+            'AliceProject key',
             ...super.render(width),
             '',
             sanitize(this.detail),
@@ -1232,20 +1238,20 @@ export async function runSupervisorTui(
       }
       input.onSubmit = (value) => {
         const name = value.trim()
-        const validation = validateSupervisorInstanceName(name)
+        const validation = validateSupervisorAliceProjectKey(name)
         if (validation) {
           input.setDetail(validation)
           return
         }
-        if (registry.instances.some((entry) => entry.name === name)) {
-          input.setDetail(`Instance "${name}" is already registered.`)
+        if (registry.projects.some((entry) => entry.key === name)) {
+          input.setDetail(`AliceProject "${name}" is already registered.`)
           return
         }
         input.focused = false
         showCreateHomeInput(name)
       }
       component = input
-      setMessage('Create a named instance without leaving the Supervisor.')
+      setMessage('Create a named AliceProject without leaving the Supervisor.')
     }
 
     list.onCancel = () => close()
@@ -1259,22 +1265,22 @@ export async function runSupervisorTui(
         return
       }
       if (
-        item.value === context.instance
-        && item.value === registry.defaultInstance
+        item.value === context.project
+        && item.value === registry.defaultProject
       ) {
-        close(`Instance ${context.instance} is already selected.`)
+        close(`AliceProject ${context.aliceProject.displayName} is already selected.`)
         return
       }
       void activateContext(
-        () => selectInstance(context, item.value),
-        (next) => `Selected instance ${next.instance}; future bare starts use it.`,
+        () => selectProject(context, item.value),
+        (next) => `Selected AliceProject ${next.aliceProject.displayName}; future bare starts use it.`,
       )
     }
 
     const panel = new (class implements Component {
       render(width: number): string[] {
         return [
-          'OpenAlice instances',
+          'OpenAlice AliceProjects',
           '─'.repeat(Math.max(1, width)),
           '',
           ...component.render(width),
@@ -1297,7 +1303,7 @@ export async function runSupervisorTui(
       anchor: 'center',
       margin: 1,
     })
-    closeInstances = () => close()
+    closeProjects = () => close()
     overlay.focus()
   }
 
@@ -1331,7 +1337,7 @@ export async function runSupervisorTui(
       clearInterval(poll)
       closeSourcePrompt?.()
       closeSettings?.()
-      closeInstances?.()
+      closeProjects?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -1340,7 +1346,7 @@ export async function runSupervisorTui(
     }
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
-      if (sourcePromptActive || settingsActive || instancesActive) {
+      if (sourcePromptActive || settingsActive || projectsActive) {
         if (piTui.matchesKey(data, 'ctrl+c')) {
           finish()
           return { consume: true }
@@ -1397,7 +1403,7 @@ export class SupervisorScreen implements Component {
   private readonly onAction?: (action: SupervisorAction) => void
   private readonly onConfigureSource?: () => void
   private readonly onSettings?: () => void
-  private readonly onInstances?: () => void
+  private readonly onProjects?: () => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
@@ -1408,7 +1414,7 @@ export class SupervisorScreen implements Component {
       onAction?: (action: SupervisorAction) => void
       onConfigureSource?: () => void
       onSettings?: () => void
-      onInstances?: () => void
+      onProjects?: () => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
       requestRender?: () => void
@@ -1418,7 +1424,7 @@ export class SupervisorScreen implements Component {
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
     this.onSettings = callbacks.onSettings
-    this.onInstances = callbacks.onInstances
+    this.onProjects = callbacks.onProjects
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
@@ -1487,7 +1493,7 @@ export class SupervisorScreen implements Component {
       return true
     }
     if (matchesKey(data, 'i')) {
-      this.onInstances?.()
+      this.onProjects?.()
       return true
     }
     if (matchesKey(data, 'm')) {
@@ -1553,7 +1559,7 @@ export class SupervisorScreen implements Component {
     } else {
       lines.push(
         narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
-        `Instance: ${this.snapshot.context?.instance ?? 'default'}`,
+        `AliceProject: ${this.snapshot.context?.aliceProject.displayName ?? 'Default AliceProject'}`,
         `Home: ${this.snapshot.context?.home ?? runtime?.home ?? 'default'}`,
       )
       if (!narrow) {
@@ -1635,7 +1641,10 @@ function createServices(
   context: ResolvedLaunchContext,
 ): SupervisorServices {
   const shared = {
-    env: buildManagedPiEnv(context, dependencies.env ?? process.env),
+    env: buildAliceProjectEnv(
+      context,
+      buildManagedPiEnv(context, dependencies.env ?? process.env),
+    ),
   }
   return {
     inspect: dependencies.inspect ?? ((options) => inspectRuntime(options, shared)),
@@ -1728,8 +1737,8 @@ function renderHelp(): string[] {
     'x  Stop (confirmation required)   r  Restart (confirmation required)',
     'l  Bounded redacted logs          d  Read-only Doctor',
     'u  Check for product update       ?  Toggle this help',
-    'i  Select or create an instance',
-    'p  Review setup for this instance',
+    'i  Select or create an AliceProject',
+    'p  Review setup for this AliceProject',
     'm  Advanced: prepare installer-managed source and start',
     'c  Advanced: choose and remember a source checkout',
     'Tab / arrows  Change panel        q / Esc  Detach only',
@@ -1771,9 +1780,9 @@ function actionBar(
 ): string[] {
   const primary = runtime?.class === 'absent'
     ? context?.runtimeProvider.kind === 'bundle'
-      ? 'Enter Start & open · s Background · p Setup · i Instances'
-      : 'Enter Start & open · s Background · p Setup · i Instances · m Managed · c Source'
-    : 'Enter / o Open · i Instances · p Setup · r Restart · x Stop'
+      ? 'Enter Start & open · s Background · p Setup · i AliceProjects'
+      : 'Enter Start & open · s Background · p Setup · i AliceProjects · m Managed · c Source'
+    : 'Enter / o Open · i AliceProjects · p Setup · r Restart · x Stop'
   const secondary = 'd Doctor · l Logs · u Update · ? Help'
   const actions = `${primary} · ${secondary}`
   if (actions.length <= width) return [actions]
@@ -1901,11 +1910,11 @@ function settingOverrideLock(
 function instanceSelectionOverrideLock(
   context: ResolvedLaunchContext,
 ): string | undefined {
-  const instanceLock = settingOverrideLock(context.provenance.instance)
-  if (instanceLock) return `Instance selection is read-only. ${instanceLock}`
+  const projectLock = settingOverrideLock(context.provenance.project)
+  if (projectLock) return `AliceProject selection is read-only. ${projectLock}`
   const homeLock = settingOverrideLock(context.provenance.home)
   if (homeLock) {
-    return `Instance selection is read-only while this session's data home is fixed. ${homeLock}`
+    return `AliceProject selection is read-only while this session's complete home is fixed. ${homeLock}`
   }
   return undefined
 }
@@ -1974,15 +1983,15 @@ function safeError(error: unknown): string {
 
 function storedHomeRecoveryNotice(
   error: unknown,
-  fallbackInstance: string,
+  fallbackProject: string,
 ): string {
   const message = error instanceof Error ? error.message : String(error)
-  const match = message.match(/for instance "([^"]+)" (is missing|is unavailable or not writable)/)
+  const match = message.match(/for AliceProject "([^"]+)" (is missing|is unavailable or not writable)/)
   const unavailable = match
-    ? `Instance "${match[1]}" ${match[2]}.`
-    : 'The remembered instance home is unavailable.'
+    ? `AliceProject "${match[1]}" ${match[2]}.`
+    : 'The remembered AliceProject home is unavailable.'
   return sanitize(
-    `${unavailable} Using "${fallbackInstance}"; press i Instances to recover.`,
+    `${unavailable} Using "${fallbackProject}"; press i AliceProjects to recover.`,
   )
 }
 

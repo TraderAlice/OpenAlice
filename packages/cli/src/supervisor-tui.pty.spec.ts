@@ -118,7 +118,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       })
     })
 
-    expect(transcript).toContain('Instance: research')
+    expect(transcript).toContain('AliceProject: Research')
     expect(transcript).toContain(`Home: ${instanceHome}`)
     expect(transcript).toContain('Resolved: home (--home) · port (--port)')
     expect(transcript).toContain('\u001b[?25h')
@@ -259,7 +259,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   })
 
-  it('edits and persists selected-instance settings inside the TUI', async () => {
+  it('edits and persists selected-AliceProject settings inside the TUI', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-settings-'))
     temporaryPaths.push(isolatedHome)
     const supervisorHome = join(isolatedHome, 'supervisor')
@@ -295,21 +295,21 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         if (!openedSettings && output.includes('p Setup')) {
           openedSettings = true
           child.write('p')
-        } else if (!selectedPort && output.includes('OpenAlice setup · default')) {
+        } else if (!selectedPort && output.includes('OpenAlice setup · Default AliceProject')) {
           selectedPort = true
           child.write('\u001b[B\u001b[B\r')
-        } else if (!submittedPort && output.includes('Set instance browser port')) {
+        } else if (!submittedPort && output.includes('Set AliceProject browser port')) {
           submittedPort = true
           child.write('49001\r')
         } else if (
           !closedSettings
-          && output.includes('Saved browser port for instance "default".')
+          && output.includes('Saved browser port for AliceProject "Default AliceProject".')
         ) {
           closedSettings = true
           child.write('\u001b')
         } else if (
           !detached
-          && output.includes('port (instance.default.port)')
+          && output.includes('port (project.default.port)')
         ) {
           detached = true
           child.write('q')
@@ -325,11 +325,11 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     const config = JSON.parse(
       await readFile(join(supervisorHome, 'config.json'), 'utf8'),
     )
-    expect(config.instances.default.port).toBe(49_001)
-    expect(transcript).toContain('OpenAlice setup · default')
-    expect(transcript).toContain('Set instance browser port')
-    expect(transcript).toContain('Saved browser port for instance "default".')
-    expect(transcript).toContain('port (instance.default.port)')
+    expect(config.projects.default.port).toBe(49_001)
+    expect(transcript).toContain('OpenAlice setup · Default AliceProject')
+    expect(transcript).toContain('Set AliceProject browser port')
+    expect(transcript).toContain('Saved browser port for AliceProject "Default AliceProject".')
+    expect(transcript).toContain('port (project.default.port)')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
@@ -373,7 +373,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
         } else if (
           !selectedMachineScope
           && output.includes('Editing')
-          && output.includes('This instance')
+          && output.includes('This AliceProject')
         ) {
           selectedMachineScope = true
           child.write('\r')
@@ -420,7 +420,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('port (machine.defaults.port)')
   }, 15_000)
 
-  it('creates, selects, remembers, and switches named instances inside the TUI', async () => {
+  it('creates, selects, remembers, and switches named AliceProjects inside the TUI', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instances-'))
     temporaryPaths.push(isolatedHome)
     const supervisorHome = join(isolatedHome, 'supervisor')
@@ -441,56 +441,56 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
-      let openedInstances = false
+      let openedProjects = false
       let requestedCreate = false
       let submittedName = false
       let acceptedHome = false
-      let reopenedInstances = false
+      let reopenedProjects = false
       let selectedDefault = false
       let detached = false
       const timeout = setTimeout(() => {
         child.kill()
-        reject(new Error(`Supervisor instances TUI timed out:\n${output}`))
+        reject(new Error(`Supervisor AliceProjects TUI timed out:\n${output}`))
       }, 12_000)
       child.onData((data) => {
         output += data
-        if (!openedInstances && output.includes('i Instances')) {
-          openedInstances = true
+        if (!openedProjects && output.includes('i AliceProjects')) {
+          openedProjects = true
           child.write('i')
-        } else if (!requestedCreate && output.includes('+ Create instance')) {
+        } else if (!requestedCreate && output.includes('+ Create AliceProject')) {
           requestedCreate = true
           child.write('\u001b[B\r')
         } else if (
           !submittedName
-          && output.includes('Instance name')
+          && output.includes('AliceProject key')
         ) {
           submittedName = true
           child.write('research\r')
         } else if (
           !acceptedHome
-          && output.includes('Create instance · research')
-          && output.includes('Data home')
+          && output.includes('Create AliceProject · research')
+          && output.includes('Complete home')
         ) {
           acceptedHome = true
           child.write('\r')
         } else if (
-          !reopenedInstances
-          && output.includes('Created and selected instance research.')
-          && output.includes('Instance: research')
+          !reopenedProjects
+          && output.includes('Created and selected AliceProject Research.')
+          && output.includes('AliceProject: Research')
         ) {
-          reopenedInstances = true
+          reopenedProjects = true
           child.write('i')
         } else if (
-          reopenedInstances
+          reopenedProjects
           && !selectedDefault
-          && output.includes('research · current · default')
+          && output.includes('Research · current · default')
         ) {
           selectedDefault = true
           child.write('\u001b[A\r')
         } else if (
           !detached
-          && output.includes('Selected instance default; future bare starts use it.')
-          && output.includes('Instance: default')
+          && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
+          && output.includes('AliceProject: Default AliceProject')
         ) {
           detached = true
           child.write('q')
@@ -499,26 +499,26 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
         if (exitCode === 0) resolve(output)
-        else reject(new Error(`Supervisor instances TUI exited ${exitCode}:\n${output}`))
+        else reject(new Error(`Supervisor AliceProjects TUI exited ${exitCode}:\n${output}`))
       })
     })
 
     const config = JSON.parse(
       await readFile(join(supervisorHome, 'config.json'), 'utf8'),
     )
-    expect(config.defaultInstance).toBeUndefined()
-    expect(config.instances.research).toEqual({
+    expect(config.defaultProject).toBeUndefined()
+    expect(config.projects.research).toEqual({
       name: 'research',
       home: await realpath(join(isolatedHome, '.openalice-research')),
     })
-    expect(transcript).toContain('OpenAlice instances')
-    expect(transcript).toContain('Created and selected instance research.')
-    expect(transcript).toContain('Selected instance default; future bare starts use it.')
+    expect(transcript).toContain('OpenAlice AliceProjects')
+    expect(transcript).toContain('Created and selected AliceProject Research.')
+    expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   }, 15_000)
 
-  it('recovers in the instance picker when the remembered complete home is missing', async () => {
+  it('recovers in the AliceProject picker when the remembered complete home is missing', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instance-recovery-'))
     temporaryPaths.push(isolatedHome)
     const supervisorHome = join(isolatedHome, 'supervisor')
@@ -550,33 +550,33 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
-      let openedInstances = false
+      let openedProjects = false
       let repairedDefault = false
       let detached = false
       const timeout = setTimeout(() => {
         child.kill()
-        reject(new Error(`Supervisor instance recovery timed out:\n${output}`))
+        reject(new Error(`Supervisor AliceProject recovery timed out:\n${output}`))
       }, 10_000)
       child.onData((data) => {
         output += data
         if (
-          !openedInstances
-          && output.includes('Using "default"; press i Instances to recover.')
-          && output.includes('Instance: default')
+          !openedProjects
+          && output.includes('Using "default"; press i AliceProjects to recover.')
+          && output.includes('AliceProject: Default AliceProject')
         ) {
-          openedInstances = true
+          openedProjects = true
           child.write('i')
         } else if (
-          openedInstances
+          openedProjects
           && !repairedDefault
-          && output.includes('default · current')
-          && output.includes('+ Create instance')
+          && output.includes('Default AliceProject · current')
+          && output.includes('+ Create AliceProject')
         ) {
           repairedDefault = true
           child.write('\r')
         } else if (
           !detached
-          && output.includes('Selected instance default; future bare starts use it.')
+          && output.includes('Selected AliceProject Default AliceProject; future bare starts use it.')
         ) {
           detached = true
           child.write('q')
@@ -585,19 +585,19 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       child.onExit(({ exitCode }) => {
         clearTimeout(timeout)
         if (exitCode === 0) resolve(output)
-        else reject(new Error(`Supervisor instance recovery exited ${exitCode}:\n${output}`))
+        else reject(new Error(`Supervisor AliceProject recovery exited ${exitCode}:\n${output}`))
       })
     })
 
     const config = JSON.parse(
       await readFile(join(supervisorHome, 'config.json'), 'utf8'),
     )
-    expect(config.defaultInstance).toBeUndefined()
-    expect(config.instances.missing.home).toBe(join(isolatedHome, 'disconnected-home'))
-    expect(transcript).toContain('Instance "missing" is missing.')
-    expect(transcript).toContain('Using "default"; press i Instances to recover.')
-    expect(transcript).toContain('+ Create instance')
-    expect(transcript).toContain('Selected instance default; future bare starts use it.')
+    expect(config.defaultProject).toBeUndefined()
+    expect(config.projects.missing.home).toBe(join(isolatedHome, 'disconnected-home'))
+    expect(transcript).toContain('AliceProject "missing" is missing.')
+    expect(transcript).toContain('Using "default"; press i AliceProjects to recover.')
+    expect(transcript).toContain('+ Create AliceProject')
+    expect(transcript).toContain('Selected AliceProject Default AliceProject; future bare starts use it.')
   }, 15_000)
 
   it('shows higher-priority CLI overrides as locked settings', async () => {
@@ -658,7 +658,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).not.toContain('Set browser port')
   })
 
-  it('shows CLI-selected instances as read-only instead of pretending to switch them', async () => {
+  it('shows CLI-selected AliceProjects as read-only instead of pretending to switch them', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-instance-lock-'))
     temporaryPaths.push(isolatedHome)
     const instanceHome = join(isolatedHome, 'research-home')
@@ -689,19 +689,19 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 10_000)
       child.onData((data) => {
         output += data
-        if (!openedInstances && output.includes('i Instances')) {
+        if (!openedInstances && output.includes('i AliceProjects')) {
           openedInstances = true
           child.write('i')
         } else if (
           !closedInstances
-          && output.includes('Instance selection is read-only.')
-          && output.includes('research · current')
+          && output.includes('AliceProject selection is read-only.')
+          && output.includes('Research · current')
         ) {
           closedInstances = true
           child.write('\u001b')
         } else if (
           !detached
-          && output.includes('Instance selection closed.')
+          && output.includes('AliceProject selection closed.')
         ) {
           detached = true
           child.write('q')
@@ -715,8 +715,8 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     })
 
     expect(transcript).toContain('Locked by --instance.')
-    expect(transcript).toContain('research · current')
-    expect(transcript).not.toContain('+ Create instance')
+    expect(transcript).toContain('Research · current')
+    expect(transcript).not.toContain('+ Create AliceProject')
   })
 
   it('explains when managed source is unavailable from a source-run CLI', async () => {

@@ -288,10 +288,6 @@ export const zh: Resources = {
   },
   settings: {
     title: '设置',
-    tab: {
-      settings: '设置',
-      tools: '工具',
-    },
     language: {
       title: '语言',
       description: '界面语言，立即生效。',
@@ -335,7 +331,20 @@ export const zh: Resources = {
     },
     about: {
       title: '关于 OpenAlice',
-      description: '查看当前安装的版本、运行环境与更新状态。',
+      description: '查看当前安装、运行环境、更新状态，以及此处打开的 AliceProject。',
+      aliceProject: {
+        title: '当前 AliceProject',
+        description: '拥有此数据目录、Guardian、后端与前端入口的顶层项目。',
+        loading: '正在读取 AliceProject 信息…',
+        unavailable: '暂时无法读取 AliceProject 信息。',
+        statusRunning: '正在此处运行',
+        dataHome: '数据目录',
+        appRoot: '运行时来源',
+        stableId: '稳定 ID',
+        runtimeManaged: '托管运行时',
+        browserNote: '工作区和 Session 都位于这个 AliceProject 内；其他浏览器窗口可以连接同一入口，而不会再创建一个后端。',
+        retry: '重试',
+      },
       versionLoading: '…',
       runtime: {
         browser: '浏览器 / 服务端',
@@ -423,8 +432,10 @@ export const zh: Resources = {
     },
     category: {
       general: '通用',
+      appearance: '外观',
       aiProvider: 'AI 提供方',
       agentPermissions: '智能体权限',
+      tools: '工具',
       trading: '交易',
       issues: '议题',
       connectors: '连接器',
@@ -471,17 +482,6 @@ export const zh: Resources = {
         description: '控制智能体是否可以绕过人工审批，直接执行已 commit 的券商写入。',
         proOnly: '当前交易模式仍会阻止券商写入。这个开关只有在 Pro 模式执行时才会真正生效。',
       },
-    },
-    persona: {
-      title: '人设',
-      description: '定义 Alice 个性与行为的系统提示词。更改在下次服务器重启后生效。',
-      loadError: '加载人设失败',
-      saveError: '保存失败',
-      loading: '加载中…',
-      saving: '保存中…',
-      save: '保存',
-      saved: '已保存',
-      unsaved: '有未保存的更改',
     },
     tools: {
       summary: '{{groups}} 个分组共 {{tools}} 个工具——更改在下次 AI 请求时生效',

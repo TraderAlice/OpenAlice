@@ -300,10 +300,6 @@ export const en = {
   },
   settings: {
     title: 'Settings',
-    tab: {
-      settings: 'Settings',
-      tools: 'Tools',
-    },
     language: {
       title: 'Language',
       description: 'Interface language. Takes effect immediately.',
@@ -347,7 +343,20 @@ export const en = {
     },
     about: {
       title: 'About OpenAlice',
-      description: 'Version, runtime, and update status for this installation.',
+      description: 'Installation, runtime, update status, and the AliceProject currently open here.',
+      aliceProject: {
+        title: 'Current AliceProject',
+        description: 'The top-level project that owns this data home, Guardian, backend, and frontend endpoint.',
+        loading: 'Reading AliceProject information…',
+        unavailable: 'AliceProject information is unavailable.',
+        statusRunning: 'Running here',
+        dataHome: 'Data home',
+        appRoot: 'Runtime source',
+        stableId: 'Stable ID',
+        runtimeManaged: 'Managed runtime',
+        browserNote: 'Workspaces and Sessions live inside this AliceProject. Other browser windows can attach to this endpoint without creating another backend.',
+        retry: 'Retry',
+      },
       versionLoading: '…',
       runtime: {
         browser: 'Browser / server',
@@ -395,7 +404,7 @@ export const en = {
     },
     dataHome: {
       title: 'Data location',
-      description: 'The complete OpenAlice home used by this instance, including data, Workspaces, credentials, Broker Packs, and runtime locks.',
+      description: 'The complete OpenAlice home owned by this AliceProject, including data, Workspaces, credentials, Broker Packs, and runtime locks.',
       current: 'Current location',
       loading: 'Loading...',
       source: {
@@ -408,7 +417,7 @@ export const en = {
       chooseAndRestart: 'Choose folder and restart',
       restarting: 'Restarting...',
       askOnStartup: 'Ask which location to use at startup',
-      askOnStartupDescription: 'Useful when several projects or OpenAlice instances need independent files and locks.',
+      askOnStartupDescription: 'Useful when several AliceProjects need independent files, services, and locks.',
       recent: 'Recent locations',
       useAndRestart: 'Use and restart',
       browserOnly: 'Folder selection is available in the desktop app. Browser and development launches can select the same boundary from the command line:',
@@ -435,8 +444,10 @@ export const en = {
     },
     category: {
       general: 'General',
+      appearance: 'Appearance',
       aiProvider: 'AI Provider',
       agentPermissions: 'Agent Permissions',
+      tools: 'Tools',
       trading: 'Trading',
       issues: 'Issues',
       connectors: 'Connectors',
@@ -483,17 +494,6 @@ export const en = {
         description: 'Whether agents may execute committed broker writes without manual approval.',
         proOnly: 'Current trading mode still blocks broker writes. This switch only takes effect for execution in Pro mode.',
       },
-    },
-    persona: {
-      title: 'Persona',
-      description: "The system prompt that defines Alice's personality and behavior. Changes take effect on next server restart.",
-      loadError: 'Failed to load persona',
-      saveError: 'Failed to save',
-      loading: 'Loading...',
-      saving: 'Saving...',
-      save: 'Save',
-      saved: 'Saved',
-      unsaved: 'Unsaved changes',
     },
     tools: {
       summary: '{{tools}} tools in {{groups}} groups — changes apply on next AI request',

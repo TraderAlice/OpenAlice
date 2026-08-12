@@ -15,7 +15,7 @@ import { MarketRotationPage } from '../pages/MarketRotationPage'
 import { MarketBoardPage } from '../pages/MarketBoardPage'
 import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
-import { SettingsPage } from '../pages/SettingsPage'
+import { AppearanceSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
 import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AIProviderPage } from '../pages/AIProviderPage'
 import { TradingPage } from '../pages/TradingPage'
@@ -263,8 +263,10 @@ const settingsCategoryTitle: Record<
   string
 > = {
   general: 'Settings',
+  appearance: 'Appearance',
   'ai-provider': 'AI Provider',
   'agent-permissions': 'Agent Permissions',
+  tools: 'Tools',
   trading: 'Trading',
   issues: 'Issues',
   connectors: 'Connectors',
@@ -276,8 +278,10 @@ const settingsCategoryTitle: Record<
 function SettingsRouter({ spec }: ViewProps<'settings'>) {
   switch (spec.params.category) {
     case 'general': return <SettingsPage />
+    case 'appearance': return <AppearanceSettingsPage />
     case 'ai-provider': return <AIProviderPage />
     case 'agent-permissions': return <AgentPermissionsPage />
+    case 'tools': return <ToolsSettingsPage />
     case 'trading': return <TradingPage />
     case 'issues': return <IssueSettingsPage />
     case 'connectors': return <ConnectorsPage />

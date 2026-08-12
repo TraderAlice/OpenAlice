@@ -16,4 +16,9 @@ describe.each(Object.entries(locales))('%s locale', (_locale, resources) => {
   it('uses the same Issues term in navigation and Settings', () => {
     expect(resources.settings.category.issues).toBe(resources.nav.item.issue)
   })
+
+  it('exposes Appearance and Tools as first-class Settings categories', () => {
+    expect(resources.settings.category.appearance).toBeTruthy()
+    expect(resources.settings.category.tools).toBeTruthy()
+  })
 })

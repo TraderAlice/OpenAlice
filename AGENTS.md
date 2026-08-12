@@ -230,6 +230,8 @@ Read the relevant guide before editing its subsystem:
 - [[docs/README.md]] — [Owner-guide index](docs/README.md) and maintenance rules.
 - [[docs/project-structure.md]] — [Project structure](docs/project-structure.md): process boundaries,
   directories, state roots, and architectural ownership.
+- [[docs/alice-project.md]] — [AliceProject](docs/alice-project.md): top-level runtime
+  identity, complete-home ownership, concurrent projects, and discovery.
 - [[docs/development-workflow.md]] — [Development workflow](docs/development-workflow.md): branches, PRs,
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron

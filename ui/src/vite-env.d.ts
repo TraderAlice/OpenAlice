@@ -35,6 +35,13 @@ interface Window {
         ports: { web: number | null; mcp: number | null; uta: number | null }
         userDataHome: string
         appHome: string
+        aliceProject: {
+          id: string
+          key: string
+          displayName: string
+          home: string
+          appRoot: string | null
+        }
       }>
     }
     readonly keyboard: {

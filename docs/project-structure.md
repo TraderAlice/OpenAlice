@@ -5,6 +5,7 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
+[[docs/alice-project.md]],
 [[docs/model-semantics-and-runtime-injection.md]],
 [[docs/cli-installer.md]], [[docs/local-runtime.md]], [[docs/broker-packs.md]],
 [[docs/data-locations.md]],
@@ -15,6 +16,13 @@ Related guides: [[docs/managed-workspace-runtime.md]],
 [[docs/conversation-provenance.md]], and [[docs/market-data-architecture.md]].
 
 ## Runtime Topology
+
+The top-level product unit is an **AliceProject**. One AliceProject owns one
+complete `OPENALICE_HOME`, one Guardian tree, one Alice backend, and one
+logical frontend endpoint. Browser windows attach to that endpoint; they are
+not additional backend instances. Multiple AliceProjects run concurrently by
+using separate complete homes. See [[docs/alice-project.md]] for identity,
+registry, discovery, and lifecycle semantics.
 
 OpenAlice has two principal long-running service processes plus an optional
 Connector Service supervised by Guardian:

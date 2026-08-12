@@ -1,7 +1,7 @@
-# Data Locations and Concurrent Instances
+# Data Locations and Concurrent AliceProjects
 
 This guide owns OpenAlice data-location selection, desktop launcher
-preferences, and the isolation contract for concurrent local instances.
+preferences, and the isolation contract for concurrent local AliceProjects.
 Runtime lock recovery itself belongs to `packages/guardian-runtime/`; the
 persistent state layout belongs to [[docs/project-structure.md]].
 
@@ -21,7 +21,7 @@ parts together:
 └── sealing.key           machine-bound encryption key
 ```
 
-Two OpenAlice instances may run concurrently when they use different complete
+Two AliceProjects may run concurrently when they use different complete
 homes and unpinned ports. Two writers must never share one home. Default ports
 probe upward independently, while explicitly pinned ports still fail if they
 collide.
@@ -77,7 +77,7 @@ is introduced.
 **Settings → General → Data location** shows the effective root and its source.
 The desktop can open the current folder, choose another folder and restart,
 reuse a recent folder, or ask which location to use on every startup. If an
-already-running instance owns the selected home, the recovery dialog offers a
+already-running AliceProject owns the selected home, the recovery dialog offers a
 third path: choose another data location without stopping the existing owner.
 
 The launcher preference is machine-local metadata stored at:
@@ -112,7 +112,7 @@ development/CLI operation that may stop an owner of the same home. Separate
 homes are the normal choice for concurrent worktrees; takeover is recovery,
 not concurrency.
 
-Bare `openalice` exposes those separate homes through `i Instances`. The
+Bare `openalice` exposes those separate homes through `i AliceProjects`. The
 machine-local Supervisor registry lives outside every complete home. It always
 retains the implicit `default`, may register named homes, and remembers the
 selected name for the next bare start. Creating or selecting an entry does not
@@ -121,17 +121,20 @@ separate Home; equal and nested registered paths are rejected. An inherited
 existing target must be empty or recognizable as an OpenAlice home. An
 accepted target is created/canonicalized during registration; if that
 registered path later disappears, a bare Supervisor launch keeps the entry,
-falls back to an available instance, and directs the user to `i Instances` to
+falls back to an available project, and directs the user to `i AliceProjects` to
 repair the remembered selection. An explicit environment/flag selection fails
 instead of falling back, so automation cannot accidentally target another
 Home. The missing path is never silently recreated. An inherited Web port
-remains automatic from 47331 so concurrent instances probe upward, while a
+remains automatic from 47331 so concurrent AliceProjects probe upward, while a
 configured port is intentionally pinned.
 
-`OPENALICE_INSTANCE`, `OPENALICE_HOME`, `--instance`, and `--home` remain
-higher-priority one-run/automation inputs. When they fix the selected instance
-or Home, the TUI explains that instance selection is read-only rather than
+`OPENALICE_PROJECT`, `OPENALICE_HOME`, `--project`, and `--home` remain
+higher-priority one-run/automation inputs. When they fix the selected project
+or Home, the TUI explains that AliceProject selection is read-only rather than
 persisting a choice that cannot affect the current process.
+
+`OPENALICE_INSTANCE` and `--instance` remain deprecated compatibility aliases
+for released automation only.
 
 ## Switching and Failure Safety
 

@@ -34,6 +34,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/alice-project-foundation.md]] — Promotes the existing named Instance,
+  complete-home, Guardian, and frontend endpoint topology into the explicit
+  AliceProject product and lifecycle abstraction. Delivered for topic review in
+  Draft PR #1063.
 - [[plans/0892-migration-baseline.md]] — Retires the development-era 0001–0038
   migration chain, establishes 0.89.2-beta as the persisted-state baseline, and
   prevents isolated tests from combining a temporary journal with a live

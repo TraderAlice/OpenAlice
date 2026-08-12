@@ -1,21 +1,18 @@
 /**
  * Launcher-owned context injection, run after a template's bootstrap.sh and
  * before the initial commit. Replaces what the per-template bootstrap scripts
- * used to do via `_common.sh` helpers (`write_mcp_config`,
- * `compose_persona_claude_md`) plus the chat skill-copy stopgap — so the
+ * used to do via `_common.sh` helpers plus the chat skill-copy stopgap — so the
  * launcher, not each script, owns *what* gets injected. Gated per template by
- * the manifest flags (`injectTools` / `injectPersona` / `bundledSkills`).
+ * the manifest flags (`injectTools` / `injectInstructions` / `bundledSkills`).
  *
- * Reproduces the old bash output byte-for-byte (the workspace-creation golden
- * spec asserts this) — the only behavioral change is that the launcher now
- * owns the files, not bash.
+ * The workspace-creation golden spec owns the resulting file contract; the
+ * launcher, rather than bootstrap shell, owns these durable files.
  */
 
-import { existsSync } from 'node:fs';
 import { cp, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { dataPath, defaultPath } from '@/core/paths.js';
+import { defaultPath } from '@/core/paths.js';
 
 import { writeWorkspaceFile } from './file-service.js';
 import type { TemplateMeta } from './template-registry.js';
@@ -44,19 +41,15 @@ export async function injectWorkspaceContext(opts: {
 }): Promise<void> {
   const { template, dir } = opts;
 
-  if (template.injectPersona) {
-    // One neutral instruction source (`<template>/instruction.md`), composed
-    // with the persona, then written byte-identically to BOTH CLAUDE.md (Claude
-    // Code's filename) and AGENTS.md (Codex's). The CLIs disagree on the
-    // filename; we don't pick a side — we copy to each at injection. A template
-    // that asks for persona injection but ships no instruction.md is a
-    // misconfiguration — let the readFile throw so the create fails loudly
-    // (matches the old `compose_persona_claude_md` exit 4).
-    const persona = await resolvePersona();
+  if (template.injectInstructions) {
+    // One template-owned instruction source, written byte-identically to both
+    // native filenames. Alice's baseline identity is intentionally frozen in
+    // the Chat template instead of coming from a mutable global brain file.
+    // Existing Workspaces keep their durable files; future edits belong to the
+    // Workspace/template upgrade boundary rather than a hidden global prompt.
     const instruction = await readFile(join(template.filesDir, 'instruction.md'), 'utf8');
-    const composed = persona !== null ? `${persona}\n\n---\n\n${instruction}` : instruction;
-    await writeWorkspaceFile(dir, 'CLAUDE.md', composed);
-    await writeWorkspaceFile(dir, 'AGENTS.md', composed);
+    await writeWorkspaceFile(dir, 'CLAUDE.md', instruction);
+    await writeWorkspaceFile(dir, 'AGENTS.md', instruction);
   }
 
   // Every workspace gets ALWAYS_SKILLS (generic launcher capabilities). Tool-
@@ -86,17 +79,4 @@ export async function injectWorkspaceContext(opts: {
       await cp(src, join(dir, '.agents/skills', name), { recursive: true });
     }
   }
-}
-
-/**
- * Live persona override (`data/brain/persona.md`) wins; else the shipped
- * default (`default/persona.default.md`); else none. Same precedence the
- * persona route and `main.ts` use.
- */
-async function resolvePersona(): Promise<string | null> {
-  const live = dataPath('brain', 'persona.md');
-  if (existsSync(live)) return readFile(live, 'utf8');
-  const fallback = defaultPath('persona.default.md');
-  if (existsSync(fallback)) return readFile(fallback, 'utf8');
-  return null;
 }

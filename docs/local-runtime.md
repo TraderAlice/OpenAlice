@@ -76,7 +76,7 @@ openalice open
 `scripts/guardian/prod.mjs` on loopback, and leaves it running after the shell
 exits. `openalice open` verifies and opens the normal Web UI. Bare `openalice`
 enters the Supervisor TUI; `openalice run` is the foreground form. A source
-checkout remains an advanced override through instance configuration,
+checkout remains an advanced override through AliceProject configuration,
 `OPENALICE_APP_HOME`, or `--app-dir`; missing source artifacts may then use the
 locked pnpm preparation path.
 

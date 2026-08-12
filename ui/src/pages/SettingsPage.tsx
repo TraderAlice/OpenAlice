@@ -36,7 +36,7 @@ function paletteDefinition(id: ThemePaletteId): ThemePaletteDefinition {
   return THEME_PALETTES.find((palette) => palette.id === id)!
 }
 
-export function AppearanceSection() {
+export function AppearanceSection({ standalone = false }: { standalone?: boolean } = {}) {
   const { t } = useTranslation()
   const theme = useThemeStore((s) => s.theme)
   const dayPalette = useThemeStore((s) => s.dayPalette)
@@ -103,8 +103,8 @@ export function AppearanceSection() {
     setStylePaletteMode(recommendedPaletteApplied ? 'saved' : 'recommended')
   }
 
-  return (
-    <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+  const content = (
+    <>
       <div className="border-b border-border/60 pb-5">
         <div>
           <span className="text-sm font-medium text-foreground">
@@ -327,6 +327,14 @@ export function AppearanceSection() {
         </div>
       </div>
 
+    </>
+  )
+
+  if (standalone) return content
+
+  return (
+    <ConfigSection title={t('settings.appearance.title')} description={t('settings.appearance.description')}>
+      {content}
     </ConfigSection>
   )
 }
@@ -818,12 +826,10 @@ function WorkspaceShellSection() {
 // ==================== Settings Section ====================
 
 function SettingsSection() {
-  const { t } = useTranslation()
-
   return (
     <div className="mx-auto w-full max-w-[1100px]">
-      {/* Appearance */}
-      <AppearanceSection />
+      {/* Installation + current AliceProject identity */}
+      <AboutOpenAliceSection />
 
       {/* Language */}
       <LanguageSection />
@@ -833,91 +839,7 @@ function SettingsSection() {
 
       {/* Windows-only workspace shell */}
       <WorkspaceShellSection />
-
-      {/* Persona */}
-      <ConfigSection title={t('settings.persona.title')} description={t('settings.persona.description')}>
-        <PersonaEditor />
-      </ConfigSection>
-
-      {/* Runtime version + manual update entry point */}
-      <AboutOpenAliceSection />
     </div>
-  )
-}
-
-// ==================== Persona Editor ====================
-
-function PersonaEditor() {
-  const { t } = useTranslation()
-  const [content, setContent] = useState('')
-  const [filePath, setFilePath] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
-
-  useEffect(() => {
-    api.persona.get()
-      .then(({ content, path }) => {
-        setContent(content)
-        setFilePath(path)
-      })
-      .catch(() => setError(t('settings.persona.loadError')))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const handleSave = async () => {
-    setSaving(true)
-    setError(null)
-    setSaved(false)
-    try {
-      await api.persona.update(content)
-      setDirty(false)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch {
-      setError(t('settings.persona.saveError'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (loading) return <div className="text-sm text-muted-foreground">{t('settings.persona.loading')}</div>
-
-  return (
-    <>
-      <textarea
-        className={`${inputClass} min-h-[200px] max-h-[400px] resize-y font-mono text-xs leading-relaxed`}
-        value={content}
-        onChange={(e) => { setContent(e.target.value); setDirty(true) }}
-      />
-      <div className="flex items-center gap-2 mt-2">
-        <button
-          onClick={handleSave}
-          disabled={saving || !dirty}
-          className="btn-primary-sm min-h-10 sm:min-h-0"
-        >
-          {saving ? t('settings.persona.saving') : t('settings.persona.save')}
-        </button>
-        {saved && (
-          <span className="inline-flex items-center gap-1.5 text-[11px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-success" />
-            <span className="text-muted-foreground">{t('settings.persona.saved')}</span>
-          </span>
-        )}
-        {error && (
-          <span className="inline-flex items-center gap-1.5 text-[11px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-            <span className="text-destructive">{error}</span>
-          </span>
-        )}
-        {dirty && !saved && !error && (
-          <span className="text-[11px] text-muted-foreground">{t('settings.persona.unsaved')}</span>
-        )}
-      </div>
-      {filePath && <p className="text-[11px] text-muted-foreground mt-1">{filePath}</p>}
-    </>
   )
 }
 
@@ -1161,66 +1083,45 @@ function ToolGroupCard({
   )
 }
 
-// ==================== Page ====================
-
-type Tab = 'settings' | 'tools'
-
-const TABS: { key: Tab; labelKey: 'settings.tab.settings' | 'settings.tab.tools' }[] = [
-  { key: 'settings', labelKey: 'settings.tab.settings' },
-  { key: 'tools', labelKey: 'settings.tab.tools' },
-]
-
-export function SettingsTabBar({
-  tab,
-  onSelect,
-}: {
-  tab: Tab
-  onSelect: (tab: Tab) => void
-}) {
+export function SettingsPage() {
   const { t } = useTranslation()
+
   return (
-    <div
-      className="flex gap-1"
-      role="group"
-      aria-label={t('settings.title')}
-    >
-      {TABS.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          onClick={() => onSelect(item.key)}
-          aria-pressed={tab === item.key}
-          className={`relative min-h-10 px-3 py-2 text-sm font-medium transition-colors sm:min-h-0 ${
-            tab === item.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          {t(item.labelKey)}
-          {tab === item.key && (
-            <span
-              aria-hidden
-              className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t"
-            />
-          )}
-        </button>
-      ))}
+    <div className="flex flex-col flex-1 min-h-0">
+      <PageHeader title={t('settings.category.general')} />
+      <SettingsScrollArea className="px-4 py-6 md:px-8">
+        <SettingsSection />
+      </SettingsScrollArea>
     </div>
   )
 }
 
-export function SettingsPage() {
+export function AppearanceSettingsPage() {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<Tab>('settings')
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader title={t('settings.title')} />
-
-      <div className="px-4 md:px-6 border-b border-border/60">
-        <SettingsTabBar tab={tab} onSelect={setTab} />
-      </div>
-
+      <PageHeader title={t('settings.appearance.title')} />
       <SettingsScrollArea className="px-4 py-6 md:px-8">
-        {tab === 'settings' ? <SettingsSection /> : <ToolsSection />}
+        <div className="mx-auto w-full max-w-[1100px]">
+          <p className="mb-4 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+            {t('settings.appearance.description')}
+          </p>
+          <AppearanceSection standalone />
+        </div>
+      </SettingsScrollArea>
+    </div>
+  )
+}
+
+export function ToolsSettingsPage() {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      <PageHeader title={t('settings.category.tools')} />
+      <SettingsScrollArea className="px-4 py-6 md:px-8">
+        <ToolsSection />
       </SettingsScrollArea>
     </div>
   )

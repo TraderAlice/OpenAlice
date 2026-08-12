@@ -775,7 +775,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       version: '0.0.0',
       defaultAgents: ['claude'],
       injectTools: false,
-      injectPersona: false,
+      injectInstructions: false,
       bundledSkills: [],
     });
   }

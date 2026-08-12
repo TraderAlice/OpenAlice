@@ -1,9 +1,7 @@
 /**
  * Golden / characterization test for launcher-owned context injection. The
- * MCP bytes are asserted exactly; the persona composition is asserted to equal
- * `persona + "\n\n---\n\n" + <template>/CLAUDE.md` — byte-identical to what the
- * old `compose_persona_claude_md` bash produced. Skills are asserted to land in
- * both discovery paths.
+ * Template instructions are asserted to land byte-identically in both native
+ * agent filenames. Skills are asserted to land in both discovery paths.
  */
 
 import { existsSync } from 'node:fs';
@@ -14,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { dataPath, defaultPath } from '@/core/paths.js';
+import { defaultPath } from '@/core/paths.js';
 
 import { injectWorkspaceContext } from './context-injector.js';
 import type { TemplateMeta } from './template-registry.js';
@@ -32,7 +30,7 @@ function makeTemplate(over: Partial<TemplateMeta>): TemplateMeta {
     version: '0.0.0',
     defaultAgents: ['claude'],
     injectTools: false,
-    injectPersona: false,
+    injectInstructions: false,
     bundledSkills: [],
     ...over,
   };
@@ -60,29 +58,23 @@ describe('injectWorkspaceContext — no MCP injection (CLI-only)', () => {
   });
 });
 
-describe('injectWorkspaceContext — persona', () => {
-  it('composes persona + separator + template instruction into CLAUDE.md and AGENTS.md', async () => {
-    // Mirror the injector's persona precedence: a live data/brain/persona.md
-    // override wins over the shipped default.
-    const personaPath = existsSync(dataPath('brain', 'persona.md'))
-      ? dataPath('brain', 'persona.md')
-      : defaultPath('persona.default.md');
-    const persona = await readFile(personaPath, 'utf8');
+describe('injectWorkspaceContext — instructions', () => {
+  it('copies template instructions into CLAUDE.md and AGENTS.md', async () => {
     const instruction = await readFile(join(CHAT_FILES, 'instruction.md'), 'utf8');
-    const expected = `${persona}\n\n---\n\n${instruction}`;
 
     await injectWorkspaceContext({
-      template: makeTemplate({ injectPersona: true, filesDir: CHAT_FILES }),
+      template: makeTemplate({ injectInstructions: true, filesDir: CHAT_FILES }),
       wsId: 'ws-abc',
       dir,
     });
 
-    expect(await read('CLAUDE.md')).toBe(expected);
-    expect(await read('AGENTS.md')).toBe(expected);
+    expect(await read('CLAUDE.md')).toBe(instruction);
+    expect(await read('AGENTS.md')).toBe(instruction);
+    expect(instruction).toContain('You are Alice, an autonomous agent from the OpenAlice project.');
   });
 
-  it('does not touch CLAUDE.md / AGENTS.md when injectPersona is false', async () => {
-    await injectWorkspaceContext({ template: makeTemplate({ injectPersona: false }), wsId: 'ws-abc', dir });
+  it('does not touch CLAUDE.md / AGENTS.md when injectInstructions is false', async () => {
+    await injectWorkspaceContext({ template: makeTemplate({ injectInstructions: false }), wsId: 'ws-abc', dir });
     expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
     expect(existsSync(join(dir, 'AGENTS.md'))).toBe(false);
   });

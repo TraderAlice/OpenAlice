@@ -57,7 +57,7 @@ beforeEach(async () => {
     version: '2.0.0',
     defaultAgents: ['pi'],
     injectTools: true,
-    injectPersona: true,
+    injectInstructions: true,
     bundledSkills: [],
     upgradeStrategy: 'managed-context',
   };

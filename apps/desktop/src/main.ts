@@ -625,12 +625,12 @@ app.whenReady().then(async () => {
       : ''
     const canChooseAnother = selectionLock === null
     const buttons = canChooseAnother
-      ? ['Keep existing instance', 'Choose another data location', 'Stop it and start this OpenAlice']
-      : ['Keep existing instance', 'Stop it and start this OpenAlice']
+      ? ['Keep existing AliceProject', 'Choose another data location', 'Stop it and start this AliceProject']
+      : ['Keep existing AliceProject', 'Stop it and start this AliceProject']
     const { response } = await dialog.showMessageBox({
       type: activeRuntime.heartbeatStale ? 'warning' : 'question',
       title: 'OpenAlice is already running',
-      message: `Another OpenAlice ${owner.launcher} instance is using this data.`,
+      message: `Another AliceProject (${owner.launcher}) is using this data.`,
       detail: `PID ${owner.pid}\nData: ${userDataHome}\nLast heartbeat: ${owner.heartbeatAt}${staleDetail}`,
       buttons,
       defaultId: activeRuntime.heartbeatStale ? buttons.length - 1 : 0,
@@ -651,7 +651,7 @@ app.whenReady().then(async () => {
     if (chosen.path === userDataHome) {
       dialog.showErrorBox(
         'OpenAlice — choose another location',
-        'That folder is the data location already owned by the running instance.',
+        'That folder is the complete home already owned by the running AliceProject.',
       )
       continue
     }

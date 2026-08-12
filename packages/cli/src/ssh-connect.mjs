@@ -169,7 +169,7 @@ export function formatSshHelp() {
   return `Usage:
   openalice ssh <user@host> [options]
 
-Connects the local browser to an OpenAlice instance that is already running on
+Connects the local browser to an AliceProject that is already running on
 the SSH host. The local listener and remote target are both fixed to 127.0.0.1.
 
 Options:
