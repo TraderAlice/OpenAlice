@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkspacesContext, type WorkspacesContextValue } from '../../contexts/workspaces-context'
 import { i18n } from '../../i18n'
 import type { SessionRecord, TemplateInfo, Workspace } from './api'
-import { AutoQuantWorkspaceSection } from './AutoQuantWorkspaceSection'
+import { ChatWorkspaceSection } from './ChatWorkspaceSection'
 
 const actions = vi.hoisted(() => ({
   openOrFocus: vi.fn(),
@@ -108,13 +108,13 @@ beforeEach(async () => {
 
 afterEach(cleanup)
 
-describe('AutoQuantWorkspaceSection session actions', () => {
+describe('Ask Alice sidebar in AutoQuant mode', () => {
   it('keeps the active research current and routes destructive actions through the More menu', async () => {
     const user = userEvent.setup()
     const onNavigate = vi.fn()
     render(
       <WorkspacesContext.Provider value={context()}>
-        <AutoQuantWorkspaceSection onNavigate={onNavigate} />
+        <ChatWorkspaceSection mode="auto-quant" displayMode="focused" onNavigate={onNavigate} />
       </WorkspacesContext.Provider>,
     )
 

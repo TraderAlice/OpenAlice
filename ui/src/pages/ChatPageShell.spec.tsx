@@ -72,4 +72,10 @@ describe('ChatPageShell display mode', () => {
     expect(screen.getByTestId('display-mode').textContent).toBe('focused')
     expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('focused')
   })
+
+  it('reuses the Ask Alice shell chrome for AutoQuant', () => {
+    render(<ChatPageShell mode="auto-quant"><div>Quant content</div></ChatPageShell>)
+    expect(screen.getByRole('button', { name: 'Collapse Quant' })).toBeTruthy()
+    expect(screen.getByTestId('display-mode').textContent).toBe('focused')
+  })
 })

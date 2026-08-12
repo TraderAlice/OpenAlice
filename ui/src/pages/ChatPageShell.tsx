@@ -8,11 +8,14 @@ import {
   type ChatDisplayMode,
 } from '../components/workspace/chat-display-mode'
 
+export type HarnessSidebarMode = 'chat' | 'auto-quant'
+
 interface ChatPageShellProps {
   children: ReactNode
+  mode?: HarnessSidebarMode
 }
 
-export function ChatPageShell({ children }: ChatPageShellProps) {
+export function ChatPageShell({ children, mode = 'chat' }: ChatPageShellProps) {
   const { t } = useTranslation()
   const [displayMode, setDisplayMode] = useState<ChatDisplayMode>(() => readChatDisplayMode())
 
@@ -25,11 +28,12 @@ export function ChatPageShell({ children }: ChatPageShellProps) {
   return (
     <>
       <PageSidebarLayout
-        storageKey="chat"
-        title={t('nav.item.chat')}
+        storageKey={mode === 'auto-quant' ? 'auto-quant' : 'chat'}
+        title={t(mode === 'auto-quant' ? 'nav.item.autoQuant' : 'nav.item.chat')}
         defaultWidth={260}
         sidebar={({ closeMobileDrawer }) => (
           <ChatChannelListContainer
+            mode={mode}
             onNavigate={closeMobileDrawer}
             displayMode={displayMode}
             onRequestDisplayMode={requestDisplayMode}
