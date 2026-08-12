@@ -741,9 +741,31 @@ describe('POST /:id/headless', () => {
   it('enables the watchdog only for an explicit timeoutMs', async () => {
     const { app, dispatchHeadlessTask } = build();
     await post(app, '/ws-1/headless', { prompt: 'x', timeoutMs: 42_000 });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', 42_000);
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'x',
+      42_000,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { kind: 'headless', surface: 'api' },
+    );
     await post(app, '/ws-1/headless', { prompt: 'x' });
-    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'x', undefined);
+    expect(dispatchHeadlessTask).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'x',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { kind: 'headless', surface: 'api' },
+    );
   });
 
   it('continues a headless conversation by product resumeId only', async () => {
@@ -757,6 +779,23 @@ describe('POST /:id/headless', () => {
     expect(response.body).toMatchObject({ taskId: 'task-1', resumeId: 'resume-1' });
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
       expect.anything(), expect.anything(), 'follow up', undefined, undefined, 'resume-1',
+    );
+  });
+
+  it('stamps headless birth when allocating a fresh product Session', async () => {
+    const { app, dispatchHeadlessTask } = build();
+    await post(app, '/ws-1/headless', { prompt: 'one-shot' });
+    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'one-shot',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { kind: 'headless', surface: 'api' },
     );
   });
 

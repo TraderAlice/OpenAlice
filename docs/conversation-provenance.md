@@ -65,6 +65,28 @@ In the office analogy, the Workspace is the desk and the product Session is one
 particular colleague-with-context. `pi`, `codex`, `opencode`, and `claude` are
 worker kinds, not unique colleagues.
 
+## Session birth metadata
+
+Product Sessions may carry an optional, immutable `metadata.createdBy` bag on
+the `ResumeIdentityRecord`. It answers how the coworker was hired, not what a
+later turn is doing:
+
+| `createdBy.kind` | Meaning |
+|---|---|
+| `interactive` | Frontend interactive spawn (`spawn` / `quick-chat` / `auto-quant` / `manager`) |
+| `issue` | Scheduled or retried Issue that recruited a fresh Session (`new-each-run` or first `new-then-resume`) |
+| `headless` | Direct async headless API dispatch without Issue/conversation wrapper |
+| `conversation` | Fresh worker from `conversation_ask` / UI inquiry / Issue comment reply |
+
+Rules:
+
+- stamped only when `ResumeRegistry.ensure` allocates a new `resumeId`;
+- first-write-wins; continue/resume never rewrites birth;
+- historical identities without metadata are unknown;
+- headless `trigger` / `inquiry` remain execution-level sources and do not
+  replace birth;
+- Session Directory projects secret-free `createdBy` for product surfaces.
+
 ## Layered Index
 
 OpenAlice should resolve provenance through five layers rather than treating

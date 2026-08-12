@@ -737,6 +737,26 @@ export interface SpawnOptions {
   readonly initialPrompt?: string;
 }
 
+/** Secret-free product-Session birth stamp (mirrors backend SessionCreatedBy). */
+export type SessionCreatedBy =
+  | { readonly kind: 'interactive'; readonly surface: 'spawn' | 'quick-chat' | 'auto-quant' | 'manager' }
+  | {
+      readonly kind: 'issue';
+      readonly workspaceId: string;
+      readonly issueId: string;
+      readonly policy: 'new-each-run' | 'new-then-resume';
+      readonly fire: 'schedule' | 'retry';
+    }
+  | { readonly kind: 'headless'; readonly surface: 'api' }
+  | {
+      readonly kind: 'conversation';
+      readonly caller:
+        | { readonly kind: 'agent'; readonly resumeId: string; readonly workspaceId?: string }
+        | { readonly kind: 'human' };
+      readonly reason: string;
+      readonly subject?: unknown;
+    };
+
 export interface WorkspaceSessionDirectoryEntry {
   readonly resumeId: string;
   readonly agent: string;
@@ -744,6 +764,8 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly updatedAt: number;
   readonly resumable: boolean;
   readonly active: boolean;
+  /** Present when this product Session was allocated after birth metadata shipped. */
+  readonly createdBy?: SessionCreatedBy;
   readonly runtime?: {
     readonly credentialSource: 'native' | 'vault' | 'workspace';
     readonly credentialSlug?: string;

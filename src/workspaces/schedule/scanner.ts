@@ -31,6 +31,7 @@ import type { SessionRuntimeSelection } from '../session-runtime-binding.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskTrigger } from '../headless-task-registry.js'
+import type { SessionCreatedBy } from '../session-metadata.js'
 
 import {
   isFireable,
@@ -96,6 +97,9 @@ export interface ScheduleScannerDeps {
     inquiry?: undefined,
     /** Fresh-Session credential/model/effort selection inherited from Issue frontmatter. */
     selection?: SessionRuntimeSelection,
+    conversation?: undefined,
+    /** Birth stamp when this fire allocates a new product Session. */
+    createdBy?: SessionCreatedBy,
   ) => Promise<{ taskId: string; resumeId: string }>
   /** Persist @new-then-resume -> exact @resumeId after the first fresh dispatch. */
   claimFreshSession?: (input: {
@@ -366,6 +370,16 @@ export class ScheduleScanner {
         workspaceId: issueWorkspace.id,
         issueId,
       }
+      // Fresh recruits only: exact @resumeId continues an existing Session.
+      const createdBy: SessionCreatedBy | undefined = resumeId
+        ? undefined
+        : {
+            kind: 'issue',
+            workspaceId: issueWorkspace.id,
+            issueId,
+            policy: claimFreshSession ? 'new-then-resume' : 'new-each-run',
+            fire: manual ? 'retry' : 'schedule',
+          }
       const result = resumeId
         ? selection
           ? await this.deps.dispatch(
@@ -396,6 +410,8 @@ export class ScheduleScanner {
               undefined,
               undefined,
               selection,
+              undefined,
+              createdBy,
             )
           : await this.deps.dispatch(
               executionWorkspace,
@@ -403,6 +419,11 @@ export class ScheduleScanner {
               what,
               SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
               trigger,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              createdBy,
             )
       if (claimFreshSession) {
         if (!this.deps.claimFreshSession) {

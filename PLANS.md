@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/session-birth-metadata.md]] — Stamps immutable product-Session
+  `metadata.createdBy` at allocation so interactive, Issue, conversation, and
+  headless births are distinguishable without inventing execution-level origin.
 - [[plans/release-feedback-reliability.md]] — Makes packaged release failures
   deterministic and diagnostic first, then removes desktop matrix fan-in and
   reuses trusted promotion evidence without weakening release gates.

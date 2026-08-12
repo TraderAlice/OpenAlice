@@ -36,6 +36,54 @@ describe('ResumeRegistry', () => {
     })
   })
 
+  it('persists immutable birth metadata on first create only', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    const created = await registry.ensure({
+      wsId: 'ws-1',
+      agent: 'pi',
+      now: 1,
+      metadata: { createdBy: { kind: 'interactive', surface: 'quick-chat' } },
+    })
+    expect(created.metadata).toEqual({
+      createdBy: { kind: 'interactive', surface: 'quick-chat' },
+    })
+
+    const again = await registry.ensure({
+      resumeId: created.resumeId,
+      wsId: 'ws-1',
+      agent: 'pi',
+      now: 2,
+      metadata: { createdBy: { kind: 'headless', surface: 'api' } },
+    })
+    expect(again.metadata).toEqual({
+      createdBy: { kind: 'interactive', surface: 'quick-chat' },
+    })
+
+    const reloaded = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    expect(reloaded.get(created.resumeId)?.metadata).toEqual({
+      createdBy: { kind: 'interactive', surface: 'quick-chat' },
+    })
+  })
+
+  it('loads identities with malformed metadata by dropping only the bag', async () => {
+    await writeFile(path, JSON.stringify({
+      version: 1,
+      records: [{
+        resumeId: 'resume-calm-amber-river-a1b2c3',
+        wsId: 'ws-1',
+        agent: 'pi',
+        createdAt: 1,
+        updatedAt: 1,
+        lifecycle: 'active',
+        metadata: { createdBy: { kind: 'interactive', surface: 'not-a-surface' } },
+      }],
+    }, null, 2), 'utf8')
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    const record = registry.get('resume-calm-amber-river-a1b2c3')
+    expect(record).toMatchObject({ wsId: 'ws-1', agent: 'pi', lifecycle: 'active' })
+    expect(record?.metadata).toBeUndefined()
+  })
+
   it('refuses to move an identity across workspace or runtime boundaries', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const created = await registry.ensure({ wsId: 'ws-1', agent: 'pi' })

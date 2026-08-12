@@ -173,6 +173,17 @@ describe('ScheduleScanner', () => {
       'same exact prompt',
       30 * 60_000,
       { kind: 'issue', workspaceId: 'w1', issueId: 'retry-me' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'retry-me',
+        policy: 'new-each-run',
+        fire: 'retry',
+      },
     )
     expect(markers.get('w1', 'retry-me')).toBeUndefined()
   })
@@ -193,9 +204,24 @@ describe('ScheduleScanner', () => {
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
     // 5th arg = the firing issue's id, threaded so the run records its origin.
-    expect(dispatch).toHaveBeenCalledWith(ws, headlessAdapter, 'go', expect.any(Number), {
-      kind: 'issue', workspaceId: 'w1', issueId: 't1',
-    })
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'go',
+      expect.any(Number),
+      { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 't1',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
     expect(markers.get('w1', 't1')).toBe(NOW)
   })
 
@@ -242,6 +268,14 @@ describe('ScheduleScanner', () => {
       undefined,
       undefined,
       { credentialSlug: 'anthropic-primary', model: 'claude-opus-4-8', reasoningEffort: 'high' },
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'tuned',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
     )
   })
 
@@ -267,6 +301,14 @@ describe('ScheduleScanner', () => {
       undefined,
       undefined,
       { credentialSource: 'native', model: 'gpt-5.6-sol', reasoningEffort: 'low' },
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'native',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
     )
   })
 
@@ -314,6 +356,17 @@ describe('ScheduleScanner', () => {
       'own this work from now on',
       expect.any(Number),
       { kind: 'issue', workspaceId: 'w1', issueId: 'sticky' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'sticky',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
     )
     expect(claimFreshSession).toHaveBeenCalledWith({
       issueWorkspace: ws,
@@ -381,9 +434,24 @@ describe('ScheduleScanner', () => {
     const { scanner, dispatch } = scannerFor([ws])
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
-    expect(dispatch).toHaveBeenCalledWith(ws, headlessAdapter, 'go', expect.any(Number), {
-      kind: 'issue', workspaceId: 'w1', issueId: 'sched',
-    })
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'go',
+      expect.any(Number),
+      { kind: 'issue', workspaceId: 'w1', issueId: 'sched' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'sched',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
     expect(scanner.snapshot()!.workspaces[0].tasks.map((t) => t.id)).toEqual(['sched'])
   })
 
@@ -393,9 +461,24 @@ describe('ScheduleScanner', () => {
     ])
     const { scanner, dispatch } = scannerFor([ws])
     await scanner.scan()
-    expect(dispatch).toHaveBeenCalledWith(ws, headlessAdapter, 'scan movers', expect.any(Number), {
-      kind: 'issue', workspaceId: 'w1', issueId: 't1',
-    })
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'scan movers',
+      expect.any(Number),
+      { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 't1',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
   })
 
   it('fires a never-fired cron issue whose occurrence is within the last tick (not never)', async () => {

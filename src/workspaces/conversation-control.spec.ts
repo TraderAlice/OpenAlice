@@ -179,6 +179,11 @@ describe('Workspace conversation control', () => {
       undefined,
       undefined,
       expect.anything(),
+      {
+        kind: 'conversation',
+        caller: { kind: 'human' },
+        reason: 'harness-chat',
+      },
     )
   })
 
@@ -247,6 +252,7 @@ describe('Workspace conversation control', () => {
         deliveredPrompt: 'Why did you create this?',
         promptMode: 'plain',
       }),
+      undefined,
     )
   })
 
@@ -269,6 +275,11 @@ describe('Workspace conversation control', () => {
       promptMode: 'plain',
       originalPrompt: 'Why did the report reach this conclusion?',
       deliveredPrompt: 'Why did the report reach this conclusion?',
+    })
+    expect((dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[9]).toEqual({
+      kind: 'conversation',
+      caller: { kind: 'human' },
+      reason: 'missing-origin',
     })
     expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
       action: 'reconstructed',
