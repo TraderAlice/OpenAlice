@@ -46,10 +46,12 @@ openalice status [options]
 openalice logs [options]
 openalice doctor [options]
 openalice open [options]
+openalice create alice-project [options]
 ```
 
 | Command | Contract |
 |---|---|
+| `create alice-project` | Register a named complete home. Interactive or `--yes` with `--name`, `--home`, and optional `--product trader\|nano`. Product is immutable birth (Trader default; Nano never starts UTA). TUI create remains Trader-equivalent. |
 | `up` | Prepare the source provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |

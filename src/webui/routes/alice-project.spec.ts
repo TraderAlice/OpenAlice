@@ -23,6 +23,7 @@ describe('AliceProject routes', () => {
         displayName: 'Research AliceProject',
         home: resolve('/tmp/openalice-project-a'),
         appRoot: resolve('/tmp/openalice-source-a'),
+        product: 'trader',
       },
     })
   })

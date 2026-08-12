@@ -30,6 +30,11 @@ import {
   type ResolveSupervisorRootOptions,
   type TuiLaunchFlags,
 } from './launch-context.ts'
+import {
+  parseAliceProjectProduct,
+  writeAliceProjectProductStamp,
+  type AliceProjectProduct,
+} from './alice-project-product.ts'
 
 const CONFIG_SCHEMA_VERSION = 2
 const PROJECT_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
@@ -69,6 +74,7 @@ const LAUNCH_VALUE_KEYS = new Set([
   'port',
   'appDir',
   'updateChecks',
+  'product',
 ])
 
 export interface SupervisorConfigDocument {
@@ -263,7 +269,9 @@ export async function persistAliceProjectLaunchConfig(
     ...existing,
     ...normalizedPatch,
     name: context.project,
+    ...(existing.product === 'nano' ? { product: 'nano' } : {}),
   }
+  if (existing.product !== 'nano') delete project.product
   for (const key of [
     'home',
     'port',
@@ -381,12 +389,15 @@ export async function createSupervisorAliceProject(
   context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
   name: string,
   home: string,
-  options: PersistAliceProjectConfigOptions = {},
+  options: PersistAliceProjectConfigOptions & {
+    product?: AliceProjectProduct
+  } = {},
 ): Promise<void> {
   requireProjectKey(name, 'project')
   if (name === 'default') {
     throw configError('The implicit "default" AliceProject already exists.')
   }
+  const product = options.product ?? 'trader'
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
   const current = parseSupervisorConfig(await readConfig(context.supervisorRoot))
@@ -394,28 +405,36 @@ export async function createSupervisorAliceProject(
     throw configError(`AliceProject "${name}" is already registered.`)
   }
   let normalizedHome = resolveConfiguredHome(name, home, options)
+  const projectEntry: AliceProjectLaunchConfig = {
+    name,
+    home: normalizedHome,
+    ...(product === 'nano' ? { product } : {}),
+  }
   const candidate: SupervisorConfigDocument = {
     ...current,
     schemaVersion: CONFIG_SCHEMA_VERSION,
     defaultProject: name,
     projects: {
       ...current.projects,
-      [name]: {
-        name,
-        home: normalizedHome,
-      },
+      [name]: projectEntry,
     },
   }
   await assertRegistryHomesSeparate(candidate, options)
   await mkdir(normalizedHome, { recursive: true, mode: 0o700 })
   await assertHomeCandidateUsable(normalizedHome)
   normalizedHome = await realpath(normalizedHome)
+  const stampedProduct = await writeAliceProjectProductStamp(normalizedHome, product)
+  if (stampedProduct !== product) {
+    throw configError(
+      `AliceProject home ${normalizedHome} was born as ${stampedProduct}; it cannot be registered as ${product}`,
+    )
+  }
   const next: SupervisorConfigDocument = {
     ...candidate,
     projects: {
       ...candidate.projects,
       [name]: {
-        name,
+        ...projectEntry,
         home: normalizedHome,
       },
     },
@@ -788,7 +807,7 @@ function parseLaunchValues(
     record,
     allowName
       ? LAUNCH_VALUE_KEYS
-      : new Set([...LAUNCH_VALUE_KEYS].filter((key) => key !== 'name')),
+      : new Set([...LAUNCH_VALUE_KEYS].filter((key) => key !== 'name' && key !== 'product')),
     label,
   )
   const result: AliceProjectLaunchConfig = {}
@@ -797,6 +816,13 @@ function parseLaunchValues(
   }
   if (allowName && record['displayName'] !== undefined) {
     result.displayName = requireDisplayName(record['displayName'], `${label}.displayName`)
+  }
+  if (allowName && record['product'] !== undefined) {
+    const product = parseAliceProjectProduct(record['product'])
+    if (!product) {
+      throw configError(`${label}.product must be "trader" or "nano".`)
+    }
+    if (product === 'nano') result.product = product
   }
   if (record['home'] !== undefined) {
     result.home = requireNonEmptyString(record['home'], `${label}.home`)

@@ -43,13 +43,33 @@ to its backend. Opening another project does not stop or mutate the first one.
 
 ## Identity
 
-An AliceProject has four identity fields:
+An AliceProject has four identity fields plus an immutable product birth:
 
 - `id`: stable `alice-project-…` identifier derived from the canonical complete
   home, unless the Supervisor supplies an explicit stable id;
 - `key`: machine-local CLI selector such as `default` or `research`;
 - `displayName`: mutable human-facing name;
-- `home`: canonical complete `OPENALICE_HOME` and ownership boundary.
+- `home`: canonical complete `OPENALICE_HOME` and ownership boundary;
+- `product`: `trader` (TraderAlice, default) or `nano` (NanoAlice). Written
+  once at create time. Missing stamps are `trader`.
+
+An existing unreadable or malformed product stamp blocks startup instead of
+silently enabling the Trader runtime and UTA. Concurrent create attempts are
+first-writer-wins and registration must agree with that recorded product.
+
+TraderAlice is the trading product (Lite/Pro remain intensity inside it).
+NanoAlice is an experimental general-purpose product: Guardian never starts
+UTA for that complete home. Product is not a Settings switch; create another
+AliceProject to use a different product.
+
+Create a named project from the CLI:
+
+```bash
+openalice create alice-project
+openalice create alice-project --name office --home ~/.openalice-office --product nano --yes
+```
+
+The Supervisor TUI create path still registers a Trader-equivalent home.
 
 The application/source root is launch metadata, not identity. Ports and Web
 URLs are live discovery data and may change between launches. Guardian's

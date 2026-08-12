@@ -34,6 +34,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/nano-alice.md]] — Adds immutable AliceProject product birth through
+  `openalice create alice-project`, with atomic first-writer ownership and a
+  Guardian contract that never starts UTA for Nano homes. Accepted and
+  delivered in PR #1065.
 - [[plans/session-birth-metadata.md]] — Stamps immutable product-Session
   `metadata.createdBy` at allocation so interactive, Issue, conversation, and
   headless births are distinguishable without inventing execution-level origin.
