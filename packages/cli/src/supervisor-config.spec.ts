@@ -352,6 +352,35 @@ describe('Supervisor configuration', () => {
     expect(saved.projects.office.port).toBe(48_010)
   })
 
+  it('rejects registration when an existing home was born as another product', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-product-conflict-'))
+    temporaryPaths.push(root)
+    const homeDir = join(root, 'user')
+    const projectHome = join(root, 'existing-home')
+    const context = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    const { writeAliceProjectProductStamp } = await import('./alice-project-product.ts')
+    await writeAliceProjectProductStamp(projectHome, 'nano')
+
+    await expect(createSupervisorAliceProject(
+      context,
+      'office',
+      projectHome,
+      { homeDir, cwd: root, platform: 'linux', product: 'trader' },
+    )).rejects.toThrow(/was born as nano; it cannot be registered as trader/)
+
+    const saved = await readSupervisorAliceProjectRegistry(context, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+    })
+    expect(saved.projects.map((project) => project.key)).not.toContain('office')
+  })
+
   it('rejects duplicate, overlapping, and home-less named AliceProjects', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-collision-'))
     temporaryPaths.push(root)

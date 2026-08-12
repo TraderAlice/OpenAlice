@@ -423,7 +423,12 @@ export async function createSupervisorAliceProject(
   await mkdir(normalizedHome, { recursive: true, mode: 0o700 })
   await assertHomeCandidateUsable(normalizedHome)
   normalizedHome = await realpath(normalizedHome)
-  await writeAliceProjectProductStamp(normalizedHome, product)
+  const stampedProduct = await writeAliceProjectProductStamp(normalizedHome, product)
+  if (stampedProduct !== product) {
+    throw configError(
+      `AliceProject home ${normalizedHome} was born as ${stampedProduct}; it cannot be registered as ${product}`,
+    )
+  }
   const next: SupervisorConfigDocument = {
     ...candidate,
     projects: {

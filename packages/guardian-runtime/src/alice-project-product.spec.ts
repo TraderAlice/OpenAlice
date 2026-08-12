@@ -37,6 +37,17 @@ describe('AliceProject product stamp', () => {
     expect(await shouldSkipUtaForHome({}, home)).toEqual({ skip: true, reason: 'nano' })
   })
 
+  it('keeps the first product under concurrent birth attempts', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'alice-product-race-'))
+    temporary.push(home)
+    const results = await Promise.all([
+      writeAliceProjectProductStamp(home, 'nano'),
+      writeAliceProjectProductStamp(home, 'trader'),
+    ])
+    const stored = await readAliceProjectProduct(home)
+    expect(results).toEqual([stored, stored])
+  })
+
   it('keeps lite skip distinct from a trader home', async () => {
     const home = await mkdtemp(join(tmpdir(), 'alice-product-lite-'))
     temporary.push(home)
@@ -47,12 +58,17 @@ describe('AliceProject product stamp', () => {
     })
   })
 
-  it('ignores a malformed stamp instead of failing startup', async () => {
+  it('fails closed when an existing birth stamp is malformed', async () => {
     const home = await mkdtemp(join(tmpdir(), 'alice-product-bad-'))
     temporary.push(home)
     const { mkdir } = await import('node:fs/promises')
     await mkdir(join(home, 'data', 'config'), { recursive: true })
     await writeFile(aliceProjectProductStampPath(home), '{ "product": "office" }\n')
-    expect(await readAliceProjectProduct(home)).toBe('trader')
+    await expect(readAliceProjectProduct(home)).rejects.toThrow(
+      /Invalid AliceProject product stamp/,
+    )
+    await expect(shouldSkipUtaForHome({}, home)).rejects.toThrow(
+      /Invalid AliceProject product stamp/,
+    )
   })
 })

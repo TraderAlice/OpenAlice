@@ -53,6 +53,10 @@ An AliceProject has four identity fields plus an immutable product birth:
 - `product`: `trader` (TraderAlice, default) or `nano` (NanoAlice). Written
   once at create time. Missing stamps are `trader`.
 
+An existing unreadable or malformed product stamp blocks startup instead of
+silently enabling the Trader runtime and UTA. Concurrent create attempts are
+first-writer-wins and registration must agree with that recorded product.
+
 TraderAlice is the trading product (Lite/Pro remain intensity inside it).
 NanoAlice is an experimental general-purpose product: Guardian never starts
 UTA for that complete home. Product is not a Settings switch; create another

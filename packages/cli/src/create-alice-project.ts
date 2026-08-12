@@ -135,7 +135,7 @@ export async function runCreateAliceProjectCommand(
   stdout.write(
     `Created AliceProject ${name} (${product === 'nano' ? 'NanoAlice' : 'TraderAlice'}).\n`
     + `Home: ${home}\n`
-    + `Selected as the next bare-start default. Start with: openalice --project ${name} up\n`,
+    + `Selected as the next bare-start default. Start with: openalice up --project ${name}\n`,
   )
   return 0
 }

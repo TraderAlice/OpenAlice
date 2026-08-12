@@ -5,7 +5,8 @@
  * homes keep their existing behavior. First write wins; callers must not
  * treat this as a runtime switch.
  */
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 import { isLiteModeEnv } from './trading-mode.js'
@@ -33,14 +34,9 @@ export function parseAliceProjectProductStamp(value: unknown): AliceProjectProdu
   return product ? { version: 1, product } : null
 }
 
-/** Missing or malformed stamps are trader. Never throws for ordinary homes. */
+/** Missing stamps preserve the released Trader behavior; invalid stamps fail closed. */
 export async function readAliceProjectProduct(home: string): Promise<AliceProjectProduct> {
-  try {
-    const parsed = JSON.parse(await readFile(aliceProjectProductStampPath(home), 'utf8')) as unknown
-    return parseAliceProjectProductStamp(parsed)?.product ?? 'trader'
-  } catch {
-    return 'trader'
-  }
+  return (await readExistingStamp(home))?.product ?? 'trader'
 }
 
 /**
@@ -54,16 +50,22 @@ export async function writeAliceProjectProductStamp(
   const existing = await readExistingStamp(home)
   if (existing) return existing.product
   const path = aliceProjectProductStampPath(home)
-  const temporary = `${path}.${process.pid}.tmp`
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   const body = `${JSON.stringify({ version: 1, product } satisfies AliceProjectProductStamp, null, 2)}\n`
   try {
     await writeFile(temporary, body, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
-    await rename(temporary, path)
+    // Publish without replacement: rename() would allow a concurrent creator
+    // to overwrite the immutable product chosen by the first writer.
+    await link(temporary, path)
   } catch (error) {
-    const raced = await readExistingStamp(home)
-    if (raced) return raced.product
+    if (isNodeError(error, 'EEXIST')) {
+      const raced = await readExistingStamp(home)
+      if (raced) return raced.product
+    }
     throw error
+  } finally {
+    await rm(temporary, { force: true }).catch(() => undefined)
   }
   return product
 }
@@ -80,11 +82,25 @@ export async function shouldSkipUtaForHome(
 }
 
 async function readExistingStamp(home: string): Promise<AliceProjectProductStamp | null> {
+  const path = aliceProjectProductStampPath(home)
+  let text: string
   try {
-    return parseAliceProjectProductStamp(
-      JSON.parse(await readFile(aliceProjectProductStampPath(home), 'utf8')) as unknown,
-    )
-  } catch {
-    return null
+    text = await readFile(path, 'utf8')
+  } catch (error) {
+    if (isNodeError(error, 'ENOENT')) return null
+    throw new Error(`Could not read AliceProject product stamp at ${path}`, { cause: error })
   }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text) as unknown
+  } catch (error) {
+    throw new Error(`Invalid AliceProject product stamp at ${path}`, { cause: error })
+  }
+  const stamp = parseAliceProjectProductStamp(parsed)
+  if (!stamp) throw new Error(`Invalid AliceProject product stamp at ${path}`)
+  return stamp
+}
+
+function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error && error.code === code
 }

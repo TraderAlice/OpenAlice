@@ -18,9 +18,11 @@ afterEach(async () => {
 })
 
 describe('openalice create alice-project', () => {
-  it('requires name and home when --yes is set', () => {
-    expect(() => parseCreateAliceProjectArgs(['--yes'])).not.toThrow()
+  it('requires name and home when --yes is set', async () => {
     expect(parseCreateAliceProjectArgs(['--yes']).yes).toBe(true)
+    await expect(runCreateAliceProjectCommand(['--yes'])).rejects.toThrow(
+      /--yes requires --name and --home/,
+    )
   })
 
   it('creates a NanoAlice project stamp and registry entry', async () => {
@@ -45,6 +47,7 @@ describe('openalice create alice-project', () => {
       },
     )).resolves.toBe(0)
     expect(stdout.join('')).toContain('NanoAlice')
+    expect(stdout.join('')).toContain('openalice up --project office')
     expect(JSON.parse(await readFile(aliceProjectProductStampPath(home), 'utf8'))).toEqual({
       version: 1,
       product: 'nano',
