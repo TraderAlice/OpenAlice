@@ -15,10 +15,12 @@ import type { ChatDisplayMode } from './workspace/chat-display-mode'
  * pre-Workspace artifacts that don't share this surface anymore.
  */
 export function ChatChannelListContainer({
+  mode = 'chat',
   onNavigate,
   displayMode,
   onRequestDisplayMode,
 }: {
+  mode?: 'chat' | 'auto-quant'
   onNavigate?: () => void
   displayMode: ChatDisplayMode
   onRequestDisplayMode: (mode: ChatDisplayMode) => void
@@ -26,6 +28,7 @@ export function ChatChannelListContainer({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatWorkspaceSection
+        mode={mode}
         onNavigate={onNavigate}
         displayMode={displayMode}
         onRequestDisplayMode={onRequestDisplayMode}

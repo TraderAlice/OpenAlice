@@ -4,8 +4,22 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import { CHAT_DISPLAY_MODE_STORAGE_KEY } from '../components/workspace/chat-display-mode'
+import {
+  AUTO_QUANT_DISPLAY_MODE_STORAGE_KEY,
+  CHAT_DISPLAY_MODE_STORAGE_KEY,
+} from '../components/workspace/chat-display-mode'
 import { ChatPageShell } from './ChatPageShell'
+
+const workspaceState = vi.hoisted(() => ({
+  autoQuantPreferenceLoaded: true,
+  hasLoaded: true,
+  autoQuantDefaultWorkspaceId: 'auto-quant-1' as string | null,
+  workspaces: [{ id: 'auto-quant-1', template: 'auto-quant-v2' }],
+}))
+
+vi.mock('../contexts/workspaces-context', () => ({
+  useWorkspaces: () => workspaceState,
+}))
 
 vi.mock('../components/ChatChannelListContainer', () => ({
   ChatChannelListContainer: ({
@@ -32,6 +46,10 @@ class ResizeObserverStub {
 
 beforeEach(async () => {
   window.localStorage.clear()
+  workspaceState.autoQuantPreferenceLoaded = true
+  workspaceState.hasLoaded = true
+  workspaceState.autoQuantDefaultWorkspaceId = 'auto-quant-1'
+  workspaceState.workspaces = [{ id: 'auto-quant-1', template: 'auto-quant-v2' }]
   await i18n.changeLanguage('en')
   vi.stubGlobal('ResizeObserver', ResizeObserverStub)
   vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
@@ -71,5 +89,24 @@ describe('ChatPageShell display mode', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByTestId('display-mode').textContent).toBe('focused')
     expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('focused')
+  })
+
+  it('reuses the Ask Alice shell chrome for a ready AutoQuant desk without sharing view state', () => {
+    window.localStorage.setItem(CHAT_DISPLAY_MODE_STORAGE_KEY, 'multi')
+    render(<ChatPageShell mode="auto-quant"><div>Quant content</div></ChatPageShell>)
+    expect(screen.getByRole('button', { name: 'Collapse Quant' })).toBeTruthy()
+    expect(screen.getByTestId('display-mode').textContent).toBe('focused')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request recent' }))
+    expect(window.localStorage.getItem(AUTO_QUANT_DISPLAY_MODE_STORAGE_KEY)).toBe('recent')
+    expect(window.localStorage.getItem(CHAT_DISPLAY_MODE_STORAGE_KEY)).toBe('multi')
+  })
+
+  it('keeps AutoQuant navigation hidden until a default desk is ready', () => {
+    workspaceState.autoQuantDefaultWorkspaceId = null
+    render(<ChatPageShell mode="auto-quant"><div>Initialize Quant</div></ChatPageShell>)
+
+    expect(screen.getByText('Initialize Quant')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Collapse Quant' })).toBeNull()
   })
 })
