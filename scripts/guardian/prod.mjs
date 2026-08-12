@@ -36,6 +36,8 @@ import {
   startGuardianControlServer,
   currentProcessStartedAt,
   buildGuardianRuntimeStatus,
+  aliceProjectEnvironment,
+  resolveAliceProjectIdentity,
   normalizeProcessExitCode,
   takeoverRequested,
 } from '@traderalice/guardian-runtime'
@@ -61,6 +63,13 @@ const RUNTIME_PROVIDER = resolveRuntimeProvider()
 const RUNTIME_CONTENT_IDENTITY = normalizeContentIdentity(
   process.env.OPENALICE_RUNTIME_CONTENT_IDENTITY,
 )
+const ALICE_PROJECT = resolveAliceProjectIdentity({
+  home: DATA_HOME,
+  appRoot: process.env.OPENALICE_APP_HOME ?? process.cwd(),
+  env: process.env,
+  key: process.env.OPENALICE_PROJECT ?? 'default',
+})
+const ALICE_PROJECT_ENV = aliceProjectEnvironment(ALICE_PROJECT)
 if (!process.env.OPENALICE_HOME && process.env.OPENALICE_USER_DATA_HOME) {
   console.warn('[guardian/prod] OPENALICE_USER_DATA_HOME is deprecated — set OPENALICE_HOME instead')
 }
@@ -188,6 +197,7 @@ const RUNTIME_VERSION = await readRuntimeVersion()
 console.log('[guardian/prod] starting')
 console.log(`[guardian/prod] mode  → ${TRADING_MODE.mode} (${TRADING_MODE.source}${TRADING_MODE.envLocked ? ', env-locked' : ''})`)
 console.log(`[guardian/prod] data  → ${DATA_HOME}`)
+console.log(`[guardian/prod] project → ${ALICE_PROJECT.displayName} (${ALICE_PROJECT.id})`)
 console.log(`[guardian/prod] UTA   → ${LITE_MODE ? 'disabled (trading mode lite)' : UTA_URL}`)
 console.log(`[guardian/prod] Connector → ${CONNECTOR_URL} (optional)`)
 console.log(`[guardian/prod] Alice → http://${BIND_HOST}:${WEB_PORT}`)
@@ -212,6 +222,7 @@ function runtimeStatus() {
     runtimeVersion: RUNTIME_VERSION,
     state: stopping ? 'stopping' : aliceStatus === 'ready' ? 'running' : 'starting',
     home: resolve(DATA_HOME),
+    aliceProject: ALICE_PROJECT,
     owner: {
       surface: LAUNCHER,
       pid: process.pid,
@@ -275,6 +286,7 @@ function makeUTASpec() {
     args: ['services/uta/dist/uta.js'],
     env: {
       ...process.env,
+      ...ALICE_PROJECT_ENV,
       OPENALICE_UTA_PORT: String(UTA_PORT),
       OPENALICE_HOME: DATA_HOME,
       AQ_LAUNCHER_ROOT: LAUNCHER_ROOT,
@@ -301,6 +313,7 @@ function spawnConnector() {
   const child = spawn(NODE_BINARY, ['services/connector/dist/connector.cjs'], {
     env: {
       ...process.env,
+      ...ALICE_PROJECT_ENV,
       OPENALICE_CONNECTOR_PORT: String(CONNECTOR_PORT),
       OPENALICE_HOME: DATA_HOME,
       AQ_LAUNCHER_ROOT: LAUNCHER_ROOT,
@@ -323,6 +336,7 @@ function spawnAlice() {
   const child = spawn(NODE_BINARY, ['dist/main.js'], {
     env: {
       ...process.env,
+      ...ALICE_PROJECT_ENV,
       OPENALICE_WEB_PORT: String(WEB_PORT),
       OPENALICE_MCP_PORT: String(MCP_PORT),
       OPENALICE_TOOL_BASE_URL: `http://127.0.0.1:${MCP_PORT}/cli`,

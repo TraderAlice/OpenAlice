@@ -20,6 +20,7 @@ import { preferencesApi } from './preferences'
 import { inquiriesApi } from './inquiries'
 import { connectorsApi } from './connectors'
 import { agentConversationsApi } from './agentConversations'
+import { aliceProjectApi } from './aliceProject'
 export const api = {
   config: configApi,
   schedule: scheduleApi,
@@ -39,7 +40,10 @@ export const api = {
   inquiries: inquiriesApi,
   connectors: connectorsApi,
   agentConversations: agentConversationsApi,
+  aliceProject: aliceProjectApi,
 }
+
+export type { AliceProject } from './aliceProject'
 
 // Re-export all types for convenience
 export type {

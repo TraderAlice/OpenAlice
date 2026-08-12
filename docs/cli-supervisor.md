@@ -98,14 +98,14 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
 - `u` performs an advisory product-update check;
-- `i` lists the implicit default plus registered instances, selects one without
-  stopping another instance, or creates a separate named complete home;
+- `i` lists the implicit default plus registered AliceProjects, selects one
+  without stopping another project, or creates a separate named complete home;
 - `p` opens Setup for data home, browser port, update checks, and resolved
-  Runtime/config provenance. Setup can edit either the selected instance or
-  machine defaults inherited by instances;
+  Runtime/config provenance. Setup can edit either the selected AliceProject or
+  machine defaults inherited by projects;
 - `m` is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
-- `c` is an advanced control that chooses and remembers the selected instance's source checkout;
+- `c` is an advanced control that chooses and remembers the selected AliceProject's source checkout;
 - `?`, Tab, and the horizontal arrows expose help and detail panels.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
@@ -115,7 +115,7 @@ discovery runs in the background and cannot block lifecycle controls.
 
 The installed Runtime is the default provider below stored configuration and
 above cwd discovery. TUI start therefore works from any directory and shows a
-small ordinary action bar. A configured instance source,
+small ordinary action bar. A configured AliceProject source,
 `OPENALICE_APP_HOME`, or `--app-dir` overrides the bundle; `m` and `c` remain
 advanced source controls. The managed source path is
 `<install root>/sources/<install-source identity>/OpenAlice`.
@@ -134,7 +134,8 @@ The TypeScript entry resolves launch-affecting values before starting terminal
 raw mode. Bare `openalice` and `openalice tui` accept:
 
 ```text
---instance <name>
+--project <key>
+--instance <key> # deprecated compatibility alias
 --home <path>
 --port <port>
 --app-dir <path>
@@ -143,61 +144,64 @@ raw mode. Bare `openalice` and `openalice tui` accept:
 ```
 
 Resolution order is defaults, installed Runtime, machine Supervisor
-configuration, selected instance configuration, environment, then explicit CLI
+configuration, selected AliceProject configuration, environment, then explicit CLI
 flags. The immutable
 resolver retains field provenance for every layer. Before terminal raw mode,
 the Supervisor reads a versioned machine-local document at
-`<Supervisor root>/config.json`. It contains machine defaults and an instance
-map outside every selectable complete home.
+`<Supervisor root>/config.json`. It contains machine defaults and an
+AliceProject map outside every selectable complete home.
 
-The `p` Setup overlay atomically edits the selected instance's data home,
+The `p` Setup overlay atomically edits the selected AliceProject's data home,
 browser port, and update-check policy. Its first row switches between `This
-instance` and `Machine defaults`. A blank Home or port and the `Inherit` update
+AliceProject` and `Machine defaults`. A blank Home or port and the `Inherit` update
 value remove that layer's override, exposing the next lower-priority value
-immediately. Named instances must retain an explicit, separate complete home;
+immediately. Named AliceProjects must retain an explicit, separate complete home;
 only the implicit `default` may inherit its Home. Home and port remain
 read-only while the selected Runtime is active when the edited layer affects
-that Runtime. A machine default may still be changed while a higher instance,
-environment, or flag layer shields the running instance.
+that Runtime. A machine default may still be changed while a higher project,
+environment, or flag layer shields the running AliceProject.
 
-Any selected-instance value supplied by an environment variable or explicit
+Any selected-project value supplied by an environment variable or explicit
 CLI flag is shown with its resolved value and a locked provenance message; the
-TUI never writes a lower-priority instance value that appears to override it.
+TUI never writes a lower-priority project value that appears to override it.
 Machine-default editing remains available because it intentionally changes the
 lower layer for future or inheriting launches. The overview reports the
 resolved field provenance, and Setup identifies the installed Runtime by the
 single OpenAlice product version plus diagnostic content identity rather than
 presenting its filesystem path as a second product concept.
 
-The `i` instance overlay reads the same atomic registry, always shows the
-implicit `default`, and adds every configured named instance. Selecting one
+The `i` AliceProject overlay reads the same atomic registry, always shows the
+implicit `default`, and adds every configured named project. Selecting one
 switches the live Supervisor view and records it as the next bare-start
-default; it does not stop, move, copy, or delete another instance. Creating an
-instance collects a validated lowercase name and separate complete home
+default; it does not stop, move, copy, or delete another project. Creating an
+AliceProject collects a validated lowercase key and separate complete home
 inside the TUI, rejects equal or nested registered homes, and selects the new
 entry atomically. An existing target must be empty or recognizable as an
 OpenAlice complete home; an unrelated non-empty directory is rejected. A new
 target is created and canonicalized when registered, so a later missing
 registered Home is never silently recreated. A bare TUI launch falls back to
-the first available instance, keeps the unavailable registry entry intact,
-and shows a persistent notice directing the user to `i Instances`; selecting
+the first available project, keeps the unavailable registry entry intact,
+and shows a persistent notice directing the user to `i AliceProjects`; selecting
 the displayed fallback repairs the remembered default. An explicit
 environment/flag selection still fails instead of falling back because
 automation must never run against a different Home. The suggested Home is a
 sibling such as
 `~/.openalice-research` and remains editable before creation. A session whose
-instance or complete home came from `OPENALICE_INSTANCE`,
-`OPENALICE_HOME`, `--instance`, or `--home` shows the registry read-only
+project or complete home came from `OPENALICE_PROJECT`,
+`OPENALICE_HOME`, `--project`, or `--home` shows the registry read-only
 instead of pretending that a lower-priority selection can win.
 
+`OPENALICE_INSTANCE` and `--instance` remain deprecated aliases at the released
+automation boundary; they are not current product terminology.
+
 The `c` editor validates an OpenAlice checkout, atomically saves it as the
-selected instance's `appDir`, and starts the Runtime. If
+selected AliceProject's `appDir`, and starts the Runtime. If
 `OPENALICE_APP_HOME` or `--app-dir` supplied the source, the TUI reports that
 higher-priority override instead of overwriting it. `openalice config check`,
 live reload with last-known-good retention, registry-entry removal, and full
-component/instance dashboards remain later increments.
+component/project dashboards remain later increments.
 
-`OPENALICE_INSTANCE`, `OPENALICE_HOME`, `OPENALICE_WEB_PORT`,
+`OPENALICE_PROJECT`, `OPENALICE_HOME`, `OPENALICE_WEB_PORT`,
 `OPENALICE_APP_HOME`, and `OPENALICE_NO_UPDATE_CHECK` are the corresponding
 environment overrides. `OPENALICE_SUPERVISOR_HOME` may relocate the
 machine-wide Supervisor root, which remains outside every selectable complete
@@ -207,13 +211,13 @@ home. Installer launchers supply the lower-priority internal pair
 them.
 
 Only an installer-owned Runtime carrying `OPENALICE_MANAGED_PI_PATH` receives
-instance-private `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`
+project-private `PI_CODING_AGENT_DIR` and `PI_CODING_AGENT_SESSION_DIR`
 values. Source development and an external Pi retain their native user
 configuration and session roots.
 
 The same stored resolver selects homes for `up`, `run`, `down`, `status`,
 `open`, `logs`, and `doctor`; those commands also accept
-`--instance <name>` and load a Home registered through the TUI.
+`--project <key>` and load a Home registered through the TUI.
 Consequently a Runtime started through the TUI and one started by
 `openalice up` receive the same managed-Pi environment, source, Web-port
 policy, and update-check setting unless an explicit command option overrides
@@ -225,7 +229,7 @@ An inherited default Web port remains automatic for the source-backed built
 Guardian: it probes upward from 47331 together with unconfigured
 MCP/local-tool, UTA, and Connector ports. Consequently multiple complete homes
 or the desktop app may occupy historical defaults without breaking a CLI
-Runtime. A machine/instance setting, environment value, or explicit flag pins
+Runtime. A machine/project setting, environment value, or explicit flag pins
 the Web port and fails visibly on collision, as do explicit internal
 environment or `data/config/ports.json` values. Stop and restart wait for
 Guardian plus Alice ownership evidence to clear, not merely for the control
@@ -418,8 +422,8 @@ completion; detailed shell installation remains user-owned.
 - `packages/cli/bin/openalice.ts` and `packages/cli/src/main.ts` — TypeScript
   application entry and default-TUI/explicit-command dispatch.
 - `packages/cli/src/launch-context.ts` — immutable launch precedence,
-  provenance, instance roots, and managed-Pi environment projection.
-- `packages/cli/src/supervisor-config.ts` — versioned machine/instance
+  provenance, AliceProject roots, and managed-Pi environment projection.
+- `packages/cli/src/supervisor-config.ts` — versioned machine/AliceProject
   configuration parsing, atomic persistence, and stored-context resolution.
 - `packages/cli/src/managed-source.ts` — local managed checkout identity,
   validation, collision safety, and atomic preparation.

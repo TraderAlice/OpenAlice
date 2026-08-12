@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/alice-project-foundation.md]] — Promotes the existing named Instance,
+  complete-home, Guardian, and frontend endpoint topology into the explicit
+  AliceProject product and lifecycle abstraction.
 - [[plans/release-feedback-reliability.md]] — Makes packaged release failures
   deterministic and diagnostic first, then removes desktop matrix fan-in and
   reuses trusted promotion evidence without weakening release gates.

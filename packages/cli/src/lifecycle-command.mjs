@@ -1,6 +1,7 @@
 import { parseLocalStartArgs } from './local-start.mjs'
 import {
   buildManagedPiEnv,
+  buildAliceProjectEnv,
 } from './launch-context.ts'
 import { resolveStoredLaunchContext } from './supervisor-config.ts'
 import {
@@ -34,18 +35,18 @@ export const ROOT_COMMANDS = Object.freeze([
 
 const LIFECYCLE_OPTIONS = Object.freeze({
   up: [
-    '--instance', '--app-dir', '--home', '--port', '--log', '--wait', '--rebuild',
+    '--project', '--instance', '--app-dir', '--home', '--port', '--log', '--wait', '--rebuild',
     '--skip-prepare', '--takeover', '--open', '--no-open', '--no-update-check', '--json',
   ],
   run: [
-    '--instance', '--app-dir', '--home', '--port', '--wait', '--rebuild',
+    '--project', '--instance', '--app-dir', '--home', '--port', '--wait', '--rebuild',
     '--skip-prepare', '--takeover', '--no-update-check',
   ],
-  down: ['--instance', '--home', '--wait', '--json'],
-  status: ['--instance', '--home', '--wait', '--json'],
-  logs: ['--instance', '--home', '--lines', '--json'],
-  doctor: ['--instance', '--home', '--wait', '--json'],
-  open: ['--instance', '--home', '--wait'],
+  down: ['--project', '--instance', '--home', '--wait', '--json'],
+  status: ['--project', '--instance', '--home', '--wait', '--json'],
+  logs: ['--project', '--instance', '--home', '--lines', '--json'],
+  doctor: ['--project', '--instance', '--home', '--wait', '--json'],
+  open: ['--project', '--instance', '--home', '--wait'],
 })
 
 export function parseLifecycleArgs(action, argv) {
@@ -55,7 +56,7 @@ export function parseLifecycleArgs(action, argv) {
   }
 
   const options = {
-    instance: null,
+    project: null,
     homeRoot: null,
     json: false,
     waitMs: action === 'down' ? 15_000 : 2_000,
@@ -72,8 +73,8 @@ export function parseLifecycleArgs(action, argv) {
       options.homeRoot = requireValue(argv, ++index, arg)
       continue
     }
-    if (arg === '--instance') {
-      options.instance = requireValue(argv, ++index, arg)
+    if (arg === '--project' || arg === '--instance') {
+      options.project = requireValue(argv, ++index, arg)
       continue
     }
     if (arg === '--wait') {
@@ -101,7 +102,7 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
         checkStoredHome: dependencies.checkStoredHome,
       }))
     )({
-      instance: options.instance ?? undefined,
+      project: options.project ?? undefined,
       home: options.homeRoot ?? undefined,
       ...(startAction && options._appDirSpecified
         ? { appDir: options.appDir ?? undefined }
@@ -139,7 +140,10 @@ export async function runLifecycleCommand(action, options, dependencies = {}) {
     }
     const runtimeDependencies = {
       ...dependencies,
-      env: buildManagedPiEnv(context, dependencies.env ?? process.env),
+      env: buildAliceProjectEnv(
+        context,
+        buildManagedPiEnv(context, dependencies.env ?? process.env),
+      ),
     }
     if (action === 'up' || action === 'run') {
       const humanOutput = !options.json
@@ -222,7 +226,7 @@ control and Alice HTTP readiness, then returns. The Runtime survives this shell.
 A source checkout is used only when selected by configuration or --app-dir.
 
 Options:
-  --instance <name>  Select a named complete-home instance
+  --project <name>   Select an AliceProject (deprecated alias: --instance)
   --app-dir <path>   Advanced: override the installed Runtime with a source checkout
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --port <port>      Pin the local Web port (default: automatic from 47331)
@@ -245,7 +249,7 @@ Runs the installed OpenAlice Runtime in the foreground without opening a
 browser. Ctrl+C stops the self-owned Guardian process tree.
 
 Options:
-  --instance <name>  Select a named complete-home instance
+  --project <name>   Select an AliceProject (deprecated alias: --instance)
   --app-dir <path>   Advanced: override the installed Runtime with a source checkout
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --port <port>      Pin the local Web port (default: automatic from 47331)
@@ -355,7 +359,7 @@ ${fishCompletionOptions()}
 }
 
 function parseStartArgs(action, argv) {
-  let instance = null
+  let project = null
   let json = false
   let openRequested = false
   let noOpenRequested = false
@@ -365,9 +369,9 @@ function parseStartArgs(action, argv) {
   const startArgv = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
-    if (arg === '--instance') {
-      if (instance !== null) throw usageError('--instance may only be provided once')
-      instance = requireValue(argv, ++index, arg)
+    if (arg === '--project' || arg === '--instance') {
+      if (project !== null) throw usageError('--project may only be provided once')
+      project = requireValue(argv, ++index, arg)
       continue
     }
     if (arg === '--json') {
@@ -403,7 +407,7 @@ function parseStartArgs(action, argv) {
     _appDirSpecified: parsed.appDir !== null,
     _portSpecified: portSpecified,
     _updateChecksSpecified: updateChecksSpecified,
-    instance,
+    project,
     openBrowser: action === 'up' && openRequested,
     json,
     logFile,
@@ -527,7 +531,7 @@ function formatControlHelp(action, description, defaultWaitSeconds, json) {
 ${description}
 
 Options:
-  --instance <name>  Select a named complete-home instance
+  --project <name>   Select an AliceProject (deprecated alias: --instance)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --wait <seconds>   Control timeout, 1-600 (default: ${defaultWaitSeconds})
 ${json ? '  --json             Print a versioned machine-readable result\n' : ''}  -h, --help         Show this help

@@ -143,11 +143,16 @@ describe('ActivityBar mobile drawer state', () => {
 
     const drawer = screen.getByRole('dialog', { name: 'Primary navigation' })
     const currentDestination = screen.getByRole('button', { name: 'Settings' })
-    const firstAction = screen.getByRole('button', { name: 'Ask Alice' })
-    const lastAction = screen.getByRole('button', { name: 'Dev Panel' })
+    const focusableActions = Array.from(
+      drawer.querySelectorAll<HTMLButtonElement>('button:not([disabled])'),
+    ).filter((element) => element.tabIndex >= 0 && element.getAttribute('aria-hidden') !== 'true')
+    const firstAction = focusableActions[0]!
+    const lastAction = focusableActions.at(-1)!
     const backdrop = document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')
 
     expect(drawer.getAttribute('aria-modal')).toBe('true')
+    expect(firstAction.textContent).toContain('Ask Alice')
+    expect(lastAction.getAttribute('aria-label')).toBe('nav.aliceProject.openDetails')
     await waitFor(() => expect(document.activeElement).toBe(currentDestination))
     expect(drawer.className).toContain('motion-reduce:transition-none')
     expect(backdrop?.getAttribute('aria-hidden')).toBe('true')

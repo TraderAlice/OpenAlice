@@ -26,6 +26,8 @@ import {
   takeoverRequested,
   startGuardianControlServer,
   buildGuardianRuntimeStatus,
+  aliceProjectEnvironment,
+  resolveAliceProjectIdentity,
   type RuntimeProcessLock,
 } from '../../packages/guardian-runtime/src/index.js'
 import {
@@ -76,6 +78,12 @@ async function main(): Promise<void> {
   const takeover = takeoverRequested()
   const guardianStartedAt = currentProcessStartedAt()
   const guardianInstanceId = randomUUID()
+  const aliceProject = resolveAliceProjectIdentity({
+    home: dataHome,
+    appRoot: process.cwd(),
+    env: process.env,
+    key: process.env['OPENALICE_PROJECT'] ?? 'default',
+  })
 
   try {
     guardianRuntimeLock = await acquireGuardianRuntime({
@@ -96,7 +104,7 @@ async function main(): Promise<void> {
       if (owner) {
         console.error(`[guardian] owner     → ${owner.launcher} pid=${owner.pid} heartbeat=${owner.heartbeatAt}`)
       }
-      console.error('[guardian] keep the existing instance, use `pnpm dev -- --home <path>` for an isolated checkout, or run `pnpm dev --takeover` to replace it')
+      console.error('[guardian] keep the existing AliceProject, use `pnpm dev -- --home <path>` for an isolated project, or run `pnpm dev --takeover` to replace it')
       process.exitCode = 2
       return
     }
@@ -161,6 +169,7 @@ async function main(): Promise<void> {
   console.log('')
   console.log(`[guardian] mode     →  ${initialMode.mode} (${initialMode.source}${initialMode.envLocked ? ', env-locked' : ''})`)
   console.log(`[guardian] data     →  ${dataHome}`)
+  console.log(`[guardian] project  →  ${aliceProject.displayName} (${aliceProject.id})`)
   console.log(`[guardian] app      →  ${process.cwd()}`)
   console.log(`[guardian] UTA      →  ${liteMode ? 'disabled (trading mode lite)' : utaUrl}`)
   console.log(`[guardian] Connector→  ${connectorEnabled ? connectorUrl : 'disabled'}`)
@@ -179,6 +188,7 @@ async function main(): Promise<void> {
       productVersion: runtimeVersion,
       state: aliceStatus === 'ready' ? 'running' : aliceStatus,
       home: resolve(dataHome),
+      aliceProject,
       owner: {
         surface: 'dev',
         pid: process.pid,
@@ -220,6 +230,7 @@ async function main(): Promise<void> {
 
   const baseEnv = {
     ...process.env,
+    ...aliceProjectEnvironment(aliceProject),
     NODE_OPTIONS: `${process.env['NODE_OPTIONS'] ?? ''} --conditions=openalice-source`.trim(),
     // Children must resolve the same user-data root the Guardian watches —
     // src/core/paths.ts reads OPENALICE_HOME; never rely on cwd inheritance.

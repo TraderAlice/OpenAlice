@@ -1,3 +1,5 @@
+import type { AliceProjectIdentity } from './alice-project.js'
+
 export const GUARDIAN_CONTROL_API_VERSION = 1
 
 export interface GuardianRuntimeStatusOptions {
@@ -13,6 +15,7 @@ export interface GuardianRuntimeStatusOptions {
   components: Record<string, string>
   componentDetail: Record<string, unknown>
   capabilities?: string[]
+  aliceProject?: AliceProjectIdentity
 }
 
 /** Shared discovery envelope for dev, Electron, Docker, and CLI Guardians. */
@@ -29,6 +32,7 @@ export function buildGuardianRuntimeStatus(options: GuardianRuntimeStatusOptions
     runtimeVersion: options.runtimeVersion ?? options.productVersion,
     state: options.state,
     home: options.home,
+    aliceProject: options.aliceProject ?? null,
     owner: options.owner,
     endpoints: options.endpoints,
     provider: options.provider,

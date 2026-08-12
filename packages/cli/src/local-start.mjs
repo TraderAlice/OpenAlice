@@ -3,6 +3,11 @@ import { access, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
+import {
+  aliceProjectEnvironment,
+  resolveAliceProjectIdentity,
+} from './alice-project.ts'
+
 import { buildManagedPiEnvForHome } from './launch-context.ts'
 import {
   LOOPBACK,
@@ -219,8 +224,15 @@ function configuredLocalUrl(port) {
 }
 
 export function buildLocalRuntimeEnv(env, options) {
+  const aliceProject = resolveAliceProjectIdentity({
+    home: options.homeRoot,
+    appRoot: options.appDir,
+    env,
+    key: env['OPENALICE_PROJECT'] ?? env['OPENALICE_INSTANCE'] ?? 'default',
+  })
   const runtimeEnv = {
     ...buildManagedPiEnvForHome(options.homeRoot, env),
+    ...aliceProjectEnvironment(aliceProject),
     OPENALICE_HOME: options.homeRoot,
     OPENALICE_APP_HOME: options.appDir,
     OPENALICE_BIND_HOST: LOOPBACK,
