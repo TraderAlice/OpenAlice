@@ -1,6 +1,6 @@
 # Session birth metadata
 
-Status: active (Draft PR for audit; not merge-authorized)
+Status: completed (accepted and delivered in PR #1064)
 
 Owner guides: [[docs/conversation-provenance.md]]
 
@@ -25,8 +25,9 @@ quick-chat / Issue recruit / agent conversation / manual headless.
 - [x] Interactive spawn hooks
 - [x] Headless dispatch + Issue scanner + conversation control
 - [x] Session Directory + owner-guide note
+- [x] Session Directory projection regression coverage
 - [x] Verification (`tsc` + targeted tests)
-- [x] Draft PR labelled for parallel audit (do not merge) — #1064
+- [x] Topic accepted and delivered — #1064
 
 ## Residual risk
 
