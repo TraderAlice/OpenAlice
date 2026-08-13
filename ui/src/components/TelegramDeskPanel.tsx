@@ -5,7 +5,9 @@ import { TELEGRAM_DESK_CADENCES } from '../api/connectors'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Field, inputClass } from './form'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
+import { useAgentLaunchPreferences } from '../hooks/useAgentLaunchConfig'
 import { useTelegramConnectorDesk } from '../hooks/useTelegramConnectorDesk'
+import { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { workspaceDisplayName } from './workspace/display'
 import { useWorkspace } from '../tabs/store'
@@ -13,6 +15,7 @@ import { useWorkspace } from '../tabs/store'
 export function TelegramDeskPanel({ linked }: { linked: boolean }) {
   const { t } = useTranslation()
   const { workspaces } = useWorkspaces()
+  const { recentChatWorkspaceId, loaded: launchPreferencesLoaded } = useAgentLaunchPreferences()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const { desk, loading, error, enable, disable, saveWhat, saveCadence } = useTelegramConnectorDesk()
   const [wsId, setWsId] = useState('')
@@ -21,11 +24,21 @@ export function TelegramDeskPanel({ linked }: { linked: boolean }) {
   const workspaceSelectId = useId()
   const cadenceSelectId = useId()
 
-  const choices = useMemo(
-    () => [...workspaces].sort((left, right) => workspaceDisplayName(left).localeCompare(workspaceDisplayName(right))),
-    [workspaces],
+  const preferredWsId = useMemo(
+    () => launchPreferencesLoaded
+      ? resolveChatWorkspaceTarget(workspaces, null, recentChatWorkspaceId)?.id ?? ''
+      : '',
+    [launchPreferencesLoaded, workspaces, recentChatWorkspaceId],
   )
-  const selectedWsId = wsId || choices[0]?.id || ''
+  const choices = useMemo(
+    () => [...workspaces].sort((left, right) => {
+      if (left.id === preferredWsId) return -1
+      if (right.id === preferredWsId) return 1
+      return workspaceDisplayName(left).localeCompare(workspaceDisplayName(right))
+    }),
+    [workspaces, preferredWsId],
+  )
+  const selectedWsId = wsId || preferredWsId || (launchPreferencesLoaded ? choices[0]?.id || '' : '')
   const boundWorkspace = desk ? workspaces.find((workspace) => workspace.id === desk.wsId) : undefined
   const currentEvery = desk?.issue.when?.kind === 'every' ? desk.issue.when.every : null
   const cadenceOptions = useMemo(() => {
@@ -127,7 +140,7 @@ export function TelegramDeskPanel({ linked }: { linked: boolean }) {
                 id={workspaceSelectId}
                 className={inputClass}
                 value={selectedWsId}
-                disabled={!linked || working}
+                disabled={!linked || working || !launchPreferencesLoaded}
                 onChange={(event) => setWsId(event.target.value)}
               >
                 {choices.map((workspace) => (
@@ -141,7 +154,7 @@ export function TelegramDeskPanel({ linked }: { linked: boolean }) {
           <button
             type="button"
             className="oa-pressable inline-flex min-h-11 items-center rounded-lg bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            disabled={!linked || !selectedWsId || working}
+            disabled={!linked || !selectedWsId || working || !launchPreferencesLoaded}
             onClick={async () => {
               setWorking(true)
               await enable(selectedWsId)

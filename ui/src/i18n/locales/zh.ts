@@ -1747,7 +1747,7 @@ export const zh: Resources = {
       loading: '正在加载电话台…',
       needLink: '请先完成机器人关联，再启用电话台。',
       workspace: '工作区',
-      workspaceDescription: '电话台只属于一个工作区。之后若要换地方，先停用再重新启用。',
+      workspaceDescription: '默认用 Ask Alice 的 Chat 工作区。之后若要换地方，先停用再重新启用。',
       enable: '启用电话台',
       enabling: '正在启用…',
       disable: '停用电话台',

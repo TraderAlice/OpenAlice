@@ -1759,7 +1759,7 @@ export const en = {
       loading: 'Loading phone desk…',
       needLink: 'Finish linking the bot before enabling the phone desk.',
       workspace: 'Workspace',
-      workspaceDescription: 'The phone desk lives in one Workspace. Change later by disabling and enabling again.',
+      workspaceDescription: 'Defaults to the Ask Alice Chat workspace. Change later by disabling and enabling again.',
       enable: 'Enable phone desk',
       enabling: 'Enabling…',
       disable: 'Disable phone desk',

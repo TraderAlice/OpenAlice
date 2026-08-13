@@ -177,8 +177,9 @@ The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
   unlink, linking instructions, and explicit test sends. The Telegram card also
-  binds the Project's one phone-desk Issue: pick a Workspace, edit What and
-  heartbeat cadence, then open the ordinary Issue detail for comments. Generic
+  binds the Project's one phone-desk Issue: the Workspace picker defaults to
+  the Ask Alice Chat workspace. The operator can edit What and heartbeat
+  cadence, then open the ordinary Issue detail for comments. Generic
   Issue create/update cannot set `telegramConnector`.
 - The phone-desk Issue is hidden from the Issue board and Tracked list. It still
   fires on `when`. Extra `telegramConnector: true` files in other Workspaces do
