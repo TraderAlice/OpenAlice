@@ -44,7 +44,14 @@ import {
 import { SessionRow } from './Sidebar'
 import { SidebarActionMenu } from './SidebarActionMenu'
 import { workspaceDisplayName, workspaceDisplayTitle } from './display'
+import {
+  flattenHarnessSessions,
+  joinWorkspaceHarnessSessions,
+  sessionRecordForRow,
+  type HarnessSession,
+} from './harness-sessions'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
+import { useWorkspaceSessionDirectories } from '../../hooks/useWorkspaceSessionDirectory'
 import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -101,6 +108,28 @@ export function ChatWorkspaceSection({
     ),
     [ctx.workspaces, templateName],
   )
+  const chatWorkspaceIds = useMemo(
+    () => chatWorkspaces.map((workspace) => workspace.id),
+    [chatWorkspaces],
+  )
+  const sessionDirectories = useWorkspaceSessionDirectories(chatWorkspaceIds)
+  const rosterByWorkspace = useMemo(() => {
+    const next = new Map<string, HarnessSession[]>()
+    for (const workspace of chatWorkspaces) {
+      next.set(
+        workspace.id,
+        joinWorkspaceHarnessSessions(
+          workspace,
+          sessionDirectories.directories.get(workspace.id) ?? null,
+        ),
+      )
+    }
+    return next
+  }, [chatWorkspaces, sessionDirectories.directories])
+  const recentRoster = useMemo(
+    () => flattenHarnessSessions(chatWorkspaces, sessionDirectories.directories),
+    [chatWorkspaces, sessionDirectories.directories],
+  )
   const workspaceListRef = useReorderMotion<HTMLUListElement>(
     chatWorkspaces.map((workspace) => workspace.id),
   )
@@ -144,6 +173,60 @@ export function ChatWorkspaceSection({
     if (mode === 'auto-quant') return
     setRecentWorkspaceId(workspaceId)
     void preferencesApi.rememberRecentChatWorkspace(workspaceId).catch(() => undefined)
+  }
+
+  const activeResumeId = useMemo(() => {
+    if (!selection?.sessionId) return null
+    const workspace = chatWorkspaces.find((candidate) => candidate.id === selection.wsId)
+    return workspace?.sessions.find((session) => session.id === selection.sessionId)?.resumeId
+      ?? null
+  }, [chatWorkspaces, selection])
+
+  const isRosterRowActive = (row: HarnessSession): boolean => {
+    if (!selection || selection.wsId !== row.workspaceId) return false
+    if (row.session && selection.sessionId === row.session.id) return true
+    return activeResumeId !== null && row.resumeId === activeResumeId
+  }
+
+  const activateRosterSession = (row: HarnessSession): void => {
+    if (row.headlessOccupying) return
+    if (row.session) {
+      rememberViewedWorkspace(row.workspaceId)
+      navigate({
+        kind: 'workspace',
+        params: { wsId: row.workspaceId, sessionId: row.session.id, source },
+      })
+      return
+    }
+    if (!row.resumable) return
+    void ctx.openHeadlessRun(row.workspaceId, row.resumeId, { title: row.title })
+    onNavigate()
+  }
+
+  const resumeRosterSession = (row: HarnessSession): void => {
+    if (row.headlessOccupying || !row.resumable) return
+    if (row.session) {
+      rememberViewedWorkspace(row.workspaceId)
+      if (row.session.surface === 'webpi') {
+        void ctx.openWebPiSession(row.workspaceId, row.session.id, source)
+      } else {
+        void ctx.resumeSession(row.workspaceId, row.session.id, source)
+      }
+      onNavigate()
+      return
+    }
+    void ctx.openHeadlessRun(row.workspaceId, row.resumeId, { title: row.title })
+    onNavigate()
+  }
+
+  const deleteRosterSession = (row: HarnessSession): void => {
+    if (!row.session) return
+    ctx.requestDeleteSession(row.workspaceId, row.session.id)
+  }
+
+  const pauseRosterSession = (row: HarnessSession): void => {
+    if (!row.session) return
+    void ctx.pauseSession(row.workspaceId, row.session.id)
   }
 
   const selectHarnessWorkspace = (
@@ -226,27 +309,15 @@ export function ChatWorkspaceSection({
         <FocusedChatWorkspace
           harness={mode}
           workspace={focusedWorkspace}
+          sessions={focusedWorkspace ? rosterByWorkspace.get(focusedWorkspace.id) ?? [] : []}
           loading={!ctx.hasLoaded && !showListError}
           unavailable={showListError}
           emptyCopy={mode === 'auto-quant' ? t('autoQuant.noResearchYet') : undefined}
-          activeSessionId={selection !== null && selection.wsId === focusedWorkspace?.id
-            ? selection.sessionId
-            : null}
-          onOpenSession={(workspaceId, sessionId) => {
-            rememberViewedWorkspace(workspaceId)
-            navigate({ kind: 'workspace', params: { wsId: workspaceId, sessionId, source } })
-          }}
-          onPauseSession={(workspaceId, sessionId) => void ctx.pauseSession(workspaceId, sessionId)}
-          onResumeSession={(workspaceId, session) => {
-            rememberViewedWorkspace(workspaceId)
-            if (session.surface === 'webpi') {
-              void ctx.openWebPiSession(workspaceId, session.id, source)
-            } else {
-              void ctx.resumeSession(workspaceId, session.id, source)
-            }
-            onNavigate()
-          }}
-          onDeleteSession={(workspaceId, sessionId) => ctx.requestDeleteSession(workspaceId, sessionId)}
+          isRowActive={isRosterRowActive}
+          onOpenSession={activateRosterSession}
+          onPauseSession={pauseRosterSession}
+          onResumeSession={resumeRosterSession}
+          onDeleteSession={deleteRosterSession}
           onBrowseSessions={(workspaceId, restoreFocus) => openConversationBrowser(workspaceId, restoreFocus)}
           onCreateWorkspace={() => setShowCreate(true)}
         />
@@ -254,24 +325,14 @@ export function ChatWorkspaceSection({
         <AllWorkspaceRecentSessions
           harness={mode}
           workspaces={chatWorkspaces}
+          sessions={recentRoster}
           loading={!ctx.hasLoaded && !showListError}
           unavailable={showListError}
-          selection={selection}
-          onOpenSession={(workspaceId, sessionId) => {
-            rememberViewedWorkspace(workspaceId)
-            navigate({ kind: 'workspace', params: { wsId: workspaceId, sessionId, source } })
-          }}
-          onPauseSession={(workspaceId, sessionId) => void ctx.pauseSession(workspaceId, sessionId)}
-          onResumeSession={(workspaceId, session) => {
-            rememberViewedWorkspace(workspaceId)
-            if (session.surface === 'webpi') {
-              void ctx.openWebPiSession(workspaceId, session.id, source)
-            } else {
-              void ctx.resumeSession(workspaceId, session.id, source)
-            }
-            onNavigate()
-          }}
-          onDeleteSession={(workspaceId, sessionId) => ctx.requestDeleteSession(workspaceId, sessionId)}
+          isRowActive={isRosterRowActive}
+          onOpenSession={activateRosterSession}
+          onPauseSession={pauseRosterSession}
+          onResumeSession={resumeRosterSession}
+          onDeleteSession={deleteRosterSession}
           onCreateWorkspace={() => setShowCreate(true)}
         />
       ) : (
@@ -337,24 +398,19 @@ export function ChatWorkspaceSection({
             key={w.id}
             harness={mode}
             workspace={w}
+            sessions={rosterByWorkspace.get(w.id) ?? []}
             label={workspaceDisplayName(w)}
             selection={selection}
+            isRowActive={isRosterRowActive}
             onOpen={() => {
               selectHarnessWorkspace(w.id, () => {
                 navigate({ kind: landingKind, params: { targetWsId: w.id } })
               })
             }}
-            onOpenSession={(sid) => {
-              rememberViewedWorkspace(w.id)
-              navigate({ kind: 'workspace', params: { wsId: w.id, sessionId: sid, source } })
-            }}
-            onPauseSession={(sid) => void ctx.pauseSession(w.id, sid)}
-            onResumeSession={(sid) => {
-              rememberViewedWorkspace(w.id)
-              void ctx.resumeSession(w.id, sid, source)
-              onNavigate()
-            }}
-            onDeleteSession={(sid) => ctx.requestDeleteSession(w.id, sid)}
+            onOpenSession={activateRosterSession}
+            onPauseSession={pauseRosterSession}
+            onResumeSession={resumeRosterSession}
+            onDeleteSession={deleteRosterSession}
             onConfigure={() => ctx.openAgentConfig(w.id)}
             onDelete={() => setPendingDelete(w)}
             onSpawn={() => navigate({ kind: landingKind, params: { targetWsId: w.id } })}
@@ -401,14 +457,15 @@ export function ChatWorkspaceSection({
         harness={mode}
         open={conversationBrowserOpen}
         workspaces={chatWorkspaces}
+        directories={sessionDirectories.directories}
         currentWorkspaceId={conversationWorkspaceId}
-        activeSessionId={selection?.wsId === conversationWorkspaceId ? selection.sessionId : null}
+        isRowActive={isRosterRowActive}
         restoreFocusRef={dialogRestoreFocusRef}
         onOpenChange={setConversationBrowserOpen}
-        onSelectSession={(workspaceId, sessionId) => {
+        onSelectSession={(row) => {
+          if (row.headlessOccupying) return
           setConversationBrowserOpen(false)
-          rememberViewedWorkspace(workspaceId)
-          navigate({ kind: 'workspace', params: { wsId: workspaceId, sessionId, source } })
+          activateRosterSession(row)
         }}
       />
 
@@ -621,14 +678,15 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
 interface FocusedChatWorkspaceProps {
   harness: 'chat' | 'auto-quant'
   workspace: Workspace | null
+  sessions: readonly HarnessSession[]
   loading: boolean
   unavailable: boolean
   emptyCopy?: string
-  activeSessionId: string | null
-  onOpenSession: (workspaceId: string, sessionId: string) => void
-  onPauseSession: (workspaceId: string, sessionId: string) => void
-  onResumeSession: (workspaceId: string, session: SessionRecord) => void
-  onDeleteSession: (workspaceId: string, sessionId: string) => void
+  isRowActive: (row: HarnessSession) => boolean
+  onOpenSession: (row: HarnessSession) => void
+  onPauseSession: (row: HarnessSession) => void
+  onResumeSession: (row: HarnessSession) => void
+  onDeleteSession: (row: HarnessSession) => void
   onBrowseSessions: (workspaceId: string, restoreFocus: HTMLElement | null) => void
   onCreateWorkspace: () => void
 }
@@ -636,30 +694,27 @@ interface FocusedChatWorkspaceProps {
 interface AllWorkspaceRecentSessionsProps {
   harness: 'chat' | 'auto-quant'
   workspaces: readonly Workspace[]
+  sessions: readonly HarnessSession[]
   loading: boolean
   unavailable: boolean
-  selection: { wsId: string; sessionId: string | null } | null
-  onOpenSession: (workspaceId: string, sessionId: string) => void
-  onPauseSession: (workspaceId: string, sessionId: string) => void
-  onResumeSession: (workspaceId: string, session: SessionRecord) => void
-  onDeleteSession: (workspaceId: string, sessionId: string) => void
+  isRowActive: (row: HarnessSession) => boolean
+  onOpenSession: (row: HarnessSession) => void
+  onPauseSession: (row: HarnessSession) => void
+  onResumeSession: (row: HarnessSession) => void
+  onDeleteSession: (row: HarnessSession) => void
   onCreateWorkspace: () => void
 }
 
 function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): ReactElement {
   const { t } = useTranslation()
-  const sessions = useMemo(() => props.workspaces
-    .flatMap((workspace) => workspace.sessions.map((session) => ({ workspace, session })))
-    .sort((a, b) => {
-      const activity = Date.parse(b.session.lastActiveAt) - Date.parse(a.session.lastActiveAt)
-      if (activity !== 0) return activity
-      const created = Date.parse(b.session.createdAt) - Date.parse(a.session.createdAt)
-      if (created !== 0) return created
-      return a.session.id.localeCompare(b.session.id)
-    }), [props.workspaces])
+  const workspaceName = useMemo(
+    () => new Map(props.workspaces.map((workspace) => [workspace.id, workspaceDisplayTitle(workspace)])),
+    [props.workspaces],
+  )
+  const sessions = props.sessions
   const visibleSessions = sessions.slice(0, ALL_WORKSPACES_SESSION_LIMIT)
   const sessionListRef = useReorderMotion<HTMLDivElement>(
-    visibleSessions.map(({ workspace, session }) => `${workspace.id}:${session.id}`),
+    visibleSessions.map((row) => `${row.workspaceId}:${row.resumeId}`),
   )
 
   if (props.loading) {
@@ -697,17 +752,16 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
           <p className="px-3 py-3 text-xs leading-relaxed text-muted-foreground/60">
             {props.harness === 'auto-quant' ? t('autoQuant.noResearchYet') : t('chat.noRecentConversations')}
           </p>
-        ) : visibleSessions.map(({ workspace, session }) => (
-          <SessionRow
-            key={`${workspace.id}:${session.id}`}
-            reorderId={`${workspace.id}:${session.id}`}
-            session={session}
-            subtitle={workspaceDisplayTitle(workspace)}
-            isActive={props.selection?.wsId === workspace.id && props.selection.sessionId === session.id}
-            onSelect={() => props.onOpenSession(workspace.id, session.id)}
-            onPause={() => props.onPauseSession(workspace.id, session.id)}
-            onResume={() => props.onResumeSession(workspace.id, session)}
-            onDelete={() => props.onDeleteSession(workspace.id, session.id)}
+        ) : visibleSessions.map((row) => (
+          <HarnessSessionRow
+            key={`${row.workspaceId}:${row.resumeId}`}
+            row={row}
+            subtitle={workspaceName.get(row.workspaceId)}
+            isActive={props.isRowActive(row)}
+            onSelect={() => props.onOpenSession(row)}
+            onPause={() => props.onPauseSession(row)}
+            onResume={() => props.onResumeSession(row)}
+            onDelete={() => props.onDeleteSession(row)}
           />
         ))}
       </div>
@@ -730,13 +784,10 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
 
 function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
   const { t } = useTranslation()
-  const sessions = useMemo(
-    () => orderSessionsForSidebar(props.workspace?.sessions ?? []),
-    [props.workspace?.sessions],
-  )
+  const sessions = props.sessions
   const visibleSessions = sessions.slice(0, FOCUSED_CHAT_SESSION_LIMIT)
   const sessionListRef = useReorderMotion<HTMLDivElement>(
-    visibleSessions.map((session) => session.id),
+    visibleSessions.map((row) => row.resumeId),
   )
 
   if (props.loading) {
@@ -789,16 +840,15 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
           <p className="px-3 py-3 text-xs text-muted-foreground/60">
             {props.emptyCopy ?? t('chat.noConversationsYet')}
           </p>
-        ) : visibleSessions.map((session) => (
-          <SessionRow
-            key={session.id}
-            reorderId={session.id}
-            session={session}
-            isActive={props.activeSessionId === session.id}
-            onSelect={() => props.onOpenSession(props.workspace!.id, session.id)}
-            onPause={() => props.onPauseSession(props.workspace!.id, session.id)}
-            onResume={() => props.onResumeSession(props.workspace!.id, session)}
-            onDelete={() => props.onDeleteSession(props.workspace!.id, session.id)}
+        ) : visibleSessions.map((row) => (
+          <HarnessSessionRow
+            key={row.resumeId}
+            row={row}
+            isActive={props.isRowActive(row)}
+            onSelect={() => props.onOpenSession(row)}
+            onPause={() => props.onPauseSession(row)}
+            onResume={() => props.onResumeSession(row)}
+            onDelete={() => props.onDeleteSession(row)}
           />
         ))}
         {sessions.length > visibleSessions.length && (
@@ -940,13 +990,15 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
 interface ChatWorkspaceRowProps {
   harness: 'chat' | 'auto-quant'
   workspace: Workspace
+  sessions: readonly HarnessSession[]
   label: string
   selection: { wsId: string; sessionId: string | null } | null
+  isRowActive: (row: HarnessSession) => boolean
   onOpen: () => void
-  onOpenSession: (sid: string) => void
-  onPauseSession: (sid: string) => void
-  onResumeSession: (sid: string) => void
-  onDeleteSession: (sid: string) => void
+  onOpenSession: (row: HarnessSession) => void
+  onPauseSession: (row: HarnessSession) => void
+  onResumeSession: (row: HarnessSession) => void
+  onDeleteSession: (row: HarnessSession) => void
   onConfigure: () => void
   onDelete: () => void
   /** Spawn a fresh agent session in THIS workspace (and open it). */
@@ -955,27 +1007,53 @@ interface ChatWorkspaceRowProps {
   onBrowseSessions: (restoreFocus: HTMLElement | null) => void
 }
 
+function HarnessSessionRow(props: {
+  row: HarnessSession
+  subtitle?: string
+  isActive: boolean
+  onSelect: () => void
+  onPause: () => void
+  onResume: () => void
+  onDelete: () => void
+}): ReactElement {
+  const row = props.row
+  return (
+    <SessionRow
+      reorderId={`${row.workspaceId}:${row.resumeId}`}
+      session={sessionRecordForRow(row)}
+      displayTitle={row.title}
+      subtitle={props.subtitle}
+      isActive={props.isActive}
+      headlessOccupying={row.headlessOccupying}
+      resumable={row.resumable}
+      failed={row.failed}
+      canDelete={row.session !== null}
+      onSelect={props.onSelect}
+      onPause={props.onPause}
+      onResume={props.onResume}
+      onDelete={props.onDelete}
+    />
+  )
+}
+
 function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   const { t } = useTranslation()
   const w = props.workspace
-  const hasRunning = w.sessions.some((s) => s.state === 'running')
+  const orderedSessions = props.sessions
+  const hasRunning = orderedSessions.some((row) => row.occupancyRunning)
   const [expanded, setExpanded] = useState(true)
   const isSelected = props.selection?.wsId === w.id && props.selection.sessionId === null
   const displayName = w.displayName?.trim()
   const subtitle = displayName && displayName !== w.tag ? w.tag : null
   const actionWorkspace = subtitle ? `${props.label} (${w.tag})` : w.tag
-  const orderedSessions = useMemo(
-    () => orderSessionsForSidebar(w.sessions),
-    [w.sessions],
-  )
   const visibleSessions = orderedSessions.slice(0, CHAT_SIDEBAR_SESSION_LIMIT)
   const sessionListRef = useReorderMotion<HTMLDivElement>(
-    visibleSessions.map((session) => session.id),
+    visibleSessions.map((row) => row.resumeId),
   )
 
   const statusClass = hasRunning
     ? 'bg-success'
-    : w.sessions.length > 0
+    : orderedSessions.length > 0
       ? 'bg-muted-foreground/40'
       : 'border border-border'
 
@@ -1026,9 +1104,9 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               </span>
             )}
           </span>
-          {w.sessions.length > 0 && (
+          {orderedSessions.length > 0 && (
             <span className="text-[11px] text-muted-foreground/45 tabular-nums shrink-0">
-              {w.sessions.length}
+              {orderedSessions.length}
             </span>
           )}
         </button>
@@ -1068,16 +1146,15 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
       </div>
       {expanded && orderedSessions.length > 0 && (
         <div ref={sessionListRef} className="oa-disclosure-enter ml-[18px] border-l border-border/50">
-          {visibleSessions.map((s) => (
-            <SessionRow
-              key={s.id}
-              reorderId={s.id}
-              session={s}
-              isActive={props.selection?.sessionId === s.id}
-              onSelect={() => props.onOpenSession(s.id)}
-              onPause={() => props.onPauseSession(s.id)}
-              onResume={() => props.onResumeSession(s.id)}
-              onDelete={() => props.onDeleteSession(s.id)}
+          {visibleSessions.map((row) => (
+            <HarnessSessionRow
+              key={row.resumeId}
+              row={row}
+              isActive={props.isRowActive(row)}
+              onSelect={() => props.onOpenSession(row)}
+              onPause={() => props.onPauseSession(row)}
+              onResume={() => props.onResumeSession(row)}
+              onDelete={() => props.onDeleteSession(row)}
             />
           ))}
           {orderedSessions.length > visibleSessions.length && (

@@ -31,6 +31,15 @@ vi.mock('../../tabs/types', () => ({
   }),
 }))
 
+vi.mock('../../hooks/useWorkspaceSessionDirectory', () => ({
+  useWorkspaceSessionDirectories: () => ({
+    directories: new Map(),
+    loading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}))
+
 const template: TemplateInfo = {
   name: 'auto-quant-v2',
   defaultAgents: ['pi'],

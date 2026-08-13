@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import {
   DEMO_AUTO_QUANT_WORKSPACE_ID,
+  DEMO_CHAT_WORKSPACE_ID,
   demoChatWorkspace,
   demoWorkspaces,
   demoTemplates,
@@ -916,30 +917,98 @@ export const workspacesHandlers = [
           lifecycle: 'active', resumable: true, active: false,
           latestExecution: {
             taskId: 'demo-thesis-owner-run', status: 'done',
-            startedAt: Date.now() - 60_000,
+            startedAt: Date.now() - 180_000,
+            finishedAt: Date.now() - 60_000,
             assistantPreview: 'Reviewed the active thesis invalidation rules.',
           },
         }],
       })
     }
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
+    const sessions: Array<{
+      resumeId: string
+      agent: string
+      createdAt: number
+      updatedAt: number
+      lifecycle: 'active' | 'retired'
+      resumable: boolean
+      active: boolean
+      interactive?: {
+        name: string
+        title?: string
+        state: 'running' | 'paused'
+        lastActiveAt: string
+      }
+      latestExecution?: {
+        taskId: string
+        status: 'running' | 'done' | 'failed' | 'interrupted'
+        startedAt: number
+        finishedAt?: number
+        issueId?: string
+        assistantPreview?: string
+      }
+    }> = (workspace?.sessions ?? []).map((session) => ({
+      resumeId: session.resumeId,
+      agent: session.agent,
+      createdAt: Date.parse(session.createdAt),
+      updatedAt: Date.parse(session.lastActiveAt),
+      lifecycle: 'active',
+      resumable: session.agent !== 'shell',
+      active: session.state === 'running',
+      interactive: {
+        name: session.name,
+        ...(session.title ? { title: session.title } : {}),
+        state: session.state,
+        lastActiveAt: session.lastActiveAt,
+      },
+    }))
+    if (wsId === DEMO_CHAT_WORKSPACE_ID) {
+      sessions.push(
+        {
+          resumeId: 'resume-demo-headless-colleague',
+          agent: 'codex',
+          createdAt: Date.now() - 3_600_000,
+          updatedAt: Date.now() - 120_000,
+          lifecycle: 'active',
+          resumable: true,
+          active: false,
+          latestExecution: {
+            taskId: 'demo-headless-colleague-run',
+            status: 'done',
+            startedAt: Date.now() - 180_000,
+            finishedAt: Date.now() - 120_000,
+            assistantPreview: 'Morning scan complete. Semis still lead.',
+          },
+        },
+        {
+          resumeId: 'resume-demo-headless-running',
+          agent: 'claude',
+          createdAt: Date.now() - 720_000,
+          updatedAt: Date.now() - 5_000,
+          lifecycle: 'active',
+          resumable: true,
+          active: true,
+          latestExecution: {
+            taskId: 'demo-headless-running',
+            status: 'running',
+            startedAt: Date.now() - 30_000,
+            issueId: 'scan-open',
+          },
+        },
+        {
+          resumeId: 'resume-demo-headless-retired',
+          agent: 'pi',
+          createdAt: Date.now() - 86_400_000,
+          updatedAt: Date.now() - 86_000_000,
+          lifecycle: 'retired',
+          resumable: false,
+          active: false,
+        },
+      )
+    }
     return HttpResponse.json({
       workspace: { id: wsId, tag: workspace?.tag ?? wsId },
-      sessions: (workspace?.sessions ?? []).map((session) => ({
-        resumeId: session.resumeId,
-        agent: session.agent,
-        createdAt: Date.parse(session.createdAt),
-        updatedAt: Date.parse(session.lastActiveAt),
-        lifecycle: 'active',
-        resumable: session.agent !== 'shell',
-        active: session.state === 'running',
-        interactive: {
-          name: session.name,
-          ...(session.title ? { title: session.title } : {}),
-          state: session.state,
-          lastActiveAt: session.lastActiveAt,
-        },
-      })),
+      sessions,
     })
   }),
   http.post('/api/workspaces/:id/resumes/:resumeId/session', async ({ params, request }) => {
