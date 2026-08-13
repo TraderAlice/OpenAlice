@@ -82,6 +82,9 @@ The filename stem is the stable issue id. Frontmatter:
 - `effort` — optional one-run reasoning effort:
   `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
   expose that level; omission inherits its Workspace/native default.
+- `timeout` — optional scheduled-run watchdog: `15m | 30m | 45m | 60m`. Omission
+  means no limit: the headless child runs until the agent exits. This is a run
+  budget, not Session birth, so an exact `@resumeId` owner may still set it.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the
@@ -154,15 +157,16 @@ Agents normally use:
 ```bash
 alice-workspace issue list
 alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6-sol --effort high
+alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6-sol --effort high --timeout 30m
 alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6-sol --effort high
+alice-workspace issue update --id <id> --timeout 45m
 alice-workspace issue comment --id <id> --text "..."
 ```
 
 The CLI and MCP tools use the same implementation and write the same files.
 Direct file editing is also valid and is the clearest way to author rich What
-markdown plus `when` / `assignee` / `agent` / `credential` / `model` / `effort`
-frontmatter.
+markdown plus `when` / `assignee` / `agent` / `credential` / `model` / `effort` /
+`timeout` frontmatter.
 
 `issue comment` is preferable to a generic `issue ask --owner` for normal
 collaboration because it leaves the question and answer in the Issue Activity
@@ -212,9 +216,9 @@ the latest scheduled run, and the assignee's resume availability. It is not
 persisted in markdown and does not create another Issue workflow status:
 
 - `not_started`, `due`, `running`, and `healthy` describe normal progress;
-- `interrupted` means the work was cut off by launcher restart, or its 30-minute
-  watchdog itself woke substantially late (usually computer sleep / launcher
-  suspension); this is operational interruption, not an agent-work failure;
+- `interrupted` means the work was cut off by launcher restart, or an optional
+  run-timeout watchdog itself woke substantially late (usually computer sleep /
+  launcher suspension); this is operational interruption, not an agent-work failure;
 - `failed` retains a real timeout, launch error, runtime error, or non-zero
   process exit until a later success;
 - `blocked` means the schedule has no future fire, or an exact Session owner is
@@ -227,9 +231,11 @@ not a health prerequisite.
 
 Failure explanations are read-side projections from the durable run record.
 Old runs therefore gain structured `failure.kind/title/message/retryable`
-diagnostics without migration. A killed run close to 30 minutes is a timeout;
-a killed run whose watchdog closes much later is described conservatively as a
-paused computer/launcher rather than falsely blaming the agent.
+diagnostics without migration. A killed run close to its configured budget is a
+timeout; historical records that omit a stored budget still use the former
+30-minute default. A killed run whose watchdog closes much later is described
+conservatively as a paused computer/launcher rather than falsely blaming the
+agent.
 
 Startup evidence is explicit on new run records. `processStarted` becomes true
 only after the OS child emits `spawn`; `launchErrorCode` distinguishes an
@@ -240,7 +246,7 @@ rather than the misleading `process_exit` used by older `exitCode: -1` records.
 
 The Issue detail offers **Retry now** only for the latest failed or interrupted
 scheduled run. Retry re-reads the live Issue and uses the same markdown What,
-assignee, runtime, resume mapping, and 30-minute budget as a scheduled fire. It
+assignee, runtime, resume mapping, and optional run timeout as a scheduled fire. It
 does not write the last-fired marker, so a recovery attempt never shifts the
 Issue's cadence. The backend rejects duplicate/racing retries and returns the
 authoritative running detail immediately; there is no automatic retry storm.

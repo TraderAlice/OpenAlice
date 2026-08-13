@@ -510,6 +510,7 @@ export function demoIssueUpdate(
       delete boardIssue.credential
       delete boardIssue.model
       delete boardIssue.effort
+      // timeout is a run budget, not Session birth — keep it.
     }
   }
   if (patch.what !== undefined) {
@@ -555,6 +556,10 @@ export function demoIssueUpdate(
   if (patch.effort !== undefined) {
     if (patch.effort === null) delete boardIssue.effort
     else boardIssue.effort = patch.effort
+  }
+  if (patch.timeout !== undefined) {
+    if (patch.timeout === null) delete boardIssue.timeout
+    else boardIssue.timeout = patch.timeout
   }
   return demoIssueDetail(wsId, id)
 }

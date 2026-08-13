@@ -30,6 +30,7 @@ import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
   ISSUES_DIR_REL,
+  isIssueTimeout,
   issueAssigneeResumeId,
   issueAssigneeSchema,
   issueFrontmatterSchema,
@@ -39,12 +40,14 @@ import {
   type IssuePriority,
   type IssueRecord,
   type IssueStatus,
+  type IssueTimeout,
 } from './declaration.js'
 export { appendIssueComment } from './comments.js'
 
 /** Fields a human/agent may patch on an existing issue. Most scheduling
- *  frontmatter is preserved untouched; `agent` is intentionally editable from
- *  the UI because it controls which runtime the scheduler uses next fire. */
+ *  frontmatter is preserved untouched; `agent` and `timeout` are intentionally
+ *  editable from the UI because they control the next scheduled fire's runtime
+ *  and optional watchdog. */
 export interface IssueFieldPatch {
   status?: IssueStatus
   priority?: IssuePriority
@@ -59,6 +62,8 @@ export interface IssueFieldPatch {
   model?: string | null
   /** Reasoning effort for one scheduled fire; null inherits Workspace/runtime. */
   effort?: ModelReasoningEffort | null
+  /** Optional scheduled-run watchdog; null removes the limit. */
+  timeout?: IssueTimeout | null
   /** Canonical markdown work definition; exact scheduled prompt. */
   what?: string
 }
@@ -78,6 +83,7 @@ export interface CreateIssueInput {
   credentialSource?: 'native'
   model?: string
   effort?: ModelReasoningEffort
+  timeout?: IssueTimeout
   /** @deprecated Compatibility alias for callers written before What became the
    * sole markdown document. New callers must use `what`. */
   body?: string
@@ -190,6 +196,7 @@ export async function updateIssueFields(
       delete data.credentialSource
       delete data.model
       delete data.effort
+      // `timeout` is a run budget, not Session birth — keep it.
     }
   }
   if (patch.agent !== undefined) {
@@ -237,6 +244,15 @@ export async function updateIssueFields(
       return { ok: false, reason: 'invalid', error: 'invalid effort' }
     } else {
       data.effort = patch.effort
+    }
+  }
+  if (patch.timeout !== undefined) {
+    if (patch.timeout === null) {
+      delete data.timeout
+    } else if (!isIssueTimeout(patch.timeout)) {
+      return { ok: false, reason: 'invalid', error: 'timeout must be 15m, 30m, 45m, or 60m' }
+    } else {
+      data.timeout = patch.timeout
     }
   }
   let what = current.issue.what
@@ -304,6 +320,7 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
   if (input.credentialSource !== undefined) data.credentialSource = input.credentialSource
   if (input.model !== undefined) data.model = input.model
   if (input.effort !== undefined) data.effort = input.effort
+  if (input.timeout !== undefined) data.timeout = input.timeout
 
   const parsed = issueFrontmatterSchema.safeParse(data)
   if (!parsed.success) {

@@ -148,6 +148,14 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     expect(r.body.error).toBe('invalid_effort')
   })
 
+  it('400 invalid_timeout for an unsupported value', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T' })
+    const { app } = build()
+    const r = await req(app, 'PATCH', '/ws-1/i1', { timeout: '12m' })
+    expect(r.status).toBe(400)
+    expect(r.body.error).toBe('invalid_timeout')
+  })
+
   it('validates and persists explicit scheduled ownership', async () => {
     await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
     const { app } = build()
@@ -252,6 +260,17 @@ describe('PATCH /api/issues/:wsId/:id', () => {
     expect(r.body.issue.agent).toBeUndefined()
     const re = await readWorkspaceIssues(wsDir)
     expect(re.ok && re.issues[0].agent).toBeUndefined()
+  })
+
+  it('sets and clears an optional scheduled-run timeout', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '30m' } })
+    const { app } = build()
+    const set = await req(app, 'PATCH', '/ws-1/i1', { timeout: '60m' })
+    expect(set.status).toBe(200)
+    expect(set.body.issue.timeout).toBe('60m')
+    const cleared = await req(app, 'PATCH', '/ws-1/i1', { timeout: null })
+    expect(cleared.status).toBe(200)
+    expect(cleared.body.issue.timeout).toBeUndefined()
   })
 })
 

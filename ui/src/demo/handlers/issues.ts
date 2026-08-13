@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import type { ModelReasoningEffort } from '../../api'
-import type { IssuePriority, IssueStatus } from '../../api/issues'
+import { ISSUE_TIMEOUTS, type IssuePriority, type IssueStatus, type IssueTimeout } from '../../api/issues'
 import {
   demoIssueAddComment,
   demoIssueDetail,
@@ -76,6 +76,7 @@ export const issuesHandlers = [
       credentialSource?: unknown
       model?: unknown
       effort?: unknown
+      timeout?: unknown
       what?: unknown
     } | null
     if (!body || typeof body !== 'object') {
@@ -91,6 +92,7 @@ export const issuesHandlers = [
       credentialSource?: 'native' | null
       model?: string | null
       effort?: ModelReasoningEffort | null
+      timeout?: IssueTimeout | null
       what?: string
     } = {}
     if (body.status !== undefined) {
@@ -160,6 +162,15 @@ export const issuesHandlers = [
         patch.effort = body.effort as ModelReasoningEffort
       }
     }
+    if (body.timeout !== undefined) {
+      if (body.timeout === null || body.timeout === '') {
+        patch.timeout = null
+      } else if (!(ISSUE_TIMEOUTS as readonly string[]).includes(String(body.timeout))) {
+        return HttpResponse.json({ error: 'invalid_timeout' }, { status: 400 })
+      } else {
+        patch.timeout = body.timeout as IssueTimeout
+      }
+    }
     if (body.what !== undefined) {
       if (typeof body.what !== 'string' || !body.what.trim()) {
         return HttpResponse.json({ error: 'invalid_what' }, { status: 400 })
@@ -175,6 +186,7 @@ export const issuesHandlers = [
       && patch.credentialSource === undefined
       && patch.model === undefined
       && patch.effort === undefined
+      && patch.timeout === undefined
       && patch.what === undefined
     ) {
       return HttpResponse.json({ error: 'no_fields' }, { status: 400 })

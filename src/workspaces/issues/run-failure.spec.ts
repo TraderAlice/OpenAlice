@@ -18,6 +18,16 @@ describe('issueRunFailure', () => {
       killed: true,
       durationMs: SCHEDULED_ISSUE_RUN_TIMEOUT_MS + 5_000,
     })).toMatchObject({ kind: 'timeout', retryable: true })
+
+    expect(issueRunFailure({
+      status: 'failed',
+      killed: true,
+      timeoutMs: 15 * 60_000,
+      durationMs: 15 * 60_000 + 2_000,
+    })).toMatchObject({
+      kind: 'timeout',
+      message: expect.stringContaining('15m'),
+    })
   })
 
   it('explains restart reconciliation, launch errors, and process exits', () => {
@@ -26,6 +36,13 @@ describe('issueRunFailure', () => {
       kind: 'launch_error', message: 'spawn ENOENT',
     })
     expect(issueRunFailure({ status: 'failed', exitCode: 2 })).toMatchObject({ kind: 'process_exit' })
+    expect(issueRunFailure({
+      status: 'failed',
+      timeoutMs: null,
+      killed: true,
+      signal: 'SIGKILL',
+      durationMs: SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+    })).toMatchObject({ kind: 'process_exit' })
     expect(issueRunFailure({
       status: 'failed',
       processStarted: true,

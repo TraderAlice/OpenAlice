@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceSessionDirectory: vi.fn(),
   listAgentCredentials: vi.fn(),
   getPresets: vi.fn(),
+  updateIssue: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -83,6 +84,17 @@ vi.mock('../api/config', () => ({
   configApi: { getPresets: mocks.getPresets },
 }))
 
+vi.mock('../api/issues', async (importOriginal) => {
+  const actual = await importOriginal() as typeof import('../api/issues')
+  return {
+    ...actual,
+    issuesApi: {
+      ...actual.issuesApi,
+      update: mocks.updateIssue,
+    },
+  }
+})
+
 vi.mock('./MarkdownWhatEditor', () => ({
   MarkdownWhatEditor: ({ value }: { value: string }) => <div>{value}</div>,
 }))
@@ -93,6 +105,8 @@ beforeEach(async () => {
   delete scheduledIssue.issue.credential
   delete scheduledIssue.issue.model
   delete scheduledIssue.issue.effort
+  delete scheduledIssue.issue.timeout
+  mocks.updateIssue.mockResolvedValue(scheduledIssue)
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
   mocks.listAgentCredentials.mockResolvedValue([{
     slug: 'longcat-1',
@@ -209,6 +223,7 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Assignee' }).className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Run timeout' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('size-10')
     expect(screen.getByRole('heading', { level: 3, name: 'Schedule' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Execution' })).toBeTruthy()
@@ -227,6 +242,24 @@ describe('IssueDetail property controls', () => {
 
     fireEvent.change(model, { target: { value: 'custom' } })
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+  })
+
+  it('patches the optional run timeout from the execution inspector', async () => {
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: { ...scheduledIssue.issue, timeout: '30m' },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    const timeout = await screen.findByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement
+    expect(timeout.value).toBe('')
+    fireEvent.change(timeout, { target: { value: '30m' } })
+    await waitFor(() => {
+      expect(mocks.updateIssue).toHaveBeenCalledWith(
+        'demo-ws-auto-quant',
+        'morning-scan',
+        { timeout: '30m' },
+      )
+    })
   })
 
   it('chooses a credential before narrowing model and effort options', async () => {

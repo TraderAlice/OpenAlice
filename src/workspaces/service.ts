@@ -1653,6 +1653,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         ...(parentTaskId ? { parentTaskId } : {}),
         ...(trigger ? { trigger } : {}),
         ...(inquiry ? { inquiry } : {}),
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       });
       await resumeRegistry.ensure({
         resumeId: identity.resumeId,

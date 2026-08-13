@@ -94,6 +94,9 @@ export const zh: Resources = {
       credential: '凭证',
       model: '模型',
       effort: '推理强度',
+      timeout: '运行时限',
+      timeoutNone: '不限制',
+      timeoutHint: '这次计划运行的可选看门狗。不设则让 Agent 跑到自己结束。',
       health: '运行状态',
       runHealth: '运行状态',
       lastRun: '上次运行',
@@ -207,6 +210,7 @@ export const zh: Resources = {
         credential: '凭证',
         model: '模型',
         effort: '推理强度',
+        timeout: '运行时限',
         what: '任务内容',
       },
       mutationValue: {

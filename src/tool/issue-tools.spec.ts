@@ -82,6 +82,18 @@ describe('issue_create', () => {
     })
   })
 
+  it('creates and returns an optional run timeout', async () => {
+    const res = await run(issueCreateFactory.build(ctx()), {
+      id: 'budgeted',
+      title: 'Budgeted run',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@new-each-run',
+      timeout: '45m',
+    })
+    expect(res.issue).toMatchObject({ timeout: '45m' })
+    expect(await readBack('budgeted')).toMatchObject({ timeout: '45m' })
+  })
+
   it('records the creating product Session without accepting identity args', async () => {
     const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
     const context = ctx({
@@ -278,6 +290,19 @@ describe('issue_update', () => {
     const cleared = await readBack('runtime-fields')
     expect(cleared?.model).toBeUndefined()
     expect(cleared?.effort).toBeUndefined()
+  })
+
+  it('updates and clears an optional run timeout', async () => {
+    await run(issueCreateFactory.build(ctx()), {
+      id: 'budget-fields',
+      title: 'Budget fields',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@new-each-run',
+    })
+    await run(issueUpdateFactory.build(ctx()), { id: 'budget-fields', timeout: '15m' })
+    expect(await readBack('budget-fields')).toMatchObject({ timeout: '15m' })
+    await run(issueUpdateFactory.build(ctx()), { id: 'budget-fields', timeout: null })
+    expect((await readBack('budget-fields'))?.timeout).toBeUndefined()
   })
 
   it('records successful mutations but not rejected ones', async () => {
