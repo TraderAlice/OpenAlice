@@ -98,6 +98,38 @@ describe('Workspace conversation target resolution', () => {
     })
   })
 
+  it('keeps an archived Session as the exact follow-up target', () => {
+    const identity = {
+      ...origin,
+      wsId: origin.workspaceId,
+      agentSessionId: 'native-private',
+      presence: 'archived' as const,
+    }
+    const { svc } = fakeService({ identity, provenance: issueProvenance() })
+    expect(resolveWorkspaceConversationTarget(svc, {
+      kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit',
+    })).toEqual({
+      mode: 'exact',
+      origin,
+      artifact: { kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit' },
+    })
+  })
+
+  it('does not replace a soft-deleted Session with a fresh worker', () => {
+    const identity = {
+      ...origin,
+      wsId: origin.workspaceId,
+      agentSessionId: 'native-private',
+      presence: 'deleted' as const,
+    }
+    const { svc } = fakeService({ identity, provenance: issueProvenance() })
+    expect(resolveWorkspaceConversationTarget(svc, {
+      kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit',
+    })).toMatchObject({
+      mode: 'unavailable', reason: 'deleted-session', attributedOrigin: origin,
+    })
+  })
+
   it('does not replace an attributed but unresumable Session with a fresh worker', () => {
     const identity = { ...origin, wsId: origin.workspaceId }
     const { svc } = fakeService({ identity, provenance: issueProvenance() })

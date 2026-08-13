@@ -67,9 +67,13 @@ worker kinds, not unique colleagues.
 
 Ask Alice and AutoQuant list those colleagues from the Workspace Session
 Directory (`GET /api/workspaces/:id/resumes`), joined to any materialized
-`SessionRecord` by `resumeId`. Birth method does not hide a row. A headless
-turn occupying that `resumeId` locks TUI spawn/resume; Automation continues to
-list dispatch records (`taskId`), not this roster.
+`SessionRecord` by `resumeId`. Birth method does not hide a row. The roster
+shows only `presence=active` coworkers; Archive files them without destroying
+the `resumeId`. Soft-delete (`presence=deleted`) is still that person for
+provenance, but follow-up is unavailable (`deleted-session`) and no new turn
+starts. A headless turn occupying that `resumeId` locks TUI spawn/resume and
+Archive; Automation continues to list dispatch records (`taskId`), not this
+roster.
 
 ## Session birth metadata
 
@@ -222,6 +226,7 @@ type FollowUpResolution =
         | 'missing-session'
         | 'missing-native-session'
         | 'retired-session'
+        | 'deleted-session'
         | 'departed-workspace'
         | 'purged-workspace'
         | 'deleted-workspace'

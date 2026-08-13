@@ -1,4 +1,10 @@
-import type { SessionRecord, Workspace, WorkspaceSessionDirectory, WorkspaceSessionDirectoryEntry } from './api'
+import type {
+  SessionPresence,
+  SessionRecord,
+  Workspace,
+  WorkspaceSessionDirectory,
+  WorkspaceSessionDirectoryEntry,
+} from './api'
 
 const PREVIEW_TITLE_LIMIT = 48
 
@@ -12,8 +18,15 @@ export interface HarnessSession {
   readonly headlessOccupying: boolean
   readonly failed: boolean
   readonly resumable: boolean
+  readonly presence: SessionPresence
   readonly session: SessionRecord | null
   readonly directory: WorkspaceSessionDirectoryEntry | null
+}
+
+export function entryPresence(
+  entry: WorkspaceSessionDirectoryEntry | null | undefined,
+): SessionPresence {
+  return entry?.presence ?? 'active'
 }
 
 function timestamp(value: string | number | undefined): number {
@@ -91,6 +104,7 @@ export function toHarnessSession(
     headlessOccupying,
     failed: entry?.latestExecution?.status === 'failed',
     resumable: entry ? entry.resumable : session !== null,
+    presence: entryPresence(entry),
     session,
     directory: entry,
   }
@@ -119,12 +133,15 @@ export function orderHarnessSessions<T extends {
 export function joinWorkspaceHarnessSessions(
   workspace: Workspace,
   directory: WorkspaceSessionDirectory | null,
+  opts: { presence?: SessionPresence } = {},
 ): HarnessSession[] {
+  const wanted = opts.presence ?? 'active'
   const sessionsByResume = new Map(
     workspace.sessions.map((session) => [session.resumeId, session]),
   )
 
   if (!directory) {
+    if (wanted !== 'active') return []
     return orderHarnessSessions(
       workspace.sessions.map((session) => toHarnessSession(workspace.id, session, null)),
     )
@@ -134,12 +151,19 @@ export function joinWorkspaceHarnessSessions(
   const rows: HarnessSession[] = []
   for (const entry of directory.sessions) {
     if ((entry.lifecycle ?? 'active') === 'retired') continue
+    // Directory presence is authoritative even when the identity still has a
+    // paused interactive seat. Mark every projected identity as seen before
+    // filtering, otherwise the legacy SessionRecord fallback below puts an
+    // archived coworker straight back onto the active floor.
     seen.add(entry.resumeId)
+    if (entryPresence(entry) !== wanted) continue
     rows.push(toHarnessSession(workspace.id, sessionsByResume.get(entry.resumeId) ?? null, entry))
   }
-  for (const session of workspace.sessions) {
-    if (seen.has(session.resumeId)) continue
-    rows.push(toHarnessSession(workspace.id, session, null))
+  if (wanted === 'active') {
+    for (const session of workspace.sessions) {
+      if (seen.has(session.resumeId)) continue
+      rows.push(toHarnessSession(workspace.id, session, null))
+    }
   }
   return orderHarnessSessions(rows)
 }

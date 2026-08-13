@@ -142,6 +142,42 @@ describe('joinWorkspaceHarnessSessions', () => {
     expect(rows.find((row) => row.resumeId === 'resume-failed')?.failed).toBe(true)
   })
 
+  it('keeps archived colleagues out of the floor roster', () => {
+    const archivedSeat = session({
+      id: 'session-archived',
+      resumeId: 'resume-archived',
+      state: 'paused',
+      pid: null,
+      startedAt: null,
+    })
+    const withArchivedSeat = {
+      ...workspace(),
+      sessions: [...workspace().sessions, archivedSeat],
+    }
+    const rows = joinWorkspaceHarnessSessions(workspace(), {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry({ resumeId: 'resume-archived', presence: 'archived' }),
+      ],
+    })
+    expect(rows.map((row) => row.resumeId)).toEqual(['resume-interactive'])
+    expect(joinWorkspaceHarnessSessions(withArchivedSeat, {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry({ resumeId: 'resume-archived', presence: 'archived' }),
+      ],
+    }, { presence: 'archived' }).map((row) => row.resumeId)).toEqual(['resume-archived'])
+    expect(joinWorkspaceHarnessSessions(withArchivedSeat, {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry({ resumeId: 'resume-archived', presence: 'archived' }),
+      ],
+    }).map((row) => row.resumeId)).toEqual(['resume-interactive'])
+  })
+
   it('does not lock an interactive TUI that is already the occupant', () => {
     const live = session({ state: 'running', pid: 9, startedAt: 1 })
     const row = toHarnessSession('ws-1', live, entry({

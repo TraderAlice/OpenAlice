@@ -38,6 +38,7 @@ function build(
     runtimeReadiness?: any;
     resumeIdentity?: any;
     sessionDirectory?: any;
+    setSessionPresence?: any;
     lifecycle?: any;
     templateUpgrades?: any;
     workspaceAbsorbs?: any;
@@ -180,6 +181,15 @@ function build(
           sessions: [{ resumeId: 'resume-1', agent: 'claude', createdAt: 1, updatedAt: 2, resumable: true, active: false }],
         })
       : null),
+    setSessionPresence: opts.setSessionPresence ?? vi.fn(async (input: any) => ({
+      resumeId: input.resumeId,
+      wsId: input.wsId,
+      agent: 'claude',
+      createdAt: 1,
+      updatedAt: 2,
+      lifecycle: 'active',
+      ...(input.presence !== 'active' ? { presence: input.presence } : {}),
+    })),
     publicMeta: vi.fn(async (m: any) => {
       const res = await readWorkspaceMetadata(m.dir);
       return { ...m, ...(res.ok ? res.metadata : {}) };
@@ -212,6 +222,33 @@ describe('GET /:id/resumes', () => {
       expect.objectContaining({ resumeId: 'resume-1', agent: 'claude', resumable: true }),
     ])
     expect(JSON.stringify(result.body)).not.toContain('agentSessionId')
+  })
+})
+
+describe('PATCH /:id/resumes/:resumeId', () => {
+  async function patch(app: any, path: string, body: unknown) {
+    const res = await app.request(path, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return { status: res.status, body: await res.json().catch(() => null) as any }
+  }
+
+  it('archives a product Session without exposing native ids', async () => {
+    const { app } = build()
+    const result = await patch(app, '/ws-1/resumes/resume-1', { presence: 'archived' })
+    expect(result).toEqual({
+      status: 200,
+      body: { resumeId: 'resume-1', presence: 'archived', lifecycle: 'active' },
+    })
+  })
+
+  it('rejects an unknown presence value', async () => {
+    const { app } = build()
+    const result = await patch(app, '/ws-1/resumes/resume-1', { presence: 'purged' })
+    expect(result.status).toBe(400)
+    expect(result.body.error).toBe('invalid_presence')
   })
 })
 

@@ -74,4 +74,50 @@ describe('buildWorkspaceSessionDirectory', () => {
     expect(JSON.stringify(result)).not.toContain('launcher-secret')
     expect(JSON.stringify(result)).not.toContain('private repeated prompt')
   })
+
+  it('projects archived presence and keeps a deleted Session non-resumable', () => {
+    const archived = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [{
+        resumeId: 'resume-archived',
+        wsId: 'ws-1',
+        agent: 'pi',
+        agentSessionId: 'native-1',
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: 'active',
+        presence: 'archived',
+      }],
+      interactiveFor: () => undefined,
+      latestExecutionFor: () => null,
+      isActive: () => false,
+    })
+    expect(archived.sessions[0]).toMatchObject({
+      resumeId: 'resume-archived',
+      presence: 'archived',
+      resumable: true,
+    })
+
+    const deleted = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [{
+        resumeId: 'resume-deleted',
+        wsId: 'ws-1',
+        agent: 'pi',
+        agentSessionId: 'native-1',
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: 'active',
+        presence: 'deleted',
+      }],
+      interactiveFor: () => undefined,
+      latestExecutionFor: () => null,
+      isActive: () => false,
+    })
+    expect(deleted.sessions[0]).toMatchObject({
+      resumeId: 'resume-deleted',
+      presence: 'deleted',
+      resumable: false,
+    })
+  })
 })

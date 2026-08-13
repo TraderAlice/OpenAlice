@@ -244,4 +244,36 @@ describe('ResumeRegistry', () => {
     expect(registry.get('resume-owner')).not.toHaveProperty('retiredAt')
     expect(registry.get('resume-owner')).not.toHaveProperty('successorResumeId')
   })
+
+  it('archives and restores floor presence without rewriting workspace retirement', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    await registry.ensure({
+      resumeId: 'resume-owner', wsId: 'ws-1', agent: 'pi', agentSessionId: 'native-1', now: 1,
+    })
+    await registry.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'archived', now: 2 })
+    expect(registry.get('resume-owner')).toMatchObject({ presence: 'archived', lifecycle: 'active' })
+
+    const reloaded = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    expect(reloaded.get('resume-owner')?.presence).toBe('archived')
+    await reloaded.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'active', now: 3 })
+    expect(reloaded.get('resume-owner')).not.toHaveProperty('presence')
+
+    await expect(reloaded.setPresence({
+      resumeId: 'resume-owner', wsId: 'ws-1', presence: 'deleted', now: 4,
+    })).rejects.toThrow(/cannot move/)
+
+    await reloaded.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'archived', now: 5 })
+    await reloaded.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'deleted', now: 6 })
+    await expect(reloaded.ensure({ resumeId: 'resume-owner', wsId: 'ws-1', agent: 'pi' }))
+      .rejects.toThrow(/deleted/)
+    await expect(reloaded.setPresence({
+      resumeId: 'resume-owner', wsId: 'ws-1', presence: 'active', now: 7,
+    })).rejects.toThrow(/cannot move/)
+
+    await reloaded.retireWorkspace('ws-1', { reason: 'desk left', now: 8 })
+    await expect(reloaded.setPresence({
+      resumeId: 'resume-owner', wsId: 'ws-1', presence: 'archived', now: 9,
+    })).rejects.toThrow(/retired/)
+    expect(reloaded.get('resume-owner')).toMatchObject({ lifecycle: 'retired', presence: 'deleted' })
+  })
 })

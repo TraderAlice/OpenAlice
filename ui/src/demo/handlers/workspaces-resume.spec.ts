@@ -77,8 +77,11 @@ describe('demo Workspace resume handlers', () => {
       'demo-resume-chat',
       'resume-demo-headless-colleague',
       'resume-demo-headless-running',
+      'resume-demo-archived-colleague',
       'resume-demo-headless-retired',
     ]))
+    expect(body.sessions.find((session) => session.resumeId === 'resume-demo-archived-colleague'))
+      .toMatchObject({ presence: 'archived' })
     expect(body.sessions.find((session) => session.resumeId === 'resume-demo-headless-colleague'))
       .toMatchObject({ active: false, latestExecution: { status: 'done' } })
     expect(body.sessions.find((session) => session.resumeId === 'resume-demo-headless-running'))

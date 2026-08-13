@@ -68,6 +68,11 @@ export interface WorkspacesContextValue {
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   openWebPiSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
+  setSessionPresence(
+    wsId: string,
+    resumeId: string,
+    presence: import('../components/workspace/api').SessionPresence,
+  ): Promise<void>
   openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,

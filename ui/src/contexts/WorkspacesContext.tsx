@@ -52,6 +52,8 @@ import {
   quickChat as apiQuickChat,
   quickStartWorkspaceManager as apiQuickStartWorkspaceManager,
   resumeSession as apiResumeSession,
+  setSessionPresence as apiSetSessionPresence,
+  type SessionPresence,
   setIssueDefaultAgent as apiSetIssueDefaultAgent,
   setAutoQuantDefaultWorkspace as apiSetAutoQuantDefaultWorkspace,
   setWorkspaceDefaultAgent as apiSetWorkspaceDefaultAgent,
@@ -610,6 +612,20 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setPendingSessionDelete({ wsId, sessionId })
   }, [])
 
+  const setSessionPresence = useCallback(async (
+    wsId: string,
+    resumeId: string,
+    presence: SessionPresence,
+  ): Promise<void> => {
+    try {
+      await apiSetSessionPresence(wsId, resumeId, presence)
+      void refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('workspace.sessionPresenceFailed'))
+      throw err
+    }
+  }, [refresh, t, toast])
+
   const openAgentConfig = useCallback((
     wsId: string,
     agent?: AgentId,
@@ -656,6 +672,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     resumeSession,
     openWebPiSession,
     requestDeleteSession,
+    setSessionPresence,
     openAgentConfig,
     saveWorkspaceMetadata,
     renameWorkspace,
@@ -681,6 +698,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     refreshWorkspaceManager,
     renameWorkspace,
     requestDeleteSession,
+    setSessionPresence,
     resumeSession,
     saveWorkspaceMetadata,
     setAutoQuantDefaultWorkspace,

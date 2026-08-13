@@ -14,6 +14,7 @@ const actions = vi.hoisted(() => ({
   pauseSession: vi.fn(async () => undefined),
   resumeSession: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
+  setSessionPresence: vi.fn(async () => undefined),
   setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
 }))
 
@@ -105,6 +106,7 @@ function context(): WorkspacesContextValue {
     resumeSession: actions.resumeSession,
     openWebPiSession: vi.fn(async () => undefined),
     requestDeleteSession: actions.requestDeleteSession,
+    setSessionPresence: actions.setSessionPresence,
     openAgentConfig: vi.fn(),
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),
@@ -140,7 +142,7 @@ describe('Ask Alice sidebar in AutoQuant mode', () => {
     const more = screen.getByRole('button', { name: `More actions for ${sessionTitle}` })
     more.focus()
     await user.keyboard('{ArrowDown}')
-    fireEvent.click(screen.getByRole('menuitem', { name: `Delete ${sessionTitle}` }))
-    expect(actions.requestDeleteSession).toHaveBeenCalledWith(workspace.id, session.id)
+    fireEvent.click(screen.getByRole('menuitem', { name: `Archive ${sessionTitle}` }))
+    expect(actions.setSessionPresence).toHaveBeenCalledWith(workspace.id, session.resumeId, 'archived')
   })
 })

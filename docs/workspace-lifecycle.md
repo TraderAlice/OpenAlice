@@ -61,6 +61,17 @@ active -> retired
    +---------+  Workspace restore / explicit recall
 ```
 
+In-desk floor presence (independent of `lifecycle`):
+
+```text
+active <-> archived <-> deleted
+```
+
+`presence` answers whether the coworker is on the Ask Alice roster, filed in
+the archive, or softly dismissed. Missing `presence` is `active`. `lifecycle:
+retired` still means the coworker left with the Workspace; restore recalls the
+desk without washing archived or deleted people back onto the floor.
+
 `SessionRecord` is only an interactive seat. Removing or pausing one does not
 retire the coworker. `resumeId` is the coworker identity; retirement is stored
 on `ResumeIdentityRecord` and retains the native runtime mapping, run history,

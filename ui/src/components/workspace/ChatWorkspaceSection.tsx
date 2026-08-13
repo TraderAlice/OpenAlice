@@ -221,6 +221,19 @@ export function ChatWorkspaceSection({
     ctx.requestDeleteSession(row.workspaceId, row.session.id)
   }
 
+  const archiveRosterSession = (row: HarnessSession): void => {
+    if (row.headlessOccupying) return
+    void ctx.setSessionPresence(row.workspaceId, row.resumeId, 'archived')
+      .then(() => sessionDirectories.refresh())
+      .catch((err) => console.error('workspaces.archive_failed', { resumeId: row.resumeId, err }))
+  }
+
+  const restoreRosterSession = (row: HarnessSession): void => {
+    void ctx.setSessionPresence(row.workspaceId, row.resumeId, 'active')
+      .then(() => sessionDirectories.refresh())
+      .catch((err) => console.error('workspaces.restore_failed', { resumeId: row.resumeId, err }))
+  }
+
   const pauseRosterSession = (row: HarnessSession): void => {
     if (!row.session) return
     void ctx.pauseSession(row.workspaceId, row.session.id)
@@ -315,6 +328,7 @@ export function ChatWorkspaceSection({
           onPauseSession={pauseRosterSession}
           onResumeSession={resumeRosterSession}
           onDeleteSession={deleteRosterSession}
+          onArchiveSession={archiveRosterSession}
           onCreateWorkspace={() => setShowCreate(true)}
         />
       ) : displayMode === 'recent' ? (
@@ -329,6 +343,7 @@ export function ChatWorkspaceSection({
           onPauseSession={pauseRosterSession}
           onResumeSession={resumeRosterSession}
           onDeleteSession={deleteRosterSession}
+          onArchiveSession={archiveRosterSession}
           onCreateWorkspace={() => setShowCreate(true)}
         />
       ) : (
@@ -406,6 +421,7 @@ export function ChatWorkspaceSection({
             onPauseSession={pauseRosterSession}
             onResumeSession={resumeRosterSession}
             onDeleteSession={deleteRosterSession}
+            onArchiveSession={archiveRosterSession}
             onConfigure={() => ctx.openAgentConfig(w.id)}
             onDelete={() => setPendingDelete(w)}
             onSpawn={() => navigate({ kind: landingKind, params: { targetWsId: w.id } })}
@@ -456,6 +472,7 @@ export function ChatWorkspaceSection({
         isRowActive={isRosterRowActive}
         restoreFocusRef={dialogRestoreFocusRef}
         onOpenChange={setConversationBrowserOpen}
+        onRestoreSession={restoreRosterSession}
         onSelectSession={(row) => {
           if (row.headlessOccupying) return
           setConversationBrowserOpen(false)
@@ -681,6 +698,7 @@ interface FocusedChatWorkspaceProps {
   onPauseSession: (row: HarnessSession) => void
   onResumeSession: (row: HarnessSession) => void
   onDeleteSession: (row: HarnessSession) => void
+  onArchiveSession: (row: HarnessSession) => void
   onCreateWorkspace: () => void
 }
 
@@ -695,6 +713,7 @@ interface AllWorkspaceRecentSessionsProps {
   onPauseSession: (row: HarnessSession) => void
   onResumeSession: (row: HarnessSession) => void
   onDeleteSession: (row: HarnessSession) => void
+  onArchiveSession: (row: HarnessSession) => void
   onCreateWorkspace: () => void
 }
 
@@ -754,6 +773,7 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
             onPause={() => props.onPauseSession(row)}
             onResume={() => props.onResumeSession(row)}
             onDelete={() => props.onDeleteSession(row)}
+            onArchive={() => props.onArchiveSession(row)}
           />
         ))}
       </div>
@@ -840,6 +860,7 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
             onPause={() => props.onPauseSession(row)}
             onResume={() => props.onResumeSession(row)}
             onDelete={() => props.onDeleteSession(row)}
+            onArchive={() => props.onArchiveSession(row)}
           />
         ))}
       </div>
@@ -952,6 +973,7 @@ interface ChatWorkspaceRowProps {
   onPauseSession: (row: HarnessSession) => void
   onResumeSession: (row: HarnessSession) => void
   onDeleteSession: (row: HarnessSession) => void
+  onArchiveSession: (row: HarnessSession) => void
   onConfigure: () => void
   onDelete: () => void
   /** Spawn a fresh agent session in THIS workspace (and open it). */
@@ -966,6 +988,8 @@ function HarnessSessionRow(props: {
   onPause: () => void
   onResume: () => void
   onDelete: () => void
+  onArchive?: () => void
+  onRestore?: () => void
 }): ReactElement {
   const row = props.row
   return (
@@ -978,11 +1002,13 @@ function HarnessSessionRow(props: {
       headlessOccupying={row.headlessOccupying}
       resumable={row.resumable}
       failed={row.failed}
-      canDelete={row.session !== null}
+      canDelete={false}
       onSelect={props.onSelect}
       onPause={props.onPause}
       onResume={props.onResume}
       onDelete={props.onDelete}
+      onArchive={props.onArchive}
+      onRestore={props.onRestore}
     />
   )
 }
@@ -1105,6 +1131,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               onPause={() => props.onPauseSession(row)}
               onResume={() => props.onResumeSession(row)}
               onDelete={() => props.onDeleteSession(row)}
+              onArchive={() => props.onArchiveSession(row)}
             />
           ))}
         </div>

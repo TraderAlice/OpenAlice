@@ -36,6 +36,11 @@ import { projectPublicSession, type PublicSession } from '../../workspaces/publi
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import {
+  parseSessionPresence,
+  ResumePresenceError,
+  sessionPresence,
+} from '../../workspaces/resume-registry.js';
+import {
   isAgentRuntime,
   prepareAgentRuntimeWorkspace,
   type CliAdapter,
@@ -1462,6 +1467,42 @@ export function createWorkspaceRoutes(
     const directory = await svc.sessionDirectory(id, 100);
     if (!directory) return c.json({ error: 'workspace_not_found' }, 404);
     return c.json(directory);
+  });
+
+  app.patch('/:id/resumes/:resumeId', async (c) => {
+    const id = c.req.param('id');
+    const resumeId = c.req.param('resumeId');
+    if (!validId(id) || !validId(resumeId)) return c.json({ error: 'not_found' }, 404);
+    if (!svc.registry.get(id)) return c.json({ error: 'workspace_not_found' }, 404);
+    const body = await safeJson(c).catch(() => null);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const presence = parseSessionPresence(fields['presence']);
+    if (!presence) {
+      return c.json({ error: 'invalid_presence', message: 'presence must be active, archived, or deleted' }, 400);
+    }
+    try {
+      const identity = await svc.setSessionPresence({ wsId: id, resumeId, presence });
+      return c.json({
+        resumeId: identity.resumeId,
+        presence: sessionPresence(identity),
+        lifecycle: identity.lifecycle,
+      });
+    } catch (err) {
+      if (err instanceof ResumePresenceError) {
+        const error = err.code === 'not_found' ? 'resume_not_found'
+          : err.code === 'retired' ? 'resume_retired'
+            : err.code === 'wrong_workspace' ? 'resume_wrong_workspace'
+              : 'invalid_presence_transition';
+        return c.json({ error, message: err.message }, err.code === 'not_found' ? 404 : 409);
+      }
+      if (err instanceof HeadlessResumeError) {
+        return c.json(
+          { error: `resume_${err.code}`, message: err.message },
+          err.code === 'not_found' ? 404 : 409,
+        );
+      }
+      throw err;
+    }
   });
 
   // Materialize one product-owned conversation as a stable interactive

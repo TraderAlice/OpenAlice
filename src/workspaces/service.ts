@@ -133,7 +133,13 @@ import {
   type HeadlessTaskStatus,
   type HeadlessTaskTrigger,
 } from './headless-task-registry.js';
-import { ResumeRegistry } from './resume-registry.js';
+import {
+  ResumePresenceError,
+  ResumeRegistry,
+  sessionPresence,
+  type ResumeIdentityRecord,
+  type SessionPresence,
+} from './resume-registry.js';
 import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js';
 import {
   AUTO_QUANT_WORKSPACE_TEMPLATE,
@@ -151,6 +157,7 @@ function automationOwnerState(assignee: string, resumes: ResumeRegistry): IssueA
   const identity = resumes.get(resumeId);
   if (!identity) return 'missing';
   if (identity.lifecycle === 'retired') return 'retired';
+  if (identity.presence === 'deleted') return 'deleted';
   return identity.agentSessionId ? 'ready' : 'unbound';
 }
 
@@ -176,7 +183,7 @@ export class HeadlessCapacityError extends Error {
 
 export class HeadlessResumeError extends Error {
   constructor(
-    public readonly code: 'not_found' | 'wrong_workspace' | 'wrong_agent' | 'not_ready' | 'retired' | 'busy',
+    public readonly code: 'not_found' | 'wrong_workspace' | 'wrong_agent' | 'not_ready' | 'retired' | 'deleted' | 'busy',
     message: string,
   ) {
     super(message);
@@ -514,6 +521,12 @@ export interface WorkspaceService {
   retryIssue(wsId: string, id: string): Promise<IssueDetail>;
   /** Safe Workspace Session index. resumeId is the only public conversation handle. */
   sessionDirectory(wsId: string, limit?: number): Promise<WorkspaceSessionDirectory | null>;
+  /** Change in-desk floor presence. Does not retire or delete the coworker. */
+  setSessionPresence(input: {
+    wsId: string
+    resumeId: string
+    presence: SessionPresence
+  }): Promise<ResumeIdentityRecord>;
   /** Resolve a `[[name]]` token to the issues across ALL workspaces that claim it.
    *  Matches case-insensitively against an issue's `id` OR its `title` (either is a
    *  valid name handle). Returns every match — 0, 1, or many (a collision the UI
@@ -1567,6 +1580,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       if (identity.lifecycle === 'retired') {
         throw new HeadlessResumeError('retired', 'resume conversation is retired');
       }
+      if (sessionPresence(identity) === 'deleted') {
+        throw new HeadlessResumeError('deleted', 'resume conversation is deleted');
+      }
       if (identity.wsId !== ws.id) {
         throw new HeadlessResumeError('wrong_workspace', 'resume conversation belongs to another workspace');
       }
@@ -1813,13 +1829,16 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     registry,
     resolveResumeWorkspace: (resumeId) => {
       const identity = resumeRegistry.get(resumeId);
-      return identity && identity.lifecycle !== 'retired' ? registry.get(identity.wsId) : undefined;
+      return identity && identity.lifecycle !== 'retired' && sessionPresence(identity) !== 'deleted'
+        ? registry.get(identity.wsId)
+        : undefined;
     },
     resolveAdapter: async (ws, agentId, resumeId) => {
       if (resumeId) {
         const identity = resumeRegistry.get(resumeId);
         if (!identity) throw new Error(`unknown resume conversation: ${resumeId}`);
         if (identity.lifecycle === 'retired') throw new Error(`retired resume conversation: ${resumeId}`);
+        if (sessionPresence(identity) === 'deleted') throw new Error(`deleted resume conversation: ${resumeId}`);
         if (identity.wsId !== ws.id) throw new Error(`resume conversation workspace resolution drifted`);
         return resolveAdapter(ws, identity.agent);
       }
@@ -2114,6 +2133,35 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (!detail) throw new IssueRetryError('not_found', 'Issue not found.');
     return detail;
   };
+
+  const setSessionPresence = async (input: {
+    wsId: string
+    resumeId: string
+    presence: SessionPresence
+  }): Promise<ResumeIdentityRecord> => {
+    const identity = resumeRegistry.get(input.resumeId)
+    if (!identity) throw new ResumePresenceError('not_found', 'resume conversation not found')
+    if (identity.wsId !== input.wsId) {
+      throw new ResumePresenceError('wrong_workspace', 'resume conversation belongs to another workspace')
+    }
+    // Presence changes and launches share the same resume lease. Checking the
+    // registries without claiming first leaves a race where Archive and Resume
+    // can both pass their busy checks and commit conflicting state.
+    if (!claimResume(input.resumeId)) {
+      throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
+    }
+    try {
+      await sessionRegistry.ensureLoaded(input.wsId)
+      const interactive = sessionRegistry.findByResumeId(input.wsId, input.resumeId)
+      const headless = headlessTasks.latestForResumeId(input.resumeId)
+      if (interactive?.state === 'running' || headless?.status === 'running') {
+        throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
+      }
+      return await resumeRegistry.setPresence(input)
+    } finally {
+      activeResumeIds.delete(input.resumeId)
+    }
+  }
 
   const sessionDirectory = async (
     wsId: string,
@@ -2539,6 +2587,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     issueDetail,
     retryIssue,
     sessionDirectory,
+    setSessionPresence,
     resolveIssuesByName,
     headlessTasks,
     resumeRegistry,

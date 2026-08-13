@@ -15,6 +15,37 @@ import type { SessionMetadata } from './session-metadata.js'
 import { parseSessionMetadata } from './session-metadata.js'
 import type { SessionRuntimeBindingStore } from './session-runtime-store.js'
 
+export type SessionPresence = 'active' | 'archived' | 'deleted'
+
+export function sessionPresence(
+  record: { readonly presence?: SessionPresence } | null | undefined,
+): SessionPresence {
+  return record?.presence ?? 'active'
+}
+
+export function parseSessionPresence(value: unknown): SessionPresence | undefined {
+  if (value === 'active' || value === 'archived' || value === 'deleted') return value
+  return undefined
+}
+
+export function canTransitionPresence(from: SessionPresence, to: SessionPresence): boolean {
+  if (from === to) return true
+  if (from === 'active' && to === 'archived') return true
+  if (from === 'archived' && (to === 'active' || to === 'deleted')) return true
+  if (from === 'deleted' && to === 'archived') return true
+  return false
+}
+
+export class ResumePresenceError extends Error {
+  constructor(
+    readonly code: 'not_found' | 'retired' | 'wrong_workspace' | 'invalid_transition',
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ResumePresenceError'
+  }
+}
+
 export interface ResumeIdentityRecord {
   readonly resumeId: string
   readonly wsId: string
@@ -29,6 +60,11 @@ export interface ResumeIdentityRecord {
   updatedAt: number
   /** Product employment state. Native transcript history is retained either way. */
   lifecycle: 'active' | 'retired'
+  /**
+   * In-desk floor presence. Missing means active. Distinct from `lifecycle`:
+   * `retired` still means the coworker left with the Workspace.
+   */
+  presence?: SessionPresence
   retiredAt?: number
   retirementReason?: string
   successorResumeId?: string
@@ -81,6 +117,7 @@ export class ResumeRegistry {
           agent: record['agent'],
         })
         const metadata = parseSessionMetadata(record['metadata'])
+        const presence = parseSessionPresence(record['presence'])
         this.records.set(record['resumeId'], {
           resumeId: record['resumeId'],
           wsId: record['wsId'],
@@ -88,6 +125,7 @@ export class ResumeRegistry {
           createdAt: record['createdAt'],
           updatedAt: record['updatedAt'],
           lifecycle: record['lifecycle'] === 'retired' ? 'retired' : 'active',
+          ...(presence && presence !== 'active' ? { presence } : {}),
           ...(typeof record['agentSessionId'] === 'string'
             ? { agentSessionId: record['agentSessionId'] }
             : {}),
@@ -154,6 +192,9 @@ export class ResumeRegistry {
       if (existing.lifecycle === 'retired') {
         throw new Error(`resume identity ${resumeId} is retired`)
       }
+      if (sessionPresence(existing) === 'deleted') {
+        throw new Error(`resume identity ${resumeId} is deleted`)
+      }
       if (
         input.runtimeBinding
         && existing.runtimeBinding
@@ -200,6 +241,34 @@ export class ResumeRegistry {
       ...(input.metadata ? { metadata: input.metadata } : {}),
     }
     this.records.set(resumeId, record)
+    await this.flush()
+    return record
+  }
+
+  async setPresence(input: {
+    resumeId: string
+    wsId: string
+    presence: SessionPresence
+    now?: number
+  }): Promise<ResumeIdentityRecord> {
+    const record = this.records.get(input.resumeId)
+    if (!record) throw new ResumePresenceError('not_found', `resume identity ${input.resumeId} was not found`)
+    if (record.wsId !== input.wsId) {
+      throw new ResumePresenceError('wrong_workspace', `resume identity ${input.resumeId} belongs to ${record.wsId}`)
+    }
+    if (record.lifecycle === 'retired') {
+      throw new ResumePresenceError('retired', `resume identity ${input.resumeId} is retired`)
+    }
+    const current = sessionPresence(record)
+    if (!canTransitionPresence(current, input.presence)) {
+      throw new ResumePresenceError(
+        'invalid_transition',
+        `cannot move resume identity ${input.resumeId} from ${current} to ${input.presence}`,
+      )
+    }
+    if (input.presence === 'active') delete record.presence
+    else record.presence = input.presence
+    record.updatedAt = input.now ?? Date.now()
     await this.flush()
     return record
   }

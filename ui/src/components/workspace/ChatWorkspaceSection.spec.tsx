@@ -22,6 +22,7 @@ const actions = vi.hoisted(() => ({
   openWebPiSession: vi.fn(async () => undefined),
   openHeadlessRun: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
+  setSessionPresence: vi.fn(async () => undefined),
   openAgentConfig: vi.fn(),
 }))
 const directoryState = vi.hoisted(() => ({
@@ -116,6 +117,7 @@ function workspaceContext(
     resumeSession: actions.resumeSession,
     openWebPiSession: actions.openWebPiSession,
     requestDeleteSession: actions.requestDeleteSession,
+    setSessionPresence: actions.setSessionPresence,
     openAgentConfig: actions.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),
@@ -571,7 +573,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledTimes(2)
   })
 
-  it('lists Directory-only colleagues and locks TUI while headless occupies them', () => {
+  it('lists Directory-only colleagues and locks TUI while headless occupies them', async () => {
     const onNavigate = vi.fn()
     directoryState.directories = new Map([[chatWorkspace.id, {
       workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
@@ -627,6 +629,17 @@ describe('ChatWorkspaceSection actions', () => {
       { title: 'Morning scan complete. Semis still lead.' },
     )
     expect(onNavigate).toHaveBeenCalledOnce()
+
+    const user = userEvent.setup()
+    const more = screen.getByRole('button', { name: 'More actions for Morning scan complete. Semis still lead.' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive Morning scan complete. Semis still lead.' }))
+    expect(actions.setSessionPresence).toHaveBeenCalledWith(
+      chatWorkspace.id,
+      'resume-headless-colleague',
+      'archived',
+    )
   })
 
   it('keeps headless occupancy inside Browse Running without a Headless filter', () => {

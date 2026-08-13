@@ -120,7 +120,7 @@ pnpm test
 
 - [x] 侧栏按最近占班列出全部在职员工，不再截断
 - [x] 行内 Browse 去掉；查找只走底栏
-- [ ] Archive 把人移出名册，不毁掉 `resumeId`
+- [x] Archive 把人移出名册，不毁掉 `resumeId`
 - [ ] Deleted 是软开除，工作留痕仍找得到人
 - [ ] `retired` 仍只表示跟桌走了
 - [ ] PR 开出后交给审查，不合
@@ -128,6 +128,6 @@ pnpm test
 ## Checklist
 
 - [x] Increment 1：去掉截断和行内 Browse + 单测
-- [ ] Increment 2：`presence` + PATCH + 名册/Browse/follow-up + owner guide
+- [x] Increment 2：`presence` + PATCH + 名册/Browse/follow-up + owner guide
 - [ ] Increment 3：soft-delete / undelete（若未并进 2）
 - [ ] 浏览器走 Chat 与 Quant

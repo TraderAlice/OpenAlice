@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Bot, ChevronDown, ChevronRight, Code2, Cpu, LayoutGrid, Library, Pencil, Play, Plus, Settings as SettingsIcon, Sparkles, Square, Terminal, X, type LucideIcon } from 'lucide-react';
+import { Archive, Bot, ChevronDown, ChevronRight, Code2, Cpu, LayoutGrid, Library, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Sparkles, Square, Terminal, X, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
@@ -639,6 +639,8 @@ export interface SessionRowProps {
   onPause: () => void;
   onResume: () => void;
   onDelete: () => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
 }
 
 export function SessionRow(props: SessionRowProps): ReactElement {
@@ -646,6 +648,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const s = props.session;
   const isPaused = s.state === 'paused';
   const headlessOccupying = props.headlessOccupying === true;
+  const presenceLocked = headlessOccupying || !isPaused;
   const resumable = props.resumable !== false;
   const canDelete = props.canDelete !== false;
   // The server resolves native title → launch prompt → sticky name.
@@ -658,6 +661,30 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       : t('workspace.sessionNotResumable', { title: display });
   const stopLabel = t('workspace.stopSession', { title: display });
   const deleteLabel = t('workspace.deleteSession', { title: display });
+  const archiveLabel = t('workspace.archiveSession', { title: display });
+  const restoreLabel = t('workspace.restoreSession', { title: display });
+  const menuItems = [
+    ...(props.onArchive ? [{
+      label: t('workspace.archiveSessionAction'),
+      ariaLabel: archiveLabel,
+      icon: <Archive size={13} strokeWidth={2} />,
+      onSelect: props.onArchive,
+      disabled: presenceLocked,
+    }] : []),
+    ...(props.onRestore ? [{
+      label: t('workspace.restoreSessionAction'),
+      ariaLabel: restoreLabel,
+      icon: <RotateCcw size={13} strokeWidth={2} />,
+      onSelect: props.onRestore,
+    }] : []),
+    ...(canDelete ? [{
+      label: t('workspace.deleteSessionAction'),
+      ariaLabel: deleteLabel,
+      icon: <X size={13} strokeWidth={2.5} />,
+      onSelect: props.onDelete,
+      danger: true,
+    }] : []),
+  ];
   const selectLabel = headlessOccupying ? t('workspace.sessionRunning', { title: display }) : display;
   const metaParts: string[] = [`agent ${s.agent}`];
   if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
@@ -735,16 +762,10 @@ export function SessionRow(props: SessionRowProps): ReactElement {
           <Square size={10} strokeWidth={0} fill="currentColor" />
         </button>
       )}
-      {canDelete && (
+      {menuItems.length > 0 && (
         <SidebarActionMenu
           label={t('common.moreActions', { target: display })}
-          items={[{
-            label: t('workspace.deleteSessionAction'),
-            ariaLabel: deleteLabel,
-            icon: <X size={13} strokeWidth={2.5} />,
-            onSelect: props.onDelete,
-            danger: true,
-          }]}
+          items={menuItems}
         />
       )}
     </div>
