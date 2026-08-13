@@ -317,11 +317,12 @@ Human `status` reports:
 - Alice, UTA, and Connector state;
 - source launch root and safe diagnostic detail when available.
 
-Dev-owned Runtimes may be inspected and opened; Electron owners are still
-identifiable through ownership evidence but do not yet advertise a browser
-handoff endpoint. `down` refuses both. Only a matching `cli-server` that
-advertises `runtime.stop` accepts the stop transaction. The Electron browser
-handoff is tracked in [[plans/electron-runtime-browser-handoff.md]].
+Dev-owned Runtimes may be inspected and opened. A healthy local `dev` or
+`cli-server` owner also advertises a verified loopback Web endpoint that
+Electron can open in the default browser without takeover. `down` still
+refuses both. Only a matching `cli-server` that advertises `runtime.stop`
+accepts the stop transaction. The Electron browser handoff is documented in
+[[docs/data-locations.md]].
 
 Source dev and built Guardian entries publish the same private, local
 `runtime.status` contract. In particular, `pnpm dev` advertises its owner PID,
@@ -479,10 +480,11 @@ npx tsc --noEmit
 pnpm test
 ```
 
-For launcher ownership or takeover changes:
+For launcher ownership, takeover, or existing-owner browser handoff:
 
 ```bash
 pnpm test:guardian-recovery
+pnpm electron:smoke:existing-owner
 ```
 
 For a distributed payload change:

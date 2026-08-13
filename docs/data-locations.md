@@ -76,9 +76,14 @@ is introduced.
 
 **Settings → General → Data location** shows the effective root and its source.
 The desktop can open the current folder, choose another folder and restart,
-reuse a recent folder, or ask which location to use on every startup. If an
-already-running AliceProject owns the selected home, the recovery dialog offers a
-third path: choose another data location without stopping the existing owner.
+reuse a recent folder, or ask which location to use on every startup. If a
+healthy development or CLI Server Runtime already owns the selected home,
+Electron's primary action is **Open in browser**: it probes the advertised
+loopback Web endpoint, opens that page, and quits without taking the lock.
+**Choose another data location** remains available when the home is not
+environment-locked. Takeover stays an explicit, destructive secondary action.
+Electron-owned, stale, starting, unhealthy, and incompatible owners keep
+tailored recovery dialogs and never receive a misleading browser button.
 
 The launcher preference is machine-local metadata stored at:
 
@@ -170,6 +175,10 @@ failed bootstrap quarantine directories when Windows still holds a handle.
   resolution, Settings controller, and relaunch requests.
 - `apps/desktop/src/main.ts` — Guardian wiring, duplicate-owner choice, safe
   relaunch, and the machine-local preference location.
+- `apps/desktop/src/existing-owner-startup.ts` — existing-owner dialog and
+  verified loopback browser handoff.
+- `packages/guardian-runtime/src/existing-owner-startup.ts` — owner/state/
+  endpoint decision table consumed by Electron.
 - `apps/desktop/src/data-home-smoke.ts` — real Electron preload and Settings
   rendering assertion for isolated launches.
 - `apps/desktop/src/ipc.ts` + `apps/desktop/src/preload.ts` — narrow renderer
@@ -181,4 +190,6 @@ For changes to this subsystem, run the focused unit/UI specs, Guardian recovery
 tests, strict desktop and UI type checks, and an isolated packaged onboarding
 or Workspace smoke. Manually verify a fresh startup prompt, a saved recent
 location, a missing saved location, and the duplicate-owner “choose another”
-path. Never use a real user home for these checks.
+path. For healthy foreign `dev` / CLI Server owners, also run
+`pnpm electron:smoke:existing-owner` on disposable homes. Never use a real
+user home for these checks.
