@@ -136,6 +136,51 @@ describe('Connector demo routes', () => {
     expect(await screen.findByText('connector-probe-demo')).toBeTruthy()
   })
 
+  it('confirms before unlinking a learned owner and keeps the token', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.discord = {
+      enabled: true,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-07-31T00:00:00.000Z',
+        adapters: [{
+          id: 'discord',
+          enabled: true,
+          status: 'healthy',
+          owner: 'owner-1',
+        }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+    render(<ConnectorsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Unlink' }))
+    expect(screen.getByRole('heading', { name: 'Unlink Discord?' })).toBeTruthy()
+    await new Promise((resolve) => window.setTimeout(resolve, 800))
+    expect(mocks.save).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('heading', { name: 'Unlink Discord?' })).toBeNull()
+    await new Promise((resolve) => window.setTimeout(resolve, 800))
+    expect(mocks.save).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unlink' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Unlink' }).at(-1)!)
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
+    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
+    expect(saved.adapters.discord.settings.ownerUserId).toBe('')
+    expect(saved.adapters.discord.settings.applicationId).toBe('discord-app')
+    expect(saved.adapters.discord.configuredSecrets).toEqual(['botToken'])
+  })
+
   it('keeps a secret as a local draft until the user saves it explicitly', async () => {
     render(<ConnectorsPage />)
 

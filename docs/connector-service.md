@@ -119,7 +119,16 @@ must present the lifecycle explicitly: credentials ready, bot online and
 `awaiting_link`, then linked/healthy. Starting the linking step enables the
 optional Connector Service and that adapter so the external bot can actually
 receive `/link`; owner/chat fields learned by the command are lifecycle output,
-not ordinary operator-entered configuration.
+not ordinary operator-entered configuration. Settings Unlink clears those
+learned fields and keeps the sealed token so a different private account can
+run `/link`. Removing the token is a different action.
+
+`awaiting_link` means the adapter can already receive `/link`. Telegram does
+not report that until long polling has started (`onStart`); Discord waits for
+the gateway to become ready. The Connector HTTP health endpoint binds before
+those external calls so Guardian can probe a `starting` adapter instead of
+treating the whole service as missing. A failed adapter stays registered with
+its `lastError` rather than collapsing to "configured but not running."
 
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
@@ -134,16 +143,16 @@ saved but no bot process exists to receive `/link`.
 |---|---|---|---|
 | Credentials needed | required secret/fields missing | adapter stopped | create the platform bot and save credentials |
 | Ready to link | credentials sealed, owner absent | adapter stopped | start the bot for linking |
-| Starting | adapter enabled, owner absent | Guardian/service reconciling | wait; Settings polls health without replacing form drafts |
+| Starting | adapter enabled, owner absent | service HTTP up; adapter `starting` until the platform connection is live | wait; Settings polls health without replacing form drafts |
 | Awaiting link | credentials sealed, owner absent | bot online with `awaiting_link` | open the private bot chat and send `/link` |
-| Linked | owner identity learned | adapter `healthy` | send tests or receive Inbox delivery |
-| Linked offline | owner identity retained | adapter/service intentionally stopped | start the connector when external delivery is wanted |
+| Linked | owner identity learned | adapter `healthy` | send tests, unlink, or receive Inbox delivery |
+| Linked offline | owner identity retained | adapter/service intentionally stopped | start the connector, or unlink and relink later |
 | Error | durable config retained | adapter `degraded` or service unavailable | inspect credentials and Connector logs |
 
 The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
-  linking instructions, and explicit test sends.
+  unlink, linking instructions, and explicit test sends.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
@@ -168,9 +177,9 @@ them through the same health contract and reports one of three phases:
 
 Each probe also records a stable reason code, check timestamp, and latency. A
 failed optional-service probe must never change Alice or Inbox availability.
-An adapter in `awaiting_link` is online and intentionally incomplete, so it does
-not degrade the service; external notification delivery becomes healthy only
-after the owner runs `/link`.
+An adapter in `starting` or `awaiting_link` is online and intentionally
+incomplete, so it does not degrade the service; external notification delivery
+becomes healthy only after the owner runs `/link`.
 The contract matrix lives in `src/services/optional-carrier/health.spec.ts`;
 `integrations.spec.ts` applies it to the real UTA and Connector response shapes.
 Guardian/process smoke tests remain responsible for proving that an enabled
