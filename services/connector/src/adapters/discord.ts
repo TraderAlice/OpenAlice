@@ -23,57 +23,64 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
   private ownerUserId?: string
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
-    const discord = await import('discord.js')
-    const {
-      Client,
-      Events,
-      GatewayIntentBits,
-      Partials,
-    } = discord
-    const applicationId = requiredString(config, 'applicationId')
-    const botToken = requiredString(config, 'botToken')
-    this.ownerUserId = optionalString(config, 'ownerUserId')
+    try {
+      const discord = await import('discord.js')
+      const {
+        Client,
+        Events,
+        GatewayIntentBits,
+        Partials,
+      } = discord
+      const applicationId = requiredString(config, 'applicationId')
+      const botToken = requiredString(config, 'botToken')
+      this.ownerUserId = optionalString(config, 'ownerUserId')
 
-    this.registerCommands(context)
-    await this.publishSlashCommands(applicationId, botToken, discord)
+      this.registerCommands(context)
+      await this.publishSlashCommands(applicationId, botToken, discord)
 
-    const client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
-      partials: [Partials.Channel],
-    })
-    this.client = client
-    client.on(Events.InteractionCreate, async (interaction) => {
-      if (!interaction.isChatInputCommand()) return
-      const handled = await context.commands.execute({
-        connectorId: this.id,
-        command: interaction.commandName,
-        userId: interaction.user.id,
-        chatId: interaction.channelId,
-        reply: async (message) => {
-          await interaction.reply({ content: message, ephemeral: false })
-        },
-      }).catch(async (error) => {
-        this.tracker.degraded(error)
-        if (!interaction.replied) await interaction.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
-        return true
+      const client = new Client({
+        intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
+        partials: [Partials.Channel],
       })
-      if (!handled && !interaction.replied) await interaction.reply('Unknown connector command.').catch(() => undefined)
-    })
-    client.on(Events.Error, (error) => this.tracker.degraded(error))
+      this.client = client
+      client.on(Events.InteractionCreate, async (interaction) => {
+        if (!interaction.isChatInputCommand()) return
+        const handled = await context.commands.execute({
+          connectorId: this.id,
+          command: interaction.commandName,
+          userId: interaction.user.id,
+          chatId: interaction.channelId,
+          reply: async (message) => {
+            await interaction.reply({ content: message, ephemeral: false })
+          },
+        }).catch(async (error) => {
+          this.tracker.degraded(error)
+          if (!interaction.replied) await interaction.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
+          return true
+        })
+        if (!handled && !interaction.replied) await interaction.reply('Unknown connector command.').catch(() => undefined)
+      })
+      client.on(Events.Error, (error) => this.tracker.degraded(error))
 
-    const ready = new Promise<void>((resolveReady) => {
-      client.once(Events.ClientReady, () => resolveReady())
-    })
-    await client.login(botToken)
-    await Promise.race([
-      ready,
-      new Promise<never>((_resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Discord gateway did not become ready within 15 seconds')), 15_000)
-        timer.unref?.()
-      }),
-    ])
-    if (this.ownerUserId) this.tracker.healthy(this.ownerUserId)
-    else this.tracker.awaitingLink()
+      const ready = new Promise<void>((resolveReady) => {
+        client.once(Events.ClientReady, () => resolveReady())
+      })
+      await client.login(botToken)
+      await Promise.race([
+        ready,
+        new Promise<never>((_resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Discord gateway did not become ready within 15 seconds')), 15_000)
+          timer.unref?.()
+        }),
+      ])
+      if (this.ownerUserId) this.tracker.healthy(this.ownerUserId)
+      else this.tracker.awaitingLink()
+    } catch (error) {
+      this.tracker.degraded(error)
+      this.client?.destroy()
+      this.client = undefined
+      throw error
+    }
   }
 
   async stop(): Promise<void> {

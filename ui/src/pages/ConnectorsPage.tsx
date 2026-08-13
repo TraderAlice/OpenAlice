@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { TFunction } from 'i18next'
-import { Bot, CheckCircle2, ChevronDown, CircleAlert, KeyRound, Link2, Power, Send, ShieldCheck } from 'lucide-react'
+import { Bot, CheckCircle2, ChevronDown, CircleAlert, KeyRound, Link2, Power, Send, ShieldCheck, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -23,6 +23,11 @@ interface PendingSecretRemoval {
   fieldLabel: string
 }
 
+interface PendingUnlink {
+  connectorId: string
+  connectorLabel: string
+}
+
 export function ConnectorsPage() {
   const { t } = useTranslation()
   const [definitions, setDefinitions] = useState<ConnectorDefinition[]>([])
@@ -33,6 +38,7 @@ export function ConnectorsPage() {
   const [savingSecret, setSavingSecret] = useState<string | null>(null)
   const [secretErrors, setSecretErrors] = useState<Record<string, string>>({})
   const [pendingSecretRemoval, setPendingSecretRemoval] = useState<PendingSecretRemoval | null>(null)
+  const [pendingUnlink, setPendingUnlink] = useState<PendingUnlink | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
   const [lastProbe, setLastProbe] = useState<{ connectorId: string; probeId: string } | null>(null)
@@ -114,6 +120,25 @@ export function ConnectorsPage() {
       }
     })
   }, [])
+
+  const unlinkAdapter = useCallback((id: string) => {
+    const definition = definitions.find((item) => item.id === id)
+    if (!definition) return
+    const learnedKeys = definition.fields.filter((field) => field.learnedBy).map((field) => field.key)
+    setConfig((current) => {
+      if (!current) return current
+      const existing = current.adapters[id] ?? emptyAdapter()
+      const settings = { ...existing.settings }
+      for (const key of learnedKeys) settings[key] = ''
+      return {
+        ...current,
+        adapters: {
+          ...current.adapters,
+          [id]: { ...existing, settings },
+        },
+      }
+    })
+  }, [definitions])
 
   const startAdapter = useCallback((id: string) => {
     setConfig((current) => {
@@ -268,6 +293,10 @@ export function ConnectorsPage() {
                         testing={testing}
                         onStart={() => startAdapter(definition.id)}
                         onStop={() => updateAdapter(definition.id, { enabled: false })}
+                        onUnlink={() => setPendingUnlink({
+                          connectorId: definition.id,
+                          connectorLabel: definition.label,
+                        })}
                         onTest={() => void test(definition.id)}
                         t={t}
                       />
@@ -316,6 +345,21 @@ export function ConnectorsPage() {
           {loadError && <p className="text-[13px] text-destructive">{t('connectorSettings.loadError')}</p>}
         </div>
       </SettingsScrollArea>
+
+      {pendingUnlink && (
+        <ConfirmDialog
+          title={t('connectorSettings.unlinkTitle', { name: pendingUnlink.connectorLabel })}
+          message={t('connectorSettings.unlinkMessage', { name: pendingUnlink.connectorLabel })}
+          confirmLabel={t('connectorSettings.unlink')}
+          workingLabel={t('connectorSettings.unlinking')}
+          variant="primary"
+          onConfirm={() => {
+            unlinkAdapter(pendingUnlink.connectorId)
+            setPendingUnlink(null)
+          }}
+          onClose={() => setPendingUnlink(null)}
+        />
+      )}
 
       {pendingSecretRemoval && (
         <ConfirmDialog
@@ -530,6 +574,7 @@ function SetupStatePanel({
   testing,
   onStart,
   onStop,
+  onUnlink,
   onTest,
   t,
 }: {
@@ -540,6 +585,7 @@ function SetupStatePanel({
   testing: string | null
   onStart: () => void
   onStop: () => void
+  onUnlink: () => void
   onTest: () => void
   t: TFunction
 }) {
@@ -595,6 +641,17 @@ function SetupStatePanel({
               {testing === definition.id
                 ? t('connectorSettings.sending')
                 : t('connectorSettings.sendTest')}
+            </button>
+          )}
+          {setup.linked && (
+            <button
+              type="button"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+              disabled={saving}
+              onClick={onUnlink}
+            >
+              <Unlink size={14} />
+              {t('connectorSettings.unlink')}
             </button>
           )}
           {running && (

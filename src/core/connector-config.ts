@@ -103,6 +103,10 @@ export async function writePublicConnectorConfig(input: PublicConnectorConfig): 
         if (!incoming.configuredSecrets.includes(key)) delete settings[key]
         continue
       }
+      if (field.learnedBy && typeof value === 'string' && value.trim() === '') {
+        delete settings[key]
+        continue
+      }
       settings[key] = value
     }
     next.adapters[id] = { enabled: incoming.enabled, settings } satisfies ConnectorAdapterConfig

@@ -73,6 +73,72 @@ describe('DeliveryManager connector registry', () => {
     await manager.stop()
   })
 
+  it('reports starting adapters before external startup finishes', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const adapter: ConnectorAdapter = {
+      id: 'slow',
+      start: async () => { await gate },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      health: () => ({ id: 'slow', enabled: true, status: 'starting' }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'slow', label: 'Slow', description: 'Slow adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { slow: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+    })
+
+    manager.installEnabledAdapters()
+    expect(manager.health()).toMatchObject({
+      status: 'healthy',
+      adapters: [{ id: 'slow', status: 'starting' }],
+    })
+
+    const started = manager.start()
+    release()
+    await started
+    await manager.stop()
+  })
+
+  it('keeps a failed adapter registered so its degraded health remains visible', async () => {
+    const adapter: ConnectorAdapter = {
+      id: 'broken',
+      start: async () => { throw new Error('Telegram API did not become ready') },
+      stop: async () => undefined,
+      deliver: async () => { throw new Error('Telegram is not ready') },
+      health: () => ({
+        id: 'broken',
+        enabled: true,
+        status: 'degraded',
+        lastError: 'Telegram API did not become ready',
+      }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'broken', label: 'Broken', description: 'Broken adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+    })
+
+    await manager.start()
+
+    expect(manager.health()).toMatchObject({
+      status: 'degraded',
+      adapters: [{ id: 'broken', status: 'degraded', lastError: 'Telegram API did not become ready' }],
+    })
+    await manager.stop()
+  })
+
   it('contains adapter delivery failures', async () => {
     const registry = new ConnectorRegistry()
     registry.register({

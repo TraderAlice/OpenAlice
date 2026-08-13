@@ -42,7 +42,10 @@ async function main(): Promise<void> {
     recorder: journal,
     updateAdapterSettings: (id, patch) => configStore.patchAdapter(id, patch),
   })
-  await manager.start()
+  // Install before opening the loopback port so health can say `starting`
+  // instead of "configured but not running". Adapter SDKs reach the network
+  // only after Guardian can already probe the process.
+  manager.installEnabledAdapters()
 
   const app = new Hono()
   app.get('/__connector/health', (c) => c.json(manager.health()))
@@ -75,6 +78,8 @@ async function main(): Promise<void> {
   }
   process.on('SIGINT', () => { void shutdown('SIGINT') })
   process.on('SIGTERM', () => { void shutdown('SIGTERM') })
+
+  await manager.start()
 }
 
 main().catch((error) => {

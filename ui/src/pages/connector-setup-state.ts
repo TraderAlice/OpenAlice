@@ -31,9 +31,12 @@ export function getConnectorSetupState(input: {
       : hasValue(adapter.settings[field.key]))
   const learnedFields = definition.fields.filter((field) => field.learnedBy)
   const linkCommand = learnedFields[0]?.learnedBy
-  const linked = learnedFields.length === 0
+  const durableLinked = learnedFields.length === 0
     || learnedFields.every((field) => hasValue(adapter.settings[field.key]))
-    || Boolean(runtime?.owner)
+  // Settings writes empty strings while unlinking. Ignore a stale runtime
+  // owner so the page can leave `linked` before Connector Service restarts.
+  const clearingOwner = learnedFields.some((field) => adapter.settings[field.key] === '')
+  const linked = durableLinked || (Boolean(runtime?.owner) && !clearingOwner)
   const running = serviceEnabled && adapter.enabled
 
   if (!ready) return { stage: 'needs_credentials', ready, linked: false, linkCommand }

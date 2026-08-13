@@ -20,47 +20,57 @@ import {
 export class TelegramConnectorAdapter implements ConnectorAdapter {
   readonly id = 'telegram'
   private readonly tracker = new AdapterHealthTracker(this.id)
+  private readonly startupTimeoutMs: number
   private bot?: Bot
   private ownerUserId?: string
   private chatId?: string
 
-  async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
-    const token = requiredString(config, 'botToken')
-    this.ownerUserId = optionalString(config, 'ownerUserId')
-    this.chatId = optionalString(config, 'chatId')
-    const bot = new Bot(token)
-    bot.api.config.use(autoRetry())
-    this.bot = bot
+  constructor(options: { startupTimeoutMs?: number } = {}) {
+    this.startupTimeoutMs = options.startupTimeoutMs ?? 15_000
+  }
 
-    for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
-      bot.command(command.name, async (ctx) => {
-        if (ctx.chat.type !== 'private' || !ctx.from) return
-        const handled = await context.commands.execute({
-          connectorId: this.id,
-          command: command.name,
-          userId: String(ctx.from.id),
-          chatId: String(ctx.chat.id),
-          reply: async (message) => { await ctx.reply(message) },
-        }).catch(async (error) => {
-          this.tracker.degraded(error)
-          await ctx.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
-          return true
+  async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
+    try {
+      const token = requiredString(config, 'botToken')
+      this.ownerUserId = optionalString(config, 'ownerUserId')
+      this.chatId = optionalString(config, 'chatId')
+      const bot = new Bot(token)
+      bot.api.config.use(autoRetry())
+      this.bot = bot
+
+      for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
+        bot.command(command.name, async (ctx) => {
+          if (ctx.chat.type !== 'private' || !ctx.from) return
+          const handled = await context.commands.execute({
+            connectorId: this.id,
+            command: command.name,
+            userId: String(ctx.from.id),
+            chatId: String(ctx.chat.id),
+            reply: async (message) => { await ctx.reply(message) },
+          }).catch(async (error) => {
+            this.tracker.degraded(error)
+            await ctx.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
+            return true
+          })
+          if (!handled) await ctx.reply('Unknown connector command.')
         })
-        if (!handled) await ctx.reply('Unknown connector command.')
-      })
-    }
-    this.registerCommands(context)
-    await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
-      command: name,
-      description,
-    })))
-    await bot.init()
-    if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
-    else this.tracker.awaitingLink()
-    void bot.start({ drop_pending_updates: true }).catch((error) => {
+      }
+      this.registerCommands(context)
+      await withTimeout(async () => {
+        await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
+          command: name,
+          description,
+        })))
+        await waitForTelegramPolling(bot, (error) => this.tracker.degraded(error))
+      }, this.startupTimeoutMs, `Telegram polling did not become ready within ${this.startupTimeoutMs}ms`)
+      if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
+      else this.tracker.awaitingLink()
+    } catch (error) {
       this.tracker.degraded(error)
-      console.warn('[connector] Telegram polling stopped:', error instanceof Error ? error.message : error)
-    })
+      await this.bot?.stop().catch(() => undefined)
+      this.bot = undefined
+      throw error
+    }
   }
 
   async stop(): Promise<void> {
@@ -123,6 +133,38 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
 
 export function telegramConnectorRegistration(): ConnectorAdapterRegistration {
   return { definition: TELEGRAM_CONNECTOR_DEFINITION, create: () => new TelegramConnectorAdapter() }
+}
+
+function waitForTelegramPolling(bot: Bot, onFailure: (error: unknown) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let ready = false
+    void bot.start({
+      drop_pending_updates: true,
+      onStart: () => {
+        ready = true
+        resolve()
+      },
+    }).catch((error) => {
+      console.warn('[connector] Telegram polling stopped:', error instanceof Error ? error.message : error)
+      onFailure(error)
+      if (!ready) reject(error)
+    })
+  })
+}
+
+export async function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+        timer.unref?.()
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 function requiredString(config: ConnectorAdapterConfig, key: string): string {
