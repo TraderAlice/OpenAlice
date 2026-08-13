@@ -108,7 +108,7 @@ export async function createTelegramConnectorDesk(
 export async function updateTelegramConnectorDesk(
   wsDir: string,
   id: string,
-  patch: { what?: string; when?: { kind: 'every'; every: TelegramConnectorCadence } },
+  patch: { what?: string; when?: { kind: 'every'; every: string } },
 ): Promise<MutateResult> {
   if (patch.when && !isTelegramConnectorCadence(patch.when.every)) {
     return {

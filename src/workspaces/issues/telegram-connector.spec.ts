@@ -129,7 +129,7 @@ describe('telegram connector desk', () => {
 
     const updated = await updateTelegramConnectorDesk(wsA, created.issue.id, {
       when: { kind: 'every', every: '3h' },
-    } as Parameters<typeof updateTelegramConnectorDesk>[2])
+    })
     expect(updated).toMatchObject({
       ok: false,
       reason: 'invalid',
