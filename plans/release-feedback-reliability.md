@@ -7,6 +7,7 @@ Related evidence:
 - [0.89.3-beta release run 31495757352](https://github.com/TraderAlice/OpenAlice/actions/runs/31495757352)
 - [master CI run 31495757321](https://github.com/TraderAlice/OpenAlice/actions/runs/31495757321)
 - [promotion PR #1060](https://github.com/TraderAlice/OpenAlice/pull/1060)
+- [Batch 1 serial PR #1061](https://github.com/TraderAlice/OpenAlice/pull/1061) — merged to `dev` on 2026-08-11
 
 Owner guides:
 
@@ -118,6 +119,6 @@ native CI/release evidence.
 
 ## Completion
 
-Batch 1 is complete when all first-batch criteria and local verification pass
-and the serial PR is merged to `dev`. The overall plan remains active until the
-second-batch DAG and provenance criteria are implemented and measured.
+Batch 1 is complete: criteria, local verification, and serial PR #1061 are
+merged to `dev`. The overall plan remains active until the second-batch DAG
+and provenance criteria are implemented and measured.

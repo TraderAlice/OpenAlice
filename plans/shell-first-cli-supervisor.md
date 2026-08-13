@@ -454,8 +454,8 @@ running Guardian, and TUI stop returned the home to absent.
 
 - [x] Inventory server/UI/Guardian outputs, production dependencies, native
   modules, Broker Pack boundary, and managed Pi injection.
-- [ ] Produce deterministic platform/architecture archives.
-- [ ] Define authenticated manifest, version, compatibility, Node requirement,
+- [x] Produce deterministic platform/architecture archives.
+- [x] Define authenticated manifest, version, compatibility, Node requirement,
   file hashes, and content identity.
 - [x] Install immutable Runtime versions and validate without a checkout.
 - [x] Add providers for bundle, source-development, Docker, Electron, and
@@ -805,3 +805,16 @@ This plan is complete only when:
   component health, while deliberately omitting `runtime.stop`. The real dev
   smoke proves CLI discovery, rejected stop, duplicate-writer refusal, and
   survival of the original owner in one isolated journey.
+- 2026-08-13: Plan-index audit against current `dev`. Increment 7's
+  platform/arch archives and hashed `runtime-manifest.json` already ship
+  through `pnpm build:headless-runtime` and the release matrix
+  (darwin/linux × arm64/x64), including an outside-checkout install/boot/
+  Doctor/`down` gate. Remaining increment 7 proof is still clean-host
+  Workspace PTY, optional components, and Pi. Increment 3 is still a hybrid
+  TypeScript/`mjs` CLI without `@xterm/headless`. Increment 4 still lacks a
+  dedicated component panel. Increment 5 still lacks log
+  filter/follow/pause, copyable Doctor remediation, update plan/progress
+  screens, and active-work disclosure. Increment 6 still lacks
+  `openalice config check`, last-known-good live reload, and registry-only
+  deletion. Increments 9–10 (atomic update/rollback and N-1 release gates)
+  remain unstarted. The plan stays Active.
