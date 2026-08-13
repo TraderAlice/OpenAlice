@@ -1748,7 +1748,7 @@ export const ja: Resources = {
       loading: '電話デスクを読み込み中…',
       needLink: '電話デスクを有効にする前に、Bot のリンクを完了してください。',
       workspace: 'ワークスペース',
-      workspaceDescription: '電話デスクは1つのワークスペースに属します。後から移す場合は無効化してから再有効化します。',
+      workspaceDescription: '既定は Ask Alice の Chat ワークスペースです。後から移す場合は無効化してから再有効化します。',
       enable: '電話デスクを有効化',
       enabling: '有効化しています…',
       disable: '電話デスクを無効化',

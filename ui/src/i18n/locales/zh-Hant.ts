@@ -1755,7 +1755,7 @@ export const zhHant: Resources = {
       loading: '正在載入電話台…',
       needLink: '請先完成機器人連結，再啟用電話台。',
       workspace: '工作區',
-      workspaceDescription: '電話台只屬於一個工作區。之後若要換地方，先停用再重新啟用。',
+      workspaceDescription: '預設使用 Ask Alice 的 Chat 工作區。之後若要換地方，先停用再重新啟用。',
       enable: '啟用電話台',
       enabling: '正在啟用…',
       disable: '停用電話台',

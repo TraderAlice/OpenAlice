@@ -16,10 +16,7 @@ import {
 
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { installHintFor } from '../components/workspace/agentInstall'
-import {
-  QuickChatError,
-  type Workspace,
-} from '../components/workspace/api'
+import { QuickChatError } from '../components/workspace/api'
 import {
   AgentLaunchDetails,
   AgentLaunchSelectors,
@@ -33,6 +30,7 @@ import {
   useAgentLaunchPreferences,
   useWorkspaceAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
+import { resolveChatWorkspaceTarget, workspaceActivityMs } from '../lib/chat-workspace-target'
 import { AutoQuantSetupPage } from './AutoQuantSetupPage'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
@@ -42,35 +40,7 @@ export {
   resolveAgentLaunchAiDetails as resolveQuickChatAiDetails,
   resolveAgentLaunchCredentialSlug as resolveQuickChatCredentialSlug,
 } from '../hooks/useAgentLaunchConfig'
-
-function workspaceActivityMs(workspace: Pick<Workspace, 'createdAt' | 'sessions'>): number {
-  const sessionActivity = workspace.sessions
-    .map((session) => Date.parse(session.lastActiveAt))
-    .filter(Number.isFinite)
-  if (sessionActivity.length > 0) return Math.max(...sessionActivity)
-  const created = Date.parse(workspace.createdAt)
-  return Number.isFinite(created) ? created : 0
-}
-
-/** Resolve the visible global-composer target. Explicit selection wins, then
- *  the persisted recent Chat workspace, then latest activity for upgrades. */
-export function resolveChatWorkspaceTarget(
-  workspaces: readonly Workspace[],
-  explicitWorkspaceId: string | null,
-  recentWorkspaceId: string | null,
-  templateName = 'chat',
-): Workspace | null {
-  const chats = workspaces.filter((workspace) => workspace.template === templateName)
-  const explicit = explicitWorkspaceId
-    ? chats.find((workspace) => workspace.id === explicitWorkspaceId)
-    : undefined
-  if (explicit) return explicit
-  const recent = recentWorkspaceId
-    ? chats.find((workspace) => workspace.id === recentWorkspaceId)
-    : undefined
-  if (recent) return recent
-  return [...chats].sort((a, b) => workspaceActivityMs(b) - workspaceActivityMs(a))[0] ?? null
-}
+export { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
 
 /**
  * Quick-chat landing — the "type a message → you're in" front door for the
