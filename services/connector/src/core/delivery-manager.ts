@@ -150,7 +150,16 @@ export class DeliveryManager {
     const deliveryId = message.id
     queueMicrotask(() => {
       if (this.stopped) return
-      void this.sendOwnerChat(message, deliveryId)
+      void this.sendOwnerChat(message, deliveryId).catch((error) => {
+        // The Issue comment is already durable before Alice projects it here.
+        // Keep owner-chat delivery best-effort like ordinary Inbox projection:
+        // a stopped/unlinked adapter or external outage must not become an
+        // unhandled rejection that can terminate Connector Service.
+        console.warn(
+          `[connector] ${message.adapterId} owner-chat delivery failed:`,
+          error instanceof Error ? error.message : error,
+        )
+      })
     })
     return { accepted: true, deliveryId }
   }

@@ -10,6 +10,7 @@ import {
   containsTelegramNoReply,
   ingestTelegramOwnerMessage,
   pullTelegramDeskInbound,
+  startTelegramDeskInboundPoll,
   shouldProjectDeskComment,
   stampTelegramDeskScheduledFire,
   type TelegramDeskChatHost,
@@ -122,6 +123,34 @@ describe('telegram desk ingest and stamp', () => {
     expect(shouldProjectDeskComment(created.issue, comment)).toBe(false)
   })
 
+  it('does not publish partial assistant text from a failed scheduled fire', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+
+    const comment = await stampTelegramDeskScheduledFire({
+      host: host(),
+      workspaceId: 'ws-a',
+      issueId: created.issue.id,
+      task: {
+        taskId: 'run-failed',
+        resumeId: 'resume-desk-owner',
+        wsId: 'ws-a',
+        agent: 'pi',
+        prompt: 'wake',
+        startedAt: 1,
+        status: 'failed',
+        finishedAt: 2,
+      },
+      assistantText: 'Partial answer before the runtime failed.',
+    })
+
+    expect(comment).toBeNull()
+  })
+
   it('does not drain Connector inbound until a live desk exists', async () => {
     let drained = 0
     const client = {
@@ -141,5 +170,34 @@ describe('telegram desk ingest and stamp', () => {
     expect(created.ok).toBe(true)
     await pullTelegramDeskInbound(host(), client)
     expect(drained).toBe(1)
+  })
+
+  it('does not overlap inbound drains when one poll is still running', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+
+    let active = 0
+    let maxActive = 0
+    let drains = 0
+    const client = {
+      drainInbound: async () => {
+        drains += 1
+        active += 1
+        maxActive = Math.max(maxActive, active)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        active -= 1
+        return []
+      },
+    } as unknown as ConnectorClient
+
+    const stop = startTelegramDeskInboundPoll(host(), { intervalMs: 2, client })
+    await new Promise((resolve) => setTimeout(resolve, 55))
+    stop()
+
+    expect(drains).toBeGreaterThan(1)
+    expect(maxActive).toBe(1)
   })
 })

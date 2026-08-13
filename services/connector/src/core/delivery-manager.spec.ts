@@ -186,6 +186,36 @@ describe('DeliveryManager connector registry', () => {
     })).resolves.toBeUndefined()
   })
 
+  it('contains asynchronous owner-chat failures after accepting the projection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'broken', label: 'Broken', description: 'Broken adapter.', fields: [], commands: [] },
+      create: () => ({
+        id: 'broken',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        sendOwnerText: async () => { throw new Error('owner chat offline') },
+        health: () => ({ id: 'broken', enabled: true, status: 'degraded' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+
+    expect(manager.enqueueOwnerChat({ id: 'desk-comment-1', adapterId: 'broken', text: 'hello' }))
+      .toEqual({ accepted: true, deliveryId: 'desk-comment-1' })
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
+      '[connector] broken owner-chat delivery failed:',
+      'owner chat offline',
+    ))
+    warn.mockRestore()
+  })
+
   it('treats an online bot waiting for /link as an intentional setup phase', async () => {
     const registry = new ConnectorRegistry()
     registry.register({

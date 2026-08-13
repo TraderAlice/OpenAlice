@@ -89,6 +89,10 @@ export async function stampTelegramDeskScheduledFire(input: {
   task: HeadlessTaskRecord
   assistantText?: string | null
 }): Promise<IssueComment | null> {
+  // A native CLI can emit partial assistant text before exiting with an error
+  // or interruption. Keep that diagnostic in the run record, but do not turn
+  // it into a durable phone-desk reply or project it to Telegram.
+  if (input.task.status !== 'done') return null
   const text = input.assistantText?.trim()
   if (!text) return null
   const workspace = input.host.getWorkspace(input.workspaceId)
@@ -145,12 +149,16 @@ export function startTelegramDeskInboundPoll(
   const client = options.client ?? new ConnectorClient(resolveConnectorUrl())
   const intervalMs = options.intervalMs ?? 1_500
   let stopped = false
+  let running = false
   const tick = async () => {
-    if (stopped) return
+    if (stopped || running) return
+    running = true
     try {
       await pullTelegramDeskInbound(host, client)
     } catch {
       // Connector is optional.
+    } finally {
+      running = false
     }
   }
   const timer = setInterval(() => { void tick() }, intervalMs)
