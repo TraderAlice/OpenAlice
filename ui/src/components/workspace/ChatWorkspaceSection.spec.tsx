@@ -421,24 +421,21 @@ describe('ChatWorkspaceSection actions', () => {
     expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
-  it('bounds expanded Workspace history and opens the complete conversation Dialog', () => {
+  it('scrolls the full Workspace roster and keeps Browse in the context menu', () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
     const onNavigate = vi.fn()
     renderSection([{ ...chatWorkspace, sessions }], null, onNavigate)
 
-    expect(screen.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(6)
-    expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
+    expect(screen.getByRole('button', { name: 'Conversation 3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'View all 9 sessions' })).toBeNull()
 
-    const browseAll = screen.getByRole('button', { name: 'View all 9 sessions' })
-    expect(browseAll.textContent).toBe('Browse all conversations')
-    expect(browseAll.className).toContain('w-full')
-    expect(browseAll.className).not.toContain('oa-pressable')
-    expect(browseAll.parentElement?.className).toContain('border-t')
-    fireEvent.click(browseAll)
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
     const browser = within(dialog)
-    expect(browser.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(9)
+    expect(browser.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
     expect(openOrFocus).not.toHaveBeenCalled()
 
     fireEvent.click(browser.getByRole('button', { name: 'Conversation 3' }))

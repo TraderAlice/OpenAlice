@@ -59,9 +59,6 @@ import type { ChatDisplayMode } from './chat-display-mode'
 
 const CHAT_TEMPLATE = 'chat'
 const AUTO_QUANT_TEMPLATE = 'auto-quant-v2'
-const CHAT_SIDEBAR_SESSION_LIMIT = 6
-const FOCUSED_CHAT_SESSION_LIMIT = 8
-const ALL_WORKSPACES_SESSION_LIMIT = 30
 
 function nextWorkspaceTag(workspaces: readonly Workspace[], base: string): string {
   const tags = new Set(workspaces.map((workspace) => workspace.tag))
@@ -318,7 +315,6 @@ export function ChatWorkspaceSection({
           onPauseSession={pauseRosterSession}
           onResumeSession={resumeRosterSession}
           onDeleteSession={deleteRosterSession}
-          onBrowseSessions={(workspaceId, restoreFocus) => openConversationBrowser(workspaceId, restoreFocus)}
           onCreateWorkspace={() => setShowCreate(true)}
         />
       ) : displayMode === 'recent' ? (
@@ -396,7 +392,6 @@ export function ChatWorkspaceSection({
         {chatWorkspaces.map((w) => (
           <ChatWorkspaceRow
             key={w.id}
-            harness={mode}
             workspace={w}
             sessions={rosterByWorkspace.get(w.id) ?? []}
             label={workspaceDisplayName(w)}
@@ -414,7 +409,6 @@ export function ChatWorkspaceSection({
             onConfigure={() => ctx.openAgentConfig(w.id)}
             onDelete={() => setPendingDelete(w)}
             onSpawn={() => navigate({ kind: landingKind, params: { targetWsId: w.id } })}
-            onBrowseSessions={(restoreFocus) => openConversationBrowser(w.id, restoreFocus)}
           />
         ))}
       </ul>
@@ -687,7 +681,6 @@ interface FocusedChatWorkspaceProps {
   onPauseSession: (row: HarnessSession) => void
   onResumeSession: (row: HarnessSession) => void
   onDeleteSession: (row: HarnessSession) => void
-  onBrowseSessions: (workspaceId: string, restoreFocus: HTMLElement | null) => void
   onCreateWorkspace: () => void
 }
 
@@ -712,9 +705,8 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
     [props.workspaces],
   )
   const sessions = props.sessions
-  const visibleSessions = sessions.slice(0, ALL_WORKSPACES_SESSION_LIMIT)
   const sessionListRef = useReorderMotion<HTMLDivElement>(
-    visibleSessions.map((row) => `${row.workspaceId}:${row.resumeId}`),
+    sessions.map((row) => `${row.workspaceId}:${row.resumeId}`),
   )
 
   if (props.loading) {
@@ -752,7 +744,7 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
           <p className="px-3 py-3 text-xs leading-relaxed text-muted-foreground/60">
             {props.harness === 'auto-quant' ? t('autoQuant.noResearchYet') : t('chat.noRecentConversations')}
           </p>
-        ) : visibleSessions.map((row) => (
+        ) : sessions.map((row) => (
           <HarnessSessionRow
             key={`${row.workspaceId}:${row.resumeId}`}
             row={row}
@@ -785,9 +777,8 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
 function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
   const { t } = useTranslation()
   const sessions = props.sessions
-  const visibleSessions = sessions.slice(0, FOCUSED_CHAT_SESSION_LIMIT)
   const sessionListRef = useReorderMotion<HTMLDivElement>(
-    visibleSessions.map((row) => row.resumeId),
+    sessions.map((row) => row.resumeId),
   )
 
   if (props.loading) {
@@ -840,7 +831,7 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
           <p className="px-3 py-3 text-xs text-muted-foreground/60">
             {props.emptyCopy ?? t('chat.noConversationsYet')}
           </p>
-        ) : visibleSessions.map((row) => (
+        ) : sessions.map((row) => (
           <HarnessSessionRow
             key={row.resumeId}
             row={row}
@@ -851,45 +842,8 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
             onDelete={() => props.onDeleteSession(row)}
           />
         ))}
-        {sessions.length > visibleSessions.length && (
-          <ConversationListFooter
-            harness={props.harness}
-            count={sessions.length}
-            onOpen={(restoreFocus) => props.onBrowseSessions(props.workspace!.id, restoreFocus)}
-          />
-        )}
       </div>
 
-    </div>
-  )
-}
-
-function ConversationListFooter({
-  harness,
-  count,
-  onOpen,
-}: {
-  harness: 'chat' | 'auto-quant'
-  count: number
-  onOpen: (restoreFocus: HTMLElement | null) => void
-}): ReactElement {
-  const { t } = useTranslation()
-
-  return (
-    <div className="mx-2 mt-1 border-t border-border/55 pt-1">
-      <button
-        type="button"
-        aria-label={harness === 'auto-quant'
-          ? t('autoQuant.viewAllResearch', { count })
-          : t('chat.viewAllSessions', { count })}
-        onClick={(event) => onOpen(event.currentTarget)}
-        className="flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-      >
-        <span className="min-w-0 flex-1 truncate">
-          {harness === 'auto-quant' ? t('autoQuant.browseResearch') : t('chat.browseWorkspace')}
-        </span>
-        <ChevronRight size={13} strokeWidth={2} className="shrink-0 text-muted-foreground/60" aria-hidden />
-      </button>
     </div>
   )
 }
@@ -988,7 +942,6 @@ function ManagerWorkspaceRow(props: ManagerWorkspaceRowProps): ReactElement {
 }
 
 interface ChatWorkspaceRowProps {
-  harness: 'chat' | 'auto-quant'
   workspace: Workspace
   sessions: readonly HarnessSession[]
   label: string
@@ -1003,8 +956,6 @@ interface ChatWorkspaceRowProps {
   onDelete: () => void
   /** Spawn a fresh agent session in THIS workspace (and open it). */
   onSpawn: () => void
-  /** Open the scalable conversation browser scoped to this Workspace. */
-  onBrowseSessions: (restoreFocus: HTMLElement | null) => void
 }
 
 function HarnessSessionRow(props: {
@@ -1046,9 +997,8 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
   const displayName = w.displayName?.trim()
   const subtitle = displayName && displayName !== w.tag ? w.tag : null
   const actionWorkspace = subtitle ? `${props.label} (${w.tag})` : w.tag
-  const visibleSessions = orderedSessions.slice(0, CHAT_SIDEBAR_SESSION_LIMIT)
   const sessionListRef = useReorderMotion<HTMLDivElement>(
-    visibleSessions.map((row) => row.resumeId),
+    orderedSessions.map((row) => row.resumeId),
   )
 
   const statusClass = hasRunning
@@ -1146,7 +1096,7 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
       </div>
       {expanded && orderedSessions.length > 0 && (
         <div ref={sessionListRef} className="oa-disclosure-enter ml-[18px] border-l border-border/50">
-          {visibleSessions.map((row) => (
+          {orderedSessions.map((row) => (
             <HarnessSessionRow
               key={row.resumeId}
               row={row}
@@ -1157,13 +1107,6 @@ function ChatWorkspaceRow(props: ChatWorkspaceRowProps): ReactElement {
               onDelete={() => props.onDeleteSession(row)}
             />
           ))}
-          {orderedSessions.length > visibleSessions.length && (
-            <ConversationListFooter
-              harness={props.harness}
-              count={orderedSessions.length}
-              onOpen={props.onBrowseSessions}
-            />
-          )}
         </div>
       )}
     </li>
