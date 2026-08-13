@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 
 import {
   DEMO_AUTO_QUANT_WORKSPACE_ID,
+  DEMO_CHAT_WORKSPACE_ID,
   DEMO_MACRO_WORKSPACE_ID,
 } from '../fixtures/workspaces'
 import { resetDemoWorkspaceWebPiState, workspacesHandlers } from './workspaces'
@@ -64,5 +65,31 @@ describe('demo Workspace resume handlers', () => {
       (candidate: { id: string }) => candidate.id === DEMO_AUTO_QUANT_WORKSPACE_ID,
     )
     expect(workspace.sessions).toContainEqual(expect.objectContaining({ id: `run-${resumeId}` }))
+  })
+
+  it('lists Directory-only Chat colleagues without inventing SessionRecords', async () => {
+    const response = await fetch(`${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/resumes`)
+    expect(response.status).toBe(200)
+    const body = await response.json() as {
+      sessions: Array<{ resumeId: string; lifecycle?: string; active?: boolean; latestExecution?: { status: string } }>
+    }
+    expect(body.sessions.map((session) => session.resumeId)).toEqual(expect.arrayContaining([
+      'demo-resume-chat',
+      'resume-demo-headless-colleague',
+      'resume-demo-headless-running',
+      'resume-demo-headless-retired',
+    ]))
+    expect(body.sessions.find((session) => session.resumeId === 'resume-demo-headless-colleague'))
+      .toMatchObject({ active: false, latestExecution: { status: 'done' } })
+    expect(body.sessions.find((session) => session.resumeId === 'resume-demo-headless-running'))
+      .toMatchObject({ active: true, latestExecution: { status: 'running' } })
+
+    const workspaces = await fetch(`${baseUrl}/api/workspaces`).then((response) => response.json())
+    const chat = workspaces.workspaces.find(
+      (candidate: { id: string }) => candidate.id === DEMO_CHAT_WORKSPACE_ID,
+    )
+    expect(chat.sessions.map((session: { resumeId: string }) => session.resumeId)).not.toEqual(
+      expect.arrayContaining(['resume-demo-headless-colleague', 'resume-demo-headless-running']),
+    )
   })
 })

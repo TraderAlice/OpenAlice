@@ -1956,6 +1956,8 @@ export const en = {
     active: 'active',
     running: 'running',
     resumeSession: 'Resume {{title}}',
+    sessionRunning: 'Running · {{title}}',
+    sessionNotResumable: 'Cannot resume {{title}}',
     stopSession: 'Stop {{title}}',
     deleteSession: 'Delete {{title}}',
     deleteSessionAction: 'Delete session',

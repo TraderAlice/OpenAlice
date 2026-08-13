@@ -629,6 +629,12 @@ export interface SessionRowProps {
   session: SessionRecord;
   subtitle?: string;
   isActive: boolean;
+  /** Headless turn currently occupies this resumeId — lock TUI attach. */
+  headlessOccupying?: boolean;
+  resumable?: boolean;
+  failed?: boolean;
+  canDelete?: boolean;
+  displayTitle?: string;
   onSelect: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -639,15 +645,25 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const { t } = useTranslation();
   const s = props.session;
   const isPaused = s.state === 'paused';
+  const headlessOccupying = props.headlessOccupying === true;
+  const resumable = props.resumable !== false;
+  const canDelete = props.canDelete !== false;
   // The server resolves native title → launch prompt → sticky name.
-  const display = s.title?.trim() || s.name;
-  const resumeLabel = t('workspace.resumeSession', { title: display });
+  const display = props.displayTitle?.trim() || s.title?.trim() || s.name;
+  const resumeLocked = headlessOccupying || !resumable;
+  const resumeLabel = headlessOccupying
+    ? t('workspace.sessionRunning', { title: display })
+    : resumable
+      ? t('workspace.resumeSession', { title: display })
+      : t('workspace.sessionNotResumable', { title: display });
   const stopLabel = t('workspace.stopSession', { title: display });
   const deleteLabel = t('workspace.deleteSession', { title: display });
+  const selectLabel = headlessOccupying ? t('workspace.sessionRunning', { title: display }) : display;
   const metaParts: string[] = [`agent ${s.agent}`];
   if (s.pid !== null) metaParts.push(`pid ${s.pid}`);
   if (s.resumeId) metaParts.push(s.resumeId);
-  if (isPaused) metaParts.push(t('workspace.paused'));
+  if (headlessOccupying) metaParts.push(t('workspace.running'));
+  else if (isPaused) metaParts.push(t('workspace.paused'));
   const meta = metaParts.join(' · ');
   // Full message on hover when it's been truncated, then the technical meta.
   const tooltipParts = [s.title?.trim() || null, props.subtitle, meta].filter(Boolean);
@@ -657,6 +673,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
     <div
       data-reorder-id={props.reorderId}
       data-active={props.isActive}
+      aria-busy={headlessOccupying || undefined}
       className={`oa-session-row group relative flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-[12px] transition-colors ${
         props.isActive ? 'bg-muted' : 'hover:bg-muted/50'
       }`}
@@ -664,17 +681,22 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       {props.isActive && <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />}
       <button
         type="button"
-        className="oa-session-row-main flex-1 min-w-0 flex items-center gap-1.5 text-left"
+        className="oa-session-row-main flex-1 min-w-0 flex items-center gap-1.5 text-left disabled:cursor-default"
         onClick={props.onSelect}
+        disabled={headlessOccupying}
         title={tooltip}
-        aria-label={display}
+        aria-label={selectLabel}
         aria-current={props.isActive ? 'page' : undefined}
       >
-        <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused ? 'text-muted-foreground/40' : 'text-muted-foreground/70'}`}>
+        <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused && !headlessOccupying ? 'text-muted-foreground/40' : 'text-muted-foreground/70'}`}>
           <AgentBadgeGlyph agentId={s.agent} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className={`block truncate ${isPaused ? 'text-muted-foreground' : 'text-foreground'}`}>{display}</span>
+          <span className={`block truncate ${
+            props.failed ? 'text-muted-foreground/70'
+              : isPaused && !headlessOccupying ? 'text-muted-foreground'
+                : 'text-foreground'
+          }`}>{display}</span>
           {props.subtitle && (
             <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground/55">
               {props.subtitle}
@@ -684,16 +706,17 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       </button>
       {/* Right-aligned, always-visible state-as-action: a running session shows
           STOP (■, click to pause it); a paused one shows PLAY (▶, click to
-          resume). The glyph is the at-a-glance state AND the action. */}
-      {isPaused ? (
+          resume). Headless occupancy locks Play instead of offering Stop. */}
+      {isPaused || headlessOccupying ? (
         <button
           type="button"
-          className={rowAction()}
+          className={`${rowAction()} disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/70`}
           title={resumeLabel}
           aria-label={resumeLabel}
+          disabled={resumeLocked}
           onClick={(e) => {
             e.stopPropagation();
-            props.onResume();
+            if (!resumeLocked) props.onResume();
           }}
         >
           <Play size={11} strokeWidth={0} fill="currentColor" />
@@ -712,16 +735,18 @@ export function SessionRow(props: SessionRowProps): ReactElement {
           <Square size={10} strokeWidth={0} fill="currentColor" />
         </button>
       )}
-      <SidebarActionMenu
-        label={t('common.moreActions', { target: display })}
-        items={[{
-          label: t('workspace.deleteSessionAction'),
-          ariaLabel: deleteLabel,
-          icon: <X size={13} strokeWidth={2.5} />,
-          onSelect: props.onDelete,
-          danger: true,
-        }]}
-      />
+      {canDelete && (
+        <SidebarActionMenu
+          label={t('common.moreActions', { target: display })}
+          items={[{
+            label: t('workspace.deleteSessionAction'),
+            ariaLabel: deleteLabel,
+            icon: <X size={13} strokeWidth={2.5} />,
+            onSelect: props.onDelete,
+            danger: true,
+          }]}
+        />
+      )}
     </div>
   );
 }

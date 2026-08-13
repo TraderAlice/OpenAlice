@@ -1952,6 +1952,8 @@ export const zhHant: Resources = {
     active: '執行中',
     running: '執行中',
     resumeSession: '繼續「{{title}}」',
+    sessionRunning: '執行中 · {{title}}',
+    sessionNotResumable: '無法繼續「{{title}}」',
     stopSession: '暫停「{{title}}」',
     deleteSession: '刪除「{{title}}」',
     deleteSessionAction: '刪除工作階段',

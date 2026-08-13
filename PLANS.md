@@ -21,6 +21,9 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/session-roster-headless-occupancy.md]] — Ask Alice / Quant list
+  Workspace employees by `resumeId`, including Directory-only colleagues, and
+  lock TUI attach while a headless turn occupies that Session.
 - [[plans/release-feedback-reliability.md]] — Makes packaged release failures
   deterministic and diagnostic first, then removes desktop matrix fan-in and
   reuses trusted promotion evidence without weakening release gates.
