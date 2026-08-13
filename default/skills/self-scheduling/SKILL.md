@@ -179,7 +179,7 @@ plain tracked item; add a `when` and it starts firing.
     only for compatibility with old files; new Issues should write it explicitly.
     A missed admission (busy Session, full worker pool) **retries that slot by
     default**, same as `every`. Write `catchUp: false` only when a miss should
-    wait for the next calendar time instead of catching up.
+    discard all elapsed slots and wait for the next future calendar time.
   - `{ kind: at, at: "2026-03-01T13:30:00Z" }` — run ONCE at an ISO timestamp,
     then never again.
 - **`agent`** *(optional)* — runtime override for `@new-then-resume` / `@new-each-run`

@@ -1,7 +1,7 @@
 # Plan: Cron missed-fire catch-up
 
-**Status:** active  
-**Owner guides:** [[docs/workspace-issues-and-scheduling.md]]  
+**Status:** active
+**Owner guides:** [[docs/workspace-issues-and-scheduling.md]]
 **Delivery:** serial PR to `dev` (`area:collaboration`). Open for review; persisted Issue `when` + launcher markers.
 
 ## Goal

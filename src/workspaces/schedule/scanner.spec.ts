@@ -632,7 +632,7 @@ describe('ScheduleScanner', () => {
     expect(dispatch).toHaveBeenCalledTimes(2)
   })
 
-  it('consumes a cron slot when catchUp is false', async () => {
+  it('consumes every elapsed cron slot when catchUp is false', async () => {
     const ws = await makeWs('w1', [{
       id: 'c1',
       title: 'i-cron',
@@ -642,10 +642,15 @@ describe('ScheduleScanner', () => {
     const dispatch = vi.fn(async () => {
       throw new Error('this conversation already has a running turn')
     })
-    const { scanner, markers } = scannerFor([ws], { dispatch })
+    const markers = new FakeMarkers()
+    // Simulate a previously successful fire followed by a long sleep. There
+    // are several stale minute slots behind the current wall clock.
+    await markers.set('w1', 'c1', NOW - 10 * 60_000)
+    const { scanner } = scannerFor([ws], { dispatch, markers })
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
-    expect(markers.getHeld('w1', 'c1')).toBeTypeOf('number')
+    expect(markers.getHeld('w1', 'c1')).toBe(NOW)
+    expect(scanner.snapshot()?.workspaces[0]?.tasks[0]?.nextDueAtMs).toBeGreaterThan(NOW)
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
   })

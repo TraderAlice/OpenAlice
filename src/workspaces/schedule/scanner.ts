@@ -25,7 +25,7 @@
  * `catchUp: false`.
  */
 
-import { computeNextRun, type Schedule } from '../../core/schedule-expr.js'
+import { computeNextRun, scheduleCatchesUp, type Schedule } from '../../core/schedule-expr.js'
 import type { CliAdapter } from '../cli-adapter.js'
 import type { SessionRuntimeSelection } from '../session-runtime-binding.js'
 import type { Logger } from '../logger.js'
@@ -355,8 +355,12 @@ export class ScheduleScanner {
     const held = this.deps.markers.getHeld(wsId, taskId) ?? null
     const dueAt = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs, held))
     if (dueAt === null || dueAt > nowMs) return
-    if (when.catchUp === false) {
-      await this.deps.markers.hold(wsId, taskId, dueAt)
+    if (!scheduleCatchesUp(when)) {
+      // Calendar-only means "the next future calendar occurrence", not "walk
+      // every stale slot one scanner tick at a time". Advancing only to dueAt
+      // would replay an entire backlog after sleep/downtime whenever admission
+      // remained blocked. Use the current scan time as the consumed cursor.
+      await this.deps.markers.hold(wsId, taskId, nowMs)
       return
     }
     if (last === null) await this.deps.markers.hold(wsId, taskId, dueAt - 1)
