@@ -1714,7 +1714,7 @@ export const en = {
     manage: 'Manage',
     hideConnectionDetailsAria: 'Hide {{name}} connection details',
     manageConnectionDetailsAria: 'Manage {{name}} connection details',
-    secretsNote: 'OpenAlice seals the stored token and never sends it back. The box shows what you are about to save, so you can check the paste.',
+    secretsNote: 'OpenAlice seals the stored token and never sends it back. Reveal the draft only when you need to check the paste.',
     showDraft: 'Show draft',
     hideDraft: 'Hide draft',
     fields: {

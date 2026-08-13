@@ -1703,7 +1703,7 @@ export const ja: Resources = {
     manage: '管理',
     hideConnectionDetailsAria: '{{name}} の接続情報を閉じる',
     manageConnectionDetailsAria: '{{name}} の接続情報を管理',
-    secretsNote: '保存済みトークンはローカルで暗号化され、送り返しません。入力欄にはこれから保存する値が見えるので、貼り付けを確認できます。',
+    secretsNote: '保存済みトークンはローカルで暗号化され、送り返しません。貼り付け内容を確認するときだけ下書きを表示してください。',
     showDraft: '下書きを表示',
     hideDraft: '下書きを隠す',
     fields: {

@@ -198,11 +198,11 @@ describe('Connector demo routes', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('too short to be a bot token')
     expect(mocks.save).not.toHaveBeenCalled()
 
-    expect(input.type).toBe('text')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Hide draft' })[0])
     expect(input.type).toBe('password')
     fireEvent.click(screen.getAllByRole('button', { name: 'Show draft' })[0])
     expect(input.type).toBe('text')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Hide draft' })[0])
+    expect(input.type).toBe('password')
 
     fireEvent.change(input, { target: { value: '123456789:AAHplausible-bot-token' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
@@ -266,6 +266,22 @@ describe('Connector demo routes', () => {
     await waitFor(() => expect(mocks.save).toHaveBeenCalled())
     expect(mocks.save.mock.calls.at(-1)?.[0].adapters.discord.settings.botToken)
       .toBe('123456789:AAHreplacement-bot-token')
+  })
+
+  it('rejects a short replacement draft before asking for confirmation', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord.configuredSecrets = ['botToken']
+    mocks.load.mockResolvedValue(snapshot)
+    render(<ConnectorsPage />)
+
+    await screen.findByText('Run external notification connectors')
+    const input = screen.getByLabelText('Discord Bot token') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'qweqw' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Replace token' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('too short to be a bot token')
+    expect(screen.queryByRole('heading', { name: 'Replace Discord token?' })).toBeNull()
+    expect(mocks.save).not.toHaveBeenCalled()
   })
 
   it('requires confirmation before removing a configured secret', async () => {

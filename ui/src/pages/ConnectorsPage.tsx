@@ -332,6 +332,14 @@ export function ConnectorsPage() {
                           setSecretErrors((current) => omitRecordKey(current, draftKey))
                         }}
                         onSaveSecret={(key, fieldLabel, configured) => {
+                          const draftKey = connectorFieldKey(definition.id, key)
+                          if (!isPlausibleConnectorSecret(secretDrafts[draftKey] ?? '')) {
+                            setSecretErrors((current) => ({
+                              ...current,
+                              [draftKey]: t('connectorSettings.tokenTooShort'),
+                            }))
+                            return
+                          }
                           if (configured) {
                             setPendingSecretReplace({
                               connectorId: definition.id,
@@ -522,6 +530,7 @@ function ConnectorCredentialsEditor({
           const draftKey = connectorFieldKey(definition.id, field.key)
           const secretDraft = secretDrafts[draftKey] ?? ''
           const secretSaving = savingSecret === draftKey
+          const secretMasked = maskedSecrets[draftKey] ?? true
           const inputId = `connector-${definition.id}-${field.key}`
           const fieldLabel = t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
           return (
@@ -547,7 +556,7 @@ function ConnectorCredentialsEditor({
                         id={inputId}
                         aria-label={`${definition.label} ${fieldLabel}`}
                         className={`${inputClass} pr-10`}
-                        type={maskedSecrets[draftKey] ? 'password' : 'text'}
+                        type={secretMasked ? 'password' : 'text'}
                         value={secretDraft}
                         placeholder={configured
                           ? t('connectorSettings.configuredPlaceholder')
@@ -561,16 +570,16 @@ function ConnectorCredentialsEditor({
                       <button
                         type="button"
                         className="oa-pressable absolute inset-y-0 right-0 flex items-center px-2.5 text-muted-foreground hover:text-foreground"
-                        aria-label={maskedSecrets[draftKey]
+                        aria-label={secretMasked
                           ? t('connectorSettings.showDraft')
                           : t('connectorSettings.hideDraft')}
-                        aria-pressed={Boolean(maskedSecrets[draftKey])}
+                        aria-pressed={!secretMasked}
                         onClick={() => setMaskedSecrets((current) => ({
                           ...current,
-                          [draftKey]: !current[draftKey],
+                          [draftKey]: !secretMasked,
                         }))}
                       >
-                        {maskedSecrets[draftKey]
+                        {secretMasked
                           ? <Eye size={15} aria-hidden />
                           : <EyeOff size={15} aria-hidden />}
                       </button>

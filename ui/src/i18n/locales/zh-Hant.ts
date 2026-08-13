@@ -1710,7 +1710,7 @@ export const zhHant: Resources = {
     manage: '管理',
     hideConnectionDetailsAria: '收合 {{name}} 連線資訊',
     manageConnectionDetailsAria: '管理 {{name}} 連線資訊',
-    secretsNote: '已儲存的權杖會在本機加密，也不會回傳。輸入框顯示你即將儲存的內容，方便核對貼上。',
+    secretsNote: '已儲存的權杖會在本機加密，也不會回傳。只在需要核對貼上內容時顯示草稿。',
     showDraft: '顯示草稿',
     hideDraft: '隱藏草稿',
     fields: {
