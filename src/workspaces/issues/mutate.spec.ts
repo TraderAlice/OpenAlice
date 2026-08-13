@@ -189,6 +189,27 @@ describe('updateIssueFields', () => {
     expect(issue?.agent).toBeUndefined()
   })
 
+  it('sets and clears an optional scheduled-run timeout', async () => {
+    await createIssue(dir, {
+      id: 'budget',
+      title: 'Budget',
+      when: { kind: 'every', every: '15m' },
+      timeout: '45m',
+    })
+    let { issue } = await readBack('budget')
+    expect(issue?.timeout).toBe('45m')
+
+    const cleared = await updateIssueFields(dir, 'budget', { timeout: null })
+    expect(cleared.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBeUndefined()
+
+    const set = await updateIssueFields(dir, 'budget', { timeout: '15m' })
+    expect(set.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBe('15m')
+  })
+
   it('switches atomically between vault access, native login, and inheritance', async () => {
     await createIssue(dir, { id: 'access', title: 'Access', credential: 'openai-primary' })
     const native = await updateIssueFields(dir, 'access', { credentialSource: 'native' })
@@ -220,6 +241,7 @@ describe('updateIssueFields', () => {
       credential: 'openai-primary',
       model: 'gpt-5.6',
       effort: 'high',
+      timeout: '30m',
     })
     const res = await updateIssueFields(dir, 'owned', {
       assignee: '@resume-kind-owl-abc123',
@@ -232,6 +254,7 @@ describe('updateIssueFields', () => {
     expect(issue?.credentialSource).toBeUndefined()
     expect(issue?.model).toBeUndefined()
     expect(issue?.effort).toBeUndefined()
+    expect(issue?.timeout).toBe('30m')
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
   })
 

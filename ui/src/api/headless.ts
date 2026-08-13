@@ -54,6 +54,9 @@ export interface HeadlessTaskRecord {
   signal?: string | null
   killed?: boolean
   error?: string
+  /** Positive watchdog budget, `null` for an explicitly unlimited new run,
+   * absent only on historical records. */
+  timeoutMs?: number | null
   /** Backend has resolved this product identity to a native runtime session. */
   resumable: boolean
   output?: {

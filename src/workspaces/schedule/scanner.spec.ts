@@ -73,6 +73,7 @@ interface IssueSpec {
   credentialSource?: 'native'
   model?: string
   effort?: string
+  timeout?: string
   assignee?: string
   body?: string
 }
@@ -88,6 +89,7 @@ function issueMd(spec: IssueSpec): string {
   if (spec.credentialSource) lines.push(`credentialSource: ${spec.credentialSource}`)
   if (spec.model) lines.push(`model: ${spec.model}`)
   if (spec.effort) lines.push(`effort: ${spec.effort}`)
+  if (spec.timeout) lines.push(`timeout: ${spec.timeout}`)
   // Scanner tests exercise dispatch policy, not declaration defaults. Keep the
   // historical fresh-every-fire fixture explicit now that omitted scheduled
   // ownership means recruit once (`@new-then-resume`).
@@ -123,7 +125,7 @@ function scannerFor(
       m: WorkspaceMeta,
       a: CliAdapter,
       p: string,
-      t: number,
+      t?: number,
       trigger?: import('../headless-task-registry.js').HeadlessTaskTrigger,
       resumeId?: string,
     ) => Promise<{ taskId: string; resumeId: string }>
@@ -171,7 +173,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'same exact prompt',
-      30 * 60_000,
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'retry-me' },
       undefined,
       undefined,
@@ -186,6 +188,83 @@ describe('ScheduleScanner', () => {
       },
     )
     expect(markers.get('w1', 'retry-me')).toBeUndefined()
+  })
+
+  it('passes an Issue timeout as the dispatch watchdog and omits it by default', async () => {
+    const limited = await makeWs('w1', [{
+      id: 'limited',
+      title: 'Limited',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+      timeout: '45m',
+    }])
+    const unlimited = await makeWs('w2', [{
+      id: 'open',
+      title: 'Open',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+    }])
+    const { scanner: limitedScanner, dispatch: limitedDispatch } = scannerFor([limited])
+    const { scanner: unlimitedScanner, dispatch: unlimitedDispatch } = scannerFor([unlimited])
+    await limitedScanner.scan()
+    await unlimitedScanner.scan()
+    expect(limitedDispatch).toHaveBeenCalledWith(
+      limited,
+      headlessAdapter,
+      'go',
+      45 * 60_000,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'limited',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
+    expect(unlimitedDispatch).toHaveBeenCalledWith(
+      unlimited,
+      headlessAdapter,
+      'go',
+      undefined,
+      { kind: 'issue', workspaceId: 'w2', issueId: 'open' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w2',
+        issueId: 'open',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
+
+    const { scanner: retryScanner, dispatch: retryDispatch } = scannerFor([limited])
+    await retryScanner.runIssueNow('w1', 'limited')
+    expect(retryDispatch).toHaveBeenCalledWith(
+      limited,
+      headlessAdapter,
+      'go',
+      45 * 60_000,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'limited',
+        policy: 'new-each-run',
+        fire: 'retry',
+      },
+    )
   })
 
   it('refuses manual retry for an unscheduled or terminal Issue', async () => {
@@ -208,7 +287,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'go',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
       undefined,
       undefined,
@@ -263,7 +342,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'go',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'tuned' },
       undefined,
       undefined,
@@ -296,7 +375,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'go',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'native' },
       undefined,
       undefined,
@@ -329,7 +408,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'continue',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'owned' },
       'resume-kind-owl-abc123',
     )
@@ -354,7 +433,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'own this work from now on',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'sticky' },
       undefined,
       undefined,
@@ -410,7 +489,7 @@ describe('ScheduleScanner', () => {
       execution,
       headlessAdapter,
       'revisit your report',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'home', issueId: 'review-report' },
       'resume-peer-author',
     )
@@ -438,7 +517,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'go',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'sched' },
       undefined,
       undefined,
@@ -465,7 +544,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'scan movers',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
       undefined,
       undefined,

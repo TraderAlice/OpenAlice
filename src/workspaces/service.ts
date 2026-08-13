@@ -519,6 +519,9 @@ export interface WorkspaceService {
   /** Retry the latest unsuccessful scheduled execution now. Reuses the live
    * Issue prompt/owner/runtime and never advances its schedule marker. */
   retryIssue(wsId: string, id: string): Promise<IssueDetail>;
+  /** Dispatch a scheduled Issue immediately without requiring a failed last
+   * run and without advancing its next-fire marker. */
+  runIssueNow(wsId: string, id: string): Promise<IssueDetail>;
   /** Safe Workspace Session index. resumeId is the only public conversation handle. */
   sessionDirectory(wsId: string, limit?: number): Promise<WorkspaceSessionDirectory | null>;
   /** Change in-desk floor presence. Does not retire or delete the coworker. */
@@ -1653,6 +1656,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         ...(parentTaskId ? { parentTaskId } : {}),
         ...(trigger ? { trigger } : {}),
         ...(inquiry ? { inquiry } : {}),
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       });
       await resumeRegistry.ensure({
         resumeId: identity.resumeId,
@@ -2082,7 +2086,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   };
 
   const retryingIssueKeys = new Set<string>();
-  const retryIssue = async (wsId: string, id: string): Promise<IssueDetail> => {
+  const dispatchScheduledIssueNow = async (
+    wsId: string,
+    id: string,
+    kind: 'retry' | 'manual',
+  ): Promise<IssueDetail> => {
     const key = `${wsId}:${id}`;
     const ws = registry.get(wsId);
     if (!ws) throw new IssueRetryError('not_found', 'Workspace not found.');
@@ -2092,19 +2100,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       : undefined;
     if (!issue) throw new IssueRetryError('not_found', 'Issue not found.');
     if (!issue.when) {
-      throw new IssueRetryError('not_scheduled', 'Only scheduled Issues can be retried.');
+      throw new IssueRetryError('not_scheduled', 'Only scheduled Issues can be run now.');
     }
     if (issue.status === 'done' || issue.status === 'canceled') {
       throw new IssueRetryError(
         'not_fireable',
-        `This Issue is ${issue.status}; reopen it before retrying.`,
+        `This Issue is ${issue.status}; reopen it before running.`,
       );
     }
     const latest = headlessTasks.list({ issue: { workspaceId: wsId, issueId: id } })[0];
     if (latest?.status === 'running' || retryingIssueKeys.has(key)) {
       throw new IssueRetryError('already_running', 'This Issue already has a run in progress.');
     }
-    if (!latest || (latest.status !== 'failed' && latest.status !== 'interrupted')) {
+    if (kind === 'retry' && (!latest || (latest.status !== 'failed' && latest.status !== 'interrupted'))) {
       throw new IssueRetryError(
         'not_retryable',
         'Only the latest failed or interrupted scheduled run can be retried.',
@@ -2114,10 +2122,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     retryingIssueKeys.add(key);
     try {
       const { taskId } = await scheduleScanner.runIssueNow(wsId, id);
-      launcherLogger.info('issue.retry_dispatched', {
+      launcherLogger.info(kind === 'retry' ? 'issue.retry_dispatched' : 'issue.manual_run_dispatched', {
         wsId,
         issueId: id,
-        previousTaskId: latest.taskId,
+        previousTaskId: latest?.taskId,
         taskId,
       });
     } catch (err) {
@@ -2133,6 +2141,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (!detail) throw new IssueRetryError('not_found', 'Issue not found.');
     return detail;
   };
+  const retryIssue = async (wsId: string, id: string): Promise<IssueDetail> =>
+    dispatchScheduledIssueNow(wsId, id, 'retry');
+  const runIssueNow = async (wsId: string, id: string): Promise<IssueDetail> =>
+    dispatchScheduledIssueNow(wsId, id, 'manual');
 
   const setSessionPresence = async (input: {
     wsId: string
@@ -2586,6 +2598,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     issuesSnapshot,
     issueDetail,
     retryIssue,
+    runIssueNow,
     sessionDirectory,
     setSessionPresence,
     resolveIssuesByName,

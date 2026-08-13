@@ -109,6 +109,24 @@ describe('HeadlessTaskRegistry', () => {
     expect(reg2.get(fired.taskId)?.trigger?.issueId).toBe('daily-scan')
   })
 
+  it('persists an explicit unlimited watchdog separately from historical absence', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const unlimited = await createTask(reg, {
+      wsId: 'w1',
+      agent: 'codex',
+      prompt: 'x',
+      startedAt: 1,
+      trigger: { kind: 'issue', workspaceId: 'home', issueId: 'daily-scan' },
+    })
+    const manual = await createTask(reg, {
+      wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2,
+    })
+
+    const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reg2.get(unlimited.taskId)).toHaveProperty('timeoutMs', null)
+    expect(reg2.get(manual.taskId)).not.toHaveProperty('timeoutMs')
+  })
+
   it('persists requested one-run model and effort', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     const task = await createTask(reg, {

@@ -95,6 +95,9 @@ export const ja: Resources = {
       credential: '認証情報',
       model: 'モデル',
       effort: '推論レベル',
+      timeout: '実行タイムアウト',
+      timeoutNone: '制限なし',
+      timeoutHint: 'このスケジュール実行の任意ウォッチドッグです。未設定ならエージェントが終わるまで待ちます。',
       health: '実行状態',
       runHealth: '実行状態',
       lastRun: '前回の実行',
@@ -153,6 +156,11 @@ export const ja: Resources = {
       applyAiConfiguration: '設定を適用',
       retryNow: '今すぐ再試行',
       retrying: '再試行中…',
+      runNow: '今すぐ実行',
+      runningNow: '起動中…',
+      runNowTitle: 'この Issue を今すぐ実行しますか？',
+      runNowMessage:
+        '現在の What、担当、ランタイムでヘッドレス実行を開始します。次の予定時刻は変わりません。',
       healthMessage: {
         inactive: '課題のステータスが「{{status}}」のため、スケジュールは停止しています。',
         not_started: 'スケジュールは有効ですが、まだ実行されていません。',
@@ -208,6 +216,7 @@ export const ja: Resources = {
         credential: '認証情報',
         model: 'モデル',
         effort: '推論レベル',
+        timeout: '実行タイムアウト',
         what: '作業内容',
       },
       mutationValue: {

@@ -31,6 +31,7 @@
  *   credentialSource: native <optional explicit Agent-runtime login>
  *   model: <optional native model id for one scheduled run>
  *   effort: none | minimal | low | medium | high | xhigh | max
+ *   timeout: 15m | 30m | 45m | 60m  (optional run budget; omit = no watchdog)
  *   ---
  *   <markdown What — the exact work definition and scheduled prompt>
  *
@@ -71,8 +72,29 @@ const MAX_BYTES = 64 * 1024
 
 export const ISSUE_STATUSES = ['backlog', 'todo', 'in_progress', 'done', 'canceled'] as const
 export const ISSUE_PRIORITIES = ['urgent', 'high', 'medium', 'low', 'none'] as const
+/** Optional scheduled-run watchdog. Omission means the agent may run until it exits. */
+export const ISSUE_TIMEOUTS = ['15m', '30m', '45m', '60m'] as const
 export type IssueStatus = (typeof ISSUE_STATUSES)[number]
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
+export type IssueTimeout = (typeof ISSUE_TIMEOUTS)[number]
+
+const ISSUE_TIMEOUT_SET: ReadonlySet<string> = new Set(ISSUE_TIMEOUTS)
+const ISSUE_TIMEOUT_MS: Record<IssueTimeout, number> = {
+  '15m': 15 * 60_000,
+  '30m': 30 * 60_000,
+  '45m': 45 * 60_000,
+  '60m': 60 * 60_000,
+}
+
+export function isIssueTimeout(value: unknown): value is IssueTimeout {
+  return typeof value === 'string' && ISSUE_TIMEOUT_SET.has(value)
+}
+
+/** Convert a declared Issue timeout into the headless watchdog budget.
+ *  `undefined` means do not arm a watchdog. */
+export function issueTimeoutMs(timeout?: IssueTimeout): number | undefined {
+  return timeout === undefined ? undefined : ISSUE_TIMEOUT_MS[timeout]
+}
 
 /** Statuses at which a scheduled issue stops firing (it's resolved/abandoned).
  *  This is how a schedule is turned off under the board model — there is no
@@ -157,6 +179,9 @@ const issueFrontmatterObjectSchema = z.object({
   effort: z.custom<ModelReasoningEffort>(isModelReasoningEffort, {
     message: 'effort must be none, minimal, low, medium, high, xhigh, or max',
   }).optional(),
+  /** Optional headless watchdog for a scheduled fire. Omission means no limit.
+   * This is a run budget, not Session birth, so an exact `@resumeId` may set it. */
+  timeout: z.enum(ISSUE_TIMEOUTS).optional(),
   /** The former parallel ownership field is outside the baseline. Keeping a
    * `never` key makes stale files fail loudly instead of being silently read. */
   execution: z.never().optional(),

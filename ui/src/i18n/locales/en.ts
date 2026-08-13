@@ -106,6 +106,9 @@ export const en = {
       credential: 'Credential',
       model: 'Model',
       effort: 'Effort',
+      timeout: 'Run timeout',
+      timeoutNone: 'No limit',
+      timeoutHint: 'Optional watchdog for this scheduled run. Leave unset so the agent can finish without a time cap.',
       health: 'Health',
       runHealth: 'Run health',
       lastRun: 'Last run',
@@ -164,6 +167,11 @@ export const en = {
       applyAiConfiguration: 'Apply configuration',
       retryNow: 'Retry now',
       retrying: 'Retrying…',
+      runNow: 'Run now',
+      runningNow: 'Starting…',
+      runNowTitle: 'Run this Issue now?',
+      runNowMessage:
+        'OpenAlice will start a headless turn with the current What, owner, and runtime. The next scheduled time stays unchanged.',
       healthMessage: {
         inactive: 'Schedule stopped because the Issue is {{status}}.',
         not_started: 'Schedule is valid and has not run yet.',
@@ -219,6 +227,7 @@ export const en = {
         credential: 'Credential',
         model: 'Model',
         effort: 'Effort',
+        timeout: 'Run timeout',
         what: 'What',
       },
       mutationValue: {

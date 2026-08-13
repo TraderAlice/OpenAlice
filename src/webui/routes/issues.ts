@@ -11,12 +11,15 @@
  *   GET  /api/issues               → list across all workspaces
  *   GET  /api/issues/:wsId/:id      → one issue's detail { issue, activity, runs, inboxReports }
  *   POST /api/issues/:wsId/:id/retry → rerun the latest failed/interrupted schedule now
+ *   POST /api/issues/:wsId/:id/run   → dispatch a scheduled Issue now without a failed last run
  *
  * Phase 2b adds the human/UI WRITE path (the agent edits the files directly /
  * via its own tools). Both writes go through the shared mutation helper
  * (`workspaces/issues/mutate.ts`) so the human and agent surfaces can never
  * drift on file format or validation; writes are working-tree only (no commit):
- *   PATCH /api/issues/:wsId/:id           body { status?, priority?, assignee?, what? }
+ *   PATCH /api/issues/:wsId/:id           body { status?, priority?, assignee?,
+ *                                          agent?, credential?, model?, effort?,
+ *                                          timeout?, what? }
  *   POST  /api/issues/:wsId/:id/comments  body { text }  (author = 'human';
  *     exact Session owners are notified and their final reply returns here)
  *
@@ -40,10 +43,12 @@ import { updateIssueCommentDelivery } from '../../workspaces/issues/comments.js'
 import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
+  isIssueTimeout,
   issueAssigneeResumeId,
   issueAssigneeSchema,
   type IssuePriority,
   type IssueStatus,
+  type IssueTimeout,
 } from '../../workspaces/issues/declaration.js'
 import { appendIssueComment, updateIssueFields } from '../../workspaces/issues/mutate.js'
 import { deprecatedIssueAssigneeReplacement } from '../../workspaces/session-signature.js'
@@ -126,11 +131,40 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
     }
   })
 
+  // POST /api/issues/:wsId/:id/run — operator-started dispatch. Same live Issue
+  // prompt/owner/runtime as the scanner; the cadence marker is not advanced.
+  app.post('/:wsId/:id/run', async (c) => {
+    const wsId = c.req.param('wsId')
+    const id = c.req.param('id')
+    if (!validId(wsId) || !validId(id)) return c.json({ error: 'not_found' }, 404)
+    try {
+      return c.json(await svc.runIssueNow(wsId, id), 202)
+    } catch (err) {
+      if (err instanceof IssueRetryError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'not_scheduled' ? 422
+          : 409
+        return c.json({ error: err.code, message: err.message }, status)
+      }
+      if (err instanceof HeadlessCapacityError) {
+        return c.json({ error: 'capacity_reached', message: err.message }, 429)
+      }
+      if (err instanceof HeadlessResumeError) {
+        return c.json({ error: err.code, message: err.message }, 409)
+      }
+      launcherLogger.warn('issue.run_failed', { wsId, id, err })
+      return c.json({
+        error: 'run_failed',
+        message: err instanceof Error ? err.message : String(err),
+      }, 500)
+    }
+  })
+
   // PATCH /api/issues/:wsId/:id — patch board fields { status?, priority?,
-  // assignee? } plus the scheduled runtime override { agent? } on one issue
-  // (the human/UI path). `agent: null` removes the override so future fires use
-  // the workspace default runtime. Other scheduling frontmatter (`when`)
-  // stays file-owned. Returns the updated detail shape; 404 when missing.
+  // assignee? } plus scheduled runtime { agent?, credential?, model?, effort?,
+  // timeout? } on one issue (the human/UI path). `timeout: null` removes the
+  // optional run watchdog. Other scheduling frontmatter (`when`) stays
+  // file-owned. Returns the updated detail shape; 404 when missing.
   app.patch('/:wsId/:id', async (c) => {
     const wsId = c.req.param('wsId')
     const id = c.req.param('id')
@@ -149,6 +183,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       credentialSource?: 'native' | null
       model?: string | null
       effort?: ModelReasoningEffort | null
+      timeout?: IssueTimeout | null
       what?: string
     } = {}
     if ('status' in fields) {
@@ -261,6 +296,19 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         patch.effort = raw
       }
     }
+    if ('timeout' in fields) {
+      const raw = fields['timeout']
+      if (raw === null || raw === '') {
+        patch.timeout = null
+      } else if (!isIssueTimeout(raw)) {
+        return c.json({
+          error: 'invalid_timeout',
+          message: 'timeout must be 15m, 30m, 45m, 60m, or null',
+        }, 400)
+      } else {
+        patch.timeout = raw
+      }
+    }
     if ('what' in fields) {
       const what = fields['what']
       if (typeof what !== 'string' || what.trim().length === 0) {
@@ -274,7 +322,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
     if (Object.keys(patch).length === 0) {
       return c.json({
         error: 'no_fields',
-        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, what',
+        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what',
       }, 400)
     }
 

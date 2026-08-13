@@ -94,6 +94,9 @@ export const zh: Resources = {
       credential: '凭证',
       model: '模型',
       effort: '推理强度',
+      timeout: '运行时限',
+      timeoutNone: '不限制',
+      timeoutHint: '这次计划运行的可选看门狗。不设则让 Agent 跑到自己结束。',
       health: '运行状态',
       runHealth: '运行状态',
       lastRun: '上次运行',
@@ -152,6 +155,11 @@ export const zh: Resources = {
       applyAiConfiguration: '应用配置',
       retryNow: '立即重试',
       retrying: '正在重试…',
+      runNow: '立即运行',
+      runningNow: '正在启动…',
+      runNowTitle: '现在运行这个议题？',
+      runNowMessage:
+        'OpenAlice 会用当前的 What、负责人和运行时启动一轮后台任务。下次预定时间不会改变。',
       healthMessage: {
         inactive: '议题状态为“{{status}}”，运行计划已停止。',
         not_started: '运行计划有效，但尚未执行。',
@@ -207,6 +215,7 @@ export const zh: Resources = {
         credential: '凭证',
         model: '模型',
         effort: '推理强度',
+        timeout: '运行时限',
         what: '任务内容',
       },
       mutationValue: {

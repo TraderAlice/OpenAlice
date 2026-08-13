@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceSessionDirectory: vi.fn(),
   listAgentCredentials: vi.fn(),
   getPresets: vi.fn(),
+  updateIssue: vi.fn(),
+  runNow: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -83,6 +85,18 @@ vi.mock('../api/config', () => ({
   configApi: { getPresets: mocks.getPresets },
 }))
 
+vi.mock('../api/issues', async (importOriginal) => {
+  const actual = await importOriginal() as typeof import('../api/issues')
+  return {
+    ...actual,
+    issuesApi: {
+      ...actual.issuesApi,
+      update: mocks.updateIssue,
+      runNow: mocks.runNow,
+    },
+  }
+})
+
 vi.mock('./MarkdownWhatEditor', () => ({
   MarkdownWhatEditor: ({ value }: { value: string }) => <div>{value}</div>,
 }))
@@ -93,6 +107,8 @@ beforeEach(async () => {
   delete scheduledIssue.issue.credential
   delete scheduledIssue.issue.model
   delete scheduledIssue.issue.effort
+  delete scheduledIssue.issue.timeout
+  mocks.updateIssue.mockResolvedValue(scheduledIssue)
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
   mocks.listAgentCredentials.mockResolvedValue([{
     slug: 'longcat-1',
@@ -140,6 +156,58 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.clearAllMocks()
+})
+
+describe('IssueDetail manual run', () => {
+  it('confirms before dispatching a scheduled Issue without waiting for failure', async () => {
+    mocks.runNow.mockResolvedValue({
+      ...scheduledIssue,
+      runs: [{
+        taskId: 'run-now-1',
+        resumeId: 'resume-run-now',
+        resumable: false,
+        wsId: 'demo-ws-auto-quant',
+        issueId: 'morning-scan',
+        agent: 'codex',
+        prompt: scheduledIssue.issue.what,
+        status: 'running',
+        startedAt: Date.now(),
+      }],
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Run this Issue now?' })
+    expect(dialog.textContent).toContain('The next scheduled time stays unchanged.')
+    expect(mocks.runNow).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Run now' }))
+    await waitFor(() => expect(mocks.runNow).toHaveBeenCalledWith('demo-ws-auto-quant', 'morning-scan'))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocks.mutate).toHaveBeenCalled()
+  })
+
+  it('does not dispatch when the confirmation is cancelled', async () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Run this Issue now?' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocks.runNow).not.toHaveBeenCalled()
+  })
+
+  it('closes the confirmation and exposes a dispatch failure in the inspector', async () => {
+    mocks.runNow.mockRejectedValue(new Error('The Issue is already running.'))
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Run now' }))
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(screen.getByRole('alert').textContent).toContain('The Issue is already running.')
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
 })
 
 describe('IssueActivity provenance identity', () => {
@@ -209,6 +277,7 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Assignee' }).className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Run timeout' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('size-10')
     expect(screen.getByRole('heading', { level: 3, name: 'Schedule' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Execution' })).toBeTruthy()
@@ -227,6 +296,24 @@ describe('IssueDetail property controls', () => {
 
     fireEvent.change(model, { target: { value: 'custom' } })
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+  })
+
+  it('patches the optional run timeout from the execution inspector', async () => {
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: { ...scheduledIssue.issue, timeout: '30m' },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    const timeout = await screen.findByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement
+    expect(timeout.value).toBe('')
+    fireEvent.change(timeout, { target: { value: '30m' } })
+    await waitFor(() => {
+      expect(mocks.updateIssue).toHaveBeenCalledWith(
+        'demo-ws-auto-quant',
+        'morning-scan',
+        { timeout: '30m' },
+      )
+    })
   })
 
   it('chooses a credential before narrowing model and effort options', async () => {

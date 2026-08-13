@@ -32,6 +32,7 @@ export interface IssueAuditSnapshot {
   credentialSource?: string
   model?: string
   effort?: string
+  timeout?: string
   whatHash: string
 }
 
@@ -60,6 +61,7 @@ export function issueAuditSnapshot(issue: IssueRecord): IssueAuditSnapshot {
     ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
+    ...(issue.timeout ? { timeout: issue.timeout } : {}),
     whatHash: digest(issue.what),
   }
 }
@@ -93,6 +95,7 @@ export function issueMutation(
   valueField('credential source', left.credentialSource, right.credentialSource)
   valueField('model', left.model, right.model)
   valueField('effort', left.effort, right.effort)
+  valueField('timeout', left.timeout, right.timeout)
   if (left.whatHash !== right.whatHash) fields.push({ field: 'what' })
   return fields.length > 0 ? { fields } : null
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, Play, RotateCcw, Settings, Timer, TrendingUp, X } from 'lucide-react'
 
 import type { HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -15,9 +15,11 @@ import type {
   IssueProvenanceRecord,
   IssueRunRecord,
   IssueStatus,
+  IssueTimeout,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
+import { ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
 import type { ModelReasoningEffort } from '../api/types'
 import type { Preset, PresetModel } from '../api/types'
 import { configApi } from '../api/config'
@@ -31,7 +33,6 @@ import {
   type WorkspaceRuntimeModeSettings,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
-import { issuesApi } from '../api/issues'
 import { credentialAccessLabel } from './workspace/AgentLaunchControls'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'
@@ -41,6 +42,7 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
+import { ConfirmDialog } from './ConfirmDialog'
 import { AutomationHealthPill, CadencePill, CadenceSummary, PriorityIndicator } from './IssuesBoard'
 import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
@@ -565,8 +567,10 @@ function PropertiesRail({
   retrying,
   error,
   canRetry,
+  canRunNow,
   onPatch,
   onRetry,
+  onRunNow,
   onConfigureAgent,
 }: {
   wsId: string
@@ -581,11 +585,14 @@ function PropertiesRail({
   retrying: boolean
   error: string | null
   canRetry: boolean
+  canRunNow: boolean
   onPatch: (patch: IssuePatch) => void
   onRetry: () => void
+  onRunNow: () => Promise<void>
   onConfigureAgent: (agent: AgentId) => void
 }) {
   const { t } = useTranslation()
+  const [confirmRun, setConfirmRun] = useState(false)
   const meta = STATUS_META[issue.status]
   const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
   const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
@@ -744,6 +751,19 @@ function PropertiesRail({
                   {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
                 </span>
               </div>
+              {canRunNow && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={retrying}
+                  onClick={() => setConfirmRun(true)}
+                  className="mt-3 w-full justify-center sm:w-auto"
+                >
+                  <Play size={12} aria-hidden />
+                  {retrying ? t('issues.detail.runningNow') : t('issues.detail.runNow')}
+                </Button>
+              )}
             </InspectorSection>
 
             <InspectorSection title={t('issues.detail.execution')}>
@@ -816,6 +836,30 @@ function PropertiesRail({
               {agentNeedsCredential && (
                 <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
               )}
+              <InspectorField
+                label={t('issues.detail.timeout')}
+                icon={<Timer size={13} aria-hidden />}
+                className="mt-3"
+              >
+                <select
+                  className={`${railControl} w-full`}
+                  aria-label={t('issues.detail.timeout')}
+                  value={issue.timeout ?? ''}
+                  disabled={saving}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    onPatch({ timeout: value === '' ? null : value as IssueTimeout })
+                  }}
+                >
+                  <option value="">{t('issues.detail.timeoutNone')}</option>
+                  {ISSUE_TIMEOUTS.map((timeout) => (
+                    <option key={timeout} value={timeout}>{timeout}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                  {t('issues.detail.timeoutHint')}
+                </p>
+              </InspectorField>
             </InspectorSection>
 
             {issue.automationHealth && (
@@ -864,6 +908,21 @@ function PropertiesRail({
         )}
       </div>
       {error && <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error}</p>}
+      {confirmRun && (
+        <ConfirmDialog
+          title={t('issues.detail.runNowTitle')}
+          message={t('issues.detail.runNowMessage')}
+          confirmLabel={t('issues.detail.runNow')}
+          cancelLabel={t('common.cancel')}
+          workingLabel={t('issues.detail.runningNow')}
+          variant="primary"
+          onConfirm={async () => {
+            await onRunNow()
+            setConfirmRun(false)
+          }}
+          onClose={() => { if (!retrying) setConfirmRun(false) }}
+        />
+      )}
     </aside>
   )
 }
@@ -1127,6 +1186,7 @@ function mutationFieldLabel(field: string, t: TFunction): string {
     case 'credential': return t('issues.detail.mutationField.credential')
     case 'model': return t('issues.detail.mutationField.model')
     case 'effort': return t('issues.detail.mutationField.effort')
+    case 'timeout': return t('issues.detail.mutationField.timeout')
     case 'what': return t('issues.detail.mutationField.what')
     default: return field
   }
@@ -1682,6 +1742,19 @@ export function IssueDetail({
     }
   }, [retrying, wsId, id, mutate])
 
+  const onRunNow = useCallback(async () => {
+    if (retrying) return
+    setRetrying(true)
+    setActionError(null)
+    try {
+      mutate(await issuesApi.runNow(wsId, id))
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRetrying(false)
+    }
+  }, [retrying, wsId, id, mutate])
+
   const backToBoard = (
     <button
       type="button"
@@ -1731,6 +1804,12 @@ export function IssueDetail({
     && latestRun?.failure?.retryable
     && (latestRun.status === 'failed' || latestRun.status === 'interrupted'),
   )
+  const canRunNow = Boolean(
+    issue.when
+    && issue.status !== 'done'
+    && issue.status !== 'canceled'
+    && latestRun?.status !== 'running',
+  )
   const comments = data.comments ?? []
   const inboxReports = data.inboxReports ?? []
   const provenance = data.provenance ?? []
@@ -1773,8 +1852,10 @@ export function IssueDetail({
           retrying={retrying}
           error={actionError}
           canRetry={canRetry}
+          canRunNow={canRunNow}
           onPatch={onPatch}
           onRetry={() => void onRetry()}
+          onRunNow={onRunNow}
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">

@@ -22,6 +22,7 @@ import {
   issueFirePrompt,
   readWorkspaceIssues,
   type IssueRecord,
+  type IssueTimeout,
 } from '../issues/declaration.js'
 
 export {
@@ -54,6 +55,7 @@ export interface ScheduleSnapshotTask {
   credentialSource?: 'native'
   model?: string
   effort?: ModelReasoningEffort
+  timeout?: IssueTimeout
   /** False once the owning issue reaches a terminal status (done/canceled). */
   enabled: boolean
   /** When the scanner last fired this issue (epoch ms), null if never. */
@@ -113,6 +115,7 @@ export function snapshotScheduledIssue(
     ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
+    ...(issue.timeout ? { timeout: issue.timeout } : {}),
     enabled: !isTerminalStatus(issue.status),
     lastFiredAtMs,
     // An overdue computed time clamps to now: a due-now task reads "due now",
