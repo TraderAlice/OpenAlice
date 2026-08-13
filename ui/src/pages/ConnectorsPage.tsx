@@ -8,6 +8,7 @@ import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { TelegramDeskPanel } from '../components/TelegramDeskPanel'
 import {
   getConnectorSetupState,
   type ConnectorRuntime,
@@ -359,6 +360,10 @@ export function ConnectorsPage() {
                         })}
                         t={t}
                       />
+
+                      {definition.id === 'telegram' && (
+                        <TelegramDeskPanel linked={setup.linked} />
+                      )}
 
                       {lastProbe?.connectorId === definition.id && (
                         <p className="text-[12px] text-success">

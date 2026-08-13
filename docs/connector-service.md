@@ -158,7 +158,14 @@ saved but no bot process exists to receive `/link`.
 The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
-  unlink, linking instructions, and explicit test sends.
+  unlink, linking instructions, and explicit test sends. The Telegram card also
+  binds the Project's one phone-desk Issue: pick a Workspace, edit What and
+  heartbeat cadence, then open the ordinary Issue detail for comments. Generic
+  Issue create/update cannot set `telegramConnector`.
+- The phone-desk Issue is hidden from the Issue board and Tracked list. It still
+  fires on `when`. Extra `telegramConnector: true` files in other Workspaces do
+  not fire. Version 2 will project comments to Telegram unless they contain the
+  literal tag `[[no-reply]]`.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product

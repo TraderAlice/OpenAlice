@@ -92,6 +92,8 @@ export type {
   PublicConnectorConfig,
   ConnectorHealth,
   ConnectorSettingsSnapshot,
+  TelegramConnectorDesk,
+  TelegramConnectorDeskSnapshot,
 } from './connectors'
 export type { ToolCallQueryResult } from './agentStatus'
 export type {
