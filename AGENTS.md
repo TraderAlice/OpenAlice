@@ -11,7 +11,8 @@ Current code, tests, rendered behavior, and GitHub state override stale prose.
 
 Durable subsystem truth lives under [[docs/README.md]]. Active multi-step
 implementation work lives under [[PLANS.md]]. Keep both indexes current when a
-change introduces a new owner guide or execution plan.
+change introduces a new owner guide or execution plan, or deletes a completed
+plan.
 
 ## Start Here
 
@@ -217,8 +218,9 @@ contract.
   truth rather than intent.
 - Keep one canonical plan per initiative. Extend or supersede it explicitly
   instead of creating parallel TODO notes.
-- Active plans stay in `plans/`; completed plans remain as a concise execution
-  record and move to the Completed section of [[PLANS.md]].
+- Active plans stay in `plans/` and [[PLANS.md]]. When a plan is accepted,
+  delete the file and its index bullet in the same change. Git history is the
+  archive; do not accumulate a Completed section.
 - GitHub issues remain the external defect/deferred-work surface. Reference
   related issues and PRs from the plan; do not use a plan to hide actionable
   deferred findings from the issue tracker.
