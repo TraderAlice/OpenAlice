@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import type {
-  ConnectorAdapterConfig,
-  ConnectorAdapterHealth,
-  ConnectorConfig,
-  ConnectorDeliveryReceipt,
-  ConnectorServiceHealth,
-  InboxNotification,
+import {
+  inboundOwnerMessageSchema,
+  type ConnectorAdapterConfig,
+  type ConnectorAdapterHealth,
+  type ConnectorConfig,
+  type ConnectorDeliveryReceipt,
+  type ConnectorServiceHealth,
+  type InboxNotification,
+  type InboundOwnerMessage,
+  type OwnerChatMessage,
 } from '@traderalice/connector-protocol'
 import {
   CommandRegistry,
@@ -32,9 +35,12 @@ export interface DeliveryManagerOptions {
  * from the caller that originally wrote the Inbox item. Enqueue accepts the
  * durable notification and performs external delivery after returning.
  */
+export const MAX_INBOUND_OWNER_MESSAGES = 100
+
 export class DeliveryManager {
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
+  private readonly inbound: InboundOwnerMessage[] = []
   private readonly startedAt: string
   private stopped = false
 
@@ -128,6 +134,58 @@ export class DeliveryManager {
     return probeId
   }
 
+  acceptInbound(input: InboundOwnerMessage): void {
+    const parsed = inboundOwnerMessageSchema.safeParse(input)
+    if (!parsed.success) return
+    this.inbound.push(parsed.data)
+    const overflow = this.inbound.length - MAX_INBOUND_OWNER_MESSAGES
+    if (overflow > 0) this.inbound.splice(0, overflow)
+  }
+
+  drainInbound(limit = 20): InboundOwnerMessage[] {
+    return this.inbound.splice(0, Math.max(0, limit))
+  }
+
+  enqueueOwnerChat(message: OwnerChatMessage): ConnectorDeliveryReceipt {
+    const deliveryId = message.id
+    queueMicrotask(() => {
+      if (this.stopped) return
+      void this.sendOwnerChat(message, deliveryId)
+    })
+    return { accepted: true, deliveryId }
+  }
+
+  async sendOwnerChat(message: OwnerChatMessage, correlationId = message.id): Promise<void> {
+    const adapter = this.adapters.get(message.adapterId)
+    if (!adapter) throw new Error(`Connector is not running: ${message.adapterId}`)
+    await this.record({
+      correlationId,
+      direction: 'outbound',
+      stage: 'delivery.attempted',
+      connectorId: adapter.id,
+      payload: { kind: 'owner-chat', textLength: message.text.length },
+    })
+    try {
+      await adapter.sendOwnerText(message.text)
+      await this.record({
+        correlationId,
+        direction: 'outbound',
+        stage: 'delivery.succeeded',
+        connectorId: adapter.id,
+        payload: { kind: 'owner-chat' },
+      })
+    } catch (error) {
+      await this.record({
+        correlationId,
+        direction: 'outbound',
+        stage: 'delivery.failed',
+        connectorId: adapter.id,
+        payload: { kind: 'owner-chat', error: error instanceof Error ? error.message : String(error) },
+      })
+      throw error
+    }
+  }
+
   health(): ConnectorServiceHealth {
     const adapters: ConnectorAdapterHealth[] = []
     for (const [id, config] of Object.entries(this.options.config.adapters)) {
@@ -168,6 +226,14 @@ export class DeliveryManager {
       updateSettings: (patch) => this.options.updateAdapterSettings(id, patch),
       getServiceStatus: () => this.health().status,
       sendTest: (connectorId) => this.sendTest(connectorId),
+      forwardOwnerText: async (input) => {
+        this.acceptInbound({
+          connectorId: id,
+          userId: input.userId,
+          text: input.text,
+          ...(input.chatId ? { chatId: input.chatId } : {}),
+        })
+      },
     }
     // Keep a failed adapter registered. start() may record a useful degraded
     // reason; dropping it here reduced Settings to "configured but not running".

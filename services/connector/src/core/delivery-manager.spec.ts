@@ -7,7 +7,7 @@ import type {
 } from '@traderalice/connector-protocol'
 import type { ConnectorAdapter, ConnectorAdapterContext } from './adapter.js'
 import { ConnectorRegistry } from './adapter.js'
-import { DeliveryManager } from './delivery-manager.js'
+import { DeliveryManager, MAX_INBOUND_OWNER_MESSAGES } from './delivery-manager.js'
 import { createConnectorIOEvent, type ConnectorIOEvent, type ConnectorIORecorder } from './io-events.js'
 
 class MemoryRecorder implements ConnectorIORecorder {
@@ -33,6 +33,8 @@ class FakeThirdPartyAdapter implements ConnectorAdapter {
   async deliver(notification: InboxNotification): Promise<void> {
     this.delivered.push(notification)
   }
+
+  async sendOwnerText(): Promise<void> {}
 
   health(): ConnectorAdapterHealth {
     return { id: this.id, enabled: true, status: this.status }
@@ -70,6 +72,20 @@ describe('DeliveryManager connector registry', () => {
 
     expect(adapter.delivered).toHaveLength(1)
     expect(manager.health()).toMatchObject({ status: 'healthy' })
+    manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: 'hello' })
+    expect(manager.drainInbound()).toEqual([
+      { connectorId: 'carrier-pigeon', userId: '1', text: 'hello' },
+    ])
+    expect(manager.drainInbound()).toEqual([])
+    manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: '' })
+    expect(manager.drainInbound()).toEqual([])
+    for (let i = 0; i < MAX_INBOUND_OWNER_MESSAGES + 1; i += 1) {
+      manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: `m${i}` })
+    }
+    const kept = manager.drainInbound(MAX_INBOUND_OWNER_MESSAGES)
+    expect(kept).toHaveLength(MAX_INBOUND_OWNER_MESSAGES)
+    expect(kept[0]?.text).toBe('m1')
+    expect(kept.at(-1)?.text).toBe(`m${MAX_INBOUND_OWNER_MESSAGES}`)
     await manager.stop()
   })
 
@@ -81,6 +97,7 @@ describe('DeliveryManager connector registry', () => {
       start: async () => { await gate },
       stop: async () => undefined,
       deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
       health: () => ({ id: 'slow', enabled: true, status: 'starting' }),
     }
     const registry = new ConnectorRegistry()
@@ -112,6 +129,7 @@ describe('DeliveryManager connector registry', () => {
       start: async () => { throw new Error('Telegram API did not become ready') },
       stop: async () => undefined,
       deliver: async () => { throw new Error('Telegram is not ready') },
+      sendOwnerText: async () => undefined,
       health: () => ({
         id: 'broken',
         enabled: true,
@@ -148,6 +166,7 @@ describe('DeliveryManager connector registry', () => {
         start: async () => undefined,
         stop: async () => undefined,
         deliver: async () => { throw new Error('external outage') },
+        sendOwnerText: async () => undefined,
         health: () => ({ id: 'broken', enabled: true, status: 'degraded' as const, lastError: 'external outage' }),
       }),
     })
@@ -176,6 +195,7 @@ describe('DeliveryManager connector registry', () => {
         start: async () => undefined,
         stop: async () => undefined,
         deliver: async () => { throw new Error('owner not linked') },
+        sendOwnerText: async () => undefined,
         health: () => ({ id: 'unlinked', enabled: true, status: 'awaiting_link' as const }),
       }),
     })

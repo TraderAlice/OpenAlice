@@ -51,6 +51,7 @@ import {
   type IssueTimeout,
 } from '../../workspaces/issues/declaration.js'
 import { appendIssueComment, updateIssueFields } from '../../workspaces/issues/mutate.js'
+import { projectDeskComment } from '../../workspaces/issues/telegram-desk-project.js'
 import { deprecatedIssueAssigneeReplacement } from '../../workspaces/session-signature.js'
 import { isAgentRuntime } from '../../workspaces/cli-adapter.js'
 import { logger as launcherLogger } from '../../workspaces/logger.js'
@@ -405,6 +406,9 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
           })
         }
       }
+      await projectDeskComment(res.issue, res.comment).catch((err) => {
+        launcherLogger.warn('telegram_desk.comment_project_failed', { wsId, id, err })
+      })
       launcherLogger.info('issue.comment_added', { wsId, id, author: 'human' })
       const detail = await svc.issueDetail(wsId, id)
       return c.json(detail ?? { issue: res.issue, comments: [res.comment], runs: [], inboxReports: [], provenance: [], activity: [] })

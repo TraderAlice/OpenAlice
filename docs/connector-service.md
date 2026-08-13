@@ -20,8 +20,14 @@ categories.
   Inbox item read.
 - The service is optional in every trading mode, including lite.
 - Guardian may start, stop, or restart it without restarting Alice or UTA.
-- Version 1 is outbound-only. `/link`, `/status`, and `/test` reserve a generic
-  slash-command control plane; ordinary DM text is not ingested.
+- Inbox delivery remains outbound. Telegram owner private-chat text is ingested
+  only as comments on the Alice Project's phone-desk Issue. `/link`, `/status`,
+  and `/test` stay the generic slash-command control plane. Discord DMs are
+  still not ingested.
+- Connector Service never interprets chat. Alice owns the phone-desk Issue.
+  Connector queues owner text and Alice drains it only while a live phone-desk
+  Issue exists; Alice projects desk comments that do not contain the literal
+  tag `[[no-reply]]`. Inbound Telegram comments are not echoed back.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are sent as file attachments, not flattened
@@ -61,6 +67,14 @@ Workspace agent
           -> Discord Connector
           -> Telegram Connector
           -> future adapter
+
+Telegram owner DM
+  -> Telegram adapter (linked private chat only)
+  -> Connector inbound queue
+  -> Alice drain (only while a live phone-desk Issue exists)
+  -> Issue comment (via: telegram)
+  -> existing comment-reply dispatch
+  -> owner-chat projection unless [[no-reply]]
 ```
 
 Load-bearing paths:
@@ -73,6 +87,10 @@ Load-bearing paths:
 - `src/core/connector-config.ts` — sealed config and Guardian enable/restart
   control.
 - `src/services/connector-client/` — Inbox projection and Alice-side health.
+- `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound drain
+  and scheduled-fire comment stamp.
+- `src/workspaces/issues/telegram-desk-project.ts` — `[[no-reply]]` filter
+  and owner-chat projection.
 - `src/webui/routes/connectors.ts` + `ui/src/pages/ConnectorsPage.tsx` — generic
   Settings surface.
 
@@ -164,8 +182,9 @@ The surfaces deliberately have different jobs:
   Issue create/update cannot set `telegramConnector`.
 - The phone-desk Issue is hidden from the Issue board and Tracked list. It still
   fires on `when`. Extra `telegramConnector: true` files in other Workspaces do
-  not fire. Version 2 will project comments to Telegram unless they contain the
-  literal tag `[[no-reply]]`.
+  not fire. Owner DMs become comments; scheduled-fire `assistantText` is stamped
+  as a comment. Connector projects those comments unless they contain the
+  literal tag `[[no-reply]]` or arrived from Telegram.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product

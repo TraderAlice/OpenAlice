@@ -119,4 +119,22 @@ export const connectorDeliveryReceiptSchema = z.object({
   accepted: z.literal(true),
   deliveryId: z.string().min(1),
 })
+
+/** Owner-private chat text. Not an Inbox item. Telegram's sendMessage cap is 4096. */
+export const OWNER_CHAT_TEXT_MAX = 4096
+
+export const ownerChatMessageSchema = z.object({
+  id: z.string().min(1),
+  adapterId: z.string().min(1),
+  text: z.string().min(1).max(OWNER_CHAT_TEXT_MAX),
+})
+export type OwnerChatMessage = z.infer<typeof ownerChatMessageSchema>
+
+export const inboundOwnerMessageSchema = z.object({
+  connectorId: z.string().min(1),
+  userId: z.string().min(1),
+  chatId: z.string().min(1).optional(),
+  text: z.string().min(1).max(OWNER_CHAT_TEXT_MAX),
+})
+export type InboundOwnerMessage = z.infer<typeof inboundOwnerMessageSchema>
 export type ConnectorDeliveryReceipt = z.infer<typeof connectorDeliveryReceiptSchema>

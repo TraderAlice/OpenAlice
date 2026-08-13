@@ -13,6 +13,7 @@ vi.mock('grammy', () => ({
       setMyCommands,
     }
     command() {}
+    on() {}
     start(options: { onStart?: () => void }) {
       return startMock(options)
     }
@@ -33,6 +34,7 @@ function context() {
     updateSettings: async () => undefined,
     getServiceStatus: () => 'healthy',
     sendTest: async () => 'probe',
+    forwardOwnerText: async () => undefined,
   }
 }
 
