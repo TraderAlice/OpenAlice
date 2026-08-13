@@ -65,4 +65,63 @@ describe('public connector config', () => {
     const stored = await config.readConnectorConfig()
     expect(stored.adapters.telegram.settings).toEqual({ botToken: 'secret-token' })
   })
+
+  it('rejects replacing a sealed token with a short draft', async () => {
+    const config = await loadModule()
+    await config.writeConnectorConfig({
+      version: 1,
+      adapters: {
+        telegram: {
+          enabled: true,
+          settings: { botToken: '123456789:AAHreal-telegram-bot-token-value' },
+        },
+      },
+    })
+    const publicConfig = await config.readPublicConnectorConfig()
+
+    await expect(config.writePublicConnectorConfig({
+      ...publicConfig,
+      adapters: {
+        ...publicConfig.adapters,
+        telegram: {
+          ...publicConfig.adapters.telegram,
+          settings: { botToken: 'qweqw' },
+          configuredSecrets: ['botToken'],
+        },
+      },
+    })).rejects.toThrow('too short or malformed')
+
+    const stored = await config.readConnectorConfig()
+    expect(stored.adapters.telegram.settings.botToken).toBe('123456789:AAHreal-telegram-bot-token-value')
+  })
+
+  it('accepts a plausible replacement token', async () => {
+    const config = await loadModule()
+    await config.writeConnectorConfig({
+      version: 1,
+      adapters: {
+        telegram: {
+          enabled: true,
+          settings: { botToken: '123456789:AAHreal-telegram-bot-token-value' },
+        },
+      },
+    })
+    const publicConfig = await config.readPublicConnectorConfig()
+    const next = '987654321:BBHanother-plausible-bot-token'
+
+    await config.writePublicConnectorConfig({
+      ...publicConfig,
+      adapters: {
+        ...publicConfig.adapters,
+        telegram: {
+          ...publicConfig.adapters.telegram,
+          settings: { botToken: next },
+          configuredSecrets: ['botToken'],
+        },
+      },
+    })
+
+    const stored = await config.readConnectorConfig()
+    expect(stored.adapters.telegram.settings.botToken).toBe(next)
+  })
 })
