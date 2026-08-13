@@ -32,6 +32,7 @@
  *   model: <optional native model id for one scheduled run>
  *   effort: none | minimal | low | medium | high | xhigh | max
  *   timeout: 15m | 30m | 45m | 60m  (optional run budget; omit = no watchdog)
+ *   telegramConnector: true  (optional; at most one per Alice Project)
  *   ---
  *   <markdown What — the exact work definition and scheduled prompt>
  *
@@ -182,6 +183,9 @@ const issueFrontmatterObjectSchema = z.object({
   /** Optional headless watchdog for a scheduled fire. Omission means no limit.
    * This is a run budget, not Session birth, so an exact `@resumeId` may set it. */
   timeout: z.enum(ISSUE_TIMEOUTS).optional(),
+  /** Present only on the Alice Project's Telegram phone-desk Issue.
+   *  Omission is a normal Issue. Any value other than literal `true` is invalid. */
+  telegramConnector: z.literal(true).optional(),
   /** The former parallel ownership field is outside the baseline. Keeping a
    * `never` key makes stale files fail loudly instead of being silently read. */
   execution: z.never().optional(),
@@ -262,6 +266,18 @@ export function isFireable(issue: IssueRecord): issue is IssueRecord & { when: S
   return issue.when !== undefined && !isTerminalStatus(issue.status)
 }
 
+export function isTelegramConnectorIssue(
+  issue: Pick<IssueRecord, 'telegramConnector'>,
+): issue is Pick<IssueRecord, 'telegramConnector'> & { telegramConnector: true } {
+  return issue.telegramConnector === true
+}
+
+/** Same-workspace extras after the first id (sorted). Caller maps them to `invalid`. */
+export function extraTelegramConnectorIssueIds(issues: readonly IssueRecord[]): Set<string> {
+  const phone = issues.filter(isTelegramConnectorIssue).map((issue) => issue.id).sort()
+  return new Set(phone.slice(1))
+}
+
 /** The prompt a scheduled fire hands to the headless run. `what` is already the
  * canonical, human-visible markdown work definition; there is no second hidden
  * prompt field for it to disagree with. */
@@ -308,6 +324,22 @@ export async function readWorkspaceIssues(wsDir: string): Promise<ReadIssuesResu
     const one = await readOneIssue(join(dir, file), id)
     if (one.ok) issues.push(one.issue)
     else invalid.push({ id, error: one.error })
+  }
+  const extras = extraTelegramConnectorIssueIds(issues)
+  if (extras.size > 0) {
+    const kept: IssueRecord[] = []
+    for (const issue of issues) {
+      if (extras.has(issue.id)) {
+        invalid.push({
+          id: issue.id,
+          error: 'telegramConnector: only one Telegram phone-desk Issue is allowed in this Alice Project',
+        })
+      } else {
+        kept.push(issue)
+      }
+    }
+    issues.length = 0
+    issues.push(...kept)
   }
   return { ok: true, issues, invalid }
 }

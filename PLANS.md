@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/telegram-connector-issue.md]] — One Issue per Alice Project is the
+  Telegram phone desk: What is the heartbeat prompt, comments are the chat,
+  Connector only transports. Increment 1 is schema, uniqueness, board hide,
+  and Settings bind.
 - [[plans/session-presence.md]] — Give product Sessions an in-desk presence
   (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
   the Ask Alice roster, and make Archive the floor action instead of deleting

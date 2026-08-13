@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(),
   save: vi.fn(),
   test: vi.fn(),
+  deskLoad: vi.fn(),
   openOrFocus: vi.fn(),
 }))
 
@@ -25,6 +26,12 @@ vi.mock('../api', async (importOriginal) => {
         load: mocks.load,
         save: mocks.save,
         test: mocks.test,
+        desk: {
+          load: mocks.deskLoad,
+          create: vi.fn(),
+          update: vi.fn(),
+          disable: vi.fn(),
+        },
       },
     },
   }
@@ -35,12 +42,19 @@ vi.mock('../tabs/store', () => ({
     selector({ openOrFocus: mocks.openOrFocus }),
 }))
 
+vi.mock('../contexts/workspaces-context', () => ({
+  useWorkspaces: () => ({
+    workspaces: [{ id: 'ws-1', tag: 'desk', displayName: 'Desk' }],
+  }),
+}))
+
 beforeEach(async () => {
   vi.clearAllMocks()
   await i18n.changeLanguage('en')
   mocks.load.mockImplementation(async () => createDemoConnectorSnapshot())
   mocks.save.mockImplementation(async (config) => ({ config: redactSecrets(config) }))
   mocks.test.mockResolvedValue({ ok: true, probeId: 'connector-probe-demo' })
+  mocks.deskLoad.mockResolvedValue({ desk: null })
 })
 
 afterEach(() => cleanup())
