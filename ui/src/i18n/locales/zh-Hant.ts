@@ -102,6 +102,9 @@ export const zhHant: Resources = {
       credential: '憑證',
       model: '模型',
       effort: '推理強度',
+      timeout: '執行時限',
+      timeoutNone: '不限制',
+      timeoutHint: '這次排程執行的可選看門狗。不設則讓 Agent 跑到自己結束。',
       health: '執行狀態',
       runHealth: '執行狀態',
       lastRun: '上次執行',
@@ -215,6 +218,7 @@ export const zhHant: Resources = {
         credential: '憑證',
         model: '模型',
         effort: '推理強度',
+        timeout: '執行時限',
         what: '任務內容',
       },
       mutationValue: {

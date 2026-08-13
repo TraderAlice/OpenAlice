@@ -38,6 +38,7 @@ import {
   ISSUES_DIR_REL,
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
+  ISSUE_TIMEOUTS,
   issueAssigneeResumeId,
   issueAssigneeSchema,
   issueWhenSchema,
@@ -218,6 +219,7 @@ function rowOf(issue: IssueRecord) {
     ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
+    ...(issue.timeout ? { timeout: issue.timeout } : {}),
     scheduled: issue.when !== undefined,
   }
 }
@@ -310,11 +312,12 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
         "Update one of THIS workspace's issues — its board fields.",
         '',
         'Patch any subset of `status`, `priority`, `assignee`, `agent`, `credential`, `credentialSource`, `model`,',
-        '`effort`, or `what`; omitted fields are',
+        '`effort`, `timeout`, or `what`; omitted fields are',
         'left untouched. `assignee:"@me"` binds this current product',
         'Session; `@new-then-resume` recruits once and assigns that first Session permanently;',
         'pass an exact `@resumeId` to assign another known Session. What is the',
-        'canonical markdown work definition and exact scheduled prompt. Other scheduling',
+        'canonical markdown work definition and exact scheduled prompt. `timeout` is an optional',
+        'scheduled-run watchdog (`15m`/`30m`/`45m`/`60m`); omit or null means no limit. Other',
         'schedule timing (`when`) is preserved — edit it by writing the file directly',
         '(`.alice/issues/<id>.md`).',
         '',
@@ -333,9 +336,10 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
         credentialSource: z.literal('native').nullable().optional().describe('Use the Agent runtime login explicitly; null inherits the Workspace headless preference.'),
         model: z.string().min(1).nullable().optional().describe('Native one-run model id; null inherits the Workspace/runtime default.'),
         effort: z.enum(MODEL_REASONING_EFFORTS).nullable().optional().describe('One-run reasoning effort; null inherits the Workspace/runtime default.'),
+        timeout: z.enum(ISSUE_TIMEOUTS).nullable().optional().describe('Optional scheduled-run watchdog; null removes the limit so the agent may run until it exits.'),
         what: z.string().min(1).optional().describe('Canonical markdown work definition; exact scheduled prompt.'),
       }),
-      execute: async ({ id, status, priority, assignee, agent, credential, credentialSource, model, effort, what }) => {
+      execute: async ({ id, status, priority, assignee, agent, credential, credentialSource, model, effort, timeout, what }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         const resolvedAssignee = resolveIssueAssignee(ctx, assignee)
@@ -349,11 +353,12 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           credentialSource === undefined &&
           model === undefined &&
           effort === undefined &&
+          timeout === undefined &&
           what === undefined
         ) {
           return {
             ok: false as const,
-            error: 'no fields to update (pass status/priority/assignee/agent/credential/credentialSource/model/effort/what)',
+            error: 'no fields to update (pass status/priority/assignee/agent/credential/credentialSource/model/effort/timeout/what)',
           }
         }
         const res = await updateIssueFields(dir.dir, id, {
@@ -365,6 +370,7 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           credentialSource,
           model,
           effort,
+          timeout,
           what,
         })
         if (res.ok) {
@@ -505,8 +511,9 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         credentialSource: z.literal('native').optional().describe('Use the Agent runtime login explicitly instead of inheriting Workspace access.'),
         model: z.string().min(1).optional().describe('Native model id for the selected credential/runtime source.'),
         effort: z.enum(MODEL_REASONING_EFFORTS).optional().describe('Reasoning effort for one scheduled run.'),
+        timeout: z.enum(ISSUE_TIMEOUTS).optional().describe('Optional scheduled-run watchdog (15m/30m/45m/60m). Omit for no limit.'),
       }),
-      execute: async ({ title, id, status, priority, assignee, when, what, agent, credential, credentialSource, model, effort }) => {
+      execute: async ({ title, id, status, priority, assignee, when, what, agent, credential, credentialSource, model, effort, timeout }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         // Structured creation is attributable: "who creates it owns it". A
@@ -528,6 +535,7 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           credentialSource,
           model,
           effort,
+          timeout,
         })
         if (res.ok) {
           await recordIssueProvenance(ctx, res.issue.id, 'created')

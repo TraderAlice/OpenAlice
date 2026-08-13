@@ -38,10 +38,10 @@ import {
   issueAssigneeClaimsFirstSession,
   issueAssigneeResumeId,
   issueFirePrompt,
+  issueTimeoutMs,
   readWorkspaceIssues,
   type IssueRecord,
 } from '../issues/declaration.js'
-import { SCHEDULED_ISSUE_RUN_TIMEOUT_MS } from '../issues/run-failure.js'
 
 import {
   fireBase,
@@ -88,7 +88,7 @@ export interface ScheduleScannerDeps {
     meta: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     /** Composite source of the dispatch. Execution may happen elsewhere. */
     trigger?: HeadlessTaskTrigger,
     /** Product Session to continue. Omitted means allocate a fresh Session. */
@@ -160,8 +160,8 @@ export class ScheduleScanner {
 
   /** Dispatch one scheduled Issue immediately without touching its firing
    * marker. This is the authoritative manual-retry path: it re-reads the live
-   * Issue and reuses the exact prompt, owner, runtime, and timeout used by the
-   * scanner, while preserving the next scheduled occurrence. */
+   * Issue and reuses the exact prompt, owner, runtime, and optional timeout used
+   * by the scanner, while preserving the next scheduled occurrence. */
   async runIssueNow(wsId: string, issueId: string): Promise<{ taskId: string }> {
     const ws = this.deps.registry.get(wsId)
     if (!ws) throw new ScheduledIssueRunNowError('not_found', 'Workspace not found.')
@@ -188,6 +188,7 @@ export class ScheduleScanner {
       issueRunOverrides(issue),
       issueAssigneeResumeId(issue.assignee) ?? undefined,
       issueAssigneeClaimsFirstSession(issue.assignee),
+      issueTimeoutMs(issue.timeout),
       true,
     )
   }
@@ -278,6 +279,7 @@ export class ScheduleScanner {
           issueRunOverrides(issue),
           issueAssigneeResumeId(issue.assignee) ?? undefined,
           issueAssigneeClaimsFirstSession(issue.assignee),
+          issueTimeoutMs(issue.timeout),
           nowMs,
         )
       }
@@ -302,6 +304,7 @@ export class ScheduleScanner {
     selection: SessionRuntimeSelection | undefined,
     resumeId: string | undefined,
     claimFreshSession: boolean,
+    timeoutMs: number | undefined,
     nowMs: number,
   ): Promise<void> {
     try {
@@ -313,6 +316,7 @@ export class ScheduleScanner {
         selection,
         resumeId,
         claimFreshSession,
+        timeoutMs,
       )
       await this.deps.markers.set(issueWorkspace.id, taskId, nowMs)
       this.deps.logger.info('schedule.fired', {
@@ -341,6 +345,7 @@ export class ScheduleScanner {
     selection?: SessionRuntimeSelection,
     resumeId?: string,
     claimFreshSession = false,
+    timeoutMs?: number,
     manual = false,
   ): Promise<{ taskId: string }> {
     const dispatchKey = `${issueWorkspace.id}:${issueId}`
@@ -386,7 +391,7 @@ export class ScheduleScanner {
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
               resumeId,
               undefined,
@@ -396,7 +401,7 @@ export class ScheduleScanner {
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
               resumeId,
             )
@@ -405,7 +410,7 @@ export class ScheduleScanner {
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
               undefined,
               undefined,
@@ -417,7 +422,7 @@ export class ScheduleScanner {
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
               undefined,
               undefined,

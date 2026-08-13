@@ -1,8 +1,10 @@
 import type { HeadlessTaskRecord } from '../headless-task-registry.js'
+import { issueTimeoutMs } from './declaration.js'
 
-/** Scheduled Issue runs share one watchdog budget. Keeping the value here lets
- * dispatch and the read-side failure projection explain the same deadline. */
-export const SCHEDULED_ISSUE_RUN_TIMEOUT_MS = 30 * 60_000
+/** Historical scheduled Issue runs that omitted `timeoutMs` on the durable
+ * record used this 30-minute budget. New fires persist the Issue's actual
+ * watchdog (or omit it when the Issue has no limit). */
+export const SCHEDULED_ISSUE_RUN_TIMEOUT_MS = issueTimeoutMs('30m')!
 
 /** A watchdog that fires this far after its own deadline did not merely time
  * out: the launcher's event loop was paused (most commonly system sleep). */
@@ -46,10 +48,11 @@ export function issueRunFailure(
     | 'signal'
     | 'killed'
     | 'error'
+    | 'timeoutMs'
   >,
-  timeoutMs = SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
 ): IssueRunFailure | undefined {
   if (task.status === 'running' || task.status === 'done') return undefined
+  const timeoutMs = task.timeoutMs ?? SCHEDULED_ISSUE_RUN_TIMEOUT_MS
 
   if (task.status === 'interrupted') {
     return {

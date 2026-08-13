@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, RotateCcw, Settings, Timer, TrendingUp, X } from 'lucide-react'
 
 import type { HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -15,6 +15,8 @@ import type {
   IssueProvenanceRecord,
   IssueRunRecord,
   IssueStatus,
+  IssueTimeout,
+  ISSUE_TIMEOUTS,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
@@ -816,6 +818,30 @@ function PropertiesRail({
               {agentNeedsCredential && (
                 <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
               )}
+              <InspectorField
+                label={t('issues.detail.timeout')}
+                icon={<Timer size={13} aria-hidden />}
+                className="mt-3"
+              >
+                <select
+                  className={`${railControl} w-full`}
+                  aria-label={t('issues.detail.timeout')}
+                  value={issue.timeout ?? ''}
+                  disabled={saving}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    onPatch({ timeout: value === '' ? null : value as IssueTimeout })
+                  }}
+                >
+                  <option value="">{t('issues.detail.timeoutNone')}</option>
+                  {ISSUE_TIMEOUTS.map((timeout) => (
+                    <option key={timeout} value={timeout}>{timeout}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                  {t('issues.detail.timeoutHint')}
+                </p>
+              </InspectorField>
             </InspectorSection>
 
             {issue.automationHealth && (
@@ -1127,6 +1153,7 @@ function mutationFieldLabel(field: string, t: TFunction): string {
     case 'credential': return t('issues.detail.mutationField.credential')
     case 'model': return t('issues.detail.mutationField.model')
     case 'effort': return t('issues.detail.mutationField.effort')
+    case 'timeout': return t('issues.detail.mutationField.timeout')
     case 'what': return t('issues.detail.mutationField.what')
     default: return field
   }

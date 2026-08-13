@@ -54,6 +54,8 @@ export interface HeadlessTaskRecord {
   signal?: string | null
   killed?: boolean
   error?: string
+  /** Watchdog budget when this dispatch armed one. */
+  timeoutMs?: number
   /** Backend has resolved this product identity to a native runtime session. */
   resumable: boolean
   output?: {

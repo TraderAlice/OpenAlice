@@ -106,6 +106,9 @@ export const en = {
       credential: 'Credential',
       model: 'Model',
       effort: 'Effort',
+      timeout: 'Run timeout',
+      timeoutNone: 'No limit',
+      timeoutHint: 'Optional watchdog for this scheduled run. Leave unset so the agent can finish without a time cap.',
       health: 'Health',
       runHealth: 'Run health',
       lastRun: 'Last run',
@@ -219,6 +222,7 @@ export const en = {
         credential: 'Credential',
         model: 'Model',
         effort: 'Effort',
+        timeout: 'Run timeout',
         what: 'What',
       },
       mutationValue: {

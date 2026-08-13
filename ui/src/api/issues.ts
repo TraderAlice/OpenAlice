@@ -5,6 +5,9 @@ import type { InboxEntry } from './inbox'
 import type { ScheduleWhen } from './schedule'
 import type { ModelReasoningEffort } from './types'
 
+export const ISSUE_TIMEOUTS = ['15m', '30m', '45m', '60m'] as const
+export type IssueTimeout = (typeof ISSUE_TIMEOUTS)[number]
+
 /**
  * Issue board — the canonical client shape for GET /api/issues.
  *
@@ -122,6 +125,8 @@ export interface IssueListItem {
   model?: string
   /** Native reasoning effort for the scheduled fire override, if set. */
   effort?: ModelReasoningEffort
+  /** Optional scheduled-run watchdog; omit for no limit. */
+  timeout?: IssueTimeout
   /** Present iff the issue is scheduled (shares the core Schedule union). */
   when?: ScheduleWhen
   /** Scanner last-fired marker (epoch ms) — scheduled issues only. */
@@ -220,6 +225,8 @@ export interface IssueDetailIssue {
   model?: string
   /** Native reasoning effort for the scheduled fire (frontmatter `effort`), if set. */
   effort?: ModelReasoningEffort
+  /** Optional scheduled-run watchdog (frontmatter `timeout`), if set. */
+  timeout?: IssueTimeout
   /** Scanner last-fired marker (epoch ms) — scheduled issues only. */
   lastFiredAtMs?: number | null
   /** Computed next fire (epoch ms) — scheduled issues only. */
@@ -258,6 +265,7 @@ export interface IssuePatch {
   credentialSource?: 'native' | null
   model?: string | null
   effort?: ModelReasoningEffort | null
+  timeout?: IssueTimeout | null
   what?: string
 }
 
@@ -287,9 +295,10 @@ export const issuesApi = {
 
   /**
    * Human write path: patch one issue's editable fields (any subset of
-   * status / priority / assignee / agent / credential / model / effort / what).
+   * status / priority / assignee / agent / credential / model / effort / timeout / what).
    * Null runtime fields clear their one-run overrides so Workspace/native
-   * defaults apply. Returns the SAME detail shape as `getDetail` so the caller
+   * defaults apply. `timeout: null` removes the optional run watchdog.
+   * Returns the SAME detail shape as `getDetail` so the caller
    * can apply it directly (refetch-free).
    * Working-tree write on the server, no commit.
    */

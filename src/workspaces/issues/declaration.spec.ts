@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { issueAssigneeResumeId, issueFirePrompt, isFireable, readWorkspaceIssues } from './declaration.js'
+import { issueAssigneeResumeId, issueFirePrompt, issueTimeoutMs, isFireable, readWorkspaceIssues } from './declaration.js'
 
 let dir: string
 beforeEach(async () => {
@@ -178,6 +178,41 @@ describe('readWorkspaceIssues', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.invalid[0]?.error).toMatch(/agent.*credential.*model.*effort/)
+  })
+
+  it('accepts an optional run timeout, including on an exact Session owner', async () => {
+    await writeIssue('budget', fm([
+      'title: Budgeted run',
+      'when: { kind: every, every: 30m }',
+      'timeout: 45m',
+    ].join('\n')))
+    await writeIssue('owned-budget', fm([
+      'title: Owned budget',
+      'when: { kind: every, every: 30m }',
+      'assignee: "@resume-kind-owl-abc123"',
+      'timeout: 15m',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
+    expect(byId['budget']?.timeout).toBe('45m')
+    expect(byId['owned-budget']?.timeout).toBe('15m')
+    expect(issueTimeoutMs(byId['budget']?.timeout)).toBe(45 * 60_000)
+    expect(issueTimeoutMs(undefined)).toBeUndefined()
+  })
+
+  it('rejects an unknown timeout instead of silently ignoring it', async () => {
+    await writeIssue('bad-timeout', fm([
+      'title: Bad timeout',
+      'when: { kind: every, every: 30m }',
+      'timeout: 12m',
+    ].join('\n')))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues).toEqual([])
+    expect(result.invalid[0]?.error).toMatch(/timeout/)
   })
 
   it('distinguishes explicit native login from inherited Workspace access', async () => {

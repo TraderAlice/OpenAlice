@@ -95,6 +95,9 @@ export const ja: Resources = {
       credential: '認証情報',
       model: 'モデル',
       effort: '推論レベル',
+      timeout: '実行タイムアウト',
+      timeoutNone: '制限なし',
+      timeoutHint: 'このスケジュール実行の任意ウォッチドッグです。未設定ならエージェントが終わるまで待ちます。',
       health: '実行状態',
       runHealth: '実行状態',
       lastRun: '前回の実行',
@@ -208,6 +211,7 @@ export const ja: Resources = {
         credential: '認証情報',
         model: 'モデル',
         effort: '推論レベル',
+        timeout: '実行タイムアウト',
         what: '作業内容',
       },
       mutationValue: {
