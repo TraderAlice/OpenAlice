@@ -163,6 +163,11 @@ export const zhHant: Resources = {
       applyAiConfiguration: '套用設定',
       retryNow: '立即重試',
       retrying: '正在重試…',
+      runNow: '立即執行',
+      runningNow: '正在啟動…',
+      runNowTitle: '現在執行這個議題？',
+      runNowMessage:
+        'OpenAlice 會用目前的 What、負責人和執行環境啟動一輪後台任務。下次預定時間不會改變。',
       healthMessage: {
         inactive: '議題狀態為「{{status}}」，執行排程已停止。',
         not_started: '執行排程有效，但尚未執行。',

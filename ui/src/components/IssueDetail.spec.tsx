@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   listAgentCredentials: vi.fn(),
   getPresets: vi.fn(),
   updateIssue: vi.fn(),
+  runNow: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -91,6 +92,7 @@ vi.mock('../api/issues', async (importOriginal) => {
     issuesApi: {
       ...actual.issuesApi,
       update: mocks.updateIssue,
+      runNow: mocks.runNow,
     },
   }
 })
@@ -154,6 +156,46 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.clearAllMocks()
+})
+
+describe('IssueDetail manual run', () => {
+  it('confirms before dispatching a scheduled Issue without waiting for failure', async () => {
+    mocks.runNow.mockResolvedValue({
+      ...scheduledIssue,
+      runs: [{
+        taskId: 'run-now-1',
+        resumeId: 'resume-run-now',
+        resumable: false,
+        wsId: 'demo-ws-auto-quant',
+        issueId: 'morning-scan',
+        agent: 'codex',
+        prompt: scheduledIssue.issue.what,
+        status: 'running',
+        startedAt: Date.now(),
+      }],
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Run this Issue now?' })
+    expect(dialog.textContent).toContain('The next scheduled time stays unchanged.')
+    expect(mocks.runNow).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Run now' }))
+    await waitFor(() => expect(mocks.runNow).toHaveBeenCalledWith('demo-ws-auto-quant', 'morning-scan'))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocks.mutate).toHaveBeenCalled()
+  })
+
+  it('does not dispatch when the confirmation is cancelled', async () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Run this Issue now?' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocks.runNow).not.toHaveBeenCalled()
+  })
 })
 
 describe('IssueActivity provenance identity', () => {

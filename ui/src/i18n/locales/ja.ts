@@ -156,6 +156,11 @@ export const ja: Resources = {
       applyAiConfiguration: '設定を適用',
       retryNow: '今すぐ再試行',
       retrying: '再試行中…',
+      runNow: '今すぐ実行',
+      runningNow: '起動中…',
+      runNowTitle: 'この Issue を今すぐ実行しますか？',
+      runNowMessage:
+        '現在の What、担当、ランタイムでヘッドレス実行を開始します。次の予定時刻は変わりません。',
       healthMessage: {
         inactive: '課題のステータスが「{{status}}」のため、スケジュールは停止しています。',
         not_started: 'スケジュールは有効ですが、まだ実行されていません。',

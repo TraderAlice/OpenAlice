@@ -167,6 +167,11 @@ export const en = {
       applyAiConfiguration: 'Apply configuration',
       retryNow: 'Retry now',
       retrying: 'Retrying…',
+      runNow: 'Run now',
+      runningNow: 'Starting…',
+      runNowTitle: 'Run this Issue now?',
+      runNowMessage:
+        'OpenAlice will start a headless turn with the current What, owner, and runtime. The next scheduled time stays unchanged.',
       healthMessage: {
         inactive: 'Schedule stopped because the Issue is {{status}}.',
         not_started: 'Schedule is valid and has not run yet.',

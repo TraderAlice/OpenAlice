@@ -5,6 +5,7 @@ import {
   demoIssueAddComment,
   demoIssueDetail,
   demoIssueRetry,
+  demoIssueRunNow,
   demoIssueUpdate,
   demoIssuesSnapshot,
 } from '../fixtures/issues'
@@ -222,6 +223,15 @@ export const issuesHandlers = [
       : HttpResponse.json({
           error: 'not_retryable',
           message: 'Only the latest failed or interrupted scheduled run can be retried.',
+        }, { status: 409 })
+  }),
+  http.post('/api/issues/:wsId/:id/run', ({ params }) => {
+    const detail = demoIssueRunNow(String(params.wsId), String(params.id))
+    return detail
+      ? HttpResponse.json(detail, { status: 202 })
+      : HttpResponse.json({
+          error: 'not_fireable',
+          message: 'Only a live scheduled Issue can be run now.',
         }, { status: 409 })
   }),
 ]

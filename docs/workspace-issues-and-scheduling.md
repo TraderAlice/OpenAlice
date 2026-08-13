@@ -200,7 +200,10 @@ The scanner persists only last-fired markers under the launcher state root.
 Schedule semantics remain in the issue file. Markers are written after a
 successful dispatch, meaning a durable run record was accepted. If that worker
 later fails to launch or exits unsuccessfully, the failed run remains the
-single attempt for that occurrence and the operator can use **Retry now**; the
+single attempt for that occurrence and the operator can use **Retry now**.
+**Run now** starts an extra turn without waiting for the next due time and
+without moving that marker, so a missed fire or a prompt test does not steal
+the next scheduled occurrence. The
 scanner does not turn its own tick interval into a retry storm. Capacity or
 another admission rejection that creates no run stays due for retry.
 
@@ -251,12 +254,18 @@ does not write the last-fired marker, so a recovery attempt never shifts the
 Issue's cadence. The backend rejects duplicate/racing retries and returns the
 authoritative running detail immediately; there is no automatic retry storm.
 
+**Run now** is the operator extra-turn control for any live scheduled Issue that
+is not already running. It uses the same dispatch path and confirmation dialog,
+does not require a failed last run, and also leaves the next-fire marker
+untouched. The two buttons stay separate: retry recovers a failed occurrence,
+run-now starts a specified Issue immediately.
+
 Headless runs may overlap with interactive sessions or other runs in the same
 checkout. Agents must tolerate concurrent edits. The launcher currently admits
 at most eight headless processes globally and serializes registry persistence,
 but there is no per-Workspace exclusive lock. One small dispatch-start guard
-prevents a manual retry and a schedule tick from launching the same Issue at the
-same instant; it is released as soon as the run is registered.
+prevents a Run now / Retry now click and a schedule tick from launching the same
+Issue at the same instant; it is released as soon as the run is registered.
 
 Offboarding is the lifecycle exception: a Workspace with a live headless run
 cannot depart. Once its Catalog row enters `offboarding`, new dispatch is
