@@ -38,7 +38,7 @@ Predecessor:
 
 - CLI lifecycle quality shipped in PR #847. The durable contract is
   [[docs/cli-installer.md]]. The execution plan is git history
-  `plans/cli-lifecycle-quality.md`.
+  `git show <deletion-commit>^:plans/cli-lifecycle-quality.md`.
 
 ## Objective
 

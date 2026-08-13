@@ -21,7 +21,7 @@ the durable truth after it changes. Git history is the archive.
 
   ```bash
   git log --diff-filter=D --summary -- plans/
-  git show <commit>:plans/<topic>.md
+  git show <deletion-commit>^:plans/<topic>.md
   ```
 
 - Use GitHub issues for externally visible defects and deferred findings; plans
