@@ -87,8 +87,12 @@ the machine key remains at `<OPENALICE_HOME>/sealing.key` outside portable
 The Settings API never returns a bot token. It returns field definitions,
 non-secret values, and `configuredSecrets` presence markers. Saving an empty
 secret keeps the stored value; explicitly removing its presence clears it.
-Changes touch `data/control/restart-connector.flag`, and Guardian reconciles the
-process from the same startup path.
+A non-empty secret body is accepted only when it is a plausible token (at
+least 20 non-whitespace characters); a short draft cannot replace a sealed
+value. Generic Settings auto-save must omit secret fields so enable/unlink
+writes cannot carry a password-manager draft. Changes touch
+`data/control/restart-connector.flag`, and Guardian reconciles the process
+from the same startup path.
 
 The retired `web.port`, MCP-Ask state, and legacy Telegram connector shape
 predate the 0.89.2-beta baseline and are not supported upgrade inputs.

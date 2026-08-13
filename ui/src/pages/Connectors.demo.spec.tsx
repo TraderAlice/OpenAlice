@@ -181,7 +181,7 @@ describe('Connector demo routes', () => {
     expect(saved.adapters.discord.configuredSecrets).toEqual(['botToken'])
   })
 
-  it('keeps a secret as a local draft until the user saves it explicitly', async () => {
+  it('keeps a secret as a local draft until the user saves a plausible token', async () => {
     render(<ConnectorsPage />)
 
     await screen.findByText('Run external notification connectors')
@@ -193,13 +193,17 @@ describe('Connector demo routes', () => {
     expect(mocks.save).not.toHaveBeenCalled()
     expect(input.value).toBe('a')
 
-    fireEvent.change(input, { target: { value: 'ab' } })
-    expect(input.value).toBe('ab')
+    fireEvent.change(input, { target: { value: 'qweqw' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
+    expect((await screen.findByRole('alert')).textContent).toContain('too short to be a bot token')
+    expect(mocks.save).not.toHaveBeenCalled()
+
+    fireEvent.change(input, { target: { value: '123456789:AAHplausible-bot-token' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
 
     await waitFor(() => expect(mocks.save).toHaveBeenCalled())
     const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
-    expect(saved.adapters.discord.settings.botToken).toBe('ab')
+    expect(saved.adapters.discord.settings.botToken).toBe('123456789:AAHplausible-bot-token')
     await waitFor(() => expect(input.value).toBe(''))
     expect(input.placeholder).toBe('Configured — enter a new value to replace')
     expect((screen.getAllByRole('button', { name: 'Replace token' })[0] as HTMLButtonElement).disabled).toBe(true)
@@ -211,13 +215,51 @@ describe('Connector demo routes', () => {
 
     await screen.findByText('Run external notification connectors')
     const input = screen.getAllByPlaceholderText('Stored locally and sealed')[0] as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'still-here' } })
+    fireEvent.change(input, { target: { value: '123456789:AAHstill-here-bot-token' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
 
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Token was not saved: Connector settings unavailable',
     )
-    expect(input.value).toBe('still-here')
+    expect(input.value).toBe('123456789:AAHstill-here-bot-token')
+  })
+
+  it('confirms before replacing a configured secret and omits secrets from unlink auto-save', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.discord = {
+      enabled: true,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-07-31T00:00:00.000Z',
+        adapters: [{
+          id: 'discord',
+          enabled: true,
+          status: 'healthy',
+          owner: 'owner-1',
+        }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+    render(<ConnectorsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord connection details' }))
+    const input = screen.getByLabelText('Discord Bot token') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '123456789:AAHreplacement-bot-token' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Replace token' }))
+    expect(screen.getByRole('heading', { name: 'Replace Discord token?' })).toBeTruthy()
+    expect(mocks.save).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Replace token' }).at(-1)!)
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+    expect(mocks.save.mock.calls.at(-1)?.[0].adapters.discord.settings.botToken)
+      .toBe('123456789:AAHreplacement-bot-token')
   })
 
   it('requires confirmation before removing a configured secret', async () => {
