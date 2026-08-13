@@ -1945,6 +1945,8 @@ export const ja: Resources = {
     active: '実行中',
     running: '実行中',
     resumeSession: '「{{title}}」を再開',
+    sessionRunning: '実行中 · {{title}}',
+    sessionNotResumable: '「{{title}}」は再開できません',
     stopSession: '「{{title}}」を停止',
     deleteSession: '「{{title}}」を削除',
     deleteSessionAction: 'セッションを削除',

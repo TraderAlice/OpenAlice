@@ -30,7 +30,11 @@ coverage/
 # Claude Code — ignore local config, but track shared dev skills/commands
 .claude/*
 !.claude/skills/
+/.claude/skills/playwright-cli/
 .playwright-mcp/
+/.playwright-cli/
+# Local accessibility snapshot exported by Playwright CLI during UI inspection.
+/oa-chat.yaml
 # Stray screenshots at repo root (playwright captures, manual screen grabs).
 # UI assets live under ui/public/ or ui/src/assets/ — never at the root.
 /*.png

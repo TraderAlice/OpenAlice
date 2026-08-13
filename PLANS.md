@@ -21,6 +21,10 @@ the durable truth after it changes.
 
 ## Active
 
+- [[plans/session-presence.md]] — Give product Sessions an in-desk presence
+  (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
+  the Ask Alice roster, and make Archive the floor action instead of deleting
+  a coworker. Increment 1 landed in PR #1069; persisted presence remains open.
 - [[plans/release-feedback-reliability.md]] — Batch 1 (deterministic/early
   release feedback) landed in PR #1061. Batch 2 still needs per-platform N-1
   fan-in and accepted-tree provenance without weakening release gates.
@@ -38,6 +42,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/session-roster-headless-occupancy.md]] — Ask Alice / Quant list
+  Workspace employees by `resumeId`, including Directory-only colleagues, and
+  lock TUI attach while a headless turn occupies that Session. Delivered in
+  serial PR #1068.
 - [[plans/nano-alice.md]] — Adds immutable AliceProject product birth through
   `openalice create alice-project`, with atomic first-writer ownership and a
   Guardian contract that never starts UTA for Nano homes. Accepted and

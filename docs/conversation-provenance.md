@@ -65,6 +65,12 @@ In the office analogy, the Workspace is the desk and the product Session is one
 particular colleague-with-context. `pi`, `codex`, `opencode`, and `claude` are
 worker kinds, not unique colleagues.
 
+Ask Alice and AutoQuant list those colleagues from the Workspace Session
+Directory (`GET /api/workspaces/:id/resumes`), joined to any materialized
+`SessionRecord` by `resumeId`. Birth method does not hide a row. A headless
+turn occupying that `resumeId` locks TUI spawn/resume; Automation continues to
+list dispatch records (`taskId`), not this roster.
+
 ## Session birth metadata
 
 Product Sessions may carry an optional, immutable `metadata.createdBy` bag on

@@ -762,6 +762,8 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly agent: string;
   readonly createdAt: number;
   readonly updatedAt: number;
+  readonly lifecycle?: 'active' | 'retired';
+  readonly successorResumeId?: string;
   readonly resumable: boolean;
   readonly active: boolean;
   /** Present when this product Session was allocated after birth metadata shipped. */
@@ -776,6 +778,8 @@ export interface WorkspaceSessionDirectoryEntry {
     readonly taskId: string;
     readonly status: 'running' | 'done' | 'failed' | 'interrupted';
     readonly startedAt: number;
+    readonly finishedAt?: number;
+    readonly durationMs?: number;
     readonly issueId?: string;
     readonly assistantPreview?: string;
   };

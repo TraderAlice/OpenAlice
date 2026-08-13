@@ -20,10 +20,23 @@ const actions = vi.hoisted(() => ({
   pauseSession: vi.fn(async () => undefined),
   resumeSession: vi.fn(async () => undefined),
   openWebPiSession: vi.fn(async () => undefined),
+  openHeadlessRun: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
   openAgentConfig: vi.fn(),
 }))
+const directoryState = vi.hoisted(() => ({
+  directories: new Map(),
+}))
 const { openOrFocus } = actions
+
+vi.mock('../../hooks/useWorkspaceSessionDirectory', () => ({
+  useWorkspaceSessionDirectories: () => ({
+    directories: directoryState.directories,
+    loading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}))
 
 vi.mock('../../tabs/store', () => ({
   useWorkspace: (selector: (state: { openOrFocus: typeof openOrFocus }) => unknown) =>
@@ -93,7 +106,7 @@ function workspaceContext(
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
-    openHeadlessRun: vi.fn(async () => undefined),
+    openHeadlessRun: actions.openHeadlessRun,
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
@@ -129,6 +142,7 @@ function renderSection(
 
 beforeEach(async () => {
   for (const mock of Object.values(actions)) mock.mockClear()
+  directoryState.directories = new Map()
   window.localStorage.clear()
   await i18n.changeLanguage('en')
 })
@@ -407,24 +421,21 @@ describe('ChatWorkspaceSection actions', () => {
     expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
-  it('bounds expanded Workspace history and opens the complete conversation Dialog', () => {
+  it('scrolls the full Workspace roster and keeps Browse in the context menu', () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
     const onNavigate = vi.fn()
     renderSection([{ ...chatWorkspace, sessions }], null, onNavigate)
 
-    expect(screen.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(6)
-    expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
+    expect(screen.getByRole('button', { name: 'Conversation 3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'View all 9 sessions' })).toBeNull()
 
-    const browseAll = screen.getByRole('button', { name: 'View all 9 sessions' })
-    expect(browseAll.textContent).toBe('Browse all conversations')
-    expect(browseAll.className).toContain('w-full')
-    expect(browseAll.className).not.toContain('oa-pressable')
-    expect(browseAll.parentElement?.className).toContain('border-t')
-    fireEvent.click(browseAll)
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
     const browser = within(dialog)
-    expect(browser.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(9)
+    expect(browser.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
     expect(openOrFocus).not.toHaveBeenCalled()
 
     fireEvent.click(browser.getByRole('button', { name: 'Conversation 3' }))
@@ -558,5 +569,101 @@ describe('ChatWorkspaceSection actions', () => {
     fireEvent.click(managerUi.getByRole('button', { name: 'Collapse sessions' }))
     expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
     expect(onNavigate).toHaveBeenCalledTimes(2)
+  })
+
+  it('lists Directory-only colleagues and locks TUI while headless occupies them', () => {
+    const onNavigate = vi.fn()
+    directoryState.directories = new Map([[chatWorkspace.id, {
+      workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
+      sessions: [
+        {
+          resumeId: 'resume-headless-colleague',
+          agent: 'codex',
+          createdAt: Date.parse('2026-08-01T00:00:00.000Z'),
+          updatedAt: Date.parse('2026-08-02T00:00:00.000Z'),
+          lifecycle: 'active',
+          resumable: true,
+          active: false,
+          latestExecution: {
+            taskId: 'task-done',
+            status: 'done',
+            startedAt: Date.parse('2026-08-02T00:00:00.000Z'),
+            finishedAt: Date.parse('2026-08-02T00:05:00.000Z'),
+            assistantPreview: 'Morning scan complete. Semis still lead.',
+          },
+        },
+        {
+          resumeId: 'resume-headless-running',
+          agent: 'claude',
+          createdAt: Date.parse('2026-08-03T00:00:00.000Z'),
+          updatedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+          lifecycle: 'active',
+          resumable: true,
+          active: true,
+          latestExecution: {
+            taskId: 'task-run',
+            status: 'running',
+            startedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+            issueId: 'scan-open',
+          },
+        },
+      ],
+    }]])
+
+    renderSection([chatWorkspace], null, onNavigate, 'focused')
+
+    expect(screen.getByRole('button', { name: 'Morning scan complete. Semis still lead.' })).toBeTruthy()
+    const [runningTitle, runningPlay] = screen.getAllByRole('button', { name: 'Running · scan-open' })
+    expect(runningTitle).toHaveProperty('disabled', true)
+    expect(runningPlay).toHaveProperty('disabled', true)
+    fireEvent.click(runningTitle!)
+    expect(openOrFocus).not.toHaveBeenCalled()
+    expect(actions.openHeadlessRun).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Morning scan complete. Semis still lead.' }))
+    expect(actions.openHeadlessRun).toHaveBeenCalledWith(
+      chatWorkspace.id,
+      'resume-headless-colleague',
+      { title: 'Morning scan complete. Semis still lead.' },
+    )
+    expect(onNavigate).toHaveBeenCalledOnce()
+  })
+
+  it('keeps headless occupancy inside Browse Running without a Headless filter', () => {
+    directoryState.directories = new Map([[chatWorkspace.id, {
+      workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
+      sessions: [{
+        resumeId: 'resume-headless-running',
+        agent: 'claude',
+        createdAt: Date.parse('2026-08-03T00:00:00.000Z'),
+        updatedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+        lifecycle: 'active',
+        resumable: true,
+        active: true,
+        latestExecution: {
+          taskId: 'task-run',
+          status: 'running',
+          startedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+          issueId: 'scan-open',
+        },
+      }],
+    }]])
+    const pausedWorkspace = {
+      ...chatWorkspace,
+      sessions: [{ ...chatSession(1), title: 'Paused thesis' }],
+    }
+    renderSection([pausedWorkspace], null, undefined, 'focused')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
+    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    const browser = within(dialog)
+    expect(browser.getByRole('button', { name: 'Paused thesis' })).toBeTruthy()
+    expect(browser.getByRole('button', { name: 'Running · scan-open' })).toBeTruthy()
+
+    fireEvent.click(browser.getByRole('button', { name: /^Running$/ }))
+    expect(browser.queryByRole('button', { name: 'Paused thesis' })).toBeNull()
+    expect(browser.getByRole('button', { name: 'Running · scan-open' })).toBeTruthy()
+    expect(browser.queryByRole('button', { name: 'Headless' })).toBeNull()
   })
 })

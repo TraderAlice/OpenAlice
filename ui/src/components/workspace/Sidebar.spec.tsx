@@ -212,4 +212,28 @@ describe('SessionRow actions', () => {
     expect(main.parentElement?.className).toContain('oa-session-row')
     expect(main.parentElement?.getAttribute('data-active')).toBe('true')
   })
+
+  it('locks Play while a headless turn occupies the Session', () => {
+    const onSelect = vi.fn()
+    const onResume = vi.fn()
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        headlessOccupying
+        onSelect={onSelect}
+        onPause={vi.fn()}
+        onResume={onResume}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const [title, play] = screen.getAllByRole('button', { name: 'Running · Review AAPL earnings' })
+    expect(title).toHaveProperty('disabled', true)
+    expect(play).toHaveProperty('disabled', true)
+    fireEvent.click(title!)
+    fireEvent.click(play!)
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onResume).not.toHaveBeenCalled()
+  })
 })

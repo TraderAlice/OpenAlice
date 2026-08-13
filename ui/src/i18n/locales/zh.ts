@@ -1944,6 +1944,8 @@ export const zh: Resources = {
     active: '运行中',
     running: '运行中',
     resumeSession: '继续“{{title}}”',
+    sessionRunning: '运行中 · {{title}}',
+    sessionNotResumable: '无法继续“{{title}}”',
     stopSession: '暂停“{{title}}”',
     deleteSession: '删除“{{title}}”',
     deleteSessionAction: '删除会话',
