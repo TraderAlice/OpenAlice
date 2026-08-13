@@ -42,10 +42,23 @@ export class DeliveryManager {
     this.startedAt = options.startedAt ?? new Date().toISOString()
   }
 
-  async start(): Promise<void> {
+  /**
+   * Create enabled adapters without reaching external APIs. The health
+   * endpoint can then report `starting` instead of the generic
+   * "configured but not running" state while Guardian is already probing.
+   */
+  installEnabledAdapters(): void {
     for (const [id, config] of Object.entries(this.options.config.adapters)) {
-      if (!config.enabled || !this.options.registry.has(id)) continue
-      await this.startAdapter(id, config).catch((error) => {
+      if (!config.enabled || !this.options.registry.has(id) || this.adapters.has(id)) continue
+      this.installAdapter(id)
+    }
+  }
+
+  async start(): Promise<void> {
+    this.installEnabledAdapters()
+    for (const [id, config] of Object.entries(this.options.config.adapters)) {
+      if (!config.enabled || !this.adapters.has(id)) continue
+      await this.bootAdapter(id, config).catch((error) => {
         console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
       })
     }
@@ -140,18 +153,25 @@ export class DeliveryManager {
     this.commands.clear()
   }
 
-  private async startAdapter(id: string, config: ConnectorAdapterConfig): Promise<void> {
+  private installAdapter(id: string): void {
     const adapter = this.options.registry.create(id)
-    const commands = new CommandRegistry(id, this.recorder)
+    this.adapters.set(id, adapter)
+    this.commands.set(id, new CommandRegistry(id, this.recorder))
+  }
+
+  private async bootAdapter(id: string, config: ConnectorAdapterConfig): Promise<void> {
+    const adapter = this.adapters.get(id)
+    const commands = this.commands.get(id)
+    if (!adapter || !commands) throw new Error(`Connector adapter is not installed: ${id}`)
     const context: ConnectorAdapterContext = {
       commands,
       updateSettings: (patch) => this.options.updateAdapterSettings(id, patch),
       getServiceStatus: () => this.health().status,
       sendTest: (connectorId) => this.sendTest(connectorId),
     }
+    // Keep a failed adapter registered. start() may record a useful degraded
+    // reason; dropping it here reduced Settings to "configured but not running".
     await adapter.start(config, context)
-    this.adapters.set(id, adapter)
-    this.commands.set(id, commands)
   }
 
   private get recorder(): ConnectorIORecorder {

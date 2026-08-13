@@ -64,14 +64,21 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
     const ready = new Promise<void>((resolveReady) => {
       client.once(Events.ClientReady, () => resolveReady())
     })
-    await client.login(botToken)
-    await Promise.race([
-      ready,
-      new Promise<never>((_resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Discord gateway did not become ready within 15 seconds')), 15_000)
-        timer.unref?.()
-      }),
-    ])
+    try {
+      await client.login(botToken)
+      await Promise.race([
+        ready,
+        new Promise<never>((_resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Discord gateway did not become ready within 15 seconds')), 15_000)
+          timer.unref?.()
+        }),
+      ])
+    } catch (error) {
+      this.tracker.degraded(error)
+      client.destroy()
+      this.client = undefined
+      throw error
+    }
     if (this.ownerUserId) this.tracker.healthy(this.ownerUserId)
     else this.tracker.awaitingLink()
   }
