@@ -74,13 +74,44 @@ describe('desktop existing-owner dialog', () => {
     expect(electron.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
       buttons: [
         'Open in browser',
+        'Keep existing AliceProject',
         'Choose another data location',
         'Stop the other AliceProject and start this one',
       ],
       defaultId: 0,
-      cancelId: 0,
+      cancelId: 1,
     }))
     expect(electron.openExternal).toHaveBeenCalledWith('http://127.0.0.1:5173')
+  })
+
+  it('dismisses a healthy handoff without opening the browser or taking over', async () => {
+    electron.showMessageBox.mockResolvedValue({ response: 1 })
+    const discovered = classifyGuardianRuntimeStatus('/tmp/home', {
+      state: 'running',
+      owner: { surface: 'dev', pid: 42 },
+      endpoints: { web: 'http://127.0.0.1:5173' },
+      components: { alice: 'ready' },
+    })
+
+    await expect(resolveExistingOwnerStartup({
+      userDataHome: '/tmp/home',
+      launcherRoot: '/tmp/home/workspaces',
+      canChooseAnother: true,
+      takeoverRequested: false,
+      dependencies: {
+        inspectLocks: async () => [activeLock],
+        discoverRuntime: async () => discovered,
+        probeAuth: async () => true,
+        showMessageBox: electron.showMessageBox,
+        openExternal: electron.openExternal,
+      },
+    })).resolves.toEqual({ action: 'quit' })
+
+    expect(electron.openExternal).not.toHaveBeenCalled()
+    expect(electron.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
+      defaultId: 0,
+      cancelId: 1,
+    }))
   })
 
   it('keeps takeover secondary for Electron owners and preserves stale default', () => {

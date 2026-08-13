@@ -1,6 +1,6 @@
 # Electron Runtime Browser Handoff
 
-Status: Implemented, awaiting merge
+Status: Complete
 
 Owner guides:
 

@@ -28,10 +28,6 @@ the durable truth after it changes.
 - [[plans/release-feedback-reliability.md]] — Batch 1 (deterministic/early
   release feedback) landed in PR #1061. Batch 2 still needs per-platform N-1
   fan-in and accepted-tree provenance without weakening release gates.
-- [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
-  healthy dev/CLI Runtime already owning the selected data location and hand
-  the user to its verified browser UI without takeover. Implemented; awaiting
-  merge.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
@@ -42,6 +38,10 @@ the durable truth after it changes.
 
 ## Completed
 
+- [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
+  healthy dev/CLI Runtime already owning the selected data location and hand
+  the user to its verified browser UI without takeover. Accepted for delivery
+  in PR #1073.
 - [[plans/session-roster-headless-occupancy.md]] — Ask Alice / Quant list
   Workspace employees by `resumeId`, including Directory-only colleagues, and
   lock TUI attach while a headless turn occupies that Session. Delivered in

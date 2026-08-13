@@ -81,7 +81,9 @@ healthy development or CLI Server Runtime already owns the selected home,
 Electron's primary action is **Open in browser**: it probes the advertised
 loopback Web endpoint, opens that page, and quits without taking the lock.
 **Choose another data location** remains available when the home is not
-environment-locked. Takeover stays an explicit, destructive secondary action.
+environment-locked. Dismissing the dialog keeps the existing AliceProject and
+quits the redundant desktop launch. Takeover stays an explicit, destructive
+secondary action.
 Electron-owned, stale, starting, unhealthy, and incompatible owners keep
 tailored recovery dialogs and never receive a misleading browser button.
 

@@ -129,7 +129,10 @@ export function dialogButtons(decision: ExistingOwnerStartupDecision): string[] 
     : 'Stop it and start this AliceProject'
   const buttons: string[] = []
   if (decision.allowOpenBrowser) buttons.push('Open in browser')
-  if (decision.kind !== 'handoff') buttons.push('Keep existing AliceProject')
+  // Keep a real cancel path even when browser handoff is the recommended
+  // action. Electron maps window close/Escape to cancelId; pointing that at
+  // Open in browser would turn dismissal into an unexpected side effect.
+  buttons.push('Keep existing AliceProject')
   if (decision.allowChooseAnother) buttons.push('Choose another data location')
   if (decision.allowTakeover) buttons.push(takeover)
   return buttons
