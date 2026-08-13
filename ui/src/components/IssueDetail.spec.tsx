@@ -196,6 +196,18 @@ describe('IssueDetail manual run', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(mocks.runNow).not.toHaveBeenCalled()
   })
+
+  it('closes the confirmation and exposes a dispatch failure in the inspector', async () => {
+    mocks.runNow.mockRejectedValue(new Error('The Issue is already running.'))
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Run now' }))
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(screen.getByRole('alert').textContent).toContain('The Issue is already running.')
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
 })
 
 describe('IssueActivity provenance identity', () => {

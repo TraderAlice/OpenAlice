@@ -1750,7 +1750,6 @@ export function IssueDetail({
       mutate(await issuesApi.runNow(wsId, id))
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e))
-      throw e
     } finally {
       setRetrying(false)
     }
