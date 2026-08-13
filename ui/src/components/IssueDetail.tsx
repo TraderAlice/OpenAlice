@@ -16,10 +16,10 @@ import type {
   IssueRunRecord,
   IssueStatus,
   IssueTimeout,
-  ISSUE_TIMEOUTS,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
+import { ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
 import type { ModelReasoningEffort } from '../api/types'
 import type { Preset, PresetModel } from '../api/types'
 import { configApi } from '../api/config'
@@ -33,7 +33,6 @@ import {
   type WorkspaceRuntimeModeSettings,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
-import { issuesApi } from '../api/issues'
 import { credentialAccessLabel } from './workspace/AgentLaunchControls'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'

@@ -204,16 +204,67 @@ describe('ScheduleScanner', () => {
       when: { kind: 'every', every: '30m' },
       what: 'go',
     }])
-    const limitedScan = scannerFor([limited])
-    const unlimitedScan = scannerFor([unlimited])
-    await limitedScan.scanner.scan()
-    await unlimitedScan.scanner.scan()
-    expect(limitedScan.dispatch.mock.calls[0]?.[3]).toBe(45 * 60_000)
-    expect(unlimitedScan.dispatch.mock.calls[0]?.[3]).toBeUndefined()
+    const { scanner: limitedScanner, dispatch: limitedDispatch } = scannerFor([limited])
+    const { scanner: unlimitedScanner, dispatch: unlimitedDispatch } = scannerFor([unlimited])
+    await limitedScanner.scan()
+    await unlimitedScanner.scan()
+    expect(limitedDispatch).toHaveBeenCalledWith(
+      limited,
+      headlessAdapter,
+      'go',
+      45 * 60_000,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'limited',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
+    expect(unlimitedDispatch).toHaveBeenCalledWith(
+      unlimited,
+      headlessAdapter,
+      'go',
+      undefined,
+      { kind: 'issue', workspaceId: 'w2', issueId: 'open' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w2',
+        issueId: 'open',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
 
-    const retry = scannerFor([limited])
-    await retry.scanner.runIssueNow('w1', 'limited')
-    expect(retry.dispatch.mock.calls[0]?.[3]).toBe(45 * 60_000)
+    const { scanner: retryScanner, dispatch: retryDispatch } = scannerFor([limited])
+    await retryScanner.runIssueNow('w1', 'limited')
+    expect(retryDispatch).toHaveBeenCalledWith(
+      limited,
+      headlessAdapter,
+      'go',
+      45 * 60_000,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'limited',
+        policy: 'new-each-run',
+        fire: 'retry',
+      },
+    )
   })
 
   it('refuses manual retry for an unscheduled or terminal Issue', async () => {
