@@ -18,6 +18,7 @@ on:
       - "scripts/desktop-packaged-smoke-plan.mjs"
       - "scripts/desktop-upgrade-smoke.mjs"
       - "scripts/desktop-upgrade-smoke-lib.mjs"
+      - "scripts/desktop-existing-owner-smoke.mjs"
       - "scripts/build-broker-packs.ts"
       - "scripts/broker-pack-upgrade-smoke.ts"
       - "scripts/guardian/**"
@@ -152,6 +153,10 @@ jobs:
 
       - name: Smoke Guardian takeover through Electron
         run: pnpm electron:smoke:guardian-recovery --skip-build
+        timeout-minutes: 5
+
+      - name: Smoke existing-owner browser handoff through Electron
+        run: pnpm electron:smoke:existing-owner --skip-build
         timeout-minutes: 5
 
       - name: Vendor managed workspace runtime

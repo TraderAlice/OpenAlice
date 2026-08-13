@@ -78,4 +78,26 @@ describe('Desktop Package Smoke workflow critical path', () => {
       expect(desktop.steps?.map((step) => step.name)).not.toContain(stepName)
     }
   })
+
+  it('smokes Guardian takeover and existing-owner browser handoff before packaging', () => {
+    const steps = workflow.jobs.package.steps ?? []
+    const names = steps.map((step) => step.name)
+    expect(names).toEqual(expect.arrayContaining([
+      'Build Alice + UTA + desktop shell',
+      'Smoke Guardian takeover through Electron',
+      'Smoke existing-owner browser handoff through Electron',
+      'Package unpacked desktop app',
+    ]))
+    expect(names.indexOf('Build Alice + UTA + desktop shell')).toBeLessThan(
+      names.indexOf('Smoke Guardian takeover through Electron'),
+    )
+    expect(names.indexOf('Smoke Guardian takeover through Electron')).toBeLessThan(
+      names.indexOf('Smoke existing-owner browser handoff through Electron'),
+    )
+    expect(names.indexOf('Smoke existing-owner browser handoff through Electron')).toBeLessThan(
+      names.indexOf('Package unpacked desktop app'),
+    )
+    expect(steps.find((step) => step.name === 'Smoke existing-owner browser handoff through Electron')?.run)
+      .toContain('pnpm electron:smoke:existing-owner --skip-build')
+  })
 })

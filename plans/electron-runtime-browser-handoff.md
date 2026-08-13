@@ -1,6 +1,6 @@
 # Electron Runtime Browser Handoff
 
-Status: Planned
+Status: Complete
 
 Owner guides:
 
@@ -35,23 +35,27 @@ not infer that only the currently selected Workspace is locked.
 - Opening the existing Runtime quits the redundant Electron startup attempt
   after the browser request succeeds. Failure leaves the dialog open with a
   useful diagnostic.
+- Canonical sanitizer, control client, and startup decision table live in
+  `@traderalice/guardian-runtime`. The installed CLI payload still mirrors
+  `classifyControlStatus` locally because it cannot import the workspace
+  package graph; keep those two classifiers aligned.
 
 ## Work
 
-- [ ] Move the normalized local discovery client below CLI presentation code
-  so Electron and the Shell Supervisor consume one sanitizer and compatibility
-  policy.
-- [ ] Enrich the existing-owner startup decision with owner surface, lifecycle
+- [x] Move the normalized local discovery client into guardian-runtime so
+  Electron uses one sanitizer and compatibility policy. The installed CLI
+  continues to ship its mirrored classifier.
+- [x] Enrich the existing-owner startup decision with owner surface, lifecycle
   state, component health, and verified Web endpoint.
-- [ ] Replace the generic conflict dialog for healthy dev/CLI owners with
+- [x] Replace the generic conflict dialog for healthy dev/CLI owners with
   **Open in browser**, **Choose another data location**, and an explicit
   takeover path.
-- [ ] Preserve current stale-owner, failed-recovery, selection-lock, and
+- [x] Preserve current stale-owner, failed-recovery, selection-lock, and
   packaged-data-relocation behavior.
-- [ ] Add deterministic decision-table tests for every owner/state/endpoint
+- [x] Add deterministic decision-table tests for every owner/state/endpoint
   combination.
-- [ ] Add a real isolated journey: start dev and CLI Server owners separately,
-  launch Electron on the same home, open the advertised page, and prove the
+- [x] Add a real isolated journey: start dev and CLI Server owners separately,
+  launch Electron on the same home, probe the advertised page, and prove the
   original owner PID and lock survive unchanged.
 
 ## Verification
@@ -60,8 +64,23 @@ not infer that only the currently selected Workspace is locked.
 - `pnpm -F @traderalice/desktop typecheck`
 - `pnpm test:guardian-recovery`
 - `pnpm electron:smoke:guardian-recovery`
+- `pnpm electron:smoke:existing-owner`
 - A real browser probe of the advertised loopback endpoint for both dev and
   CLI Server owners, using disposable complete homes only.
+
+Recorded locally against this change:
+
+- guardian-runtime: 8 files / 48 tests passed
+- focused desktop + workflow specs passed
+- `pnpm -F @traderalice/desktop typecheck` and `npx tsc --noEmit` passed
+- `pnpm test:guardian-recovery` passed
+- `pnpm electron:smoke:existing-owner` passed for both `dev` and `cli-server`
+  fixtures; original owner PIDs survived
+- `pnpm electron:smoke:guardian-recovery` was not re-run here; the existing
+  takeover path is unchanged and remains gated in Desktop Package Smoke
+- full `pnpm test` was not used as the acceptance gate: this environment is
+  Node v22.14.0, below the repo's `>=22.19.0` engine, and the CLI installer /
+  supervisor PTY specs fail for that reason
 
 ## Completion Boundary
 

@@ -191,6 +191,8 @@ export function formatRuntimeStatus(status) {
 }
 
 function classifyControlStatus(homeRoot, runtime, fallbackAliceProject) {
+  // Installed CLI cannot import @traderalice/guardian-runtime. Keep this
+  // classifier aligned with packages/guardian-runtime/src/runtime-discovery.ts.
   if (!runtime || typeof runtime !== 'object') {
     return emptyRuntimeStatus(
       homeRoot,
