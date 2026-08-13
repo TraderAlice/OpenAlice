@@ -1941,6 +1941,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
               scheduleMarkers.get(ws.id, issue.id) ?? null,
               nowMs,
               DEFAULT_INTERVAL_MS,
+              scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
             ),
           );
         }
@@ -1981,6 +1982,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             scheduleMarkers.get(ws.id, issue.id) ?? null,
             nowMs,
             DEFAULT_INTERVAL_MS,
+            scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
           );
           const latestRun = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } })[0];
           return snapshotBoardIssue(
@@ -2034,6 +2036,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         scheduleMarkers.get(ws.id, issue.id) ?? null,
         Date.now(),
         DEFAULT_INTERVAL_MS,
+        scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
       );
       scheduledSnapshot = fired;
     }

@@ -66,6 +66,8 @@ export interface IssueFieldPatch {
   timeout?: IssueTimeout | null
   /** Canonical markdown work definition; exact scheduled prompt. */
   what?: string
+  /** Cron missed-fire policy; only valid when the Issue already has a cron `when`. */
+  catchUp?: boolean
 }
 
 /** Input to `createIssue`. `id` is optional — derived as a kebab slug from the
@@ -254,6 +256,16 @@ export async function updateIssueFields(
     } else {
       data.timeout = patch.timeout
     }
+  }
+  if (patch.catchUp !== undefined) {
+    const when = data.when
+    if (!when || typeof when !== 'object' || Array.isArray(when) || !('kind' in when) || when.kind !== 'cron') {
+      return { ok: false, reason: 'invalid', error: 'catchUp is only valid on a cron schedule' }
+    }
+    const cron: Record<string, unknown> = { ...when }
+    if (patch.catchUp) delete cron.catchUp
+    else cron.catchUp = false
+    data.when = cron
   }
   let what = current.issue.what
   if (patch.what !== undefined) {

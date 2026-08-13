@@ -29,6 +29,8 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/cron-catch-up.md]] — Cron schedules catch up a missed fire by default
+  (same as `every`); `catchUp: false` waits for the next calendar slot.
 - [[plans/session-presence.md]] — Give product Sessions an in-desk presence
   (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
   the Ask Alice roster, and make Archive the floor action instead of deleting

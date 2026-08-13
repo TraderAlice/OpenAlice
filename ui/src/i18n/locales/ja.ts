@@ -102,6 +102,8 @@ export const ja: Resources = {
       runHealth: '実行状態',
       lastRun: '前回の実行',
       nextRun: '次回の実行',
+      catchUp: '失敗した発火を再試行',
+      catchUpDescription: 'Session がビジー、またはワーカー枠が埋まっている場合、この回を成功するまで due のままにします。オフにすると次のカレンダー時刻まで待ちます。',
       viewLastRun: '前回の実行を表示',
       never: '未実行',
       default: 'デフォルト',
@@ -285,6 +287,8 @@ export const ja: Resources = {
       weekend: '週末',
       local: 'ローカル',
       localTime: 'ローカル時刻',
+      catchUp: '見逃した発火は成功するまで再試行します',
+      calendarOnly: '見逃した場合は次のカレンダー時刻まで待ちます',
     },
     weekday: {
       sun: '日',

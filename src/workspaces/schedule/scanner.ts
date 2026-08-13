@@ -19,10 +19,10 @@
  * sight), `cron` from `now - interval` (catches an occurrence that just passed,
  * without firing immediately on creation OR never firing at all — seeding cron
  * from `now` makes `computeNextRun` always strictly future, i.e. never due).
- * Then `computeNextRun(when, base) <= now`. The marker is written only AFTER a
- * successful dispatch, so a capacity-rejected `every`/`at` fire retries next
- * tick; a `cron` fire rejected at its exact occurrence may skip to the next
- * occurrence (rare — needs the pool full at that minute).
+ * Then `computeNextRun(when, base) <= now`. The last-fired marker is written
+ * only AFTER a successful dispatch. Admission skips (`busy`, capacity) leave
+ * `every` due; cron defaults to the same catch-up, or consumes the slot when
+ * `catchUp: false`.
  */
 
 import { computeNextRun, type Schedule } from '../../core/schedule-expr.js'
@@ -75,7 +75,9 @@ export class ScheduledIssueRunNowError extends Error {
 export interface MarkerStore {
   key(wsId: string, taskId: string): string
   get(wsId: string, taskId: string): number | undefined
+  getHeld(wsId: string, taskId: string): number | undefined
   set(wsId: string, taskId: string, ts: number): Promise<void>
+  hold(wsId: string, taskId: string, ts: number): Promise<void>
   prune(seenKeys: Set<string>): Promise<void>
 }
 
@@ -274,6 +276,7 @@ export class ScheduleScanner {
         await this.fire(
           ws,
           issue.id,
+          when,
           issueFirePrompt(issue),
           issue.agent,
           issueRunOverrides(issue),
@@ -285,20 +288,23 @@ export class ScheduleScanner {
       }
       // Read the marker AFTER any fire so last/next reflect a just-fired run.
       const last = this.deps.markers.get(ws.id, issue.id) ?? null
-      tasks.push(snapshotScheduledIssue(issue, when, last, nowMs, this.intervalMs))
+      const held = this.deps.markers.getHeld(ws.id, issue.id) ?? null
+      tasks.push(snapshotScheduledIssue(issue, when, last, nowMs, this.intervalMs, held))
     }
     return { wsId: ws.id, tag: ws.tag, status: 'ok', tasks }
   }
 
   private isDue(wsId: string, taskId: string, when: Schedule, nowMs: number): boolean {
     const last = this.deps.markers.get(wsId, taskId) ?? null
-    const next = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs))
+    const held = this.deps.markers.getHeld(wsId, taskId) ?? null
+    const next = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs, held))
     return next !== null && next <= nowMs
   }
 
   private async fire(
     issueWorkspace: WorkspaceMeta,
     taskId: string,
+    when: Schedule,
     what: string,
     agentId: string | undefined,
     selection: SessionRuntimeSelection | undefined,
@@ -327,14 +333,33 @@ export class ScheduleScanner {
         ...(resumeId ? { resumeId } : {}),
       })
     } catch (err) {
-      // Capacity full (or transient) - do NOT mark; the task stays due and
-      // retries on the next tick once a headless slot frees.
+      // Capacity / busy: every stays due with no marker. Cron catch-up holds
+      // the occurrence; calendar-only cron consumes it.
+      await this.noteCronMiss(issueWorkspace.id, taskId, when, nowMs)
       this.deps.logger.info('schedule.fire_skipped', {
         wsId: issueWorkspace.id,
         taskId,
         reason: err instanceof Error ? err.message : String(err),
       })
     }
+  }
+
+  private async noteCronMiss(
+    wsId: string,
+    taskId: string,
+    when: Schedule,
+    nowMs: number,
+  ): Promise<void> {
+    if (when.kind !== 'cron') return
+    const last = this.deps.markers.get(wsId, taskId) ?? null
+    const held = this.deps.markers.getHeld(wsId, taskId) ?? null
+    const dueAt = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs, held))
+    if (dueAt === null || dueAt > nowMs) return
+    if (when.catchUp === false) {
+      await this.deps.markers.hold(wsId, taskId, dueAt)
+      return
+    }
+    if (last === null) await this.deps.markers.hold(wsId, taskId, dueAt - 1)
   }
 
   private async dispatchIssue(

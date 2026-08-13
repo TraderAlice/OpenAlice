@@ -116,6 +116,8 @@ export const issueWhenSchema = z.discriminatedUnion('kind', [
     /** Omitted is legacy machine-local time; explicit `local` is recommended
      * for personal reminders, while market clocks should use an IANA zone. */
     timezone: z.string().min(1).refine(isValidScheduleTimezone, 'timezone must be `local` or a valid IANA timezone').optional(),
+    /** Omit/`true` retries a missed slot. `false` waits for the next calendar time. */
+    catchUp: z.boolean().optional(),
   }),
 ])
 

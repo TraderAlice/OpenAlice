@@ -150,6 +150,22 @@ clock explicitly. Cron is not an exchange calendar: holidays, early closes, and
 calendar primitive can add those semantics without making ordinary reminders
 depend on a trading subsystem.
 
+`every` and `cron` share one dispatch channel. They differ only in due math:
+`every` is an interval since the last accepted fire; `cron` is a wall clock.
+By default a missed cron admission (`busy`, full worker pool, or another
+dispatch throw before a run exists) **catches up**: the occurrence stays due
+until a run is accepted, then the next fire is the next calendar slot after
+that success. Set `catchUp: false` to consume the missed slot and wait for the
+next calendar time instead:
+
+```yaml
+when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York, catchUp: false }
+```
+
+Omitted `catchUp` means catch-up. This does not retry a run that was already
+accepted and later failed; that occurrence stays one attempt and uses
+**Retry now**. Creating a cron Issue still does not dump historical slots.
+
 ## Agent and Human Surfaces
 
 Agents normally use:
@@ -205,7 +221,8 @@ single attempt for that occurrence and the operator can use **Retry now**.
 without moving that marker, so a missed fire or a prompt test does not steal
 the next scheduled occurrence. The
 scanner does not turn its own tick interval into a retry storm. Capacity or
-another admission rejection that creates no run stays due for retry.
+another admission rejection that creates no run stays due for retry, including
+cron unless the Issue sets `catchUp: false`.
 
 The durable run record keeps the requested model and effort beside the resolved
 agent. This is selection provenance, not a claim that the provider honored an
