@@ -85,7 +85,10 @@ the machine key remains at `<OPENALICE_HOME>/sealing.key` outside portable
 `data/`.
 
 The Settings API never returns a bot token. It returns field definitions,
-non-secret values, and `configuredSecrets` presence markers. Saving an empty
+non-secret values, and `configuredSecrets` presence markers. The Settings
+draft field is visible by default so an operator can verify a paste; a
+control can mask it for screenshares. `type="password"` is not used, because
+it hides typos and invites password-manager autofill of the wrong secret. Saving an empty
 secret keeps the stored value; explicitly removing its presence clears it.
 A non-empty secret body is accepted only when it is a plausible token (at
 least 20 non-whitespace characters); a short draft cannot replace a sealed

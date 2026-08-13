@@ -1702,7 +1702,9 @@ export const zh: Resources = {
     manage: '管理',
     hideConnectionDetailsAria: '收起 {{name}} 连接信息',
     manageConnectionDetailsAria: '管理 {{name}} 连接信息',
-    secretsNote: 'OpenAlice 会在本地加密保存密钥，且绝不会将其返回浏览器。',
+    secretsNote: '已保存的令牌会在本地加密，也不会回传。输入框显示你即将保存的内容，方便核对粘贴。',
+    showDraft: '显示草稿',
+    hideDraft: '隐藏草稿',
     fields: {
       applicationId: '应用 ID',
       botToken: '机器人令牌',

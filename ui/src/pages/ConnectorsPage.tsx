@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { TFunction } from 'i18next'
-import { Bot, CheckCircle2, ChevronDown, CircleAlert, KeyRound, Link2, Power, Send, ShieldCheck, Unlink } from 'lucide-react'
+import { Bot, CheckCircle2, ChevronDown, CircleAlert, Eye, EyeOff, KeyRound, Link2, Power, Send, ShieldCheck, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -477,6 +477,7 @@ function ConnectorCredentialsEditor({
   t: TFunction
 }) {
   const credentialsId = `connector-${definition.id}-credentials`
+  const [maskedSecrets, setMaskedSecrets] = useState<Record<string, boolean>>({})
   return (
     <div className="border-y border-border/60">
       <button
@@ -541,18 +542,39 @@ function ConnectorCredentialsEditor({
               ) : field.kind === 'secret' ? (
                 <>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      id={inputId}
-                      aria-label={`${definition.label} ${fieldLabel}`}
-                      className={inputClass}
-                      type="password"
-                      value={secretDraft}
-                      placeholder={configured
-                        ? t('connectorSettings.configuredPlaceholder')
-                        : t(`connectorSettings.placeholders.${field.key}`, { defaultValue: field.placeholder ?? '' })}
-                      autoComplete="off"
-                      onChange={(event) => onSecretDraftChange(draftKey, event.target.value)}
-                    />
+                    <div className="relative min-w-0 flex-1">
+                      <input
+                        id={inputId}
+                        aria-label={`${definition.label} ${fieldLabel}`}
+                        className={`${inputClass} pr-10`}
+                        type={maskedSecrets[draftKey] ? 'password' : 'text'}
+                        value={secretDraft}
+                        placeholder={configured
+                          ? t('connectorSettings.configuredPlaceholder')
+                          : t(`connectorSettings.placeholders.${field.key}`, { defaultValue: field.placeholder ?? '' })}
+                        autoComplete="off"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        onChange={(event) => onSecretDraftChange(draftKey, event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="oa-pressable absolute inset-y-0 right-0 flex items-center px-2.5 text-muted-foreground hover:text-foreground"
+                        aria-label={maskedSecrets[draftKey]
+                          ? t('connectorSettings.showDraft')
+                          : t('connectorSettings.hideDraft')}
+                        aria-pressed={Boolean(maskedSecrets[draftKey])}
+                        onClick={() => setMaskedSecrets((current) => ({
+                          ...current,
+                          [draftKey]: !current[draftKey],
+                        }))}
+                      >
+                        {maskedSecrets[draftKey]
+                          ? <Eye size={15} aria-hidden />
+                          : <EyeOff size={15} aria-hidden />}
+                      </button>
+                    </div>
                     <button
                       type="button"
                       className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"

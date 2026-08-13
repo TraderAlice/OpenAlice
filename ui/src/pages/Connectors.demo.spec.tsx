@@ -198,6 +198,12 @@ describe('Connector demo routes', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('too short to be a bot token')
     expect(mocks.save).not.toHaveBeenCalled()
 
+    expect(input.type).toBe('text')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Hide draft' })[0])
+    expect(input.type).toBe('password')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Show draft' })[0])
+    expect(input.type).toBe('text')
+
     fireEvent.change(input, { target: { value: '123456789:AAHplausible-bot-token' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
 

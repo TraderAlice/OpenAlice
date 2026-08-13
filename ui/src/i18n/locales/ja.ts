@@ -1703,7 +1703,9 @@ export const ja: Resources = {
     manage: '管理',
     hideConnectionDetailsAria: '{{name}} の接続情報を閉じる',
     manageConnectionDetailsAria: '{{name}} の接続情報を管理',
-    secretsNote: 'OpenAlice はシークレットをローカルで暗号化し、ブラウザーへ返すことはありません。',
+    secretsNote: '保存済みトークンはローカルで暗号化され、送り返しません。入力欄にはこれから保存する値が見えるので、貼り付けを確認できます。',
+    showDraft: '下書きを表示',
+    hideDraft: '下書きを隠す',
     fields: {
       applicationId: 'アプリケーション ID',
       botToken: 'Bot トークン',
