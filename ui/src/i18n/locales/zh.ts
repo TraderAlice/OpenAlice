@@ -1950,6 +1950,7 @@ export const zh: Resources = {
     archiveSessionAction: '归档',
     restoreSession: '恢复“{{title}}”',
     restoreSessionAction: '放回名册',
+    sessionPresenceFailed: '无法更新这个 Session。',
     stopSession: '暂停“{{title}}”',
     deleteSession: '删除“{{title}}”',
     deleteSessionAction: '删除会话',

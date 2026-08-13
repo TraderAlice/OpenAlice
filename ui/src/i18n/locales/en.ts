@@ -1962,6 +1962,7 @@ export const en = {
     archiveSessionAction: 'Archive',
     restoreSession: 'Restore {{title}}',
     restoreSessionAction: 'Restore to roster',
+    sessionPresenceFailed: 'Could not update this Session.',
     stopSession: 'Stop {{title}}',
     deleteSession: 'Delete {{title}}',
     deleteSessionAction: 'Delete session',

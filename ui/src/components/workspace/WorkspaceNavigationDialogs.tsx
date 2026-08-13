@@ -361,8 +361,9 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                       <button
                         type="button"
                         onClick={() => props.onRestoreSession?.(row)}
+                        disabled={row.headlessOccupying}
                         aria-label={t('workspace.restoreSession', { title: row.title })}
-                        className="oa-icon-action flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                        className="oa-icon-action flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
                       >
                         <RotateCcw size={15} strokeWidth={2} aria-hidden />
                       </button>

@@ -1951,6 +1951,7 @@ export const ja: Resources = {
     archiveSessionAction: 'アーカイブ',
     restoreSession: '「{{title}}」を復元',
     restoreSessionAction: '名簿に戻す',
+    sessionPresenceFailed: 'この Session を更新できませんでした。',
     stopSession: '「{{title}}」を停止',
     deleteSession: '「{{title}}」を削除',
     deleteSessionAction: 'セッションを削除',

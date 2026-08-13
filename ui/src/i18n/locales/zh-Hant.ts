@@ -1958,6 +1958,7 @@ export const zhHant: Resources = {
     archiveSessionAction: '封存',
     restoreSession: '恢復「{{title}}」',
     restoreSessionAction: '放回名冊',
+    sessionPresenceFailed: '無法更新這個 Session。',
     stopSession: '暫停「{{title}}」',
     deleteSession: '刪除「{{title}}」',
     deleteSessionAction: '刪除工作階段',

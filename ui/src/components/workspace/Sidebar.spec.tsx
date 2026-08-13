@@ -259,4 +259,29 @@ describe('SessionRow actions', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archive Review AAPL earnings' }))
     expect(onArchive).toHaveBeenCalledOnce()
   })
+
+  it('does not offer Archive while an interactive Session is running', async () => {
+    const user = userEvent.setup()
+    const onArchive = vi.fn()
+    render(
+      <SessionRow
+        session={session}
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+        onArchive={onArchive}
+      />,
+    )
+
+    const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    const archive = screen.getByRole('menuitem', { name: 'Archive Review AAPL earnings' })
+    expect(archive.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(archive)
+    expect(onArchive).not.toHaveBeenCalled()
+  })
 })

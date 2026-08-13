@@ -2144,13 +2144,23 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     if (identity.wsId !== input.wsId) {
       throw new ResumePresenceError('wrong_workspace', 'resume conversation belongs to another workspace')
     }
-    await sessionRegistry.ensureLoaded(input.wsId)
-    const interactive = sessionRegistry.findByResumeId(input.wsId, input.resumeId)
-    const headless = headlessTasks.latestForResumeId(input.resumeId)
-    if (activeResumeIds.has(input.resumeId) || interactive?.state === 'running' || headless?.status === 'running') {
+    // Presence changes and launches share the same resume lease. Checking the
+    // registries without claiming first leaves a race where Archive and Resume
+    // can both pass their busy checks and commit conflicting state.
+    if (!claimResume(input.resumeId)) {
       throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
     }
-    return resumeRegistry.setPresence(input)
+    try {
+      await sessionRegistry.ensureLoaded(input.wsId)
+      const interactive = sessionRegistry.findByResumeId(input.wsId, input.resumeId)
+      const headless = headlessTasks.latestForResumeId(input.resumeId)
+      if (interactive?.state === 'running' || headless?.status === 'running') {
+        throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
+      }
+      return await resumeRegistry.setPresence(input)
+    } finally {
+      activeResumeIds.delete(input.resumeId)
+    }
   }
 
   const sessionDirectory = async (

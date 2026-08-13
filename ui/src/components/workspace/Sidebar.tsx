@@ -648,6 +648,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const s = props.session;
   const isPaused = s.state === 'paused';
   const headlessOccupying = props.headlessOccupying === true;
+  const presenceLocked = headlessOccupying || !isPaused;
   const resumable = props.resumable !== false;
   const canDelete = props.canDelete !== false;
   // The server resolves native title → launch prompt → sticky name.
@@ -668,7 +669,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       ariaLabel: archiveLabel,
       icon: <Archive size={13} strokeWidth={2} />,
       onSelect: props.onArchive,
-      disabled: headlessOccupying,
+      disabled: presenceLocked,
     }] : []),
     ...(props.onRestore ? [{
       label: t('workspace.restoreSessionAction'),

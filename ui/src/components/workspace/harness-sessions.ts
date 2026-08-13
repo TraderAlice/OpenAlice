@@ -151,8 +151,12 @@ export function joinWorkspaceHarnessSessions(
   const rows: HarnessSession[] = []
   for (const entry of directory.sessions) {
     if ((entry.lifecycle ?? 'active') === 'retired') continue
-    if (entryPresence(entry) !== wanted) continue
+    // Directory presence is authoritative even when the identity still has a
+    // paused interactive seat. Mark every projected identity as seen before
+    // filtering, otherwise the legacy SessionRecord fallback below puts an
+    // archived coworker straight back onto the active floor.
     seen.add(entry.resumeId)
+    if (entryPresence(entry) !== wanted) continue
     rows.push(toHarnessSession(workspace.id, sessionsByResume.get(entry.resumeId) ?? null, entry))
   }
   if (wanted === 'active') {

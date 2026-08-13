@@ -617,9 +617,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     resumeId: string,
     presence: SessionPresence,
   ): Promise<void> => {
-    await apiSetSessionPresence(wsId, resumeId, presence)
-    void refresh()
-  }, [refresh])
+    try {
+      await apiSetSessionPresence(wsId, resumeId, presence)
+      void refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('workspace.sessionPresenceFailed'))
+      throw err
+    }
+  }, [refresh, t, toast])
 
   const openAgentConfig = useCallback((
     wsId: string,
