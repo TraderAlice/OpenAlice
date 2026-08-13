@@ -24,17 +24,21 @@ the durable truth after it changes.
 - [[plans/session-presence.md]] — Give product Sessions an in-desk presence
   (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
   the Ask Alice roster, and make Archive the floor action instead of deleting
-  a coworker.
-- [[plans/release-feedback-reliability.md]] — Makes packaged release failures
-  deterministic and diagnostic first, then removes desktop matrix fan-in and
-  reuses trusted promotion evidence without weakening release gates.
+  a coworker. Increment 1 landed in PR #1069; persisted presence remains open.
+- [[plans/release-feedback-reliability.md]] — Batch 1 (deterministic/early
+  release feedback) landed in PR #1061. Batch 2 still needs per-platform N-1
+  fan-in and accepted-tree provenance without weakening release gates.
 - [[plans/electron-runtime-browser-handoff.md]] — Lets Electron detect a
   healthy dev/CLI Runtime already owning the selected data location and hand
-  the user to its verified browser UI without takeover.
+  the user to its verified browser UI without takeover. Not started; Electron
+  still presents a generic owner-conflict dialog.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
-  acceptance through serial increments.
+  acceptance through serial increments. Increments 1–2 and most of 4/6/7 are
+  in `dev`; remaining work is the TypeScript CLI conversion, logs/Doctor/update
+  UX, config check, registry deletion, authenticity-hardened updates, and
+  release-gate N-1.
 
 ## Completed
 
@@ -52,8 +56,8 @@ the durable truth after it changes.
   Accepted and delivered in PR #1064.
 - [[plans/alice-project-foundation.md]] — Promotes the existing named Instance,
   complete-home, Guardian, and frontend endpoint topology into the explicit
-  AliceProject product and lifecycle abstraction. Delivered for topic review in
-  Draft PR #1063.
+  AliceProject product and lifecycle abstraction. Accepted and delivered in
+  PR #1063.
 - [[plans/0892-migration-baseline.md]] — Retires the development-era 0001–0038
   migration chain, establishes 0.89.2-beta as the persisted-state baseline, and
   prevents isolated tests from combining a temporary journal with a live
@@ -70,11 +74,11 @@ the durable truth after it changes.
 - [[plans/static-markdown-content-stability.md]] — Keeps Inbox and Tracked
   Markdown DOM stable across unchanged Workspace Manager and Inbox polling so
   text selection, browser translation, and report interactions survive.
-  Delivered for topic review in Draft PR #1030.
+  Accepted and delivered in PR #1030.
 - [[plans/shadcn-resizable-page-sidebar.md]] — Replaced the hand-written
   page-sidebar rail with shadcn Resizable and closed its responsive,
   threshold-motion, resisted-overdrag, repeat-cycle, and rapid-reversal
-  contracts in Draft PR #1025.
+  contracts. Accepted and delivered in PR #1025.
 - [[plans/tracked-relationship-graph.md]] — Adds an Obsidian-style global and
   local relationship graph derived from Tracked entities and authored Workspace
   backlinks, with provenance-preserving material navigation.
@@ -114,8 +118,8 @@ the durable truth after it changes.
 - [[plans/shadcn-overlay-foundation.md]] — Established an OpenAlice-owned
   shadcn/Radix primitive layer, retired representative hand-written overlay
   behavior, and preserved the current product hierarchy and visual language as
-  the foundation for later runtime-selectable style profiles. Implemented in
-  Draft PR #970.
+  the foundation for later runtime-selectable style profiles. Accepted and
+  delivered in PR #970.
 - [[plans/desktop-upgrade-release-gate.md]] — Adds a real N-1 desktop-state
   upgrade journey to the native package matrix and validates final updater
   metadata and artifacts before a release can be published.

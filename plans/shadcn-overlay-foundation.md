@@ -1,9 +1,10 @@
 # shadcn Overlay Foundation
 
-- Status: `complete` (implemented in Draft PR #970; awaiting maintainer acceptance)
-- Updated: `2026-08-04`
-- Delivery: one autonomous topic branch and community-facing Draft PR targeting
-  `dev`; the PR remains unmerged until maintainer acceptance.
+- Status: `completed` (accepted and delivered in PR #970)
+- Updated: `2026-08-13`
+- Delivery: autonomous topic PR #970 targeting `dev`; accepted and merged on
+  2026-08-04. Subsequent serial PRs #971 and #973 continued from that
+  foundation.
 - Related issues: none yet.
 - Owner guides: [[docs/ui-interaction-and-motion.md]],
   [[docs/project-structure.md]], and [[docs/development-workflow.md]].
@@ -120,8 +121,8 @@ Win98 skin and broad component restyling are deliberately outside this stage.
 - [x] Run the applicable Electron/package smoke before calling the stage
       complete.
 - [x] Update the owner guide with the durable primitive ownership contract.
-- [x] Publish and maintain one labelled Draft PR against `dev`; do not merge it
-      automatically.
+- [x] Publish and maintain one labelled Draft PR against `dev`. Accepted and
+      merged as PR #970 on 2026-08-04.
 
 ## Verification Evidence
 
@@ -154,5 +155,5 @@ gates, not modal primitives, and remain outside that migration.
 - Nested overlays close one layer at a time and reliably restore focus.
 - Required typechecks, the full test suite, real browser routes, and the chosen
   Electron/package smoke pass.
-- The Draft PR documents remaining custom overlays and names the next bounded
+- PR #970 documents remaining custom overlays and names the next bounded
   migration topic without hiding deferred defects in this plan.

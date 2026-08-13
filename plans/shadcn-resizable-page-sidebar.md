@@ -1,11 +1,11 @@
 # shadcn Resizable Page Sidebar
 
-- Status: `complete` (rapid-reversal repair included in Draft PR #1025; awaiting maintainer acceptance)
-- Updated: `2026-08-08`
-- Delivery: one autonomous topic Draft PR targeting `dev`; merge only after
-  maintainer acceptance.
+- Status: `completed` (accepted and delivered in PR #1025)
+- Updated: `2026-08-13`
+- Delivery: autonomous topic PR #1025 targeting `dev`; accepted and merged on
+  2026-08-08.
 - Related PRs: #1023 established the adjacent long-form reading surface but is
-  not part of this migration; Draft PR #1025 contains this implementation.
+  not part of this migration; PR #1025 contains this implementation.
 - Owner guides: [[docs/ui-interaction-and-motion.md]] and
   [[docs/development-workflow.md]].
 - Upstream reference: [shadcn Resizable](https://ui.shadcn.com/docs/components/base/resizable)
@@ -409,5 +409,5 @@ At every settled desktop layout exactly one surface is interactive:
   mobile routes keep their existing Sheet behavior and focus return.
 - All current shell consumers compile and representative real routes remain
   usable across the responsive and style-profile matrix.
-- Required browser, automated, build, and unsigned Electron checks pass, and a
-  single Draft PR contains the complete topic for maintainer acceptance.
+- Required browser, automated, build, and unsigned Electron checks pass.
+  Accepted and delivered in PR #1025.
