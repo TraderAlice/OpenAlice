@@ -609,6 +609,36 @@ export function demoIssueAddComment(
   return demoIssueDetail(wsId, id)
 }
 
+/** POST-run backing: operator-started dispatch without requiring a failed last run. */
+export function demoIssueRunNow(wsId: string, id: string): IssueDetail | null {
+  const boardIssue = findBoardIssue(wsId, id)
+  const extras = demoIssueExtras[`${wsId}/${id}`]
+  if (!boardIssue?.when || boardIssue.status === 'done' || boardIssue.status === 'canceled') {
+    return null
+  }
+  const latest = extras?.runs[0]
+  if (latest?.status === 'running') return null
+  const run: IssueRunRecord = {
+    taskId: `demo-run-${Date.now()}`,
+    resumeId: `demo-resume-run-${Date.now()}`,
+    resumable: false,
+    wsId,
+    issueId: id,
+    agent: boardIssue.agent ?? extras?.agent ?? latest?.agent ?? 'codex',
+    prompt: extras?.runs[0]?.prompt ?? boardIssue.title,
+    status: 'running',
+    startedAt: Date.now(),
+  }
+  if (!extras) return null
+  extras.runs.unshift(run)
+  boardIssue.automationHealth = {
+    state: 'running',
+    message: 'A scheduled run is in progress.',
+    latestTaskId: run.taskId,
+  }
+  return demoIssueDetail(wsId, id)
+}
+
 /** POST-retry backing: add a fresh running execution without changing cadence. */
 export function demoIssueRetry(wsId: string, id: string): IssueDetail | null {
   const boardIssue = findBoardIssue(wsId, id)

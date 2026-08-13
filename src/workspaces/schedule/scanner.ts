@@ -159,9 +159,9 @@ export class ScheduleScanner {
   }
 
   /** Dispatch one scheduled Issue immediately without touching its firing
-   * marker. This is the authoritative manual-retry path: it re-reads the live
-   * Issue and reuses the exact prompt, owner, runtime, and optional timeout used
-   * by the scanner, while preserving the next scheduled occurrence. */
+   * marker. This is the authoritative manual-run / retry path: it re-reads the
+   * live Issue and reuses the exact prompt, owner, runtime, and optional timeout used by
+   * the scanner, while preserving the next scheduled occurrence. */
   async runIssueNow(wsId: string, issueId: string): Promise<{ taskId: string }> {
     const ws = this.deps.registry.get(wsId)
     if (!ws) throw new ScheduledIssueRunNowError('not_found', 'Workspace not found.')
@@ -171,12 +171,12 @@ export class ScheduleScanner {
     const issue = res.issues.find((candidate) => candidate.id === issueId)
     if (!issue) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
     if (!issue.when) {
-      throw new ScheduledIssueRunNowError('not_scheduled', 'Only scheduled Issues can be retried.')
+      throw new ScheduledIssueRunNowError('not_scheduled', 'Only scheduled Issues can be run now.')
     }
     if (!isFireable(issue)) {
       throw new ScheduledIssueRunNowError(
         'not_fireable',
-        `This Issue is ${issue.status}; reopen it before retrying.`,
+        `This Issue is ${issue.status}; reopen it before running.`,
       )
     }
 

@@ -155,6 +155,11 @@ export const zh: Resources = {
       applyAiConfiguration: '应用配置',
       retryNow: '立即重试',
       retrying: '正在重试…',
+      runNow: '立即运行',
+      runningNow: '正在启动…',
+      runNowTitle: '现在运行这个议题？',
+      runNowMessage:
+        'OpenAlice 会用当前的 What、负责人和运行时启动一轮后台任务。下次预定时间不会改变。',
       healthMessage: {
         inactive: '议题状态为“{{status}}”，运行计划已停止。',
         not_started: '运行计划有效，但尚未执行。',

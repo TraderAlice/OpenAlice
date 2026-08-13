@@ -67,6 +67,11 @@ function build(inboxReports: InboxEntry[] = []) {
     if (!detail) throw new IssueRetryError('not_found', 'Issue not found.')
     return detail
   })
+  const runIssueNow = vi.fn(async (wsId: string, id: string) => {
+    const detail = await readDetail(wsId, id)
+    if (!detail) throw new IssueRetryError('not_found', 'Issue not found.')
+    return detail
+  })
   const svc = {
     registry: {
       get: (id: string) => (
@@ -91,9 +96,10 @@ function build(inboxReports: InboxEntry[] = []) {
     },
     issueDetail: readDetail,
     retryIssue,
+    runIssueNow,
     provenanceStore: { append: appendProvenance, list: vi.fn(), latest: vi.fn() },
   } as unknown as WorkspaceService
-  return { app: createIssuesRoutes(svc, { conversation }), appendProvenance, retryIssue, ask }
+  return { app: createIssuesRoutes(svc, { conversation }), appendProvenance, retryIssue, runIssueNow, ask }
 }
 
 async function req(app: any, method: string, path: string, body?: unknown) {
@@ -309,6 +315,29 @@ describe('POST /api/issues/:wsId/:id/retry', () => {
     const { app, retryIssue } = build()
     retryIssue.mockRejectedValueOnce(new IssueRetryError('already_running', 'This Issue already has a run in progress.'))
     const r = await req(app, 'POST', '/ws-1/i1/retry')
+    expect(r.status).toBe(409)
+    expect(r.body).toEqual({
+      error: 'already_running',
+      message: 'This Issue already has a run in progress.',
+    })
+  })
+})
+
+describe('POST /api/issues/:wsId/:id/run', () => {
+  it('returns the authoritative detail with 202', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
+    const { app, runIssueNow } = build()
+    const r = await req(app, 'POST', '/ws-1/i1/run')
+    expect(r.status).toBe(202)
+    expect(r.body.issue.id).toBe('i1')
+    expect(runIssueNow).toHaveBeenCalledWith('ws-1', 'i1')
+  })
+
+  it('maps a live-run conflict to 409', async () => {
+    await createIssue(wsDir, { id: 'i1', title: 'T', when: { kind: 'every', every: '1h' } })
+    const { app, runIssueNow } = build()
+    runIssueNow.mockRejectedValueOnce(new IssueRetryError('already_running', 'This Issue already has a run in progress.'))
+    const r = await req(app, 'POST', '/ws-1/i1/run')
     expect(r.status).toBe(409)
     expect(r.body).toEqual({
       error: 'already_running',

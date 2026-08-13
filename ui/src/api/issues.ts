@@ -332,4 +332,13 @@ export const issuesApi = {
       { method: 'POST', headers },
     )
   },
+
+  /** Dispatch a scheduled Issue now without requiring a failed last run.
+   * The backend preserves the cadence marker. */
+  async runNow(wsId: string, id: string): Promise<IssueDetail> {
+    return fetchJson<IssueDetail>(
+      `/api/issues/${encodeURIComponent(wsId)}/${encodeURIComponent(id)}/run`,
+      { method: 'POST', headers },
+    )
+  },
 }
