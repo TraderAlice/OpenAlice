@@ -119,6 +119,24 @@ describe('telegram connector desk', () => {
     expect(updated.issue.when).toEqual({ kind: 'every', every: '1h' })
   })
 
+  it('rejects unsupported cadences at the domain boundary', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsA },
+      [{ id: 'ws-a', dir: wsA }],
+    )
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+
+    const updated = await updateTelegramConnectorDesk(wsA, created.issue.id, {
+      when: { kind: 'every', every: '3h' },
+    } as Parameters<typeof updateTelegramConnectorDesk>[2])
+    expect(updated).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+      error: 'Unsupported Telegram phone-desk cadence: 3h',
+    })
+  })
+
   it('does not treat a hand-written false flag as a desk', async () => {
     await writeFile(join(wsA, '.alice', 'issues', 'nope.md'), `---
 title: Nope

@@ -60,6 +60,7 @@ Existing per-`resumeId` busy stays. Queue-on-busy is out of this plan.
 - [x] Generic create/update/CLI/MCP cannot set the flag; dedicated Settings helper can
 - [x] Board + issues list omit the phone-desk row
 - [x] Settings → Telegram: enable chat → pick Workspace → create Issue; What + schedule editor
+- [x] Backend enforces linked-owner readiness, supported cadence choices, and serialized one-desk writes
 - [x] Owner guides updated; typecheck + tests; review-only PR
 
 ### 2. Comments in, comments out, `[[no-reply]]` (`review:deep`)

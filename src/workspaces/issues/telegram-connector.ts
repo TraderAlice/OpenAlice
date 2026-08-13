@@ -15,6 +15,16 @@ export const TELEGRAM_CONNECTOR_ISSUE_ID = 'telegram-phone-desk'
 
 export const TELEGRAM_CONNECTOR_DEFAULT_WHEN = { kind: 'every' as const, every: '4h' }
 
+/** Product-supported heartbeat choices. Keep this invariant in the domain:
+ * Settings is the ordinary writer, but direct HTTP callers must not be able to
+ * persist a cadence the product cannot subsequently represent. */
+export const TELEGRAM_CONNECTOR_CADENCES = ['1h', '2h', '4h', '8h', '12h', '24h'] as const
+export type TelegramConnectorCadence = typeof TELEGRAM_CONNECTOR_CADENCES[number]
+
+export function isTelegramConnectorCadence(value: string): value is TelegramConnectorCadence {
+  return TELEGRAM_CONNECTOR_CADENCES.some((cadence) => cadence === value)
+}
+
 export const TELEGRAM_CONNECTOR_DEFAULT_WHAT = [
   'You are the Telegram phone desk for this Workspace.',
   '',
@@ -98,8 +108,15 @@ export async function createTelegramConnectorDesk(
 export async function updateTelegramConnectorDesk(
   wsDir: string,
   id: string,
-  patch: { what?: string; when?: { kind: 'every'; every: string } },
+  patch: { what?: string; when?: { kind: 'every'; every: TelegramConnectorCadence } },
 ): Promise<MutateResult> {
+  if (patch.when && !isTelegramConnectorCadence(patch.when.every)) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      error: `Unsupported Telegram phone-desk cadence: ${patch.when.every}`,
+    }
+  }
   return updateIssueFields(wsDir, id, patch)
 }
 
