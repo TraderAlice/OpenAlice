@@ -3,7 +3,7 @@ import { issueTimeoutMs } from './declaration.js'
 
 /** Historical scheduled Issue runs that omitted `timeoutMs` on the durable
  * record used this 30-minute budget. New fires persist the Issue's actual
- * watchdog (or omit it when the Issue has no limit). */
+ * watchdog, or `null` when the Issue has no limit. */
 export const SCHEDULED_ISSUE_RUN_TIMEOUT_MS = issueTimeoutMs('30m')!
 
 /** A watchdog that fires this far after its own deadline did not merely time
@@ -52,7 +52,9 @@ export function issueRunFailure(
   >,
 ): IssueRunFailure | undefined {
   if (task.status === 'running' || task.status === 'done') return undefined
-  const timeoutMs = task.timeoutMs ?? SCHEDULED_ISSUE_RUN_TIMEOUT_MS
+  const timeoutMs = task.timeoutMs === undefined
+    ? SCHEDULED_ISSUE_RUN_TIMEOUT_MS
+    : task.timeoutMs
 
   if (task.status === 'interrupted') {
     return {
@@ -63,7 +65,7 @@ export function issueRunFailure(
     }
   }
 
-  if (task.killed) {
+  if (task.killed && timeoutMs !== null) {
     const durationMs = task.durationMs ?? timeoutMs
     const lateByMs = durationMs - timeoutMs
     if (lateByMs >= SCHEDULED_ISSUE_WATCHDOG_LATE_GRACE_MS) {

@@ -38,6 +38,13 @@ describe('issueRunFailure', () => {
     expect(issueRunFailure({ status: 'failed', exitCode: 2 })).toMatchObject({ kind: 'process_exit' })
     expect(issueRunFailure({
       status: 'failed',
+      timeoutMs: null,
+      killed: true,
+      signal: 'SIGKILL',
+      durationMs: SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+    })).toMatchObject({ kind: 'process_exit' })
+    expect(issueRunFailure({
+      status: 'failed',
       processStarted: true,
       exitCode: 7,
     })).toMatchObject({ kind: 'process_exit' })

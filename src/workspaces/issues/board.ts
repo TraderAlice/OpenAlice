@@ -341,7 +341,9 @@ export interface IssueRunRecord {
   signal?: string | null
   killed?: boolean
   error?: string
-  timeoutMs?: number
+  /** Positive watchdog budget, `null` for an explicitly unlimited new run,
+   * absent only on historical records. */
+  timeoutMs?: number | null
   output?: HeadlessTaskOutputSummary
   /** Read-side explanation for non-successful scheduled execution. Derived
    * from durable fields so old registry entries need no migration. */

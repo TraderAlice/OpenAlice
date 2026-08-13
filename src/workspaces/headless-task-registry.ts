@@ -114,9 +114,10 @@ export interface HeadlessTaskRecord {
   signal?: string | null
   killed?: boolean
   error?: string
-  /** Watchdog budget when this dispatch armed one. Absent means no limit, or a
-   * historical record that used the former 30-minute scheduled-Issue default. */
-  timeoutMs?: number
+  /** Watchdog policy recorded at dispatch time. A positive number is the armed
+   * budget, `null` explicitly records a new unlimited scheduled-Issue run, and
+   * absence is reserved for historical records or non-Issue dispatches. */
+  timeoutMs?: number | null
   /**
    * The agent CLI's OWN session id, captured from the run's stdout (adapter's
    * `extractHeadlessSessionId`). This is what makes a headless run REOPENABLE:
@@ -219,7 +220,11 @@ export class HeadlessTaskRegistry {
       // Keep the field absent (not `undefined`) on manual runs so the JSON stays clean.
       ...(input.trigger ? { trigger: input.trigger } : {}),
       ...(input.inquiry ? { inquiry: input.inquiry } : {}),
-      ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+      ...(input.timeoutMs !== undefined
+        ? { timeoutMs: input.timeoutMs }
+        : input.trigger?.kind === 'issue'
+          ? { timeoutMs: null }
+          : {}),
     }
     this.tasks.push(rec)
     await this.flush()
