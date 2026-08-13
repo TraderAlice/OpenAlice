@@ -51,6 +51,8 @@ import { createEconomyTools } from './tool/economy.js'
 import { SessionStore } from './core/session.js'
 import { createInboxStore } from './core/inbox-store.js'
 import { startInboxConnectorBridge } from './services/connector-client/index.js'
+import { createWorkspaceConversationControl } from './workspaces/conversation-control.js'
+import { startTelegramDeskInboundPoll } from './workspaces/issues/telegram-desk-chat.js'
 import { ToolCenter } from './core/tool-center.js'
 import { WorkspaceToolCenter } from './core/workspace-tool-center.js'
 import { inboxPushFactory } from './tool/inbox-push.js'
@@ -287,6 +289,15 @@ async function main() {
   // skip (see cron listener). Created here so cron dispatch can hold it.
   const workspaceServiceRef = createWorkspaceServiceRef()
   startInboxConnectorBridge(inboxStore, () => workspaceServiceRef.current)
+  startTelegramDeskInboundPoll({
+    listWorkspaces: () => workspaceServiceRef.current?.registry.list() ?? [],
+    getWorkspace: (id) => workspaceServiceRef.current?.registry.get(id),
+    provenanceStore: () => workspaceServiceRef.current?.provenanceStore,
+    conversation: () => {
+      const service = workspaceServiceRef.current
+      return service ? createWorkspaceConversationControl(service) : undefined
+    },
+  })
 
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
   // drives the periodic equity-curve writes. The UTA service starts

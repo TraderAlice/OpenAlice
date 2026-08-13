@@ -1,6 +1,6 @@
 # Plan: Telegram phone-desk Issue
 
-**Status:** active — increment 1  
+**Status:** active — increment 2  
 **Owner guides:** [[docs/workspace-issues-and-scheduling.md]], [[docs/connector-service.md]], [[docs/conversation-provenance.md]]  
 **Delivery:** serial PRs to `dev` (`area:collaboration`, `area:settings`). Increment 2 is `review:deep`. Open PR, do not merge.
 
@@ -65,9 +65,9 @@ Existing per-`resumeId` busy stays. Queue-on-busy is out of this plan.
 
 ### 2. Comments in, comments out, `[[no-reply]]` (`review:deep`)
 
-- [ ] Inbound owner DM → comment → existing reply dispatch → project unless `[[no-reply]]`
-- [ ] Scheduled fire of this Issue stamps `assistantText` as a comment, then same filter
-- [ ] Literal tag only; send nothing when present
+- [x] Inbound owner DM → comment → existing reply dispatch → project unless `[[no-reply]]`
+- [x] Scheduled fire of this Issue stamps `assistantText` as a comment, then same filter
+- [x] Literal tag only; send nothing when present
 
 ### Not in this plan
 

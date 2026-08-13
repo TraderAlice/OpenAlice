@@ -56,6 +56,23 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         })
       }
       this.registerCommands(context)
+      bot.on('message:text', async (ctx) => {
+        if (ctx.chat.type !== 'private' || !ctx.from) return
+        const text = ctx.message.text.trim()
+        if (!text || text.startsWith('/')) return
+        if (!this.isOwner(String(ctx.from.id))) return
+        try {
+          await context.forwardOwnerText({
+            text,
+            userId: String(ctx.from.id),
+            chatId: String(ctx.chat.id),
+          })
+        } catch (error) {
+          this.tracker.degraded(error)
+          await ctx.reply('OpenAlice could not accept this message. Check Connector Settings and logs.')
+            .catch(() => undefined)
+        }
+      })
       await withTimeout(async () => {
         await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
           command: name,
@@ -91,6 +108,19 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
           new InputFile(attachment.content, attachment.filename),
         )
       }
+      this.tracker.success(this.ownerUserId)
+    } catch (error) {
+      this.tracker.degraded(error)
+      throw error
+    }
+  }
+
+  async sendOwnerText(text: string): Promise<void> {
+    if (!this.bot) throw new Error('Telegram bot is not ready')
+    if (!this.chatId) throw new Error('Telegram private chat is not linked')
+    this.tracker.attempt()
+    try {
+      await this.bot.api.sendMessage(this.chatId, text)
       this.tracker.success(this.ownerUserId)
     } catch (error) {
       this.tracker.degraded(error)
