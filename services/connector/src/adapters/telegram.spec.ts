@@ -99,4 +99,17 @@ describe('Telegram polling readiness', () => {
     expect(adapter.health().status).toBe('degraded')
     expect(stopMock).toHaveBeenCalled()
   })
+
+  it('reports validation failures instead of remaining stuck in starting', async () => {
+    const adapter = new TelegramConnectorAdapter({ startupTimeoutMs: 20 })
+
+    await expect(adapter.start(
+      { enabled: true, settings: {} },
+      context(),
+    )).rejects.toThrow('Telegram setting botToken is required')
+    expect(adapter.health()).toMatchObject({
+      status: 'degraded',
+      lastError: 'Telegram setting botToken is required',
+    })
+  })
 })

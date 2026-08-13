@@ -30,32 +30,32 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   }
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
-    const token = requiredString(config, 'botToken')
-    this.ownerUserId = optionalString(config, 'ownerUserId')
-    this.chatId = optionalString(config, 'chatId')
-    const bot = new Bot(token)
-    bot.api.config.use(autoRetry())
-    this.bot = bot
-
-    for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
-      bot.command(command.name, async (ctx) => {
-        if (ctx.chat.type !== 'private' || !ctx.from) return
-        const handled = await context.commands.execute({
-          connectorId: this.id,
-          command: command.name,
-          userId: String(ctx.from.id),
-          chatId: String(ctx.chat.id),
-          reply: async (message) => { await ctx.reply(message) },
-        }).catch(async (error) => {
-          this.tracker.degraded(error)
-          await ctx.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
-          return true
-        })
-        if (!handled) await ctx.reply('Unknown connector command.')
-      })
-    }
-    this.registerCommands(context)
     try {
+      const token = requiredString(config, 'botToken')
+      this.ownerUserId = optionalString(config, 'ownerUserId')
+      this.chatId = optionalString(config, 'chatId')
+      const bot = new Bot(token)
+      bot.api.config.use(autoRetry())
+      this.bot = bot
+
+      for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
+        bot.command(command.name, async (ctx) => {
+          if (ctx.chat.type !== 'private' || !ctx.from) return
+          const handled = await context.commands.execute({
+            connectorId: this.id,
+            command: command.name,
+            userId: String(ctx.from.id),
+            chatId: String(ctx.chat.id),
+            reply: async (message) => { await ctx.reply(message) },
+          }).catch(async (error) => {
+            this.tracker.degraded(error)
+            await ctx.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
+            return true
+          })
+          if (!handled) await ctx.reply('Unknown connector command.')
+        })
+      }
+      this.registerCommands(context)
       await withTimeout(async () => {
         await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
           command: name,
@@ -63,14 +63,14 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         })))
         await waitForTelegramPolling(bot, (error) => this.tracker.degraded(error))
       }, this.startupTimeoutMs, `Telegram polling did not become ready within ${this.startupTimeoutMs}ms`)
+      if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
+      else this.tracker.awaitingLink()
     } catch (error) {
       this.tracker.degraded(error)
-      await bot.stop().catch(() => undefined)
+      await this.bot?.stop().catch(() => undefined)
       this.bot = undefined
       throw error
     }
-    if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
-    else this.tracker.awaitingLink()
   }
 
   async stop(): Promise<void> {
