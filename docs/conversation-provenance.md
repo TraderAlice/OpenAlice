@@ -330,6 +330,10 @@ Issue-file edits that bypass UI/CLI mutation routes. Such edits are attributed
 to a Session only when exactly one Session could have made them; concurrent
 edits remain explicitly unknown rather than crediting the wrong coworker.
 
+The Alice Project's Telegram phone-desk Issue uses this same comment sidecar as
+its chat transcript. Settings binds the desk; inbound Telegram projection is a
+later Connector increment and does not create a second conversation object.
+
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
 delivered to that exact Session. The final assistant response is recorded as a
 reply comment, linked by `replyTo`; delivery state stays on the source comment.

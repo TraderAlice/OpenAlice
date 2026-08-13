@@ -58,6 +58,8 @@ export interface IssuesSnapshotIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  /** Present only on the Project Telegram phone-desk Issue. */
+  telegramConnector?: true
   /** True iff this issue's NAME (title, case-insensitive) is also used by an
    *  issue in a DIFFERENT workspace. A name is a global team object, so a clash
    *  across workspaces is ambiguous and the UI warns on it. DETECTION ONLY — we
@@ -257,6 +259,7 @@ export interface IssueDetailIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  telegramConnector?: true
 }
 
 /** GET /api/issues/:wsId/:id — one issue + its human-facing Activity timeline,
@@ -442,6 +445,7 @@ export function detailIssue(
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
+    ...(issue.telegramConnector ? { telegramConnector: true as const } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,
       nextDueAtMs: markers.nextDueAtMs,
@@ -469,6 +473,7 @@ export function snapshotBoardIssue(
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
+    ...(issue.telegramConnector ? { telegramConnector: true as const } : {}),
     ...(issue.when ? { when: issue.when } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,

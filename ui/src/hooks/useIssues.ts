@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { api } from '../api'
-import type { IssueSnapshot } from '../api/issues'
+import { omitTelegramConnectorIssues, type IssueSnapshot } from '../api/issues'
 
 /**
  * Process-level cache of the last snapshot. It survives unmount, so reopening
@@ -38,7 +38,7 @@ export function useIssues(): UseIssues {
     mounted.current = true
     const load = async () => {
       try {
-        const next = await api.issues.get()
+        const next = omitTelegramConnectorIssues(await api.issues.get())
         cached = next
         if (mounted.current) {
           setData(next)

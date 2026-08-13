@@ -202,6 +202,41 @@ describe('readWorkspaceIssues', () => {
     expect(issueTimeoutMs(undefined)).toBeUndefined()
   })
 
+  it('treats omitted telegramConnector as a normal issue', async () => {
+    await writeIssue('plain', fm('title: Plain'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues[0]?.telegramConnector).toBeUndefined()
+  })
+
+  it('reads an explicit telegramConnector flag', async () => {
+    await writeIssue('desk', fm('title: Desk\ntelegramConnector: true\nwhen: { kind: every, every: 4h }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues[0]?.telegramConnector).toBe(true)
+  })
+
+  it('rejects telegramConnector values other than true', async () => {
+    await writeIssue('nope', fm('title: Nope\ntelegramConnector: false'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues).toEqual([])
+    expect(result.invalid[0]?.error).toMatch(/telegramConnector/)
+  })
+
+  it('keeps only the first telegramConnector issue in one workspace', async () => {
+    await writeIssue('alpha-desk', fm('title: Alpha\ntelegramConnector: true\nwhen: { kind: every, every: 4h }'))
+    await writeIssue('zeta-desk', fm('title: Zeta\ntelegramConnector: true\nwhen: { kind: every, every: 4h }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues.map((issue) => issue.id)).toEqual(['alpha-desk'])
+    expect(result.invalid.map((issue) => issue.id)).toEqual(['zeta-desk'])
+  })
+
   it('rejects an unknown timeout instead of silently ignoring it', async () => {
     await writeIssue('bad-timeout', fm([
       'title: Bad timeout',
