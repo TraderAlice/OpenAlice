@@ -1,6 +1,6 @@
 # Plan: Session roster by resumeId (lock TUI while headless)
 
-**Status:** active  
+**Status:** completed (delivered in PR #1068)  
 **Owner guides:** [[docs/conversation-provenance.md]], [[docs/workspace-issues-and-scheduling.md]]  
 **Delivery:** serial PR to `dev` (`area:workspace`)
 
