@@ -1,5 +1,9 @@
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from './headless-task-registry.js'
-import type { ResumeIdentityRecord } from './resume-registry.js'
+import {
+  sessionPresence,
+  type ResumeIdentityRecord,
+  type SessionPresence,
+} from './resume-registry.js'
 import { sessionPreferredTitle, type SessionRecord } from './session-registry.js'
 import type { SessionCreatedBy } from './session-metadata.js'
 import type { ModelReasoningEffort } from '@/ai-providers/model-semantics.js'
@@ -11,6 +15,8 @@ export interface WorkspaceSessionDirectoryEntry {
   updatedAt: number
   lifecycle: ResumeIdentityRecord['lifecycle']
   successorResumeId?: string
+  /** Missing means active. */
+  presence?: SessionPresence
   resumable: boolean
   active: boolean
   /** Secret-free birth stamp when this product Session was first allocated. */
@@ -66,7 +72,10 @@ export function buildWorkspaceSessionDirectory(input: {
         updatedAt: identity.updatedAt,
         lifecycle: identity.lifecycle ?? 'active',
         ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
-        resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
+        ...(sessionPresence(identity) !== 'active' ? { presence: sessionPresence(identity) } : {}),
+        resumable: identity.lifecycle !== 'retired'
+          && sessionPresence(identity) !== 'deleted'
+          && Boolean(identity.agentSessionId),
         active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
         ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
         ...(identity.runtimeBinding

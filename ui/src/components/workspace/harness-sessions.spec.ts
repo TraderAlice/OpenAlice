@@ -142,6 +142,24 @@ describe('joinWorkspaceHarnessSessions', () => {
     expect(rows.find((row) => row.resumeId === 'resume-failed')?.failed).toBe(true)
   })
 
+  it('keeps archived colleagues out of the floor roster', () => {
+    const rows = joinWorkspaceHarnessSessions(workspace(), {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry({ resumeId: 'resume-archived', presence: 'archived' }),
+      ],
+    })
+    expect(rows.map((row) => row.resumeId)).toEqual(['resume-interactive'])
+    expect(joinWorkspaceHarnessSessions(workspace(), {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry({ resumeId: 'resume-archived', presence: 'archived' }),
+      ],
+    }, { presence: 'archived' }).map((row) => row.resumeId)).toEqual(['resume-archived'])
+  })
+
   it('does not lock an interactive TUI that is already the occupant', () => {
     const live = session({ state: 'running', pid: 9, startedAt: 1 })
     const row = toHarnessSession('ws-1', live, entry({

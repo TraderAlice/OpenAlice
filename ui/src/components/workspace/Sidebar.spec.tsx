@@ -236,4 +236,27 @@ describe('SessionRow actions', () => {
     expect(onSelect).not.toHaveBeenCalled()
     expect(onResume).not.toHaveBeenCalled()
   })
+
+  it('archives a Session from the More menu instead of deleting the coworker', async () => {
+    const user = userEvent.setup()
+    const onArchive = vi.fn()
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+        onArchive={onArchive}
+      />,
+    )
+
+    const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive Review AAPL earnings' }))
+    expect(onArchive).toHaveBeenCalledOnce()
+  })
 })

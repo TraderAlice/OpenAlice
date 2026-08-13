@@ -6,6 +6,7 @@ import {
   Clock3,
   LayoutGrid,
   MessageSquare,
+  RotateCcw,
   Search,
 } from 'lucide-react'
 
@@ -148,7 +149,7 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
 }
 
 type ConversationScope = 'current' | 'all'
-type ConversationStateFilter = 'all' | SessionRecord['state']
+type ConversationStateFilter = 'all' | SessionRecord['state'] | 'archived'
 
 export interface ConversationBrowserDialogProps extends DialogFocusProps {
   harness?: 'chat' | 'auto-quant'
@@ -160,6 +161,7 @@ export interface ConversationBrowserDialogProps extends DialogFocusProps {
   activeSessionId?: string | null
   onOpenChange: (open: boolean) => void
   onSelectSession: (row: HarnessSession) => void
+  onRestoreSession?: (row: HarnessSession) => void
 }
 
 export function ConversationBrowserDialog(props: ConversationBrowserDialogProps): ReactElement {
@@ -183,6 +185,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
       const rows = joinWorkspaceHarnessSessions(
         workspace,
         props.directories?.get(workspace.id) ?? null,
+        { presence: stateFilter === 'archived' ? 'archived' : 'active' },
       )
       return rows.map((row) => ({ workspace, row }))
     })
@@ -192,7 +195,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
       const occupancy = right.row.occupancyAt - left.row.occupancyAt
       if (occupancy !== 0) return occupancy
       return left.row.resumeId.localeCompare(right.row.resumeId)
-    }), [props.currentWorkspaceId, props.directories, props.workspaces, scope])
+    }), [props.currentWorkspaceId, props.directories, props.workspaces, scope, stateFilter])
 
   const visibleSessions = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()
@@ -221,6 +224,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
     { value: 'all', label: t('workspace.filterAll') },
     { value: 'running', label: t('workspace.filterRunning') },
     { value: 'paused', label: t('workspace.filterPaused') },
+    { value: 'archived', label: t('workspace.filterArchived') },
   ]
 
   return (
@@ -311,7 +315,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                   ? new Date(row.occupancyAt).toISOString()
                   : row.session?.lastActiveAt
                 return (
-                  <li key={`${workspace.id}:${row.resumeId}`}>
+                  <li key={`${workspace.id}:${row.resumeId}`} className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -320,7 +324,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                       disabled={row.headlessOccupying}
                       aria-label={title}
                       aria-current={active ? 'page' : undefined}
-                      className={`oa-nav-row flex min-h-16 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                      className={`oa-nav-row flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
                         active ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-muted'
                       } disabled:cursor-default disabled:opacity-70`}
                     >
@@ -340,15 +344,29 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                         </span>
                       </span>
                       <span className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-medium sm:inline-flex ${
-                        row.occupancyRunning
-                          ? 'bg-success/10 text-success'
-                          : 'bg-muted text-muted-foreground'
+                        row.presence === 'archived'
+                          ? 'bg-muted text-muted-foreground'
+                          : row.occupancyRunning
+                            ? 'bg-success/10 text-success'
+                            : 'bg-muted text-muted-foreground'
                       }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${row.occupancyRunning ? 'bg-success' : 'bg-muted-foreground/45'}`} aria-hidden />
-                        {row.occupancyRunning ? t('workspace.filterRunning') : t('workspace.paused')}
+                        <span className={`h-1.5 w-1.5 rounded-full ${row.occupancyRunning && row.presence !== 'archived' ? 'bg-success' : 'bg-muted-foreground/45'}`} aria-hidden />
+                        {row.presence === 'archived'
+                          ? t('workspace.filterArchived')
+                          : row.occupancyRunning ? t('workspace.filterRunning') : t('workspace.paused')}
                       </span>
                       <Clock3 size={14} strokeWidth={2} className="shrink-0 text-muted-foreground/50" aria-hidden />
                     </button>
+                    {row.presence === 'archived' && props.onRestoreSession && (
+                      <button
+                        type="button"
+                        onClick={() => props.onRestoreSession?.(row)}
+                        aria-label={t('workspace.restoreSession', { title: row.title })}
+                        className="oa-icon-action flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <RotateCcw size={15} strokeWidth={2} aria-hidden />
+                      </button>
+                    )}
                   </li>
                 )
               })}

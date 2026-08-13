@@ -176,6 +176,7 @@ function context(
     resumeSession: mocks.resumeSession,
     openWebPiSession: mocks.openWebPiSession,
     requestDeleteSession: vi.fn(),
+    setSessionPresence: vi.fn(async () => undefined),
     openAgentConfig: mocks.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),

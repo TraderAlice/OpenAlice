@@ -764,6 +764,7 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly updatedAt: number;
   readonly lifecycle?: 'active' | 'retired';
   readonly successorResumeId?: string;
+  readonly presence?: 'active' | 'archived' | 'deleted';
   readonly resumable: boolean;
   readonly active: boolean;
   /** Present when this product Session was allocated after birth metadata shipped. */
@@ -800,6 +801,34 @@ export async function getWorkspaceSessionDirectory(id: string): Promise<Workspac
   const res = await fetch(`/api/workspaces/${encodeURIComponent(id)}/resumes`);
   if (!res.ok) throw new Error(`Failed to load Workspace Sessions (${res.status})`);
   return res.json() as Promise<WorkspaceSessionDirectory>;
+}
+
+export type SessionPresence = 'active' | 'archived' | 'deleted';
+
+export interface SessionPresenceResult {
+  readonly resumeId: string;
+  readonly presence: SessionPresence;
+  readonly lifecycle: 'active' | 'retired';
+}
+
+export async function setSessionPresence(
+  wsId: string,
+  resumeId: string,
+  presence: SessionPresence,
+): Promise<SessionPresenceResult> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/resumes/${encodeURIComponent(resumeId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ presence }),
+    },
+  );
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    throw new Error(parsed?.message ?? parsed?.error ?? `set session presence failed: ${res.status}`);
+  }
+  return res.json() as Promise<SessionPresenceResult>;
 }
 
 export async function spawnSession(

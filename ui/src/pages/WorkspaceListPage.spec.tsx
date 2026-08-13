@@ -72,6 +72,7 @@ function context(): WorkspacesContextValue {
     resumeSession: vi.fn(async () => undefined),
     openWebPiSession: vi.fn(async () => undefined),
     requestDeleteSession: vi.fn(),
+    setSessionPresence: vi.fn(async () => undefined),
     openAgentConfig: vi.fn(),
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),

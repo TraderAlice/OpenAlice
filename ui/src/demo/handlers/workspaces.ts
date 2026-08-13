@@ -26,6 +26,8 @@ import type {
   WorkspaceRuntimePreference,
 } from '../../components/workspace/api'
 
+const demoSessionPresence = new Map<string, 'active' | 'archived' | 'deleted'>()
+
 const demoManagerSession = {
   id: 'demo-manager-session',
   resumeId: 'demo-resume-manager',
@@ -906,6 +908,16 @@ export const workspacesHandlers = [
       resumable: true,
     })
   }),
+  http.patch('/api/workspaces/:id/resumes/:resumeId', async ({ params, request }) => {
+    const resumeId = String(params.resumeId)
+    const body = await request.json().catch(() => ({})) as { presence?: unknown }
+    const presence = body.presence
+    if (presence !== 'active' && presence !== 'archived' && presence !== 'deleted') {
+      return HttpResponse.json({ error: 'invalid_presence' }, { status: 400 })
+    }
+    demoSessionPresence.set(resumeId, presence)
+    return HttpResponse.json({ resumeId, presence, lifecycle: 'active' })
+  }),
   http.get('/api/workspaces/:id/resumes', ({ params }) => {
     const wsId = String(params.id)
     if (wsId === DEMO_AUTO_QUANT_WORKSPACE_ID) {
@@ -931,6 +943,7 @@ export const workspacesHandlers = [
       createdAt: number
       updatedAt: number
       lifecycle: 'active' | 'retired'
+      presence?: 'active' | 'archived' | 'deleted'
       resumable: boolean
       active: boolean
       interactive?: {
@@ -996,6 +1009,23 @@ export const workspacesHandlers = [
           },
         },
         {
+          resumeId: 'resume-demo-archived-colleague',
+          agent: 'pi',
+          createdAt: Date.now() - 2_400_000,
+          updatedAt: Date.now() - 1_800_000,
+          lifecycle: 'active',
+          presence: 'archived',
+          resumable: true,
+          active: false,
+          latestExecution: {
+            taskId: 'demo-archived-colleague-run',
+            status: 'done',
+            startedAt: Date.now() - 2_000_000,
+            finishedAt: Date.now() - 1_800_000,
+            assistantPreview: 'Filed last week’s metals watch.',
+          },
+        },
+        {
           resumeId: 'resume-demo-headless-retired',
           agent: 'pi',
           createdAt: Date.now() - 86_400_000,
@@ -1008,7 +1038,10 @@ export const workspacesHandlers = [
     }
     return HttpResponse.json({
       workspace: { id: wsId, tag: workspace?.tag ?? wsId },
-      sessions,
+      sessions: sessions.map((session) => {
+        const presence = demoSessionPresence.get(session.resumeId) ?? session.presence
+        return presence && presence !== 'active' ? { ...session, presence } : session
+      }),
     })
   }),
   http.post('/api/workspaces/:id/resumes/:resumeId/session', async ({ params, request }) => {

@@ -120,6 +120,9 @@ function exactResolution(
   if (identity.lifecycle === 'retired') {
     return { mode: 'unavailable', reason: 'retired-session', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
   }
+  if (identity.presence === 'deleted') {
+    return { mode: 'unavailable', reason: 'deleted-session', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
+  }
   if (!svc.registry.get(identity.wsId)) {
     return {
       mode: 'unavailable',

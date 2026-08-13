@@ -14,6 +14,7 @@ export interface SidebarActionMenuItem {
   icon: ReactNode
   onSelect: () => void
   danger?: boolean
+  disabled?: boolean
 }
 
 export function SidebarActionMenu({
@@ -57,9 +58,11 @@ export function SidebarActionMenu({
           <DropdownMenuItem
             key={item.label}
             aria-label={item.ariaLabel}
+            disabled={item.disabled}
             variant={item.danger ? 'destructive' : 'default'}
             className="flex min-h-9 w-full cursor-default items-center gap-2 rounded-none px-3 py-2 text-left text-[12px] transition-colors focus:bg-muted"
             onClick={() => {
+              if (item.disabled) return
               // Base UI restores focus to the trigger as the menu finishes
               // closing. Run follow-up dialogs only after that handoff so they
               // capture a durable return target instead of an unmounted item.

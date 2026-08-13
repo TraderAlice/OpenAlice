@@ -95,6 +95,7 @@ export type WorkspaceConversationResolution =
         | 'missing-session'
         | 'missing-native-session'
         | 'retired-session'
+        | 'deleted-session'
         | 'departed-workspace'
         | 'purged-workspace'
         | 'deleted-workspace'

@@ -153,7 +153,11 @@ function AssigneeEditor({
 }) {
   const { t } = useTranslation()
   const sessionChoices = sessions
-    .filter((session) => session.resumeId && session.agent !== 'shell' && session.resumable)
+    .filter((session) =>
+      session.resumeId
+      && session.agent !== 'shell'
+      && session.resumable
+      && (session.presence ?? 'active') === 'active')
     .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
   const selectedResumeId = value.startsWith('@resume-') ? value.slice(1) : null
   const hasSelected = !selectedResumeId || sessionChoices.some((session) => session.resumeId === selectedResumeId)
