@@ -152,11 +152,13 @@ function AssigneeEditor({
   scheduled: boolean
   sessions: readonly WorkspaceSessionDirectoryEntry[]
   disabled?: boolean
-  onChange: (next: string) => void
+  onChange: (next: string) => Promise<boolean>
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [draftValue, setDraftValue] = useState(value)
+  const [committing, setCommitting] = useState(false)
   const sessionChoices = sessions
     .filter((session) =>
       session.resumeId
@@ -165,13 +167,17 @@ function AssigneeEditor({
       && (session.presence ?? 'active') === 'active')
     .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
   const selectedResumeId = value.startsWith('@resume-') ? value.slice(1) : null
+  const draftResumeId = draftValue.startsWith('@resume-') ? draftValue.slice(1) : null
   const hasSelected = !selectedResumeId || sessionChoices.some((session) => session.resumeId === selectedResumeId)
   const contextFor = (session: WorkspaceSessionDirectoryEntry) => {
     const rawContext = session.interactive?.title
       || session.interactive?.name
       || session.latestExecution?.assistantPreview
     const normalizedContext = rawContext?.replace(/\s+/g, ' ').trim()
-    return normalizedContext && normalizedContext !== session.resumeId ? normalizedContext : null
+    if (!normalizedContext || normalizedContext === session.resumeId) return null
+    return normalizedContext.length > 120
+      ? `${normalizedContext.slice(0, 117).trimEnd()}…`
+      : normalizedContext
   }
   const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
     const activity = session.active ? 'active' : formatRelativeTime(session.updatedAt)
@@ -197,28 +203,57 @@ function AssigneeEditor({
   const selectedDescription = selectedSession
     ? `${selectedSession.agent} · ${selectedSession.active ? t('issues.detail.activeNow') : formatRelativeTime(selectedSession.updatedAt)}`
     : selectedPolicy?.description
+  const draftSession = draftResumeId
+    ? sessionChoices.find((session) => session.resumeId === draftResumeId)
+    : null
+  const draftPolicy = policyChoices.find((choice) => choice.value === draftValue)
+  const draftLabel = draftSession
+    ? contextFor(draftSession) ?? draftSession.resumeId
+    : draftPolicy?.label ?? (draftResumeId ? draftResumeId : draftValue)
+  const draftDescription = draftSession
+    ? `${draftSession.resumeId} · ${draftSession.agent} · ${draftSession.active ? t('issues.detail.activeNow') : formatRelativeTime(draftSession.updatedAt)}`
+    : draftPolicy?.description
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const filteredSessions = normalizedQuery
     ? sessionChoices.filter((session) => [session.resumeId, session.agent, contextFor(session)]
         .filter(Boolean)
         .some((candidate) => candidate!.toLocaleLowerCase().includes(normalizedQuery)))
     : sessionChoices
-  const choose = (next: string) => {
-    onChange(next)
+  const close = () => {
     setOpen(false)
     setQuery('')
+    setDraftValue(value)
+  }
+  const apply = async () => {
+    if (draftValue === value || committing) return
+    setCommitting(true)
+    try {
+      if (await onChange(draftValue)) {
+        setOpen(false)
+        setQuery('')
+      }
+    } finally {
+      setCommitting(false)
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={(next) => {
-      setOpen(next)
-      if (!next) setQuery('')
+      if (next) {
+        setDraftValue(value)
+        setOpen(true)
+        return
+      }
+      if (!committing) close()
     }}>
       <button
         type="button"
         disabled={disabled}
         aria-label={t('issues.detail.assignee')}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setDraftValue(value)
+          setOpen(true)
+        }}
         className="oa-pressable flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <UserRound size={15} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -228,7 +263,7 @@ function AssigneeEditor({
         </span>
         <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
       </button>
-      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] overflow-hidden p-0 sm:max-w-xl">
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="px-4 pt-4">
           <DialogTitle>{t('issues.detail.chooseAssignee')}</DialogTitle>
           <DialogDescription>{t('issues.detail.chooseAssigneeDescription')}</DialogDescription>
@@ -244,7 +279,7 @@ function AssigneeEditor({
             className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
         </label>
-        <div className="min-h-0 overflow-y-auto px-2 pb-4">
+        <div className="min-h-0 max-w-full overflow-x-hidden overflow-y-auto px-2 pb-4">
           <p className="px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
             {t('issues.detail.assignmentPolicy')}
           </p>
@@ -254,8 +289,8 @@ function AssigneeEditor({
                 key={choice.value}
                 label={choice.label}
                 description={choice.description}
-                selected={value === choice.value}
-                onClick={() => choose(choice.value)}
+                selected={draftValue === choice.value}
+                onClick={() => setDraftValue(choice.value)}
               />
             ))}
           </div>
@@ -267,8 +302,8 @@ function AssigneeEditor({
               <AssigneeChoice
                 label={t('issues.detail.signedSession', { resumeId: selectedResumeId })}
                 description={t('issues.detail.sessionUnavailable')}
-                selected
-                onClick={() => choose(value)}
+                selected={draftValue === value}
+                onClick={() => setDraftValue(value)}
               />
             )}
             {filteredSessions.map((session) => (
@@ -276,8 +311,8 @@ function AssigneeEditor({
                 key={session.resumeId}
                 label={contextFor(session) ?? session.resumeId}
                 description={labelFor(session)}
-                selected={selectedResumeId === session.resumeId}
-                onClick={() => choose(`@${session.resumeId}`)}
+                selected={draftResumeId === session.resumeId}
+                onClick={() => setDraftValue(`@${session.resumeId}`)}
               />
             ))}
             {filteredSessions.length === 0 && (
@@ -285,6 +320,23 @@ function AssigneeEditor({
             )}
           </div>
         </div>
+        <DialogFooter className="mx-0 mb-0 items-center rounded-none px-4 py-3 sm:justify-between">
+          <div className="min-w-0 text-left sm:mr-auto">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+              {t('issues.detail.pendingAssignee')}
+            </span>
+            <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{draftLabel}</span>
+            {draftDescription && <span className="block truncate text-xs text-muted-foreground">{draftDescription}</span>}
+          </div>
+          <div className="flex w-full justify-end gap-2 sm:w-auto">
+            <Button type="button" variant="outline" disabled={committing} onClick={close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" disabled={committing || draftValue === value} onClick={() => void apply()}>
+              {committing ? t('issues.detail.assigning') : t('issues.detail.confirmAssignment')}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -305,7 +357,7 @@ function AssigneeChoice({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-h-12 w-full min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-foreground">{label}</span>
@@ -674,7 +726,7 @@ function SchedulePolicyEditor({
 }: {
   issue: IssueDetailIssue
   saving: boolean
-  onPatch: (patch: IssuePatch) => void
+  onPatch: (patch: IssuePatch) => Promise<boolean>
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -781,13 +833,13 @@ function PropertiesRail({
   error: string | null
   canRetry: boolean
   canRunNow: boolean
-  onPatch: (patch: IssuePatch) => void
-  onRetry: () => void
+  onPatch: (patch: IssuePatch) => Promise<boolean>
+  onRetry: () => Promise<void>
   onRunNow: () => Promise<void>
   onConfigureAgent: (agent: AgentId) => void
 }) {
   const { t } = useTranslation()
-  const [confirmRun, setConfirmRun] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<'run' | 'retry' | null>(null)
   const meta = STATUS_META[issue.status]
   const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
   const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
@@ -917,7 +969,7 @@ function PropertiesRail({
                 </a>
               )}
               {canRetry ? (
-                <Button type="button" size="sm" disabled={retrying} onClick={onRetry} className="ml-auto">
+                <Button type="button" size="sm" disabled={retrying} onClick={() => setConfirmAction('retry')} className="ml-auto">
                   <RotateCcw size={12} aria-hidden />
                   {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
                 </Button>
@@ -926,7 +978,7 @@ function PropertiesRail({
                   type="button"
                   size="sm"
                   disabled={retrying}
-                  onClick={() => setConfirmRun(true)}
+                  onClick={() => setConfirmAction('run')}
                   className="ml-auto"
                 >
                   <Play size={12} aria-hidden />
@@ -1079,19 +1131,20 @@ function PropertiesRail({
         )}
       </div>
       {error && <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error}</p>}
-      {confirmRun && (
+      {confirmAction && (
         <ConfirmDialog
-          title={t('issues.detail.runNowTitle')}
-          message={t('issues.detail.runNowMessage')}
-          confirmLabel={t('issues.detail.runNow')}
+          title={t(confirmAction === 'retry' ? 'issues.detail.retryNowTitle' : 'issues.detail.runNowTitle')}
+          message={t(confirmAction === 'retry' ? 'issues.detail.retryNowMessage' : 'issues.detail.runNowMessage')}
+          confirmLabel={t(confirmAction === 'retry' ? 'issues.detail.retryNow' : 'issues.detail.runNow')}
           cancelLabel={t('common.cancel')}
-          workingLabel={t('issues.detail.runningNow')}
+          workingLabel={t(confirmAction === 'retry' ? 'issues.detail.retrying' : 'issues.detail.runningNow')}
           variant="primary"
           onConfirm={async () => {
-            await onRunNow()
-            setConfirmRun(false)
+            if (confirmAction === 'retry') await onRetry()
+            else await onRunNow()
+            setConfirmAction(null)
           }}
-          onClose={() => { if (!retrying) setConfirmRun(false) }}
+          onClose={() => { if (!retrying) setConfirmAction(null) }}
         />
       )}
     </aside>
@@ -2095,7 +2148,7 @@ export function IssueDetail({
           canRetry={canRetry}
           canRunNow={canRunNow}
           onPatch={onPatch}
-          onRetry={() => void onRetry()}
+          onRetry={onRetry}
           onRunNow={onRunNow}
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />

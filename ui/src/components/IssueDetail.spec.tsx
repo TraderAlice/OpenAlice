@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   getPresets: vi.fn(),
   updateIssue: vi.fn(),
   runNow: vi.fn(),
+  retry: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -93,6 +94,7 @@ vi.mock('../api/issues', async (importOriginal) => {
       ...actual.issuesApi,
       update: mocks.updateIssue,
       runNow: mocks.runNow,
+      retry: mocks.retry,
     },
   }
 })
@@ -108,6 +110,7 @@ beforeEach(async () => {
   delete scheduledIssue.issue.model
   delete scheduledIssue.issue.effort
   delete scheduledIssue.issue.timeout
+  scheduledIssue.runs = []
   mocks.updateIssue.mockResolvedValue(scheduledIssue)
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
   mocks.listAgentCredentials.mockResolvedValue([{
@@ -195,6 +198,38 @@ describe('IssueDetail manual run', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(mocks.runNow).not.toHaveBeenCalled()
+  })
+
+  it('confirms before retrying a failed run', async () => {
+    scheduledIssue.runs = [{
+      taskId: 'failed-run',
+      resumeId: 'resume-failed-run',
+      resumable: true,
+      wsId: 'demo-ws-auto-quant',
+      issueId: 'morning-scan',
+      agent: 'codex',
+      prompt: scheduledIssue.issue.what,
+      status: 'failed',
+      startedAt: Date.now() - 30_000,
+      finishedAt: Date.now() - 20_000,
+      failure: {
+        kind: 'runtime_error',
+        title: 'Runtime failed',
+        message: 'The runtime exited early.',
+        retryable: true,
+      },
+    }]
+    mocks.retry.mockResolvedValue({ ...scheduledIssue, runs: [] })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Retry this Issue now?' })
+    expect(dialog.textContent).toContain('The next scheduled time stays unchanged.')
+    expect(mocks.retry).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retry now' }))
+    await waitFor(() => expect(mocks.retry).toHaveBeenCalledWith('demo-ws-auto-quant', 'morning-scan'))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })
 
   it('closes the confirmation and exposes a dispatch failure in the inspector', async () => {
@@ -485,6 +520,7 @@ describe('IssueDetail property controls', () => {
   })
 
   it('keeps stable Session identities first in a large assignee picker', async () => {
+    const longPreview = `Updated a very long financial and industrial rotation report. ${'Cross-market context and execution notes. '.repeat(5)}END-OF-PREVIEW`
     mocks.getWorkspaceSessionDirectory.mockResolvedValue({
       sessions: [
         {
@@ -498,7 +534,7 @@ describe('IssueDetail property controls', () => {
             taskId: 'task-1',
             status: 'done',
             startedAt: Date.now() - 90_000,
-            assistantPreview: 'Updated a very long financial and industrial rotation report.',
+            assistantPreview: longPreview,
           },
         },
         {
@@ -522,6 +558,8 @@ describe('IssueDetail property controls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Assignee' }))
     const dialog = await screen.findByRole('dialog', { name: 'Choose responsibility' })
+    expect(dialog.className).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(dialog.className).toContain('grid-rows-[auto_auto_minmax(0,1fr)_auto]')
     const choices = within(dialog).getAllByRole('button')
     const activeIndex = choices.findIndex((choice) => choice.textContent?.includes('Current thesis room'))
     const recentIndex = choices.findIndex((choice) => choice.textContent?.includes('Updated a very long financial'))
@@ -531,9 +569,25 @@ describe('IssueDetail property controls', () => {
     expect(choices[activeIndex]?.textContent).toContain('resume-active-owner · pi · active')
     expect(choices[recentIndex]?.textContent).toContain('resume-recent-worker · codex')
 
-    const search = within(dialog).getByPlaceholderText(/Search Sessions/)
+    fireEvent.click(choices[activeIndex]!)
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    expect(within(dialog).getByText('Pending assignment')).toBeTruthy()
+    expect(within(dialog).getByText('resume-active-owner · pi · active now')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm assignment' }))
+    await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'morning-scan',
+      { assignee: '@resume-active-owner' },
+    ))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Choose responsibility' })).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }))
+    const reopenedDialog = await screen.findByRole('dialog', { name: 'Choose responsibility' })
+
+    const search = within(reopenedDialog).getByPlaceholderText(/Search Sessions/)
     fireEvent.change(search, { target: { value: 'financial' } })
-    expect(within(dialog).queryByText('Current thesis room')).toBeNull()
-    expect(within(dialog).getByText('Updated a very long financial and industrial rotation report.')).toBeTruthy()
+    expect(within(reopenedDialog).queryByText('Current thesis room')).toBeNull()
+    expect(within(reopenedDialog).getByText(/^Updated a very long financial.*…$/)).toBeTruthy()
+    expect(within(reopenedDialog).queryByText(/END-OF-PREVIEW/)).toBeNull()
   })
 })
