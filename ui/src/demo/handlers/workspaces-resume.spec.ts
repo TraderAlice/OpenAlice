@@ -67,7 +67,7 @@ describe('demo Workspace resume handlers', () => {
     expect(workspace.sessions).toContainEqual(expect.objectContaining({ id: `run-${resumeId}` }))
   })
 
-  it('lists Directory-only Chat colleagues without inventing SessionRecords', async () => {
+  it('lists Chat colleagues while the Workspace roster already contains headless Sessions', async () => {
     const response = await fetch(`${baseUrl}/api/workspaces/${DEMO_CHAT_WORKSPACE_ID}/resumes`)
     expect(response.status).toBe(200)
     const body = await response.json() as {
@@ -91,7 +91,7 @@ describe('demo Workspace resume handlers', () => {
     const chat = workspaces.workspaces.find(
       (candidate: { id: string }) => candidate.id === DEMO_CHAT_WORKSPACE_ID,
     )
-    expect(chat.sessions.map((session: { resumeId: string }) => session.resumeId)).not.toEqual(
+    expect(chat.sessions.map((session: { resumeId: string }) => session.resumeId)).toEqual(
       expect.arrayContaining(['resume-demo-headless-colleague', 'resume-demo-headless-running']),
     )
   })

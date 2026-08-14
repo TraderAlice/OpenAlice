@@ -19,14 +19,15 @@ export interface HarnessSession {
   readonly failed: boolean
   readonly resumable: boolean
   readonly presence: SessionPresence
-  readonly session: SessionRecord | null
+  readonly session: SessionRecord
   readonly directory: WorkspaceSessionDirectoryEntry | null
 }
 
 export function entryPresence(
   entry: WorkspaceSessionDirectoryEntry | null | undefined,
+  fallback: SessionPresence = 'active',
 ): SessionPresence {
-  return entry?.presence ?? 'active'
+  return entry?.presence ?? fallback
 }
 
 function timestamp(value: string | number | undefined): number {
@@ -88,23 +89,23 @@ export function isHeadlessOccupying(
 
 export function toHarnessSession(
   workspaceId: string,
-  session: SessionRecord | null,
+  session: SessionRecord,
   entry: WorkspaceSessionDirectoryEntry | null,
 ): HarnessSession {
-  const resumeId = session?.resumeId ?? entry?.resumeId ?? ''
-  const interactiveRunning = session?.state === 'running'
+  const resumeId = session.resumeId
+  const interactiveRunning = session.state === 'running'
   const headlessOccupying = isHeadlessOccupying(session, entry)
   return {
     workspaceId,
     resumeId,
-    agent: session?.agent ?? entry?.agent ?? 'pi',
+    agent: session.agent,
     title: harnessSessionTitle(session, entry),
     occupancyAt: harnessOccupancyAt(session, entry),
     occupancyRunning: interactiveRunning || headlessOccupying,
     headlessOccupying,
     failed: entry?.latestExecution?.status === 'failed',
-    resumable: entry ? entry.resumable : session !== null,
-    presence: entryPresence(entry),
+    resumable: entry?.resumable ?? true,
+    presence: entryPresence(entry, session.presence ?? 'active'),
     session,
     directory: entry,
   }
@@ -126,9 +127,9 @@ export function orderHarnessSessions<T extends {
 }
 
 /**
- * Join Directory identities with materialized SessionRecords.
- * Directory-only colleagues stay visible. Until Directory arrives, the
- * materialized list is the fallback roster.
+ * Decorate the durable Session roster with Directory execution/provenance.
+ * SessionRecord is the only membership source: Directory must never invent a
+ * second, later row for a headless-born conversation.
  */
 export function joinWorkspaceHarnessSessions(
   workspace: Workspace,
@@ -136,56 +137,27 @@ export function joinWorkspaceHarnessSessions(
   opts: { presence?: SessionPresence } = {},
 ): HarnessSession[] {
   const wanted = opts.presence ?? 'active'
-  const sessionsByResume = new Map(
-    workspace.sessions.map((session) => [session.resumeId, session]),
-  )
-
   if (!directory) {
     if (wanted !== 'active') return []
     return orderHarnessSessions(
-      workspace.sessions.map((session) => toHarnessSession(workspace.id, session, null)),
+      workspace.sessions
+        .filter((session) => (session.presence ?? 'active') === 'active')
+        .map((session) => toHarnessSession(workspace.id, session, null)),
     )
   }
 
-  const seen = new Set<string>()
-  const rows: HarnessSession[] = []
-  for (const entry of directory.sessions) {
-    if ((entry.lifecycle ?? 'active') === 'retired') continue
-    // Directory presence is authoritative even when the identity still has a
-    // paused interactive seat. Mark every projected identity as seen before
-    // filtering, otherwise the legacy SessionRecord fallback below puts an
-    // archived coworker straight back onto the active floor.
-    seen.add(entry.resumeId)
-    if (entryPresence(entry) !== wanted) continue
-    rows.push(toHarnessSession(workspace.id, sessionsByResume.get(entry.resumeId) ?? null, entry))
-  }
-  if (wanted === 'active') {
-    for (const session of workspace.sessions) {
-      if (seen.has(session.resumeId)) continue
-      rows.push(toHarnessSession(workspace.id, session, null))
-    }
-  }
+  const directoryByResume = new Map(
+    directory.sessions
+      .filter((entry) => (entry.lifecycle ?? 'active') !== 'retired')
+      .map((entry) => [entry.resumeId, entry]),
+  )
+  const rows = workspace.sessions.flatMap((session) => {
+    const entry = directoryByResume.get(session.resumeId) ?? null
+    const presence = entryPresence(entry, session.presence ?? 'active')
+    if (presence !== wanted) return []
+    return [toHarnessSession(workspace.id, session, entry)]
+  })
   return orderHarnessSessions(rows)
-}
-
-export function sessionRecordForRow(row: HarnessSession): SessionRecord {
-  if (row.session) {
-    return row.session.title === row.title ? row.session : { ...row.session, title: row.title }
-  }
-  const occupancy = row.occupancyAt > 0 ? new Date(row.occupancyAt).toISOString() : new Date().toISOString()
-  return {
-    id: `resume:${row.resumeId}`,
-    resumeId: row.resumeId,
-    wsId: row.workspaceId,
-    agent: row.agent,
-    name: row.title,
-    createdAt: occupancy,
-    lastActiveAt: occupancy,
-    state: 'paused',
-    pid: null,
-    startedAt: null,
-    title: row.title,
-  }
 }
 
 export function flattenHarnessSessions(

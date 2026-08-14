@@ -448,8 +448,9 @@ provenance store.
 | `ui/src/pages/AutomationRunsSection.tsx` | Run list, final reply, tool activity, and diagnostics UI |
 | `src/tool/issue-tools.ts` | Workspace-scoped issue CLI/MCP tools |
 | `src/tool/inbox-push.ts` | Headless/interactive delivery to Inbox |
-| `src/workspaces/session-registry.ts` | Durable Session identity and resumeId → Session index |
-| `src/webui/routes/workspaces.ts` | Idempotent resumeId → interactive-Session materialization |
+| `src/workspaces/session-registry.ts` | Durable product Session roster and resumeId → Session index |
+| `src/workspaces/product-session-coordinator.ts` | Paired Resume identity + Session roster birth, transition, and repair |
+| `src/webui/routes/workspaces.ts` | Idempotent resumeId → interactive process attachment |
 | `src/webui/routes/issues.ts` | Issue board/detail HTTP API |
 | `src/webui/routes/schedule.ts` | Scheduled projection API |
 | `default/skills/self-scheduling/SKILL.md` | Agent-facing authoring instructions |

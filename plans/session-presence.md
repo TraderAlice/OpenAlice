@@ -50,7 +50,7 @@ presence:  'active' | 'archived' | 'deleted'  // 人：在职 / 归档 / 软删�
 
 - 侧栏 More 主操作是 **Archive**，不是 Delete。Delete 是二次确认的软开除。
 - 正在占班（TUI 或 headless running）时 Archive / Delete 都锁。
-- Archive / Delete **不**拆 `SessionRecord` 座位；座位仍只是椅子。现有 `DELETE /sessions/:sid` 继续只拆椅子——产品路径改走 presence。
+- Archive / Delete **不**拆 `SessionRecord`；它是产品 Session 的持久名册记录。`DELETE /sessions/:sid` 只停止实时进程并把 presence 置为 `deleted`；只有 Workspace purge 才物理清除记录。
 - 归档可 Restore → `presence=active`。软删可 Undelete → `archived`（先回柜子，不直接站回名册）。
 - 真物理删除不存在。产物、Inbox、run 历史、`resumeId` 署名都留着。
 

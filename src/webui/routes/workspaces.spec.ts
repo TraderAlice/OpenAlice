@@ -39,6 +39,7 @@ function build(
     resumeIdentity?: any;
     sessionDirectory?: any;
     setSessionPresence?: any;
+    deleteSessionPresence?: any;
     lifecycle?: any;
     templateUpgrades?: any;
     workspaceAbsorbs?: any;
@@ -169,7 +170,9 @@ function build(
     },
     pool: {
       get: vi.fn(() => opts.poolLive),
+      disposeToken: vi.fn(() => Boolean(opts.poolLive)),
     },
+    scrollbackStore: { remove: vi.fn(async () => undefined) },
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
     lifecycle,
@@ -189,6 +192,15 @@ function build(
       updatedAt: 2,
       lifecycle: 'active',
       ...(input.presence !== 'active' ? { presence: input.presence } : {}),
+    })),
+    deleteSessionPresence: opts.deleteSessionPresence ?? vi.fn(async (input: any) => ({
+      resumeId: input.resumeId,
+      wsId: input.wsId,
+      agent: 'claude',
+      createdAt: 1,
+      updatedAt: 2,
+      lifecycle: 'active',
+      presence: 'deleted',
     })),
     publicMeta: vi.fn(async (m: any) => {
       const res = await readWorkspaceMetadata(m.dir);
@@ -249,6 +261,37 @@ describe('PATCH /:id/resumes/:resumeId', () => {
     const result = await patch(app, '/ws-1/resumes/resume-1', { presence: 'purged' })
     expect(result.status).toBe(400)
     expect(result.body.error).toBe('invalid_presence')
+  })
+})
+
+describe('DELETE /:id/sessions/:sid', () => {
+  it('keeps the durable roster row and moves its resume identity off the active floor', async () => {
+    const deleteSessionPresence = vi.fn(async (input: any) => ({
+      ...input,
+      presence: 'deleted',
+      lifecycle: 'active',
+      createdAt: 1,
+      updatedAt: 2,
+    }))
+    const record = {
+      id: 'claude-calm-seat',
+      resumeId: 'resume-1',
+      wsId: 'ws-1',
+      agent: 'claude',
+      name: 'c1',
+      createdAt: new Date(0).toISOString(),
+      lastActiveAt: new Date(0).toISOString(),
+      state: 'paused',
+    }
+    const { app } = build({ sessionRecord: record, deleteSessionPresence })
+
+    const res = await app.request('/ws-1/sessions/claude-calm-seat', { method: 'DELETE' })
+
+    expect(res.status).toBe(200)
+    expect(deleteSessionPresence).toHaveBeenCalledWith({
+      wsId: 'ws-1',
+      resumeId: 'resume-1',
+    })
   })
 })
 
@@ -933,10 +976,52 @@ describe('POST /:id/headless/:taskId/session', () => {
         runtimeBinding: { version: 1, credential: { source: 'native' } },
       });
     }
+    let coordinatorTail: Promise<unknown> = Promise.resolve();
+    const sessionCoordinator = {
+      ensure: vi.fn((input: any) => {
+        const operation = coordinatorTail.then(async () => {
+          const prior = resumeRecords.get(input.resumeId) ?? {};
+          const identity = { ...prior, ...input, resumeId: input.resumeId ?? 'resume-created' };
+          resumeRecords.set(identity.resumeId, identity);
+          const existing = sessionRegistry.findByResumeId(input.wsId, identity.resumeId);
+          if (existing) {
+            Object.assign(existing, { state: input.state, surface: input.surface });
+            return { identity, session: existing, created: false };
+          }
+          const record = {
+            id: 'codex-test-session',
+            resumeId: identity.resumeId,
+            wsId: input.wsId,
+            agent: input.agent,
+            name: 'x1',
+            createdAt: '2026-07-12T00:00:00.000Z',
+            lastActiveAt: '2026-07-12T00:00:00.000Z',
+            state: input.state,
+            surface: input.surface,
+            ...(input.fallbackTitle ? { fallbackTitle: input.fallbackTitle } : {}),
+            ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+            ...(input.agentSessionId
+              ? { resumeHint: { kind: 'agent-session-id', value: input.agentSessionId } }
+              : {}),
+          };
+          await sessionRegistry.create(record);
+          return { identity, session: record, created: true };
+        });
+        coordinatorTail = operation.then(() => undefined, () => undefined);
+        return operation;
+      }),
+      transition: vi.fn(async (input: any) => {
+        const record = sessionRegistry.findByResumeId(input.wsId, input.resumeId);
+        if (!record) throw new Error('missing test SessionRecord');
+        Object.assign(record, { state: input.state, surface: input.surface });
+        return record;
+      }),
+    };
     const svc = {
       registry: { get: (id: string) => id === 'ws-1' ? { id, dir: '/w' } : undefined },
       headlessTasks: { get: (id: string) => id === task.taskId ? task : null },
       sessionRegistry,
+      sessionCoordinator,
       resumeRegistry: {
         get: (id: string) => resumeRecords.get(id) ?? null,
         ensure: vi.fn(async (input: any) => {
@@ -953,11 +1038,12 @@ describe('POST /:id/headless/:taskId/session', () => {
       }),
       config: { launcherRepoRoot: '/repo' },
       pool: { get: (id: string) => live.get(id), spawn },
+      isResumeActive: vi.fn(() => false),
     } as unknown as WorkspaceService;
     return { app: createWorkspaceRoutes(svc), records, spawn };
   }
 
-  it('materializes one persistent Session and reuses it on repeated opens', async () => {
+  it('returns one persistent Session and reuses it on repeated opens', async () => {
     const { app, records, spawn } = buildHeadlessSession();
     const first = await post(app, '/ws-1/headless/run-1/session');
     const second = await post(app, '/ws-1/headless/run-1/session');
@@ -1422,6 +1508,29 @@ describe('Workspace manager surface routes', () => {
     const startWebPiSession = vi.fn(async () => snapshot);
     const prompt = vi.fn(async () => snapshot);
     const disposeToken = vi.fn(() => true);
+    const ensureManagerSession = vi.fn(async (input: any) => {
+      const identity = {
+        resumeId: 'resume-manager-test',
+        wsId: input.wsId,
+        agent: input.agent,
+      };
+      if (!createdRecord) {
+        const createdAt = new Date().toISOString();
+        createdRecord = {
+          id: 'pi-manager-test',
+          resumeId: identity.resumeId,
+          wsId: input.wsId,
+          agent: input.agent,
+          name: 'p1',
+          createdAt,
+          lastActiveAt: createdAt,
+          state: input.state,
+          surface: input.surface,
+          fallbackTitle: input.fallbackTitle,
+        };
+      }
+      return { identity, session: createdRecord, created: true };
+    });
     const svc = {
       managerWorkspace: meta,
       registry: {
@@ -1439,6 +1548,13 @@ describe('Workspace manager surface routes', () => {
       resumeRegistry: {
         get: vi.fn(() => null),
         ensure: vi.fn(async () => ({ resumeId: 'resume-manager-test' })),
+      },
+      sessionCoordinator: {
+        ensure: ensureManagerSession,
+        transition: vi.fn(async (input: any) => {
+          Object.assign(createdRecord, input);
+          return createdRecord;
+        }),
       },
       sessionRegistry: {
         ensureLoaded: vi.fn(async () => undefined),
@@ -1464,6 +1580,7 @@ describe('Workspace manager surface routes', () => {
         })),
         disposeToken,
       },
+      isResumeActive: vi.fn(() => false),
       startWebPiSession,
       webPi: { get: vi.fn(() => snapshot), prompt },
       config: { launcherRepoRoot: '/repo' },
@@ -1513,6 +1630,28 @@ describe('Workspace manager surface routes', () => {
     let spawnedContext: any = null;
     let liveSession: any = null;
     const startWebPiSession = vi.fn();
+    const ensureManagerSession = vi.fn(async (input: any) => {
+      const identity = {
+        resumeId: 'resume-manager-codex',
+        wsId: input.wsId,
+        agent: input.agent,
+      };
+      const createdAt = new Date().toISOString();
+      const record = records.get('codex-manager-test') ?? {
+        id: 'codex-manager-test',
+        resumeId: identity.resumeId,
+        wsId: input.wsId,
+        agent: input.agent,
+        name: 'x1',
+        createdAt,
+        lastActiveAt: createdAt,
+        state: input.state,
+        surface: input.surface,
+        fallbackTitle: input.fallbackTitle,
+      };
+      records.set(record.id, record);
+      return { identity, session: record, created: true };
+    });
     const svc = {
       managerWorkspace: meta,
       registry: { list: () => [{ id: 'ws-1' }], get: () => undefined },
@@ -1532,6 +1671,14 @@ describe('Workspace manager surface routes', () => {
         get: vi.fn(() => null),
         ensure: vi.fn(async () => ({ resumeId: 'resume-manager-codex' })),
       },
+      sessionCoordinator: {
+        ensure: ensureManagerSession,
+        transition: vi.fn(async (input: any) => {
+          const record = records.get('codex-manager-test');
+          Object.assign(record, input);
+          return record;
+        }),
+      },
       sessionRegistry: {
         ensureLoaded: vi.fn(async () => undefined),
         findById: vi.fn((id: string) => records.get(id)),
@@ -1539,6 +1686,11 @@ describe('Workspace manager surface routes', () => {
         create: vi.fn(async (record: any) => { records.set(record.id, record); }),
         get: vi.fn((_wsId: string, id: string) => records.get(id)),
         listFor: vi.fn(() => [...records.values()]),
+        update: vi.fn(async (_wsId: string, id: string, patch: any) => {
+          const record = records.get(id);
+          Object.assign(record, patch);
+          return record;
+        }),
         remove: vi.fn(async () => undefined),
       },
       pool: {
@@ -1555,6 +1707,7 @@ describe('Workspace manager surface routes', () => {
           return liveSession;
         }),
       },
+      isResumeActive: vi.fn(() => false),
       startWebPiSession,
       webPi: { get: vi.fn(() => null) },
       config: { launcherRepoRoot: '/repo' },

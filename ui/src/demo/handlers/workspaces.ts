@@ -976,38 +976,30 @@ export const workspacesHandlers = [
       },
     }))
     if (wsId === DEMO_CHAT_WORKSPACE_ID) {
+      const completedHeadless = sessions.find(
+        (session) => session.resumeId === 'resume-demo-headless-colleague',
+      )
+      if (completedHeadless) {
+        completedHeadless.latestExecution = {
+          taskId: 'demo-headless-colleague-run',
+          status: 'done',
+          startedAt: Date.now() - 180_000,
+          finishedAt: Date.now() - 120_000,
+          assistantPreview: 'Morning scan complete. Semis still lead.',
+        }
+      }
+      const runningHeadless = sessions.find(
+        (session) => session.resumeId === 'resume-demo-headless-running',
+      )
+      if (runningHeadless) {
+        runningHeadless.latestExecution = {
+          taskId: 'demo-headless-running',
+          status: 'running',
+          startedAt: Date.now() - 30_000,
+          issueId: 'scan-open',
+        }
+      }
       sessions.push(
-        {
-          resumeId: 'resume-demo-headless-colleague',
-          agent: 'codex',
-          createdAt: Date.now() - 3_600_000,
-          updatedAt: Date.now() - 120_000,
-          lifecycle: 'active',
-          resumable: true,
-          active: false,
-          latestExecution: {
-            taskId: 'demo-headless-colleague-run',
-            status: 'done',
-            startedAt: Date.now() - 180_000,
-            finishedAt: Date.now() - 120_000,
-            assistantPreview: 'Morning scan complete. Semis still lead.',
-          },
-        },
-        {
-          resumeId: 'resume-demo-headless-running',
-          agent: 'claude',
-          createdAt: Date.now() - 720_000,
-          updatedAt: Date.now() - 5_000,
-          lifecycle: 'active',
-          resumable: true,
-          active: true,
-          latestExecution: {
-            taskId: 'demo-headless-running',
-            status: 'running',
-            startedAt: Date.now() - 30_000,
-            issueId: 'scan-open',
-          },
-        },
         {
           resumeId: 'resume-demo-archived-colleague',
           agent: 'pi',

@@ -38,6 +38,20 @@ function workspace(sessions: readonly SessionRecord[] = [session()]): Workspace 
   }
 }
 
+function headlessSession(overrides: Partial<SessionRecord> = {}): SessionRecord {
+  return session({
+    id: 'session-headless',
+    resumeId: 'resume-headless-only',
+    agent: 'codex',
+    name: 'x1',
+    createdAt: '2026-08-02T00:00:00.000Z',
+    lastActiveAt: '2026-08-02T02:00:00.000Z',
+    surface: 'headless',
+    title: undefined,
+    ...overrides,
+  })
+}
+
 function entry(overrides: Partial<WorkspaceSessionDirectoryEntry> = {}): WorkspaceSessionDirectoryEntry {
   return {
     resumeId: 'resume-headless-only',
@@ -73,14 +87,26 @@ describe('harness session titles', () => {
 })
 
 describe('joinWorkspaceHarnessSessions', () => {
-  it('falls back to materialized Sessions until Directory arrives', () => {
+  it('uses the persistent Session roster until Directory arrives', () => {
     const rows = joinWorkspaceHarnessSessions(workspace(), null)
     expect(rows.map((row) => row.resumeId)).toEqual(['resume-interactive'])
     expect(rows[0]?.session?.id).toBe('session-1')
   })
 
-  it('keeps Directory-only colleagues and hides retired identities', () => {
-    const rows = joinWorkspaceHarnessSessions(workspace(), {
+  it('uses roster presence before Directory arrives instead of flashing archived rows', () => {
+    const rows = joinWorkspaceHarnessSessions(workspace([
+      session(),
+      headlessSession({
+        resumeId: 'resume-archived',
+        presence: 'archived',
+      }),
+    ]), null)
+
+    expect(rows.map((row) => row.resumeId)).toEqual(['resume-interactive'])
+  })
+
+  it('decorates the persistent roster and never invents Directory-only rows', () => {
+    const rows = joinWorkspaceHarnessSessions(workspace([session(), headlessSession()]), {
       workspace: { id: 'ws-1', tag: 'chat-aug1' },
       sessions: [
         entry({ resumeId: 'resume-interactive', interactive: {
@@ -90,7 +116,7 @@ describe('joinWorkspaceHarnessSessions', () => {
           lastActiveAt: '2026-08-01T01:00:00.000Z',
         } }),
         entry(),
-        entry({ resumeId: 'resume-retired', lifecycle: 'retired' }),
+        entry({ resumeId: 'resume-directory-only' }),
       ],
     })
 
@@ -98,8 +124,9 @@ describe('joinWorkspaceHarnessSessions', () => {
       'resume-headless-only',
       'resume-interactive',
     ])
-    expect(rows[0]?.session).toBeNull()
+    expect(rows[0]?.session.id).toBe('session-headless')
     expect(rows[0]?.title).toBe('Morning scan complete. Semis still lead.')
+    expect(rows.some((row) => row.resumeId === 'resume-directory-only')).toBe(false)
   })
 
   it('locks TUI while headless occupies and sorts running occupancy first', () => {
@@ -119,7 +146,22 @@ describe('joinWorkspaceHarnessSessions', () => {
       },
     })
 
-    const rows = joinWorkspaceHarnessSessions(workspace([paused]), {
+    const runningRecord = headlessSession({
+      id: 'session-running',
+      resumeId: 'resume-running',
+      agent: 'claude',
+      name: 'c1',
+      state: 'running',
+      lastActiveAt: '2026-08-02T12:00:00.000Z',
+    })
+    const failedRecord = headlessSession({
+      id: 'session-failed',
+      resumeId: 'resume-failed',
+      name: 'x2',
+      lastActiveAt: '2026-08-04T11:05:00.000Z',
+    })
+
+    const rows = joinWorkspaceHarnessSessions(workspace([paused, runningRecord, failedRecord]), {
       workspace: { id: 'ws-1', tag: 'chat-aug1' },
       sessions: [
         entry({ resumeId: paused.resumeId }),
@@ -138,7 +180,7 @@ describe('joinWorkspaceHarnessSessions', () => {
       headlessOccupying: true,
       resumable: true,
     })
-    expect(toHarnessSession('ws-1', paused, runningHeadless).headlessOccupying).toBe(true)
+    expect(toHarnessSession('ws-1', runningRecord, runningHeadless).headlessOccupying).toBe(true)
     expect(rows.find((row) => row.resumeId === 'resume-failed')?.failed).toBe(true)
   })
 
@@ -192,7 +234,13 @@ describe('joinWorkspaceHarnessSessions', () => {
 
 describe('orderHarnessSessions', () => {
   it('keeps one resumeId as one row when flattening several desks', () => {
-    const other: Workspace = { ...workspace([]), id: 'ws-2', tag: 'chat-aug2', dir: '/tmp/chat-aug2' }
+    const other: Workspace = {
+      ...workspace([]),
+      id: 'ws-2',
+      tag: 'chat-aug2',
+      dir: '/tmp/chat-aug2',
+      sessions: [headlessSession({ wsId: 'ws-2' })],
+    }
     const rows = flattenHarnessSessions(
       [workspace(), other],
       new Map([

@@ -17,12 +17,14 @@ export interface PublicSession {
   readonly createdAt: string;
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
-  readonly surface: 'terminal' | 'webpi';
+  readonly surface: 'terminal' | 'webpi' | 'headless';
   readonly resumeId: string;
   readonly pid: number | null;
   readonly startedAt: number | null;
   readonly title: string | null;
   readonly sourceRunId: string | null;
+  /** Product roster visibility projected from ResumeIdentityRecord. */
+  readonly presence?: 'active' | 'archived' | 'deleted';
   readonly runtime?: PublicSessionRuntime;
 }
 
@@ -34,7 +36,10 @@ interface LiveSessionProjection {
 export interface PublicSessionProjectionContext {
   readonly terminal?: LiveSessionProjection | null;
   readonly webPi?: LiveSessionProjection | null;
+  /** A one-shot execution currently owns the Session without a PTY/WebPi pid. */
+  readonly headless?: boolean;
   readonly runtimeBinding?: SessionRuntimeBinding | null;
+  readonly presence?: 'active' | 'archived' | 'deleted';
 }
 
 /**
@@ -48,6 +53,7 @@ export function projectPublicSession(
 ): PublicSession {
   const terminal = context.terminal ?? null;
   const webPi = context.webPi ?? null;
+  const headless = context.headless === true;
   const binding = context.runtimeBinding ?? null;
 
   return {
@@ -57,13 +63,14 @@ export function projectPublicSession(
     name: record.name,
     createdAt: record.createdAt,
     lastActiveAt: record.lastActiveAt,
-    state: record.state === 'running' && (terminal || webPi) ? 'running' : 'paused',
-    surface: webPi ? 'webpi' : (record.surface ?? 'terminal'),
+    state: record.state === 'running' && (terminal || webPi || headless) ? 'running' : 'paused',
+    surface: webPi ? 'webpi' : terminal ? 'terminal' : (record.surface ?? 'terminal'),
     resumeId: record.resumeId,
     pid: terminal?.pid ?? webPi?.pid ?? null,
     startedAt: terminal?.startedAt ?? webPi?.startedAt ?? null,
     title: sessionPreferredTitle(record) ?? null,
     sourceRunId: record.sourceRunId ?? null,
+    ...(context.presence ? { presence: context.presence } : {}),
     ...(binding
       ? {
           runtime: {
