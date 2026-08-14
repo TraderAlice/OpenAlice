@@ -84,6 +84,7 @@ export interface IssueComment {
   markdown: string
   replyTo?: string
   delivery?: IssueCommentDelivery
+  via?: 'telegram'
 }
 
 export type IssueRunFailureKind =

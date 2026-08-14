@@ -102,6 +102,7 @@ import {
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
 import { readIssueComments } from './issues/comments.js';
 import { recordIssueCommentReply } from './issues/comment-delivery.js';
+import { stampTelegramDeskScheduledFire } from './issues/telegram-desk-chat.js';
 import {
   IssueChangeTracker,
   issueMutation,
@@ -793,6 +794,40 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         wsId: subject.workspaceId,
         issueId: subject.issueId,
         commentId: subject.commentId,
+        err,
+      });
+    }
+  };
+
+  const telegramDeskChatHost = {
+    listWorkspaces: () => registry.list().map((workspace) => ({ id: workspace.id, dir: workspace.dir })),
+    getWorkspace: (id: string) => {
+      const workspace = registry.get(id);
+      return workspace ? { id: workspace.id, dir: workspace.dir } : undefined;
+    },
+    provenanceStore: () => provenanceStore,
+    conversation: () => undefined,
+  };
+
+  const stampTelegramDeskFire = async (
+    task: HeadlessTaskRecord,
+    assistantText?: string | null,
+  ): Promise<void> => {
+    if (task.trigger?.kind !== 'issue') return;
+    if (task.inquiry?.subject.kind === 'issue' && task.inquiry.subject.commentId) return;
+    try {
+      await stampTelegramDeskScheduledFire({
+        host: telegramDeskChatHost,
+        workspaceId: task.trigger.workspaceId,
+        issueId: task.trigger.issueId,
+        task,
+        ...(assistantText !== undefined ? { assistantText } : {}),
+      });
+    } catch (err) {
+      launcherLogger.warn('telegram_desk.fire_stamp_failed', {
+        taskId: task.taskId,
+        wsId: task.trigger.workspaceId,
+        issueId: task.trigger.issueId,
         err,
       });
     }
@@ -1764,6 +1799,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           assistantText: r.structured.assistantText,
           ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
         });
+        await stampTelegramDeskFire(rec, r.structured.assistantText);
         // Scheduled one-shot issues are the only board items whose lifecycle can
         // be closed mechanically from a run exit. Repeating schedules keep their
         // issue open; failed one-shots stay open so the operator can inspect and

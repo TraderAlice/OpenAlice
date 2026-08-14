@@ -25,12 +25,49 @@ vi.mock('../hooks/useTelegramConnectorDesk', () => ({
   useTelegramConnectorDesk: () => mocks.desk,
 }))
 
+const launchMocks = vi.hoisted(() => ({
+  recentChatWorkspaceId: 'ws-b' as string | null,
+}))
+
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
     workspaces: [
-      { id: 'ws-a', tag: 'alpha', displayName: 'Alpha desk' },
-      { id: 'ws-b', tag: 'beta', displayName: 'Beta desk' },
+      {
+        id: 'ws-a',
+        tag: 'alpha',
+        displayName: 'Alpha desk',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        template: 'auto-quant-v2',
+        sessions: [],
+      },
+      {
+        id: 'ws-b',
+        tag: 'beta',
+        displayName: 'Beta desk',
+        createdAt: '2026-06-01T00:00:00.000Z',
+        template: 'chat',
+        sessions: [],
+      },
+      {
+        id: 'ws-c',
+        tag: 'gamma',
+        displayName: 'Gamma desk',
+        createdAt: '2026-07-01T00:00:00.000Z',
+        template: 'chat',
+        sessions: [],
+      },
     ],
+  }),
+}))
+
+vi.mock('../hooks/useAgentLaunchConfig', () => ({
+  useAgentLaunchPreferences: () => ({
+    recentChatWorkspaceId: launchMocks.recentChatWorkspaceId,
+    lastCredentialByAgent: {},
+    recentLaunch: null,
+    loaded: true,
+    rememberLaunch: vi.fn(),
+    adoptRecentChatWorkspace: vi.fn(),
   }),
 }))
 
@@ -64,6 +101,7 @@ beforeEach(async () => {
   mocks.desk.desk = null
   mocks.desk.loading = false
   mocks.desk.error = null
+  launchMocks.recentChatWorkspaceId = 'ws-b'
   vi.clearAllMocks()
 })
 
@@ -76,11 +114,28 @@ describe('TelegramDeskPanel', () => {
     expect((screen.getByRole('button', { name: 'Enable phone desk' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('enables the desk in the selected workspace once linked', async () => {
+  it('defaults the unbound picker to the Ask Alice Chat workspace', () => {
     render(<TelegramDeskPanel linked />)
-    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'ws-b' } })
+    expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe('ws-b')
+  })
+
+  it('falls back to the active Chat workspace when Ask Alice has no remembered target', () => {
+    launchMocks.recentChatWorkspaceId = null
+    render(<TelegramDeskPanel linked />)
+    expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe('ws-c')
+  })
+
+  it('enables the desk in the Ask Alice workspace without a manual pick', async () => {
+    render(<TelegramDeskPanel linked />)
     fireEvent.click(screen.getByRole('button', { name: 'Enable phone desk' }))
     await waitFor(() => expect(mocks.desk.enable).toHaveBeenCalledWith('ws-b'))
+  })
+
+  it('enables the desk in the selected workspace once linked', async () => {
+    render(<TelegramDeskPanel linked />)
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'ws-c' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enable phone desk' }))
+    await waitFor(() => expect(mocks.desk.enable).toHaveBeenCalledWith('ws-c'))
   })
 
   it('opens the bound Issue detail and confirms disable', async () => {

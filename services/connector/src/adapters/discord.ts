@@ -112,6 +112,20 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
     }
   }
 
+  async sendOwnerText(text: string): Promise<void> {
+    if (!this.client?.isReady()) throw new Error('Discord client is not ready')
+    if (!this.ownerUserId) throw new Error('Discord owner is not linked')
+    this.tracker.attempt()
+    try {
+      const user = await this.client.users.fetch(this.ownerUserId)
+      await user.send({ content: text })
+      this.tracker.success(this.ownerUserId)
+    } catch (error) {
+      this.tracker.degraded(error)
+      throw error
+    }
+  }
+
   health(): ConnectorAdapterHealth {
     return this.tracker.get()
   }

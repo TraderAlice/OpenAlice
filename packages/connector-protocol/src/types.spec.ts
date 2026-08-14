@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import {
   MAX_CONNECTOR_ATTACHMENT_BYTES,
+  OWNER_CHAT_TEXT_MAX,
   inboxNotificationSchema,
+  ownerChatMessageSchema,
 } from './types.js'
 
 const baseNotification = {
@@ -12,6 +14,26 @@ const baseNotification = {
   title: 'Report ready',
   body: '',
 }
+
+describe('owner chat messages', () => {
+  it('rejects empty or oversized owner-chat text', () => {
+    expect(() => ownerChatMessageSchema.parse({
+      id: 'desk-1',
+      adapterId: 'telegram',
+      text: '',
+    })).toThrow()
+    expect(ownerChatMessageSchema.parse({
+      id: 'desk-1',
+      adapterId: 'telegram',
+      text: 'Markets are quiet.',
+    }).text).toBe('Markets are quiet.')
+    expect(() => ownerChatMessageSchema.parse({
+      id: 'desk-1',
+      adapterId: 'telegram',
+      text: 'x'.repeat(OWNER_CHAT_TEXT_MAX + 1),
+    })).toThrow()
+  })
+})
 
 describe('Inbox notification attachments', () => {
   it('accepts a bounded Markdown file payload', () => {
