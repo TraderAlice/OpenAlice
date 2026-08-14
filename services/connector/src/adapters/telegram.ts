@@ -16,7 +16,6 @@ import type {
 import {
   AdapterHealthTracker,
   decodeConnectorAttachment,
-  decodeInboxAttachments,
   formatInboxNotification,
   formatPlainInboxNotification,
 } from './shared.js'
@@ -60,7 +59,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
 
       bot.command('inbox', async (ctx) => {
         if (ctx.chat.type !== 'private' || !ctx.from) return
-        await this.presentInbox(ctx, context, { stack: [] }).catch(async (error) => {
+        await this.presentInbox(ctx, context, { stack: [], scope: 'unread' }).catch(async (error) => {
           this.tracker.degraded(error)
           await ctx.reply('Could not load Inbox. Check OpenAlice logs.').catch(() => undefined)
         })
@@ -157,12 +156,6 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         formatPlainInboxNotification(notification),
         formatTelegramInboxMarkdownV2(notification),
       )
-      for (const attachment of decodeInboxAttachments(notification)) {
-        await this.bot.api.sendDocument(
-          this.chatId,
-          new InputFile(attachment.content, attachment.filename),
-        )
-      }
       this.tracker.success(this.ownerUserId)
     } catch (error) {
       this.tracker.degraded(error)
@@ -240,13 +233,15 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       else await ctx.reply('This command is only available to the linked owner.')
       return
     }
+    const scope = session.scope ?? 'unread'
     const page = await this.resolveInboxStore().read({
-      unread: true,
+      ...(scope === 'unread' ? { unread: true } : {}),
       limit: TELEGRAM_INBOX_PAGE_SIZE,
       ...(session.before ? { before: session.before } : {}),
     })
     const nextSession: TelegramInboxSession = {
       stack: session.stack,
+      scope,
       ...(session.before ? { before: session.before } : {}),
       entryIds: page.entries.map((entry) => entry.id),
     }
@@ -254,6 +249,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       entries: page.entries,
       hasMore: page.hasMore,
       canGoNewer: session.stack.length > 0,
+      scope,
     })
     const sent = await this.presentForm(ctx, form, mode)
     if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), nextSession)
@@ -304,8 +300,9 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       return
     }
     if (resolution.kind === 'page') {
+      const scope = resolution.session.scope ?? 'unread'
       const page = await this.resolveInboxStore().read({
-        unread: true,
+        ...(scope === 'unread' ? { unread: true } : {}),
         limit: TELEGRAM_INBOX_PAGE_SIZE,
         ...(resolution.session.before ? { before: resolution.session.before } : {}),
       })

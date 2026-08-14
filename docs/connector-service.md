@@ -22,8 +22,9 @@ categories.
 - Guardian may start, stop, or restart it without restarting Alice or UTA.
 - Inbox delivery remains outbound by default. Each adapter may advertise
   `inbox` and `settings` capabilities and implement those slash commands
-  itself. Telegram uses an inline-button form: `/inbox` pages unread items
-  and `/settings` toggles Inbox push. Discord and Slack register the same
+  itself. Telegram uses an inline-button form: `/inbox` defaults to unread
+  items, can switch to the full Inbox history, and `/settings` toggles Inbox
+  push. Discord and Slack register the same
   commands and currently reply with a placeholder. `inboxPush: false` skips Inbox
   `deliver` for that adapter and does not affect phone-desk owner chat.
   `/link`, `/status`, and `/test` stay the generic control plane. Discord
@@ -32,7 +33,8 @@ categories.
   view is a bounded summary: title, Workspace, time, a short body prefix,
   and an attachment count. It never expands raw Workspace paths. Telegram
   keeps five items per page and hard-caps the whole page below the 4096
-  plain-text limit. Entries with files offer a short “view files” control.
+  plain-text limit. Each row opens a bounded detail view; entries with files
+  then offer a short “view files” control.
   Callback data carries only page-local indexes or a server-validated
   Inbox entry id plus doc index, never a trusted raw path.
 - On-demand file pull is not phone-desk inbound and is not an ordinary
@@ -53,8 +55,12 @@ categories.
   echoed back.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
-- Inbox `docs` that are Markdown or static HTML reports are sent as file attachments, not flattened
-  into the message body. Alice reads the live Workspace file before crossing
+- Inbox `docs` that are Markdown or static HTML reports are externalized as
+  file attachments, not flattened into the message body. Telegram sends them
+  only after the owner requests a file from `/inbox`; its proactive push lists
+  the available files without attaching all of them. Other adapters retain
+  their existing push-time attachment behavior until they implement the same
+  pull controls. Alice reads the live Workspace file before crossing
   the process boundary; Connector Service never reaches into a Workspace
   itself. The Workspace artifact is never rewritten or given an agent-facing
   encoding requirement. At the externalization boundary Alice detects the
@@ -109,7 +115,7 @@ Telegram owner DM
   -> existing comment-reply dispatch
   -> owner-chat projection unless [[no-reply]]
 
-Telegram /inbox "view files" confirm
+Telegram /inbox detail -> "view files" confirm
   -> Connector action queue (requestId, connectorId, entryId, docIndex)
   -> Alice connector action bridge drain (not the phone-desk inbound drain)
   -> Alice re-reads Inbox entry and materializes one Workspace file
