@@ -337,7 +337,8 @@ comments are projected back unless they contain `[[no-reply]]`. Connector does
 not create a second conversation object.
 
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
-delivered to that exact Session. The final assistant response is recorded as a
+delivered to that exact Session. The Input Prompt is `commentPrompt` when set,
+otherwise the historical wrapper around the comment. The final assistant response is recorded as a
 reply comment, linked by `replyTo`; delivery state stays on the source comment.
 For a human comment without a fixed owner, OpenAlice follows the Issue creation
 provenance and uses the universal follow-up rule: continue the attributable

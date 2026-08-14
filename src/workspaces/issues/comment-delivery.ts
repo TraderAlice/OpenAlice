@@ -11,6 +11,7 @@ import {
   type IssueComment,
   type IssueCommentDelivery,
 } from './comments.js'
+import { renderIssueCommentPrompt } from './comment-prompt.js'
 import { issueAssigneeResumeId, type IssueRecord } from './declaration.js'
 import { projectDeskComment } from './telegram-desk-project.js'
 
@@ -26,14 +27,14 @@ export function issueCommentReplyPrompt(input: {
   issue: IssueRecord
   comment: IssueComment
 }): string {
-  return [
-    `A new comment was left on Issue ${input.issueWorkspaceId}/${input.issue.id} (${input.issue.title}) by ${input.comment.author}.`,
-    '',
-    input.comment.markdown,
-    '',
-    'Reply directly to this comment. Your final assistant response will be recorded automatically in the Issue Activity timeline.',
-    'Do not call `alice-workspace issue comment` for this reply; that would create a second notification loop.',
-  ].join('\n')
+  return renderIssueCommentPrompt(input.issue.commentPrompt, {
+    comment: input.comment.markdown,
+    title: input.issue.title,
+    id: input.issue.id,
+    workspaceId: input.issueWorkspaceId,
+    author: input.comment.author,
+    what: input.issue.what,
+  })
 }
 
 /**

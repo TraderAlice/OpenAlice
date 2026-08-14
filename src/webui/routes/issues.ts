@@ -19,7 +19,7 @@
  * drift on file format or validation; writes are working-tree only (no commit):
  *   PATCH /api/issues/:wsId/:id           body { status?, priority?, assignee?,
  *                                          agent?, credential?, model?, effort?,
- *                                          timeout?, what?, catchUp? }
+ *                                          timeout?, what?, commentPrompt?, catchUp? }
  *   POST  /api/issues/:wsId/:id/comments  body { text }  (author = 'human';
  *     exact Session owners are notified and their final reply returns here)
  *
@@ -186,6 +186,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       effort?: ModelReasoningEffort | null
       timeout?: IssueTimeout | null
       what?: string
+      commentPrompt?: string | null
       catchUp?: boolean
     } = {}
     if ('status' in fields) {
@@ -321,6 +322,16 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       }
       patch.what = what.trim()
     }
+    if ('commentPrompt' in fields) {
+      const raw = fields['commentPrompt']
+      if (raw === null || raw === '') {
+        patch.commentPrompt = null
+      } else if (typeof raw !== 'string') {
+        return c.json({ error: 'invalid_comment_prompt', message: 'commentPrompt must be a template string or null' }, 400)
+      } else {
+        patch.commentPrompt = raw
+      }
+    }
     if ('catchUp' in fields) {
       if (typeof fields['catchUp'] !== 'boolean') {
         return c.json({ error: 'invalid_catch_up', message: 'catchUp must be true or false' }, 400)
@@ -330,7 +341,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
     if (Object.keys(patch).length === 0) {
       return c.json({
         error: 'no_fields',
-        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what, catchUp',
+        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what, commentPrompt, catchUp',
       }, 400)
     }
 

@@ -85,14 +85,24 @@ The filename stem is the stable issue id. Frontmatter:
 - `timeout` — optional scheduled-run watchdog: `15m | 30m | 45m | 60m`. Omission
   means no limit: the headless child runs until the agent exits. This is a run
   budget, not Session birth, so an exact `@resumeId` owner may still set it.
+- `commentPrompt` — optional template for the Input Prompt sent when a comment
+  needs a reply. Omission keeps the historical wrapper (Issue id, title, author,
+  then the comment, plus the “do not call `issue comment`” instruction). An
+  override replaces that whole structure. Closed tokens: `{comment}`, `{title}`,
+  `{id}`, `{workspaceId}`, `{author}`, `{what}`. The template must include
+  `{comment}`. Chat-style Issues (including the Telegram phone desk) set
+  `{comment}` alone so the inbound text is the prompt. Empty/null write drops
+  the field and restores the default.
 - `telegramConnector: true` — present only on the Alice Project's Telegram
   phone-desk Issue. Omission is a normal Issue. Any other value is invalid. At
   most one live desk exists in the Project. Settings → Connectors is the only
   writer of this flag; generic create/CLI/MCP cannot set it. The board and
   Tracked list omit the row. What remains the exact scheduled Input Prompt.
-  Comments are the chat transcript. Owner Telegram DMs become comments;
-  scheduled-fire `assistantText` is stamped as a comment. Connector projects
-  comments that do not contain `[[no-reply]]` and did not arrive from Telegram.
+  Comments are the chat transcript. The desk is created with
+  `commentPrompt: '{comment}'` so inbound DMs are the Input Prompt as-is.
+  Owner Telegram DMs become comments; scheduled-fire `assistantText` is stamped
+  as a comment. Connector projects comments that do not contain `[[no-reply]]`
+  and did not arrive from Telegram.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the

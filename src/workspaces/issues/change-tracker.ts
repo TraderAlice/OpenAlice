@@ -33,6 +33,7 @@ export interface IssueAuditSnapshot {
   model?: string
   effort?: string
   timeout?: string
+  commentPrompt?: string
   whatHash: string
 }
 
@@ -62,6 +63,7 @@ export function issueAuditSnapshot(issue: IssueRecord): IssueAuditSnapshot {
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
+    ...(issue.commentPrompt ? { commentPrompt: issue.commentPrompt } : {}),
     whatHash: digest(issue.what),
   }
 }
@@ -96,6 +98,7 @@ export function issueMutation(
   valueField('model', left.model, right.model)
   valueField('effort', left.effort, right.effort)
   valueField('timeout', left.timeout, right.timeout)
+  valueField('commentPrompt', left.commentPrompt, right.commentPrompt)
   if (left.whatHash !== right.whatHash) fields.push({ field: 'what' })
   return fields.length > 0 ? { fields } : null
 }

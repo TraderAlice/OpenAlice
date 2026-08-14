@@ -202,6 +202,20 @@ describe('readWorkspaceIssues', () => {
     expect(issueTimeoutMs(undefined)).toBeUndefined()
   })
 
+  it('reads a commentPrompt override and rejects one without {comment}', async () => {
+    await writeIssue('chat', fm("title: Chat\ncommentPrompt: '{comment}'"))
+    const ok = await readWorkspaceIssues(dir)
+    expect(ok.ok).toBe(true)
+    if (!ok.ok) return
+    expect(ok.issues[0]?.commentPrompt).toBe('{comment}')
+
+    await writeIssue('bad-prompt', fm("title: Bad\ncommentPrompt: '{title} only'"))
+    const bad = await readWorkspaceIssues(dir)
+    expect(bad.ok).toBe(true)
+    if (!bad.ok) return
+    expect(bad.invalid.some((issue) => issue.id === 'bad-prompt' && /commentPrompt/.test(issue.error))).toBe(true)
+  })
+
   it('treats omitted telegramConnector as a normal issue', async () => {
     await writeIssue('plain', fm('title: Plain'))
     const result = await readWorkspaceIssues(dir)

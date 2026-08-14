@@ -32,6 +32,7 @@
  *   model: <optional native model id for one scheduled run>
  *   effort: none | minimal | low | medium | high | xhigh | max
  *   timeout: 15m | 30m | 45m | 60m  (optional run budget; omit = no watchdog)
+ *   commentPrompt: <optional template for the comment-reply Input Prompt>
  *   telegramConnector: true  (optional; at most one per Alice Project)
  *   ---
  *   <markdown What — the exact work definition and scheduled prompt>
@@ -60,6 +61,7 @@ import {
   UNASSIGNED_ASSIGNEE,
   resumeIdFromSignature,
 } from '../session-signature.js'
+import { parseIssueCommentPrompt } from './comment-prompt.js'
 
 /** Directory of per-issue markdown files, relative to a workspace's `dir`. */
 export const ISSUES_DIR_REL = join('.alice', 'issues')
@@ -185,6 +187,9 @@ const issueFrontmatterObjectSchema = z.object({
   /** Optional headless watchdog for a scheduled fire. Omission means no limit.
    * This is a run budget, not Session birth, so an exact `@resumeId` may set it. */
   timeout: z.enum(ISSUE_TIMEOUTS).optional(),
+  /** Optional template for the comment-reply Input Prompt. Omission keeps the
+   *  historical wrapper. Must include `{comment}`. */
+  commentPrompt: z.string().min(1).optional(),
   /** Present only on the Alice Project's Telegram phone-desk Issue.
    *  Omission is a normal Issue. Any value other than literal `true` is invalid. */
   telegramConnector: z.literal(true).optional(),
@@ -235,6 +240,16 @@ export const issueFrontmatterSchema = issueFrontmatterObjectSchema
           code: 'custom',
           path: [field],
           message: `session assignee owns its runtime; remove the ${field} override`,
+        })
+      }
+    }
+    if (value.commentPrompt !== undefined) {
+      const parsed = parseIssueCommentPrompt(value.commentPrompt)
+      if (!parsed.ok) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['commentPrompt'],
+          message: parsed.error,
         })
       }
     }

@@ -82,6 +82,7 @@ export async function createTelegramConnectorDesk(
       status: leftover.status === 'canceled' ? 'todo' : leftover.status,
       when: leftover.when ?? TELEGRAM_CONNECTOR_DEFAULT_WHEN,
       telegramConnector: true,
+      ...(leftover.commentPrompt ? {} : { commentPrompt: '{comment}' }),
     }, { allowTelegramConnector: true })
     if (!revived.ok) {
       return revived.reason === 'invalid'
@@ -97,6 +98,7 @@ export async function createTelegramConnectorDesk(
     assignee: '@new-then-resume',
     when: TELEGRAM_CONNECTOR_DEFAULT_WHEN,
     what: TELEGRAM_CONNECTOR_DEFAULT_WHAT,
+    commentPrompt: '{comment}',
     telegramConnector: true,
   }, { allowTelegramConnector: true })
   if (!created.ok && created.reason === 'conflict') {

@@ -79,6 +79,7 @@ export const issuesHandlers = [
       effort?: unknown
       timeout?: unknown
       what?: unknown
+      commentPrompt?: unknown
     } | null
     if (!body || typeof body !== 'object') {
       return HttpResponse.json({ error: 'invalid_body' }, { status: 400 })
@@ -95,6 +96,7 @@ export const issuesHandlers = [
       effort?: ModelReasoningEffort | null
       timeout?: IssueTimeout | null
       what?: string
+      commentPrompt?: string | null
     } = {}
     if (body.status !== undefined) {
       if (!ISSUE_STATUSES.includes(body.status as IssueStatus)) {
@@ -178,6 +180,15 @@ export const issuesHandlers = [
       }
       patch.what = body.what.trim()
     }
+    if (body.commentPrompt !== undefined) {
+      if (body.commentPrompt === null || body.commentPrompt === '') {
+        patch.commentPrompt = null
+      } else if (typeof body.commentPrompt !== 'string') {
+        return HttpResponse.json({ error: 'invalid_comment_prompt' }, { status: 400 })
+      } else {
+        patch.commentPrompt = body.commentPrompt
+      }
+    }
     if (
       patch.status === undefined &&
       patch.priority === undefined &&
@@ -189,6 +200,7 @@ export const issuesHandlers = [
       && patch.effort === undefined
       && patch.timeout === undefined
       && patch.what === undefined
+      && patch.commentPrompt === undefined
     ) {
       return HttpResponse.json({ error: 'no_fields' }, { status: 400 })
     }

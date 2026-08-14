@@ -185,9 +185,11 @@ The surfaces deliberately have different jobs:
   Issue create/update cannot set `telegramConnector`.
 - The phone-desk Issue is hidden from the Issue board and Tracked list. It still
   fires on `when`. Extra `telegramConnector: true` files in other Workspaces do
-  not fire. Owner DMs become comments; scheduled-fire `assistantText` is stamped
-  as a comment. Connector projects those comments unless they contain the
-  literal tag `[[no-reply]]` or arrived from Telegram.
+  not fire. Owner DMs become comments; the desk is seeded with
+  `commentPrompt: '{comment}'` so those comments are the reply Input Prompt
+  as-is. Scheduled-fire `assistantText` is stamped as a comment. Connector
+  projects those comments unless they contain the literal tag `[[no-reply]]`
+  or arrived from Telegram.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product

@@ -43,6 +43,7 @@ import {
   type IssueStatus,
   type IssueTimeout,
 } from './declaration.js'
+import { parseIssueCommentPrompt } from './comment-prompt.js'
 export { appendIssueComment } from './comments.js'
 
 /** Fields a human/agent may patch on an existing issue. Most scheduling
@@ -67,6 +68,8 @@ export interface IssueFieldPatch {
   timeout?: IssueTimeout | null
   /** Canonical markdown work definition; exact scheduled prompt. */
   what?: string
+  /** Comment-reply Input Prompt template; null restores the default wrapper. */
+  commentPrompt?: string | null
   /** Cron missed-fire policy; only valid when the Issue already has a cron `when`. */
   catchUp?: boolean
   /** Settings-only cadence edit for the phone desk. */
@@ -91,6 +94,8 @@ export interface CreateIssueInput {
   model?: string
   effort?: ModelReasoningEffort
   timeout?: IssueTimeout
+  /** Comment-reply Input Prompt template. Omission keeps the default wrapper. */
+  commentPrompt?: string
   /** @deprecated Compatibility alias for callers written before What became the
    * sole markdown document. New callers must use `what`. */
   body?: string
@@ -265,6 +270,15 @@ export async function updateIssueFields(
       data.timeout = patch.timeout
     }
   }
+  if (patch.commentPrompt !== undefined) {
+    if (patch.commentPrompt === null || !patch.commentPrompt.trim()) {
+      delete data.commentPrompt
+    } else {
+      const parsed = parseIssueCommentPrompt(patch.commentPrompt)
+      if (!parsed.ok) return { ok: false, reason: 'invalid', error: parsed.error }
+      data.commentPrompt = parsed.template
+    }
+  }
   if (patch.telegramConnector !== undefined) {
     if (!options?.allowTelegramConnector) {
       return {
@@ -361,6 +375,11 @@ export async function createIssue(
   if (input.model !== undefined) data.model = input.model
   if (input.effort !== undefined) data.effort = input.effort
   if (input.timeout !== undefined) data.timeout = input.timeout
+  if (input.commentPrompt !== undefined) {
+    const parsed = parseIssueCommentPrompt(input.commentPrompt)
+    if (!parsed.ok) return { ok: false, reason: 'invalid', error: parsed.error }
+    data.commentPrompt = parsed.template
+  }
   if (input.telegramConnector === true) {
     if (!options?.allowTelegramConnector) {
       return {

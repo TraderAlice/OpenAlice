@@ -181,6 +181,18 @@ describe('updateIssueFields', () => {
     expect(issue?.what).toBe('keep the fire prompt')
   })
 
+  it('stores a commentPrompt override and can clear it', async () => {
+    await createIssue(dir, { id: 'talk', title: 'Talk', what: 'desc', commentPrompt: '{comment}' })
+    const stored = await readBack('talk')
+    expect(stored.issue?.commentPrompt).toBe('{comment}')
+
+    const cleared = await updateIssueFields(dir, 'talk', { commentPrompt: null })
+    expect(cleared.ok).toBe(true)
+    if (!cleared.ok) return
+    expect(cleared.issue.commentPrompt).toBeUndefined()
+    expect((await readBack('talk')).issue?.commentPrompt).toBeUndefined()
+  })
+
   it('clears an issue agent override with null', async () => {
     await createIssue(dir, { id: 'agent-clear', title: 'T', agent: 'claude' })
     const res = await updateIssueFields(dir, 'agent-clear', { agent: null })

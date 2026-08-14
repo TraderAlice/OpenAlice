@@ -253,6 +253,8 @@ export interface IssueDetailIssue {
   model?: string
   effort?: ModelReasoningEffort
   timeout?: IssueTimeout
+  /** Optional comment-reply Input Prompt template. Omission keeps the default wrapper. */
+  commentPrompt?: string
   /** When the scanner last fired this issue (epoch ms); only for scheduled issues. */
   lastFiredAtMs?: number | null
   /** When it is next due (epoch ms); only for scheduled issues. */
@@ -445,6 +447,7 @@ export function detailIssue(
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
+    ...(issue.commentPrompt ? { commentPrompt: issue.commentPrompt } : {}),
     ...(issue.telegramConnector ? { telegramConnector: true as const } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,
