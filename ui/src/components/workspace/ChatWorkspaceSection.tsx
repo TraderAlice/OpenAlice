@@ -47,7 +47,6 @@ import { workspaceDisplayName, workspaceDisplayTitle } from './display'
 import {
   flattenHarnessSessions,
   joinWorkspaceHarnessSessions,
-  sessionRecordForRow,
   type HarnessSession,
 } from './harness-sessions'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
@@ -181,43 +180,31 @@ export function ChatWorkspaceSection({
 
   const isRosterRowActive = (row: HarnessSession): boolean => {
     if (!selection || selection.wsId !== row.workspaceId) return false
-    if (row.session && selection.sessionId === row.session.id) return true
+    if (selection.sessionId === row.session.id) return true
     return activeResumeId !== null && row.resumeId === activeResumeId
   }
 
   const activateRosterSession = (row: HarnessSession): void => {
     if (row.headlessOccupying) return
-    if (row.session) {
-      rememberViewedWorkspace(row.workspaceId)
-      navigate({
-        kind: 'workspace',
-        params: { wsId: row.workspaceId, sessionId: row.session.id, source },
-      })
-      return
-    }
-    if (!row.resumable) return
-    void ctx.openHeadlessRun(row.workspaceId, row.resumeId, { title: row.title })
-    onNavigate()
+    rememberViewedWorkspace(row.workspaceId)
+    navigate({
+      kind: 'workspace',
+      params: { wsId: row.workspaceId, sessionId: row.session.id, source },
+    })
   }
 
   const resumeRosterSession = (row: HarnessSession): void => {
     if (row.headlessOccupying || !row.resumable) return
-    if (row.session) {
-      rememberViewedWorkspace(row.workspaceId)
-      if (row.session.surface === 'webpi') {
-        void ctx.openWebPiSession(row.workspaceId, row.session.id, source)
-      } else {
-        void ctx.resumeSession(row.workspaceId, row.session.id, source)
-      }
-      onNavigate()
-      return
+    rememberViewedWorkspace(row.workspaceId)
+    if (row.session.surface === 'webpi') {
+      void ctx.openWebPiSession(row.workspaceId, row.session.id, source)
+    } else {
+      void ctx.resumeSession(row.workspaceId, row.session.id, source)
     }
-    void ctx.openHeadlessRun(row.workspaceId, row.resumeId, { title: row.title })
     onNavigate()
   }
 
   const deleteRosterSession = (row: HarnessSession): void => {
-    if (!row.session) return
     ctx.requestDeleteSession(row.workspaceId, row.session.id)
   }
 
@@ -235,7 +222,6 @@ export function ChatWorkspaceSection({
   }
 
   const pauseRosterSession = (row: HarnessSession): void => {
-    if (!row.session) return
     void ctx.pauseSession(row.workspaceId, row.session.id)
   }
 
@@ -995,7 +981,7 @@ function HarnessSessionRow(props: {
   return (
     <SessionRow
       reorderId={`${row.workspaceId}:${row.resumeId}`}
-      session={sessionRecordForRow(row)}
+      session={row.session.title === row.title ? row.session : { ...row.session, title: row.title }}
       displayTitle={row.title}
       subtitle={props.subtitle}
       isActive={props.isActive}

@@ -29,6 +29,9 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/unified-session-records.md]] — Give every `resumeId` one durable
+  Session record from birth, reuse it across headless/TUI/WebPi turns, and
+  remove frontend-synthesized roster rows without changing resume semantics.
 - [[plans/issue-comment-prompt.md]] — Optional per-Issue `commentPrompt`
   template for comment-reply Input Prompts. Omission keeps the historical
   wrapper; chat desks seed `{comment}`.

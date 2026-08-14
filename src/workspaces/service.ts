@@ -335,6 +335,7 @@ import {
   SessionRegistry,
   type SessionRecord,
 } from './session-registry.js';
+import { ProductSessionCoordinator } from './product-session-coordinator.js';
 import { projectPublicSession } from './public-session.js';
 import { NativeSessionTitleResolver } from './session-title-resolver.js';
 import { buildCliPath, buildSpawnEnv } from './spawn-env.js';
@@ -392,6 +393,7 @@ export interface WorkspaceService {
   /** Coordinates runtime starts with directory-wide lifecycle operations. */
   readonly operationGuard: WorkspaceOperationGuard;
   readonly sessionRegistry: SessionRegistry;
+  readonly sessionCoordinator: ProductSessionCoordinator;
   readonly scrollbackStore: ScrollbackStore;
   readonly templates: TemplateRegistry;
   readonly adapters: AdapterRegistry;
@@ -546,6 +548,12 @@ export interface WorkspaceService {
     wsId: string
     resumeId: string
     presence: SessionPresence
+  }): Promise<ResumeIdentityRecord>;
+  /** Move a paused Session through the recoverable archive boundary into the
+   *  soft-deleted presence state while holding one resume lease. */
+  deleteSessionPresence(input: {
+    wsId: string
+    resumeId: string
   }): Promise<ResumeIdentityRecord>;
   /** Resolve a `[[name]]` token to the issues across ALL workspaces that claim it.
    *  Matches case-insensitively against an issue's `id` OR its `title` (either is a
@@ -861,6 +869,25 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   }
 
   const adapters = createBuiltinAdapterRegistry();
+  const sessionCoordinator = new ProductSessionCoordinator(
+    resumeRegistry,
+    sessionRegistry,
+    launcherLogger.child({ scope: 'product-session' }),
+  );
+  await sessionCoordinator.reconcile({
+    namePrefixForAgent: (agent) => {
+      const adapter = adapters.get(agent);
+      return adapter?.namePrefix ?? adapter?.id[0] ?? agent[0] ?? 's';
+    },
+    fallbackForResume: (resumeId) => {
+      const task = headlessTasks.latestForResumeId(resumeId);
+      return task ? { title: task.prompt, sourceRunId: task.taskId } : undefined;
+    },
+    shouldRetain: (identity) => {
+      const lifecycle = catalog.get(identity.wsId)?.lifecycle;
+      return lifecycle !== 'purging' && lifecycle !== 'purged';
+    },
+  });
   const sessionTitleResolver = new NativeSessionTitleResolver({
     sessionRegistry,
     resumeRegistry,
@@ -1656,9 +1683,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         throw new HeadlessResumeError('not_ready', 'runtime session id has not been captured yet');
       }
       await sessionRegistry.ensureLoaded(ws.id);
-      const interactive = sessionRegistry.findByResumeId(ws.id, resumeId);
-      if (interactive?.state === 'running') {
-        throw new HeadlessResumeError('busy', 'this conversation is open in an interactive session');
+      const productSession = sessionRegistry.findByResumeId(ws.id, resumeId);
+      if (productSession?.state === 'running') {
+        throw new HeadlessResumeError('busy', 'this conversation already has a running execution');
       }
       // Reserve before the first await below. Without this, two HTTP requests
       // can both pass the check and mutate one native transcript concurrently.
@@ -1690,18 +1717,24 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       });
     }
     let rec: HeadlessTaskRecord;
+    let productSessionResumeId: string | undefined;
     try {
-      // ResumeRegistry is the sole allocator for product conversation ids.
-      // HeadlessTaskRegistry only records executions against that identity.
-      // Birth metadata is first-write-wins inside ensure(); only pass it when
-      // this dispatch is allocating a fresh product Session.
-      const identity = await resumeRegistry.ensure({
+      // ResumeRegistry remains the sole product-id allocator, while the
+      // coordinator guarantees that the same birth also enters the durable
+      // Session roster. HeadlessTaskRegistry records only this execution.
+      const productSession = await sessionCoordinator.ensure({
         ...(resumeId ? { resumeId } : {}),
         wsId: ws.id,
         agent: adapter.id,
+        namePrefix: adapter.namePrefix ?? adapter.id[0] ?? 's',
         runtimeBinding: sessionRuntime.binding,
         ...(!resumeId && createdBy ? { metadata: sessionMetadata(createdBy) } : {}),
+        state: 'running',
+        surface: 'headless',
+        fallbackTitle: prompt,
       });
+      const identity = productSession.identity;
+      productSessionResumeId = identity.resumeId;
       if (catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new Error(`workspace stopped accepting work during dispatch: ${ws.id}`);
       }
@@ -1724,6 +1757,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         agent: adapter.id,
         latestTaskId: rec.taskId,
       });
+      await sessionCoordinator.transition({
+        wsId: ws.id,
+        resumeId: identity.resumeId,
+        state: 'running',
+        surface: 'headless',
+        sourceRunId: rec.taskId,
+      });
       if (conversation) {
         await agentConversationLog.recordDispatch({
           taskId: rec.taskId,
@@ -1736,6 +1776,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         });
       }
     } catch (err) {
+      if (productSessionResumeId) {
+        await sessionCoordinator.transition({
+          wsId: ws.id,
+          resumeId: productSessionResumeId,
+          state: 'paused',
+          surface: 'headless',
+        }).catch((transitionErr) => launcherLogger.warn('product_session.dispatch_rollback_failed', {
+          wsId: ws.id,
+          resumeId: productSessionResumeId,
+          err: transitionErr,
+        }));
+      }
       if (resumeId) activeResumeIds.delete(resumeId);
       throw err;
     }
@@ -1876,7 +1928,20 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }),
         );
       })
-      .finally(() => activeResumeIds.delete(rec.resumeId));
+      .finally(async () => {
+        await sessionCoordinator.transition({
+          wsId: ws.id,
+          resumeId: rec.resumeId,
+          state: 'paused',
+          surface: 'headless',
+        }).catch((err) => launcherLogger.warn('product_session.headless_pause_failed', {
+          wsId: ws.id,
+          resumeId: rec.resumeId,
+          taskId: rec.taskId,
+          err,
+        }));
+        activeResumeIds.delete(rec.resumeId);
+      });
     return { taskId: rec.taskId, resumeId: rec.resumeId };
   };
 
@@ -2239,6 +2304,42 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }
   }
 
+  const deleteSessionPresence = async (input: {
+    wsId: string
+    resumeId: string
+  }): Promise<ResumeIdentityRecord> => {
+    const identity = resumeRegistry.get(input.resumeId)
+    if (!identity) throw new ResumePresenceError('not_found', 'resume conversation not found')
+    if (identity.wsId !== input.wsId) {
+      throw new ResumePresenceError('wrong_workspace', 'resume conversation belongs to another workspace')
+    }
+    // Soft-delete is one product operation even though the presence state
+    // machine deliberately requires active -> archived -> deleted. Hold the
+    // resume lease across both transitions so a launch cannot slip between
+    // them and revive a half-deleted Session.
+    if (!claimResume(input.resumeId)) {
+      throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
+    }
+    try {
+      await sessionRegistry.ensureLoaded(input.wsId)
+      const session = sessionRegistry.findByResumeId(input.wsId, input.resumeId)
+      const headless = headlessTasks.latestForResumeId(input.resumeId)
+      if (session?.state === 'running' || headless?.status === 'running') {
+        throw new HeadlessResumeError('busy', 'this conversation already has a running turn')
+      }
+      let current = identity
+      if (sessionPresence(current) === 'active') {
+        current = await resumeRegistry.setPresence({ ...input, presence: 'archived' })
+      }
+      if (sessionPresence(current) !== 'deleted') {
+        current = await resumeRegistry.setPresence({ ...input, presence: 'deleted' })
+      }
+      return current
+    } finally {
+      activeResumeIds.delete(input.resumeId)
+    }
+  }
+
   const sessionDirectory = async (
     wsId: string,
     limit = 50,
@@ -2564,13 +2665,17 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     const harnessSource = await readHarnessSource(w.dir);
     await sessionRegistry.ensureLoaded(w.id).catch(() => undefined);
     void refreshSessionTitles(w);
-    const sessions = sessionRegistry.listFor(w.id).map((record) =>
-      projectPublicSession(record, {
+    const sessions = sessionRegistry.listFor(w.id).flatMap((record) => {
+      const identity = resumeRegistry.get(record.resumeId);
+      if (!identity || identity.lifecycle === 'retired' || sessionPresence(identity) === 'deleted') return [];
+      return [projectPublicSession(record, {
         terminal: pool.get(record.id),
         webPi: webPi.get(record.id),
-        runtimeBinding: resumeRegistry.get(record.resumeId)?.runtimeBinding,
-      }),
-    );
+        headless: activeResumeIds.has(record.resumeId),
+        runtimeBinding: identity.runtimeBinding,
+        presence: sessionPresence(identity),
+      })];
+    });
     // Deprecated native-project compatibility-export signals. Retained in the
     // public contract for advanced diagnostics; managed Session defaults come
     // from `runtimeSettings` and primary UI surfaces do not expose these files.
@@ -2633,6 +2738,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     workspaceAbsorbs,
     operationGuard: workspaceOperationGuard,
     sessionRegistry,
+    sessionCoordinator,
     scrollbackStore,
     templates,
     adapters,
@@ -2720,6 +2826,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     runIssueNow,
     sessionDirectory,
     setSessionPresence,
+    deleteSessionPresence,
     resolveIssuesByName,
     headlessTasks,
     resumeRegistry,

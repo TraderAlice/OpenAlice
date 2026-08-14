@@ -56,4 +56,21 @@ describe('projectPublicSession', () => {
       startedAt: 1_723_337_000_000,
     });
   });
+
+  it('projects an active headless execution as the live Session surface', () => {
+    expect(projectPublicSession({ ...record, surface: 'headless' }, {
+      headless: true,
+    })).toMatchObject({
+      state: 'running',
+      surface: 'headless',
+      pid: null,
+      startedAt: null,
+    });
+  });
+
+  it('projects roster presence with the first Workspace payload', () => {
+    expect(projectPublicSession(record, { presence: 'archived' })).toMatchObject({
+      presence: 'archived',
+    });
+  });
 });

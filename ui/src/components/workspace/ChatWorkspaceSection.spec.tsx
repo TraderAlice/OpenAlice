@@ -573,7 +573,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledTimes(2)
   })
 
-  it('lists Directory-only colleagues and locks TUI while headless occupies them', async () => {
+  it('lists headless-born persistent Sessions and locks TUI while headless occupies them', async () => {
     const onNavigate = vi.fn()
     directoryState.directories = new Map([[chatWorkspace.id, {
       workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
@@ -612,7 +612,34 @@ describe('ChatWorkspaceSection actions', () => {
       ],
     }]])
 
-    renderSection([chatWorkspace], null, onNavigate, 'focused')
+    const headlessWorkspace = {
+      ...chatWorkspace,
+      sessions: [
+        {
+          ...chatSession(20),
+          id: 'session-headless-colleague',
+          resumeId: 'resume-headless-colleague',
+          agent: 'codex',
+          name: 'x1',
+          surface: 'headless' as const,
+          title: null,
+          lastActiveAt: '2026-08-02T00:05:00.000Z',
+        },
+        {
+          ...chatSession(21),
+          id: 'session-headless-running',
+          resumeId: 'resume-headless-running',
+          agent: 'claude',
+          name: 'c1',
+          surface: 'headless' as const,
+          state: 'running' as const,
+          title: null,
+          lastActiveAt: '2026-08-03T01:00:00.000Z',
+        },
+      ],
+    }
+
+    renderSection([headlessWorkspace], null, onNavigate, 'focused')
 
     expect(screen.getByRole('button', { name: 'Morning scan complete. Semis still lead.' })).toBeTruthy()
     const [runningTitle, runningPlay] = screen.getAllByRole('button', { name: 'Running · scan-open' })
@@ -620,13 +647,13 @@ describe('ChatWorkspaceSection actions', () => {
     expect(runningPlay).toHaveProperty('disabled', true)
     fireEvent.click(runningTitle!)
     expect(openOrFocus).not.toHaveBeenCalled()
-    expect(actions.openHeadlessRun).not.toHaveBeenCalled()
+    expect(actions.resumeSession).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume Morning scan complete. Semis still lead.' }))
-    expect(actions.openHeadlessRun).toHaveBeenCalledWith(
+    expect(actions.resumeSession).toHaveBeenCalledWith(
       chatWorkspace.id,
-      'resume-headless-colleague',
-      { title: 'Morning scan complete. Semis still lead.' },
+      'session-headless-colleague',
+      'chat',
     )
     expect(onNavigate).toHaveBeenCalledOnce()
 
@@ -663,7 +690,20 @@ describe('ChatWorkspaceSection actions', () => {
     }]])
     const pausedWorkspace = {
       ...chatWorkspace,
-      sessions: [{ ...chatSession(1), title: 'Paused thesis' }],
+      sessions: [
+        { ...chatSession(1), title: 'Paused thesis' },
+        {
+          ...chatSession(22),
+          id: 'session-headless-running',
+          resumeId: 'resume-headless-running',
+          agent: 'claude',
+          name: 'c1',
+          surface: 'headless' as const,
+          state: 'running' as const,
+          title: null,
+          lastActiveAt: '2026-08-03T01:00:00.000Z',
+        },
+      ],
     }
     renderSection([pausedWorkspace], null, undefined, 'focused')
 

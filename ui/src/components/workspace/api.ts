@@ -665,8 +665,9 @@ export async function setIssueDefaultAgent(agent: string | null): Promise<string
 
 // ── sessions ─────────────────────────────────────────────────────────────────
 //
-// V3.S4 — single SessionRecord type that covers both running PTYs and paused
-// records. `pid` + `startedAt` are non-null only when `state === 'running'`.
+// One persistent product Session record shared by headless, terminal, and
+// WebPi execution surfaces. `pid` + `startedAt` are live read-side projections
+// and are non-null only when an interactive process is attached.
 // Persisted server-side at <OPENALICE_HOME>/workspaces/state/sessions/<wsId>.json
 // so records survive PTY death and server restarts.
 
@@ -680,13 +681,15 @@ export interface SessionRecord {
   readonly lastActiveAt: string;
   readonly state: 'running' | 'paused';
   /** UI surface only; `agent` remains `pi` for WebPi. */
-  readonly surface?: 'terminal' | 'webpi';
+  readonly surface?: 'terminal' | 'webpi' | 'headless';
   readonly pid: number | null;
   readonly startedAt: number | null;
   /** Resolved native/fallback sidebar title; null for an unseeded, unnamed Session. */
   readonly title: string | null;
-  /** Headless run this stable Alice Session was materialized from. */
+  /** First headless run associated with this stable Alice Session. */
   readonly sourceRunId?: string | null;
+  /** Visibility projected with the roster so first paint needs no second join. */
+  readonly presence?: 'active' | 'archived' | 'deleted';
   /** Secret-free launch semantics pinned to this resumable Session. */
   readonly runtime?: {
     readonly credentialSource: 'native' | 'vault' | 'workspace';
@@ -877,7 +880,7 @@ export interface OpenHeadlessSessionResult {
   readonly created: boolean;
 }
 
-/** Idempotently materialize a finished headless run as one interactive Session. */
+/** Resolve the persistent Session row and attach it to the Ask Alice surface. */
 export async function openResumeSession(
   wsId: string,
   resumeId: string,
@@ -1165,7 +1168,7 @@ export async function abortWebPiSession(wsId: string, sessionId: string): Promis
   return body.snapshot;
 }
 
-/** Permanently remove a session record (kills PTY first if running). */
+/** Remove a conversation from the active floor (kills its process first). */
 export async function deleteSession(wsId: string, sessionId: string): Promise<boolean> {
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}`,

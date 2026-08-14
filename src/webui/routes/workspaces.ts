@@ -47,7 +47,6 @@ import {
   type ResolvedSessionRuntimeBinding,
   type WorkspaceAiCred,
 } from '../../workspaces/cli-adapter.js';
-import { generatePetnameId } from '../../workspaces/petname-id.js';
 import { addCredential, readCredentials, readWorkspaceDefaultAgent, setCredentialLastModel, credentialWires, credentialWireShapeEnum, type Credential } from '../../core/config.js';
 import { inferCredentialVendor, resolveAnthropicAuthMode } from '../../core/credential-inference.js';
 import {
@@ -439,14 +438,6 @@ export function createWorkspaceRoutes(
     }
     await svc.sessionRegistry.ensureLoaded(id);
     const prefix = adapter.namePrefix ?? adapter.id[0] ?? 's';
-    const recordId = generatePetnameId(adapter.id, {
-      fallbackPrefix: 'session',
-      isTaken: (candidate) =>
-        svc.sessionRegistry.findById(candidate) !== undefined ||
-        svc.pool.get(candidate) !== undefined,
-    });
-    const recordName = svc.sessionRegistry.nextName(id, adapter.id, prefix);
-    const nowIso = new Date().toISOString();
     const fallbackTitle = normalizeSessionTitle(opts.title) ?? normalizeSessionTitle(initialPrompt);
     const claimedResume = opts.resumeId
       ? (svc.claimResume?.(opts.resumeId) ?? true)
@@ -457,46 +448,32 @@ export function createWorkspaceRoutes(
     const releaseClaim = () => {
       if (claimedResume && opts.resumeId) svc.releaseResume?.(opts.resumeId);
     };
-    let identity: { resumeId: string };
+    let productSession: Awaited<ReturnType<typeof svc.sessionCoordinator.ensure>>;
     try {
-      identity = await svc.resumeRegistry.ensure({
+      productSession = await svc.sessionCoordinator.ensure({
         ...(opts.resumeId ? { resumeId: opts.resumeId } : {}),
         wsId: id,
         agent: adapter.id,
+        namePrefix: prefix,
         ...(resume && resume !== 'last' ? { agentSessionId: resume.sessionId } : {}),
         ...(sessionRuntime ? { runtimeBinding: sessionRuntime.binding } : {}),
         // Birth is first-write-wins; only stamp when allocating a new identity.
         ...(!opts.resumeId && opts.createdBy
           ? { metadata: sessionMetadata(opts.createdBy) }
           : {}),
+        state: 'running',
+        surface: 'terminal',
+        ...(fallbackTitle ? { fallbackTitle } : {}),
+        ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       });
     } catch (err) {
       releaseClaim();
       return { ok: false, status: 500, body: { error: 'resume_registry_failed', message: (err as Error).message } };
     }
-    const record: SessionRecord = {
-      id: recordId,
-      resumeId: identity.resumeId,
-      wsId: id,
-      agent: adapter.id,
-      name: recordName,
-      createdAt: nowIso,
-      lastActiveAt: nowIso,
-      state: 'running',
-      surface: 'terminal',
-      ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
-      ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
-      ...(resume && resume !== 'last'
-        ? { resumeHint: { kind: 'agent-session-id' as const, value: resume.sessionId } }
-        : {}),
-    };
-    try {
-      await svc.sessionRegistry.create(record);
-    } catch (err) {
-      releaseClaim();
-      launcherLogger.error('session_registry.create_failed', { id, recordId, err });
-      return { ok: false, status: 500, body: { error: 'registry_failed', message: (err as Error).message } };
-    }
+    const identity = productSession.identity;
+    const record = productSession.session;
+    const recordId = record.id;
+    const recordName = record.name;
     try {
       const ctx: SessionFactoryContext = {
         ...(resume !== undefined ? { resume } : {}),
@@ -545,7 +522,12 @@ export function createWorkspaceRoutes(
       };
     } catch (err) {
       releaseClaim();
-      await svc.sessionRegistry.remove(id, recordId).catch(() => undefined);
+      await svc.sessionCoordinator.transition({
+        wsId: id,
+        resumeId: record.resumeId,
+        state: 'paused',
+        surface: 'terminal',
+      }).catch(() => undefined);
       launcherLogger.error('workspace.session_spawn_failed', { id, err });
       return { ok: false, status: 500, body: { error: 'spawn_failed', message: (err as Error).message } };
     }
@@ -557,11 +539,14 @@ export function createWorkspaceRoutes(
   const publicSession = (record: SessionRecord): PublicSession => {
     const terminal = svc.pool.get(record.id);
     const browser = svc.webPi?.get(record.id) ?? null;
-    const binding = svc.resumeRegistry.get(record.resumeId)?.runtimeBinding;
+    const identity = svc.resumeRegistry.get(record.resumeId);
+    const binding = identity?.runtimeBinding;
     return projectPublicSession(record, {
       terminal,
       webPi: browser,
+      headless: svc.isResumeActive(record.resumeId),
       runtimeBinding: binding,
+      ...(identity ? { presence: sessionPresence(identity) } : {}),
     });
   };
 
@@ -582,7 +567,9 @@ export function createWorkspaceRoutes(
   ): Promise<OpenHeadlessSessionResult> => {
     await svc.sessionRegistry.ensureLoaded(meta.id);
     const existing = svc.sessionRegistry.findByResumeId(meta.id, resumeId);
-    if (existing) return { ok: true, created: false, session: publicSession(existing) };
+    if (existing && (svc.pool.get(existing.id) || svc.webPi.get(existing.id))) {
+      return { ok: true, created: false, session: publicSession(existing) };
+    }
     const identity = svc.resumeRegistry.get(resumeId);
     if (!identity || identity.wsId !== meta.id) return { ok: false, status: 404, body: { error: 'resume_not_found' } };
     if (identity.lifecycle === 'retired') {
@@ -661,6 +648,10 @@ export function createWorkspaceRoutes(
       activeWorkspaceCount: svc.registry.list().length,
       sessions: svc.sessionRegistry
         .listFor(meta.id)
+        .filter((record) => {
+          const identity = svc.resumeRegistry.get(record.resumeId);
+          return identity?.lifecycle !== 'retired' && sessionPresence(identity) !== 'deleted';
+        })
         .map(publicSession)
         .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt)),
     };
@@ -1863,8 +1854,12 @@ export function createWorkspaceRoutes(
         agent: record.agent,
         runtimeBinding: resolved.binding,
       });
+      const identity = svc.resumeRegistry.get(record.resumeId);
       return c.json({
-        session: projectPublicSession(record, { runtimeBinding: resolved.binding }),
+        session: projectPublicSession(record, {
+          runtimeBinding: resolved.binding,
+          ...(identity ? { presence: sessionPresence(identity) } : {}),
+        }),
       });
     } catch (err) {
       if (err instanceof SessionRuntimeBindingError) {
@@ -2500,9 +2495,11 @@ export function createWorkspaceRoutes(
     if (record.scrollbackFile) {
       await svc.scrollbackStore.remove(record.scrollbackFile);
     }
-    await svc.sessionRegistry.remove(id, token).catch((err) =>
-      launcherLogger.warn('session_registry.delete_failed', { id, token, err }),
-    );
+    await svc.sessionRegistry.update(id, token, {
+      state: 'paused',
+      lastActiveAt: new Date().toISOString(),
+    });
+    await svc.deleteSessionPresence({ wsId: id, resumeId: record.resumeId });
     launcherLogger.info('workspace.session_deleted', { id, sessionId: token, wasRunning });
     return c.json({ ok: true, wasRunning });
   });

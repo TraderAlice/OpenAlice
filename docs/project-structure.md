@@ -206,18 +206,20 @@ provenance link:
   identify the same stateful Session by this id.
 - `taskId` identifies one headless execution. Every follow-up turn gets a new
   task id, so run history remains append-only.
-- `SessionRecord.id` is Alice's durable interactive materialization key. Tabs,
-  PTY attachment, and pause/resume routes use it; it is not Session identity.
+- `SessionRecord.id` is Alice's durable launcher-owned roster/attachment key.
+  Every non-purged product Session receives one at the same birth boundary as
+  its `resumeId`; tabs, process attachment, and pause/resume routes use it, but
+  it is not the product Session identity.
 - `agentSessionId` is the backend-only native CLI conversation id. The
   `ResumeRegistry` maps `resumeId` to this adapter-specific value; it must not
   appear in frontend resume requests or Inbox provenance.
-- `sourceRunId` is present when a finished headless run has been materialized
-  as an interactive Session and preserves execution provenance.
+- `sourceRunId` preserves the first associated headless execution provenance.
 
-Do not use a headless task id directly as a PTY/session id, and do not create a
-new interactive materialization every time the same `resumeId` is opened. The
-run is execution provenance; `resumeId` is the product Session; the
-`SessionRecord` is one durable interactive surface.
+Do not use a headless task id directly as a roster or process-attachment id,
+and do not create another `SessionRecord` when the same `resumeId` changes
+between headless, terminal, and WebPi execution. The run is execution
+provenance; `resumeId` is the product identity; `SessionRecord` is its one
+durable launcher-owned roster record.
 
 For the broader “ask the agent who produced this” model — including mutable
 Issues, Inbox deliveries, document revisions, reconstruction fallback, and
@@ -291,9 +293,10 @@ issue/schedule -> headless Workspace run -> native agent -> inbox_push -> Inbox
 
 Inbox is the durable agent-to-user delivery surface. Agents publish reports or
 status by calling the injected `inbox_push` capability. Alice stamps the
-interactive Session or headless run identity out-of-band. The user can return
-to the exact originating interactive Session; a finished headless run is
-materialized once and then reused as a normal Session for follow-up.
+product Session and exact execution identity out-of-band. The user can return
+to the exact originating Session regardless of whether its first turn was
+headless or interactive; opening TUI/WebPi attaches a process to the existing
+durable Session record.
 
 ## Persistent State
 
