@@ -29,6 +29,9 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/issue-comment-prompt.md]] — Optional per-Issue `commentPrompt`
+  template for comment-reply Input Prompts. Omission keeps the historical
+  wrapper; chat desks seed `{comment}`.
 - [[plans/telegram-connector-issue.md]] — One Issue per Alice Project is the
   Telegram phone desk: What is the heartbeat prompt, comments are the chat,
   Connector only transports. Increment 1 bound the desk in Settings.

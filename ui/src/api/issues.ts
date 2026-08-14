@@ -8,6 +8,16 @@ import type { ModelReasoningEffort } from './types'
 export const ISSUE_TIMEOUTS = ['15m', '30m', '45m', '60m'] as const
 export type IssueTimeout = (typeof ISSUE_TIMEOUTS)[number]
 
+/** Must stay in sync with `DEFAULT_ISSUE_COMMENT_PROMPT` in Alice. */
+export const DEFAULT_ISSUE_COMMENT_PROMPT = [
+  'A new comment was left on Issue {workspaceId}/{id} ({title}) by {author}.',
+  '',
+  '{comment}',
+  '',
+  'Reply directly to this comment. Your final assistant response will be recorded automatically in the Issue Activity timeline.',
+  'Do not call `alice-workspace issue comment` for this reply; that would create a second notification loop.',
+].join('\n')
+
 /**
  * Issue board — the canonical client shape for GET /api/issues.
  *
@@ -246,6 +256,8 @@ export interface IssueDetailIssue {
   effort?: ModelReasoningEffort
   /** Optional scheduled-run watchdog (frontmatter `timeout`), if set. */
   timeout?: IssueTimeout
+  /** Optional comment-reply Input Prompt template. Omission keeps the default wrapper. */
+  commentPrompt?: string
   /** Scanner last-fired marker (epoch ms) — scheduled issues only. */
   lastFiredAtMs?: number | null
   /** Computed next fire (epoch ms) — scheduled issues only. */
@@ -287,6 +299,7 @@ export interface IssuePatch {
   effort?: ModelReasoningEffort | null
   timeout?: IssueTimeout | null
   what?: string
+  commentPrompt?: string | null
 }
 
 export const issuesApi = {

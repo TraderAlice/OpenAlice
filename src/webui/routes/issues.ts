@@ -19,7 +19,7 @@
  * drift on file format or validation; writes are working-tree only (no commit):
  *   PATCH /api/issues/:wsId/:id           body { status?, priority?, assignee?,
  *                                          agent?, credential?, model?, effort?,
- *                                          timeout?, what? }
+ *                                          timeout?, what?, commentPrompt? }
  *   POST  /api/issues/:wsId/:id/comments  body { text }  (author = 'human';
  *     exact Session owners are notified and their final reply returns here)
  *
@@ -186,6 +186,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       effort?: ModelReasoningEffort | null
       timeout?: IssueTimeout | null
       what?: string
+      commentPrompt?: string | null
     } = {}
     if ('status' in fields) {
       const s = fields['status']
@@ -320,10 +321,20 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       }
       patch.what = what.trim()
     }
+    if ('commentPrompt' in fields) {
+      const raw = fields['commentPrompt']
+      if (raw === null || raw === '') {
+        patch.commentPrompt = null
+      } else if (typeof raw !== 'string') {
+        return c.json({ error: 'invalid_comment_prompt', message: 'commentPrompt must be a template string or null' }, 400)
+      } else {
+        patch.commentPrompt = raw
+      }
+    }
     if (Object.keys(patch).length === 0) {
       return c.json({
         error: 'no_fields',
-        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what',
+        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what, commentPrompt',
       }, 400)
     }
 

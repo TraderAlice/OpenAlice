@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, Play, RotateCcw, Settings, Timer, TrendingUp, X } from 'lucide-react'
+import { inputClass } from './form'
 
 import type { HeadlessTaskStatus } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
@@ -19,7 +20,7 @@ import type {
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
-import { ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
+import { DEFAULT_ISSUE_COMMENT_PROMPT, ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
 import type { ModelReasoningEffort } from '../api/types'
 import type { Preset, PresetModel } from '../api/types'
 import { configApi } from '../api/config'
@@ -1046,6 +1047,75 @@ function WhatEditor({
   )
 }
 
+function CommentPromptEditor({
+  value,
+  onSave,
+}: {
+  value?: string
+  onSave: (commentPrompt: string | null) => Promise<boolean> | void
+}) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  const [saving, setSaving] = useState(false)
+  const stored = value ?? ''
+  const dirty = draft !== (stored || DEFAULT_ISSUE_COMMENT_PROMPT)
+
+  useEffect(() => {
+    setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  }, [value])
+
+  return (
+    <section id="issue-comment-prompt" className="mt-4 scroll-mt-20 border-t border-border/60 pt-4">
+      <div className="mb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">
+          {t('issues.detail.commentPrompt')}
+        </h2>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/65">
+          {t('issues.detail.commentPromptDescription')}
+        </p>
+        <p className="mt-1 font-mono text-[11px] leading-snug text-muted-foreground">
+          {t('issues.detail.commentPromptTokens')}
+        </p>
+      </div>
+      <textarea
+        className={`${inputClass} min-h-28 font-mono text-[12.5px] leading-5`}
+        value={draft}
+        aria-label={t('issues.detail.commentPrompt')}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="oa-pressable inline-flex min-h-9 items-center rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50"
+          disabled={saving || !dirty}
+          onClick={async () => {
+            setSaving(true)
+            await onSave(draft.trim() === DEFAULT_ISSUE_COMMENT_PROMPT ? null : draft)
+            setSaving(false)
+          }}
+        >
+          {saving ? t('issues.detail.whatSaving') : t('issues.detail.commentPromptSave')}
+        </button>
+        {stored ? (
+          <button
+            type="button"
+            className="oa-pressable inline-flex min-h-9 items-center rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true)
+              const ok = await onSave(null)
+              if (ok !== false) setDraft(DEFAULT_ISSUE_COMMENT_PROMPT)
+              setSaving(false)
+            }}
+          >
+            {t('issues.detail.commentPromptReset')}
+          </button>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
 // ==================== Run history ====================
 
 function RunRow({ run, onOpen }: { run: IssueRunRecord; onOpen: (run: IssueRunRecord) => void }) {
@@ -1188,6 +1258,7 @@ function mutationFieldLabel(field: string, t: TFunction): string {
     case 'effort': return t('issues.detail.mutationField.effort')
     case 'timeout': return t('issues.detail.mutationField.timeout')
     case 'what': return t('issues.detail.mutationField.what')
+    case 'commentPrompt': return t('issues.detail.mutationField.commentPrompt')
     default: return field
   }
 }
@@ -1864,6 +1935,11 @@ export function IssueDetail({
             value={issue.what}
             scheduled={Boolean(issue.when)}
             onSave={(what) => onPatch({ what })}
+          />
+          <CommentPromptEditor
+            key={`${wsId}:${id}:comment-prompt`}
+            value={issue.commentPrompt}
+            onSave={(commentPrompt) => onPatch({ commentPrompt })}
           />
           <IssueActivity
             activity={activity}

@@ -182,6 +182,8 @@ interface IssueDetailExtras {
   what?: string
   /** Scheduling frontmatter `agent` (adapter id), if set. */
   agent?: string
+  /** Comment-reply Input Prompt template, if set. */
+  commentPrompt?: string
   /** This issue's headless runs, newest-first (Activity feed). */
   runs: IssueRunRecord[]
 }
@@ -465,6 +467,7 @@ export function demoIssueDetail(wsId: string, id: string): IssueDetail | null {
       ...boardIssue,
       what,
       ...(extras?.agent ? { agent: extras.agent } : {}),
+      ...(extras?.commentPrompt ? { commentPrompt: extras.commentPrompt } : {}),
     },
     comments,
     runs,
@@ -521,6 +524,16 @@ export function demoIssueUpdate(
       existing.body = ''
     } else {
       demoIssueExtras[key] = { body: '', what: patch.what, runs: [] }
+    }
+  }
+  if (patch.commentPrompt !== undefined) {
+    const key = `${wsId}/${id}`
+    const existing = demoIssueExtras[key]
+    if (existing) {
+      if (patch.commentPrompt === null) delete existing.commentPrompt
+      else existing.commentPrompt = patch.commentPrompt
+    } else if (patch.commentPrompt !== null) {
+      demoIssueExtras[key] = { body: '', commentPrompt: patch.commentPrompt, runs: [] }
     }
   }
   if (patch.agent !== undefined) {

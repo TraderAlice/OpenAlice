@@ -54,6 +54,7 @@ describe('telegram connector desk', () => {
     if (!first.ok) return
     expect(first.issue.id).toBe(TELEGRAM_CONNECTOR_ISSUE_ID)
     expect(first.issue.telegramConnector).toBe(true)
+    expect(first.issue.commentPrompt).toBe('{comment}')
 
     const second = await createTelegramConnectorDesk(
       { id: 'ws-b', dir: wsB },
@@ -101,6 +102,7 @@ describe('telegram connector desk', () => {
     expect(revived.issue.id).toBe(TELEGRAM_CONNECTOR_ISSUE_ID)
     expect(revived.issue.telegramConnector).toBe(true)
     expect(revived.issue.status).toBe('todo')
+    expect(revived.issue.commentPrompt).toBe('{comment}')
   })
 
   it('updates the desk cadence through the Settings helper', async () => {

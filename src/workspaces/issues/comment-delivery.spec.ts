@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceConversationControl } from '../../core/workspace-tool-center.js'
-import { dispatchIssueCommentReply, recordIssueCommentReply } from './comment-delivery.js'
+import { dispatchIssueCommentReply, issueCommentReplyPrompt, recordIssueCommentReply } from './comment-delivery.js'
 import { appendIssueComment, readIssueComments, type IssueComment } from './comments.js'
 import type { IssueRecord } from './declaration.js'
 import { createIssue } from './mutate.js'
@@ -44,6 +44,29 @@ function conversation(result: Awaited<ReturnType<WorkspaceConversationControl['a
     read: vi.fn(),
   } as unknown as WorkspaceConversationControl
 }
+
+describe('issueCommentReplyPrompt', () => {
+  it('wraps an ordinary comment in the historical default', () => {
+    expect(issueCommentReplyPrompt({
+      issueWorkspaceId: 'ws-home',
+      issue: issue('@resume-owner'),
+      comment,
+    })).toContain('Issue ws-home/audit (Audit the close)')
+    expect(issueCommentReplyPrompt({
+      issueWorkspaceId: 'ws-home',
+      issue: issue('@resume-owner'),
+      comment,
+    })).toContain('What changed?')
+  })
+
+  it('uses a stored commentPrompt template as the whole Input Prompt', () => {
+    expect(issueCommentReplyPrompt({
+      issueWorkspaceId: 'ws-home',
+      issue: { ...issue('@resume-owner'), commentPrompt: '{comment}' },
+      comment,
+    })).toBe('What changed?')
+  })
+})
 
 describe('dispatchIssueCommentReply', () => {
   it('keeps agent-authored workspace-owned comments as notes', async () => {
