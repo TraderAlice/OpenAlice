@@ -1,4 +1,6 @@
 import { dialog, shell } from 'electron'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 
 import {
   decideExistingOwnerStartup,
@@ -77,6 +79,16 @@ async function takeSmokeHandoff(
     throw new Error(
       `existing-owner smoke expected browser handoff, got ${decision.kind}: ${decision.reason}`,
     )
+  }
+  const receiptPath = process.env['OPENALICE_ELECTRON_SMOKE_EXISTING_OWNER_RECEIPT']?.trim()
+  if (receiptPath) {
+    await mkdir(dirname(receiptPath), { recursive: true })
+    await writeFile(receiptPath, `${JSON.stringify({
+      schemaVersion: 1,
+      action: 'open-browser',
+      url: decision.url,
+      pid: decision.pid,
+    }, null, 2)}\n`, 'utf8')
   }
   console.log(`[guardian] existing-owner handoff → ${decision.url} pid=${decision.pid}`)
   return { action: 'quit' }
