@@ -20,10 +20,14 @@ categories.
   Inbox item read.
 - The service is optional in every trading mode, including lite.
 - Guardian may start, stop, or restart it without restarting Alice or UTA.
-- Inbox delivery remains outbound. Telegram owner private-chat text is ingested
-  only as comments on the Alice Project's phone-desk Issue. `/link`, `/status`,
-  and `/test` stay the generic slash-command control plane. Discord DMs are
-  still not ingested.
+- Inbox delivery remains outbound by default. Each adapter may advertise
+  `inbox` and `settings` capabilities and implement those slash commands
+  itself. Telegram uses an inline-button form: `/inbox` pages unread items
+  and `/settings` toggles Inbox push. Discord registers the same commands
+  and currently replies with a placeholder. `inboxPush: false` skips Inbox
+  `deliver` for that adapter and does not affect phone-desk owner chat.
+  `/link`, `/status`, and `/test` stay the generic control plane. Discord
+  DMs are still not ingested.
 - Connector Service never interprets chat. Alice owns the phone-desk Issue.
   Connector queues owner text and Alice drains that stack only while a live
   phone-desk Issue exists and no desk generation is running. Several stacked
@@ -169,6 +173,10 @@ collapsing to "configured but not running."
 
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
+`/test` still sends when Inbox push is off. `/inbox` and `/settings` are
+capability commands: the catalog only declares them; Telegram renders
+buttons, and a connector that has not implemented the form yet must still
+answer the slash command.
 
 ### Setup lifecycle and UI ownership
 

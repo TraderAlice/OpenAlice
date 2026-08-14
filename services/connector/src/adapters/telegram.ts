@@ -1,11 +1,12 @@
-import { Bot, InputFile } from 'grammy'
+import { Bot, InlineKeyboard, InputFile, type Context } from 'grammy'
 import { autoRetry } from '@grammyjs/auto-retry'
 import type {
   ConnectorAdapterConfig,
   ConnectorAdapterHealth,
   InboxNotification,
 } from '@traderalice/connector-protocol'
-import { TELEGRAM_CONNECTOR_DEFINITION } from '@traderalice/connector-protocol'
+import { isInboxPushEnabled, TELEGRAM_CONNECTOR_DEFINITION } from '@traderalice/connector-protocol'
+import { createInboxStore, type IInboxStore } from '@/core/inbox-store.js'
 import type {
   ConnectorAdapter,
   ConnectorAdapterContext,
@@ -18,6 +19,14 @@ import {
   formatPlainInboxNotification,
 } from './shared.js'
 import { formatTelegramInboxMarkdownV2 } from './telegram-markdown-v2.js'
+import {
+  TELEGRAM_INBOX_PAGE_SIZE,
+  advanceInboxSession,
+  formatTelegramInboxPage,
+  formatTelegramSettingsPage,
+  parseTelegramControl,
+  type TelegramInboxSession,
+} from './telegram-controls.js'
 import { sendTelegramRichText } from './telegram-rich-text.js'
 
 export class TelegramConnectorAdapter implements ConnectorAdapter {
@@ -27,9 +36,13 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private bot?: Bot
   private ownerUserId?: string
   private chatId?: string
+  private inboxPush = true
+  private inboxStore?: IInboxStore
+  private readonly inboxSessions = new Map<string, TelegramInboxSession>()
 
-  constructor(options: { startupTimeoutMs?: number } = {}) {
+  constructor(options: { startupTimeoutMs?: number; inboxStore?: IInboxStore } = {}) {
     this.startupTimeoutMs = options.startupTimeoutMs ?? 15_000
+    this.inboxStore = options.inboxStore
   }
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
@@ -37,10 +50,33 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       const token = requiredString(config, 'botToken')
       this.ownerUserId = optionalString(config, 'ownerUserId')
       this.chatId = optionalString(config, 'chatId')
+      this.inboxPush = isInboxPushEnabled(config.settings)
       const bot = new Bot(token)
       this.bot = bot
 
+      bot.command('inbox', async (ctx) => {
+        if (ctx.chat.type !== 'private' || !ctx.from) return
+        await this.presentInbox(ctx, context, { stack: [] }).catch(async (error) => {
+          this.tracker.degraded(error)
+          await ctx.reply('Could not load Inbox. Check OpenAlice logs.').catch(() => undefined)
+        })
+      })
+      bot.command('settings', async (ctx) => {
+        if (ctx.chat.type !== 'private' || !ctx.from) return
+        await this.presentSettings(ctx, context).catch(async (error) => {
+          this.tracker.degraded(error)
+          await ctx.reply('Could not open settings. Check OpenAlice logs.').catch(() => undefined)
+        })
+      })
+      bot.on('callback_query:data', async (ctx) => {
+        await this.handleControl(ctx, context).catch(async (error) => {
+          this.tracker.degraded(error)
+          await ctx.answerCallbackQuery({ text: 'That control failed.' }).catch(() => undefined)
+        })
+      })
+
       for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
+        if (command.name === 'inbox' || command.name === 'settings') continue
         bot.command(command.name, async (ctx) => {
           if (ctx.chat.type !== 'private' || !ctx.from) return
           const handled = await context.commands.execute({
@@ -171,6 +207,93 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     })
   }
 
+  private async presentInbox(
+    ctx: Context,
+    _context: ConnectorAdapterContext,
+    session: TelegramInboxSession,
+    mode: 'reply' | 'edit' = 'reply',
+  ): Promise<void> {
+    if (!this.isOwner(String(ctx.from?.id ?? ''))) {
+      if (mode === 'edit') await ctx.answerCallbackQuery({ text: 'Only the linked owner can use this.' })
+      else await ctx.reply('This command is only available to the linked owner.')
+      return
+    }
+    const page = await this.resolveInboxStore().read({
+      unread: true,
+      limit: TELEGRAM_INBOX_PAGE_SIZE,
+      ...(session.before ? { before: session.before } : {}),
+    })
+    const form = formatTelegramInboxPage({
+      entries: page.entries,
+      hasMore: page.hasMore,
+      canGoNewer: session.stack.length > 0,
+    })
+    const sent = await this.presentForm(ctx, form, mode)
+    if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), session)
+  }
+
+  private async presentSettings(ctx: Context, _context: ConnectorAdapterContext, mode: 'reply' | 'edit' = 'reply'): Promise<void> {
+    if (!this.isOwner(String(ctx.from?.id ?? ''))) {
+      if (mode === 'edit') await ctx.answerCallbackQuery({ text: 'Only the linked owner can use this.' })
+      else await ctx.reply('This command is only available to the linked owner.')
+      return
+    }
+    await this.presentForm(ctx, formatTelegramSettingsPage(this.inboxPush), mode)
+  }
+
+  private async handleControl(ctx: Context, context: ConnectorAdapterContext): Promise<void> {
+    const data = ctx.callbackQuery?.data
+    if (!data) return
+    const control = parseTelegramControl(data)
+    if (!control) {
+      await ctx.answerCallbackQuery()
+      return
+    }
+    if (!this.isOwner(String(ctx.from?.id ?? ''))) {
+      await ctx.answerCallbackQuery({ text: 'Only the linked owner can use this.' })
+      return
+    }
+    await ctx.answerCallbackQuery()
+    if (control.kind === 'settings') {
+      this.inboxPush = control.inboxPush
+      await context.updateSettings({ inboxPush: control.inboxPush })
+      await this.presentSettings(ctx, context, 'edit')
+      return
+    }
+    const messageId = ctx.callbackQuery?.message?.message_id
+    const key = ctx.chat && messageId ? sessionKey(ctx.chat.id, messageId) : undefined
+    const current = key ? this.inboxSessions.get(key) : undefined
+    if (!current) {
+      await ctx.editMessageText('This Inbox page expired. Send /inbox again.')
+      return
+    }
+    const page = await this.resolveInboxStore().read({
+      unread: true,
+      limit: TELEGRAM_INBOX_PAGE_SIZE,
+      ...(current.before ? { before: current.before } : {}),
+    })
+    const next = advanceInboxSession(current, control.direction, page.entries.at(-1)?.id)
+    await this.presentInbox(ctx, context, next, 'edit')
+  }
+
+  private async presentForm(
+    ctx: Context,
+    form: { text: string; actions: Array<Array<{ text: string; data: string }>> },
+    mode: 'reply' | 'edit',
+  ): Promise<number | undefined> {
+    const markup = toInlineKeyboard(form.actions)
+    if (mode === 'edit') {
+      await ctx.editMessageText(form.text, markup ? { reply_markup: markup } : {})
+      return ctx.callbackQuery?.message?.message_id
+    }
+    const sent = await ctx.reply(form.text, markup ? { reply_markup: markup } : {})
+    return sent.message_id
+  }
+
+  private resolveInboxStore(): IInboxStore {
+    return this.inboxStore ??= createInboxStore()
+  }
+
   private isOwner(userId: string): boolean {
     return Boolean(this.ownerUserId && this.ownerUserId === userId)
   }
@@ -217,6 +340,22 @@ export async function withTimeout<T>(operation: () => Promise<T>, timeoutMs: num
   } finally {
     if (timer) clearTimeout(timer)
   }
+}
+
+function toInlineKeyboard(
+  actions: Array<Array<{ text: string; data: string }>>,
+): InlineKeyboard | undefined {
+  if (actions.length === 0) return undefined
+  const keyboard = new InlineKeyboard()
+  for (const [index, row] of actions.entries()) {
+    if (index > 0) keyboard.row()
+    for (const button of row) keyboard.text(button.text, button.data)
+  }
+  return keyboard
+}
+
+function sessionKey(chatId: number, messageId: number): string {
+  return `${chatId}:${messageId}`
 }
 
 function requiredString(config: ConnectorAdapterConfig, key: string): string {

@@ -1741,6 +1741,10 @@ export const ja: Resources = {
     fields: {
       applicationId: 'アプリケーション ID',
       botToken: 'Bot トークン',
+      inboxPush: 'Inbox 通知をプッシュ',
+    },
+    fieldDescriptions: {
+      inboxPush: 'オフにすると、新しい Inbox は OpenAlice に残り、必要なときに見られます。',
     },
     placeholders: {
       applicationId: 'Discord アプリケーション ID',

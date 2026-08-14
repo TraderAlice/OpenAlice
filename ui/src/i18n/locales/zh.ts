@@ -1740,6 +1740,10 @@ export const zh: Resources = {
     fields: {
       applicationId: '应用 ID',
       botToken: '机器人令牌',
+      inboxPush: '推送 Inbox 通知',
+    },
+    fieldDescriptions: {
+      inboxPush: '关闭后，新的 Inbox 条目留在 OpenAlice，需要时再查看。',
     },
     placeholders: {
       applicationId: 'Discord 应用 ID',

@@ -6,6 +6,7 @@ export type ConnectorIOStage =
   | 'delivery.attempted'
   | 'delivery.succeeded'
   | 'delivery.failed'
+  | 'delivery.skipped'
   | 'command.received'
   | 'command.replied'
   | 'command.failed'

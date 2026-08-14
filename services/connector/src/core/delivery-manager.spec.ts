@@ -186,6 +186,37 @@ describe('DeliveryManager connector registry', () => {
     })).resolves.toBeUndefined()
   })
 
+  it('skips Inbox push when the adapter turned it off', async () => {
+    const deliver = vi.fn(async () => undefined)
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'quiet', label: 'Quiet', description: 'Quiet adapter.', fields: [], commands: [] },
+      create: () => ({
+        id: 'quiet',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver,
+        sendOwnerText: async () => undefined,
+        health: () => ({ id: 'quiet', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { quiet: { enabled: true, settings: { inboxPush: false } } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+    await manager.deliver({
+      id: 'inbox-3',
+      createdAt: new Date().toISOString(),
+      workspaceId: 'ws-1',
+      title: 'Stay local',
+      body: '',
+    })
+    expect(deliver).not.toHaveBeenCalled()
+    await manager.stop()
+  })
+
   it('contains asynchronous owner-chat failures after accepting the projection', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const registry = new ConnectorRegistry()

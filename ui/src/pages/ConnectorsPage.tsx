@@ -315,6 +315,13 @@ export function ConnectorsPage() {
                         t={t}
                       />
 
+                      <ConnectorPreferences
+                        definition={definition}
+                        adapter={adapter}
+                        onSettingChange={(key, value) => updateSetting(definition.id, key, value)}
+                        t={t}
+                      />
+
                       <ConnectorCredentialsEditor
                         definition={definition}
                         adapter={adapter}
@@ -460,6 +467,50 @@ export function ConnectorsPage() {
   )
 }
 
+function ConnectorPreferences({
+  definition,
+  adapter,
+  onSettingChange,
+  t,
+}: {
+  definition: ConnectorDefinition
+  adapter: PublicConnectorConfig['adapters'][string]
+  onSettingChange: (key: string, value: string | number | boolean) => void
+  t: TFunction
+}) {
+  const fields = definition.fields.filter((field) => field.group === 'preferences')
+  if (fields.length === 0) return null
+  return (
+    <div className="space-y-3">
+      {fields.map((field) => {
+        const inputId = `connector-${definition.id}-${field.key}`
+        const fieldLabel = t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
+        const value = adapter.settings[field.key]
+        const checked = typeof value === 'boolean' ? value : field.defaultValue !== false
+        return (
+          <label key={field.key} className="flex items-start gap-3">
+            <input
+              id={inputId}
+              className="mt-1"
+              type="checkbox"
+              checked={field.kind === 'boolean' ? checked : Boolean(value)}
+              onChange={(event) => onSettingChange(field.key, event.target.checked)}
+            />
+            <span>
+              <span className="block text-[13px] font-medium text-foreground">{fieldLabel}</span>
+              {field.description && (
+                <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground/70">
+                  {t(`connectorSettings.fieldDescriptions.${field.key}`, { defaultValue: field.description })}
+                </span>
+              )}
+            </span>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
 function ConnectorCredentialsEditor({
   definition,
   adapter,
@@ -529,7 +580,7 @@ function ConnectorCredentialsEditor({
         <p className="mb-4 text-[11.5px] leading-5 text-muted-foreground">
           {t('connectorSettings.secretsNote')}
         </p>
-        {definition.fields.filter((field) => !field.learnedBy).map((field) => {
+        {definition.fields.filter((field) => !field.learnedBy && field.group !== 'preferences').map((field) => {
           const configured = adapter.configuredSecrets.includes(field.key)
           const value = adapter.settings[field.key]
           const draftKey = connectorFieldKey(definition.id, field.key)

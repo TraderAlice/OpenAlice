@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import {
   inboundOwnerMessageSchema,
+  isInboxPushEnabled,
   type ConnectorAdapterConfig,
   type ConnectorAdapterHealth,
   type ConnectorConfig,
@@ -86,35 +87,18 @@ export class DeliveryManager {
 
   async deliver(notification: InboxNotification, correlationId = `delivery-${randomUUID()}`): Promise<void> {
     await Promise.allSettled([...this.adapters.values()].map(async (adapter) => {
-      await this.record({
-        correlationId,
-        direction: 'outbound',
-        stage: 'delivery.attempted',
-        connectorId: adapter.id,
-        payload: journalNotificationPayload(notification),
-      })
-      try {
-        await adapter.deliver(notification)
+      const settings = this.options.config.adapters[adapter.id]?.settings ?? {}
+      if (!isInboxPushEnabled(settings)) {
         await this.record({
           correlationId,
           direction: 'outbound',
-          stage: 'delivery.succeeded',
+          stage: 'delivery.skipped',
           connectorId: adapter.id,
-          payload: { notificationId: notification.id },
+          payload: { notificationId: notification.id, reason: 'inbox-push-disabled' },
         })
-      } catch (error) {
-        await this.record({
-          correlationId,
-          direction: 'outbound',
-          stage: 'delivery.failed',
-          connectorId: adapter.id,
-          payload: {
-            notificationId: notification.id,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        })
-        console.warn(`[connector] ${adapter.id} delivery failed:`, error instanceof Error ? error.message : error)
+        return
       }
+      await this.deliverToAdapter(adapter, notification, correlationId)
     }))
   }
 
@@ -232,7 +216,14 @@ export class DeliveryManager {
     if (!adapter || !commands) throw new Error(`Connector adapter is not installed: ${id}`)
     const context: ConnectorAdapterContext = {
       commands,
-      updateSettings: (patch) => this.options.updateAdapterSettings(id, patch),
+      updateSettings: async (patch) => {
+        await this.options.updateAdapterSettings(id, patch)
+        const current = this.options.config.adapters[id] ?? { enabled: false, settings: {} }
+        this.options.config.adapters[id] = {
+          ...current,
+          settings: { ...current.settings, ...patch },
+        }
+      },
       getServiceStatus: () => this.health().status,
       sendTest: (connectorId) => this.sendTest(connectorId),
       forwardOwnerText: async (input) => {

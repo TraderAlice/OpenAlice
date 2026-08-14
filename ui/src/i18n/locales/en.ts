@@ -1752,6 +1752,10 @@ export const en = {
     fields: {
       applicationId: 'Application ID',
       botToken: 'Bot token',
+      inboxPush: 'Push Inbox notifications',
+    },
+    fieldDescriptions: {
+      inboxPush: 'When off, new Inbox items stay in OpenAlice until you look them up.',
     },
     placeholders: {
       applicationId: 'Discord application ID',

@@ -33,12 +33,24 @@ export const DISCORD_CONNECTOR_DEFINITION: ConnectorDefinition = {
         description: 'Only this Discord account can link and receive notifications.',
         placeholder: 'Can be learned with /link',
       },
+      {
+        key: 'inboxPush',
+        label: 'Push Inbox notifications',
+        kind: 'boolean',
+        required: false,
+        group: 'preferences',
+        defaultValue: true,
+        description: 'When off, new Inbox items stay in OpenAlice until you open them there or run /inbox.',
+      },
     ],
     commands: [
       { name: 'link', description: 'Link this Discord account as the owner.' },
       { name: 'status', description: 'Show connector health.' },
       { name: 'test', description: 'Send a test notification.' },
+      { name: 'inbox', description: 'Browse recent Inbox items.' },
+      { name: 'settings', description: 'Change Inbox push for this chat.' },
     ],
+    capabilities: ['inbox', 'settings'],
   }
 
 export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
@@ -71,12 +83,24 @@ export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
         description: 'Learned automatically when the owner runs /link.',
         placeholder: 'Can be learned with /link',
       },
+      {
+        key: 'inboxPush',
+        label: 'Push Inbox notifications',
+        kind: 'boolean',
+        required: false,
+        group: 'preferences',
+        defaultValue: true,
+        description: 'When off, new Inbox items stay in OpenAlice until you run /inbox.',
+      },
     ],
     commands: [
       { name: 'link', description: 'Link this private chat as the owner.' },
       { name: 'status', description: 'Show connector health.' },
       { name: 'test', description: 'Send a test notification.' },
+      { name: 'inbox', description: 'Browse recent Inbox items.' },
+      { name: 'settings', description: 'Change Inbox push for this chat.' },
     ],
+    capabilities: ['inbox', 'settings'],
   }
 
 export const BUILTIN_CONNECTOR_DEFINITIONS: ConnectorDefinition[] = [

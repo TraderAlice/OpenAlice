@@ -13,8 +13,16 @@ export const connectorFieldDefinitionSchema = z.object({
   /** Slash command that owns this value. Settings renders these fields as
    *  lifecycle output rather than ordinary operator-entered configuration. */
   learnedBy: z.string().min(1).optional(),
+  /** Settings card section. `preferences` stays out of connection details. */
+  group: z.enum(['credentials', 'preferences']).optional(),
+  defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
 })
 export type ConnectorFieldDefinition = z.infer<typeof connectorFieldDefinitionSchema>
+
+/** Capabilities a connector may advertise. Each adapter implements its own
+ *  interaction; the catalog only says the command exists. */
+export const connectorCapabilitySchema = z.enum(['inbox', 'settings'])
+export type ConnectorCapability = z.infer<typeof connectorCapabilitySchema>
 
 export const connectorDefinitionSchema = z.object({
   id: z.string().min(1),
@@ -25,6 +33,7 @@ export const connectorDefinitionSchema = z.object({
     name: z.string().min(1),
     description: z.string().min(1),
   })).default([]),
+  capabilities: z.array(connectorCapabilitySchema).optional(),
 })
 export type ConnectorDefinition = z.infer<typeof connectorDefinitionSchema>
 
@@ -141,3 +150,8 @@ export const inboundOwnerMessageSchema = z.object({
 })
 export type InboundOwnerMessage = z.infer<typeof inboundOwnerMessageSchema>
 export type ConnectorDeliveryReceipt = z.infer<typeof connectorDeliveryReceiptSchema>
+
+/** Missing or non-false means push is on. Existing installs stay noisy. */
+export function isInboxPushEnabled(settings: Record<string, string | number | boolean>): boolean {
+  return settings.inboxPush !== false
+}

@@ -16,8 +16,11 @@ export interface ConnectorDefinition {
     required: boolean
     placeholder?: string
     learnedBy?: string
+    group?: 'credentials' | 'preferences'
+    defaultValue?: string | number | boolean
   }>
   commands: Array<{ name: string; description: string }>
+  capabilities?: Array<'inbox' | 'settings'>
 }
 
 export interface PublicConnectorConfig {
@@ -137,11 +140,19 @@ function isConnectorDefinition(value: unknown): boolean {
       && typeof field.required === 'boolean'
       && isOptionalString(field.description)
       && isOptionalString(field.placeholder)
-      && isOptionalString(field.learnedBy))
+      && isOptionalString(field.learnedBy)
+      && (field.group === undefined || field.group === 'credentials' || field.group === 'preferences')
+      && (field.defaultValue === undefined
+        || typeof field.defaultValue === 'string'
+        || typeof field.defaultValue === 'number'
+        || typeof field.defaultValue === 'boolean'))
     && Array.isArray(value.commands)
     && value.commands.every((command) => isRecord(command)
       && typeof command.name === 'string'
       && typeof command.description === 'string')
+    && (value.capabilities === undefined
+      || (Array.isArray(value.capabilities)
+        && value.capabilities.every((capability) => capability === 'inbox' || capability === 'settings')))
 }
 
 function isPublicConnectorConfig(value: unknown): boolean {

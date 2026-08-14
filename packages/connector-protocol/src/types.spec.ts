@@ -4,6 +4,7 @@ import {
   MAX_CONNECTOR_ATTACHMENT_BYTES,
   OWNER_CHAT_TEXT_MAX,
   inboxNotificationSchema,
+  isInboxPushEnabled,
   ownerChatMessageSchema,
 } from './types.js'
 
@@ -37,6 +38,14 @@ describe('owner chat messages', () => {
       adapterId: 'telegram',
       text: 'x'.repeat(OWNER_CHAT_TEXT_MAX + 1),
     })).toThrow()
+  })
+})
+
+describe('Inbox push preference', () => {
+  it('defaults to on so existing installs keep delivering', () => {
+    expect(isInboxPushEnabled({})).toBe(true)
+    expect(isInboxPushEnabled({ inboxPush: true })).toBe(true)
+    expect(isInboxPushEnabled({ inboxPush: false })).toBe(false)
   })
 })
 

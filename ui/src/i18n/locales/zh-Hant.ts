@@ -1748,6 +1748,10 @@ export const zhHant: Resources = {
     fields: {
       applicationId: '應用程式 ID',
       botToken: '機器人權杖',
+      inboxPush: '推送 Inbox 通知',
+    },
+    fieldDescriptions: {
+      inboxPush: '關閉後，新的 Inbox 條目留在 OpenAlice，需要時再查看。',
     },
     placeholders: {
       applicationId: 'Discord 應用程式 ID',
