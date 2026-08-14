@@ -27,6 +27,11 @@ describe('owner chat messages', () => {
       adapterId: 'telegram',
       text: 'Markets are quiet.',
     }).text).toBe('Markets are quiet.')
+    expect(ownerChatMessageSchema.parse({
+      id: 'desk-1',
+      adapterId: 'telegram',
+      text: 'x'.repeat(OWNER_CHAT_TEXT_MAX),
+    }).text).toHaveLength(OWNER_CHAT_TEXT_MAX)
     expect(() => ownerChatMessageSchema.parse({
       id: 'desk-1',
       adapterId: 'telegram',

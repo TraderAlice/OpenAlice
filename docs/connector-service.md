@@ -46,14 +46,21 @@ categories.
   sends the original bytes instead of guessing. A skipped or ambiguous
   eligible attachment is logged and leaves bridge health degraded so partial
   or unnormalized delivery is visible to operators.
-- HTML is a presentation asset, not a Connector message format. Adapters send
-  the `.html` file with a `text/html` media type and never inline,
-  translate, or render its contents into the external chat message. OpenAlice
-  previews static HTML in an origin-less sandbox with scripts, forms,
-  navigation, and network disabled; inline CSS, SVG, and data images remain
-  available for self-contained human-facing reports. Markdown remains the
-  default agent-readable work product, while Inbox comments carry the concise
-  summary for both the user and other agents.
+- HTML report files are a presentation asset, not a Connector message format.
+  Adapters send the `.html` file with a `text/html` media type and never
+  inline, translate, or render those file contents into the chat body.
+  OpenAlice previews static HTML in an origin-less sandbox with scripts,
+  forms, navigation, and network disabled; inline CSS, SVG, and data images
+  remain available for self-contained human-facing reports. Markdown remains
+  the default agent-readable work product, while Inbox comments carry the
+  concise summary for both the user and other agents.
+- Telegram text uses `sendMessage` with `parse_mode: MarkdownV2`. Connector
+  converts common GFM (`**bold**`, lists, headings, code) into MarkdownV2 and
+  escapes unmatched specials so agent text does not 400. Inbox titles and
+  provenance are escaped literals; Inbox bodies go through the same converter.
+  If MarkdownV2 is rejected, Connector tries Bot API 10.1 `sendRichMessage`
+  with the original GFM, then plain `sendMessage` (4096). Discord still uses
+  its own markdown. Do not use legacy `parse_mode: Markdown`.
 - Session provenance is rendered as a visible `@resumeId` signature. The
   runtime label may accompany it (`pi · @resume-…`) but must never replace it.
 

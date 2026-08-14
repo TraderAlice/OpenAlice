@@ -1,28 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { InboxNotification } from '@traderalice/connector-protocol'
 import { CommandRegistry } from '../core/adapter.js'
+import { formatInboxNotification } from './shared.js'
 import { TelegramConnectorAdapter, withTimeout } from './telegram.js'
 
 const startMock = vi.fn()
 const stopMock = vi.fn()
 const setMyCommands = vi.fn(async () => undefined)
+const sendRichMessage = vi.fn(async () => undefined)
+const sendMessage = vi.fn(async () => undefined)
+const sendDocument = vi.fn(async () => undefined)
 
-vi.mock('grammy', () => ({
-  Bot: class {
-    api = {
-      config: { use() {} },
-      setMyCommands,
-    }
-    command() {}
-    on() {}
-    start(options: { onStart?: () => void }) {
-      return startMock(options)
-    }
-    stop() {
-      return stopMock()
-    }
-  },
-  InputFile: class {},
-}))
+vi.mock('grammy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('grammy')>()
+  return {
+    ...actual,
+    Bot: class {
+      api = {
+        config: { use() {} },
+        setMyCommands,
+        sendRichMessage,
+        sendMessage,
+        sendDocument,
+      }
+      command() {}
+      on() {}
+      start(options: { onStart?: () => void }) {
+        return startMock(options)
+      }
+      stop() {
+        return stopMock()
+      }
+    },
+    InputFile: class {},
+  }
+})
 
 vi.mock('@grammyjs/auto-retry', () => ({
   autoRetry: () => () => undefined,
@@ -57,7 +69,13 @@ describe('Telegram polling readiness', () => {
     startMock.mockReset()
     stopMock.mockReset()
     setMyCommands.mockClear()
+    sendRichMessage.mockReset()
+    sendMessage.mockReset()
+    sendDocument.mockReset()
     stopMock.mockResolvedValue(undefined)
+    sendRichMessage.mockResolvedValue(undefined)
+    sendMessage.mockResolvedValue(undefined)
+    sendDocument.mockResolvedValue(undefined)
   })
 
   it('does not claim awaiting_link until long polling has started', async () => {
@@ -127,5 +145,59 @@ describe('Telegram polling readiness', () => {
       status: 'degraded',
       lastError: 'Telegram setting botToken is required',
     })
+  })
+})
+
+describe('Telegram rich outbound text', () => {
+  beforeEach(() => {
+    startMock.mockReset()
+    stopMock.mockReset()
+    sendRichMessage.mockReset()
+    sendMessage.mockReset()
+    startMock.mockImplementation((options: { onStart?: () => void }) => {
+      queueMicrotask(() => options.onStart?.())
+      return new Promise(() => undefined)
+    })
+    sendRichMessage.mockResolvedValue(undefined)
+    sendMessage.mockResolvedValue(undefined)
+  })
+
+  it('projects owner comments as rich GFM', async () => {
+    const adapter = new TelegramConnectorAdapter({ startupTimeoutMs: 200 })
+    await adapter.start({
+      enabled: true,
+      settings: { botToken: 'token', ownerUserId: '42', chatId: '99' },
+    }, context())
+    const markdown = '**hello**\n\n- one\n- two'
+
+    await adapter.sendOwnerText(markdown)
+
+    expect(sendRichMessage).toHaveBeenCalledWith('99', { markdown })
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('sends Inbox notifications as rich GFM', async () => {
+    const adapter = new TelegramConnectorAdapter({ startupTimeoutMs: 200 })
+    await adapter.start({
+      enabled: true,
+      settings: { botToken: 'token', ownerUserId: '42', chatId: '99' },
+    }, context())
+    const notification: InboxNotification = {
+      id: 'inbox-1',
+      createdAt: '2026-07-13T00:00:00.000Z',
+      workspaceId: 'ws-1',
+      workspaceLabel: 'Research *desk*',
+      title: 'Close [scan]',
+      body: 'Three **findings**.',
+      provenance: { resumeId: 'resume-calm-river-12ab' },
+      href: 'https://openalice.example/inbox',
+    }
+
+    await adapter.deliver(notification)
+
+    expect(sendRichMessage).toHaveBeenCalledWith('99', {
+      markdown: formatInboxNotification(notification),
+    })
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 })

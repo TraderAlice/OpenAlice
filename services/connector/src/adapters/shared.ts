@@ -62,7 +62,7 @@ export class AdapterHealthTracker {
 
 export function formatInboxNotification(notification: InboxNotification): string {
   const workspace = notification.workspaceLabel ?? notification.workspaceId
-  const provenance = formatProvenance(notification)
+  const provenance = formatInboxProvenance(notification)
   const parts = [
     `**${escapeMarkdown(notification.title)}**`,
     `Workspace: ${escapeMarkdown(workspace)}`,
@@ -75,7 +75,7 @@ export function formatInboxNotification(notification: InboxNotification): string
 
 export function formatPlainInboxNotification(notification: InboxNotification): string {
   const workspace = notification.workspaceLabel ?? notification.workspaceId
-  const provenance = formatProvenance(notification)
+  const provenance = formatInboxProvenance(notification)
   const parts = [notification.title, `Workspace: ${workspace}`]
   if (provenance) parts.push(`From: ${provenance}`)
   if (notification.body.trim()) parts.push('', truncate(notification.body.trim(), 1_600))
@@ -113,7 +113,7 @@ export function decodeInboxAttachments(notification: InboxNotification): Decoded
   })
 }
 
-function formatProvenance(notification: InboxNotification): string | undefined {
+export function formatInboxProvenance(notification: InboxNotification): string | undefined {
   const actor = notification.provenance?.actorLabel?.trim()
   const resumeId = notification.provenance?.resumeId?.trim()
   const signature = resumeId ? `@${resumeId}` : undefined
