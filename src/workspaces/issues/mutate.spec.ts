@@ -222,6 +222,41 @@ describe('updateIssueFields', () => {
     expect(issue?.timeout).toBe('15m')
   })
 
+  it('toggles cron catchUp without rewriting the rest of when', async () => {
+    await createIssue(dir, {
+      id: 'morning',
+      title: 'Morning',
+      when: { kind: 'cron', cron: '0 9 * * *', timezone: 'America/New_York' },
+    })
+    const off = await updateIssueFields(dir, 'morning', { catchUp: false })
+    expect(off.ok).toBe(true)
+    let { issue } = await readBack('morning')
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+      catchUp: false,
+    })
+
+    const on = await updateIssueFields(dir, 'morning', { catchUp: true })
+    expect(on.ok).toBe(true)
+    ;({ issue } = await readBack('morning'))
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+    })
+
+    const every = await createIssue(dir, {
+      id: 'heartbeat',
+      title: 'Heartbeat',
+      when: { kind: 'every', every: '4h' },
+    })
+    expect(every.ok).toBe(true)
+    const refused = await updateIssueFields(dir, 'heartbeat', { catchUp: false })
+    expect(refused).toMatchObject({ ok: false, reason: 'invalid' })
+  })
+
   it('switches atomically between vault access, native login, and inheritance', async () => {
     await createIssue(dir, { id: 'access', title: 'Access', credential: 'openai-primary' })
     const native = await updateIssueFields(dir, 'access', { credentialSource: 'native' })

@@ -316,6 +316,27 @@ describe('IssueDetail property controls', () => {
     })
   })
 
+  it('patches cron catch-up from the schedule inspector', async () => {
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: {
+        ...scheduledIssue.issue,
+        when: { ...scheduledIssue.issue.when!, catchUp: false },
+      },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    const toggle = await screen.findByRole('checkbox', { name: /Retry a missed fire/ }) as HTMLInputElement
+    expect(toggle.checked).toBe(true)
+    fireEvent.click(toggle)
+    await waitFor(() => {
+      expect(mocks.updateIssue).toHaveBeenCalledWith(
+        'demo-ws-auto-quant',
+        'morning-scan',
+        { catchUp: false },
+      )
+    })
+  })
+
   it('chooses a credential before narrowing model and effort options', async () => {
     scheduledIssue.issue.credential = 'deepseek-1'
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)

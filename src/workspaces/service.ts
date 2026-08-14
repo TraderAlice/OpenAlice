@@ -515,7 +515,7 @@ export interface WorkspaceService {
     createdBy?: SessionCreatedBy,
   ): Promise<{ taskId: string; resumeId: string }>;
   /** Read-only scheduling projection of every workspace's `.alice/issues/`
-   *  directory (scheduled issues only) + each task's last-fired marker and
+   *  directory (scheduled issues only) + each task's dispatch cursor and
    *  computed next-due. Powers GET /api/schedule. */
   scheduleSnapshot(): Promise<ScheduleSnapshot>;
   /** Read-only snapshot of every workspace's `.alice/issues/` directory — ALL
@@ -1884,7 +1884,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   // files and fire due SCHEDULED issues as headless runs through the SAME dispatch
   // primitive (issues without a `when` are pure board items, ignored here). The
   // scanner owns its own tick (infra periodicity, NOT a scheduled task) and
-  // persists only a last-fired marker — never the schedule itself, which lives
+  // persists only dispatch cursors — never the schedule itself, which lives
   // solely in the workspace's file.
   const scheduleMarkers = await ScheduleMarkerStore.load(
     join(config.launcherRoot, 'state', 'schedule-markers.json'),
@@ -2002,6 +2002,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
               scheduleMarkers.get(ws.id, issue.id) ?? null,
               nowMs,
               DEFAULT_INTERVAL_MS,
+              scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
             ),
           );
         }
@@ -2042,6 +2043,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             scheduleMarkers.get(ws.id, issue.id) ?? null,
             nowMs,
             DEFAULT_INTERVAL_MS,
+            scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
           );
           const latestRun = headlessTasks.list({ issue: { workspaceId: ws.id, issueId: issue.id } })[0];
           return snapshotBoardIssue(
@@ -2095,6 +2097,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         scheduleMarkers.get(ws.id, issue.id) ?? null,
         Date.now(),
         DEFAULT_INTERVAL_MS,
+        scheduleMarkers.getHeld(ws.id, issue.id) ?? null,
       );
       scheduledSnapshot = fired;
     }

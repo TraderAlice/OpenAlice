@@ -19,7 +19,7 @@
  * drift on file format or validation; writes are working-tree only (no commit):
  *   PATCH /api/issues/:wsId/:id           body { status?, priority?, assignee?,
  *                                          agent?, credential?, model?, effort?,
- *                                          timeout?, what?, commentPrompt? }
+ *                                          timeout?, what?, commentPrompt?, catchUp? }
  *   POST  /api/issues/:wsId/:id/comments  body { text }  (author = 'human';
  *     exact Session owners are notified and their final reply returns here)
  *
@@ -187,6 +187,7 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
       timeout?: IssueTimeout | null
       what?: string
       commentPrompt?: string | null
+      catchUp?: boolean
     } = {}
     if ('status' in fields) {
       const s = fields['status']
@@ -331,10 +332,16 @@ export function createIssuesRoutes(svc: WorkspaceService, deps: IssueRoutesDeps 
         patch.commentPrompt = raw
       }
     }
+    if ('catchUp' in fields) {
+      if (typeof fields['catchUp'] !== 'boolean') {
+        return c.json({ error: 'invalid_catch_up', message: 'catchUp must be true or false' }, 400)
+      }
+      patch.catchUp = fields['catchUp']
+    }
     if (Object.keys(patch).length === 0) {
       return c.json({
         error: 'no_fields',
-        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what, commentPrompt',
+        message: 'provide at least one of status, priority, assignee, agent, credential, model, effort, timeout, what, commentPrompt, catchUp',
       }, 400)
     }
 

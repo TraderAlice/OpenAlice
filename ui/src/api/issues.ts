@@ -300,6 +300,7 @@ export interface IssuePatch {
   timeout?: IssueTimeout | null
   what?: string
   commentPrompt?: string | null
+  catchUp?: boolean
 }
 
 export const issuesApi = {
@@ -328,7 +329,7 @@ export const issuesApi = {
 
   /**
    * Human write path: patch one issue's editable fields (any subset of
-   * status / priority / assignee / agent / credential / model / effort / timeout / what).
+   * status / priority / assignee / agent / credential / model / effort / timeout / what / catchUp).
    * Null runtime fields clear their one-run overrides so Workspace/native
    * defaults apply. `timeout: null` removes the optional run watchdog.
    * Returns the SAME detail shape as `getDetail` so the caller

@@ -12,6 +12,9 @@
  *
  * Disk shape mirrors HeadlessTaskRegistry: versioned JSON, atomic tmp->rename,
  * co-located under the launcher `state/` dir.
+ *
+ * Version 2 records last successful fire separately from a held cron cursor
+ * (catch-up or calendar-only skip). Version 1 numeric values remain last-fired.
  */
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
@@ -25,8 +28,13 @@ import type { Logger } from '../logger.js'
 const SEP = ' '
 const composite = (wsId: string, taskId: string): string => `${wsId}${SEP}${taskId}`
 
+interface MarkerRecord {
+  fired?: number
+  held?: number
+}
+
 export class ScheduleMarkerStore {
-  private readonly fired = new Map<string, number>()
+  private readonly records = new Map<string, MarkerRecord>()
 
   private constructor(
     private readonly path: string,
@@ -36,10 +44,11 @@ export class ScheduleMarkerStore {
   static async load(path: string, logger: Logger): Promise<ScheduleMarkerStore> {
     const store = new ScheduleMarkerStore(path, logger)
     try {
-      const parsed = JSON.parse(await readFile(path, 'utf8')) as { markers?: Record<string, number> }
+      const parsed = JSON.parse(await readFile(path, 'utf8')) as { markers?: Record<string, unknown> }
       if (parsed.markers) {
-        for (const [k, v] of Object.entries(parsed.markers)) {
-          if (typeof v === 'number') store.fired.set(k, v)
+        for (const [key, value] of Object.entries(parsed.markers)) {
+          const record = decodeMarker(value)
+          if (record) store.records.set(key, record)
         }
       }
     } catch {
@@ -54,20 +63,30 @@ export class ScheduleMarkerStore {
   }
 
   get(wsId: string, taskId: string): number | undefined {
-    return this.fired.get(composite(wsId, taskId))
+    return this.records.get(composite(wsId, taskId))?.fired
+  }
+
+  getHeld(wsId: string, taskId: string): number | undefined {
+    return this.records.get(composite(wsId, taskId))?.held
   }
 
   async set(wsId: string, taskId: string, ts: number): Promise<void> {
-    this.fired.set(composite(wsId, taskId), ts)
+    this.records.set(composite(wsId, taskId), { fired: ts })
+    await this.flush()
+  }
+
+  async hold(wsId: string, taskId: string, ts: number): Promise<void> {
+    const current = this.records.get(composite(wsId, taskId)) ?? {}
+    this.records.set(composite(wsId, taskId), { ...current, held: ts })
     await this.flush()
   }
 
   /** Drop markers whose key wasn't seen this scan (workspace/task gone) - bounds growth. */
   async prune(seenKeys: Set<string>): Promise<void> {
     let changed = false
-    for (const k of [...this.fired.keys()]) {
-      if (!seenKeys.has(k)) {
-        this.fired.delete(k)
+    for (const key of [...this.records.keys()]) {
+      if (!seenKeys.has(key)) {
+        this.records.delete(key)
         changed = true
       }
     }
@@ -77,13 +96,23 @@ export class ScheduleMarkerStore {
   private async flush(): Promise<void> {
     try {
       await mkdir(dirname(this.path), { recursive: true })
-      const markers: Record<string, number> = {}
-      for (const [k, v] of this.fired) markers[k] = v
+      const markers: Record<string, MarkerRecord> = {}
+      for (const [key, value] of this.records) markers[key] = value
       const tmp = `${this.path}.tmp`
-      await writeFile(tmp, JSON.stringify({ version: 1, markers }, null, 2), 'utf8')
+      await writeFile(tmp, JSON.stringify({ version: 2, markers }, null, 2), 'utf8')
       await rename(tmp, this.path)
     } catch (err) {
       this.logger.warn('schedule_marker.flush_failed', { err })
     }
   }
+}
+
+function decodeMarker(value: unknown): MarkerRecord | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return { fired: value }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as { fired?: unknown; held?: unknown }
+  const next: MarkerRecord = {}
+  if (typeof record.fired === 'number' && Number.isFinite(record.fired)) next.fired = record.fired
+  if (typeof record.held === 'number' && Number.isFinite(record.held)) next.held = record.held
+  return next.fired !== undefined || next.held !== undefined ? next : null
 }

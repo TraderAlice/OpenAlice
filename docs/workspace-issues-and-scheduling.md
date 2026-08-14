@@ -168,6 +168,22 @@ clock explicitly. Cron is not an exchange calendar: holidays, early closes, and
 calendar primitive can add those semantics without making ordinary reminders
 depend on a trading subsystem.
 
+`every` and `cron` share one dispatch channel. They differ only in due math:
+`every` is an interval since the last accepted fire; `cron` is a wall clock.
+By default a missed cron admission (`busy`, full worker pool, or another
+dispatch throw before a run exists) **catches up**: the occurrence stays due
+until a run is accepted, then the next fire is the next calendar slot after
+that success. Set `catchUp: false` to consume every elapsed slot and wait for
+the next future calendar time instead:
+
+```yaml
+when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York, catchUp: false }
+```
+
+Omitted `catchUp` means catch-up. This does not retry a run that was already
+accepted and later failed; that occurrence stays one attempt and uses
+**Retry now**. Creating a cron Issue still does not dump historical slots.
+
 ## Agent and Human Surfaces
 
 Agents normally use:
@@ -214,16 +230,18 @@ The scanner interprets timing only. It hands the visible markdown What to the
 agent unchanged. Conditions belong in that prompt: for “notify only if X,” the
 run checks X and exits silently when false.
 
-The scanner persists only last-fired markers under the launcher state root.
-Schedule semantics remain in the issue file. Markers are written after a
-successful dispatch, meaning a durable run record was accepted. If that worker
+The scanner persists dispatch cursors (the last accepted fire plus any held
+cron occurrence) under the launcher state root. Schedule semantics remain in
+the issue file. The last-fire cursor is written after a successful dispatch,
+meaning a durable run record was accepted. If that worker
 later fails to launch or exits unsuccessfully, the failed run remains the
 single attempt for that occurrence and the operator can use **Retry now**.
 **Run now** starts an extra turn without waiting for the next due time and
 without moving that marker, so a missed fire or a prompt test does not steal
 the next scheduled occurrence. The
 scanner does not turn its own tick interval into a retry storm. Capacity or
-another admission rejection that creates no run stays due for retry.
+another admission rejection that creates no run stays due for retry, including
+cron unless the Issue sets `catchUp: false`.
 
 The durable run record keeps the requested model and effort beside the resolved
 agent. This is selection provenance, not a claim that the provider honored an
@@ -414,7 +432,7 @@ provenance store.
 | `src/workspaces/issues/automation-health.ts` | Live schedule/run/owner health projection |
 | `src/workspaces/issues/run-failure.ts` | Read-side scheduled-run termination explanation |
 | `src/workspaces/schedule/scanner.ts` | Workspace scan, due calculation, dispatch |
-| `src/workspaces/schedule/marker-store.ts` | Atomic last-fired persistence |
+| `src/workspaces/schedule/marker-store.ts` | Atomic dispatch-cursor persistence |
 | `src/workspaces/service.ts` | Scanner composition, agent resolution, headless registry |
 | `src/workspaces/headless-task.ts` | Process lifecycle, bounded logs, live structured snapshots |
 | `src/workspaces/headless-task-registry.ts` | Durable run records, resume lineage, and capacity projection |

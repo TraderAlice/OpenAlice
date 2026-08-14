@@ -4,7 +4,7 @@ import type { ModelReasoningEffort } from './types'
 export type ScheduleWhen =
   | { kind: 'at'; at: string }
   | { kind: 'every'; every: string }
-  | { kind: 'cron'; cron: string; timezone?: string }
+  | { kind: 'cron'; cron: string; timezone?: string; catchUp?: boolean }
 
 export interface ScheduleTask {
   id: string

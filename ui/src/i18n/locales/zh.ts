@@ -101,6 +101,8 @@ export const zh: Resources = {
       runHealth: '运行状态',
       lastRun: '上次运行',
       nextRun: '下次运行',
+      catchUp: '错过时自动重试',
+      catchUpDescription: '如果 Session 正忙或 worker 池已满，这一格会保持 due 直到跑出去。关掉则等到日历上的下一次。',
       viewLastRun: '查看上次运行',
       never: '从未',
       default: '默认',
@@ -290,6 +292,8 @@ export const zh: Resources = {
       weekend: '周末',
       local: '本地',
       localTime: '本地时间',
+      catchUp: '错过会自动补打，直到跑出去',
+      calendarOnly: '错过则等到日历上的下一次',
     },
     weekday: {
       sun: '周日',

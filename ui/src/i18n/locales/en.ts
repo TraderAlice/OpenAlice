@@ -113,6 +113,8 @@ export const en = {
       runHealth: 'Run health',
       lastRun: 'Last run',
       nextRun: 'Next run',
+      catchUp: 'Retry a missed fire',
+      catchUpDescription: 'If the Session is busy or the worker pool is full, keep this occurrence due until it runs. Turn off to wait for the next calendar time.',
       viewLastRun: 'View last run',
       never: 'never',
       default: 'Default',
@@ -302,6 +304,8 @@ export const en = {
       weekend: 'weekend',
       local: 'local',
       localTime: 'local time',
+      catchUp: 'Retries a missed fire until it runs',
+      calendarOnly: 'Missed fires wait for the next calendar time',
     },
     weekday: {
       sun: 'Sun',
