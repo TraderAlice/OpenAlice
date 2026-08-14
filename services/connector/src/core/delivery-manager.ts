@@ -142,7 +142,7 @@ export class DeliveryManager {
     if (overflow > 0) this.inbound.splice(0, overflow)
   }
 
-  drainInbound(limit = 20): InboundOwnerMessage[] {
+  drainInbound(limit = MAX_INBOUND_OWNER_MESSAGES): InboundOwnerMessage[] {
     return this.inbound.splice(0, Math.max(0, limit))
   }
 

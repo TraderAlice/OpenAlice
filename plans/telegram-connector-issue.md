@@ -49,7 +49,10 @@ Chosen model (serial alignment, not a second chat surface):
 
 ## Occupancy
 
-Existing per-`resumeId` busy stays. Queue-on-busy is out of this plan.
+Existing per-`resumeId` busy stays. A general Issue busy-queue is still out
+of this plan. Telegram inbound is different: later owner DMs stay in the
+Connector queue while a desk generation is running, then flush as one quoted
+comment.
 
 ## Increments
 
@@ -71,7 +74,7 @@ Existing per-`resumeId` busy stays. Queue-on-busy is out of this plan.
 
 ### Not in this plan
 
-Queue when `busy`. Groups / Discord chat. Showing the stored bot token. Changing `inbox_push` for ordinary Issues.
+General Issue queue when `busy`. Groups / Discord chat. Showing the stored bot token. Changing `inbox_push` for ordinary Issues.
 
 ## Completion
 

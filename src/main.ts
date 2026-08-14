@@ -52,7 +52,7 @@ import { SessionStore } from './core/session.js'
 import { createInboxStore } from './core/inbox-store.js'
 import { startInboxConnectorBridge } from './services/connector-client/index.js'
 import { createWorkspaceConversationControl } from './workspaces/conversation-control.js'
-import { startTelegramDeskInboundPoll } from './workspaces/issues/telegram-desk-chat.js'
+import { startTelegramDeskInboundPoll, telegramDeskHasRunningWork } from './workspaces/issues/telegram-desk-chat.js'
 import { ToolCenter } from './core/tool-center.js'
 import { WorkspaceToolCenter } from './core/workspace-tool-center.js'
 import { inboxPushFactory } from './tool/inbox-push.js'
@@ -296,6 +296,11 @@ async function main() {
     conversation: () => {
       const service = workspaceServiceRef.current
       return service ? createWorkspaceConversationControl(service) : undefined
+    },
+    deskGenerating: (desk) => {
+      const service = workspaceServiceRef.current
+      if (!service) return false
+      return telegramDeskHasRunningWork(service.headlessTasks.list({ status: 'running' }), desk)
     },
   })
 

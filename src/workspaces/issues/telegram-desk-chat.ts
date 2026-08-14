@@ -39,21 +39,66 @@ export interface TelegramDeskChatHost {
   getWorkspace(id: string): { id: string; dir: string } | undefined
   provenanceStore(): IProvenanceStore | undefined
   conversation(): WorkspaceConversationControl | undefined
+  /** True while a scheduled fire or comment reply for this desk is running. */
+  deskGenerating?(desk: TelegramConnectorDesk): boolean
+}
+
+export function telegramDeskHasRunningWork(
+  tasks: readonly Pick<HeadlessTaskRecord, 'status' | 'trigger' | 'inquiry'>[],
+  desk: { wsId: string; issue: { id: string } },
+): boolean {
+  return tasks.some((task) => task.status === 'running' && isDeskTask(task, desk))
+}
+
+function isDeskTask(
+  task: Pick<HeadlessTaskRecord, 'trigger' | 'inquiry'>,
+  desk: { wsId: string; issue: { id: string } },
+): boolean {
+  const trigger = task.trigger
+  if (trigger?.kind === 'issue' && trigger.workspaceId === desk.wsId && trigger.issueId === desk.issue.id) {
+    return true
+  }
+  const subject = task.inquiry?.subject
+  return subject?.kind === 'issue' && subject.workspaceId === desk.wsId && subject.issueId === desk.issue.id
+}
+
+/** One inbound stays as-is. Several become one stacked comment, each quoted. */
+export function formatTelegramInboundStack(texts: readonly string[]): string {
+  const parts = texts.map((text) => text.trim()).filter((text) => text.length > 0)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0] ?? ''
+  return parts.map(quoteInboundMessage).join('\n')
+}
+
+function quoteInboundMessage(text: string): string {
+  return text.split('\n').map((line) => (line.length > 0 ? `> ${line}` : '>')).join('\n')
 }
 
 export async function ingestTelegramOwnerMessage(
   host: TelegramDeskChatHost,
   message: InboundOwnerMessage,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
-  if (message.connectorId !== 'telegram') {
+  return ingestTelegramOwnerMessages(host, [message])
+}
+
+export async function ingestTelegramOwnerMessages(
+  host: TelegramDeskChatHost,
+  messages: readonly InboundOwnerMessage[],
+): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
+  const texts = messages
+    .filter((message) => message.connectorId === 'telegram')
+    .map((message) => message.text)
+  if (texts.length === 0 && messages.length > 0) {
     return { ok: false, reason: 'unsupported_connector' }
   }
+  const markdown = formatTelegramInboundStack(texts)
+  if (!markdown) return { ok: false, reason: 'empty' }
   const desk = await findLiveDesk(host)
   if (!desk) return { ok: false, reason: 'desk_disabled' }
   const workspace = host.getWorkspace(desk.wsId)
   if (!workspace) return { ok: false, reason: 'workspace_missing' }
 
-  const appended = await appendIssueComment(workspace.dir, desk.issue.id, 'human', message.text, {
+  const appended = await appendIssueComment(workspace.dir, desk.issue.id, 'human', markdown, {
     id: `telegram-${randomUUID()}`,
     via: 'telegram',
   })
@@ -131,14 +176,16 @@ export async function pullTelegramDeskInbound(
   client: ConnectorClient,
 ): Promise<void> {
   // Drain is destructive. Leave Connector's queue untouched until a live desk
-  // can accept the text as a comment.
-  if (!(await findLiveDesk(host))) return
+  // can accept the stack as one comment, and until any in-flight generation
+  // has finished so later DMs can pile up instead of racing the same Session.
+  const desk = await findLiveDesk(host)
+  if (!desk) return
+  if (host.deskGenerating?.(desk)) return
   const messages = await client.drainInbound(AbortSignal.timeout(5_000))
-  for (const message of messages) {
-    const result = await ingestTelegramOwnerMessage(host, message)
-    if (!result.ok) {
-      console.warn('[connector] Telegram phone-desk inbound skipped:', result.reason)
-    }
+  if (messages.length === 0) return
+  const result = await ingestTelegramOwnerMessages(host, messages)
+  if (!result.ok) {
+    console.warn('[connector] Telegram phone-desk inbound skipped:', result.reason)
   }
 }
 
