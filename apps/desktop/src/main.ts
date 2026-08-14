@@ -124,6 +124,8 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 if (existingOwnerSmokeMode()) {
+  const smokeUserData = process.env['OPENALICE_ELECTRON_SMOKE_USER_DATA']?.trim()
+  if (smokeUserData) app.setPath('userData', smokeUserData)
   app.commandLine.appendSwitch('no-sandbox')
   app.commandLine.appendSwitch('disable-gpu')
   app.disableHardwareAcceleration()
@@ -623,6 +625,10 @@ app.whenReady().then(async () => {
   const guardianStartedAt = currentProcessStartedAt()
   while (!takeover) {
     let existingOwner
+    desktopDiagnostics.write(
+      'existing-owner',
+      `inspect home=${userDataHome} launcherRoot=${launcherRoot}`,
+    )
     try {
       existingOwner = await resolveExistingOwnerStartup({
         userDataHome,
@@ -631,6 +637,10 @@ app.whenReady().then(async () => {
         takeoverRequested: false,
       })
     } catch (error) {
+      desktopDiagnostics.write(
+        'existing-owner',
+        `inspection failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`,
+      )
       dialog.showErrorBox(
         'OpenAlice — existing AliceProject',
         `${error instanceof Error ? error.message : String(error)}\n\nOpenAlice did not take over the running AliceProject.`,
@@ -638,6 +648,10 @@ app.whenReady().then(async () => {
       app.quit()
       return
     }
+    desktopDiagnostics.write(
+      'existing-owner',
+      `resolved action=${existingOwner.action}${existingOwner.action === 'continue' ? ` takeover=${existingOwner.takeover}` : ''}`,
+    )
     if (existingOwner.action === 'quit') {
       app.quit()
       return
