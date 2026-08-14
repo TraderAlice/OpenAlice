@@ -57,9 +57,17 @@ if (!skipBuild) {
 
 async function proveSurface(surface) {
   // Electron canonicalizes explicit data homes before startup. Canonicalize
-  // the fixture root too so aliases such as macOS /var -> /private/var (and
-  // Windows path casing) cannot make one AliceProject look like two identities.
-  const smokeRoot = realpathSync(mkdtempSync(join(tmpdir(), `openalice-existing-owner-${surface}-`)))
+  // the fixture root too so aliases such as macOS /var -> /private/var cannot
+  // make one AliceProject look like two identities. On Windows, tmpdir() may
+  // expose an 8.3 path (RUNNER~1) that realpathSync preserves even though the
+  // Electron data-home path later expands it. Prefer the CI runner temp root,
+  // or an ignored repo-local fallback, so both processes start with one stable
+  // long-form AliceProject identity.
+  const smokeBase = process.platform === 'win32'
+    ? (process.env.RUNNER_TEMP?.trim() || join(repoRoot, 'dist', 'smoke'))
+    : tmpdir()
+  mkdirSync(smokeBase, { recursive: true })
+  const smokeRoot = realpathSync(mkdtempSync(join(smokeBase, `openalice-existing-owner-${surface}-`)))
   const smokeHome = join(smokeRoot, 'home')
   const smokeWorkspaces = join(smokeRoot, 'workspaces')
   const electronUserData = join(smokeRoot, 'electron-user-data')
