@@ -275,12 +275,12 @@ describe('IssueDetail property controls', () => {
     expect(status.className).toContain('h-10')
     expect(status.className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Assignee' }).className).toContain('w-full')
+    expect(screen.getByRole('button', { name: 'Assignee' }).className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Run timeout' })).toBeTruthy()
+    expect(screen.queryByRole('combobox', { name: 'Run timeout' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('size-10')
     expect(screen.getByRole('heading', { level: 3, name: 'Schedule' })).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 3, name: 'Execution' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 3, name: 'Agent' })).toBeTruthy()
     expect(screen.getByText('America/New_York').className).toContain('break-all')
     expect(screen.getByRole('button', { name: 'AI configuration' }).textContent)
       .toContain('Runtime managed')
@@ -304,6 +304,7 @@ describe('IssueDetail property controls', () => {
       issue: { ...scheduledIssue.issue, timeout: '30m' },
     })
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule settings' }))
     const timeout = await screen.findByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement
     expect(timeout.value).toBe('')
     fireEvent.change(timeout, { target: { value: '30m' } })
@@ -325,6 +326,7 @@ describe('IssueDetail property controls', () => {
       },
     })
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule settings' }))
     const toggle = await screen.findByRole('checkbox', { name: /Retry a missed fire/ }) as HTMLInputElement
     expect(toggle.checked).toBe(true)
     fireEvent.click(toggle)
@@ -478,7 +480,7 @@ describe('IssueDetail property controls', () => {
 
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
-    expect(screen.getByText('运行状态')).toBeTruthy()
+    expect(screen.getByText('失败')).toBeTruthy()
     expect(screen.getByText('Provider rejected model MODEL_NOT_FOUND.')).toBeTruthy()
   })
 
@@ -518,12 +520,20 @@ describe('IssueDetail property controls', () => {
 
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
-    const assignee = screen.getByRole('combobox', { name: 'Assignee' }) as HTMLSelectElement
-    await waitFor(() => expect(assignee.options).toHaveLength(4))
-    const labels = Array.from(assignee.options, (option) => option.textContent ?? '')
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Choose responsibility' })
+    const choices = within(dialog).getAllByRole('button')
+    const activeIndex = choices.findIndex((choice) => choice.textContent?.includes('Current thesis room'))
+    const recentIndex = choices.findIndex((choice) => choice.textContent?.includes('Updated a very long financial'))
 
-    expect(labels[2]).toBe('@resume-active-owner · pi · active — Current thesis room')
-    expect(labels[3]).toMatch(/^@resume-recent-worker · codex · .+ — Updated a very long financi…$/)
-    expect(labels.some((label) => label.startsWith('Updated a very long'))).toBe(false)
+    expect(activeIndex).toBeGreaterThanOrEqual(0)
+    expect(recentIndex).toBeGreaterThan(activeIndex)
+    expect(choices[activeIndex]?.textContent).toContain('resume-active-owner · pi · active')
+    expect(choices[recentIndex]?.textContent).toContain('resume-recent-worker · codex')
+
+    const search = within(dialog).getByPlaceholderText(/Search Sessions/)
+    fireEvent.change(search, { target: { value: 'financial' } })
+    expect(within(dialog).queryByText('Current thesis room')).toBeNull()
+    expect(within(dialog).getByText('Updated a very long financial and industrial rotation report.')).toBeTruthy()
   })
 })
