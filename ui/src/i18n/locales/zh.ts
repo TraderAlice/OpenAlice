@@ -1740,10 +1740,16 @@ export const zh: Resources = {
     fields: {
       applicationId: '应用 ID',
       botToken: '机器人令牌',
+      appToken: '应用级令牌',
+      inboxPush: '推送 Inbox 通知',
+    },
+    fieldDescriptions: {
+      inboxPush: '关闭后，新的 Inbox 条目留在 OpenAlice，需要时再查看。',
     },
     placeholders: {
       applicationId: 'Discord 应用 ID',
       botToken: '仅在本地加密保存',
+      appToken: '带 connections:write 的 xapp 令牌',
     },
     configuredPlaceholder: '已配置——输入新值以替换',
     saving: '保存中…',

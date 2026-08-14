@@ -112,6 +112,10 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
     }
   }
 
+  async deliverArtifact(): Promise<void> {
+    throw new Error('Inbox file delivery is not implemented for Discord yet.')
+  }
+
   async sendOwnerText(text: string): Promise<void> {
     if (!this.client?.isReady()) throw new Error('Discord client is not ready')
     if (!this.ownerUserId) throw new Error('Discord owner is not linked')
@@ -149,6 +153,14 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
       if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
       const probeId = await context.sendTest(this.id)
       await reply(`Test notification sent. Probe: ${probeId}`)
+    })
+    context.commands.register('inbox', async ({ userId, reply }) => {
+      if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
+      await reply('Inbox browsing is not implemented for Discord yet. Open Inbox in OpenAlice.')
+    })
+    context.commands.register('settings', async ({ userId, reply }) => {
+      if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
+      await reply('Discord settings buttons are not implemented yet. Change Inbox push in OpenAlice → Settings → Connectors.')
     })
   }
 

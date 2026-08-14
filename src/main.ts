@@ -51,6 +51,7 @@ import { createEconomyTools } from './tool/economy.js'
 import { SessionStore } from './core/session.js'
 import { createInboxStore } from './core/inbox-store.js'
 import { startInboxConnectorBridge } from './services/connector-client/index.js'
+import { startConnectorActionBridge } from './services/connector-client/action-bridge.js'
 import { createWorkspaceConversationControl } from './workspaces/conversation-control.js'
 import { startTelegramDeskInboundPoll, telegramDeskHasRunningWork } from './workspaces/issues/telegram-desk-chat.js'
 import { ToolCenter } from './core/tool-center.js'
@@ -289,6 +290,7 @@ async function main() {
   // skip (see cron listener). Created here so cron dispatch can hold it.
   const workspaceServiceRef = createWorkspaceServiceRef()
   startInboxConnectorBridge(inboxStore, () => workspaceServiceRef.current)
+  startConnectorActionBridge(inboxStore, () => workspaceServiceRef.current)
   startTelegramDeskInboundPoll({
     listWorkspaces: () => workspaceServiceRef.current?.registry.list() ?? [],
     getWorkspace: (id) => workspaceServiceRef.current?.registry.get(id),

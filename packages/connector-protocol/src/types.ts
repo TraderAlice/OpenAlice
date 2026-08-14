@@ -13,8 +13,16 @@ export const connectorFieldDefinitionSchema = z.object({
   /** Slash command that owns this value. Settings renders these fields as
    *  lifecycle output rather than ordinary operator-entered configuration. */
   learnedBy: z.string().min(1).optional(),
+  /** Settings card section. `preferences` stays out of connection details. */
+  group: z.enum(['credentials', 'preferences']).optional(),
+  defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
 })
 export type ConnectorFieldDefinition = z.infer<typeof connectorFieldDefinitionSchema>
+
+/** Capabilities a connector may advertise. Each adapter implements its own
+ *  interaction; the catalog only says the command exists. */
+export const connectorCapabilitySchema = z.enum(['inbox', 'settings'])
+export type ConnectorCapability = z.infer<typeof connectorCapabilitySchema>
 
 export const connectorDefinitionSchema = z.object({
   id: z.string().min(1),
@@ -25,6 +33,7 @@ export const connectorDefinitionSchema = z.object({
     name: z.string().min(1),
     description: z.string().min(1),
   })).default([]),
+  capabilities: z.array(connectorCapabilitySchema).optional(),
 })
 export type ConnectorDefinition = z.infer<typeof connectorDefinitionSchema>
 
@@ -141,3 +150,94 @@ export const inboundOwnerMessageSchema = z.object({
 })
 export type InboundOwnerMessage = z.infer<typeof inboundOwnerMessageSchema>
 export type ConnectorDeliveryReceipt = z.infer<typeof connectorDeliveryReceiptSchema>
+
+/** Bounded Connector → Alice work that is not phone-desk inbound chat. */
+export const MAX_CONNECTOR_ACTION_REQUESTS = 20
+export const CONNECTOR_ACTION_TTL_MS = 60_000
+export const MAX_CONNECTOR_DOC_INDEX = 999
+
+export const connectorArtifactRequestSchema = z.object({
+  requestId: z.string().min(1).max(64),
+  connectorId: z.string().min(1).max(64),
+  entryId: z.string().min(1).max(128),
+  docIndex: z.number().int().min(0).max(MAX_CONNECTOR_DOC_INDEX),
+  createdAt: z.string().datetime(),
+})
+export type ConnectorArtifactRequest = z.infer<typeof connectorArtifactRequestSchema>
+
+export const connectorArtifactRequestListSchema = z.object({
+  requests: z.array(connectorArtifactRequestSchema).max(MAX_CONNECTOR_ACTION_REQUESTS),
+})
+export type ConnectorArtifactRequestList = z.infer<typeof connectorArtifactRequestListSchema>
+
+/** Directed file delivery. Never an InboxNotification: no title/body re-summary. */
+export const connectorArtifactDeliverySchema = z.object({
+  requestId: z.string().min(1).max(64),
+  connectorId: z.string().min(1).max(64),
+  entryId: z.string().min(1).max(128),
+  docIndex: z.number().int().min(0).max(MAX_CONNECTOR_DOC_INDEX),
+  attachment: connectorAttachmentSchema,
+})
+export type ConnectorArtifactDelivery = z.infer<typeof connectorArtifactDeliverySchema>
+
+export const connectorArtifactFailureReasonSchema = z.enum([
+  'expired',
+  'entry_not_found',
+  'workspace_unavailable',
+  'doc_not_found',
+  'path_escape',
+  'file_missing',
+  'file_too_large',
+  'unsupported',
+  'delivery_failed',
+])
+export type ConnectorArtifactFailureReason = z.infer<typeof connectorArtifactFailureReasonSchema>
+
+export const connectorArtifactFailureSchema = z.object({
+  requestId: z.string().min(1).max(64),
+  connectorId: z.string().min(1).max(64),
+  entryId: z.string().min(1).max(128),
+  docIndex: z.number().int().min(0).max(MAX_CONNECTOR_DOC_INDEX),
+  reason: connectorArtifactFailureReasonSchema,
+  message: z.string().min(1).max(500),
+})
+export type ConnectorArtifactFailure = z.infer<typeof connectorArtifactFailureSchema>
+
+export function isConnectorActionExpired(createdAt: string, now = Date.now()): boolean {
+  const created = Date.parse(createdAt)
+  return !Number.isFinite(created) || now - created > CONNECTOR_ACTION_TTL_MS
+}
+
+export function artifactFailureMessage(
+  reason: ConnectorArtifactFailureReason,
+  displayName?: string,
+): string {
+  const file = displayName?.trim()
+  switch (reason) {
+    case 'expired':
+      return 'That file request expired. Ask for the file again.'
+    case 'entry_not_found':
+      return 'That Inbox item is no longer available. Send /inbox again.'
+    case 'workspace_unavailable':
+      return 'OpenAlice could not open that Workspace. Try again when it is available.'
+    case 'doc_not_found':
+      return 'That file is no longer listed on this Inbox item. Send /inbox again.'
+    case 'path_escape':
+      return 'That file is outside the Workspace and was not sent.'
+    case 'file_missing':
+      return file
+        ? `The current file ${file} is missing. Try again after it is restored.`
+        : 'That file is missing from the Workspace. Try again after it is restored.'
+    case 'file_too_large':
+      return 'That file is larger than 1 MB and was not sent.'
+    case 'unsupported':
+      return 'This connector cannot send Inbox files yet.'
+    case 'delivery_failed':
+      return 'OpenAlice could not send the file. Try again.'
+  }
+}
+
+/** Missing or non-false means push is on. Existing installs stay noisy. */
+export function isInboxPushEnabled(settings: Record<string, string | number | boolean>): boolean {
+  return settings.inboxPush !== false
+}

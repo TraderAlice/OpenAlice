@@ -124,6 +124,15 @@ describe('InboxStore (in-memory)', () => {
     expect(entries.map((e) => e.id)).toEqual([e2.id, e1.id])
   })
 
+  it('read can limit itself to unread entries', async () => {
+    const read = await store.append({ workspaceId: 'ws-1', comments: 'seen' })
+    await store.append({ workspaceId: 'ws-1', comments: 'fresh' })
+    await store.markRead(read.id)
+    const { entries, hasMore } = await store.read({ unread: true })
+    expect(entries.map((entry) => entry.comments)).toEqual(['fresh'])
+    expect(hasMore).toBe(false)
+  })
+
   it('gets one entry directly by its immutable id', async () => {
     const entry = await store.append({ workspaceId: 'ws-1', comments: 'find me' })
     expect(await store.get(entry.id)).toMatchObject({ id: entry.id, comments: 'find me' })

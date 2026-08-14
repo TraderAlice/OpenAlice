@@ -8,6 +8,8 @@
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
 import {
+  connectorArtifactDeliverySchema,
+  connectorArtifactFailureSchema,
   connectorDeliveryReceiptSchema,
   inboxNotificationSchema,
   ownerChatMessageSchema,
@@ -16,6 +18,7 @@ import { ConnectorRegistry } from './core/adapter.js'
 import { DeliveryManager } from './core/delivery-manager.js'
 import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
+import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
@@ -31,6 +34,7 @@ async function main(): Promise<void> {
   const registry = new ConnectorRegistry()
   registry.register(discordConnectorRegistration())
   registry.register(telegramConnectorRegistration())
+  registry.register(slackConnectorRegistration())
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -61,6 +65,19 @@ async function main(): Promise<void> {
   })
   app.post('/v1/inbound/drain', async (c) => {
     return c.json({ messages: manager.drainInbound() })
+  })
+  app.post('/v1/actions/drain', (c) => {
+    return c.json({ requests: manager.drainActions() })
+  })
+  app.post('/v1/artifacts/deliver', async (c) => {
+    const delivery = connectorArtifactDeliverySchema.parse(await c.req.json())
+    await manager.deliverArtifact(delivery)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: delivery.requestId }))
+  })
+  app.post('/v1/artifacts/fail', async (c) => {
+    const failure = connectorArtifactFailureSchema.parse(await c.req.json())
+    await manager.failArtifact(failure)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
   })
   app.post('/v1/connectors/:id/test', async (c) => {
     const probeId = await manager.sendTest(c.req.param('id'))

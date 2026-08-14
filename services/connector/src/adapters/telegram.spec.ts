@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InboxNotification } from '@traderalice/connector-protocol'
 import { CommandRegistry } from '../core/adapter.js'
@@ -47,6 +48,7 @@ function context() {
     getServiceStatus: () => 'healthy',
     sendTest: async () => 'probe',
     forwardOwnerText: async () => undefined,
+    enqueueArtifactRequest: () => 'art-test',
   }
 }
 
@@ -154,12 +156,14 @@ describe('Telegram rich outbound text', () => {
     stopMock.mockReset()
     sendRichMessage.mockReset()
     sendMessage.mockReset()
+    sendDocument.mockReset()
     startMock.mockImplementation((options: { onStart?: () => void }) => {
       queueMicrotask(() => options.onStart?.())
       return new Promise(() => undefined)
     })
     sendRichMessage.mockResolvedValue(undefined)
     sendMessage.mockResolvedValue(undefined)
+    sendDocument.mockResolvedValue(undefined)
   })
 
   it('projects owner comments as rich GFM', async () => {
@@ -198,6 +202,38 @@ describe('Telegram rich outbound text', () => {
     expect(sendRichMessage).toHaveBeenCalledWith('99', {
       markdown: formatInboxNotification(notification),
     })
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('sends a requested file without repeating the Inbox summary', async () => {
+    const adapter = new TelegramConnectorAdapter({ startupTimeoutMs: 200 })
+    await adapter.start({
+      enabled: true,
+      settings: { botToken: 'token', ownerUserId: '42', chatId: '99' },
+    }, context())
+    const content = Buffer.from('# Close scan\n')
+
+    await adapter.deliverArtifact({
+      requestId: 'art-1',
+      connectorId: 'telegram',
+      entryId: 'entry-1',
+      docIndex: 0,
+      attachment: {
+        filename: 'close.md',
+        mediaType: 'text/markdown; charset=utf-8',
+        sizeBytes: content.byteLength,
+        contentSha256: createHash('sha256').update(content).digest('hex'),
+        contentBase64: content.toString('base64'),
+      },
+    })
+
+    expect(sendDocument).toHaveBeenCalledOnce()
+    expect(sendDocument).toHaveBeenCalledWith(
+      '99',
+      expect.any(Object),
+      { caption: 'Current file: close.md' },
+    )
+    expect(sendRichMessage).not.toHaveBeenCalled()
     expect(sendMessage).not.toHaveBeenCalled()
   })
 })

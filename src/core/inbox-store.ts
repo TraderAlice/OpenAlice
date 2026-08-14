@@ -110,6 +110,7 @@ export interface InboxReadOpts {
   limit?: number
   before?: string
   workspaceId?: string
+  unread?: boolean
 }
 
 export interface IInboxStore {
@@ -268,6 +269,9 @@ export function createInboxStore(opts: InboxStoreOptions = {}): IInboxStore {
     if (opts.workspaceId) {
       all = all.filter((e) => e.workspaceId === opts.workspaceId)
     }
+    if (opts.unread) {
+      all = all.filter((e) => !e.readAt)
+    }
 
     let scoped = all
     if (opts.before) {
@@ -407,7 +411,8 @@ export function createMemoryInboxStore(): IInboxStore {
   }
 
   async function read(opts: InboxReadOpts = {}): Promise<{ entries: InboxEntry[]; hasMore: boolean }> {
-    let scoped = opts.workspaceId ? entries.filter((e) => e.workspaceId === opts.workspaceId) : entries
+    let scoped = opts.workspaceId ? entries.filter((e) => e.workspaceId === opts.workspaceId) : [...entries]
+    if (opts.unread) scoped = scoped.filter((e) => !e.readAt)
     if (opts.before) {
       const idx = scoped.findIndex((e) => e.id === opts.before)
       scoped = idx >= 0 ? scoped.slice(0, idx) : []

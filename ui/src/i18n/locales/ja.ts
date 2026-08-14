@@ -1741,10 +1741,16 @@ export const ja: Resources = {
     fields: {
       applicationId: 'アプリケーション ID',
       botToken: 'Bot トークン',
+      appToken: 'アプリレベル トークン',
+      inboxPush: 'Inbox 通知をプッシュ',
+    },
+    fieldDescriptions: {
+      inboxPush: 'オフにすると、新しい Inbox は OpenAlice に残り、必要なときに見られます。',
     },
     placeholders: {
       applicationId: 'Discord アプリケーション ID',
       botToken: 'ローカルで暗号化して保存',
+      appToken: 'connections:write 付きの xapp トークン',
     },
     configuredPlaceholder: '設定済み — 新しい値を入力して置換',
     saving: '保存中…',

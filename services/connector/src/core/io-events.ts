@@ -6,9 +6,14 @@ export type ConnectorIOStage =
   | 'delivery.attempted'
   | 'delivery.succeeded'
   | 'delivery.failed'
+  | 'delivery.skipped'
   | 'command.received'
   | 'command.replied'
   | 'command.failed'
+  | 'action.enqueued'
+  | 'artifact.attempted'
+  | 'artifact.succeeded'
+  | 'artifact.failed'
 
 export interface ConnectorIOEvent {
   version: 1
