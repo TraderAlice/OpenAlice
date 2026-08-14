@@ -149,10 +149,12 @@ run `/link`. Removing the token is a different action.
 
 `awaiting_link` means the adapter can already receive `/link`. Telegram does
 not report that until long polling has started (`onStart`); Discord waits for
-the gateway to become ready. The Connector HTTP health endpoint binds before
-those external calls so Guardian can probe a `starting` adapter instead of
-treating the whole service as missing. A failed adapter stays registered with
-its `lastError` rather than collapsing to "configured but not running."
+the gateway to become ready. Publishing Telegram's slash-command menu is
+best-effort: a failed `setMyCommands` must not block polling or Inbox delivery.
+The Connector HTTP health endpoint binds before those external calls so
+Guardian can probe a `starting` adapter instead of treating the whole service
+as missing. A failed adapter stays registered with its `lastError` rather than
+collapsing to "configured but not running."
 
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.

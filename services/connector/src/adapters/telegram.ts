@@ -35,7 +35,6 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       this.ownerUserId = optionalString(config, 'ownerUserId')
       this.chatId = optionalString(config, 'chatId')
       const bot = new Bot(token)
-      bot.api.config.use(autoRetry())
       this.bot = bot
 
       for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
@@ -73,13 +72,20 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
             .catch(() => undefined)
         }
       })
-      await withTimeout(async () => {
-        await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
-          command: name,
-          description,
-        })))
-        await waitForTelegramPolling(bot, (error) => this.tracker.degraded(error))
-      }, this.startupTimeoutMs, `Telegram polling did not become ready within ${this.startupTimeoutMs}ms`)
+      // The slash-command menu is convenience. A 404/transformer failure here
+      // must not block long polling, owner chat, or Inbox delivery — users can
+      // still type the commands directly.
+      await publishTelegramCommands(bot).catch((error) => {
+        console.warn('[connector] Telegram command menu was not published:', error instanceof Error ? error.message : error)
+      })
+      await withTimeout(
+        () => waitForTelegramPolling(bot, (error) => this.tracker.degraded(error)),
+        this.startupTimeoutMs,
+        `Telegram polling did not become ready within ${this.startupTimeoutMs}ms`,
+      )
+      // Keep the optional startup menu call untransformed; install retries only
+      // after polling is live for subsequent Telegram API traffic.
+      bot.api.config.use(autoRetry())
       if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
       else this.tracker.awaitingLink()
     } catch (error) {
@@ -163,6 +169,13 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
 
 export function telegramConnectorRegistration(): ConnectorAdapterRegistration {
   return { definition: TELEGRAM_CONNECTOR_DEFINITION, create: () => new TelegramConnectorAdapter() }
+}
+
+async function publishTelegramCommands(bot: Bot): Promise<void> {
+  await bot.api.setMyCommands(TELEGRAM_CONNECTOR_DEFINITION.commands.map(({ name, description }) => ({
+    command: name,
+    description,
+  })))
 }
 
 function waitForTelegramPolling(bot: Bot, onFailure: (error: unknown) => void): Promise<void> {

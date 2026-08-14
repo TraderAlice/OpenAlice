@@ -75,6 +75,20 @@ describe('Telegram polling readiness', () => {
     expect(setMyCommands).toHaveBeenCalledOnce()
   })
 
+  it('still starts polling when the command menu cannot be published', async () => {
+    setMyCommands.mockRejectedValueOnce(new Error("Call to 'setMyCommands' failed! (404: Not Found)"))
+    startMock.mockImplementation((options: { onStart?: () => void }) => {
+      queueMicrotask(() => options.onStart?.())
+      return new Promise(() => undefined)
+    })
+    const adapter = new TelegramConnectorAdapter({ startupTimeoutMs: 200 })
+
+    await adapter.start({ enabled: true, settings: { botToken: 'token' } }, context())
+
+    expect(adapter.health().status).toBe('awaiting_link')
+    expect(startMock).toHaveBeenCalledOnce()
+  })
+
   it('marks a linked bot healthy only after polling is ready', async () => {
     startMock.mockImplementation((options: { onStart?: () => void }) => {
       queueMicrotask(() => options.onStart?.())
