@@ -14,8 +14,10 @@ import type {
 import {
   AdapterHealthTracker,
   decodeInboxAttachments,
+  formatInboxNotification,
   formatPlainInboxNotification,
 } from './shared.js'
+import { sendTelegramRichText } from './telegram-rich-text.js'
 
 export class TelegramConnectorAdapter implements ConnectorAdapter {
   readonly id = 'telegram'
@@ -107,7 +109,12 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     if (!this.chatId) throw new Error('Telegram private chat is not linked')
     this.tracker.attempt()
     try {
-      await this.bot.api.sendMessage(this.chatId, formatPlainInboxNotification(notification))
+      await sendTelegramRichText(
+        this.bot.api,
+        this.chatId,
+        formatInboxNotification(notification),
+        formatPlainInboxNotification(notification),
+      )
       for (const attachment of decodeInboxAttachments(notification)) {
         await this.bot.api.sendDocument(
           this.chatId,
@@ -126,7 +133,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     if (!this.chatId) throw new Error('Telegram private chat is not linked')
     this.tracker.attempt()
     try {
-      await this.bot.api.sendMessage(this.chatId, text)
+      await sendTelegramRichText(this.bot.api, this.chatId, text)
       this.tracker.success(this.ownerUserId)
     } catch (error) {
       this.tracker.degraded(error)

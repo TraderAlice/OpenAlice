@@ -120,8 +120,11 @@ export const connectorDeliveryReceiptSchema = z.object({
   deliveryId: z.string().min(1),
 })
 
-/** Owner-private chat text. Not an Inbox item. Telegram's sendMessage cap is 4096. */
-export const OWNER_CHAT_TEXT_MAX = 4096
+/** Telegram `sendMessage` cap. Used when rich-message send falls back to plain text. */
+export const TELEGRAM_PLAIN_TEXT_MAX = 4096
+
+/** Owner-private chat text. Not an Inbox item. Telegram `sendRichMessage` allows 32768 UTF-8 characters. */
+export const OWNER_CHAT_TEXT_MAX = 32_768
 
 export const ownerChatMessageSchema = z.object({
   id: z.string().min(1),

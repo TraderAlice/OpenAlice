@@ -1,4 +1,4 @@
-import { ConnectorClient } from '@traderalice/connector-protocol'
+import { ConnectorClient, OWNER_CHAT_TEXT_MAX } from '@traderalice/connector-protocol'
 
 import { resolveConnectorUrl } from '../../services/connector-client/index.js'
 import type { IssueComment } from './comments.js'
@@ -28,6 +28,6 @@ export async function projectDeskComment(
   await client.sendOwnerMessage({
     id: `desk-${comment.id}`,
     adapterId: 'telegram',
-    text: comment.markdown.slice(0, 4096),
+    text: comment.markdown.slice(0, OWNER_CHAT_TEXT_MAX),
   }, AbortSignal.timeout(5_000))
 }

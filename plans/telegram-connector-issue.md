@@ -1,6 +1,6 @@
 # Plan: Telegram phone-desk Issue
 
-**Status:** active — increment 2  
+**Status:** active — increment 3 
 **Owner guides:** [[docs/workspace-issues-and-scheduling.md]], [[docs/connector-service.md]], [[docs/conversation-provenance.md]]  
 **Delivery:** serial PRs to `dev` (`area:collaboration`, `area:settings`). Increment 2 is `review:deep`. Open PR, do not merge.
 
@@ -71,6 +71,14 @@ comment.
 - [x] Inbound owner DM → comment → existing reply dispatch → project unless `[[no-reply]]`
 - [x] Scheduled fire of this Issue stamps `assistantText` as a comment, then same filter
 - [x] Literal tag only; send nothing when present
+
+### 3. Telegram rich-message rendering
+
+- [x] Connector Grammy ≥ 1.44 so `sendRichMessage` exists
+- [x] Phone-desk owner chat and Inbox text use `sendRichMessage({ markdown })`
+- [x] Parse/missing-method 400/404 falls back to plain `sendMessage`
+- [x] Owner-chat cap follows the rich-message 32768 limit
+- [x] HTML report attachments stay files; no MarkdownV2 `parse_mode`
 
 ### Not in this plan
 

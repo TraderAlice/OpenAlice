@@ -46,14 +46,19 @@ categories.
   sends the original bytes instead of guessing. A skipped or ambiguous
   eligible attachment is logged and leaves bridge health degraded so partial
   or unnormalized delivery is visible to operators.
-- HTML is a presentation asset, not a Connector message format. Adapters send
-  the `.html` file with a `text/html` media type and never inline,
-  translate, or render its contents into the external chat message. OpenAlice
-  previews static HTML in an origin-less sandbox with scripts, forms,
-  navigation, and network disabled; inline CSS, SVG, and data images remain
-  available for self-contained human-facing reports. Markdown remains the
-  default agent-readable work product, while Inbox comments carry the concise
-  summary for both the user and other agents.
+- HTML report files are a presentation asset, not a Connector message format.
+  Adapters send the `.html` file with a `text/html` media type and never
+  inline, translate, or render those file contents into the chat body.
+  OpenAlice previews static HTML in an origin-less sandbox with scripts,
+  forms, navigation, and network disabled; inline CSS, SVG, and data images
+  remain available for self-contained human-facing reports. Markdown remains
+  the default agent-readable work product, while Inbox comments carry the
+  concise summary for both the user and other agents.
+- Telegram text uses Bot API 10.1 `sendRichMessage` with GFM-compatible
+  `markdown`. Phone-desk comments go out as-is. Inbox titles and provenance
+  stay escaped; Inbox bodies keep their markdown. A 400 parse/format error, or
+  a missing-method response, falls back to plain `sendMessage` (4096). This is
+  not `parse_mode` MarkdownV2. Discord still uses its own markdown.
 - Session provenance is rendered as a visible `@resumeId` signature. The
   runtime label may accompany it (`pi · @resume-…`) but must never replace it.
 
