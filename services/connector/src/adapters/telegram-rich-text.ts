@@ -1,20 +1,36 @@
 import { TELEGRAM_PLAIN_TEXT_MAX } from '@traderalice/connector-protocol'
 import { GrammyError } from 'grammy'
+import { toTelegramMarkdownV2 } from './telegram-markdown-v2.js'
 
 export interface TelegramRichTextApi {
   sendRichMessage(chatId: string | number, richMessage: { markdown: string }): Promise<unknown>
-  sendMessage(chatId: string | number, text: string): Promise<unknown>
+  sendMessage(
+    chatId: string | number,
+    text: string,
+    other?: { parse_mode?: 'MarkdownV2' },
+  ): Promise<unknown>
 }
 
-/** Send GFM-compatible markdown through Bot API 10.1. A parse/format 400
- * (or a missing-method response) falls back to plain `sendMessage` so the
- * owner still receives the text. */
+/** Send formatted Telegram text. MarkdownV2 is the `sendMessage` parse_mode.
+ * Raw agent markdown is converted first. If Telegram rejects that payload,
+ * try Bot API 10.1 `sendRichMessage` with the original GFM, then plain text. */
 export async function sendTelegramRichText(
   api: TelegramRichTextApi,
   chatId: string,
   markdown: string,
   plainFallback = markdown,
+  markdownV2 = toTelegramMarkdownV2(markdown),
 ): Promise<void> {
+  try {
+    await api.sendMessage(chatId, clipTelegramPlainText(markdownV2), { parse_mode: 'MarkdownV2' })
+    return
+  } catch (error) {
+    if (!isRecoverableRichMessageError(error)) throw error
+    console.warn(
+      '[connector] Telegram MarkdownV2 fell back:',
+      error instanceof Error ? error.message : error,
+    )
+  }
   try {
     await api.sendRichMessage(chatId, { markdown })
   } catch (error) {

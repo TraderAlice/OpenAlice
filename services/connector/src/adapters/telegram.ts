@@ -17,6 +17,7 @@ import {
   formatInboxNotification,
   formatPlainInboxNotification,
 } from './shared.js'
+import { formatTelegramInboxMarkdownV2 } from './telegram-markdown-v2.js'
 import { sendTelegramRichText } from './telegram-rich-text.js'
 
 export class TelegramConnectorAdapter implements ConnectorAdapter {
@@ -114,6 +115,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         this.chatId,
         formatInboxNotification(notification),
         formatPlainInboxNotification(notification),
+        formatTelegramInboxMarkdownV2(notification),
       )
       for (const attachment of decodeInboxAttachments(notification)) {
         await this.bot.api.sendDocument(

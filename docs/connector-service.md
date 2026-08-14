@@ -54,11 +54,13 @@ categories.
   remain available for self-contained human-facing reports. Markdown remains
   the default agent-readable work product, while Inbox comments carry the
   concise summary for both the user and other agents.
-- Telegram text uses Bot API 10.1 `sendRichMessage` with GFM-compatible
-  `markdown`. Phone-desk comments go out as-is. Inbox titles and provenance
-  stay escaped; Inbox bodies keep their markdown. A 400 parse/format error, or
-  a missing-method response, falls back to plain `sendMessage` (4096). This is
-  not `parse_mode` MarkdownV2. Discord still uses its own markdown.
+- Telegram text uses `sendMessage` with `parse_mode: MarkdownV2`. Connector
+  converts common GFM (`**bold**`, lists, headings, code) into MarkdownV2 and
+  escapes unmatched specials so agent text does not 400. Inbox titles and
+  provenance are escaped literals; Inbox bodies go through the same converter.
+  If MarkdownV2 is rejected, Connector tries Bot API 10.1 `sendRichMessage`
+  with the original GFM, then plain `sendMessage` (4096). Discord still uses
+  its own markdown. Do not use legacy `parse_mode: Markdown`.
 - Session provenance is rendered as a visible `@resumeId` signature. The
   runtime label may accompany it (`pi · @resume-…`) but must never replace it.
 

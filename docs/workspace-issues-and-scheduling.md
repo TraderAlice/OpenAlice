@@ -105,8 +105,8 @@ The filename stem is the stable issue id. Frontmatter:
   one quoted comment when the desk is idle again. Scheduled-fire
   `assistantText` is stamped as a comment. Connector projects comments that
   do not contain `[[no-reply]]` and did not arrive from Telegram. Projected
-  comments use Telegram rich markdown (`sendRichMessage`); a parse failure
-  falls back to plain text.
+  comments use Telegram MarkdownV2; a parse failure tries `sendRichMessage`,
+  then plain text.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the

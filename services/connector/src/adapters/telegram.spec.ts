@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InboxNotification } from '@traderalice/connector-protocol'
 import { CommandRegistry } from '../core/adapter.js'
-import { formatInboxNotification } from './shared.js'
+import { formatTelegramInboxMarkdownV2, toTelegramMarkdownV2 } from './telegram-markdown-v2.js'
 import { TelegramConnectorAdapter, withTimeout } from './telegram.js'
 
 const startMock = vi.fn()
@@ -162,22 +162,23 @@ describe('Telegram rich outbound text', () => {
     sendMessage.mockResolvedValue(undefined)
   })
 
-  it('projects owner comments through sendRichMessage markdown', async () => {
+  it('projects owner comments as MarkdownV2', async () => {
     const adapter = new TelegramConnectorAdapter({ startupTimeoutMs: 200 })
     await adapter.start({
       enabled: true,
       settings: { botToken: 'token', ownerUserId: '42', chatId: '99' },
     }, context())
+    const markdown = '**hello**\n\n- one\n- two'
 
-    await adapter.sendOwnerText('**hello**\n\n- one\n- two')
+    await adapter.sendOwnerText(markdown)
 
-    expect(sendRichMessage).toHaveBeenCalledWith('99', {
-      markdown: '**hello**\n\n- one\n- two',
+    expect(sendMessage).toHaveBeenCalledWith('99', toTelegramMarkdownV2(markdown), {
+      parse_mode: 'MarkdownV2',
     })
-    expect(sendMessage).not.toHaveBeenCalled()
+    expect(sendRichMessage).not.toHaveBeenCalled()
   })
 
-  it('sends Inbox notifications as escaped rich markdown', async () => {
+  it('sends Inbox notifications as MarkdownV2', async () => {
     const adapter = new TelegramConnectorAdapter({ startupTimeoutMs: 200 })
     await adapter.start({
       enabled: true,
@@ -196,9 +197,9 @@ describe('Telegram rich outbound text', () => {
 
     await adapter.deliver(notification)
 
-    expect(sendRichMessage).toHaveBeenCalledWith('99', {
-      markdown: formatInboxNotification(notification),
+    expect(sendMessage).toHaveBeenCalledWith('99', formatTelegramInboxMarkdownV2(notification), {
+      parse_mode: 'MarkdownV2',
     })
-    expect(sendMessage).not.toHaveBeenCalled()
+    expect(sendRichMessage).not.toHaveBeenCalled()
   })
 })

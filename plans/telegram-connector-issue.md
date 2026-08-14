@@ -75,10 +75,11 @@ comment.
 ### 3. Telegram rich-message rendering
 
 - [x] Connector Grammy ≥ 1.44 so `sendRichMessage` exists
-- [x] Phone-desk owner chat and Inbox text use `sendRichMessage({ markdown })`
-- [x] Parse/missing-method 400/404 falls back to plain `sendMessage`
+- [x] Phone-desk owner chat and Inbox text use `sendMessage` MarkdownV2
+- [x] GFM is converted; unmatched specials are escaped
+- [x] MarkdownV2 parse 400 falls back to `sendRichMessage`, then plain text
 - [x] Owner-chat cap follows the rich-message 32768 limit
-- [x] HTML report attachments stay files; no MarkdownV2 `parse_mode`
+- [x] HTML report attachments stay files; no legacy `parse_mode: Markdown`
 
 ### Not in this plan
 
