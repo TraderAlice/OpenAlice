@@ -8,13 +8,17 @@ import type { ConnectorClient } from '@traderalice/connector-protocol'
 import { createTelegramConnectorDesk } from './telegram-connector.js'
 import {
   containsTelegramNoReply,
+  formatTelegramInboundStack,
   ingestTelegramOwnerMessage,
+  ingestTelegramOwnerMessages,
   pullTelegramDeskInbound,
   startTelegramDeskInboundPoll,
   shouldProjectDeskComment,
   stampTelegramDeskScheduledFire,
+  telegramDeskHasRunningWork,
   type TelegramDeskChatHost,
 } from './telegram-desk-chat.js'
+import { readIssueComments } from './comments.js'
 
 let home: string
 let wsDir: string
@@ -29,7 +33,7 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true })
 })
 
-function host(): TelegramDeskChatHost {
+function host(overrides: Partial<TelegramDeskChatHost> = {}): TelegramDeskChatHost {
   return {
     listWorkspaces: () => [{ id: 'ws-a', dir: wsDir }],
     getWorkspace: (id) => id === 'ws-a' ? { id: 'ws-a', dir: wsDir } : undefined,
@@ -39,6 +43,7 @@ function host(): TelegramDeskChatHost {
       latest: () => undefined,
     } as unknown as NonNullable<ReturnType<TelegramDeskChatHost['provenanceStore']>>),
     conversation: () => undefined,
+    ...overrides,
   }
 }
 
@@ -151,6 +156,50 @@ describe('telegram desk ingest and stamp', () => {
     expect(comment).toBeNull()
   })
 
+  it('quotes stacked inbound DMs as one comment', () => {
+    expect(formatTelegramInboundStack(['one'])).toBe('one')
+    expect(formatTelegramInboundStack([
+      '那个事情我想了想你再改改',
+      '算了不用改了,就这样吧',
+    ])).toBe([
+      '> 那个事情我想了想你再改改',
+      '> 算了不用改了,就这样吧',
+    ].join('\n'))
+    expect(telegramDeskHasRunningWork([
+      {
+        status: 'running',
+        inquiry: {
+          subject: { kind: 'issue', workspaceId: 'ws-a', issueId: 'telegram-phone-desk', relation: 'owner' },
+          question: 'hi',
+          resolution: { mode: 'exact' },
+        },
+      },
+    ], { wsId: 'ws-a', issue: { id: 'telegram-phone-desk' } })).toBe(true)
+    expect(telegramDeskHasRunningWork([
+      { status: 'done', trigger: { kind: 'issue', workspaceId: 'ws-a', issueId: 'telegram-phone-desk' } },
+    ], { wsId: 'ws-a', issue: { id: 'telegram-phone-desk' } })).toBe(false)
+  })
+
+  it('records stacked inbound DMs as one human comment', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    const result = await ingestTelegramOwnerMessages(host(), [
+      { connectorId: 'telegram', userId: '42', text: '那个事情我想了想你再改改' },
+      { connectorId: 'telegram', userId: '42', text: '算了不用改了,就这样吧' },
+    ])
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.comment.markdown).toBe([
+      '> 那个事情我想了想你再改改',
+      '> 算了不用改了,就这样吧',
+    ].join('\n'))
+    const comments = await readIssueComments(wsDir, created.ok ? created.issue.id : 'telegram-phone-desk')
+    expect(comments.ok && comments.comments).toHaveLength(1)
+  })
+
   it('does not drain Connector inbound until a live desk exists', async () => {
     let drained = 0
     const client = {
@@ -169,6 +218,27 @@ describe('telegram desk ingest and stamp', () => {
     )
     expect(created.ok).toBe(true)
     await pullTelegramDeskInbound(host(), client)
+    expect(drained).toBe(1)
+  })
+
+  it('leaves Connector inbound stacked while the desk is generating', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    let drained = 0
+    const client = {
+      drainInbound: async () => {
+        drained += 1
+        return [{ connectorId: 'telegram', userId: '42', text: 'later' }]
+      },
+    } as unknown as ConnectorClient
+
+    await pullTelegramDeskInbound(host({ deskGenerating: () => true }), client)
+    expect(drained).toBe(0)
+
+    await pullTelegramDeskInbound(host({ deskGenerating: () => false }), client)
     expect(drained).toBe(1)
   })
 

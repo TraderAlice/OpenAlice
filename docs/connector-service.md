@@ -25,9 +25,11 @@ categories.
   and `/test` stay the generic slash-command control plane. Discord DMs are
   still not ingested.
 - Connector Service never interprets chat. Alice owns the phone-desk Issue.
-  Connector queues owner text and Alice drains it only while a live phone-desk
-  Issue exists; Alice projects desk comments that do not contain the literal
-  tag `[[no-reply]]`. Inbound Telegram comments are not echoed back.
+  Connector queues owner text and Alice drains that stack only while a live
+  phone-desk Issue exists and no desk generation is running. Several stacked
+  DMs become one quoted comment. Alice projects desk comments that do not
+  contain the literal tag `[[no-reply]]`. Inbound Telegram comments are not
+  echoed back.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are sent as file attachments, not flattened
@@ -71,8 +73,10 @@ Workspace agent
 Telegram owner DM
   -> Telegram adapter (linked private chat only)
   -> Connector inbound queue
-  -> Alice drain (only while a live phone-desk Issue exists)
-  -> Issue comment (via: telegram)
+  -> Alice drain only while a live phone-desk Issue exists and no
+     desk generation is running; later DMs stay stacked
+  -> one Issue comment (via: telegram); several stacked DMs are
+     quoted into that one comment
   -> existing comment-reply dispatch
   -> owner-chat projection unless [[no-reply]]
 ```
