@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, Play, RotateCcw, Settings, Timer, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Brain, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
 import { inputClass } from './form'
 
 import type { HeadlessTaskStatus } from '../api/headless'
@@ -155,6 +155,8 @@ function AssigneeEditor({
   onChange: (next: string) => void
 }) {
   const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const sessionChoices = sessions
     .filter((session) =>
       session.resumeId
@@ -164,43 +166,153 @@ function AssigneeEditor({
     .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
   const selectedResumeId = value.startsWith('@resume-') ? value.slice(1) : null
   const hasSelected = !selectedResumeId || sessionChoices.some((session) => session.resumeId === selectedResumeId)
-  const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
+  const contextFor = (session: WorkspaceSessionDirectoryEntry) => {
     const rawContext = session.interactive?.title
       || session.interactive?.name
       || session.latestExecution?.assistantPreview
     const normalizedContext = rawContext?.replace(/\s+/g, ' ').trim()
-    const context = normalizedContext && normalizedContext !== session.resumeId
-      ? normalizedContext.length > 28
-        ? `${normalizedContext.slice(0, 27)}…`
-        : normalizedContext
-      : null
+    return normalizedContext && normalizedContext !== session.resumeId ? normalizedContext : null
+  }
+  const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
     const activity = session.active ? 'active' : formatRelativeTime(session.updatedAt)
-    return `@${session.resumeId} · ${session.agent} · ${activity}${context ? ` — ${context}` : ''}`
+    return `${session.resumeId} · ${session.agent} · ${activity}`
+  }
+
+  const policyChoices = scheduled
+    ? [
+        { value: '@new-then-resume', label: t('issues.detail.assigneeNew'), description: t('issues.detail.assigneeNewDescription') },
+        { value: '@new-each-run', label: t('issues.detail.assigneeWorkspaceScheduled'), description: t('issues.detail.assigneeEachDescription') },
+      ]
+    : [
+        { value: '@human', label: t('issues.detail.human'), description: t('issues.detail.assigneeHumanDescription') },
+        { value: '@unassigned', label: t('issues.detail.unassigned'), description: t('issues.detail.assigneeUnassignedDescription') },
+      ]
+  const selectedSession = selectedResumeId
+    ? sessionChoices.find((session) => session.resumeId === selectedResumeId)
+    : null
+  const selectedPolicy = policyChoices.find((choice) => choice.value === value)
+  const selectedLabel = selectedSession
+    ? contextFor(selectedSession) ?? selectedSession.resumeId
+    : selectedPolicy?.label ?? (selectedResumeId ? selectedResumeId : value)
+  const selectedDescription = selectedSession
+    ? `${selectedSession.agent} · ${selectedSession.active ? t('issues.detail.activeNow') : formatRelativeTime(selectedSession.updatedAt)}`
+    : selectedPolicy?.description
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredSessions = normalizedQuery
+    ? sessionChoices.filter((session) => [session.resumeId, session.agent, contextFor(session)]
+        .filter(Boolean)
+        .some((candidate) => candidate!.toLocaleLowerCase().includes(normalizedQuery)))
+    : sessionChoices
+  const choose = (next: string) => {
+    onChange(next)
+    setOpen(false)
+    setQuery('')
   }
 
   return (
-    <select
-      className={`${railControl} w-full`}
-      value={value}
-      disabled={disabled}
-      aria-label={t('issues.detail.assignee')}
-      onChange={(event) => onChange(event.target.value)}
+    <Dialog open={open} onOpenChange={(next) => {
+      setOpen(next)
+      if (!next) setQuery('')
+    }}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={t('issues.detail.assignee')}
+        onClick={() => setOpen(true)}
+        className="oa-pressable flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <UserRound size={15} className="shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium text-foreground">{selectedLabel}</span>
+          {selectedDescription && <span className="block truncate text-[11px] text-muted-foreground">{selectedDescription}</span>}
+        </span>
+        <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
+      </button>
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] overflow-hidden p-0 sm:max-w-xl">
+        <DialogHeader className="px-4 pt-4">
+          <DialogTitle>{t('issues.detail.chooseAssignee')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.chooseAssigneeDescription')}</DialogDescription>
+        </DialogHeader>
+        <label className="mx-4 flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-ring/30">
+          <Search size={15} className="text-muted-foreground" aria-hidden />
+          <span className="sr-only">{t('issues.detail.searchSessions')}</span>
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('issues.detail.searchSessions')}
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        <div className="min-h-0 overflow-y-auto px-2 pb-4">
+          <p className="px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            {t('issues.detail.assignmentPolicy')}
+          </p>
+          <div className="space-y-0.5">
+            {policyChoices.map((choice) => (
+              <AssigneeChoice
+                key={choice.value}
+                label={choice.label}
+                description={choice.description}
+                selected={value === choice.value}
+                onClick={() => choose(choice.value)}
+              />
+            ))}
+          </div>
+          <p className="mt-2 border-t border-border/60 px-2 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            {t('issues.detail.workspaceSessions')}
+          </p>
+          <div className="space-y-0.5">
+            {!hasSelected && selectedResumeId && (
+              <AssigneeChoice
+                label={t('issues.detail.signedSession', { resumeId: selectedResumeId })}
+                description={t('issues.detail.sessionUnavailable')}
+                selected
+                onClick={() => choose(value)}
+              />
+            )}
+            {filteredSessions.map((session) => (
+              <AssigneeChoice
+                key={session.resumeId}
+                label={contextFor(session) ?? session.resumeId}
+                description={labelFor(session)}
+                selected={selectedResumeId === session.resumeId}
+                onClick={() => choose(`@${session.resumeId}`)}
+              />
+            ))}
+            {filteredSessions.length === 0 && (
+              <p className="px-3 py-8 text-center text-sm text-muted-foreground">{t('issues.detail.noSessionsFound')}</p>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function AssigneeChoice({
+  label,
+  description,
+  selected,
+  onClick,
+}: {
+  label: string
+  description?: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {scheduled && <option value="@new-then-resume">{t('issues.detail.assigneeNew')}</option>}
-      {scheduled && <option value="@new-each-run">{t('issues.detail.assigneeWorkspaceScheduled')}</option>}
-      {!scheduled && <option value="@human">{t('issues.detail.human')}</option>}
-      {!scheduled && <option value="@unassigned">{t('issues.detail.unassigned')}</option>}
-      <optgroup label={t('issues.detail.workspaceSessions')}>
-        {sessionChoices.map((session) => (
-          <option key={session.resumeId} value={`@${session.resumeId}`}>
-            {labelFor(session)}
-          </option>
-        ))}
-        {!hasSelected && selectedResumeId && (
-          <option value={value}>{t('issues.detail.signedSession', { resumeId: selectedResumeId })}</option>
-        )}
-      </optgroup>
-    </select>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-foreground">{label}</span>
+        {description && <span className="mt-0.5 block truncate text-xs text-muted-foreground">{description}</span>}
+      </span>
+      {selected && <Check size={16} className="shrink-0 text-primary" aria-hidden />}
+    </button>
   )
 }
 
@@ -555,6 +667,88 @@ function IssueAiEditor({
   )
 }
 
+function SchedulePolicyEditor({
+  issue,
+  saving,
+  onPatch,
+}: {
+  issue: IssueDetailIssue
+  saving: boolean
+  onPatch: (patch: IssuePatch) => void
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+
+  if (!issue.when) return null
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={saving}
+        onClick={() => setOpen(true)}
+        className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <SlidersHorizontal size={13} aria-hidden />
+        {t('issues.detail.editSchedule')}
+      </Button>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('issues.detail.scheduleSettings')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.scheduleSettingsDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {issue.when.kind === 'cron' && (
+            <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={issue.when.catchUp !== false}
+                disabled={saving}
+                aria-label={t('issues.detail.catchUp')}
+                onChange={(event) => onPatch({ catchUp: event.target.checked })}
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">{t('issues.detail.catchUp')}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                  {t('issues.detail.catchUpDescription')}
+                </span>
+              </span>
+            </label>
+          )}
+          <label className="block space-y-1.5">
+            <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+              <Timer size={14} aria-hidden />
+              {t('issues.detail.timeout')}
+            </span>
+            <select
+              className={`${railControl} w-full`}
+              aria-label={t('issues.detail.timeout')}
+              value={issue.timeout ?? ''}
+              disabled={saving}
+              onChange={(event) => {
+                const value = event.target.value
+                onPatch({ timeout: value === '' ? null : value as IssueTimeout })
+              }}
+            >
+              <option value="">{t('issues.detail.timeoutNone')}</option>
+              {ISSUE_TIMEOUTS.map((timeout) => (
+                <option key={timeout} value={timeout}>{timeout}</option>
+              ))}
+            </select>
+            <span className="block text-[11px] leading-relaxed text-muted-foreground">{t('issues.detail.timeoutHint')}</span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => setOpen(false)}>{t('common.close')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PropertiesRail({
   wsId,
   issue,
@@ -658,7 +852,7 @@ function PropertiesRail({
     && resolvedAi.accessMode === 'native'
   const automationHealthMessage = useMemo<string | null>(() => {
     const health = issue.automationHealth
-    if (!health) return null
+    if (!health) return issue.when ? t('issues.detail.healthMessage.not_started') : null
     // Failure/interruption messages may contain authoritative runtime diagnostics.
     // Keep those verbatim; only localize launcher-owned, deterministic states.
     if (health.state === 'failed' || health.state === 'interrupted') return health.message
@@ -692,8 +886,58 @@ function PropertiesRail({
       id="issue-work-item"
       className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0 lg:self-start"
     >
-      <div className="overflow-hidden rounded-xl border border-border bg-background">
-        <InspectorSection title={t('issues.detail.workItem')}>
+      <div className="overflow-hidden rounded-xl border border-border bg-background lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto">
+        <h3 className="sr-only">{t('issues.detail.workItem')}</h3>
+
+        {issue.when && (
+          <section className="oa-status-surface px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <AutomationHealthPill
+                health={issue.automationHealth ?? {
+                  state: 'not_started',
+                  message: t('issues.detail.healthMessage.not_started'),
+                }}
+              />
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {t('issues.detail.lastRun')} · {issue.lastFiredAtMs
+                  ? formatRelativeTime(issue.lastFiredAtMs)
+                  : t('issues.detail.never')}
+              </span>
+            </div>
+            {automationHealthMessage && (
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{automationHealthMessage}</p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {issue.lastFiredAtMs && (
+                <a
+                  href="#issue-runs"
+                  className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {t('issues.detail.viewLastRun')}
+                </a>
+              )}
+              {canRetry ? (
+                <Button type="button" size="sm" disabled={retrying} onClick={onRetry} className="ml-auto">
+                  <RotateCcw size={12} aria-hidden />
+                  {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
+                </Button>
+              ) : canRunNow ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={retrying}
+                  onClick={() => setConfirmRun(true)}
+                  className="ml-auto"
+                >
+                  <Play size={12} aria-hidden />
+                  {retrying ? t('issues.detail.runningNow') : t('issues.detail.runNow')}
+                </Button>
+              ) : null}
+            </div>
+          </section>
+        )}
+
+        <InspectorSection title={t('issues.detail.ownership')}>
           <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-2">
             <InspectorField
               label={t('issues.detail.status')}
@@ -743,25 +987,6 @@ function PropertiesRail({
           <>
             <InspectorSection title={t('issues.detail.schedule')}>
               <CadenceSummary when={issue.when} />
-              {issue.when.kind === 'cron' && (
-                <label className="mt-3 flex min-h-11 items-start gap-2.5 border-t border-border/50 pt-3">
-                  <input
-                    className="mt-1"
-                    type="checkbox"
-                    checked={issue.when.catchUp !== false}
-                    disabled={saving}
-                    onChange={(event) => onPatch({ catchUp: event.target.checked })}
-                  />
-                  <span>
-                    <span className="block text-xs font-medium text-foreground">
-                      {t('issues.detail.catchUp')}
-                    </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
-                      {t('issues.detail.catchUpDescription')}
-                    </span>
-                  </span>
-                </label>
-              )}
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Clock size={13} aria-hidden />
@@ -771,30 +996,40 @@ function PropertiesRail({
                   {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
                 </span>
               </div>
-              {canRunNow && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={retrying}
-                  onClick={() => setConfirmRun(true)}
-                  className="mt-3 w-full justify-center sm:w-auto"
-                >
-                  <Play size={12} aria-hidden />
-                  {retrying ? t('issues.detail.runningNow') : t('issues.detail.runNow')}
-                </Button>
-              )}
+              <div className="mt-1 flex justify-end">
+                <SchedulePolicyEditor issue={issue} saving={saving} onPatch={onPatch} />
+              </div>
             </InspectorSection>
 
-            <InspectorSection title={t('issues.detail.execution')}>
+            <InspectorSection title={t('issues.detail.agent')}>
               <InspectorField label={t('issues.detail.runtime')}>
                 {ownerResumeId ? (
-                  <div
-                    className="flex min-h-9 items-center gap-2 rounded-md border border-border bg-muted/25 px-3 py-2"
-                    title={t('issues.detail.sessionDeterminesRuntime')}
-                  >
-                    <Cpu size={14} className="text-muted-foreground" aria-hidden />
-                    <span>{ownerSession?.agent ?? t('issues.detail.sessionOwned')}</span>
+                  <div className="overflow-hidden rounded-md border border-border bg-muted/20">
+                    <div
+                      className="flex min-h-10 items-center gap-2.5 px-3 py-2"
+                      title={t('issues.detail.sessionDeterminesRuntime')}
+                    >
+                      <Cpu size={14} className="text-muted-foreground" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                        {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{t('issues.detail.sessionBinding')}</span>
+                    </div>
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 border-t border-border/60 px-3 py-2.5">
+                      <KeyRound size={14} className="text-muted-foreground" aria-hidden />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-medium">
+                          {ownerSession?.runtime?.credentialSource === 'vault'
+                            ? credentialLabel(availableCredentials.find((candidate) => candidate.slug === ownerSession.runtime?.credentialSlug))
+                              || ownerSession.runtime?.credentialSlug
+                              || t('issues.detail.savedAccess')
+                            : t('issues.detail.agentLogin')}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {ownerSession?.runtime?.model ?? t('issues.detail.runtimeDecides')} · {ownerSession?.runtime?.reasoningEffort ?? t('issues.detail.runtimeDecides')}
+                        </span>
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex min-w-0 items-center gap-2">
@@ -820,25 +1055,8 @@ function PropertiesRail({
                 )}
               </InspectorField>
 
-              <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
-                {ownerResumeId ? (
-                  <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-md border border-border bg-muted/25 px-3 py-2.5">
-                    <KeyRound size={15} className="text-muted-foreground" aria-hidden />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium">
-                        {ownerSession?.runtime?.credentialSource === 'vault'
-                          ? credentialLabel(availableCredentials.find((candidate) => candidate.slug === ownerSession.runtime?.credentialSlug))
-                            || ownerSession.runtime?.credentialSlug
-                            || t('issues.detail.savedAccess')
-                          : t('issues.detail.agentLogin')}
-                      </span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        {ownerSession?.runtime?.model ?? t('issues.detail.runtimeDecides')} · {ownerSession?.runtime?.reasoningEffort ?? t('issues.detail.runtimeDecides')}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-muted-foreground/75">{t('issues.detail.sessionBinding')}</span>
-                    </span>
-                  </div>
-                ) : (
+              {!ownerResumeId && (
+                <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
                   <div className="flex min-w-0">
                     <IssueAiEditor
                       issue={issue}
@@ -851,79 +1069,12 @@ function PropertiesRail({
                       onApply={onPatch}
                     />
                   </div>
-                )}
-              </InspectorField>
+                </InspectorField>
+              )}
               {agentNeedsCredential && (
                 <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
               )}
-              <InspectorField
-                label={t('issues.detail.timeout')}
-                icon={<Timer size={13} aria-hidden />}
-                className="mt-3"
-              >
-                <select
-                  className={`${railControl} w-full`}
-                  aria-label={t('issues.detail.timeout')}
-                  value={issue.timeout ?? ''}
-                  disabled={saving}
-                  onChange={(event) => {
-                    const value = event.target.value
-                    onPatch({ timeout: value === '' ? null : value as IssueTimeout })
-                  }}
-                >
-                  <option value="">{t('issues.detail.timeoutNone')}</option>
-                  {ISSUE_TIMEOUTS.map((timeout) => (
-                    <option key={timeout} value={timeout}>{timeout}</option>
-                  ))}
-                </select>
-                <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-                  {t('issues.detail.timeoutHint')}
-                </p>
-              </InspectorField>
             </InspectorSection>
-
-            {issue.automationHealth && (
-              <InspectorSection title={t('issues.detail.runHealth')}>
-                <div className="oa-status-surface rounded-lg bg-muted/25 px-3 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <AutomationHealthPill health={issue.automationHealth} />
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {t('issues.detail.lastRun')} · {issue.lastFiredAtMs
-                        ? formatRelativeTime(issue.lastFiredAtMs)
-                        : t('issues.detail.never')}
-                    </span>
-                  </div>
-                  {automationHealthMessage && (
-                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{automationHealthMessage}</p>
-                  )}
-                  {(issue.lastFiredAtMs || canRetry) && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {issue.lastFiredAtMs && (
-                        <a
-                          href="#issue-runs"
-                          className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {t('issues.detail.viewLastRun')}
-                        </a>
-                      )}
-                      {canRetry && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={retrying}
-                          onClick={onRetry}
-                          className="border-warning/35 bg-warning/10 text-warning hover:border-warning/60 hover:bg-warning/15 hover:text-warning"
-                        >
-                          <RotateCcw size={12} aria-hidden />
-                          {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </InspectorSection>
-            )}
           </>
         )}
       </div>
