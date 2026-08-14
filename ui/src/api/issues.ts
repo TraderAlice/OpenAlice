@@ -84,6 +84,7 @@ export interface IssueComment {
   markdown: string
   replyTo?: string
   delivery?: IssueCommentDelivery
+  via?: 'telegram'
 }
 
 export type IssueRunFailureKind =
@@ -135,6 +136,8 @@ export interface IssueListItem {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  /** Present only on the Project Telegram phone-desk Issue. */
+  telegramConnector?: true
   /**
    * True iff this issue's NAME (title, case-insensitive) is also claimed by an
    * issue in a DIFFERENT workspace. A `[[name]]` is a global team object, so a
@@ -163,6 +166,22 @@ export interface IssueSnapshot {
    * keys off each row's `nameCollision` flag, not this list. Detection only.
    */
   duplicateNames?: string[]
+}
+
+export function isTelegramConnectorIssue(
+  issue: Pick<IssueListItem, 'telegramConnector'>,
+): boolean {
+  return issue.telegramConnector === true
+}
+
+export function omitTelegramConnectorIssues(snapshot: IssueSnapshot): IssueSnapshot {
+  return {
+    ...snapshot,
+    workspaces: snapshot.workspaces.map((workspace) => ({
+      ...workspace,
+      issues: workspace.issues.filter((issue) => !isTelegramConnectorIssue(issue)),
+    })),
+  }
 }
 
 // ==================== Wikilink resolver ====================
@@ -233,6 +252,7 @@ export interface IssueDetailIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  telegramConnector?: true
 }
 
 /** GET /api/issues/:wsId/:id — one issue + Activity, Runs, and reports. */

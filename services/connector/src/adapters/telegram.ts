@@ -55,8 +55,26 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         })
       }
       this.registerCommands(context)
+      bot.on('message:text', async (ctx) => {
+        if (ctx.chat.type !== 'private' || !ctx.from) return
+        const text = ctx.message.text.trim()
+        if (!text || text.startsWith('/')) return
+        if (!this.isOwner(String(ctx.from.id))) return
+        try {
+          await context.forwardOwnerText({
+            text,
+            userId: String(ctx.from.id),
+            chatId: String(ctx.chat.id),
+          })
+        } catch (error) {
+          this.tracker.degraded(error)
+          await ctx.reply('OpenAlice could not accept this message. Check Connector Settings and logs.')
+            .catch(() => undefined)
+        }
+      })
       // The slash-command menu is convenience. A 404/transformer failure here
-      // must not block long polling or Inbox delivery — users can still type /link.
+      // must not block long polling, owner chat, or Inbox delivery — users can
+      // still type the commands directly.
       await publishTelegramCommands(bot).catch((error) => {
         console.warn('[connector] Telegram command menu was not published:', error instanceof Error ? error.message : error)
       })
@@ -65,6 +83,8 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         this.startupTimeoutMs,
         `Telegram polling did not become ready within ${this.startupTimeoutMs}ms`,
       )
+      // Keep the optional startup menu call untransformed; install retries only
+      // after polling is live for subsequent Telegram API traffic.
       bot.api.config.use(autoRetry())
       if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
       else this.tracker.awaitingLink()
@@ -94,6 +114,19 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
           new InputFile(attachment.content, attachment.filename),
         )
       }
+      this.tracker.success(this.ownerUserId)
+    } catch (error) {
+      this.tracker.degraded(error)
+      throw error
+    }
+  }
+
+  async sendOwnerText(text: string): Promise<void> {
+    if (!this.bot) throw new Error('Telegram bot is not ready')
+    if (!this.chatId) throw new Error('Telegram private chat is not linked')
+    this.tracker.attempt()
+    try {
+      await this.bot.api.sendMessage(this.chatId, text)
       this.tracker.success(this.ownerUserId)
     } catch (error) {
       this.tracker.degraded(error)

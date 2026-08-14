@@ -217,7 +217,9 @@ export class WebPlugin implements Plugin {
     app.route('/api/channels', createChannelsRoutes({ sessions, sseByChannel: this.sseByChannel }))
     app.route('/api/media', createMediaRoutes())
     app.route('/api/config', createConfigRoutes({ ctx }))
-    app.route('/api/connectors', createConnectorRoutes())
+    app.route('/api/connectors', createConnectorRoutes({
+      getWorkspaceService: () => this.workspaceService,
+    }))
     app.route('/api/preferences', createPreferencesRoutes())
     app.route('/api/market-data', createMarketDataRoutes(ctx))
     app.route('/api/trading/config', createTradingConfigRoutes(ctx))

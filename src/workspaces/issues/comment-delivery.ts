@@ -12,6 +12,7 @@ import {
   type IssueCommentDelivery,
 } from './comments.js'
 import { issueAssigneeResumeId, type IssueRecord } from './declaration.js'
+import { projectDeskComment } from './telegram-desk-project.js'
 
 const COMMENT_REPLY_TIMEOUT_MS = 300_000
 
@@ -183,6 +184,7 @@ export async function recordIssueCommentReply(input: {
       },
     )
     if (!updated.ok) throw new Error(updated.error)
+    await projectDeskComment(appended.issue, appended.comment).catch(() => undefined)
     return 'replied'
   }
 

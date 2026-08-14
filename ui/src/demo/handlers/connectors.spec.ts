@@ -59,6 +59,39 @@ describe('demo Connector handlers', () => {
     expect(refreshed.health.status).toBe('degraded')
   })
 
+  it('binds, updates, and disables the demo Telegram phone desk', async () => {
+    const missing = await fetch(`${baseUrl}/api/connectors/telegram/desk`)
+    expect(await missing.json()).toEqual({ desk: null })
+
+    const created = await fetch(`${baseUrl}/api/connectors/telegram/desk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wsId: 'ws-demo' }),
+    })
+    const createdBody = await created.json()
+    expect(created.status).toBe(201)
+    expect(createdBody.desk.wsId).toBe('ws-demo')
+    expect(createdBody.desk.issue.telegramConnector).toBe(true)
+
+    const conflict = await fetch(`${baseUrl}/api/connectors/telegram/desk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wsId: 'ws-other' }),
+    })
+    expect(conflict.status).toBe(409)
+
+    const patched = await fetch(`${baseUrl}/api/connectors/telegram/desk`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ when: { kind: 'every', every: '1h' } }),
+    })
+    expect((await patched.json()).desk.issue.when).toEqual({ kind: 'every', every: '1h' })
+
+    const disabled = await fetch(`${baseUrl}/api/connectors/telegram/desk`, { method: 'DELETE' })
+    expect((await disabled.json()).desk.issue.status).toBe('canceled')
+    expect((await fetch(`${baseUrl}/api/connectors/telegram/desk`).then((result) => result.json())).desk).toBeNull()
+  })
+
   it('provides a deterministic test response and rejects unknown connectors', async () => {
     const accepted = await fetch(`${baseUrl}/api/connectors/discord/test`, { method: 'POST' })
     const missing = await fetch(`${baseUrl}/api/connectors/matrix/test`, { method: 'POST' })

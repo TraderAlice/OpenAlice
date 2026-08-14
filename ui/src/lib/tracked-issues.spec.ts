@@ -12,6 +12,14 @@ const snapshot: IssueSnapshot = {
     issues: [
       { id: 'linked', title: 'Linked Issue', status: 'todo', priority: 'medium', assignee: '@human' },
       { id: 'unlinked', title: 'Unlinked Issue', status: 'todo', priority: 'low', assignee: '@human' },
+      {
+        id: 'telegram-phone-desk',
+        title: 'Telegram phone desk',
+        status: 'todo',
+        priority: 'none',
+        assignee: '@new-then-resume',
+        telegramConnector: true,
+      },
     ],
   }],
 }
@@ -28,6 +36,15 @@ const graph: EntityGraph = {
   }],
   edges: [],
 }
+
+describe('trackedIssueAnchors', () => {
+  it('omits the Telegram phone-desk Issue', () => {
+    expect(trackedIssueAnchors(snapshot).map((anchor) => anchor.issue.id)).toEqual([
+      'linked',
+      'unlinked',
+    ])
+  })
+})
 
 describe('graphWithTrackedIssues', () => {
   it('enriches linked Issue nodes and adds unlinked Issues once', () => {

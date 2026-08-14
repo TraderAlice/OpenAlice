@@ -1,4 +1,6 @@
 import { fetchJson, headers } from './client'
+import type { IssueDetailIssue } from './issues'
+import type { ScheduleWhen } from './schedule'
 
 export type ConnectorFieldKind = 'text' | 'secret' | 'number' | 'boolean'
 
@@ -58,6 +60,18 @@ export interface ConnectorSettingsSnapshot {
   health: ConnectorHealth
 }
 
+export interface TelegramConnectorDesk {
+  wsId: string
+  issue: IssueDetailIssue
+}
+
+export interface TelegramConnectorDeskSnapshot {
+  desk: TelegramConnectorDesk | null
+}
+
+export const TELEGRAM_DESK_CADENCES = ['1h', '2h', '4h', '8h', '12h', '24h'] as const
+export type TelegramDeskCadence = (typeof TELEGRAM_DESK_CADENCES)[number]
+
 export const connectorsApi = {
   async load(): Promise<ConnectorSettingsSnapshot> {
     return decodeConnectorSettingsSnapshot(await fetchJson<unknown>('/api/connectors'))
@@ -71,6 +85,31 @@ export const connectorsApi = {
   },
   test(id: string): Promise<{ ok: boolean; probeId: string }> {
     return fetchJson(`/api/connectors/${encodeURIComponent(id)}/test`, { method: 'POST' })
+  },
+  desk: {
+    async load(): Promise<TelegramConnectorDeskSnapshot> {
+      return decodeTelegramConnectorDeskSnapshot(await fetchJson<unknown>('/api/connectors/telegram/desk'))
+    },
+    async create(wsId: string): Promise<TelegramConnectorDesk> {
+      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ wsId }),
+      })
+      return decodeTelegramConnectorDeskResponse(body)
+    },
+    async update(patch: { what?: string; when?: Extract<ScheduleWhen, { kind: 'every' }> }): Promise<TelegramConnectorDesk> {
+      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(patch),
+      })
+      return decodeTelegramConnectorDeskResponse(body)
+    },
+    async disable(): Promise<TelegramConnectorDesk | null> {
+      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', { method: 'DELETE' })
+      return decodeTelegramConnectorDeskSnapshot(body).desk
+    },
   },
 }
 
@@ -161,4 +200,31 @@ function isOptionalNumber(value: unknown): boolean {
 
 function isOneOf(value: unknown, options: readonly string[]): value is string {
   return typeof value === 'string' && options.includes(value)
+}
+
+function decodeTelegramConnectorDeskSnapshot(value: unknown): TelegramConnectorDeskSnapshot {
+  if (!isRecord(value) || !('desk' in value)) {
+    throw new Error('Invalid Telegram phone-desk response.')
+  }
+  if (value.desk === null) return { desk: null }
+  return { desk: decodeTelegramConnectorDesk(value.desk) }
+}
+
+function decodeTelegramConnectorDeskResponse(value: unknown): TelegramConnectorDesk {
+  if (!isRecord(value)) throw new Error('Invalid Telegram phone-desk response.')
+  return decodeTelegramConnectorDesk(value.desk)
+}
+
+function decodeTelegramConnectorDesk(value: unknown): TelegramConnectorDesk {
+  if (!isRecord(value) || typeof value.wsId !== 'string' || !isRecord(value.issue)) {
+    throw new Error('Invalid Telegram phone-desk response.')
+  }
+  const issue = value.issue
+  if (typeof issue.id !== 'string' || typeof issue.title !== 'string' || typeof issue.what !== 'string') {
+    throw new Error('Invalid Telegram phone-desk response.')
+  }
+  return {
+    wsId: value.wsId,
+    issue: issue as unknown as IssueDetailIssue,
+  }
 }

@@ -10,6 +10,7 @@ import { serve } from '@hono/node-server'
 import {
   connectorDeliveryReceiptSchema,
   inboxNotificationSchema,
+  ownerChatMessageSchema,
 } from '@traderalice/connector-protocol'
 import { ConnectorRegistry } from './core/adapter.js'
 import { DeliveryManager } from './core/delivery-manager.js'
@@ -53,6 +54,13 @@ async function main(): Promise<void> {
   app.post('/v1/notifications/inbox', async (c) => {
     const notification = inboxNotificationSchema.parse(await c.req.json())
     return c.json(connectorDeliveryReceiptSchema.parse(manager.enqueue(notification)), 202)
+  })
+  app.post('/v1/notifications/owner-chat', async (c) => {
+    const message = ownerChatMessageSchema.parse(await c.req.json())
+    return c.json(connectorDeliveryReceiptSchema.parse(manager.enqueueOwnerChat(message)), 202)
+  })
+  app.post('/v1/inbound/drain', async (c) => {
+    return c.json({ messages: manager.drainInbound() })
   })
   app.post('/v1/connectors/:id/test', async (c) => {
     const probeId = await manager.sendTest(c.req.param('id'))

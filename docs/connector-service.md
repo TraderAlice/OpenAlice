@@ -20,8 +20,14 @@ categories.
   Inbox item read.
 - The service is optional in every trading mode, including lite.
 - Guardian may start, stop, or restart it without restarting Alice or UTA.
-- Version 1 is outbound-only. `/link`, `/status`, and `/test` reserve a generic
-  slash-command control plane; ordinary DM text is not ingested.
+- Inbox delivery remains outbound. Telegram owner private-chat text is ingested
+  only as comments on the Alice Project's phone-desk Issue. `/link`, `/status`,
+  and `/test` stay the generic slash-command control plane. Discord DMs are
+  still not ingested.
+- Connector Service never interprets chat. Alice owns the phone-desk Issue.
+  Connector queues owner text and Alice drains it only while a live phone-desk
+  Issue exists; Alice projects desk comments that do not contain the literal
+  tag `[[no-reply]]`. Inbound Telegram comments are not echoed back.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are sent as file attachments, not flattened
@@ -61,6 +67,14 @@ Workspace agent
           -> Discord Connector
           -> Telegram Connector
           -> future adapter
+
+Telegram owner DM
+  -> Telegram adapter (linked private chat only)
+  -> Connector inbound queue
+  -> Alice drain (only while a live phone-desk Issue exists)
+  -> Issue comment (via: telegram)
+  -> existing comment-reply dispatch
+  -> owner-chat projection unless [[no-reply]]
 ```
 
 Load-bearing paths:
@@ -73,6 +87,10 @@ Load-bearing paths:
 - `src/core/connector-config.ts` — sealed config and Guardian enable/restart
   control.
 - `src/services/connector-client/` — Inbox projection and Alice-side health.
+- `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound drain
+  and scheduled-fire comment stamp.
+- `src/workspaces/issues/telegram-desk-project.ts` — `[[no-reply]]` filter
+  and owner-chat projection.
 - `src/webui/routes/connectors.ts` + `ui/src/pages/ConnectorsPage.tsx` — generic
   Settings surface.
 
@@ -85,10 +103,16 @@ the machine key remains at `<OPENALICE_HOME>/sealing.key` outside portable
 `data/`.
 
 The Settings API never returns a bot token. It returns field definitions,
-non-secret values, and `configuredSecrets` presence markers. Saving an empty
-secret keeps the stored value; explicitly removing its presence clears it.
-Changes touch `data/control/restart-connector.flag`, and Guardian reconciles the
-process from the same startup path.
+non-secret values, and `configuredSecrets` presence markers. The Settings
+draft field is masked by default to keep tokens out of screenshots and
+screenshares; an explicit reveal control lets the operator verify a paste.
+Saving an empty secret keeps the stored value; explicitly removing its presence clears it.
+A non-empty secret body is accepted only when it is a plausible token (at
+least 20 non-whitespace characters); a short draft cannot replace a sealed
+value. Generic Settings auto-save must omit secret fields so enable/unlink
+writes cannot carry a password-manager draft. Changes touch
+`data/control/restart-connector.flag`, and Guardian reconciles the process
+from the same startup path.
 
 The retired `web.port`, MCP-Ask state, and legacy Telegram connector shape
 predate the 0.89.2-beta baseline and are not supported upgrade inputs.
@@ -126,10 +150,11 @@ run `/link`. Removing the token is a different action.
 `awaiting_link` means the adapter can already receive `/link`. Telegram does
 not report that until long polling has started (`onStart`); Discord waits for
 the gateway to become ready. Publishing Telegram's slash-command menu is
-best-effort: a failed `setMyCommands` must not block polling or Inbox delivery. The Connector HTTP health endpoint binds before
-those external calls so Guardian can probe a `starting` adapter instead of
-treating the whole service as missing. A failed adapter stays registered with
-its `lastError` rather than collapsing to "configured but not running."
+best-effort: a failed `setMyCommands` must not block polling or Inbox delivery.
+The Connector HTTP health endpoint binds before those external calls so
+Guardian can probe a `starting` adapter instead of treating the whole service
+as missing. A failed adapter stays registered with its `lastError` rather than
+collapsing to "configured but not running."
 
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
@@ -153,7 +178,16 @@ saved but no bot process exists to receive `/link`.
 The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
-  unlink, linking instructions, and explicit test sends.
+  unlink, linking instructions, and explicit test sends. The Telegram card also
+  binds the Project's one phone-desk Issue: the Workspace picker defaults to
+  the Ask Alice Chat workspace. The operator can edit What and heartbeat
+  cadence, then open the ordinary Issue detail for comments. Generic
+  Issue create/update cannot set `telegramConnector`.
+- The phone-desk Issue is hidden from the Issue board and Tracked list. It still
+  fires on `when`. Extra `telegramConnector: true` files in other Workspaces do
+  not fire. Owner DMs become comments; scheduled-fire `assistantText` is stamped
+  as a comment. Connector projects those comments unless they contain the
+  literal tag `[[no-reply]]` or arrived from Telegram.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product

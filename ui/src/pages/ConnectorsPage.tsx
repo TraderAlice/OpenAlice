@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { TFunction } from 'i18next'
-import { Bot, CheckCircle2, ChevronDown, CircleAlert, KeyRound, Link2, Power, Send, ShieldCheck, Unlink } from 'lucide-react'
+import { Bot, CheckCircle2, ChevronDown, CircleAlert, Eye, EyeOff, KeyRound, Link2, Power, Send, ShieldCheck, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -8,6 +8,7 @@ import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { TelegramDeskPanel } from '../components/TelegramDeskPanel'
 import {
   getConnectorSetupState,
   type ConnectorRuntime,
@@ -22,6 +23,10 @@ interface PendingSecretRemoval {
   fieldKey: string
   fieldLabel: string
 }
+
+interface PendingSecretReplace extends PendingSecretRemoval {}
+
+const MIN_CONNECTOR_SECRET_LENGTH = 20
 
 interface PendingUnlink {
   connectorId: string
@@ -38,6 +43,7 @@ export function ConnectorsPage() {
   const [savingSecret, setSavingSecret] = useState<string | null>(null)
   const [secretErrors, setSecretErrors] = useState<Record<string, string>>({})
   const [pendingSecretRemoval, setPendingSecretRemoval] = useState<PendingSecretRemoval | null>(null)
+  const [pendingSecretReplace, setPendingSecretReplace] = useState<PendingSecretReplace | null>(null)
   const [pendingUnlink, setPendingUnlink] = useState<PendingUnlink | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
@@ -72,11 +78,11 @@ export function ConnectorsPage() {
   useEffect(() => { void load() }, [load])
 
   const save = useCallback(async (next: PublicConnectorConfig) => {
-    const response = await api.connectors.save(next)
+    const response = await api.connectors.save(omitSecretSettings(next, definitions))
     setConfig((current) => JSON.stringify(current) === JSON.stringify(response.config) ? current : response.config)
     window.setTimeout(() => { void refreshRuntime() }, 900)
     window.setTimeout(() => { void refreshRuntime() }, 2_400)
-  }, [refreshRuntime])
+  }, [definitions, refreshRuntime])
 
   const { status, retry } = useAutoSave({
     data: config!,
@@ -175,6 +181,14 @@ export function ConnectorsPage() {
     const value = secretDrafts[draftKey] ?? ''
     if (!value) return
 
+    if (!isPlausibleConnectorSecret(value)) {
+      setSecretErrors((current) => ({
+        ...current,
+        [draftKey]: t('connectorSettings.tokenTooShort'),
+      }))
+      return
+    }
+
     const existing = config.adapters[id] ?? emptyAdapter()
     const next: PublicConnectorConfig = {
       ...config,
@@ -218,7 +232,7 @@ export function ConnectorsPage() {
     } finally {
       setSavingSecret((current) => current === draftKey ? null : current)
     }
-  }, [config, refreshRuntime, secretDrafts])
+  }, [config, refreshRuntime, secretDrafts, t])
 
   const test = useCallback(async (id: string) => {
     setTesting(id)
@@ -318,7 +332,26 @@ export function ConnectorsPage() {
                           setSecretDrafts((current) => ({ ...current, [draftKey]: value }))
                           setSecretErrors((current) => omitRecordKey(current, draftKey))
                         }}
-                        onSaveSecret={(key) => void saveSecret(definition.id, key)}
+                        onSaveSecret={(key, fieldLabel, configured) => {
+                          const draftKey = connectorFieldKey(definition.id, key)
+                          if (!isPlausibleConnectorSecret(secretDrafts[draftKey] ?? '')) {
+                            setSecretErrors((current) => ({
+                              ...current,
+                              [draftKey]: t('connectorSettings.tokenTooShort'),
+                            }))
+                            return
+                          }
+                          if (configured) {
+                            setPendingSecretReplace({
+                              connectorId: definition.id,
+                              connectorLabel: definition.label,
+                              fieldKey: key,
+                              fieldLabel,
+                            })
+                            return
+                          }
+                          void saveSecret(definition.id, key)
+                        }}
                         onRemoveSecret={(fieldKey, fieldLabel) => setPendingSecretRemoval({
                           connectorId: definition.id,
                           connectorLabel: definition.label,
@@ -327,6 +360,10 @@ export function ConnectorsPage() {
                         })}
                         t={t}
                       />
+
+                      {definition.id === 'telegram' && (
+                        <TelegramDeskPanel linked={setup.linked} />
+                      )}
 
                       {lastProbe?.connectorId === definition.id && (
                         <p className="text-[12px] text-success">
@@ -345,6 +382,21 @@ export function ConnectorsPage() {
           {loadError && <p className="text-[13px] text-destructive">{t('connectorSettings.loadError')}</p>}
         </div>
       </SettingsScrollArea>
+
+      {pendingSecretReplace && (
+        <ConfirmDialog
+          title={t('connectorSettings.replaceSecretTitle', { name: pendingSecretReplace.connectorLabel })}
+          message={t('connectorSettings.replaceSecretMessage', { name: pendingSecretReplace.connectorLabel })}
+          confirmLabel={t('connectorSettings.replaceToken')}
+          workingLabel={t('connectorSettings.saving')}
+          variant="primary"
+          onConfirm={async () => {
+            await saveSecret(pendingSecretReplace.connectorId, pendingSecretReplace.fieldKey)
+            setPendingSecretReplace(null)
+          }}
+          onClose={() => setPendingSecretReplace(null)}
+        />
+      )}
 
       {pendingUnlink && (
         <ConfirmDialog
@@ -433,11 +485,12 @@ function ConnectorCredentialsEditor({
   onToggle: () => void
   onSettingChange: (key: string, value: string | number | boolean) => void
   onSecretDraftChange: (draftKey: string, value: string) => void
-  onSaveSecret: (key: string) => void
+  onSaveSecret: (key: string, fieldLabel: string, configured: boolean) => void
   onRemoveSecret: (fieldKey: string, fieldLabel: string) => void
   t: TFunction
 }) {
   const credentialsId = `connector-${definition.id}-credentials`
+  const [maskedSecrets, setMaskedSecrets] = useState<Record<string, boolean>>({})
   return (
     <div className="border-y border-border/60">
       <button
@@ -482,6 +535,7 @@ function ConnectorCredentialsEditor({
           const draftKey = connectorFieldKey(definition.id, field.key)
           const secretDraft = secretDrafts[draftKey] ?? ''
           const secretSaving = savingSecret === draftKey
+          const secretMasked = maskedSecrets[draftKey] ?? true
           const inputId = `connector-${definition.id}-${field.key}`
           const fieldLabel = t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
           return (
@@ -502,23 +556,44 @@ function ConnectorCredentialsEditor({
               ) : field.kind === 'secret' ? (
                 <>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      id={inputId}
-                      aria-label={`${definition.label} ${fieldLabel}`}
-                      className={inputClass}
-                      type="password"
-                      value={secretDraft}
-                      placeholder={configured
-                        ? t('connectorSettings.configuredPlaceholder')
-                        : t(`connectorSettings.placeholders.${field.key}`, { defaultValue: field.placeholder ?? '' })}
-                      autoComplete="off"
-                      onChange={(event) => onSecretDraftChange(draftKey, event.target.value)}
-                    />
+                    <div className="relative min-w-0 flex-1">
+                      <input
+                        id={inputId}
+                        aria-label={`${definition.label} ${fieldLabel}`}
+                        className={`${inputClass} pr-10`}
+                        type={secretMasked ? 'password' : 'text'}
+                        value={secretDraft}
+                        placeholder={configured
+                          ? t('connectorSettings.configuredPlaceholder')
+                          : t(`connectorSettings.placeholders.${field.key}`, { defaultValue: field.placeholder ?? '' })}
+                        autoComplete="off"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        onChange={(event) => onSecretDraftChange(draftKey, event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="oa-pressable absolute inset-y-0 right-0 flex items-center px-2.5 text-muted-foreground hover:text-foreground"
+                        aria-label={secretMasked
+                          ? t('connectorSettings.showDraft')
+                          : t('connectorSettings.hideDraft')}
+                        aria-pressed={!secretMasked}
+                        onClick={() => setMaskedSecrets((current) => ({
+                          ...current,
+                          [draftKey]: !secretMasked,
+                        }))}
+                      >
+                        {secretMasked
+                          ? <Eye size={15} aria-hidden />
+                          : <EyeOff size={15} aria-hidden />}
+                      </button>
+                    </div>
                     <button
                       type="button"
                       className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
                       disabled={!secretDraft || secretSaving}
-                      onClick={() => onSaveSecret(field.key)}
+                      onClick={() => onSaveSecret(field.key, fieldLabel, configured)}
                     >
                       {secretSaving
                         ? t('connectorSettings.saving')
@@ -795,6 +870,34 @@ function HealthBadge({ health, t }: { health: ConnectorHealth | null; t: TFuncti
 
 function emptyAdapter(): PublicConnectorConfig['adapters'][string] {
   return { enabled: false, settings: {}, configuredSecrets: [] }
+}
+
+function isPlausibleConnectorSecret(value: string): boolean {
+  const next = value.trim()
+  return next.length >= MIN_CONNECTOR_SECRET_LENGTH && !/\s/.test(next)
+}
+
+function omitSecretSettings(
+  config: PublicConnectorConfig,
+  definitions: ConnectorDefinition[],
+): PublicConnectorConfig {
+  const secretKeys = new Map(definitions.map((definition) => [
+    definition.id,
+    new Set(definition.fields.filter((field) => field.kind === 'secret').map((field) => field.key)),
+  ]))
+  return {
+    ...config,
+    adapters: Object.fromEntries(Object.entries(config.adapters).map(([id, adapter]) => {
+      const secrets = secretKeys.get(id) ?? new Set<string>()
+      return [id, {
+        ...adapter,
+        // Empty secret values stay: they are the explicit "remove token" signal.
+        settings: Object.fromEntries(
+          Object.entries(adapter.settings).filter(([key, value]) => !secrets.has(key) || value === ''),
+        ),
+      }]
+    })),
+  }
 }
 
 function connectorFieldKey(connectorId: string, fieldKey: string): string {

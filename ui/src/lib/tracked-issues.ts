@@ -1,4 +1,4 @@
-import type { IssueListItem, IssueSnapshot } from '../api/issues'
+import { isTelegramConnectorIssue, type IssueListItem, type IssueSnapshot } from '../api/issues'
 import type { EntityGraph, EntityGraphArtifactNode } from '../api/entities'
 
 export interface TrackedIssueAnchor {
@@ -38,11 +38,13 @@ export function trackedIssueAnchors(snapshot: IssueSnapshot | null): TrackedIssu
   if (!snapshot) return []
   return (snapshot.workspaces ?? [])
     .filter((workspace) => workspace.status === 'ok')
-    .flatMap((workspace) => (workspace.issues ?? []).map((issue) => ({
-      workspaceId: workspace.wsId,
-      workspaceTag: workspace.tag,
-      issue,
-    })))
+    .flatMap((workspace) => (workspace.issues ?? [])
+      .filter((issue) => !isTelegramConnectorIssue(issue))
+      .map((issue) => ({
+        workspaceId: workspace.wsId,
+        workspaceTag: workspace.tag,
+        issue,
+      })))
     .sort((a, b) => STATUS_ORDER[a.issue.status] - STATUS_ORDER[b.issue.status]
       || a.issue.title.localeCompare(b.issue.title)
       || a.workspaceTag.localeCompare(b.workspaceTag))
