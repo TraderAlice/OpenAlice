@@ -9,6 +9,7 @@ import {
   advanceInboxSession,
   assertTelegramFormBounds,
   formatTelegramInboxConfirmPage,
+  formatTelegramInboxDetailPage,
   formatTelegramInboxFilesPage,
   formatTelegramInboxPage,
   formatTelegramSettingsPage,
@@ -37,7 +38,11 @@ describe('Telegram interactive controls', () => {
   it('parses button payloads without command params or raw paths', () => {
     expect(parseTelegramControl('i:o')).toEqual({ kind: 'inbox', direction: 'older' })
     expect(parseTelegramControl('i:n')).toEqual({ kind: 'inbox', direction: 'newer' })
+    expect(parseTelegramControl('i:s:u')).toEqual({ kind: 'inbox-scope', scope: 'unread' })
+    expect(parseTelegramControl('i:s:a')).toEqual({ kind: 'inbox-scope', scope: 'all' })
+    expect(parseTelegramControl('i:e:2')).toEqual({ kind: 'inbox-entry', entryIndex: 2 })
     expect(parseTelegramControl('i:b')).toEqual({ kind: 'inbox-back' })
+    expect(parseTelegramControl('i:v')).toEqual({ kind: 'inbox-open-files' })
     expect(parseTelegramControl('i:f:0')).toEqual({ kind: 'inbox-files', entryIndex: 0 })
     expect(parseTelegramControl('i:f:4')).toEqual({ kind: 'inbox-files', entryIndex: 4 })
     expect(parseTelegramControl('i:fp:2')).toEqual({ kind: 'inbox-files-page', page: 2 })
@@ -60,14 +65,19 @@ describe('Telegram interactive controls', () => {
       entries: [entry()],
       hasMore: true,
       canGoNewer: false,
+      scope: 'unread',
     })
     expect(page.text).toContain('Inbox · unread')
     expect(page.text).toContain('1. Overnight risk')
     expect(page.text).toContain('Three findings.')
-    expect(page.actions).toEqual([[{ text: 'Older', data: 'i:o' }]])
+    expect(page.actions).toEqual([
+      [{ text: '✓ Unread', data: 'i:s:u' }, { text: 'All', data: 'i:s:a' }],
+      [{ text: '1 · Overnight risk', data: 'i:e:0' }],
+      [{ text: 'Older', data: 'i:o' }],
+    ])
   })
 
-  it('summarizes attachments by count and offers a bounded view-files button', () => {
+  it('summarizes attachments by count and opens the entry detail', () => {
     const page = formatTelegramInboxPage({
       entries: [entry({
         docs: [
@@ -77,10 +87,11 @@ describe('Telegram interactive controls', () => {
       })],
       hasMore: false,
       canGoNewer: false,
+      scope: 'unread',
     })
     expect(page.text).toContain('Files: 2')
     expect(page.text).not.toContain('research/deep/nested')
-    expect(collectActions(page)).toEqual([{ text: 'Files 1', data: 'i:f:0' }])
+    expect(collectActions(page).map((action) => action.data)).toEqual(['i:s:u', 'i:s:a', 'i:e:0'])
     assertTelegramFormBounds(page)
   })
 
@@ -97,11 +108,13 @@ describe('Telegram interactive controls', () => {
       entries,
       hasMore: true,
       canGoNewer: true,
+      scope: 'unread',
     })
     const again = formatTelegramInboxPage({
       entries,
       hasMore: true,
       canGoNewer: true,
+      scope: 'unread',
     })
     expect(page.text).toBe(again.text)
     expect(page.text.length).toBeLessThan(TELEGRAM_PLAIN_TEXT_MAX)
@@ -116,7 +129,11 @@ describe('Telegram interactive controls', () => {
       'Files: 2',
     ])
     const actions = collectActions(page)
-    expect(actions.map((action) => action.data)).toEqual(['i:f:0', 'i:f:1', 'i:f:2', 'i:f:3', 'i:f:4', 'i:n', 'i:o'])
+    expect(actions.map((action) => action.data)).toEqual([
+      'i:s:u', 'i:s:a',
+      'i:e:0', 'i:e:1', 'i:e:2', 'i:e:3', 'i:e:4',
+      'i:n', 'i:o',
+    ])
     for (const action of actions) {
       expect(action.text.length).toBeLessThanOrEqual(TELEGRAM_BUTTON_TEXT_MAX)
       expect(Buffer.byteLength(action.data, 'utf8')).toBeLessThanOrEqual(TELEGRAM_CALLBACK_DATA_MAX)
@@ -129,11 +146,26 @@ describe('Telegram interactive controls', () => {
     expect(inboxFileDisplayName('research/deep/报告 😀.md')).toBe('报告 😀.md')
   })
 
+  it('renders a bounded detail view before exposing its files', () => {
+    const detail = formatTelegramInboxDetailPage(entry({
+      comments: `Overnight risk\n\n${'Finding. '.repeat(400)}`,
+      docs: [{ path: 'research/close.md' }],
+    }))
+    expect(detail.text).toContain('Overnight risk')
+    expect(detail.text).toContain('Files: 1')
+    expect(detail.text.length).toBeLessThanOrEqual(TELEGRAM_INBOX_PAGE_HARD_MAX)
+    expect(detail.actions).toEqual([
+      [{ text: 'View 1 file', data: 'i:v' }],
+      [{ text: 'Back to Inbox', data: 'i:b' }],
+    ])
+    assertTelegramFormBounds(detail)
+  })
+
   it('keeps Inbox paging on the same form via a cursor stack', () => {
-    const first = { stack: [] as string[] }
+    const first = { stack: [] as string[], scope: 'all' as const }
     const older = advanceInboxSession(first, 'older', 'entry-5')
-    expect(older).toEqual({ stack: [''], before: 'entry-5' })
-    expect(advanceInboxSession(older, 'newer')).toEqual({ stack: [], before: undefined })
+    expect(older).toEqual({ stack: [''], scope: 'all', before: 'entry-5' })
+    expect(advanceInboxSession(older, 'newer')).toEqual({ stack: [], scope: 'all', before: undefined })
   })
 
   it('renders Settings as a single toggle button', () => {
@@ -203,6 +235,47 @@ describe('Telegram inbox control transitions', () => {
       { kind: 'inbox-send' },
       { isOwner: false, getEntry },
     )).resolves.toEqual({ kind: 'forbidden' })
+  })
+
+  it('switches between unread and full history while resetting pagination', async () => {
+    await expect(transitionTelegramInbox(
+      { stack: ['', 'older'], scope: 'unread', before: 'entry-5', entryIds: ['entry-1'] },
+      { kind: 'inbox-scope', scope: 'all' },
+      { isOwner: true, getEntry: async () => listed },
+    )).resolves.toEqual({
+      kind: 'reload-inbox',
+      session: { stack: [], scope: 'all', entryIds: [], view: undefined },
+    })
+  })
+
+  it('opens an entry detail before its file list and returns through the same layers', async () => {
+    const detail = await transitionTelegramInbox(
+      { stack: [], scope: 'all', entryIds: ['entry-1'] },
+      { kind: 'inbox-entry', entryIndex: 0 },
+      { isOwner: true, getEntry: async () => listed },
+    )
+    expect(detail.kind).toBe('show')
+    if (detail.kind !== 'show') return
+    expect(detail.session.view).toEqual({ kind: 'detail', entryId: 'entry-1' })
+    expect(detail.form.text).toContain('Overnight risk')
+
+    const files = await transitionTelegramInbox(
+      detail.session,
+      { kind: 'inbox-open-files' },
+      { isOwner: true, getEntry: async () => listed },
+    )
+    expect(files.kind).toBe('show')
+    if (files.kind !== 'show') return
+    expect(files.session.view).toEqual({ kind: 'files', entryId: 'entry-1', page: 0 })
+
+    const back = await transitionTelegramInbox(
+      files.session,
+      { kind: 'inbox-back' },
+      { isOwner: true, getEntry: async () => listed },
+    )
+    expect(back.kind).toBe('show')
+    if (back.kind !== 'show') return
+    expect(back.session.view).toEqual({ kind: 'detail', entryId: 'entry-1' })
   })
 
   it('opens a file list from a page-local entry index', async () => {

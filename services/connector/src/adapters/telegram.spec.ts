@@ -186,6 +186,7 @@ describe('Telegram rich outbound text', () => {
       enabled: true,
       settings: { botToken: 'token', ownerUserId: '42', chatId: '99' },
     }, context())
+    const attachment = Buffer.from('# Close scan\n')
     const notification: InboxNotification = {
       id: 'inbox-1',
       createdAt: '2026-07-13T00:00:00.000Z',
@@ -195,6 +196,13 @@ describe('Telegram rich outbound text', () => {
       body: 'Three **findings**.',
       provenance: { resumeId: 'resume-calm-river-12ab' },
       href: 'https://openalice.example/inbox',
+      attachments: [{
+        filename: 'close.md',
+        mediaType: 'text/markdown; charset=utf-8',
+        sizeBytes: attachment.byteLength,
+        contentSha256: createHash('sha256').update(attachment).digest('hex'),
+        contentBase64: attachment.toString('base64'),
+      }],
     }
 
     await adapter.deliver(notification)
@@ -203,6 +211,7 @@ describe('Telegram rich outbound text', () => {
       markdown: formatInboxNotification(notification),
     })
     expect(sendMessage).not.toHaveBeenCalled()
+    expect(sendDocument).not.toHaveBeenCalled()
   })
 
   it('sends a requested file without repeating the Inbox summary', async () => {
