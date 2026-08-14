@@ -3,6 +3,7 @@ import { autoRetry } from '@grammyjs/auto-retry'
 import type {
   ConnectorAdapterConfig,
   ConnectorAdapterHealth,
+  ConnectorArtifactDelivery,
   InboxNotification,
 } from '@traderalice/connector-protocol'
 import { isInboxPushEnabled, TELEGRAM_CONNECTOR_DEFINITION } from '@traderalice/connector-protocol'
@@ -14,6 +15,7 @@ import type {
 } from '../core/adapter.js'
 import {
   AdapterHealthTracker,
+  decodeConnectorAttachment,
   decodeInboxAttachments,
   formatInboxNotification,
   formatPlainInboxNotification,
@@ -25,6 +27,8 @@ import {
   formatTelegramInboxPage,
   formatTelegramSettingsPage,
   parseTelegramControl,
+  truncateTelegramText,
+  transitionTelegramInbox,
   type TelegramInboxSession,
 } from './telegram-controls.js'
 import { sendTelegramRichText } from './telegram-rich-text.js'
@@ -166,6 +170,24 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     }
   }
 
+  async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
+    if (!this.bot) throw new Error('Telegram bot is not ready')
+    if (!this.chatId) throw new Error('Telegram private chat is not linked')
+    this.tracker.attempt()
+    try {
+      const file = decodeConnectorAttachment(delivery.attachment)
+      await this.bot.api.sendDocument(
+        this.chatId,
+        new InputFile(file.content, file.filename),
+        { caption: truncateTelegramText(`Current file: ${file.filename}`, 200) },
+      )
+      this.tracker.success(this.ownerUserId)
+    } catch (error) {
+      this.tracker.degraded(error)
+      throw error
+    }
+  }
+
   async sendOwnerText(text: string): Promise<void> {
     if (!this.bot) throw new Error('Telegram bot is not ready')
     if (!this.chatId) throw new Error('Telegram private chat is not linked')
@@ -223,13 +245,18 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       limit: TELEGRAM_INBOX_PAGE_SIZE,
       ...(session.before ? { before: session.before } : {}),
     })
+    const nextSession: TelegramInboxSession = {
+      stack: session.stack,
+      ...(session.before ? { before: session.before } : {}),
+      entryIds: page.entries.map((entry) => entry.id),
+    }
     const form = formatTelegramInboxPage({
       entries: page.entries,
       hasMore: page.hasMore,
       canGoNewer: session.stack.length > 0,
     })
     const sent = await this.presentForm(ctx, form, mode)
-    if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), session)
+    if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), nextSession)
   }
 
   private async presentSettings(ctx: Context, _context: ConnectorAdapterContext, mode: 'reply' | 'edit' = 'reply'): Promise<void> {
@@ -249,31 +276,65 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       await ctx.answerCallbackQuery()
       return
     }
-    if (!this.isOwner(String(ctx.from?.id ?? ''))) {
+    const messageId = ctx.callbackQuery?.message?.message_id
+    const key = ctx.chat && messageId ? sessionKey(ctx.chat.id, messageId) : undefined
+    const current = key ? this.inboxSessions.get(key) : undefined
+    const resolution = await transitionTelegramInbox(current, control, {
+      isOwner: this.isOwner(String(ctx.from?.id ?? '')),
+      getEntry: (id) => this.resolveInboxStore().get(id),
+    })
+    if (resolution.kind === 'forbidden') {
       await ctx.answerCallbackQuery({ text: 'Only the linked owner can use this.' })
       return
     }
     await ctx.answerCallbackQuery()
-    if (control.kind === 'settings') {
-      this.inboxPush = control.inboxPush
-      await context.updateSettings({ inboxPush: control.inboxPush })
+    if (resolution.kind === 'ignored') return
+    if (resolution.kind === 'settings') {
+      this.inboxPush = resolution.inboxPush
+      await context.updateSettings({ inboxPush: resolution.inboxPush })
       await this.presentSettings(ctx, context, 'edit')
       return
     }
-    const messageId = ctx.callbackQuery?.message?.message_id
-    const key = ctx.chat && messageId ? sessionKey(ctx.chat.id, messageId) : undefined
-    const current = key ? this.inboxSessions.get(key) : undefined
-    if (!current) {
+    if (resolution.kind === 'expired') {
       await ctx.editMessageText('This Inbox page expired. Send /inbox again.')
       return
     }
-    const page = await this.resolveInboxStore().read({
-      unread: true,
-      limit: TELEGRAM_INBOX_PAGE_SIZE,
-      ...(current.before ? { before: current.before } : {}),
-    })
-    const next = advanceInboxSession(current, control.direction, page.entries.at(-1)?.id)
-    await this.presentInbox(ctx, context, next, 'edit')
+    if (resolution.kind === 'error') {
+      await ctx.editMessageText(resolution.text)
+      return
+    }
+    if (resolution.kind === 'page') {
+      const page = await this.resolveInboxStore().read({
+        unread: true,
+        limit: TELEGRAM_INBOX_PAGE_SIZE,
+        ...(resolution.session.before ? { before: resolution.session.before } : {}),
+      })
+      const next = advanceInboxSession(resolution.session, resolution.direction, page.entries.at(-1)?.id)
+      await this.presentInbox(ctx, context, next, 'edit')
+      return
+    }
+    if (resolution.kind === 'reload-inbox') {
+      await this.presentInbox(ctx, context, resolution.session, 'edit')
+      return
+    }
+    if (resolution.kind === 'request-artifact') {
+      try {
+        context.enqueueArtifactRequest({
+          entryId: resolution.entryId,
+          docIndex: resolution.docIndex,
+        })
+      } catch (error) {
+        await ctx.editMessageText(
+          error instanceof Error ? error.message : 'Could not request that file. Try again.',
+        )
+        return
+      }
+      const sent = await this.presentForm(ctx, resolution.form, 'edit')
+      if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), resolution.session)
+      return
+    }
+    const sent = await this.presentForm(ctx, resolution.form, 'edit')
+    if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), resolution.session)
   }
 
   private async presentForm(

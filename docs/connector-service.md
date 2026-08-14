@@ -23,11 +23,28 @@ categories.
 - Inbox delivery remains outbound by default. Each adapter may advertise
   `inbox` and `settings` capabilities and implement those slash commands
   itself. Telegram uses an inline-button form: `/inbox` pages unread items
-  and `/settings` toggles Inbox push. Discord registers the same commands
-  and currently replies with a placeholder. `inboxPush: false` skips Inbox
+  and `/settings` toggles Inbox push. Discord and Slack register the same
+  commands and currently reply with a placeholder. `inboxPush: false` skips Inbox
   `deliver` for that adapter and does not affect phone-desk owner chat.
   `/link`, `/status`, and `/test` stay the generic control plane. Discord
   DMs are still not ingested.
+- OpenAlice Inbox still shows the full entry. The Connector `/inbox` pull
+  view is a bounded summary: title, Workspace, time, a short body prefix,
+  and an attachment count. It never expands raw Workspace paths. Telegram
+  keeps five items per page and hard-caps the whole page below the 4096
+  plain-text limit. Entries with files offer a short “view files” control.
+  Callback data carries only page-local indexes or a server-validated
+  Inbox entry id plus doc index, never a trusted raw path.
+- On-demand file pull is not phone-desk inbound and is not an ordinary
+  Inbox `deliver`. The originating Connector enqueues a bounded, TTL-limited
+  artifact request (`requestId`, `connectorId`, `entryId`, `docIndex`).
+  Alice’s resident action bridge drains that queue, re-reads the Inbox
+  entry, resolves the Workspace, materializes the selected current file
+  through the existing attachment safety path, and posts a directed
+  artifact delivery back to that Connector only. Cancel does not enqueue.
+  First-version pull does not change Inbox read state. Discord and Slack
+  keep `/inbox` as a placeholder and reject artifact delivery as
+  unimplemented.
 - Connector Service never interprets chat. Alice owns the phone-desk Issue.
   Connector queues owner text and Alice drains that stack only while a live
   phone-desk Issue exists and no desk generation is running. Several stacked
@@ -91,6 +108,12 @@ Telegram owner DM
      quoted into that one comment
   -> existing comment-reply dispatch
   -> owner-chat projection unless [[no-reply]]
+
+Telegram /inbox "view files" confirm
+  -> Connector action queue (requestId, connectorId, entryId, docIndex)
+  -> Alice connector action bridge drain (not the phone-desk inbound drain)
+  -> Alice re-reads Inbox entry and materializes one Workspace file
+  -> Connector directed artifact delivery to the requesting adapter only
 ```
 
 Load-bearing paths:
@@ -102,7 +125,8 @@ Load-bearing paths:
 - `services/connector/src/adapters/` — one file per platform implementation.
 - `src/core/connector-config.ts` — sealed config and Guardian enable/restart
   control.
-- `src/services/connector-client/` — Inbox projection and Alice-side health.
+- `src/services/connector-client/` — Inbox projection, on-demand single-doc
+  materialization, Alice-side health, and the resident artifact-request bridge.
 - `src/workspaces/issues/telegram-desk-chat.ts` — phone-desk inbound drain
   and scheduled-fire comment stamp.
 - `src/workspaces/issues/telegram-desk-project.ts` — `[[no-reply]]` filter

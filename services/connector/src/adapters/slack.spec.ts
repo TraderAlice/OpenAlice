@@ -41,6 +41,7 @@ function context() {
     getServiceStatus: () => 'healthy',
     sendTest: async () => 'probe',
     forwardOwnerText: async () => undefined,
+    enqueueArtifactRequest: () => 'art-test',
   }
 }
 

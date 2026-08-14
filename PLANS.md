@@ -38,8 +38,9 @@ the durable truth after it changes. Git history is the archive.
   Increment 2 projects comments unless `[[no-reply]]`.
 - [[plans/connector-inbox-commands.md]] — Connectors declare `inbox` and
   `settings` capabilities and implement their own slash-command forms.
-  Telegram uses buttons; Discord stays a placeholder. `inboxPush` can mute
-  push without touching the phone desk.
+  Telegram uses a bounded `/inbox` summary plus on-demand file pull;
+  Discord/Slack stay placeholders. `inboxPush` can mute push without
+  touching the phone desk.
 - [[plans/session-presence.md]] — Give product Sessions an in-desk presence
   (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
   the Ask Alice roster, and make Archive the floor action instead of deleting

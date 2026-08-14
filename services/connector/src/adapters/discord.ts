@@ -112,6 +112,10 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
     }
   }
 
+  async deliverArtifact(): Promise<void> {
+    throw new Error('Inbox file delivery is not implemented for Discord yet.')
+  }
+
   async sendOwnerText(text: string): Promise<void> {
     if (!this.client?.isReady()) throw new Error('Discord client is not ready')
     if (!this.ownerUserId) throw new Error('Discord owner is not linked')

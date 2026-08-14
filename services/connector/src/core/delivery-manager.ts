@@ -1,9 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import {
+  CONNECTOR_ACTION_TTL_MS,
+  MAX_CONNECTOR_ACTION_REQUESTS,
+  connectorArtifactDeliverySchema,
+  connectorArtifactFailureSchema,
+  connectorArtifactRequestSchema,
+  artifactFailureMessage,
   inboundOwnerMessageSchema,
+  isConnectorActionExpired,
   isInboxPushEnabled,
   type ConnectorAdapterConfig,
   type ConnectorAdapterHealth,
+  type ConnectorArtifactDelivery,
+  type ConnectorArtifactFailure,
+  type ConnectorArtifactRequest,
   type ConnectorConfig,
   type ConnectorDeliveryReceipt,
   type ConnectorServiceHealth,
@@ -42,6 +52,7 @@ export class DeliveryManager {
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
   private readonly inbound: InboundOwnerMessage[] = []
+  private readonly actions: ConnectorArtifactRequest[] = []
   private readonly startedAt: string
   private stopped = false
 
@@ -128,6 +139,100 @@ export class DeliveryManager {
 
   drainInbound(limit = MAX_INBOUND_OWNER_MESSAGES): InboundOwnerMessage[] {
     return this.inbound.splice(0, Math.max(0, limit))
+  }
+
+  enqueueArtifactRequest(connectorId: string, input: { entryId: string; docIndex: number }): string {
+    const expired = this.expireActions()
+    for (const request of expired) {
+      void this.failArtifact({
+        requestId: request.requestId,
+        connectorId: request.connectorId,
+        entryId: request.entryId,
+        docIndex: request.docIndex,
+        reason: 'expired',
+        message: artifactFailureMessage('expired'),
+      }).catch((error) => {
+        console.warn(
+          `[connector] ${request.connectorId} expired file-request notify failed:`,
+          error instanceof Error ? error.message : error,
+        )
+      })
+    }
+    if (this.actions.length >= MAX_CONNECTOR_ACTION_REQUESTS) {
+      throw new Error('Too many pending file requests. Try again in a moment.')
+    }
+    const request = connectorArtifactRequestSchema.parse({
+      requestId: `art-${randomUUID()}`,
+      connectorId,
+      entryId: input.entryId,
+      docIndex: input.docIndex,
+      createdAt: new Date().toISOString(),
+    })
+    this.actions.push(request)
+    void this.record({
+      correlationId: request.requestId,
+      direction: 'inbound',
+      stage: 'action.enqueued',
+      connectorId,
+      payload: {
+        requestId: request.requestId,
+        entryId: request.entryId,
+        docIndex: request.docIndex,
+        ttlMs: CONNECTOR_ACTION_TTL_MS,
+      },
+    })
+    return request.requestId
+  }
+
+  drainActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorArtifactRequest[] {
+    return this.actions.splice(0, Math.max(0, limit))
+  }
+
+  async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
+    const parsed = connectorArtifactDeliverySchema.parse(delivery)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    if (!adapter.deliverArtifact) {
+      throw new Error(`Inbox file delivery is not implemented for ${parsed.connectorId} yet.`)
+    }
+    await this.record({
+      correlationId: parsed.requestId,
+      direction: 'outbound',
+      stage: 'artifact.attempted',
+      connectorId: adapter.id,
+      payload: journalArtifactPayload(parsed),
+    })
+    try {
+      await adapter.deliverArtifact(parsed)
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'artifact.succeeded',
+        connectorId: adapter.id,
+        payload: { requestId: parsed.requestId, entryId: parsed.entryId, docIndex: parsed.docIndex },
+      })
+    } catch (error) {
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'artifact.failed',
+        connectorId: adapter.id,
+        payload: {
+          requestId: parsed.requestId,
+          entryId: parsed.entryId,
+          docIndex: parsed.docIndex,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
+  }
+
+  async failArtifact(failure: ConnectorArtifactFailure): Promise<void> {
+    const parsed = connectorArtifactFailureSchema.parse(failure)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    await adapter.sendOwnerText(parsed.message)
   }
 
   enqueueOwnerChat(message: OwnerChatMessage): ConnectorDeliveryReceipt {
@@ -234,6 +339,7 @@ export class DeliveryManager {
           ...(input.chatId ? { chatId: input.chatId } : {}),
         })
       },
+      enqueueArtifactRequest: (input) => this.enqueueArtifactRequest(id, input),
     }
     // Keep a failed adapter registered. start() may record a useful degraded
     // reason; dropping it here reduced Settings to "configured but not running".
@@ -277,10 +383,34 @@ export class DeliveryManager {
     }
   }
 
+  private expireActions(now = Date.now()): ConnectorArtifactRequest[] {
+    const expired: ConnectorArtifactRequest[] = []
+    for (let index = this.actions.length - 1; index >= 0; index -= 1) {
+      const request = this.actions[index]
+      if (!request || isConnectorActionExpired(request.createdAt, now)) {
+        if (request) expired.push(request)
+        this.actions.splice(index, 1)
+      }
+    }
+    return expired
+  }
+
   private async record(event: ConnectorIOEventInput): Promise<void> {
     await this.recorder.record(event).catch((error) => {
       console.warn('[connector] I/O delivery event could not be recorded:', error instanceof Error ? error.message : error)
     })
+  }
+}
+
+function journalArtifactPayload(delivery: ConnectorArtifactDelivery): Record<string, unknown> {
+  return {
+    requestId: delivery.requestId,
+    entryId: delivery.entryId,
+    docIndex: delivery.docIndex,
+    filename: delivery.attachment.filename,
+    mediaType: delivery.attachment.mediaType,
+    sizeBytes: delivery.attachment.sizeBytes,
+    contentSha256: delivery.attachment.contentSha256,
   }
 }
 

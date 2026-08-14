@@ -121,6 +121,10 @@ export class SlackConnectorAdapter implements ConnectorAdapter {
     }
   }
 
+  async deliverArtifact(): Promise<void> {
+    throw new Error('Inbox file delivery is not implemented for Slack yet.')
+  }
+
   async sendOwnerText(text: string): Promise<void> {
     if (!this.web) throw new Error('Slack client is not ready')
     if (!this.ownerUserId) throw new Error('Slack owner is not linked')
