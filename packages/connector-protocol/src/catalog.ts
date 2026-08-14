@@ -103,7 +103,56 @@ export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
     capabilities: ['inbox', 'settings'],
   }
 
+export const SLACK_CONNECTOR_DEFINITION: ConnectorDefinition = {
+    id: 'slack',
+    label: 'Slack',
+    description: 'Send Inbox notifications to your private Slack app DM.',
+    fields: [
+      {
+        key: 'botToken',
+        label: 'Bot token',
+        kind: 'secret',
+        required: true,
+        placeholder: 'xoxb-… sealed locally',
+      },
+      {
+        key: 'appToken',
+        label: 'App-level token',
+        kind: 'secret',
+        required: true,
+        placeholder: 'xapp-… Socket Mode, connections:write',
+      },
+      {
+        key: 'ownerUserId',
+        label: 'Owner user ID',
+        kind: 'text',
+        required: false,
+        learnedBy: 'link',
+        description: 'Only this Slack account can link and receive notifications.',
+        placeholder: 'Can be learned with /link',
+      },
+      {
+        key: 'inboxPush',
+        label: 'Push Inbox notifications',
+        kind: 'boolean',
+        required: false,
+        group: 'preferences',
+        defaultValue: true,
+        description: 'When off, new Inbox items stay in OpenAlice until you open them there or run /inbox.',
+      },
+    ],
+    commands: [
+      { name: 'link', description: 'Link this Slack account as the owner.' },
+      { name: 'status', description: 'Show connector health.' },
+      { name: 'test', description: 'Send a test notification.' },
+      { name: 'inbox', description: 'Browse recent Inbox items.' },
+      { name: 'settings', description: 'Change Inbox push for this chat.' },
+    ],
+    capabilities: ['inbox', 'settings'],
+  }
+
 export const BUILTIN_CONNECTOR_DEFINITIONS: ConnectorDefinition[] = [
   DISCORD_CONNECTOR_DEFINITION,
   TELEGRAM_CONNECTOR_DEFINITION,
+  SLACK_CONNECTOR_DEFINITION,
 ]

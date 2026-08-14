@@ -1752,6 +1752,7 @@ export const en = {
     fields: {
       applicationId: 'Application ID',
       botToken: 'Bot token',
+      appToken: 'App-level token',
       inboxPush: 'Push Inbox notifications',
     },
     fieldDescriptions: {
@@ -1760,6 +1761,7 @@ export const en = {
     placeholders: {
       applicationId: 'Discord application ID',
       botToken: 'Stored locally and sealed',
+      appToken: 'xapp token with connections:write',
     },
     configuredPlaceholder: 'Configured — enter a new value to replace',
     saving: 'Saving…',

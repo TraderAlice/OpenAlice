@@ -1748,6 +1748,7 @@ export const zhHant: Resources = {
     fields: {
       applicationId: '應用程式 ID',
       botToken: '機器人權杖',
+      appToken: '應用層權杖',
       inboxPush: '推送 Inbox 通知',
     },
     fieldDescriptions: {
@@ -1756,6 +1757,7 @@ export const zhHant: Resources = {
     placeholders: {
       applicationId: 'Discord 應用程式 ID',
       botToken: '僅在本機加密儲存',
+      appToken: '具 connections:write 的 xapp 權杖',
     },
     configuredPlaceholder: '已設定——輸入新值以取代',
     saving: '儲存中…',

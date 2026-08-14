@@ -9,7 +9,7 @@ It complements [[docs/workspace-issues-and-scheduling.md]] and
 
 Connector Service projects durable OpenAlice Inbox entries into optional
 external chats. It is not another agent runtime, chat input loop, or source of
-truth. Telegram and Discord are the first adapters, not hard-coded product
+truth. Telegram, Discord, and Slack are the first adapters, not hard-coded product
 categories.
 
 - Local Inbox append completes before any external request begins.
@@ -79,6 +79,7 @@ Workspace agent
        -> adapter registry
           -> Discord Connector
           -> Telegram Connector
+          -> Slack Connector
           -> future adapter
 
 Telegram owner DM
@@ -151,7 +152,17 @@ Discord uses a user-installed application with slash commands scoped to the
 app DM context. No guild/channel is required and raw DM messages are not read.
 The owner runs `/link` in the app DM, then OpenAlice stores that Discord user
 ID. Telegram uses private-chat long polling; the owner starts the bot and runs
-`/link`, which stores the matching user and chat IDs.
+`/link`, which stores the matching user and chat IDs. Slack is a workspace-installed
+app that talks only in the owner's app DM. OpenAlice is local, so Slack uses
+Socket Mode (`xapp` app-level token + `xoxb` bot token) instead of a public
+Request URL. Slash commands are created in the Slack app settings; Connector
+listens for them over the socket and does not register them at runtime. Raw
+Slack messages are not read. The owner DMs the app and runs `/link`.
+
+Do not use Slack's hosted Deno/Functions platform for this connector. That
+path expects Slack to host the app. Socket Mode plus the Web API is the
+current local-app shape after the 2026 Node SDK majors (`@slack/web-api` 8,
+`@slack/socket-mode` 3).
 
 Saving valid bot credentials does not mean the connector is linked. Settings
 must present the lifecycle explicitly: credentials ready, bot online and

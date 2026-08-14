@@ -16,6 +16,7 @@ import { ConnectorRegistry } from './core/adapter.js'
 import { DeliveryManager } from './core/delivery-manager.js'
 import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
+import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
   const registry = new ConnectorRegistry()
   registry.register(discordConnectorRegistration())
   registry.register(telegramConnectorRegistration())
+  registry.register(slackConnectorRegistration())
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),

@@ -18,6 +18,9 @@ interaction.
 - Telegram: inline keyboard forms. `/inbox` pages unread items on one
   message. `/settings` is a single toggle button.
 - Discord: same commands, placeholder replies.
+- Slack: workspace-installed Socket Mode app, owner DM only, same
+  commands with placeholder `/inbox` and `/settings`. Not Slack's hosted
+  Deno platform.
 - Connector reads InboxStore files from `OPENALICE_HOME` (works in Electron
   without Alice HTTP).
 

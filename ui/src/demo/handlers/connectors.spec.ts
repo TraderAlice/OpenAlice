@@ -18,12 +18,13 @@ describe('demo Connector handlers', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.definitions.map((definition: { id: string }) => definition.id)).toEqual(['discord', 'telegram'])
+    expect(body.definitions.map((definition: { id: string }) => definition.id)).toEqual(['discord', 'telegram', 'slack'])
     expect(body.config).toEqual({
       serviceEnabled: false,
       adapters: {
         discord: { enabled: false, settings: {}, configuredSecrets: [] },
         telegram: { enabled: false, settings: {}, configuredSecrets: [] },
+        slack: { enabled: false, settings: {}, configuredSecrets: [] },
       },
     })
     expect(body.health).toEqual({ enabled: false, status: 'disabled' })
