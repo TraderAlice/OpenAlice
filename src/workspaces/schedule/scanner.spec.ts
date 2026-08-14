@@ -26,6 +26,7 @@ const noopLogger = {
 
 class FakeMarkers implements MarkerStore {
   private m = new Map<string, number>()
+  private held = new Map<string, number>()
   pruned: Set<string> | null = null
   key(w: string, t: string): string {
     return `${w} ${t}`
@@ -33,12 +34,20 @@ class FakeMarkers implements MarkerStore {
   get(w: string, t: string): number | undefined {
     return this.m.get(this.key(w, t))
   }
+  getHeld(w: string, t: string): number | undefined {
+    return this.held.get(this.key(w, t))
+  }
   async set(w: string, t: string, ts: number): Promise<void> {
     this.m.set(this.key(w, t), ts)
+    this.held.delete(this.key(w, t))
+  }
+  async hold(w: string, t: string, ts: number): Promise<void> {
+    this.held.set(this.key(w, t), ts)
   }
   async prune(seen: Set<string>): Promise<void> {
     this.pruned = seen
     for (const k of [...this.m.keys()]) if (!seen.has(k)) this.m.delete(k)
+    for (const k of [...this.held.keys()]) if (!seen.has(k)) this.held.delete(k)
   }
 }
 
@@ -102,7 +111,7 @@ function issueMd(spec: IssueSpec): string {
         ? `kind: at, at: "${w.at}"`
         : w.kind === 'every'
           ? `kind: every, every: "${w.every}"`
-          : `kind: cron, cron: "${w.cron}"`
+          : `kind: cron, cron: "${w.cron}"${w.catchUp === false ? ', catchUp: false' : ''}`
     lines.push(`when: { ${inner} }`)
   }
   return `---\n${lines.join('\n')}\n---\n${spec.body ?? ''}`
@@ -602,6 +611,48 @@ describe('ScheduleScanner', () => {
     await scanner.scan()
     expect(dispatch).not.toHaveBeenCalled()
     expect((markers as FakeMarkers).pruned?.has(markers.key('w1', 't1'))).toBe(true)
+  })
+
+  it('keeps a never-fired cron due after an admission skip', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'c1',
+      title: 'i-cron',
+      when: { kind: 'cron', cron: '* * * * *' },
+      what: 'tick',
+    }])
+    const dispatch = vi.fn(async () => {
+      throw new Error('this conversation already has a running turn')
+    })
+    const { scanner, markers } = scannerFor([ws], { dispatch })
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(markers.get('w1', 'c1')).toBeUndefined()
+    expect(markers.getHeld('w1', 'c1')).toBeTypeOf('number')
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(2)
+  })
+
+  it('consumes every elapsed cron slot when catchUp is false', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'c1',
+      title: 'i-cron',
+      when: { kind: 'cron', cron: '* * * * *', catchUp: false },
+      what: 'tick',
+    }])
+    const dispatch = vi.fn(async () => {
+      throw new Error('this conversation already has a running turn')
+    })
+    const markers = new FakeMarkers()
+    // Simulate a previously successful fire followed by a long sleep. There
+    // are several stale minute slots behind the current wall clock.
+    await markers.set('w1', 'c1', NOW - 10 * 60_000)
+    const { scanner } = scannerFor([ws], { dispatch, markers })
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(markers.getHeld('w1', 'c1')).toBe(NOW)
+    expect(scanner.snapshot()?.workspaces[0]?.tasks[0]?.nextDueAtMs).toBeGreaterThan(NOW)
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(1)
   })
 
   it('does not mark when dispatch hits capacity (so it retries next tick)', async () => {

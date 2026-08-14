@@ -67,6 +67,8 @@ export interface IssueFieldPatch {
   timeout?: IssueTimeout | null
   /** Canonical markdown work definition; exact scheduled prompt. */
   what?: string
+  /** Cron missed-fire policy; only valid when the Issue already has a cron `when`. */
+  catchUp?: boolean
   /** Settings-only cadence edit for the phone desk. */
   when?: unknown
   /** Settings-only: `true` binds the desk; `null` removes the flag. */
@@ -278,6 +280,16 @@ export async function updateIssueFields(
     const when = issueWhenSchema.safeParse(patch.when)
     if (!when.success) return { ok: false, reason: 'invalid', error: 'invalid when' }
     data.when = when.data
+  }
+  if (patch.catchUp !== undefined) {
+    const when = data.when
+    if (!when || typeof when !== 'object' || Array.isArray(when) || !('kind' in when) || when.kind !== 'cron') {
+      return { ok: false, reason: 'invalid', error: 'catchUp is only valid on a cron schedule' }
+    }
+    const cron: Record<string, unknown> = { ...when }
+    if (patch.catchUp) delete cron.catchUp
+    else cron.catchUp = false
+    data.when = cron
   }
   let what = current.issue.what
   if (patch.what !== undefined) {

@@ -299,6 +299,26 @@ describe('readWorkspaceIssues', () => {
     }
   })
 
+  it('reads cron catchUp and treats omission as catch-up', async () => {
+    await writeIssue('default-catch', fm('title: Default\nwhen: { kind: cron, cron: "0 9 * * *" }'))
+    await writeIssue('no-catch', fm('title: Strict\nwhen: { kind: cron, cron: "0 9 * * *", catchUp: false }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const byId = Object.fromEntries(result.issues.map((issue) => [issue.id, issue]))
+    expect(byId['default-catch']?.when).toEqual({ kind: 'cron', cron: '0 9 * * *' })
+    expect(byId['no-catch']?.when).toEqual({ kind: 'cron', cron: '0 9 * * *', catchUp: false })
+  })
+
+  it('rejects a non-boolean cron catchUp', async () => {
+    await writeIssue('bad-catch', fm('title: Bad catch\nwhen: { kind: cron, cron: "0 9 * * *", catchUp: "sometimes" }'))
+    const result = await readWorkspaceIssues(dir)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.issues).toEqual([])
+    expect(result.invalid[0]?.error).toMatch(/catchUp/)
+  })
+
   it('rejects a cron timezone that is neither local nor an IANA zone', async () => {
     await writeIssue('bad-zone', fm('title: Bad zone\nwhen: { kind: cron, cron: "0 9 * * *", timezone: "New York-ish" }'))
     const result = await readWorkspaceIssues(dir)

@@ -742,6 +742,25 @@ function PropertiesRail({
           <>
             <InspectorSection title={t('issues.detail.schedule')}>
               <CadenceSummary when={issue.when} />
+              {issue.when.kind === 'cron' && (
+                <label className="mt-3 flex min-h-11 items-start gap-2.5 border-t border-border/50 pt-3">
+                  <input
+                    className="mt-1"
+                    type="checkbox"
+                    checked={issue.when.catchUp !== false}
+                    disabled={saving}
+                    onChange={(event) => onPatch({ catchUp: event.target.checked })}
+                  />
+                  <span>
+                    <span className="block text-xs font-medium text-foreground">
+                      {t('issues.detail.catchUp')}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                      {t('issues.detail.catchUpDescription')}
+                    </span>
+                  </span>
+                </label>
+              )}
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Clock size={13} aria-hidden />

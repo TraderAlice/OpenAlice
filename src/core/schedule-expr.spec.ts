@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { computeNextRun, nextCronFire } from './schedule-expr.js'
+import { computeNextRun, nextCronFire, scheduleCatchesUp } from './schedule-expr.js'
 
 describe('schedule-expr', () => {
   const base = Date.UTC(2026, 0, 1, 12, 0, 0) // 2026-01-01T12:00:00Z (a Thursday)
@@ -30,6 +30,12 @@ describe('schedule-expr', () => {
   })
 
   describe('cron', () => {
+    it('catches up missed fires unless catchUp is false', () => {
+      expect(scheduleCatchesUp({ kind: 'every', every: '4h' })).toBe(true)
+      expect(scheduleCatchesUp({ kind: 'cron', cron: '0 9 * * *' })).toBe(true)
+      expect(scheduleCatchesUp({ kind: 'cron', cron: '0 9 * * *', catchUp: true })).toBe(true)
+      expect(scheduleCatchesUp({ kind: 'cron', cron: '0 9 * * *', catchUp: false })).toBe(false)
+    })
     it('finds the next matching local minute', () => {
       const next = computeNextRun({ kind: 'cron', cron: '0 9 * * *' }, base)
       expect(next).not.toBeNull()

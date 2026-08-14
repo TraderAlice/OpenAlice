@@ -25,7 +25,22 @@ export const LOCAL_SCHEDULE_TIMEZONE = 'local' as const
 export type Schedule =
   | { kind: 'at'; at: string }
   | { kind: 'every'; every: string }
-  | { kind: 'cron'; cron: string; timezone?: string }
+  | {
+      kind: 'cron'
+      cron: string
+      timezone?: string
+      /**
+       * Missed-fire policy. Omit or `true` keeps a due occurrence until a run
+       * is accepted (same as `every`). `false` consumes the slot and waits for
+       * the next calendar time.
+       */
+      catchUp?: boolean
+    }
+
+/** True when a missed admission should stay due instead of advancing the clock. */
+export function scheduleCatchesUp(schedule: Schedule): boolean {
+  return schedule.kind !== 'cron' || schedule.catchUp !== false
+}
 
 /** True for OpenAlice's `local` sentinel or a timezone understood by Intl.
  * Kept next to evaluation so file validation and the scanner cannot disagree. */

@@ -175,6 +175,13 @@ export function CadenceSummary({ when }: { when: ScheduleWhen }) {
             {when.timezone ?? t('issues.cadence.localTime')}
           </span>
         )}
+        {when.kind === 'cron' && (
+          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+            {when.catchUp === false
+              ? t('issues.cadence.calendarOnly')
+              : t('issues.cadence.catchUp')}
+          </span>
+        )}
       </span>
     </div>
   )
