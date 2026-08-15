@@ -132,10 +132,15 @@ Chat uses that boundary deliberately:
 
 - **New conversation** creates a Session inside the recent Chat Workspace.
 - **New Workspace** explicitly creates a new durable context container.
+- A new Alice Project with no Chat Workspace first shows **Initialize Ask
+  Alice**, the same setup chrome as AutoQuant, without a pinned Harness
+  version. Initialize creates the stable starter workspace at the latest Chat
+  Harness, then the composer appears.
 - The global Ask Alice composer stores `quickChat.recentChatWorkspaceId` in
   `data/preferences.json`. A missing or stale pointer falls back to the most
   recently active Chat Workspace; only a user with no Chat Workspace gets a
-  new stable starter workspace.
+  new stable starter workspace (from that setup page, or as a fallback on
+  first send).
 - Chat navigation treats a Workspace as a potentially large conversation
   container. Its sidebar disclosure is a bounded recent/running preview; the
   Workspace page is the searchable, lifecycle-filtered catalog for the full

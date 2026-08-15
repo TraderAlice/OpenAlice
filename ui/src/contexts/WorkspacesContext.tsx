@@ -46,6 +46,7 @@ import {
   listTemplates,
   listWorkspaces,
   initializeAutoQuantWorkspace as apiInitializeAutoQuantWorkspace,
+  initializeChatWorkspace as apiInitializeChatWorkspace,
   openWebPiSession as apiOpenWebPiSession,
   openResumeSession,
   pauseSession as apiPauseSession,
@@ -349,6 +350,16 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     ])
     setAutoQuantDefaultWorkspaceId(workspace.id)
     setAutoQuantPreferenceError(null)
+    void refresh()
+    return workspace
+  }, [refresh])
+
+  const initializeChat = useCallback(async (): Promise<Workspace> => {
+    const workspace = await apiInitializeChatWorkspace()
+    setWorkspaces((current) => [
+      workspace,
+      ...current.filter((candidate) => candidate.id !== workspace.id),
+    ])
     void refresh()
     return workspace
   }, [refresh])
@@ -666,6 +677,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setDefaultAgent,
     setIssueDefaultAgent,
     initializeAutoQuant,
+    initializeChat,
     setAutoQuantDefaultWorkspace,
     quickChat,
     pauseSession,
@@ -684,6 +696,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     defaultAgent,
     hasLoaded,
     initializeAutoQuant,
+    initializeChat,
     issueDefaultAgent,
     listError,
     openAgentConfig,

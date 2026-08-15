@@ -156,6 +156,7 @@ function context(
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    initializeChat: vi.fn(async () => { throw new Error('not used') }),
     setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: mocks.quickChat,
     pauseSession: vi.fn(async () => undefined),
@@ -334,6 +335,17 @@ describe('ChatLandingPage Workspace inventory states', () => {
     expect(screen.queryByPlaceholderText('Ask Alice…')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(failed.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('shows Initialize Ask Alice instead of the composer when no Chat workspace exists', () => {
+    mocks.useWorkspaces.mockReturnValue(context([]))
+
+    render(<ChatLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByRole('heading', { name: 'Initialize Ask Alice' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Initialize Ask Alice' })).toBeTruthy()
+    expect(screen.queryByPlaceholderText('Ask Alice…')).toBeNull()
+    expect(screen.queryByText('Pinned Harness version')).toBeNull()
   })
 
   it('keeps the composer available with an explicit stale-data notice after a later refresh fails', () => {

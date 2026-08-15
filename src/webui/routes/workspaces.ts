@@ -999,6 +999,33 @@ export function createWorkspaceRoutes(
     }
   });
 
+  app.post('/chat/initialize', async (c) => {
+    try {
+      const preference = await quickChatPreferences.readQuickChatPreferences();
+      const existed = svc.registry.list().some(
+        (workspace) => workspace.template === CHAT_WORKSPACE_TEMPLATE,
+      );
+      const result = await svc.resolveOrCreateChatWorkspace(preference.recentChatWorkspaceId);
+      if (!result.ok) {
+        const status =
+          result.code === 'tag_in_use' ? 409
+          : result.code === 'unknown_template' ? 400
+          : result.code === 'unknown_source_version' ? 400
+          : result.code === 'invalid_tag' ? 400
+          : 500;
+        return c.json({ error: result.code, message: result.message }, status as 400 | 409 | 500);
+      }
+      await quickChatPreferences.rememberRecentChatWorkspace(result.workspace.id);
+      return c.json(
+        { workspace: await svc.publicMeta(result.workspace) },
+        existed ? 200 : 201,
+      );
+    } catch (err) {
+      launcherLogger.error('chat.initialize_failed', { err });
+      return c.json({ error: 'chat_initialize_failed', message: (err as Error).message }, 500);
+    }
+  });
+
   app.post('/auto-quant/initialize', async (c) => {
     try {
       const preference = await readAutoQuantPreference();

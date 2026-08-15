@@ -66,6 +66,10 @@ Trading as Git, and Portfolio, plus the matching Settings categories
 Ask Alice or Settings. AutoQuant and Tracked stay visible until that
 boundary is reviewed separately.
 
+A new AliceProject with no Chat Workspace opens Ask Alice on the shared
+harness setup page rather than an empty composer; Chat does not pin a Harness
+version.
+
 Create a named project from the CLI:
 
 ```bash
