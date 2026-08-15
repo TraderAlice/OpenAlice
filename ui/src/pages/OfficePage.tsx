@@ -128,6 +128,7 @@ export function OfficePage() {
             />
             <div className="shrink-0 border-t border-border px-4 py-2 md:px-6">
               <OfficeReplayBar
+                firstSeq={building.firstSeq}
                 lastSeq={building.lastSeq}
                 asOfSeq={asOfSeq}
                 onAsOfSeq={setAsOfSeq}

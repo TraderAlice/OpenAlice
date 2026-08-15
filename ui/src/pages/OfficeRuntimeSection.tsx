@@ -107,17 +107,17 @@ export function OfficeRuntimeSection() {
           const payload = event.payload
           const detail = eventDetail(event)
           return (
-            <article key={event.seq} className="flex flex-wrap items-start gap-3 px-1 py-3 sm:px-2">
-              <span className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${STATUS_STYLE[event.type]}`}>
+            <article key={event.seq} className="min-w-0 space-y-2 px-1 py-3 sm:px-2">
+              <span className={`inline-flex max-w-full rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${STATUS_STYLE[event.type]}`}>
                 {eventLabel(event.type)}
               </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-foreground">
+              <div className="min-w-0">
+                <div className="break-words text-sm text-foreground">
                   <span className="font-medium">@{payload.resumeId || '—'}</span>
                   <span className="text-muted-foreground"> · {payload.agent || '—'} · {payload.workspaceId || '—'}</span>
                 </div>
                 {detail && (
-                  <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[13px] text-foreground/90">
+                  <p className="mt-1 line-clamp-3 break-words whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/90">
                     {detail}
                   </p>
                 )}
@@ -139,7 +139,7 @@ export function OfficeRuntimeSection() {
               {payload.taskId && (
                 <button
                   type="button"
-                  className="oa-pressable rounded-md border border-border px-2 py-1 text-xs text-primary hover:bg-primary/10"
+                  className="oa-pressable inline-flex max-w-full rounded-md border border-border px-2 py-1 text-xs text-primary hover:bg-primary/10"
                   onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
                 >
                   {t('office.openRun')}

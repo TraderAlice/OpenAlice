@@ -30,6 +30,7 @@
 5. **Codex v2 是可替换 pack。** UI 只依赖一个窄接口（见下）。`apps/pet` 继续当实验室，不把 Tauri 播放器嵌进 Office，也不让 `ui/` import `apps/pet`。
 6. **画面是空间办公室，不是卡片看板。** 一层像素地板上摆 16-bit 家具（桌、柜、茶水车、盆栽），v2 sprite 站在桌前。两间 Workspace 是同一层里的两个工区。不做 3D、不做写实摄影道具、不做自由拖拽。点桌子先选中，右侧详情栏再打开 Session；档案柜仍开门到 Files。
 7. **档案柜是第二刀。** 第一刀只留柜的占位（一间办公室一侧），点进去仍是现有 Files。按员工归档的柜面后做。
+8. **实时投影必须有固定成本。** `AgentRuntimeLog` 启动时从日志恢复每个 Session 的最后占用态，之后随 append 增量维护。直播 `/floor` 和 Occupancy 首屏只读有界内存；只有用户明确拖动 Replay 或翻旧页时才读取完整磁盘历史。
 
 ### Sprite pack interface (keep loose)
 
@@ -116,6 +117,13 @@ Activity Bar 的 Office 入口默认关闭。Settings → Beta 里有本机开�
 
 - [x] Settings → Beta 分类 + Office 开关，默认关，本机 persist
 - [x] Activity Bar 仅在开关打开时显示 Office；`/office` 直链仍采用
+
+### 5. Review hardening
+
+- [x] 直播地板改为 AgentRuntimeLog 增量投影，停止每 4 秒全量扫描 JSONL
+- [x] Occupancy 最新页走有界内存，旧页和显式 Replay 才读磁盘
+- [x] 窄侧栏的 Occupancy 行改为纵向信息层级，不让动作按钮挤压正文
+- [x] Replay 滑杆以实际 `firstSeq` 为下界
 
 ## Verification
 

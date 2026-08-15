@@ -23,7 +23,12 @@ describe('GET /api/office/floor', () => {
         ? directory('chat-1', 'chat', [{ resumeId: 'resume-alice', agent: 'codex', lifecycle: 'active' }])
         : directory('quant-1', 'auto-quant', [])),
       sessionRegistry: { findByResumeId: vi.fn(() => ({ id: 'codex-1', name: 'c1', resumeId: 'resume-alice', title: 'Desk mate' })) },
-      agentRuntimeLog: { lastSeq: () => 0, read: vi.fn(async () => []) },
+      agentRuntimeLog: {
+        lastSeq: () => 0,
+        firstSeq: () => 0,
+        projectionEvents: () => [],
+        read: vi.fn(async () => []),
+      },
       provenanceStore: { list: vi.fn(() => []) },
     } as never))
     const res = await app.request('/floor')
@@ -38,7 +43,12 @@ describe('GET /api/office/floor', () => {
       registry: { list: () => [], get: vi.fn() },
       sessionDirectory: vi.fn(async () => null),
       provenanceStore: { list: vi.fn(() => []) },
-      agentRuntimeLog: { lastSeq: () => 0, read: vi.fn(async () => []) },
+      agentRuntimeLog: {
+        lastSeq: () => 0,
+        firstSeq: () => 0,
+        projectionEvents: () => [],
+        read: vi.fn(async () => []),
+      },
     } as never))
     const res = await app.request('/floor?workspaceId=missing')
     expect(res.status).toBe(404)
@@ -46,6 +56,32 @@ describe('GET /api/office/floor', () => {
 
   it('projects active employees and hangs drawers; asOfSeq replays mood', async () => {
     const now = 50_000
+    const read = vi.fn(async () => [
+      {
+        seq: 1,
+        ts: now - 20_000,
+        type: 'runtime.started',
+        payload: { workspaceId: 'office-1', resumeId: 'resume-alice', agent: 'codex', surface: 'headless' },
+      },
+      {
+        seq: 2,
+        ts: now - 10_000,
+        type: 'runtime.turn.tool',
+        payload: {
+          workspaceId: 'office-1',
+          resumeId: 'resume-alice',
+          agent: 'codex',
+          toolName: 'workspace_list',
+          toolStatus: 'running',
+        },
+      },
+      {
+        seq: 3,
+        ts: now,
+        type: 'runtime.stopped',
+        payload: { workspaceId: 'office-1', resumeId: 'resume-alice', agent: 'codex', status: 'done' },
+      },
+    ])
     const app = new Hono().route('/', createOfficeRoutes({
       registry: {
         list: () => [{ id: 'office-1', tag: 'chat' }],
@@ -62,32 +98,20 @@ describe('GET /api/office/floor', () => {
       },
       agentRuntimeLog: {
         lastSeq: () => 3,
-        read: vi.fn(async () => [
-          {
-            seq: 1,
-            ts: now - 20_000,
-            type: 'runtime.started',
-            payload: { workspaceId: 'office-1', resumeId: 'resume-alice', agent: 'codex', surface: 'headless' },
+        firstSeq: () => 1,
+        projectionEvents: () => [{
+          seq: 3,
+          ts: now,
+          type: 'runtime.stopped',
+          payload: {
+            workspaceId: 'office-1',
+            resumeId: 'resume-alice',
+            agent: 'codex',
+            surface: 'headless',
+            status: 'done',
           },
-          {
-            seq: 2,
-            ts: now - 10_000,
-            type: 'runtime.turn.tool',
-            payload: {
-              workspaceId: 'office-1',
-              resumeId: 'resume-alice',
-              agent: 'codex',
-              toolName: 'workspace_list',
-              toolStatus: 'running',
-            },
-          },
-          {
-            seq: 3,
-            ts: now,
-            type: 'runtime.stopped',
-            payload: { workspaceId: 'office-1', resumeId: 'resume-alice', agent: 'codex', status: 'done' },
-          },
-        ]),
+        }],
+        read,
       },
       provenanceStore: {
         list: vi.fn(() => [
@@ -113,6 +137,7 @@ describe('GET /api/office/floor', () => {
       resumeId: 'resume-alice',
       drawers: [expect.objectContaining({ label: 'note.md' })],
     })
+    expect(read).not.toHaveBeenCalled()
 
     const replay = await (await app.request('/floor?asOfSeq=2')).json() as {
       offices: { employees: { mood: string; bubble: { name?: string } | null }[] }[]
@@ -123,5 +148,6 @@ describe('GET /api/office/floor', () => {
       mood: 'working',
       bubble: { kind: 'tool', name: 'workspace_list' },
     })
+    expect(read).toHaveBeenCalledTimes(1)
   })
 })

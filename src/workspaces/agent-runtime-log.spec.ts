@@ -97,4 +97,40 @@ describe('AgentRuntimeLog', () => {
     expect(raw).not.toContain('output')
   })
 
+  it('recovers one enriched live projection event per Session', async () => {
+    const { log, path } = await openLog()
+    const subject = { workspaceId: 'desk-a', resumeId: 'resume-alice', agent: 'claude' }
+    await log.record('runtime.started', { ...subject, surface: 'headless', cause: { kind: 'http' } })
+    await log.record('runtime.turn.text', { ...subject, text: 'Still working.' })
+    await log.record('runtime.started', {
+      workspaceId: 'desk-b',
+      resumeId: 'resume-bob',
+      agent: 'pi',
+      surface: 'webpi',
+      cause: { kind: 'ui' },
+    })
+
+    expect(log.firstSeq()).toBe(1)
+    expect(log.projectionEvents()).toHaveLength(2)
+    expect(log.projectionEvents()[0]).toMatchObject({
+      seq: 2,
+      type: 'runtime.turn.text',
+      payload: { workspaceId: 'desk-a', resumeId: 'resume-alice', surface: 'headless' },
+    })
+
+    await log.close()
+    const reopened = await AgentRuntimeLog.open(path, silent)
+    expect(reopened.firstSeq()).toBe(1)
+    expect(reopened.projectionEvents()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        seq: 2,
+        payload: expect.objectContaining({ resumeId: 'resume-alice', surface: 'headless' }),
+      }),
+      expect.objectContaining({
+        seq: 3,
+        payload: expect.objectContaining({ resumeId: 'resume-bob', surface: 'webpi' }),
+      }),
+    ]))
+  })
+
 })
