@@ -11,6 +11,8 @@ import {
   SlidersHorizontal,
   Wrench,
 } from 'lucide-react'
+import { useAliceProject } from '../hooks/useAliceProject'
+import { isNanoHiddenSettingsCategory, isNanoProduct } from '../lib/product-surfaces'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
@@ -36,12 +38,16 @@ const CATEGORIES = [
  */
 export function SettingsCategoryList({ onSelect }: { onSelect?: () => void }) {
   const { t } = useTranslation()
+  const { project } = useAliceProject()
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const categories = isNanoProduct(project?.product)
+    ? CATEGORIES.filter((item) => !isNanoHiddenSettingsCategory(item.category))
+    : CATEGORIES
 
   return (
     <div className="py-1">
-      {CATEGORIES.map((item) => {
+      {categories.map((item) => {
         const active =
           focused?.kind === 'settings' && focused.params.category === item.category
         return (

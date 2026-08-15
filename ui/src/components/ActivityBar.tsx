@@ -8,7 +8,8 @@ import { usePendingPushCount } from '../live/trading-push'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
-import { NAV_SECTIONS } from './activity-navigation'
+import { useAliceProject } from '../hooks/useAliceProject'
+import { navSectionsForProduct } from './activity-navigation'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 /**
@@ -86,6 +87,8 @@ export function ActivityBar({
   returnFocusRef,
 }: ActivityBarProps) {
   const { t } = useTranslation()
+  const { project } = useAliceProject()
+  const navSections = navSectionsForProduct(project?.product)
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
@@ -121,7 +124,7 @@ export function ActivityBar({
 
         {/* Navigation */}
         <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-0.5' : 'pb-3'} ${compactRail ? 'px-2 md:items-center' : narrowRail ? 'px-2.5' : 'px-3'}`}>
-          {NAV_SECTIONS.map((section, si) => {
+          {navSections.map((section, si) => {
             const labeled = section.sectionLabel.length > 0
             // User toggle wins over default. The collapse store stores
             // user's explicit preference (true/false); absence means

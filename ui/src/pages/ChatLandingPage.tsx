@@ -25,11 +25,13 @@ import {
 import { RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
+import { useAliceProject } from '../hooks/useAliceProject'
 import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
   useWorkspaceAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
+import { chatLandingExampleGroups } from '../lib/chat-landing-examples'
 import { resolveChatWorkspaceTarget, workspaceActivityMs } from '../lib/chat-workspace-target'
 import { AutoQuantSetupPage } from './AutoQuantSetupPage'
 
@@ -61,6 +63,7 @@ function HarnessLandingPage({
   mode: HarnessLandingMode
 }) {
   const { t } = useTranslation()
+  const { project } = useAliceProject()
   const {
     quickChat,
     agents,
@@ -131,48 +134,7 @@ function HarnessLandingPage({
   const selectedInfo = launchConfig.selectedAgent
   const installHint = selectedInfo ? installHintFor(selectedInfo.id) : undefined
   const exampleGroups = mode === 'chat'
-    ? [
-        [
-          {
-            id: 'market',
-            label: t('chatLanding.marketBriefLabel'),
-            title: t('chatLanding.marketBriefTitle'),
-            prompt: t('chatLanding.marketBriefPrompt'),
-          },
-          {
-            id: 'portfolio',
-            label: t('chatLanding.portfolioReviewLabel'),
-            title: t('chatLanding.portfolioReviewTitle'),
-            prompt: t('chatLanding.portfolioReviewPrompt'),
-          },
-          {
-            id: 'thesis',
-            label: t('chatLanding.researchMemoLabel'),
-            title: t('chatLanding.researchMemoTitle'),
-            prompt: t('chatLanding.researchMemoPrompt'),
-          },
-        ],
-        [
-          {
-            id: 'workspace',
-            label: t('chatLanding.workspaceAuditLabel'),
-            title: t('chatLanding.workspaceAuditTitle'),
-            prompt: t('chatLanding.workspaceAuditPrompt'),
-          },
-          {
-            id: 'automation',
-            label: t('chatLanding.automationLabel'),
-            title: t('chatLanding.automationTitle'),
-            prompt: t('chatLanding.automationPrompt'),
-          },
-          {
-            id: 'quant',
-            label: t('chatLanding.quantDeskLabel'),
-            title: t('chatLanding.quantDeskTitle'),
-            prompt: t('chatLanding.quantDeskPrompt'),
-          },
-        ],
-      ]
+    ? chatLandingExampleGroups((key) => t(key as never), project?.product)
     : [[
         { id: 'quant-1', label: null, title: t('autoQuantLanding.ex1'), prompt: t('autoQuantLanding.ex1') },
         { id: 'quant-2', label: null, title: t('autoQuantLanding.ex2'), prompt: t('autoQuantLanding.ex2') },
@@ -528,7 +490,7 @@ function HarnessLandingPage({
               {t(`${copyKey}.examplesLabel`)}
             </span>
             <span aria-hidden className="h-px min-w-4 flex-1 bg-border/45" />
-            {mode === 'chat' && (
+            {mode === 'chat' && exampleGroups.length > 1 && (
               <button
                 type="button"
                 onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}

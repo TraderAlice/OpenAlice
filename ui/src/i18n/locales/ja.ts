@@ -1091,6 +1091,12 @@ export const ja: Resources = {
     quantDeskLabel: 'クオンツデスク',
     quantDeskTitle: '再現可能な研究を委任する',
     quantDeskPrompt: '短期のセクターローテーションがコスト控除後の1週間相対リターンを予測するか、AutoQuant デスクに検証を依頼してください。再現可能な証拠、不変の Run または Report 参照、限界を求め、取引権限は与えないでください。',
+    codeReviewLabel: 'コードレビュー',
+    codeReviewTitle: 'この Workspace を確認する',
+    codeReviewPrompt: 'この Workspace のコードやメモを読み、最もリスクの高い問題、未完了の作業、次に直すべき3点を挙げてください。このフォルダの外に出ず、市場や取引の作業は始めないでください。',
+    inboxTriageLabel: 'Inbox',
+    inboxTriageTitle: '今日届いたものを仕分ける',
+    inboxTriagePrompt: 'この Workspace の Inbox と Issue を読み、返信が必要なもの、後回しにできるもの、最初に取るべき行動をまとめてください。市場や取引のタスクは作らないでください。',
   },
   autoQuantLanding: {
     heading: 'クオンツデスクで何を調査しますか？',
