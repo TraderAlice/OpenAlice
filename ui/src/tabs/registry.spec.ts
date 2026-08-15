@@ -59,6 +59,21 @@ describe('Tracked selection URL projection', () => {
   })
 })
 
+describe('Office URL projection', () => {
+  it('projects Office onto a single /office route', () => {
+    expect(getView('office').toUrl({ kind: 'office', params: {} })).toBe('/office')
+  })
+})
+
+describe('Settings URL projection', () => {
+  it('projects the Beta category onto /settings/beta', () => {
+    expect(getView('settings').toUrl({
+      kind: 'settings',
+      params: { category: 'beta' },
+    })).toBe('/settings/beta')
+  })
+})
+
 describe('shared product shells', () => {
   it('assigns every Ask Alice surface to the shared chat shell', () => {
     expect(getViewShell({ kind: 'chat-landing', params: {} })).toBe('chat')

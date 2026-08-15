@@ -27,9 +27,11 @@ probe upward independently, while explicitly pinned ports still fail if they
 collide.
 
 Workspace launcher state includes the private
-`workspaces/state/agent-conversations.jsonl` prompt/reply event stream. It moves
-with the complete home, is not part of any Workspace repository, and should be
-treated as sensitive conversation history when backing up or sharing a home.
+`workspaces/state/agent-conversations.jsonl` prompt/reply event stream and
+`workspaces/state/agent-runtime.jsonl` occupancy journal. Both move with the
+complete home and are not part of any Workspace repository. Treat the
+conversation stream as sensitive history when backing up or sharing a home;
+the occupancy journal has no prompt bodies.
 
 Each Workspace repository carries `.alice/settings.json`, a versioned,
 secret-free description of its recent interactive and headless Agent runtime

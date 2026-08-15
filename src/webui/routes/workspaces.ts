@@ -475,6 +475,14 @@ export function createWorkspaceRoutes(
     const recordId = record.id;
     const recordName = record.name;
     try {
+      if (productSession.created) {
+        await svc.recordAgentRuntime?.('session.born', {
+          workspaceId: id,
+          resumeId: identity.resumeId,
+          agent: adapter.id,
+          sessionRecordId: record.id,
+        })
+      }
       const ctx: SessionFactoryContext = {
         ...(resume !== undefined ? { resume } : {}),
         agentId,
@@ -506,6 +514,14 @@ export function createWorkspaceRoutes(
         resume: resume === undefined ? null : resume === 'last' ? 'last' : resume.sessionId,
         seeded: resume === undefined && !!initialPrompt,
       });
+      await svc.recordAgentRuntime?.('runtime.started', {
+        workspaceId: id,
+        resumeId: identity.resumeId,
+        agent: adapter.id,
+        sessionRecordId: record.id,
+        surface: 'terminal',
+        cause: { kind: 'ui' },
+      })
       releaseClaim();
       return {
         ok: true,
@@ -529,6 +545,15 @@ export function createWorkspaceRoutes(
         surface: 'terminal',
       }).catch(() => undefined);
       launcherLogger.error('workspace.session_spawn_failed', { id, err });
+      await svc.recordAgentRuntime?.('runtime.spawn_failed', {
+        workspaceId: id,
+        resumeId: record.resumeId,
+        agent: adapter.id,
+        sessionRecordId: record.id,
+        surface: 'terminal',
+        cause: { kind: 'ui' },
+        error: (err as Error).message,
+      })
       return { ok: false, status: 500, body: { error: 'spawn_failed', message: (err as Error).message } };
     }
     } finally {
@@ -1813,6 +1838,16 @@ export function createWorkspaceRoutes(
         via: action,
         scrollback: scrollbackRel ?? null,
       });
+      if (wasRunning && record) {
+        await svc.recordAgentRuntime?.('runtime.stopped', {
+          workspaceId: record.wsId,
+          resumeId: record.resumeId,
+          agent: record.agent,
+          sessionRecordId: record.id,
+          surface: wasWebPiRunning && !wasTerminalRunning ? 'webpi' : 'terminal',
+          status: 'paused',
+        })
+      }
       return c.json({ ok: true, wasRunning });
     });
   }
@@ -2044,6 +2079,15 @@ export function createWorkspaceRoutes(
             code: earlyExit.code,
             signal: earlyExit.signal,
           });
+          await svc.recordAgentRuntime?.('runtime.spawn_failed', {
+            workspaceId: record.wsId,
+            resumeId: record.resumeId,
+            agent: adapter.id,
+            sessionRecordId: record.id,
+            surface: 'terminal',
+            cause: { kind: 'ui' },
+            error: `agent exited within startup window (code=${earlyExit.code})`,
+          });
           return c.json({
             error: 'spawn_died',
             message: `agent exited within startup window (code=${earlyExit.code})`,
@@ -2069,6 +2113,14 @@ export function createWorkspaceRoutes(
           resume: resume === undefined ? null : resume === 'last' ? 'last' : resume.sessionId,
           scrollbackBytes: initialReplayBytes?.length ?? 0,
         });
+        await svc.recordAgentRuntime?.('runtime.started', {
+          workspaceId: record.wsId,
+          resumeId: record.resumeId,
+          agent: adapter.id,
+          sessionRecordId: record.id,
+          surface: 'terminal',
+          cause: { kind: 'ui' },
+        });
         return c.json({
           ok: true,
           sessionId: session.recordId,
@@ -2082,6 +2134,15 @@ export function createWorkspaceRoutes(
         });
       } catch (err) {
         launcherLogger.error('workspace.session_resume_failed', { id, token, err });
+        await svc.recordAgentRuntime?.('runtime.spawn_failed', {
+          workspaceId: record.wsId,
+          resumeId: record.resumeId,
+          agent: record.agent,
+          sessionRecordId: record.id,
+          surface: 'terminal',
+          cause: { kind: 'ui' },
+          error: (err as Error).message,
+        });
         return c.json({ error: 'resume_failed', message: (err as Error).message }, 500);
       } finally {
         if (claimedResume) svc.releaseResume?.(record.resumeId);
@@ -2528,6 +2589,16 @@ export function createWorkspaceRoutes(
     });
     await svc.deleteSessionPresence({ wsId: id, resumeId: record.resumeId });
     launcherLogger.info('workspace.session_deleted', { id, sessionId: token, wasRunning });
+    if (wasRunning) {
+      await svc.recordAgentRuntime?.('runtime.stopped', {
+        workspaceId: record.wsId,
+        resumeId: record.resumeId,
+        agent: record.agent,
+        sessionRecordId: record.id,
+        surface: wasWebPiRunning && !wasTerminalRunning ? 'webpi' : 'terminal',
+        status: 'interrupted',
+      });
+    }
     return c.json({ ok: true, wasRunning });
   });
 

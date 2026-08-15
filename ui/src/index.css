@@ -56,6 +56,16 @@
   --color-backdrop: var(--backdrop);
   --color-code-background: var(--code-background);
   --color-report-canvas: var(--report-canvas);
+  --color-office-wall: var(--office-wall);
+  --color-office-wall-grain: var(--office-wall-grain);
+  --color-office-wall-crown: var(--office-wall-crown);
+  --color-office-trim: var(--office-trim);
+  --color-office-trim-shadow: var(--office-trim-shadow);
+  --color-office-floor: var(--office-floor);
+  --color-office-floor-plank: var(--office-floor-plank);
+  --color-office-floor-sheen: var(--office-floor-sheen);
+  --color-office-label: var(--office-label);
+  --color-office-label-foreground: var(--office-label-foreground);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;

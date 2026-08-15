@@ -36,12 +36,13 @@ export type ViewSpec =
   | { kind: 'issue-detail';   params: { wsId: string; id: string } }
   | { kind: 'tracked-issue-detail'; params: { wsId: string; id: string } }
   | { kind: 'automation';     params: { section: 'runs' | 'api' } }
+  | { kind: 'office';         params: Record<string, never> }
   | { kind: 'news';           params: Record<string, never> }
   | { kind: 'market-list';    params: Record<string, never> }
   | { kind: 'market-rotation'; params: Record<string, never> }
   | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' | 'term-structure' | 'global-macro' | 'shipping' | 'fed' } }
   | { kind: 'market-detail';  params: { assetClass: 'equity' | 'crypto' | 'currency' | 'commodity'; symbol: string; source?: string } }
-  | { kind: 'settings';       params: { category: 'general' | 'appearance' | 'ai-provider' | 'agent-permissions' | 'tools' | 'trading' | 'issues' | 'connectors' | 'mcp' | 'market-data' | 'news-collector' } }
+  | { kind: 'settings';       params: { category: 'general' | 'appearance' | 'ai-provider' | 'agent-permissions' | 'tools' | 'trading' | 'issues' | 'connectors' | 'mcp' | 'market-data' | 'news-collector' | 'beta' } }
   | { kind: 'uta-detail';     params: { id: string } }
   | { kind: 'onboarding';     params: Record<string, never> }
   | { kind: 'design-project'; params: { project: string } }
@@ -95,6 +96,7 @@ export type ActivitySection =
   | 'portfolio'
   | 'issue'
   | 'automation'
+  | 'office'
   | 'news'
 
 export interface Tab {

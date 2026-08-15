@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Bot,
   CandlestickChart,
+  FlaskConical,
   LineChart,
   ListChecks,
   Newspaper,
@@ -29,6 +30,7 @@ const CATEGORIES = [
   { labelKey: 'settings.category.mcpServer',   category: 'mcp',            Icon: Plug },
   { labelKey: 'settings.category.marketData',  category: 'market-data',    Icon: LineChart },
   { labelKey: 'settings.category.newsSources', category: 'news-collector', Icon: Newspaper },
+  { labelKey: 'settings.category.beta',        category: 'beta',           Icon: FlaskConical },
 ] as const
 
 /**

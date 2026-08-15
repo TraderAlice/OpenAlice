@@ -64,6 +64,7 @@ function fakeService(opts: {
     dispatchHeadlessTask,
     headlessTasks: { get: () => opts.task ?? null },
     headlessLogsDir: opts.logsDir ?? '/tmp/logs',
+    recordAgentRuntime: vi.fn(async () => undefined),
   } as unknown as WorkspaceService
   return { svc, adapter, workspace, dispatchHeadlessTask, appendProvenance }
 }
@@ -252,6 +253,9 @@ describe('Workspace conversation control', () => {
       resolution: { reason: 'autoquant-not-initialized' },
     })
     expect(dispatchHeadlessTask).not.toHaveBeenCalled()
+    expect(svc.recordAgentRuntime).toHaveBeenCalledWith('runtime.rejected', expect.objectContaining({
+      reason: 'autoquant-not-initialized',
+    }))
   })
 
   it('continues the exact Session behind Issue provenance', async () => {

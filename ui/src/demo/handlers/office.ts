@@ -1,0 +1,44 @@
+import { http, HttpResponse } from 'msw'
+
+export const officeHandlers = [
+  http.get('/api/office/floor', ({ request }) => {
+    const asOfRaw = new URL(request.url).searchParams.get('asOfSeq')
+    const asOfSeq = asOfRaw == null ? undefined : Number.parseInt(asOfRaw, 10)
+    const working = asOfSeq == null || asOfSeq >= 4
+    return HttpResponse.json({
+      lastSeq: 6,
+      firstSeq: 1,
+      ...(asOfSeq != null ? { asOfSeq } : {}),
+      offices: [
+        {
+          workspace: { id: 'chat-demo', tag: 'chat' },
+          employees: [
+            {
+              resumeId: 'resume-chat-demo',
+              agent: 'codex',
+              name: 'c1',
+              title: 'Desk mate',
+              sessionRecordId: 'codex-demo-1',
+              mood: working ? 'working' : 'idle',
+              surface: 'headless',
+              bubble: working ? { kind: 'tool', name: 'workspace_list' } : null,
+              lastSeq: working ? 4 : 2,
+              drawers: [{
+                id: 'prov-demo',
+                kind: 'report',
+                action: 'created',
+                at: Date.now() - 60_000,
+                label: 'desk-note.md',
+                path: 'docs/desk-note.md',
+              }],
+            },
+          ],
+        },
+        {
+          workspace: { id: 'quant-demo', tag: 'auto-quant' },
+          employees: [],
+        },
+      ],
+    })
+  }),
+]

@@ -11,6 +11,8 @@ import { marketHandlers } from './market'
 import { configKeysHandlers } from './configKeys'
 import { agentStatusHandlers } from './agentStatus'
 import { agentConversationHandlers } from './agentConversations'
+import { agentRuntimeHandlers } from './agentRuntime'
+import { officeHandlers } from './office'
 import { newsListHandlers } from './newsList'
 import { devMiscHandlers } from './devMisc'
 import { headlessHandlers } from './headless'
@@ -36,6 +38,8 @@ export const handlers = [
   ...configKeysHandlers,
   ...agentStatusHandlers,
   ...agentConversationHandlers,
+  ...agentRuntimeHandlers,
+  ...officeHandlers,
   ...newsListHandlers,
   ...devMiscHandlers,
   ...headlessHandlers,

@@ -19,6 +19,8 @@ import { preferencesApi } from './preferences'
 import { inquiriesApi } from './inquiries'
 import { connectorsApi } from './connectors'
 import { agentConversationsApi } from './agentConversations'
+import { agentRuntimeLogApi } from './agentRuntimeLog'
+import { officeApi } from './office'
 import { aliceProjectApi } from './aliceProject'
 export const api = {
   config: configApi,
@@ -38,6 +40,8 @@ export const api = {
   inquiries: inquiriesApi,
   connectors: connectorsApi,
   agentConversations: agentConversationsApi,
+  agentRuntime: agentRuntimeLogApi,
+  office: officeApi,
   aliceProject: aliceProjectApi,
 }
 

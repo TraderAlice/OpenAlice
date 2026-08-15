@@ -48,6 +48,7 @@ function build(
     sessionRecord?: any;
     runtimeBinding?: any;
     poolLive?: any;
+    recordAgentRuntime?: any;
   } = {},
 ) {
   const claude = {
@@ -172,6 +173,7 @@ function build(
       get: vi.fn(() => opts.poolLive),
       disposeToken: vi.fn(() => Boolean(opts.poolLive)),
     },
+    recordAgentRuntime: opts.recordAgentRuntime ?? vi.fn(async () => undefined),
     scrollbackStore: { remove: vi.fn(async () => undefined) },
     getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness,
@@ -291,6 +293,38 @@ describe('DELETE /:id/sessions/:sid', () => {
     expect(deleteSessionPresence).toHaveBeenCalledWith({
       wsId: 'ws-1',
       resumeId: 'resume-1',
+    })
+  })
+
+  it('records occupancy when a live TUI Session is deleted', async () => {
+    const recordAgentRuntime = vi.fn(async () => undefined)
+    const record = {
+      id: 'claude-calm-seat',
+      resumeId: 'resume-1',
+      wsId: 'ws-1',
+      agent: 'claude',
+      name: 'c1',
+      createdAt: new Date(0).toISOString(),
+      lastActiveAt: new Date(0).toISOString(),
+      state: 'running',
+      surface: 'terminal',
+    }
+    const { app } = build({
+      sessionRecord: record,
+      poolLive: { pid: 9 },
+      recordAgentRuntime,
+    })
+
+    const res = await app.request('/ws-1/sessions/claude-calm-seat', { method: 'DELETE' })
+
+    expect(res.status).toBe(200)
+    expect(recordAgentRuntime).toHaveBeenCalledWith('runtime.stopped', {
+      workspaceId: 'ws-1',
+      resumeId: 'resume-1',
+      agent: 'claude',
+      sessionRecordId: 'claude-calm-seat',
+      surface: 'terminal',
+      status: 'interrupted',
     })
   })
 })
@@ -1255,8 +1289,9 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
         nativeSessionId: 'aid',
       }),
       config: { launcherRepoRoot: '/repo' },
+      recordAgentRuntime: vi.fn(async () => undefined),
     } as unknown as WorkspaceService;
-    return { app: createWorkspaceRoutes(svc), spawn };
+    return { app: createWorkspaceRoutes(svc), spawn, svc };
   }
 
   it('two simultaneous resumes spawn the agent exactly once', async () => {
@@ -1307,6 +1342,44 @@ describe('POST /:id/sessions/:sid/resume — concurrent coalescing (ANG-120)', (
       sessionRuntime: expect.objectContaining({
         binding: { version: 1, credential: { source: 'native' } },
       }),
+    }));
+  });
+
+  it('records TUI occupancy when Play resumes a paused Session', async () => {
+    const { app, svc } = buildResume();
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/resume`);
+
+    expect(result.status).toBe(200);
+    expect(svc.recordAgentRuntime).toHaveBeenCalledWith('runtime.started', {
+      workspaceId: 'ws-1',
+      resumeId: 'resume-aid',
+      agent: 'claude',
+      sessionRecordId: TOKEN,
+      surface: 'terminal',
+      cause: { kind: 'ui' },
+    });
+  });
+
+  it('records a TUI spawn failure when resume dies in the startup window', async () => {
+    const { app, spawn, svc } = buildResume();
+    spawn.mockImplementationOnce(() => ({
+      recordId: TOKEN,
+      wsId: 'ws-1',
+      name: 'c1',
+      pid: 4242,
+      startedAt: 1,
+      waitForFirstExit: vi.fn(async () => ({ code: 1, signal: null })),
+    } as never));
+
+    const result = await post(app, `/ws-1/sessions/${TOKEN}/resume`);
+
+    expect(result.status).toBe(500);
+    expect(result.body.error).toBe('spawn_died');
+    expect(svc.recordAgentRuntime).toHaveBeenCalledWith('runtime.spawn_failed', expect.objectContaining({
+      workspaceId: 'ws-1',
+      resumeId: 'resume-aid',
+      surface: 'terminal',
+      cause: { kind: 'ui' },
     }));
   });
 });

@@ -63,9 +63,12 @@ flowchart LR
   S -. backend mapping .-> N["Native agent session id"]
 ```
 
-In the office analogy, the Workspace is the desk and the product Session is one
-particular colleague-with-context. `pi`, `codex`, `opencode`, and `claude` are
-worker kinds, not unique colleagues.
+In the Office surface, a Workspace is one office and the product Session
+(`resumeId`) is an employee at their own desk. Files are filing cabinets in
+that office. `/office` shows every business Workspace as its own room on one
+floor; two offices sit side by side when the viewport allows. `pi`, `codex`, `opencode`, and `claude` are worker kinds, not
+unique colleagues. Identity rules are unchanged: `resumeId` is the person,
+`taskId` is one shift, and `SessionRecord.id` is the seat attachment.
 
 Ask Alice and AutoQuant list those colleagues from persistent
 `SessionRecord`s in the first Workspace payload. The Workspace Session
@@ -661,6 +664,15 @@ Every dispatched Workspace conversation also appends a
 - the original prompt, delivered prompt, and whether explicit reconstruction
   guidance changed it;
 - terminal status, final assistant text, duration, and compact error.
+
+Desk occupancy and headless turn assets — Session birth, process start,
+spawn failure, stop, declined asks, plus translated text/tool/error
+blocks — are a separate append-only journal at
+`<launcherRoot>/state/agent-runtime.jsonl`. Completion keeps assistant
+text and metrics on `runtime.stopped`. It is a replay projection for
+Office, not a dispatch authority and not a prompt or tool-I/O log. TUI
+internals are not extracted yet. See
+[[docs/workspace-issues-and-scheduling.md]].
 
 The file is private launcher state (`0600` where supported), not Workspace Git
 content. It can contain complete prompts and replies and must be treated as
