@@ -30,9 +30,10 @@ browser / Electron
   -> product interaction
 ```
 
-Lifecycle commands do not edit Workspaces, credentials, broker state, trading
-permissions, or product configuration. Browser closure and shell exit do not
-stop a detached Runtime.
+Lifecycle start/stop commands do not edit Workspaces, broker state, trading
+permissions, or product configuration. `project copy-ai-creds` is the explicit
+exception that merges one complete home's AI vault into another. Browser
+closure and shell exit do not stop a detached Runtime.
 
 ## Canonical Lifecycle Commands
 
@@ -47,11 +48,15 @@ openalice logs [options]
 openalice doctor [options]
 openalice open [options]
 openalice create alice-project [options]
+openalice project [list|use|copy-ai-creds] [options]
 ```
 
 | Command | Contract |
 |---|---|
 | `create alice-project` | Register a named complete home. Interactive or `--yes` with `--name`, `--home`, and optional `--product trader\|nano`. Product is immutable birth (Trader default; Nano never starts UTA). TUI create remains Trader-equivalent. |
+| `project list` | Print registered AliceProjects and the remembered bare-start default. `--json` emits the registry summary. |
+| `project use <key>` | Record that AliceProject as the next bare-start default. Does not start, stop, or copy another project. |
+| `project copy-ai-creds` | Copy the AI vault from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Broker accounts and `sealing.key` are never copied. Secrets are never printed. |
 | `up` | Prepare the source provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |
@@ -101,7 +106,8 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 - `d` runs read-only Doctor checks;
 - `u` performs an advisory product-update check;
 - `i` lists the implicit default plus registered AliceProjects, selects one
-  without stopping another project, or creates a separate named complete home;
+  without stopping another project, or creates a separate named complete home.
+  AI vault copy is a separate command: `openalice project copy-ai-creds`;
 - `p` opens Setup for data home, browser port, update checks, and resolved
   Runtime/config provenance. Setup can edit either the selected AliceProject or
   machine defaults inherited by projects;

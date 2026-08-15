@@ -113,7 +113,9 @@ openalice status [--instance <name>] [--json]
 openalice open [--instance <name>]
 openalice logs [--instance <name>] [--component <name>] [--follow] [--json]
 openalice doctor [--instance <name>] [--json] [--fix]
-openalice instance list [--json]
+openalice project list [--json]
+openalice project use <key>
+openalice project copy-ai-creds [--from <key>] [--to <key>] [--yes]
 openalice instance delete <name>
 openalice update [--check] [--yes]
 openalice uninstall [--plan] [--yes]

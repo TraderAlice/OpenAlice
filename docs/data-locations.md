@@ -150,6 +150,11 @@ validates the target, saves the selection, then performs a full Guardian
 restart. The newly selected home may be empty or an existing OpenAlice home.
 A non-empty unrelated directory requires confirmation.
 
+`openalice project copy-ai-creds` is the explicit exception for AI vault rows
+in `<home>/data/config/ai-provider-manager.json`. It merges into the
+destination home, never prints secrets, and does not copy broker accounts,
+`sealing.key`, or `provider-keys.json`.
+
 The following cases fail visibly before another backend starts:
 
 - a saved location disappeared, such as an unmounted removable drive;
