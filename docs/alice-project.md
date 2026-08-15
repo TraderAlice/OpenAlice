@@ -67,7 +67,16 @@ Create a named project from the CLI:
 ```bash
 openalice create alice-project
 openalice create alice-project --name office --home ~/.openalice-office --product nano --yes
+openalice project list
+openalice project use office
+openalice project copy-ai-creds --from default --to office --yes
 ```
+
+`project use` only changes the Supervisor's remembered default. It does not
+stop a running project or move state. `copy-ai-creds` is the explicit exception
+for AI credential rows: it copies only `credentials` from the per-home
+`ai-provider-manager.json`, writes into the destination home, and never prints
+secrets. Workspace launch preferences and broker credentials stay project-local.
 
 The Supervisor TUI create path still registers a Trader-equivalent home.
 
@@ -160,6 +169,7 @@ loading, error, retry, and transport selection and has unit coverage.
 - one writable complete home has at most one Guardian owner;
 - project id does not depend on display name, port, or browser URL;
 - a project switch never moves, copies, merges, or deletes state;
+- AI vault copy is a separate, confirmed command and never travels with select;
 - opening a project never stops another project;
 - browser and Electron show the same secret-free identity shape;
 - `Workspace` is never renamed or overloaded to mean AliceProject;

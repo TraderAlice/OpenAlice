@@ -18,6 +18,7 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'version', description: 'Print the OpenAlice product and install version' },
   { name: 'tui', description: 'Open the local Supervisor TUI' },
   { name: 'create', description: 'Create a named AliceProject (Trader or Nano)' },
+  { name: 'project', description: 'List, select, or copy AI credentials between AliceProjects' },
   { name: 'up', description: 'Start a persistent local Runtime in the background' },
   { name: 'run', description: 'Run a local Runtime in the foreground' },
   { name: 'down', description: 'Stop the persistent local Runtime' },
@@ -540,15 +541,19 @@ ${json ? '  --json             Print a versioned machine-readable result\n' : ''
 }
 
 function bashCompletionCases() {
-  return Object.entries(LIFECYCLE_OPTIONS)
+  const lifecycle = Object.entries(LIFECYCLE_OPTIONS)
     .map(([command, options]) => `    ${command}) COMPREPLY=( $(compgen -W "${options.join(' ')}" -- "$current") ) ;;`)
     .join('\n')
+  return `${lifecycle}
+    project) COMPREPLY=( $(compgen -W "list use copy-ai-creds --json --from --to --yes" -- "$current") ) ;;`
 }
 
 function zshCompletionCases() {
-  return Object.entries(LIFECYCLE_OPTIONS)
+  const lifecycle = Object.entries(LIFECYCLE_OPTIONS)
     .map(([command, options]) => `  ${command}) _values 'option' ${options.map(shellQuote).join(' ')} ;;`)
     .join('\n')
+  return `${lifecycle}
+  project) _values 'option' 'list' 'use' 'copy-ai-creds' '--json' '--from' '--to' '--yes' ;;`
 }
 
 function fishCompletionOptions() {

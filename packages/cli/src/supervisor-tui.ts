@@ -1058,7 +1058,7 @@ export async function runSupervisorTui(
 
     projectsActive = true
     let changing = false
-    let message = 'Selecting an AliceProject also makes it the next bare-start default.'
+    let message = 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.'
     const lock = instanceSelectionOverrideLock(context)
     if (lock) message = lock
     const createValue = '__create_alice_project__'
@@ -1128,7 +1128,7 @@ export async function runSupervisorTui(
     const showList = () => {
       ui.setShowHardwareCursor(false)
       component = list
-      setMessage(lock ?? 'Selecting an AliceProject also makes it the next bare-start default.')
+      setMessage(lock ?? 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.')
     }
     const activateContext = async (
       operation: () => Promise<ResolvedLaunchContext>,

@@ -26,6 +26,10 @@ import {
   formatCreateAliceProjectHelp,
   runCreateAliceProjectCommand,
 } from '../src/create-alice-project.ts'
+import {
+  formatProjectHelp,
+  runProjectCommand,
+} from '../src/project-command.ts'
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
@@ -142,6 +146,13 @@ Prints a completion script to stdout without modifying shell configuration.
       throw error
     }
     return runCreateAliceProjectCommand(createArgs)
+  }
+  if (command === 'project') {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatProjectHelp())
+      return 0
+    }
+    return runProjectCommand(args)
   }
   const error = new Error(`Unknown command: ${command}\n\n${formatRootHelp()}`)
   error.code = 'EUSAGE'

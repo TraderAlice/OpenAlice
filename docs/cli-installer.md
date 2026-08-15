@@ -102,6 +102,9 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
   metadata used when managed remote reproduces the invoking CLI.
 - `packages/cli/src/supervisor-config.ts` — machine-local Supervisor and
   selected-instance configuration loading and atomic persistence.
+- `packages/cli/src/project-command.ts` and
+  `packages/cli/src/ai-credential-copy.ts` — AliceProject list/select and
+  confirmed AI credential copy between complete homes.
 - `packages/cli/src/managed-source.ts` — installer-channel-aligned local source
   selection, validated atomic clone, and collision refusal.
 - `packages/cli/src/install-layout.mjs` — strict discovery of installer-owned

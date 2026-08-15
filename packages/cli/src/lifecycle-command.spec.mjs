@@ -274,12 +274,13 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
   it('generates root help and four shell completions from one command registry', () => {
     const help = formatRootHelp()
-    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'create', 'completion']) {
+    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'create', 'project', 'completion']) {
       expect(help).toContain(command)
     }
     expect(formatLifecycleHelp('up')).toContain('installed OpenAlice Runtime in the background')
     expect(formatLifecycleHelp('run')).toContain('foreground')
     expect(formatShellCompletion('bash')).toContain('complete -F _openalice_completion openalice')
+    expect(formatShellCompletion('bash')).toContain('copy-ai-creds')
     expect(formatShellCompletion('zsh')).toContain('#compdef openalice')
     expect(formatShellCompletion('fish')).toContain('complete -c openalice')
     expect(formatShellCompletion('powershell')).toContain('Register-ArgumentCompleter')
