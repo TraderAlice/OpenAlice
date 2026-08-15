@@ -352,9 +352,17 @@ const mcpSchema = z.object({
   port: z.number().int().positive().default(3001),
 }).default({ enabled: false, port: 3001 })
 
+/**
+ * In-memory fallback when `ports.json` is absent and Guardian did not inject
+ * `OPENALICE_WEB_PORT`. Must match `PORT_DEFAULTS.web` in
+ * `scripts/guardian/shared.ts`. Never persist this value as a pin: Guardian
+ * treats any `ports.json` `web` field as an explicit bind and will not probe.
+ */
+export const DEFAULT_WEB_PORT = 47331
+
 /** Local listeners are transport configuration, not external connectors. */
 const portsSchema = z.object({
-  web: z.number().int().positive().default(3002),
+  web: z.number().int().positive().default(DEFAULT_WEB_PORT),
 })
 
 const snapshotSchema = z.object({
@@ -510,9 +518,14 @@ async function removeJsonFile(filename: string): Promise<void> {
 }
 
 /** Parse with Zod; if the file was missing, seed it to disk with defaults. */
-async function parseAndSeed<T>(filename: string, schema: z.ZodType<T>, raw: unknown | undefined): Promise<T> {
+async function parseAndSeed<T>(
+  filename: string,
+  schema: z.ZodType<T>,
+  raw: unknown | undefined,
+  options?: { persistDefaults?: boolean },
+): Promise<T> {
   const parsed = schema.parse(raw ?? {})
-  if (raw === undefined) {
+  if (raw === undefined && options?.persistDefaults !== false) {
     await mkdir(CONFIG_DIR, { recursive: true })
     await writeFile(resolve(CONFIG_DIR, filename), JSON.stringify(parsed, null, 2) + '\n')
   }
@@ -541,18 +554,19 @@ async function loadConfigUnlocked(): Promise<Config> {
     aiProvider:    await parseAndSeed(files[5], aiProviderSchema, raws[5]),
     snapshot:      await parseAndSeed(files[6], snapshotSchema, raws[6]),
     mcp:           await parseAndSeed(files[7], mcpSchema, raws[7]),
-    ports:         await parseAndSeed(files[8], portsSchema, raws[8]),
+    // Missing ports.json is unconfigured, not "use 47331 forever". Seeding a
+    // default here would make Guardian treat the next boot as an explicit pin
+    // and refuse to probe when that port is already taken.
+    ports:         await parseAndSeed(files[8], portsSchema, raws[8], { persistDefaults: false }),
     news:          await parseAndSeed(files[9], newsCollectorSchema, raws[9]),
     tools:         await parseAndSeed(files[10], toolsSchema, raws[10]),
     trading:       await parseAndSeed(files[11], tradingSchema, raws[11]),
   }
 
-  // Spawn-time-fixed channel: when guardian (Electron main) spawns the
-  // backend, it injects the chosen ports as env. Env wins over the file
-  // value because the file is user preference but the actual bound port
-  // is decided by guardian at boot (may differ if the preferred port was
-  // taken). In dev mode (no guardian) both env vars are unset and the
-  // file value flows through unchanged.
+  // Guardian injects the ports it claimed as env. Env wins over the file.
+  // Explicit file/env pins fail loud when occupied; only an absent file is
+  // allowed to probe. Standalone Alice (no Guardian env) uses the in-memory
+  // default or the file as written by the user / Settings.
   const envWebPort = parseEnvPort(process.env['OPENALICE_WEB_PORT'])
   if (envWebPort !== null) config.ports.web = envWebPort
   const envMcpPort = parseEnvPort(process.env['OPENALICE_MCP_PORT'])

@@ -133,7 +133,12 @@ repair the remembered selection. An explicit environment/flag selection fails
 instead of falling back, so automation cannot accidentally target another
 Home. The missing path is never silently recreated. An inherited Web port
 remains automatic from 47331 so concurrent AliceProjects probe upward, while a
-configured port is intentionally pinned.
+configured port is intentionally pinned. First Alice boot must not write
+`data/config/ports.json` merely to materialize that default: a file `web`
+value is a pin, so a seeded `3002` (or `47331`) would refuse to move when
+another home already holds it. Existing shipped `{ "web": 3002 }` files stay
+pins; delete the key or the file to restore probing. `openalice up --port`
+and `OPENALICE_WEB_PORT` remain one-run pins and do not rewrite the file.
 
 `OPENALICE_PROJECT`, `OPENALICE_HOME`, `--project`, and `--home` remain
 higher-priority one-run/automation inputs. When they fix the selected project

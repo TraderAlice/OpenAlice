@@ -60,6 +60,10 @@ export interface GuardianPorts {
 // An EXPLICITLY configured port that is already taken fails loud — silently
 // drifting off a value the user pinned would be worse than aborting. Only
 // unconfigured ports keep the probe-upward-from-default behavior.
+//
+// Missing ports.json is the unconfigured state. Alice must not seed a default
+// `web` value into this file: a written number is a pin, including the
+// historical `{ "web": 3002 }` first-boot seed.
 
 const PORT_DEFAULTS = { web: 47331, mcp: 47332, uta: 47333, connector: 47334, ui: 5173 } as const
 
