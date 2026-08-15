@@ -159,6 +159,37 @@ describe('business inquiry routes', () => {
     expect(dispatchHeadlessTask.mock.calls[1]?.[6]?.subject).toMatchObject({ relation: 'run', runId: 'run-old' })
   })
 
+  it('projects compact turn progress on inquiry history', async () => {
+    const { app, list } = build()
+    const progress = {
+      updatedAt: 2,
+      assistantText: null,
+      blocks: [{ type: 'tool' as const, id: 't1', name: 'Read', status: 'running' as const }],
+      metrics: { textBlocks: 0, toolCalls: 1, toolFailures: 0 },
+    }
+    list.mockReturnValue([{
+      taskId: 'run-ask',
+      resumeId: 'resume-author',
+      wsId: 'ws-1',
+      agent: 'pi',
+      prompt: 'Why?',
+      status: 'running',
+      startedAt: 1,
+      inquiry: {
+        subject: { kind: 'inbox', entryId: 'entry-1' },
+        question: 'Why?',
+        resolution: { mode: 'exact' },
+      },
+      progress,
+    }])
+    const body = await json(await app.request('/inbox/entry-1'))
+    expect(body.inquiries).toEqual([expect.objectContaining({
+      taskId: 'run-ask',
+      assistantText: null,
+      progress,
+    })])
+  })
+
   it('lists inquiry history by business object', async () => {
     const { app, list } = build()
     expect((await app.request('/inbox/entry-1')).status).toBe(200)

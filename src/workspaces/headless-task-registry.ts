@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path'
 
 import type { ModelReasoningEffort } from '../ai-providers/model-semantics.js'
 import type { HeadlessLaunchErrorCode } from './headless-task.js'
+import { progressChanged, type HeadlessTurnProgress } from './headless-progress.js'
 import type { Logger } from './logger.js'
 
 export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
@@ -128,6 +129,8 @@ export interface HeadlessTaskRecord {
   agentSessionId?: string
   /** Compact list-view projection; full normalized blocks stay in the log API. */
   output?: HeadlessTaskOutputSummary
+  /** Live compact timeline. Present only while the child is running. */
+  progress?: HeadlessTurnProgress
 }
 
 /** Task-log file paths — shared by the writer (service) and reader (route). */
@@ -180,6 +183,7 @@ export class HeadlessTaskRegistry {
       if (t.status === 'running') {
         t.status = 'interrupted'
         t.finishedAt = t.finishedAt ?? t.startedAt
+        delete t.progress
         changed = true
       }
     }
@@ -252,6 +256,15 @@ export class HeadlessTaskRegistry {
     const rec = this.tasks.find((t) => t.taskId === taskId)
     if (!rec) return
     Object.assign(rec, patch)
+    if (rec.status !== 'running') delete rec.progress
+    await this.flush()
+  }
+
+  /** Compact live timeline for comment/inquiry consumers. */
+  async setProgress(taskId: string, progress: HeadlessTurnProgress): Promise<void> {
+    const rec = this.tasks.find((t) => t.taskId === taskId)
+    if (!rec || !progressChanged(rec.progress, progress)) return
+    rec.progress = progress
     await this.flush()
   }
 

@@ -104,9 +104,12 @@ The filename stem is the stable issue id. Frontmatter:
   running, later DMs stay in the Connector queue; Alice flushes that stack as
   one quoted comment when the desk is idle again. Scheduled-fire
   `assistantText` is stamped as a comment. Connector projects comments that
-  do not contain `[[no-reply]]` and did not arrive from Telegram. Projected
-  comments use Telegram MarkdownV2; a parse failure tries `sendRichMessage`,
-  then plain text.
+  do not contain `[[no-reply]]` and did not arrive from Telegram. While a
+  desk turn is running, it also ships sealed mid-turn `text` blocks — the
+  last consecutive text before a tool or error — and never ships tool I/O.
+  The trailing text stays with the final comment. Projected comments use
+  Telegram MarkdownV2; a parse failure tries `sendRichMessage`, then plain
+  text.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 Only the credential slug is persisted; endpoint and key material remain in the
@@ -140,7 +143,15 @@ Comments are also the Issue's normal conversation entry. When `assignee` is an
 exact `@resumeId`, a comment from somebody else is delivered asynchronously to
 that Session and its final reply is appended as another structured comment.
 The source comment records `pending`, `replied`, or `failed`, so a durable note
-never masquerades as a delivered message. A human comment without a fixed owner
+never masquerades as a delivered message. While `pending`, the same delivery
+may carry compact **turn progress** from the headless listener: interleaved
+semantic `text` blocks, tool names/status, and errors. That projection is
+transport only — it is not the reply comment, and it never includes tool
+input/output. The snapshot has a fixed UTF-8 byte budget and is removed from
+the task record when the run finishes; terminal delivery state and the
+structured run log remain durable. Inbox inquiries expose the same shape on the inquiry record.
+Issue UI and Inbox still decide how to render it. The Telegram phone desk
+already projects sealed `text` blocks from that same field. A human comment without a fixed owner
 uses the same provenance-aware fallback as Inbox: OpenAlice asks the
 attributable creator, or recruits a reconstruction Agent in the Issue
 Workspace when no creator Session exists. The answer is recorded in Activity
