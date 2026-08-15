@@ -31,9 +31,10 @@ Usage:
 Bare \`project\` lists registered homes and can interactively select the next
 bare-start default. TUI \`i\` does the same without leaving Supervisor.
 
-copy-ai-creds copies the AI vault from one complete home into another. Matching
-vendor+key rows are skipped; colliding slugs are renamed. Broker accounts and
-sealing keys are never copied. Secrets are never printed.
+copy-ai-creds copies AI credential rows from one complete home into another.
+Matching vendor+key rows are skipped; colliding slugs are renamed. Workspace
+launch preferences, broker accounts, and sealing keys are never copied.
+Secrets are never printed.
 
 Options:
   --json         Machine-readable list
@@ -135,13 +136,12 @@ async function runProjectCopyAiCreds(argv: string[], io: ProjectCommandIo): Prom
   }
   const from = requireProject(registry, fromKey)
   const to = requireProject(registry, toKey)
+  if (from.key === to.key) {
+    throw usageError('Source and destination AliceProjects must be different.')
+  }
   const sourceVault = await readAiProviderVault(from.home)
   const sourceCount = Object.keys(sourceVault.credentials).length
-  if (sourceCount === 0) {
-    stdout.write(`No AI credentials in ${from.key} to copy.\n`)
-    return 0
-  }
-  if (!options.yes) {
+  if (sourceCount > 0 && !options.yes) {
     if (!isInteractive()) throw usageError('Refusing to copy AI credentials without --yes')
     stdout.write(
       `Copy ${sourceCount} AI credential${sourceCount === 1 ? '' : 's'} from ${from.key} to ${to.key}?\n`

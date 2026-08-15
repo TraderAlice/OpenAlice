@@ -23,7 +23,6 @@ export interface AiCredentialRecord {
 
 export interface AiProviderVault {
   credentials: Record<string, AiCredentialRecord>
-  workspaceCredentialDefaults?: Record<string, { credentialSlug: string; [key: string]: unknown }>
   [key: string]: unknown
 }
 
@@ -54,8 +53,7 @@ export function allocateCredentialSlug(vendor: string, taken: Set<string>): stri
 export function mergeAiCredentials(
   source: Record<string, AiCredentialRecord>,
   dest: Record<string, AiCredentialRecord>,
-): { credentials: Record<string, AiCredentialRecord>; aliases: Array<{ from: string; to: string }> }
-  & AiCredentialCopyPlan {
+): { credentials: Record<string, AiCredentialRecord> } & AiCredentialCopyPlan {
   const destByIdentity = new Map(
     Object.entries(dest).map(([slug, credential]) => [credentialIdentity(credential), slug]),
   )
@@ -64,14 +62,12 @@ export function mergeAiCredentials(
   const copied: string[] = []
   const skipped: string[] = []
   const renamed: Array<{ from: string; to: string }> = []
-  const aliases: Array<{ from: string; to: string }> = []
 
   for (const [slug, credential] of Object.entries(source)) {
     if (!isCopyableCredential(credential)) continue
     const existing = destByIdentity.get(credentialIdentity(credential))
     if (existing) {
       skipped.push(slug)
-      if (existing !== slug) aliases.push({ from: slug, to: existing })
       continue
     }
     let destSlug = slug
@@ -83,28 +79,8 @@ export function mergeAiCredentials(
     taken.add(destSlug)
     destByIdentity.set(credentialIdentity(credential), destSlug)
     copied.push(destSlug)
-    if (destSlug !== slug) aliases.push({ from: slug, to: destSlug })
   }
-  return { credentials, copied, skipped, renamed, aliases }
-}
-
-export function mergeWorkspaceCredentialDefaults(
-  source: AiProviderVault['workspaceCredentialDefaults'],
-  dest: AiProviderVault['workspaceCredentialDefaults'],
-  credentials: Record<string, AiCredentialRecord>,
-  renamed: Array<{ from: string; to: string }>,
-): AiProviderVault['workspaceCredentialDefaults'] {
-  if (!source) return dest
-  const renameMap = new Map(renamed.map((entry) => [entry.from, entry.to]))
-  const next = { ...dest }
-  for (const [agentId, def] of Object.entries(source)) {
-    if (!agentId || next[agentId]) continue
-    if (!def || typeof def.credentialSlug !== 'string' || !def.credentialSlug) continue
-    const mapped = renameMap.get(def.credentialSlug) ?? def.credentialSlug
-    if (!credentials[mapped]) continue
-    next[agentId] = { ...def, credentialSlug: mapped }
-  }
-  return Object.keys(next).length > 0 ? next : dest
+  return { credentials, copied, skipped, renamed }
 }
 
 export async function readAiProviderVault(home: string): Promise<AiProviderVault> {
@@ -162,19 +138,10 @@ export async function copyAiCredentials(input: {
   const source = await readAiProviderVault(input.fromHome)
   const dest = await readAiProviderVault(input.toHome)
   const merged = mergeAiCredentials(source.credentials, dest.credentials)
-  const workspaceCredentialDefaults = mergeWorkspaceCredentialDefaults(
-    source.workspaceCredentialDefaults,
-    dest.workspaceCredentialDefaults,
-    merged.credentials,
-    merged.aliases,
-  )
   if (merged.copied.length > 0) {
     await writeAiProviderVault(input.toHome, {
       ...dest,
       credentials: merged.credentials,
-      ...(workspaceCredentialDefaults
-        ? { workspaceCredentialDefaults }
-        : {}),
     })
   }
   return {
@@ -221,29 +188,9 @@ export function parseAiProviderVault(value: unknown): AiProviderVault {
       }
     }
   }
-  let workspaceCredentialDefaults: AiProviderVault['workspaceCredentialDefaults']
-  if (
-    root.workspaceCredentialDefaults
-    && typeof root.workspaceCredentialDefaults === 'object'
-    && !Array.isArray(root.workspaceCredentialDefaults)
-  ) {
-    workspaceCredentialDefaults = {}
-    for (const [agentId, raw] of Object.entries(
-      root.workspaceCredentialDefaults as Record<string, unknown>,
-    )) {
-      if (!agentId || typeof raw !== 'object' || raw === null || Array.isArray(raw)) continue
-      const record = raw as Record<string, unknown>
-      if (typeof record.credentialSlug !== 'string' || !record.credentialSlug) continue
-      workspaceCredentialDefaults[agentId] = {
-        ...record,
-        credentialSlug: record.credentialSlug,
-      }
-    }
-  }
   return {
     ...root,
     credentials,
-    ...(workspaceCredentialDefaults ? { workspaceCredentialDefaults } : {}),
   }
 }
 

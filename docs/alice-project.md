@@ -74,9 +74,9 @@ openalice project copy-ai-creds --from default --to office --yes
 
 `project use` only changes the Supervisor's remembered default. It does not
 stop a running project or move state. `copy-ai-creds` is the explicit exception
-for AI vault rows: it unseals nothing (the vault is the per-home
-`ai-provider-manager.json`), writes into the destination home, and never
-prints secrets. Broker credentials stay project-local.
+for AI credential rows: it copies only `credentials` from the per-home
+`ai-provider-manager.json`, writes into the destination home, and never prints
+secrets. Workspace launch preferences and broker credentials stay project-local.
 
 The Supervisor TUI create path still registers a Trader-equivalent home.
 

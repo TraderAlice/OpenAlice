@@ -104,7 +104,7 @@ runs `npm ci --omit=dev --ignore-scripts` in the staged release.
   selected-instance configuration loading and atomic persistence.
 - `packages/cli/src/project-command.ts` and
   `packages/cli/src/ai-credential-copy.ts` — AliceProject list/select and
-  confirmed AI vault copy between complete homes.
+  confirmed AI credential copy between complete homes.
 - `packages/cli/src/managed-source.ts` — installer-channel-aligned local source
   selection, validated atomic clone, and collision refusal.
 - `packages/cli/src/install-layout.mjs` — strict discovery of installer-owned

@@ -56,7 +56,7 @@ openalice project [list|use|copy-ai-creds] [options]
 | `create alice-project` | Register a named complete home. Interactive or `--yes` with `--name`, `--home`, and optional `--product trader\|nano`. Product is immutable birth (Trader default; Nano never starts UTA). TUI create remains Trader-equivalent. |
 | `project list` | Print registered AliceProjects and the remembered bare-start default. `--json` emits the registry summary. |
 | `project use <key>` | Record that AliceProject as the next bare-start default. Does not start, stop, or copy another project. |
-| `project copy-ai-creds` | Copy the AI vault from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Broker accounts and `sealing.key` are never copied. Secrets are never printed. |
+| `project copy-ai-creds` | Copy AI credential rows from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Workspace launch preferences, broker accounts, and `sealing.key` are never copied. Secrets are never printed. |
 | `up` | Prepare the source provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |

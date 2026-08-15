@@ -89,6 +89,14 @@ describe('openalice project', () => {
     })).rejects.toMatchObject({ code: 'EUSAGE' })
   })
 
+  it('rejects the same project even when its credential vault is empty', async () => {
+    const env = await setupProjects()
+    await expect(runProjectCommand(
+      ['copy-ai-creds', '--from', 'office', '--to', 'office', '--yes'],
+      { resolveContext: async () => env.context },
+    )).rejects.toMatchObject({ code: 'EUSAGE' })
+  })
+
   it('rejects an unknown project key', async () => {
     const env = await setupProjects()
     await expect(runProjectCommand(['use', 'missing'], {

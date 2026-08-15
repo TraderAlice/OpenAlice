@@ -10,7 +10,6 @@ import {
   copyAiCredentials,
   formatAiCredentialCopyResult,
   mergeAiCredentials,
-  mergeWorkspaceCredentialDefaults,
   writeAiProviderVault,
 } from './ai-credential-copy.ts'
 
@@ -48,30 +47,6 @@ describe('mergeAiCredentials', () => {
   it('allocates the next free vendor slug', () => {
     expect(allocateCredentialSlug('openai', new Set(['openai-1', 'openai-2']))).toBe('openai-3')
   })
-
-  it('maps workspace defaults onto dest slugs after identity skip or rename', () => {
-    const merged = mergeAiCredentials(
-      {
-        'anthropic-1': { vendor: 'anthropic', authType: 'api-key', apiKey: 'sk-same' },
-        'openai-1': { vendor: 'openai', authType: 'api-key', apiKey: 'sk-new' },
-      },
-      {
-        'anthropic-2': { vendor: 'anthropic', authType: 'api-key', apiKey: 'sk-same' },
-        'openai-1': { vendor: 'openai', authType: 'api-key', apiKey: 'sk-existing' },
-      },
-    )
-    const defaults = mergeWorkspaceCredentialDefaults(
-      {
-        pi: { credentialSlug: 'anthropic-1' },
-        claude: { credentialSlug: 'openai-1' },
-      },
-      {},
-      merged.credentials,
-      merged.aliases,
-    )
-    expect(defaults?.pi?.credentialSlug).toBe('anthropic-2')
-    expect(defaults?.claude?.credentialSlug).toBe('openai-2')
-  })
 })
 
 describe('copyAiCredentials', () => {
@@ -107,7 +82,7 @@ describe('copyAiCredentials', () => {
       workspaceDefaultAgent?: string
     }
     expect(written.credentials['openai-1']?.apiKey).toBe('sk-secret-source')
-    expect(written.workspaceCredentialDefaults?.pi?.credentialSlug).toBe('openai-1')
+    expect(written.workspaceCredentialDefaults).toBeUndefined()
     expect(written.workspaceDefaultAgent).toBe('pi')
     expect(formatAiCredentialCopyResult(result)).not.toContain('sk-secret')
   })
