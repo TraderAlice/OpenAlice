@@ -1,6 +1,6 @@
 # Plan: Headless turn progress on the comment path
 
-**Status:** active — increment 1  
+**Status:** active — increments 1 and 3  
 **Owner guides:** [[docs/workspace-issues-and-scheduling.md]], [[docs/conversation-provenance.md]], [[docs/connector-service.md]]  
 **Delivery:** serial PR to `dev` (`area:collaboration`, `area:workspace`, `review:deep`). Open PR, do not merge.
 
@@ -26,9 +26,15 @@ or projects it stays a consumer decision.
 - **Write cheaply.** First semantic snapshot publishes immediately; later
   updates debounce (~1s) and skip identical fingerprints. Comment sidecar
   writes only for Issue-comment inquiries (`subject.commentId`).
-- **Out of this increment:** Issue Activity chrome, Inbox thread chrome, and
+- **Out of increment 1:** Issue Activity chrome, Inbox thread chrome, and
   Telegram `send`/`edit` policy. Those consume the field; they do not define
   it.
+- **Telegram ships sealed text only.** A `text` block goes to the phone desk
+  only after a tool or error follows it. Consecutive texts are one narration:
+  only the last one before the non-text block is sent, so streamed chunks do
+  not each become a DM. Tool/error blocks stay off Telegram. The trailing
+  text is still today's final comment. A text already sent as progress is
+  not sent again when that comment is stamped.
 
 ## Compact shape
 
@@ -51,7 +57,7 @@ keeps `headless-tasks.json` and comment sidecars bounded.
 
 ## Increments
 
-### 1. Central transport + API projection (this PR)
+### 1. Central transport + API projection
 
 - [x] `projectTurnProgress` + fingerprint + debounced publisher
 - [x] Runner `onProgress` from the structured snapshot writer
@@ -60,7 +66,7 @@ keeps `headless-tasks.json` and comment sidecars bounded.
 - [x] Inquiry API includes `progress`; Issue comments already travel with
       `delivery`
 - [x] Owner-guide note; typecheck + focused tests
-- [ ] Review-only PR to `dev`
+- [x] Review-only PR to `dev`
 
 ### 2. Issue and Inbox consume
 
@@ -69,10 +75,15 @@ Do not invent a second fetch of `/output`.
 
 ### 3. Connector / Telegram consume
 
-Phone-desk projection decides typing, a status edit, or shipping new `text`
-blocks. Final reply stays today's comment. Do not spam tool I/O to Telegram.
+- [x] Phone-desk consumer reads the compact progress feed
+- [x] Ship sealed mid-turn `text` blocks only (last consecutive text before
+      a tool or error); skip tool/error blocks and `[[no-reply]]`
+- [x] Dedup: a text already sent as progress is not resent as the final
+      comment (`replyTo` / scheduled `taskId` scope)
+- [x] Wire comment replies and scheduled desk fires from the existing
+      progress publisher; owner-guide note
 
 ## Completion
 
-Delete this file and its [[PLANS.md]] bullet when increment 3 is accepted, or
+Delete this file and its [[PLANS.md]] bullet when increment 2 is accepted, or
 when a later change supersedes the remaining consumer work.

@@ -3,6 +3,8 @@
  *
  * Connector only transports. Issue comments are the transcript. The literal
  * tag [[no-reply]] is filtered here so silent heartbeat comments stay local.
+ * Sealed mid-turn text blocks (a tool or error followed them) also project so
+ * the phone chat does not wait for the final reply.
  */
 import { randomUUID } from 'node:crypto'
 import {
@@ -31,6 +33,8 @@ export {
   TELEGRAM_NO_REPLY_TAG,
   containsTelegramNoReply,
   projectDeskComment,
+  projectDeskTurnProgress,
+  projectWorkspaceDeskTurnProgress,
   shouldProjectDeskComment,
 } from './telegram-desk-project.js'
 
@@ -167,7 +171,9 @@ export async function stampTelegramDeskScheduledFire(input: {
     at: input.task.finishedAt ?? Date.now(),
     fingerprint: `telegram-desk-fire:${input.task.taskId}`,
   })
-  await projectDeskComment(appended.issue, appended.comment).catch(() => undefined)
+  await projectDeskComment(appended.issue, appended.comment, undefined, {
+    progressScopeId: input.task.taskId,
+  }).catch(() => undefined)
   return appended.comment
 }
 

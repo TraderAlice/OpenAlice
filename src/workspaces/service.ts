@@ -109,6 +109,10 @@ import {
 } from './headless-progress.js';
 import { stampTelegramDeskScheduledFire } from './issues/telegram-desk-chat.js';
 import {
+  deskProgressScope,
+  projectWorkspaceDeskTurnProgress,
+} from './issues/telegram-desk-project.js';
+import {
   IssueChangeTracker,
   issueMutation,
   issueMutationFingerprint,
@@ -1803,24 +1807,42 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       publish: async (progress) => {
         await headlessTasks.setProgress(rec.taskId, progress);
         const subject = rec.inquiry?.subject;
-        if (subject?.kind !== 'issue' || !subject.commentId) return;
-        const issueWorkspace = registry.get(subject.workspaceId);
-        if (!issueWorkspace) return;
-        const updated = await updateIssueCommentProgress(
-          issueWorkspace.dir,
-          subject.issueId,
-          subject.commentId,
-          progress,
-        );
-        if (!updated.ok) {
-          launcherLogger.warn('issue.comment_progress_failed', {
-            taskId: rec.taskId,
-            wsId: subject.workspaceId,
-            issueId: subject.issueId,
-            commentId: subject.commentId,
-            error: updated.error,
-          });
+        if (subject?.kind === 'issue' && subject.commentId) {
+          const issueWorkspace = registry.get(subject.workspaceId);
+          if (issueWorkspace) {
+            const updated = await updateIssueCommentProgress(
+              issueWorkspace.dir,
+              subject.issueId,
+              subject.commentId,
+              progress,
+            );
+            if (!updated.ok) {
+              launcherLogger.warn('issue.comment_progress_failed', {
+                taskId: rec.taskId,
+                wsId: subject.workspaceId,
+                issueId: subject.issueId,
+                commentId: subject.commentId,
+                error: updated.error,
+              });
+            }
+          }
         }
+        const desk = deskProgressScope(rec);
+        if (!desk) return;
+        const deskWorkspace = registry.get(desk.workspaceId);
+        if (!deskWorkspace) return;
+        await projectWorkspaceDeskTurnProgress({
+          wsDir: deskWorkspace.dir,
+          issueId: desk.issueId,
+          scopeId: desk.scopeId,
+          progress,
+        }).catch((err) => launcherLogger.warn('telegram.desk_progress_failed', {
+          taskId: rec.taskId,
+          wsId: desk.workspaceId,
+          issueId: desk.issueId,
+          scopeId: desk.scopeId,
+          err,
+        }));
       },
     });
     // Fire-and-forget: run to natural exit, then fill the record. Process

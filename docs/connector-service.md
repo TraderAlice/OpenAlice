@@ -52,7 +52,10 @@ categories.
   phone-desk Issue exists and no desk generation is running. Several stacked
   DMs become one quoted comment. Alice projects desk comments that do not
   contain the literal tag `[[no-reply]]`. Inbound Telegram comments are not
-  echoed back.
+  echoed back. While a desk turn is running, Alice also ships sealed mid-turn
+  `text` blocks (a tool or error followed them) so the phone chat does not
+  wait for the final reply. Tool names, status, and payloads stay off Telegram.
+  The trailing text still becomes today's reply comment.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are externalized as
@@ -249,10 +252,10 @@ The surfaces deliberately have different jobs:
   `commentPrompt: '{comment}'` so those comments are the reply Input Prompt
   as-is. Scheduled-fire `assistantText` is stamped as a comment. Connector
   projects those comments unless they contain the literal tag `[[no-reply]]`
-  or arrived from Telegram. Pending comment replies may also carry compact
-  turn progress from the headless listener; Connector does not project that
-  yet. How Telegram consumes it (typing, a status edit, or shipping new
-  semantic text blocks) is a later Connector decision.
+  or arrived from Telegram. Pending comment replies also carry compact turn
+  progress. The phone desk ships sealed mid-turn `text` blocks (the last
+  consecutive text before a tool or error) and skips tool/error blocks. A
+  text already sent this way is not sent again as the final comment.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
