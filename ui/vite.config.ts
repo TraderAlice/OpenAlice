@@ -16,8 +16,10 @@ import { resolve } from 'node:path'
  *      the user manually started backend on a different port than
  *      configured, in which case the standalone workflow is on them.
  *
- * Default 3002 if both sources unusable, with a clear warning.
+ * Default 47331 if both sources unusable, matching Guardian PORT_DEFAULTS.web.
  */
+const DEFAULT_BACKEND_PORT = 47331
+
 function readBackendPort(): number {
   // Env wins — set by the dev orchestrator. No drift with backend.
   const envPort = Number.parseInt(process.env['OPENALICE_BACKEND_PORT'] ?? '', 10)
@@ -30,12 +32,12 @@ function readBackendPort(): number {
     const parsed = JSON.parse(raw) as { web?: number }
     const port = parsed.web
     if (typeof port === 'number' && port > 0 && port <= 65535) return port
-    console.warn(`[vite] ${configPath}: web.port missing or invalid, falling back to 3002`)
+    console.warn(`[vite] ${configPath}: web.port missing or invalid, falling back to ${DEFAULT_BACKEND_PORT}`)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.warn(`[vite] could not read ${configPath} (${msg}), falling back to 3002`)
+    console.warn(`[vite] could not read ${configPath} (${msg}), falling back to ${DEFAULT_BACKEND_PORT}`)
   }
-  return 3002
+  return DEFAULT_BACKEND_PORT
 }
 
 const backendPort = readBackendPort()

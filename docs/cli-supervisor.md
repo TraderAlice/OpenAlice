@@ -231,7 +231,9 @@ An inherited default Web port remains automatic for the source-backed built
 Guardian: it probes upward from 47331 together with unconfigured
 MCP/local-tool, UTA, and Connector ports. Consequently multiple complete homes
 or the desktop app may occupy historical defaults without breaking a CLI
-Runtime. A machine/project setting, environment value, or explicit flag pins
+Runtime. Creating an AliceProject and the first Alice `loadConfig()` must not
+write a default into `data/config/ports.json`; a written `web` value is a pin.
+A machine/project setting, environment value, or explicit flag pins
 the Web port and fails visibly on collision, as do explicit internal
 environment or `data/config/ports.json` values. Stop and restart wait for
 Guardian plus Alice ownership evidence to clear, not merely for the control
