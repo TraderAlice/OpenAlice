@@ -1093,9 +1093,9 @@ function HeadlessSessionBusyDialog(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <div className="flex items-start gap-3 pr-7">
+      <DialogContent className="min-w-0 overflow-hidden sm:max-w-md">
+        <DialogHeader className="min-w-0">
+          <div className="flex min-w-0 max-w-full items-start gap-3 pr-7">
             <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               <LoaderCircle
                 size={18}
@@ -1112,8 +1112,11 @@ function HeadlessSessionBusyDialog(props: {
         </DialogHeader>
 
         {props.row && (
-          <div className="rounded-lg border border-border/70 bg-muted/35 px-3.5 py-3">
-            <p className="truncate text-sm font-medium text-foreground" title={props.row.title}>
+          <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-border/70 bg-muted/35 px-3.5 py-3">
+            <p
+              className="line-clamp-2 min-w-0 max-w-full break-words text-sm font-medium leading-snug text-foreground [overflow-wrap:anywhere]"
+              title={props.row.title}
+            >
               {props.row.title}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
