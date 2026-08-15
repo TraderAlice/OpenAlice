@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 
 import type { Page } from '../App'
+import { isNanoHiddenActivityPage, isNanoProduct } from '../lib/product-surfaces'
 import type { ViewSpec } from '../tabs/types'
 
 type NavItemKey =
@@ -79,3 +80,13 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ]
+
+export function navSectionsForProduct(product?: string | null): NavSection[] {
+  if (!isNanoProduct(product)) return NAV_SECTIONS
+  return NAV_SECTIONS
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !isNanoHiddenActivityPage(item.page)),
+    }))
+    .filter((section) => section.items.length > 0)
+}

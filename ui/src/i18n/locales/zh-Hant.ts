@@ -1115,6 +1115,12 @@ export const zhHant: Resources = {
     quantDeskLabel: '量化組',
     quantDeskTitle: '委派一項可重現研究',
     quantDeskPrompt: '讓 AutoQuant 研究短期板塊輪動在計入成本後能否預測未來一週的相對報酬。要求回傳可重現證據、不可變的 Run 或 Report 參照、研究限制，並且不授予交易權限。',
+    codeReviewLabel: '程式碼審閱',
+    codeReviewTitle: '審閱目前 Workspace',
+    codeReviewPrompt: '閱讀此 Workspace 裡的程式碼或筆記，列出風險最高的問題、尚未完成的部分，以及接下來三處具體修改。只停留在這個目錄，不要開始市場或交易工作。',
+    inboxTriageLabel: '收件匣',
+    inboxTriageTitle: '整理今天進來的事項',
+    inboxTriagePrompt: '閱讀此 Workspace 的 Inbox 與 Issue，總結哪些需要回覆、哪些可以稍後處理，以及我該先做的第一件事。不要編造市場或交易任務。',
   },
   autoQuantLanding: {
     heading: '量化組接下來研究什麼？',

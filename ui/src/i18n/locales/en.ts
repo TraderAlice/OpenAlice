@@ -1119,6 +1119,12 @@ export const en = {
     quantDeskLabel: 'Quant desk',
     quantDeskTitle: 'Delegate a reproducible study',
     quantDeskPrompt: 'Ask the AutoQuant desk to test whether short-term sector rotation predicts one-week relative returns after costs. Require reproducible evidence, immutable run or report references, limitations, and no trading authority.',
+    codeReviewLabel: 'Code review',
+    codeReviewTitle: 'Review the current Workspace',
+    codeReviewPrompt: 'Read this Workspace and review the current code or notes. List the highest-risk issues, what is unfinished, and the next three concrete edits. Stay inside this folder; do not start market or trading work.',
+    inboxTriageLabel: 'Inbox',
+    inboxTriageTitle: 'Triage what landed today',
+    inboxTriagePrompt: 'Read Inbox and Issues in this Workspace. Summarize what needs a reply, what can wait, and the first action I should take. Do not invent market or trading tasks.',
   },
   autoQuantLanding: {
     heading: 'What should the quant desk investigate?',
