@@ -147,7 +147,9 @@ never masquerades as a delivered message. While `pending`, the same delivery
 may carry compact **turn progress** from the headless listener: interleaved
 semantic `text` blocks, tool names/status, and errors. That projection is
 transport only — it is not the reply comment, and it never includes tool
-input/output. Inbox inquiries expose the same shape on the inquiry record.
+input/output. The snapshot has a fixed UTF-8 byte budget and is removed from
+the task record when the run finishes; terminal delivery state and the
+structured run log remain durable. Inbox inquiries expose the same shape on the inquiry record.
 Issue UI and Inbox still decide how to render it. The Telegram phone desk
 already projects sealed `text` blocks from that same field. A human comment without a fixed owner
 uses the same provenance-aware fallback as Inbox: OpenAlice asks the

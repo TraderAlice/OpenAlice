@@ -10,6 +10,12 @@ import type { HeadlessStructuredOutput } from './headless-output.js'
 
 export const HEADLESS_PROGRESS_DEBOUNCE_MS = 1_000
 export const MAX_PROGRESS_BLOCKS = 40
+export const MAX_PROGRESS_PAYLOAD_BYTES = 32 * 1_024
+const MAX_PROGRESS_ASSISTANT_BYTES = 4 * 1_024
+const MAX_PROGRESS_TEXT_BYTES = 4 * 1_024
+const MAX_PROGRESS_ERROR_BYTES = 1 * 1_024
+const MAX_PROGRESS_LABEL_BYTES = 256
+const CLIPPED_SUFFIX = '…'
 
 export type HeadlessProgressToolStatus = 'running' | 'completed' | 'failed'
 
@@ -29,24 +35,52 @@ export interface HeadlessTurnProgress {
   }
 }
 
+function clipUtf8(value: string, maxBytes: number): string {
+  const encoded = Buffer.from(value, 'utf8')
+  if (encoded.byteLength <= maxBytes) return value
+  const suffix = Buffer.from(CLIPPED_SUFFIX, 'utf8')
+  const budget = Math.max(0, maxBytes - suffix.byteLength)
+  let end = budget
+  while (end > 0 && (encoded[end] & 0xc0) === 0x80) end -= 1
+  return `${encoded.subarray(0, end).toString('utf8')}${CLIPPED_SUFFIX}`
+}
+
 export function projectTurnProgress(
   structured: HeadlessStructuredOutput,
   now = Date.now(),
 ): HeadlessTurnProgress {
   const blocks = structured.blocks.flatMap((block): HeadlessProgressBlock[] => {
-    if (block.type === 'text') return [{ type: 'text', text: block.text }]
-    if (block.type === 'error') return [{ type: 'error', message: block.message }]
-    return [{ type: 'tool', id: block.id, name: block.name, status: block.status }]
+    if (block.type === 'text') return [{ type: 'text', text: clipUtf8(block.text, MAX_PROGRESS_TEXT_BYTES) }]
+    if (block.type === 'error') return [{ type: 'error', message: clipUtf8(block.message, MAX_PROGRESS_ERROR_BYTES) }]
+    return [{
+      type: 'tool',
+      id: clipUtf8(block.id, MAX_PROGRESS_LABEL_BYTES),
+      name: clipUtf8(block.name, MAX_PROGRESS_LABEL_BYTES),
+      status: block.status,
+    }]
   })
-  const trimmed = blocks.length <= MAX_PROGRESS_BLOCKS
+  const blockLimited = blocks.length <= MAX_PROGRESS_BLOCKS
     ? blocks
     : blocks.slice(blocks.length - MAX_PROGRESS_BLOCKS)
-  return {
+  let payloadBlocks = blockLimited
+  const buildProgress = (): HeadlessTurnProgress => ({
     updatedAt: now,
-    assistantText: structured.assistantText,
-    blocks: trimmed,
+    assistantText: structured.assistantText === null
+      ? null
+      : clipUtf8(structured.assistantText, MAX_PROGRESS_ASSISTANT_BYTES),
+    blocks: payloadBlocks,
     metrics: structured.metrics,
+  })
+  // The block count alone is not a storage bound: normalized text blocks can
+  // each be large. Prefer the newest activity and keep the exact persisted
+  // snapshot below one explicit UTF-8 budget.
+  while (
+    payloadBlocks.length > 0
+    && Buffer.byteLength(JSON.stringify(buildProgress()), 'utf8') > MAX_PROGRESS_PAYLOAD_BYTES
+  ) {
+    payloadBlocks = payloadBlocks.slice(1)
   }
+  return buildProgress()
 }
 
 /** Equality key that ignores the wall-clock stamp. */
@@ -74,25 +108,33 @@ export function createProgressPublisher(opts: {
 } {
   const debounceMs = opts.debounceMs ?? HEADLESS_PROGRESS_DEBOUNCE_MS
   let latest: HeadlessTurnProgress | null = null
-  let published: HeadlessTurnProgress | null = null
+  let started = false
+  let queuedFingerprint: string | null = null
   let timer: NodeJS.Timeout | null = null
   let chain = Promise.resolve()
 
   const enqueue = (progress: HeadlessTurnProgress) => {
-    if (!progressChanged(published, progress)) return
-    published = progress
-    try {
-      const result = opts.publish(progress)
-      chain = chain.then(() => Promise.resolve(result)).catch(() => undefined)
-    } catch {
-      /* publisher errors must not break the runner */
-    }
+    const fingerprint = progressFingerprint(progress)
+    if (fingerprint === queuedFingerprint) return
+    queuedFingerprint = fingerprint
+    // Invoke the publisher inside the chain. Calling it before `then()` makes
+    // asynchronous registry/comment writes overlap even though their returned
+    // promises are nominally chained.
+    chain = chain.then(async () => {
+      try {
+        await opts.publish(progress)
+      } catch {
+        if (queuedFingerprint === fingerprint) queuedFingerprint = null
+        /* publisher errors must not break the runner */
+      }
+    })
   }
 
   return {
     offer(progress) {
       latest = progress
-      if (!published) {
+      if (!started) {
+        started = true
         enqueue(progress)
         return
       }

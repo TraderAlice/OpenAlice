@@ -4,6 +4,7 @@ import type { HeadlessStructuredOutput } from './headless-output.js'
 import {
   createProgressPublisher,
   MAX_PROGRESS_BLOCKS,
+  MAX_PROGRESS_PAYLOAD_BYTES,
   progressChanged,
   progressFingerprint,
   projectTurnProgress,
@@ -53,6 +54,22 @@ describe('projectTurnProgress', () => {
     expect(progress.blocks[0]).toEqual({ type: 'text', text: 'line-5' })
     expect(progress.blocks.at(-1)).toEqual({ type: 'text', text: 'line-44' })
   })
+
+  it('bounds the complete persisted snapshot by UTF-8 bytes', () => {
+    const blocks = Array.from({ length: MAX_PROGRESS_BLOCKS }, (_, index) => ({
+      type: 'text' as const,
+      text: `line-${index}-${'猫'.repeat(8_000)}`,
+    }))
+    const progress = projectTurnProgress(structured({
+      blocks,
+      assistantText: '猫'.repeat(8_000),
+      metrics: { textBlocks: blocks.length, toolCalls: 0, toolFailures: 0 },
+    }))
+    expect(Buffer.byteLength(JSON.stringify(progress), 'utf8')).toBeLessThanOrEqual(MAX_PROGRESS_PAYLOAD_BYTES)
+    expect(progress.blocks.length).toBeGreaterThan(0)
+    expect(progress.blocks.at(-1)).toMatchObject({ type: 'text' })
+    expect(JSON.stringify(progress)).not.toContain('�')
+  })
 })
 
 describe('progress fingerprint', () => {
@@ -73,11 +90,30 @@ describe('createProgressPublisher', () => {
     publisher.offer(projectTurnProgress(structured({ assistantText: 'one' }), 1))
     publisher.offer(projectTurnProgress(structured({ assistantText: 'two' }), 2))
     publisher.offer(projectTurnProgress(structured({ assistantText: 'three' }), 3))
+    await vi.advanceTimersByTimeAsync(0)
     expect(publish).toHaveBeenCalledTimes(1)
     expect(publish.mock.calls[0]?.[0].assistantText).toBe('one')
     await vi.advanceTimersByTimeAsync(1_000)
     expect(publish).toHaveBeenCalledTimes(2)
     expect(publish.mock.calls[1]?.[0].assistantText).toBe('three')
+    vi.useRealTimers()
+  })
+
+  it('does not overlap asynchronous publishers', async () => {
+    vi.useFakeTimers()
+    const releases: Array<() => void> = []
+    const publish = vi.fn(async () => new Promise<void>((resolve) => releases.push(resolve)))
+    const publisher = createProgressPublisher({ debounceMs: 1_000, publish })
+    publisher.offer(projectTurnProgress(structured({ assistantText: 'one' }), 1))
+    await vi.advanceTimersByTimeAsync(0)
+    publisher.offer(projectTurnProgress(structured({ assistantText: 'two' }), 2))
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(publish).toHaveBeenCalledTimes(1)
+    releases.shift()?.()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(publish).toHaveBeenCalledTimes(2)
+    releases.shift()?.()
+    await publisher.flush()
     vi.useRealTimers()
   })
 

@@ -348,6 +348,8 @@ reply comment, linked by `replyTo`; delivery state stays on the source comment.
 While that delivery is `pending`, compact turn progress (semantic text blocks
 and tool status, never tool payloads) may ride on the same record so Inbox,
 Issue, and Connector can watch the turn without each parsing headless logs.
+This bounded snapshot is live transport, not durable transcript history, and
+is removed from the task record at terminal state.
 The Telegram phone desk already ships sealed mid-turn `text` blocks from that
 progress; tool and error blocks stay local.
 

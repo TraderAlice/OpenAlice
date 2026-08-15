@@ -53,6 +53,23 @@ describe('updateIssueCommentProgress', () => {
     })
   })
 
+  it('serializes concurrent sidecar mutations without losing comments', async () => {
+    await createIssue(dir, { id: 'desk', title: 'Desk' })
+    const writes = Array.from({ length: 20 }, (_, index) => appendIssueComment(
+      dir,
+      'desk',
+      'human',
+      `comment ${index}`,
+      { id: `comment-${index}` },
+    ))
+    const results = await Promise.all(writes)
+    expect(results.every((result) => result.ok)).toBe(true)
+    const comments = await readIssueComments(dir, 'desk')
+    expect(comments.ok && comments.comments.map((comment) => comment.id).sort()).toEqual(
+      Array.from({ length: 20 }, (_, index) => `comment-${index}`).sort(),
+    )
+  })
+
   it('refuses progress once the comment is no longer pending', async () => {
     await createIssue(dir, { id: 'desk', title: 'Desk' })
     await appendIssueComment(dir, 'desk', 'human', 'hello', {

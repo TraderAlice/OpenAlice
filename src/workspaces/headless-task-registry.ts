@@ -129,7 +129,7 @@ export interface HeadlessTaskRecord {
   agentSessionId?: string
   /** Compact list-view projection; full normalized blocks stay in the log API. */
   output?: HeadlessTaskOutputSummary
-  /** Live compact timeline. Written while the child runs; last snapshot remains. */
+  /** Live compact timeline. Present only while the child is running. */
   progress?: HeadlessTurnProgress
 }
 
@@ -183,6 +183,7 @@ export class HeadlessTaskRegistry {
       if (t.status === 'running') {
         t.status = 'interrupted'
         t.finishedAt = t.finishedAt ?? t.startedAt
+        delete t.progress
         changed = true
       }
     }
@@ -249,13 +250,13 @@ export class HeadlessTaskRegistry {
         | 'killed'
         | 'error'
         | 'output'
-        | 'progress'
       >
     >,
   ): Promise<void> {
     const rec = this.tasks.find((t) => t.taskId === taskId)
     if (!rec) return
     Object.assign(rec, patch)
+    if (rec.status !== 'running') delete rec.progress
     await this.flush()
   }
 

@@ -154,6 +154,31 @@ async function writeIssueComments(wsDir: string, id: string, comments: IssueComm
   await writeWorkspaceFile(wsDir, issueCommentsRel(id), content)
 }
 
+const issueCommentMutationChains = new Map<string, Promise<void>>()
+
+/** Serialize the full read-modify-write cycle for one Issue sidecar. Different
+ * Issues remain independent, while progress, delivery, and human comments on
+ * the same Issue cannot overwrite one another. */
+async function mutateIssueComments<T>(
+  wsDir: string,
+  id: string,
+  mutation: () => Promise<T>,
+): Promise<T> {
+  const key = `${wsDir}\0${id}`
+  const predecessor = issueCommentMutationChains.get(key) ?? Promise.resolve()
+  let release!: () => void
+  const turn = new Promise<void>((resolve) => { release = resolve })
+  const tail = predecessor.then(() => turn)
+  issueCommentMutationChains.set(key, tail)
+  await predecessor
+  try {
+    return await mutation()
+  } finally {
+    release()
+    if (issueCommentMutationChains.get(key) === tail) issueCommentMutationChains.delete(key)
+  }
+}
+
 export async function appendIssueComment(
   wsDir: string,
   id: string,
@@ -171,25 +196,27 @@ export async function appendIssueComment(
   if (!author.trim() || !markdown) {
     return { ok: false, reason: 'invalid', error: 'author and comment markdown must be non-empty' }
   }
-  const existing = await readIssueComments(wsDir, id)
-  if (!existing.ok) return { ok: false, reason: 'invalid', error: existing.error }
+  return mutateIssueComments(wsDir, id, async (): Promise<AppendIssueCommentResult> => {
+    const existing = await readIssueComments(wsDir, id)
+    if (!existing.ok) return { ok: false, reason: 'invalid', error: existing.error }
 
-  if (options.id) {
-    const duplicate = existing.comments.find((comment) => comment.id === options.id)
-    if (duplicate) return { ok: true, issue: issue.issue, comment: duplicate }
-  }
+    if (options.id) {
+      const duplicate = existing.comments.find((comment) => comment.id === options.id)
+      if (duplicate) return { ok: true, issue: issue.issue, comment: duplicate }
+    }
 
-  const comment: IssueComment = {
-    id: options.id ?? `comment-${randomUUID()}`,
-    author: author.trim(),
-    at: options.at ?? new Date().toISOString(),
-    markdown,
-    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
-    ...(options.delivery ? { delivery: options.delivery } : {}),
-    ...(options.via ? { via: options.via } : {}),
-  }
-  await writeIssueComments(wsDir, id, [...existing.comments, comment])
-  return { ok: true, issue: issue.issue, comment }
+    const comment: IssueComment = {
+      id: options.id ?? `comment-${randomUUID()}`,
+      author: author.trim(),
+      at: options.at ?? new Date().toISOString(),
+      markdown,
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(options.delivery ? { delivery: options.delivery } : {}),
+      ...(options.via ? { via: options.via } : {}),
+    }
+    await writeIssueComments(wsDir, id, [...existing.comments, comment])
+    return { ok: true, issue: issue.issue, comment }
+  })
 }
 
 export async function updateIssueCommentDelivery(
@@ -198,15 +225,17 @@ export async function updateIssueCommentDelivery(
   commentId: string,
   delivery: IssueCommentDelivery,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; error: string }> {
-  const existing = await readIssueComments(wsDir, id)
-  if (!existing.ok) return existing
-  const index = existing.comments.findIndex((comment) => comment.id === commentId)
-  if (index < 0) return { ok: false, error: `comment not found: ${commentId}` }
-  const comment = { ...existing.comments[index], delivery }
-  const comments = [...existing.comments]
-  comments[index] = comment
-  await writeIssueComments(wsDir, id, comments)
-  return { ok: true, comment }
+  return mutateIssueComments(wsDir, id, async () => {
+    const existing = await readIssueComments(wsDir, id)
+    if (!existing.ok) return existing
+    const index = existing.comments.findIndex((comment) => comment.id === commentId)
+    if (index < 0) return { ok: false as const, error: `comment not found: ${commentId}` }
+    const comment = { ...existing.comments[index], delivery }
+    const comments = [...existing.comments]
+    comments[index] = comment
+    await writeIssueComments(wsDir, id, comments)
+    return { ok: true as const, comment }
+  })
 }
 
 /** Attach live turn progress to a pending comment. No-ops when the comment
@@ -217,24 +246,26 @@ export async function updateIssueCommentProgress(
   commentId: string,
   progress: HeadlessTurnProgress,
 ): Promise<{ ok: true; comment: IssueComment; changed: boolean } | { ok: false; error: string }> {
-  const existing = await readIssueComments(wsDir, id)
-  if (!existing.ok) return existing
-  const index = existing.comments.findIndex((comment) => comment.id === commentId)
-  if (index < 0) return { ok: false, error: `comment not found: ${commentId}` }
-  const current = existing.comments[index]
-  const delivery = current?.delivery
-  if (!current || delivery?.state !== 'pending') {
-    return { ok: false, error: `comment is not awaiting a reply: ${commentId}` }
-  }
-  if (!progressChanged(delivery.progress, progress)) {
-    return { ok: true, comment: current, changed: false }
-  }
-  const comment = {
-    ...current,
-    delivery: { ...delivery, progress },
-  }
-  const comments = [...existing.comments]
-  comments[index] = comment
-  await writeIssueComments(wsDir, id, comments)
-  return { ok: true, comment, changed: true }
+  return mutateIssueComments(wsDir, id, async () => {
+    const existing = await readIssueComments(wsDir, id)
+    if (!existing.ok) return existing
+    const index = existing.comments.findIndex((comment) => comment.id === commentId)
+    if (index < 0) return { ok: false as const, error: `comment not found: ${commentId}` }
+    const current = existing.comments[index]
+    const delivery = current?.delivery
+    if (!current || delivery?.state !== 'pending') {
+      return { ok: false as const, error: `comment is not awaiting a reply: ${commentId}` }
+    }
+    if (!progressChanged(delivery.progress, progress)) {
+      return { ok: true as const, comment: current, changed: false }
+    }
+    const comment = {
+      ...current,
+      delivery: { ...delivery, progress },
+    }
+    const comments = [...existing.comments]
+    comments[index] = comment
+    await writeIssueComments(wsDir, id, comments)
+    return { ok: true as const, comment, changed: true }
+  })
 }

@@ -57,9 +57,16 @@ describe('HeadlessTaskRegistry', () => {
   it('complete updates status; get returns it; runningCount drops', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
+    await reg.setProgress(a.taskId, {
+      updatedAt: 1,
+      assistantText: 'working',
+      blocks: [{ type: 'text', text: 'working' }],
+      metrics: { textBlocks: 1, toolCalls: 0, toolFailures: 0 },
+    })
     await reg.complete(a.taskId, { status: 'done', exitCode: 0, durationMs: 5, finishedAt: 2 })
     expect(reg.get(a.taskId)?.status).toBe('done')
     expect(reg.get(a.taskId)?.exitCode).toBe(0)
+    expect(reg.get(a.taskId)?.progress).toBeUndefined()
     expect(reg.runningCount()).toBe(0)
   })
 

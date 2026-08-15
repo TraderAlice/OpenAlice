@@ -1,8 +1,8 @@
 # Plan: Headless turn progress on the comment path
 
-**Status:** active — increments 1 and 3  
-**Owner guides:** [[docs/workspace-issues-and-scheduling.md]], [[docs/conversation-provenance.md]], [[docs/connector-service.md]]  
-**Delivery:** serial PR to `dev` (`area:collaboration`, `area:workspace`, `review:deep`). Open PR, do not merge.
+**Status:** active — increments 1 and 3
+**Owner guides:** [[docs/workspace-issues-and-scheduling.md]], [[docs/conversation-provenance.md]], [[docs/connector-service.md]]
+**Delivery:** serial PR to `dev` (`area:collaboration`, `area:workspace`, `review:deep`).
 
 ## Goal
 
@@ -23,9 +23,14 @@ or projects it stays a consumer decision.
 - **Source of truth is the headless task.** `HeadlessTaskRecord.progress` is
   updated while the child runs. Comment sidecars and inquiry APIs are
   projections of that record.
-- **Write cheaply.** First semantic snapshot publishes immediately; later
-  updates debounce (~1s) and skip identical fingerprints. Comment sidecar
-  writes only for Issue-comment inquiries (`subject.commentId`).
+- **Write cheaply and serially.** First semantic snapshot publishes without a
+  debounce; later updates debounce (~1s) and skip identical fingerprints. The
+  publisher invokes async consumers in one chain, and each Issue sidecar
+  serializes its complete read-modify-write cycle.
+- **Live progress stays bounded and ephemeral.** Every projected string and the
+  complete JSON snapshot have explicit UTF-8 byte limits. Terminal task records
+  discard progress because durable output already lives in the structured log;
+  terminal Issue delivery likewise replaces the pending snapshot.
 - **Out of increment 1:** Issue Activity chrome, Inbox thread chrome, and
   Telegram `send`/`edit` policy. Those consume the field; they do not define
   it.
@@ -52,8 +57,8 @@ interface HeadlessTurnProgress {
 }
 ```
 
-Blocks keep interleaved semantic text. Tool payloads are dropped. A block cap
-keeps `headless-tasks.json` and comment sidecars bounded.
+Blocks keep interleaved semantic text. Tool payloads are dropped. Block and
+UTF-8 payload caps keep `headless-tasks.json` and comment sidecars bounded.
 
 ## Increments
 
