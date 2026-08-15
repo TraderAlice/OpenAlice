@@ -211,7 +211,9 @@ export function HarnessSetupPage({
             </div>
             {showHarnessVersion && (
               <div className="mb-4 flex items-center justify-between rounded-lg bg-muted/70 px-3 py-2 text-xs">
-                <span className="text-muted-foreground">{t(`${copyPrefix}.harnessVersion`)}</span>
+                {/* Only AutoQuant pins a Harness version. Chat deliberately
+                    reuses the latest template and never renders this row. */}
+                <span className="text-muted-foreground">{t('autoQuantSetup.harnessVersion')}</span>
                 <span className="font-mono text-foreground">{version ?? '—'}</span>
               </div>
             )}

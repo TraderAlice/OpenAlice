@@ -60,9 +60,15 @@ first-writer-wins and registration must agree with that recorded product.
 TraderAlice is the trading product (Lite/Pro remain intensity inside it).
 NanoAlice is an experimental general-purpose product: Guardian never starts
 UTA for that complete home. Product is not a Settings switch; create another
-AliceProject to use a different product. A new Alice Project with no Chat
-Workspace opens Ask Alice on the shared harness setup page rather than an
-empty composer; Chat does not pin a Harness version.
+AliceProject to use a different product. The Nano chrome hides Market, News,
+Trading as Git, and Portfolio, plus the matching Settings categories
+(Trading, Market Data, News Sources). Bookmarks to those routes return to
+Ask Alice or Settings. AutoQuant and Tracked stay visible until that
+boundary is reviewed separately.
+
+A new AliceProject with no Chat Workspace opens Ask Alice on the shared
+harness setup page rather than an empty composer; Chat does not pin a Harness
+version.
 
 Create a named project from the CLI:
 
