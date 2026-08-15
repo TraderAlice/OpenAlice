@@ -1,5 +1,5 @@
 import { fetchJson, headers } from './client'
-import type { HeadlessTaskStatus } from './headless'
+import type { HeadlessTaskStatus, HeadlessTurnProgress } from './headless'
 
 export type InquirySubject =
   | { kind: 'inbox'; entryId: string }
@@ -22,6 +22,7 @@ export interface InquiryRecord {
   durationMs?: number
   error?: string
   assistantText: string | null
+  progress?: HeadlessTurnProgress
   inquiry: {
     subject: InquirySubject
     question: string

@@ -53,6 +53,7 @@ import {
 import { logger as launcherLogger } from './logger.js';
 import { runHeadlessProbe, type HeadlessProbeResult } from './probe.js';
 import { headlessTaskStatus, runHeadlessTask, type HeadlessTaskResult } from './headless-task.js';
+import type { HeadlessStructuredOutput } from './headless-output.js';
 import {
   checkingRuntimeReadinessRow,
   failedRuntimeReadinessRow,
@@ -100,8 +101,12 @@ import {
   type WorkspaceSessionDirectory,
 } from './session-directory.js';
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
-import { readIssueComments } from './issues/comments.js';
+import { readIssueComments, updateIssueCommentProgress } from './issues/comments.js';
 import { recordIssueCommentReply } from './issues/comment-delivery.js';
+import {
+  createProgressPublisher,
+  projectTurnProgress,
+} from './headless-progress.js';
 import { stampTelegramDeskScheduledFire } from './issues/telegram-desk-chat.js';
 import {
   IssueChangeTracker,
@@ -1493,6 +1498,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       sessionRuntime?: ResolvedSessionRuntimeBinding;
       /** Record this supplied binding only after a fresh child actually spawns. */
       rememberRuntime?: boolean;
+      onProgress?: (snapshot: HeadlessStructuredOutput) => void;
     } = {},
   ): Promise<HeadlessTaskResult> => {
     const operationLease = workspaceOperationGuard.acquire(ws.id, 'headless-run');
@@ -1601,6 +1607,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             ? { keepDiagnosticLine: adapter.keepHeadlessDiagnosticLine.bind(adapter) }
             : {}),
           ...(opts.onSessionId ? { onSessionId: opts.onSessionId } : {}),
+          ...(opts.onProgress ? { onProgress: opts.onProgress } : {}),
           onChildSpawned: (child) => {
             activityLease.attach(child);
             if (rememberRuntime && existsSync(ws.dir)) {
@@ -1792,6 +1799,30 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       throw err;
     }
     if (!resumeId) activeResumeIds.add(rec.resumeId);
+    const progressPublisher = createProgressPublisher({
+      publish: async (progress) => {
+        await headlessTasks.setProgress(rec.taskId, progress);
+        const subject = rec.inquiry?.subject;
+        if (subject?.kind !== 'issue' || !subject.commentId) return;
+        const issueWorkspace = registry.get(subject.workspaceId);
+        if (!issueWorkspace) return;
+        const updated = await updateIssueCommentProgress(
+          issueWorkspace.dir,
+          subject.issueId,
+          subject.commentId,
+          progress,
+        );
+        if (!updated.ok) {
+          launcherLogger.warn('issue.comment_progress_failed', {
+            taskId: rec.taskId,
+            wsId: subject.workspaceId,
+            issueId: subject.issueId,
+            commentId: subject.commentId,
+            error: updated.error,
+          });
+        }
+      },
+    });
     // Fire-and-forget: run to natural exit, then fill the record. Process
     // failures and terminal in-band runtime errors fail the task; retryable
     // errors followed by a later assistant reply remain visible in Activity
@@ -1802,6 +1833,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...(nativeResume ? { resume: nativeResume } : {}),
       sessionRuntime,
       ...(!resumeId ? { rememberRuntime: true } : {}),
+      onProgress: (snapshot) => progressPublisher.offer(projectTurnProgress(snapshot)),
       onSessionId: (id) => {
         void Promise.all([
           headlessTasks.setAgentSessionId(rec.taskId, id),
@@ -1814,6 +1846,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       },
     })
       .then(async (r) => {
+        progressPublisher.offer(projectTurnProgress(r.structured));
+        await progressPublisher.flush();
         const status = headlessTaskStatus(r);
         await headlessTasks.complete(rec.taskId, {
           status,
@@ -1900,6 +1934,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         );
       })
       .catch(async (err) => {
+        await progressPublisher.flush();
         const message = err instanceof Error ? err.message : String(err);
         await headlessTasks.complete(rec.taskId, {
           status: 'failed',

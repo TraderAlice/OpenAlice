@@ -249,7 +249,10 @@ The surfaces deliberately have different jobs:
   `commentPrompt: '{comment}'` so those comments are the reply Input Prompt
   as-is. Scheduled-fire `assistantText` is stamped as a comment. Connector
   projects those comments unless they contain the literal tag `[[no-reply]]`
-  or arrived from Telegram.
+  or arrived from Telegram. Pending comment replies may also carry compact
+  turn progress from the headless listener; Connector does not project that
+  yet. How Telegram consumes it (typing, a status edit, or shipping new
+  semantic text blocks) is a later Connector decision.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product

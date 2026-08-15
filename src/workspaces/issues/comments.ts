@@ -14,6 +14,10 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 
 import { readWorkspaceFile, writeWorkspaceFile } from '../file-service.js'
+import {
+  progressChanged,
+  type HeadlessTurnProgress,
+} from '../headless-progress.js'
 import { ISSUES_DIR_REL, parseIssueContent, type IssueRecord } from './declaration.js'
 
 export interface IssueComment {
@@ -29,11 +33,33 @@ export interface IssueComment {
   via?: 'telegram'
 }
 
+const headlessTurnProgressSchema = z.object({
+  updatedAt: z.number(),
+  assistantText: z.string().nullable(),
+  blocks: z.array(z.union([
+    z.object({ type: z.literal('text'), text: z.string() }),
+    z.object({
+      type: z.literal('tool'),
+      id: z.string().min(1),
+      name: z.string().min(1),
+      status: z.enum(['running', 'completed', 'failed']),
+    }),
+    z.object({ type: z.literal('error'), message: z.string() }),
+  ])),
+  metrics: z.object({
+    textBlocks: z.number().int().nonnegative(),
+    toolCalls: z.number().int().nonnegative(),
+    toolFailures: z.number().int().nonnegative(),
+  }),
+})
+
 export type IssueCommentDelivery =
   | {
       state: 'pending'
       targetResumeId: string
       taskId: string
+      /** Compact live timeline. Absent until the first structured snapshot. */
+      progress?: HeadlessTurnProgress
     }
   | {
       state: 'replied'
@@ -53,6 +79,7 @@ const issueCommentDeliverySchema = z.discriminatedUnion('state', [
     state: z.literal('pending'),
     targetResumeId: z.string().min(1),
     taskId: z.string().min(1),
+    progress: headlessTurnProgressSchema.optional(),
   }),
   z.object({
     state: z.literal('replied'),
@@ -180,4 +207,34 @@ export async function updateIssueCommentDelivery(
   comments[index] = comment
   await writeIssueComments(wsDir, id, comments)
   return { ok: true, comment }
+}
+
+/** Attach live turn progress to a pending comment. No-ops when the comment
+ * is missing, no longer pending, or the compact snapshot did not change. */
+export async function updateIssueCommentProgress(
+  wsDir: string,
+  id: string,
+  commentId: string,
+  progress: HeadlessTurnProgress,
+): Promise<{ ok: true; comment: IssueComment; changed: boolean } | { ok: false; error: string }> {
+  const existing = await readIssueComments(wsDir, id)
+  if (!existing.ok) return existing
+  const index = existing.comments.findIndex((comment) => comment.id === commentId)
+  if (index < 0) return { ok: false, error: `comment not found: ${commentId}` }
+  const current = existing.comments[index]
+  const delivery = current?.delivery
+  if (!current || delivery?.state !== 'pending') {
+    return { ok: false, error: `comment is not awaiting a reply: ${commentId}` }
+  }
+  if (!progressChanged(delivery.progress, progress)) {
+    return { ok: true, comment: current, changed: false }
+  }
+  const comment = {
+    ...current,
+    delivery: { ...delivery, progress },
+  }
+  const comments = [...existing.comments]
+  comments[index] = comment
+  await writeIssueComments(wsDir, id, comments)
+  return { ok: true, comment, changed: true }
 }

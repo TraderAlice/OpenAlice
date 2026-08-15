@@ -1,6 +1,6 @@
 import { fetchJson, headers } from './client'
 import type { Entity } from './entities'
-import type { HeadlessTaskRecord } from './headless'
+import type { HeadlessTaskRecord, HeadlessTurnProgress } from './headless'
 import type { InboxEntry } from './inbox'
 import type { ScheduleWhen } from './schedule'
 import type { ModelReasoningEffort } from './types'
@@ -82,7 +82,7 @@ export type IssueActivityRecord =
   | { kind: 'comment'; id: string; at: number; comment: IssueComment }
 
 export type IssueCommentDelivery =
-  | { state: 'pending'; targetResumeId: string; taskId: string }
+  | { state: 'pending'; targetResumeId: string; taskId: string; progress?: HeadlessTurnProgress }
   | { state: 'replied'; targetResumeId: string; taskId: string; replyCommentId: string }
   | { state: 'failed'; targetResumeId?: string; taskId?: string; error: string }
 

@@ -140,7 +140,12 @@ Comments are also the Issue's normal conversation entry. When `assignee` is an
 exact `@resumeId`, a comment from somebody else is delivered asynchronously to
 that Session and its final reply is appended as another structured comment.
 The source comment records `pending`, `replied`, or `failed`, so a durable note
-never masquerades as a delivered message. A human comment without a fixed owner
+never masquerades as a delivered message. While `pending`, the same delivery
+may carry compact **turn progress** from the headless listener: interleaved
+semantic `text` blocks, tool names/status, and errors. That projection is
+transport only — it is not the reply comment, and it never includes tool
+input/output. Inbox inquiries expose the same shape on the inquiry record.
+Issue UI, Inbox, and Connector decide how to render or project it. A human comment without a fixed owner
 uses the same provenance-aware fallback as Inbox: OpenAlice asks the
 attributable creator, or recruits a reconstruction Agent in the Issue
 Workspace when no creator Session exists. The answer is recorded in Activity
