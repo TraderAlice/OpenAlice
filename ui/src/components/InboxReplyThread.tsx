@@ -6,6 +6,7 @@ import type { InquiryRecord } from '../api/inquiries'
 import { useInquiryThread } from '../hooks/useInquiryThread'
 import { formatRelativeTime } from '../lib/intl'
 import { MarkdownContent } from './MarkdownContent'
+import { hasTurnProgress, TurnProgress } from './TurnProgress'
 
 export function InboxReplyThread({
   sender,
@@ -128,7 +129,9 @@ function InboxReplyRecord({ record }: { record: InquiryRecord }) {
             </span>
           )}
         </div>
-        {running ? (
+        {running && hasTurnProgress(record.progress) ? (
+          <TurnProgress progress={record.progress} />
+        ) : running ? (
           <p className="mt-1.5 text-[12px] text-muted-foreground/60">{t('inbox.replyWaiting')}</p>
         ) : record.assistantText ? (
           <div className="mt-2 text-[13px] leading-relaxed text-foreground/85">

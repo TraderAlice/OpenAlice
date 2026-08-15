@@ -1978,6 +1978,14 @@ export const zhHant: Resources = {
     deleting: '正在刪除…',
     deleteFailed: '無法刪除這則收件匣訊息。訊息仍保留，請再試一次。',
   },
+  turnProgress: {
+    liveLabel: '正在回覆',
+    status: {
+      running: '進行中',
+      completed: '完成',
+      failed: '失敗',
+    },
+  },
   templates: {
     catalogTitle: '工作區模板',
     catalogDescription:

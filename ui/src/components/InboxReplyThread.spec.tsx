@@ -113,4 +113,37 @@ describe('InboxReplyThread', () => {
     expect(screen.getByText('Can you verify it once more?')).toBeTruthy()
     expect(screen.getByText('Working on a reply…')).toBeTruthy()
   })
+
+  it('replaces the waiting line with live progress blocks', async () => {
+    const load = vi.fn().mockResolvedValue([
+      record({
+        taskId: 'ask_progress',
+        status: 'running',
+        startedAt: Date.now(),
+        assistantText: null,
+        progress: {
+          updatedAt: Date.now(),
+          assistantText: 'Checking the close.',
+          blocks: [
+            { type: 'text', text: 'Checking the close.' },
+            { type: 'tool', id: 't1', name: 'Read', status: 'running' },
+          ],
+          metrics: { textBlocks: 1, toolCalls: 1, toolFailures: 0 },
+        },
+        inquiry: {
+          subject: { kind: 'inbox', entryId: 'inbox_123' },
+          question: 'Can you verify it once more?',
+          resolution: { mode: 'exact' },
+        },
+      }),
+    ])
+
+    render(
+      <InboxReplyThread sender="pi" hasExactSender load={load} ask={vi.fn()} />,
+    )
+
+    expect(await screen.findByText('Checking the close.')).toBeTruthy()
+    expect(screen.getByText('Read')).toBeTruthy()
+    expect(screen.queryByText('Working on a reply…')).toBeNull()
+  })
 })

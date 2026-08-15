@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Brain, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Brain, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
 import { inputClass } from './form'
 
-import type { HeadlessTaskStatus } from '../api/headless'
+import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
 import type {
   IssueDetail as IssueDetailData,
@@ -48,6 +48,7 @@ import { AutomationHealthPill, CadencePill, CadenceSummary, PriorityIndicator } 
 import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
+import { hasTurnProgress, TurnProgress } from './TurnProgress'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { CenteredLoading } from './StateViews'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -1544,6 +1545,29 @@ function mutationSummary(
   })
 }
 
+export function IssuePendingReply({
+  targetResumeId,
+  progress,
+}: {
+  targetResumeId: string
+  progress?: HeadlessTurnProgress
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="mt-3 border-t border-border/60 pt-2">
+      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <LoaderCircle size={11} className="shrink-0 animate-spin text-primary" aria-hidden />
+        <span>
+          {t('issues.detail.waitingForPrefix')}{' '}
+          <span className="font-mono text-foreground/75">@{targetResumeId}</span>{' '}
+          {t('issues.detail.waitingForSuffix')}
+        </span>
+      </p>
+      {hasTurnProgress(progress) && <TurnProgress progress={progress} />}
+    </div>
+  )
+}
+
 export function IssueActivity({
   activity,
   onOpenSession,
@@ -1614,11 +1638,10 @@ export function IssueActivity({
                     </div>
                     <MarkdownContent text={comment.markdown} />
                     {delivery?.state === 'pending' && (
-                      <p className="mt-3 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
-                        {t('issues.detail.waitingForPrefix')}{' '}
-                        <span className="font-mono text-foreground/75">@{delivery.targetResumeId}</span>{' '}
-                        {t('issues.detail.waitingForSuffix')}
-                      </p>
+                      <IssuePendingReply
+                        targetResumeId={delivery.targetResumeId}
+                        progress={delivery.progress}
+                      />
                     )}
                     {delivery?.state === 'failed' && (
                       <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-[11px] leading-snug text-warning">
