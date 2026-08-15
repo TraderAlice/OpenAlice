@@ -53,6 +53,7 @@ export interface WorkspacesContextValue {
   setDefaultAgent(agent: string | null): Promise<void>
   setIssueDefaultAgent(agent: string | null): Promise<void>
   initializeAutoQuant(): Promise<Workspace>
+  initializeChat(): Promise<Workspace>
   setAutoQuantDefaultWorkspace(workspaceId: string): Promise<void>
   quickChat(
     prompt: string,

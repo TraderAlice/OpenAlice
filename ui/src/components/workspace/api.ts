@@ -952,6 +952,17 @@ export async function initializeAutoQuantWorkspace(): Promise<Workspace> {
   return body.workspace
 }
 
+export async function initializeChatWorkspace(): Promise<Workspace> {
+  const res = await fetch('/api/workspaces/chat/initialize', { method: 'POST' })
+  const body = (await res.json().catch(() => null)) as
+    | { workspace?: Workspace; message?: string; error?: string }
+    | null
+  if (!res.ok || !body?.workspace) {
+    throw new Error(body?.message ?? body?.error ?? `Ask Alice initialization failed: ${res.status}`)
+  }
+  return body.workspace
+}
+
 export const MANAGER_WORKSPACE_ID = 'workspace-manager'
 
 export interface ManagerWorkspaceSnapshot {

@@ -349,6 +349,13 @@ export const workspacesHandlers = [
     demoAutoQuantDefaultWorkspaceId = workspace.id
     return HttpResponse.json({ defaultWorkspaceId: workspace.id, ready: true })
   }),
+  http.post('/api/workspaces/chat/initialize', () => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.template === 'chat')
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    return HttpResponse.json({ workspace })
+  }),
   http.post('/api/workspaces/auto-quant/initialize', () => {
     const workspace = demoWorkspaces.find((candidate) =>
       candidate.template === 'auto-quant-v2')

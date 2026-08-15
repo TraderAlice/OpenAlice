@@ -32,6 +32,7 @@ import {
 } from '../hooks/useAgentLaunchConfig'
 import { resolveChatWorkspaceTarget, workspaceActivityMs } from '../lib/chat-workspace-target'
 import { AutoQuantSetupPage } from './AutoQuantSetupPage'
+import { ChatSetupPage } from './ChatSetupPage'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
 export {
@@ -44,12 +45,11 @@ export { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
 
 /**
  * Quick-chat landing — the "type a message → you're in" front door for the
- * "Ask Alice" activity. A single composer: the user types a first message and
- * hits send; `quickChat` reuses-or-creates the chat workspace, spawns a fresh
- * session seeded with that message (the agent CLI opens already working on it),
- * and focuses into the session's terminal tab. No template/CLI pickers in the
- * way — the bottom row shows the workspace type (Chat) and a small runtime
- * picker for agent CLIs. Shell is not an agent runtime and is excluded here.
+ * "Ask Alice" activity. A new Alice Project with no Chat workspace first
+ * shows the shared harness setup page (same chrome as AutoQuant, without a
+ * pinned version). After that, a single composer: the user types a first
+ * message and hits send; `quickChat` reuses the Chat workspace, spawns a
+ * fresh session seeded with that message, and focuses the session tab.
  */
 type HarnessLandingMode = 'chat' | 'auto-quant'
 
@@ -573,6 +573,9 @@ function HarnessLandingPage({
 }
 
 export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+  const ctx = useWorkspaces()
+  const hasChatWorkspace = ctx.workspaces.some((workspace) => workspace.template === 'chat')
+  if (!hasChatWorkspace) return <ChatSetupPage />
   return <HarnessLandingPage spec={spec} mode="chat" />
 }
 

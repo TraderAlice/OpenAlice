@@ -824,6 +824,36 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     expect(rememberRecentChatWorkspace).not.toHaveBeenCalled();
   });
 
+  it('initializes the first Chat workspace without pinning a Harness version', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'chat', template: 'chat' });
+    expect(creator.create).toHaveBeenCalledWith('chat', 'chat');
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('reuses an existing Chat workspace instead of creating another', async () => {
+    const existing = {
+      id: 'chat-existing',
+      dir: '/chat',
+      template: 'chat',
+      tag: 'chat',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, rememberRecentChatWorkspace } = build({ workspaces: [existing] });
+
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      workspace: { id: 'chat-existing', template: 'chat' },
+    });
+    expect(creator.create).not.toHaveBeenCalled();
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('chat-existing');
+  });
+
   it('initializes the first AutoQuant Workspace and stores it as the default', async () => {
     const { app, creator, rememberAutoQuantDefaultWorkspace } = build();
     const response = await app.request('/auto-quant/initialize', { method: 'POST' });
