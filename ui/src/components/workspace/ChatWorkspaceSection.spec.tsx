@@ -573,7 +573,7 @@ describe('ChatWorkspaceSection actions', () => {
     expect(onNavigate).toHaveBeenCalledTimes(2)
   })
 
-  it('lists headless-born persistent Sessions and locks TUI while headless occupies them', async () => {
+  it('groups running headless Sessions and explains why TUI is temporarily unavailable', async () => {
     const onNavigate = vi.fn()
     directoryState.directories = new Map([[chatWorkspace.id, {
       workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
@@ -641,13 +641,23 @@ describe('ChatWorkspaceSection actions', () => {
 
     renderSection([headlessWorkspace], null, onNavigate, 'focused')
 
+    const runningSection = screen.getByRole('region', { name: 'Running in background' })
+    expect(within(runningSection).getByText('scan-open')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Morning scan complete. Semis still lead.' })).toBeTruthy()
     const [runningTitle, runningPlay] = screen.getAllByRole('button', { name: 'Running · scan-open' })
-    expect(runningTitle).toHaveProperty('disabled', true)
-    expect(runningPlay).toHaveProperty('disabled', true)
     fireEvent.click(runningTitle!)
+    expect(screen.getByRole('dialog', { name: 'This Session is running in the background' })).toBeTruthy()
+    expect(screen.getByText('Started by Issue scan-open')).toBeTruthy()
     expect(openOrFocus).not.toHaveBeenCalled()
     expect(actions.resumeSession).not.toHaveBeenCalled()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]!)
+
+    fireEvent.click(runningPlay!)
+    expect(screen.getByRole('dialog', { name: 'This Session is running in the background' })).toBeTruthy()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]!)
+
+    fireEvent.click(within(runningSection).getByRole('button', { name: /Running in background/ }))
+    expect(within(runningSection).queryByText('scan-open')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume Morning scan complete. Semis still lead.' }))
     expect(actions.resumeSession).toHaveBeenCalledWith(

@@ -213,8 +213,9 @@ describe('SessionRow actions', () => {
     expect(main.parentElement?.getAttribute('data-active')).toBe('true')
   })
 
-  it('locks Play while a headless turn occupies the Session', () => {
+  it('explains headless occupancy instead of swallowing Session clicks', () => {
     const onSelect = vi.fn()
+    const onHeadlessBusy = vi.fn()
     const onResume = vi.fn()
     render(
       <SessionRow
@@ -222,6 +223,7 @@ describe('SessionRow actions', () => {
         isActive={false}
         headlessOccupying
         onSelect={onSelect}
+        onHeadlessBusy={onHeadlessBusy}
         onPause={vi.fn()}
         onResume={onResume}
         onDelete={vi.fn()}
@@ -229,10 +231,9 @@ describe('SessionRow actions', () => {
     )
 
     const [title, play] = screen.getAllByRole('button', { name: 'Running · Review AAPL earnings' })
-    expect(title).toHaveProperty('disabled', true)
-    expect(play).toHaveProperty('disabled', true)
     fireEvent.click(title!)
     fireEvent.click(play!)
+    expect(onHeadlessBusy).toHaveBeenCalledTimes(2)
     expect(onSelect).not.toHaveBeenCalled()
     expect(onResume).not.toHaveBeenCalled()
   })
