@@ -1,5 +1,5 @@
 import { ChevronDown, Info, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
@@ -9,7 +9,8 @@ import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
 import { useAliceProject } from '../hooks/useAliceProject'
-import { navSectionsForProduct } from './activity-navigation'
+import { useBetaFeatures } from '../live/beta-features'
+import { filterNavSections, navSectionsForProduct } from './activity-navigation'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 /**
@@ -31,6 +32,7 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'portfolio':            return 'portfolio'
     case 'issue':                return 'issue'
     case 'automation':           return 'automation'
+    case 'office':               return 'office'
     case 'news':                 return 'news'
   }
 }
@@ -88,7 +90,11 @@ export function ActivityBar({
 }: ActivityBarProps) {
   const { t } = useTranslation()
   const { project } = useAliceProject()
-  const navSections = navSectionsForProduct(project?.product)
+  const officeNav = useBetaFeatures((s) => s.office)
+  const navSections = useMemo(
+    () => filterNavSections(navSectionsForProduct(project?.product), { office: officeNav }),
+    [officeNav, project?.product],
+  )
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)

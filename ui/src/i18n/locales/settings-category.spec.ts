@@ -21,4 +21,9 @@ describe.each(Object.entries(locales))('%s locale', (_locale, resources) => {
     expect(resources.settings.category.appearance).toBeTruthy()
     expect(resources.settings.category.tools).toBeTruthy()
   })
+
+  it('exposes Beta as a Settings category that can gate Office', () => {
+    expect(resources.settings.category.beta).toBeTruthy()
+    expect(resources.settings.beta.office).toBeTruthy()
+  })
 })

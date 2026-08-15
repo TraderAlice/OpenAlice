@@ -9,6 +9,7 @@ import { IssueSettingsPage } from '../pages/IssueSettingsPage'
 import { IssueDetailPage } from '../pages/IssueDetailPage'
 import { TrackedIssueDetailPage } from '../pages/TrackedIssueDetailPage'
 import { AutomationPage } from '../pages/AutomationPage'
+import { OfficePage } from '../pages/OfficePage'
 import { NewsPage } from '../pages/NewsPage'
 import { MarketPage } from '../pages/MarketPage'
 import { MarketRotationPage } from '../pages/MarketRotationPage'
@@ -16,6 +17,7 @@ import { MarketBoardPage } from '../pages/MarketBoardPage'
 import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
 import { AppearanceSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
+import { BetaSettingsPage } from '../pages/BetaSettingsPage'
 import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AIProviderPage } from '../pages/AIProviderPage'
 import { TradingPage } from '../pages/TradingPage'
@@ -185,6 +187,13 @@ const automationModule: ViewModule<'automation'> = {
   ),
 }
 
+const officeModule: ViewModule<'office'> = {
+  kind: 'office',
+  title: () => 'Office',
+  toUrl: () => '/office',
+  Component: () => <OfficePage />,
+}
+
 const newsModule: ViewModule<'news'> = {
   kind: 'news',
   title: () => 'News',
@@ -273,6 +282,7 @@ const settingsCategoryTitle: Record<
   mcp: 'MCP Server',
   'market-data': 'Market Data',
   'news-collector': 'News Sources',
+  beta: 'Beta',
 }
 
 function SettingsRouter({ spec }: ViewProps<'settings'>) {
@@ -288,6 +298,7 @@ function SettingsRouter({ spec }: ViewProps<'settings'>) {
     case 'mcp': return <MCPPage />
     case 'market-data': return <MarketDataPage />
     case 'news-collector': return <NewsCollectorPage />
+    case 'beta': return <BetaSettingsPage />
   }
 }
 
@@ -583,6 +594,7 @@ const VIEWS = {
   'issue-detail': issueDetailModule,
   'tracked-issue-detail': trackedIssueDetailModule,
   automation: automationModule,
+  office: officeModule,
   news: newsModule,
   'market-list': marketListModule,
   'market-rotation': marketRotationModule,

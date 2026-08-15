@@ -97,6 +97,52 @@ describe('UrlAdopter file provenance', () => {
   })
 })
 
+describe('UrlAdopter Settings Beta', () => {
+  it('adopts the Beta settings category from /settings/beta', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/beta']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'settings',
+      params: { category: 'beta' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
+describe('UrlAdopter Office occupancy', () => {
+  it('adopts the Office surface from /office', async () => {
+    render(
+      <MemoryRouter initialEntries={['/office']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'office',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('office')
+  })
+
+  it('redirects the retired Automation Runtime route to Office', async () => {
+    render(
+      <MemoryRouter initialEntries={['/automation/runtime']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'office',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('office')
+  })
+})
+
 describe('UrlAdopter Tracked selection', () => {
   it('restores a Workspace Issue from query parameters', async () => {
     render(

@@ -31,6 +31,7 @@ business desk merely because the user opened management chat.
     ├── workspace-catalog.json      complete lifecycle history
     ├── resume-identities.json      identity, lifecycle, and native mappings
     ├── headless-tasks.json         immutable execution history
+    ├── agent-runtime.jsonl         desk occupancy lifecycle journal
     └── artifact-provenance.json    immutable attribution history
 ```
 

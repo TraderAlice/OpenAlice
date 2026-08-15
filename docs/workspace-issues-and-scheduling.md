@@ -9,6 +9,19 @@ Related guides: [[docs/project-structure.md]] and
 live in [[docs/conversation-provenance.md]]. The agent-facing usage manual ships as
 `default/skills/self-scheduling/SKILL.md`.
 
+## Runtime occupancy journal
+
+`workspaces/state/agent-runtime.jsonl` is an append-only projection of desk
+occupancy plus the headless turn assets Office can replay: Session birth,
+process start, spawn failure, stop, declined asks, then `runtime.turn.text` /
+`runtime.turn.tool` / `runtime.turn.error` as the structured translator
+emits them. Completion stays on `runtime.stopped` with clipped assistant
+text and block metrics. Tool input/output and the user prompt stay out —
+they already live in the structured run snapshot and conversation log.
+TUI has no equivalent extractor yet, so headed Sessions still only write
+occupancy. The journal is not a dispatch authority. Office reads this file;
+Automation → Runs remains the current headless-task table.
+
 ## One Object, Two Roles
 
 Each issue is one file:

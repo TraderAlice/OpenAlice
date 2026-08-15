@@ -54,7 +54,9 @@ export function UrlAdopter() {
         <Route path="/issues" element={<AdoptStatic spec={{ kind: 'issue', params: {} }} />} />
         <Route path="/issues/:wsId/:id" element={<AdoptIssueDetail />} />
         <Route path="/automation" element={<Navigate to="/automation/runs" replace />} />
+        <Route path="/automation/runtime" element={<Navigate to="/office" replace />} />
         <Route path="/automation/:section" element={<AdoptAutomation />} />
+        <Route path="/office" element={<AdoptStatic spec={{ kind: 'office', params: {} }} />} />
         <Route path="/news" element={<AdoptTraderStatic spec={{ kind: 'news', params: {} }} />} />
         <Route path="/market" element={<AdoptTraderStatic spec={{ kind: 'market-list', params: {} }} />} />
         <Route path="/market/rotation" element={<AdoptTraderStatic spec={{ kind: 'market-rotation', params: {} }} />} />
@@ -78,6 +80,7 @@ export function UrlAdopter() {
         <Route path="/settings/market-data" element={<AdoptTraderSettings category="market-data" />} />
         <Route path="/settings/news-collector" element={<AdoptTraderSettings category="news-collector" />} />
         <Route path="/settings/connectors" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'connectors' } }} />} />
+        <Route path="/settings/beta" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'beta' } }} />} />
         <Route path="/settings/uta/:id" element={<TraderOnly fallback="/settings"><AdoptUtaDetail /></TraderOnly>} />
 
         {/* Dev */}
@@ -261,6 +264,7 @@ function AdoptDev() {
 
 function AdoptAutomation() {
   const { section } = useParams<{ section: string }>()
+  if (section === 'runtime') return <Navigate to="/office" replace />
   const valid: ReadonlyArray<string> = ['runs', 'api']
   if (!section || !valid.includes(section)) return <Navigate to="/automation/runs" replace />
   return (
@@ -443,6 +447,7 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'issue':
     case 'issue-detail':       return 'issue'
     case 'automation':         return 'automation'
+    case 'office':             return 'office'
     case 'news':               return 'news'
     case 'market-list':
     case 'market-rotation':

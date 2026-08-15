@@ -22,6 +22,7 @@ describe('Nano product surfaces', () => {
     expect(isNanoHiddenActivityPage('chat')).toBe(false)
     expect(isNanoHiddenActivityPage('auto-quant')).toBe(false)
     expect(isNanoHiddenActivityPage('tracked')).toBe(false)
+    expect(isNanoHiddenActivityPage('office')).toBe(false)
   })
 
   it('hides the matching Settings categories and view specs', () => {
@@ -29,9 +30,12 @@ describe('Nano product surfaces', () => {
     expect(isNanoHiddenSettingsCategory('market-data')).toBe(true)
     expect(isNanoHiddenSettingsCategory('news-collector')).toBe(true)
     expect(isNanoHiddenSettingsCategory('ai-provider')).toBe(false)
+    expect(isNanoHiddenSettingsCategory('beta')).toBe(false)
     expect(isNanoHiddenViewSpec({ kind: 'portfolio', params: {} })).toBe(true)
     expect(isNanoHiddenViewSpec({ kind: 'settings', params: { category: 'trading' } })).toBe(true)
     expect(isNanoHiddenViewSpec({ kind: 'settings', params: { category: 'general' } })).toBe(false)
+    expect(isNanoHiddenViewSpec({ kind: 'settings', params: { category: 'beta' } })).toBe(false)
+    expect(isNanoHiddenViewSpec({ kind: 'office', params: {} })).toBe(false)
     expect(isNanoHiddenViewSpec({ kind: 'chat-landing', params: {} })).toBe(false)
   })
 })

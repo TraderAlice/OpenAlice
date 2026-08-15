@@ -145,6 +145,18 @@ import {
   type AgentConversationDispatch,
 } from './agent-conversation-log.js';
 import {
+  AgentRuntimeLog,
+  conversationCause,
+  issueCause,
+  type AgentRuntimeCause,
+  type AgentRuntimeEventType,
+  type AgentRuntimePayload,
+} from './agent-runtime-log.js';
+import {
+  createHeadlessTurnJournal,
+  headlessCompletionAssets,
+} from './agent-runtime-turn.js';
+import {
   HeadlessTaskRegistry,
   headlessLogPaths,
   type HeadlessTaskInquiry,
@@ -577,6 +589,13 @@ export interface WorkspaceService {
   provenanceStore: ArtifactProvenanceStore;
   /** Append-only analysis/audit projection of cross-Agent messages. */
   agentConversationLog: AgentConversationLog;
+  /** Append-only desk/employee occupancy journal. Never a dispatch authority. */
+  agentRuntimeLog: AgentRuntimeLog;
+  recordAgentRuntime(
+    type: AgentRuntimeEventType,
+    payload: AgentRuntimePayload,
+    opts?: { readonly causedBy?: number },
+  ): Promise<void>;
   /** True while a headless turn owns this conversation transcript. */
   isResumeActive(resumeId: string): boolean;
   /** Atomically reserve a conversation before crossing an async spawn boundary. */
@@ -677,6 +696,41 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'agent-conversations.jsonl'),
     launcherLogger.child({ scope: 'agent-conversation-log' }),
   );
+  const agentRuntimeLog = await AgentRuntimeLog.open(
+    join(config.launcherRoot, 'state', 'agent-runtime.jsonl'),
+    launcherLogger.child({ scope: 'agent-runtime-log' }),
+  );
+  const recordAgentRuntime = async (
+    type: AgentRuntimeEventType,
+    payload: AgentRuntimePayload,
+    opts?: { readonly causedBy?: number },
+  ): Promise<void> => {
+    await agentRuntimeLog.record(type, payload, opts);
+  };
+
+  const runtimeCauseFromDispatch = (
+    conversation?: AgentConversationDispatch,
+    trigger?: HeadlessTaskTrigger,
+  ): AgentRuntimeCause => {
+    if (conversation) {
+      const source = conversation.source;
+      return conversationCause({
+        source: source.kind === 'session'
+          ? {
+              kind: 'session',
+              resumeId: source.resumeId,
+              workspaceId: source.workspaceId,
+              agent: source.agent,
+            }
+          : source.kind === 'workspace'
+            ? { kind: 'workspace', workspaceId: source.workspaceId }
+            : { kind: 'human' },
+        resolution: conversation.resolution.mode === 'reconstructed' ? 'reconstructed' : 'exact',
+      });
+    }
+    if (trigger?.kind === 'issue') return issueCause(trigger.workspaceId, trigger.issueId);
+    return { kind: 'http' };
+  };
   const issueChangeTracker = await IssueChangeTracker.load(
     join(config.launcherRoot, 'state', 'issue-audit-snapshots.json'),
     provenanceStore,
@@ -1729,6 +1783,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }
     let rec: HeadlessTaskRecord;
     let productSessionResumeId: string | undefined;
+    let occupancySessionId: string | undefined;
     try {
       // ResumeRegistry remains the sole product-id allocator, while the
       // coordinator guarantees that the same birth also enters the durable
@@ -1746,8 +1801,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       });
       const identity = productSession.identity;
       productSessionResumeId = identity.resumeId;
+      occupancySessionId = productSession.session.id;
       if (catalog.get(ws.id)?.lifecycle !== 'active') {
         throw new Error(`workspace stopped accepting work during dispatch: ${ws.id}`);
+      }
+      let occupancyCauseSeq: number | undefined;
+      if (productSession.created) {
+        const born = await agentRuntimeLog.record('session.born', {
+          workspaceId: ws.id,
+          resumeId: identity.resumeId,
+          agent: adapter.id,
+          sessionRecordId: productSession.session.id,
+        });
+        occupancyCauseSeq = born?.seq;
       }
       rec = await headlessTasks.create({
         wsId: ws.id,
@@ -1786,6 +1852,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           conversation,
         });
       }
+      await agentRuntimeLog.record('runtime.started', {
+        workspaceId: ws.id,
+        resumeId: rec.resumeId,
+        agent: adapter.id,
+        sessionRecordId: productSession.session.id,
+        taskId: rec.taskId,
+        surface: 'headless',
+        cause: runtimeCauseFromDispatch(conversation, trigger),
+      }, occupancyCauseSeq !== undefined ? { causedBy: occupancyCauseSeq } : undefined);
     } catch (err) {
       if (productSessionResumeId) {
         await sessionCoordinator.transition({
@@ -1803,6 +1878,18 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       throw err;
     }
     if (!resumeId) activeResumeIds.add(rec.resumeId);
+    const occupancySubject = {
+      workspaceId: ws.id,
+      resumeId: rec.resumeId,
+      agent: adapter.id,
+      ...(occupancySessionId ? { sessionRecordId: occupancySessionId } : {}),
+      taskId: rec.taskId,
+      surface: 'headless' as const,
+    };
+    const turnJournal = createHeadlessTurnJournal({
+      subject: occupancySubject,
+      record: (type, payload) => agentRuntimeLog.record(type, payload),
+    });
     const progressPublisher = createProgressPublisher({
       publish: async (progress) => {
         await headlessTasks.setProgress(rec.taskId, progress);
@@ -1855,7 +1942,10 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       ...(nativeResume ? { resume: nativeResume } : {}),
       sessionRuntime,
       ...(!resumeId ? { rememberRuntime: true } : {}),
-      onProgress: (snapshot) => progressPublisher.offer(projectTurnProgress(snapshot)),
+      onProgress: (snapshot) => {
+        turnJournal.offer(snapshot);
+        progressPublisher.offer(projectTurnProgress(snapshot));
+      },
       onSessionId: (id) => {
         void Promise.all([
           headlessTasks.setAgentSessionId(rec.taskId, id),
@@ -1868,8 +1958,9 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       },
     })
       .then(async (r) => {
+        turnJournal.offer(r.structured);
         progressPublisher.offer(projectTurnProgress(r.structured));
-        await progressPublisher.flush();
+        await Promise.all([turnJournal.flush(), progressPublisher.flush()]);
         const status = headlessTaskStatus(r);
         await headlessTasks.complete(rec.taskId, {
           status,
@@ -1899,6 +1990,21 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             assistantText: r.structured.assistantText,
             durationMs: r.durationMs,
             ...(status !== 'done' && r.stderrTail ? { error: r.stderrTail.slice(-1000) } : {}),
+          });
+        }
+        if (r.processStarted === false) {
+          await agentRuntimeLog.record('runtime.spawn_failed', {
+            ...occupancySubject,
+            ...(r.launchErrorCode ? { launchErrorCode: r.launchErrorCode } : {}),
+            ...(r.error ? { error: r.error } : {}),
+          });
+        } else {
+          await agentRuntimeLog.record('runtime.stopped', {
+            ...occupancySubject,
+            status,
+            exitCode: r.exitCode,
+            ...(r.error ? { error: r.error } : {}),
+            ...headlessCompletionAssets(r.structured),
           });
         }
         await completeIssueCommentInquiry({
@@ -1956,7 +2062,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         );
       })
       .catch(async (err) => {
-        await progressPublisher.flush();
+        await Promise.all([turnJournal.flush(), progressPublisher.flush()]);
         const message = err instanceof Error ? err.message : String(err);
         await headlessTasks.complete(rec.taskId, {
           status: 'failed',
@@ -1972,6 +2078,16 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
             error: message,
           });
         }
+        await agentRuntimeLog.record('runtime.stopped', {
+          workspaceId: ws.id,
+          resumeId: rec.resumeId,
+          agent: adapter.id,
+          ...(occupancySessionId ? { sessionRecordId: occupancySessionId } : {}),
+          taskId: rec.taskId,
+          surface: 'headless',
+          status: 'failed',
+          error: message,
+        });
         await completeIssueCommentInquiry({
           task: rec,
           status: 'failed',
@@ -2557,6 +2673,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           state: 'paused',
           lastActiveAt: new Date().toISOString(),
         }).catch((err) => launcherLogger.warn('webpi.pause_update_failed', { recordId, err }));
+        void agentRuntimeLog.record('runtime.stopped', {
+          workspaceId: record.wsId,
+          resumeId: record.resumeId,
+          agent: record.agent,
+          sessionRecordId: record.id,
+          surface: 'webpi',
+          status: 'paused',
+        });
       },
     },
   );
@@ -2631,6 +2755,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       state: 'running',
       surface: 'webpi',
       lastActiveAt: new Date().toISOString(),
+    });
+    await agentRuntimeLog.record('runtime.started', {
+      workspaceId: record.wsId,
+      resumeId: record.resumeId,
+      agent: record.agent,
+      sessionRecordId: record.id,
+      surface: 'webpi',
+      cause: { kind: 'ui' },
     });
     return snapshot;
     } finally {
@@ -2889,6 +3021,8 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resumeRegistry,
     provenanceStore,
     agentConversationLog,
+    agentRuntimeLog,
+    recordAgentRuntime,
     isResumeActive: (resumeId) => activeResumeIds.has(resumeId),
     claimResume,
     releaseResume: (resumeId) => activeResumeIds.delete(resumeId),

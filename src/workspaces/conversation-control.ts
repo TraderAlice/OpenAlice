@@ -27,6 +27,7 @@ import type {
   SessionCreatedBy,
 } from './session-metadata.js'
 import { logger as launcherLogger } from './logger.js'
+import { conversationCause } from './agent-runtime-log.js'
 import type { WorkspaceService } from './service.js'
 import { AUTO_QUANT_WORKSPACE_TEMPLATE } from './chat-workspace-resolver.js'
 
@@ -231,6 +232,37 @@ function reconstructionPrompt(
   ].join('\n')
 }
 
+async function recordConversationReject(
+  svc: WorkspaceService,
+  input: {
+    readonly source?: WorkspaceConversationCaller
+    readonly target: WorkspaceConversationTarget
+  },
+  resolution: Extract<WorkspaceConversationResolution, { mode: 'unavailable' }>,
+): Promise<void> {
+  const attributed = resolution.attributedOrigin
+  const source = input.source
+  await svc.recordAgentRuntime?.('runtime.rejected', {
+    workspaceId: attributed?.workspaceId
+      ?? (source?.kind === 'session' || source?.kind === 'workspace' ? source.workspaceId : ''),
+    resumeId: attributed?.resumeId ?? '',
+    agent: attributed?.agent ?? '',
+    reason: resolution.reason,
+    cause: conversationCause({
+      source: source?.kind === 'session'
+        ? {
+            kind: 'session',
+            resumeId: source.resumeId,
+            workspaceId: source.workspaceId,
+            agent: source.agent,
+          }
+        : source?.kind === 'workspace'
+          ? { kind: 'workspace', workspaceId: source.workspaceId }
+          : { kind: 'human' },
+    }),
+  })
+}
+
 export function createWorkspaceConversationControl(
   svc: WorkspaceService,
   harnessDependencies: ConversationHarnessDependencies = defaultHarnessDependencies,
@@ -240,7 +272,10 @@ export function createWorkspaceConversationControl(
       const resolution = input.target.kind === 'harness'
         ? await resolveHarnessConversationTarget(svc, input.target.harness, harnessDependencies)
         : resolveWorkspaceConversationTarget(svc, input.target)
-      if (resolution.mode === 'unavailable') return { status: 'unavailable', resolution }
+      if (resolution.mode === 'unavailable') {
+        await recordConversationReject(svc, input, resolution)
+        return { status: 'unavailable', resolution }
+      }
 
       const continuingOrigin = resolution.origin
       const wsId = continuingOrigin?.workspaceId ?? (
@@ -248,15 +283,17 @@ export function createWorkspaceConversationControl(
       )
       const meta = svc.registry.get(wsId)
       if (!meta) {
-        return {
-          status: 'unavailable',
+        const missing = {
+          status: 'unavailable' as const,
           resolution: {
-            mode: 'unavailable',
+            mode: 'unavailable' as const,
             reason: unavailableWorkspaceReason(svc, wsId),
             ...(resolution.artifact ? { artifact: resolution.artifact } : {}),
             ...(resolution.mode === 'exact' ? { attributedOrigin: resolution.origin } : {}),
           },
         }
+        await recordConversationReject(svc, input, missing.resolution)
+        return missing
       }
 
       if (continuingOrigin && input.agent) {

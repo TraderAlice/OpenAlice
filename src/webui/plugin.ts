@@ -19,6 +19,8 @@ import { createTradingConfigRoutes } from './routes/trading-config.js'
 import { createToolsRoutes } from './routes/tools.js'
 import { createAgentStatusRoutes } from './routes/agent-status.js'
 import { createAgentConversationRoutes } from './routes/agent-conversations.js'
+import { createAgentRuntimeLogRoutes } from './routes/agent-runtime.js'
+import { createOfficeRoutes } from './routes/office.js'
 import { createNewsRoutes } from './routes/news.js'
 import { createMarketRoutes } from './routes/market.js'
 import { createBarsRoutes } from './routes/bars.js'
@@ -265,6 +267,8 @@ export class WebPlugin implements Plugin {
     app.route('/api/agent-runtimes', createAgentRuntimeRoutes(this.workspaceService))
     app.route('/api/headless', createHeadlessRoutes(this.workspaceService))
     app.route('/api/agent-conversations', createAgentConversationRoutes(this.workspaceService.agentConversationLog))
+    app.route('/api/agent-runtime', createAgentRuntimeLogRoutes(this.workspaceService))
+    app.route('/api/office', createOfficeRoutes(this.workspaceService))
     app.route('/api/schedule', createScheduleRoutes(this.workspaceService))
     app.route('/api/issues', createIssuesRoutes(this.workspaceService))
     app.route('/api/inquiries', createInquiryRoutes({

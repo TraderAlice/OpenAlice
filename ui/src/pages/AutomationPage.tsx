@@ -22,8 +22,9 @@ interface AutomationPageProps {
 /**
  * Automation page is sub-section-driven — `spec.params.section` picks which
  * surface renders. The Automation sidebar holds one row per section so each
- * section is its own tab in the editor area. Schedules live on self-described
- * Workspace issues; the retired event-bus surfaces are intentionally absent.
+ * section is its own tab in the editor area. Occupancy lives on Office.
+ * Schedules live on self-described Workspace issues; the retired event-bus
+ * surfaces are intentionally absent.
  */
 export function AutomationPage({ spec }: AutomationPageProps) {
   const { t } = useTranslation()
@@ -40,11 +41,7 @@ export function AutomationPage({ spec }: AutomationPageProps) {
         className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:px-6 py-5"
       >
         <div className="flex-1 min-h-0">
-          {section === 'api' ? (
-            <AutomationApiSection />
-          ) : (
-            <AutomationRunsSection />
-          )}
+          {section === 'api' ? <AutomationApiSection /> : <AutomationRunsSection />}
         </div>
       </div>
     </div>

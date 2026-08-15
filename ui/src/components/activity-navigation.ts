@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Building2,
   Code2,
   GitBranch,
   Inbox,
@@ -22,7 +23,7 @@ import type { ViewSpec } from '../tabs/types'
 
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.workspaces'
-  | 'nav.item.market' | 'nav.item.news' | 'nav.item.tradingAsGit' | 'nav.item.issue'
+  | 'nav.item.market' | 'nav.item.news' | 'nav.item.office' | 'nav.item.tradingAsGit' | 'nav.item.issue'
   | 'nav.item.portfolio' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
 interface NavLeaf {
@@ -40,6 +41,16 @@ export interface NavSection {
   items: NavLeaf[]
   defaultCollapsed?: boolean
   descriptionKey?: 'nav.betaDescription'
+}
+
+export function filterNavSections(
+  sections: readonly NavSection[],
+  flags: { office: boolean },
+): NavSection[] {
+  return sections.flatMap((section) => {
+    const items = section.items.filter((item) => item.page !== 'office' || flags.office)
+    return items.length === 0 ? [] : [{ ...section, items }]
+  })
 }
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -62,6 +73,7 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: 'nav.section.beta',
     descriptionKey: 'nav.betaDescription',
     items: [
+      { page: 'office',         labelKey: 'nav.item.office',       icon: Building2, defaultTab: { kind: 'office', params: {} } },
       { page: 'trading-as-git', labelKey: 'nav.item.tradingAsGit', icon: GitBranch, defaultTab: { kind: 'trading-as-git', params: {} } },
       { page: 'portfolio',      labelKey: 'nav.item.portfolio',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
       { page: 'connectors',     labelKey: 'nav.item.connectors',   icon: Plug, defaultTab: { kind: 'connectors', params: {} } },
