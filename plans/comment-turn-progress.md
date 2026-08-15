@@ -1,6 +1,6 @@
 # Plan: Headless turn progress on the comment path
 
-**Status:** active — increments 1 and 3
+**Status:** active — increment 2
 **Owner guides:** [[docs/workspace-issues-and-scheduling.md]], [[docs/conversation-provenance.md]], [[docs/connector-service.md]]
 **Delivery:** serial PR to `dev` (`area:collaboration`, `area:workspace`, `review:deep`).
 
@@ -31,9 +31,13 @@ or projects it stays a consumer decision.
   complete JSON snapshot have explicit UTF-8 byte limits. Terminal task records
   discard progress because durable output already lives in the structured log;
   terminal Issue delivery likewise replaces the pending snapshot.
-- **Out of increment 1:** Issue Activity chrome, Inbox thread chrome, and
-  Telegram `send`/`edit` policy. Those consume the field; they do not define
-  it.
+- **Out of increment 1:** Issue Activity chrome and Inbox thread chrome.
+  Those consume the field; they do not define it.
+- **Issue / Inbox render the compact timeline.** Shared `TurnProgress` shows
+  interleaved text, tool name/status, and errors on the existing comment and
+  inquiry records. Trailing text is live (unlike Telegram, which waits to
+  seal). No second fetch of `/output`, and no tool payloads. Generic waiting
+  copy remains only until the first snapshot arrives.
 - **Telegram ships sealed text only.** A `text` block goes to the phone desk
   only after a tool or error follows it. Consecutive texts are one narration:
   only the last one before the non-text block is sent, so streamed chunks do
@@ -75,8 +79,11 @@ UTF-8 payload caps keep `headless-tasks.json` and comment sidecars bounded.
 
 ### 2. Issue and Inbox consume
 
-Read `delivery.progress` / inquiry `progress` instead of a spinner-only wait.
-Do not invent a second fetch of `/output`.
+- [x] Shared `TurnProgress` reads `delivery.progress` / inquiry `progress`
+- [x] Issue Activity pending comments show the live timeline under the
+      waiting-for-owner line
+- [x] Inbox reply thread replaces “Working on a reply…” once blocks arrive
+- [x] Demo handlers carry a running snapshot; owner-guide note
 
 ### 3. Connector / Telegram consume
 

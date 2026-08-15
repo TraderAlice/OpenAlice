@@ -1982,6 +1982,14 @@ export const en = {
     deleting: 'Deleting…',
     deleteFailed: 'Couldn’t delete this Inbox entry. It is still available. Try again.',
   },
+  turnProgress: {
+    liveLabel: 'Live reply',
+    status: {
+      running: 'running',
+      completed: 'done',
+      failed: 'failed',
+    },
+  },
   templates: {
     catalogTitle: 'Workspace templates',
     catalogDescription:

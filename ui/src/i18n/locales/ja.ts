@@ -1971,6 +1971,14 @@ export const ja: Resources = {
     deleting: '削除中…',
     deleteFailed: '受信トレイの項目を削除できませんでした。項目はそのまま残っています。もう一度お試しください。',
   },
+  turnProgress: {
+    liveLabel: '返信中',
+    status: {
+      running: '実行中',
+      completed: '完了',
+      failed: '失敗',
+    },
+  },
   templates: {
     catalogTitle: 'ワークスペーステンプレート',
     catalogDescription:

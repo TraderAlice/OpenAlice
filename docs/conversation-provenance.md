@@ -350,8 +350,11 @@ and tool status, never tool payloads) may ride on the same record so Inbox,
 Issue, and Connector can watch the turn without each parsing headless logs.
 This bounded snapshot is live transport, not durable transcript history, and
 is removed from the task record at terminal state.
-The Telegram phone desk already ships sealed mid-turn `text` blocks from that
-progress; tool and error blocks stay local.
+
+Issue Activity and Inbox reply threads render the same snapshot as a compact
+live timeline. The Telegram phone desk already ships sealed mid-turn `text`
+blocks from that progress; tool and error blocks stay local to the workstation
+surfaces.
 
 For a human comment without a fixed owner, OpenAlice follows the Issue creation
 provenance and uses the universal follow-up rule: continue the attributable

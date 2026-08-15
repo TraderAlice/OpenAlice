@@ -6,6 +6,7 @@ import type {
   IssueSnapshot,
 } from '../../api/issues'
 import { demoInboxEntries } from './inbox'
+import { demoTurnProgress } from './turn-progress'
 
 // GET /api/issues aggregates every workspace's declared issues by SCANNING
 // each workspace's `.alice/issues/<id>.md` dir (one markdown file per issue) —
@@ -598,7 +599,12 @@ export function demoIssueAddComment(
     author,
     at: new Date().toISOString(),
     markdown: text,
-    delivery: { state: 'pending' as const, targetResumeId: ownerResumeId, taskId },
+    delivery: {
+      state: 'pending' as const,
+      targetResumeId: ownerResumeId,
+      taskId,
+      progress: demoTurnProgress(),
+    },
   })
   demoIssueComments[key] = comments
   window.setTimeout(() => {

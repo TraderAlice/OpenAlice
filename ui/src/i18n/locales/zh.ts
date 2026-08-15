@@ -1970,6 +1970,14 @@ export const zh: Resources = {
     deleting: '正在删除…',
     deleteFailed: '无法删除这条收件箱消息。消息仍然保留，请重试。',
   },
+  turnProgress: {
+    liveLabel: '正在回复',
+    status: {
+      running: '进行中',
+      completed: '完成',
+      failed: '失败',
+    },
+  },
   templates: {
     catalogTitle: '工作区模板',
     catalogDescription:
