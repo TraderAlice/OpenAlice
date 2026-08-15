@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Archive, Bot, ChevronDown, ChevronRight, Code2, Cpu, LayoutGrid, Library, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Sparkles, Square, Terminal, X, type LucideIcon } from 'lucide-react';
+import { Archive, Bot, ChevronDown, ChevronRight, Code2, Cpu, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Sparkles, Square, Terminal, X, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
@@ -636,6 +636,8 @@ export interface SessionRowProps {
   canDelete?: boolean;
   displayTitle?: string;
   onSelect: () => void;
+  /** Explain why an occupied headless Session cannot be opened yet. */
+  onHeadlessBusy?: () => void;
   onPause: () => void;
   onResume: () => void;
   onDelete: () => void;
@@ -653,7 +655,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const canDelete = props.canDelete !== false;
   // The server resolves native title → launch prompt → sticky name.
   const display = props.displayTitle?.trim() || s.title?.trim() || s.name;
-  const resumeLocked = headlessOccupying || !resumable;
+  const resumeLocked = !resumable;
   const resumeLabel = headlessOccupying
     ? t('workspace.sessionRunning', { title: display })
     : resumable
@@ -709,8 +711,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
       <button
         type="button"
         className="oa-session-row-main flex-1 min-w-0 flex items-center gap-1.5 text-left disabled:cursor-default"
-        onClick={props.onSelect}
-        disabled={headlessOccupying}
+        onClick={headlessOccupying ? (props.onHeadlessBusy ?? props.onSelect) : props.onSelect}
         title={tooltip}
         aria-label={selectLabel}
         aria-current={props.isActive ? 'page' : undefined}
@@ -731,10 +732,28 @@ export function SessionRow(props: SessionRowProps): ReactElement {
           )}
         </span>
       </button>
-      {/* Right-aligned, always-visible state-as-action: a running session shows
-          STOP (■, click to pause it); a paused one shows PLAY (▶, click to
-          resume). Headless occupancy locks Play instead of offering Stop. */}
-      {isPaused || headlessOccupying ? (
+      {/* Right-aligned, always-visible state-as-action: an interactive running
+          Session shows STOP, a paused one shows PLAY, and headless occupancy
+          shows live activity that opens the single-writer explanation. */}
+      {headlessOccupying ? (
+        <button
+          type="button"
+          className={rowAction()}
+          title={resumeLabel}
+          aria-label={resumeLabel}
+          onClick={(e) => {
+            e.stopPropagation();
+            (props.onHeadlessBusy ?? props.onSelect)();
+          }}
+        >
+          <LoaderCircle
+            size={12}
+            strokeWidth={2.25}
+            className="animate-spin motion-reduce:animate-none"
+            aria-hidden
+          />
+        </button>
+      ) : isPaused ? (
         <button
           type="button"
           className={`${rowAction()} disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/70`}

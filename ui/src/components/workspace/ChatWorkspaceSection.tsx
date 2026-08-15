@@ -18,6 +18,7 @@ import {
   Clock3,
   LayoutGrid,
   Layers3,
+  LoaderCircle,
   MessageSquarePlus,
   Network,
   PanelsTopLeft,
@@ -54,6 +55,16 @@ import { useWorkspaceSessionDirectories } from '../../hooks/useWorkspaceSessionD
 import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import type { ChatDisplayMode } from './chat-display-mode'
 
 const CHAT_TEMPLATE = 'chat'
@@ -138,6 +149,7 @@ export function ChatWorkspaceSection({
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false)
   const [conversationBrowserOpen, setConversationBrowserOpen] = useState(false)
   const [conversationWorkspaceId, setConversationWorkspaceId] = useState<string | null>(null)
+  const [busySession, setBusySession] = useState<HarnessSession | null>(null)
   const dialogRestoreFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -185,13 +197,25 @@ export function ChatWorkspaceSection({
   }
 
   const activateRosterSession = (row: HarnessSession): void => {
-    if (row.headlessOccupying) return
+    if (row.headlessOccupying) {
+      setBusySession(row)
+      return
+    }
     rememberViewedWorkspace(row.workspaceId)
     navigate({
       kind: 'workspace',
       params: { wsId: row.workspaceId, sessionId: row.session.id, source },
     })
   }
+
+  useEffect(() => {
+    if (!busySession) return
+    const stillRunning = recentRoster.some((row) =>
+      row.workspaceId === busySession.workspaceId
+      && row.resumeId === busySession.resumeId
+      && row.headlessOccupying)
+    if (!stillRunning) setBusySession(null)
+  }, [busySession, recentRoster])
 
   const resumeRosterSession = (row: HarnessSession): void => {
     if (row.headlessOccupying || !row.resumable) return
@@ -460,9 +484,16 @@ export function ChatWorkspaceSection({
         onOpenChange={setConversationBrowserOpen}
         onRestoreSession={restoreRosterSession}
         onSelectSession={(row) => {
-          if (row.headlessOccupying) return
-          setConversationBrowserOpen(false)
+          if (!row.headlessOccupying) setConversationBrowserOpen(false)
           activateRosterSession(row)
+        }}
+      />
+
+      <HeadlessSessionBusyDialog
+        row={busySession}
+        open={busySession !== null}
+        onOpenChange={(open) => {
+          if (!open) setBusySession(null)
         }}
       />
 
@@ -703,6 +734,95 @@ interface AllWorkspaceRecentSessionsProps {
   onCreateWorkspace: () => void
 }
 
+interface HarnessSessionRosterProps {
+  harness: 'chat' | 'auto-quant'
+  sessions: readonly HarnessSession[]
+  emptyCopy: string
+  keyFor: (row: HarnessSession) => string
+  subtitleFor?: (row: HarnessSession) => string | undefined
+  isRowActive: (row: HarnessSession) => boolean
+  onOpenSession: (row: HarnessSession) => void
+  onPauseSession: (row: HarnessSession) => void
+  onResumeSession: (row: HarnessSession) => void
+  onDeleteSession: (row: HarnessSession) => void
+  onArchiveSession: (row: HarnessSession) => void
+}
+
+function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
+  const { t } = useTranslation()
+  const [runningExpanded, setRunningExpanded] = useState(true)
+  const running = props.sessions.filter((row) => row.headlessOccupying)
+  const recent = props.sessions.filter((row) => !row.headlessOccupying)
+  const runningRef = useReorderMotion<HTMLDivElement>(running.map(props.keyFor))
+  const recentRef = useReorderMotion<HTMLDivElement>(recent.map(props.keyFor))
+  const renderRow = (row: HarnessSession) => (
+    <HarnessSessionRow
+      key={props.keyFor(row)}
+      row={row}
+      subtitle={props.subtitleFor?.(row)}
+      isActive={props.isRowActive(row)}
+      onSelect={() => props.onOpenSession(row)}
+      onPause={() => props.onPauseSession(row)}
+      onResume={() => props.onResumeSession(row)}
+      onDelete={() => props.onDeleteSession(row)}
+      onArchive={() => props.onArchiveSession(row)}
+    />
+  )
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto py-0.5">
+      {running.length > 0 && (
+        <section className="border-b border-border/55 pb-1" aria-label={t('chat.runningInBackground')}>
+          <button
+            type="button"
+            className="oa-nav-row flex min-h-8 w-full items-center gap-2 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground"
+            onClick={() => setRunningExpanded((expanded) => !expanded)}
+            aria-expanded={runningExpanded}
+          >
+            <LoaderCircle
+              size={12}
+              strokeWidth={2.25}
+              className="shrink-0 animate-spin text-primary motion-reduce:animate-none"
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1 truncate">{t('chat.runningInBackground')}</span>
+            <span className="tabular-nums text-muted-foreground/55">{running.length}</span>
+            {runningExpanded
+              ? <ChevronDown size={12} strokeWidth={2.25} aria-hidden />
+              : <ChevronRight size={12} strokeWidth={2.25} aria-hidden />}
+          </button>
+          {runningExpanded && (
+            <div ref={runningRef} className="oa-disclosure-enter">
+              {running.map(renderRow)}
+            </div>
+          )}
+        </section>
+      )}
+
+      <div className="flex items-center gap-2 px-3 pb-1 pt-1.5">
+        <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+          {props.harness === 'auto-quant' ? t('autoQuant.recentResearch') : t('chat.recentConversations')}
+        </span>
+        {recent.length > 0 && (
+          <span className="text-[10px] tabular-nums text-muted-foreground/45">{recent.length}</span>
+        )}
+      </div>
+
+      <div ref={recentRef}>
+        {props.sessions.length === 0 ? (
+          <p className="px-3 py-3 text-xs leading-relaxed text-muted-foreground/60">
+            {props.emptyCopy}
+          </p>
+        ) : recent.length === 0 ? (
+          <p className="px-3 py-2 text-[11px] leading-relaxed text-muted-foreground/55">
+            {t('chat.allConversationsRunning')}
+          </p>
+        ) : recent.map(renderRow)}
+      </div>
+    </div>
+  )
+}
+
 function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): ReactElement {
   const { t } = useTranslation()
   const workspaceName = useMemo(
@@ -710,9 +830,6 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
     [props.workspaces],
   )
   const sessions = props.sessions
-  const sessionListRef = useReorderMotion<HTMLDivElement>(
-    sessions.map((row) => `${row.workspaceId}:${row.resumeId}`),
-  )
 
   if (props.loading) {
     return (
@@ -735,34 +852,19 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 px-3 pb-1 pt-1.5">
-        <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
-          {props.harness === 'auto-quant' ? t('autoQuant.recentResearch') : t('chat.recentConversations')}
-        </span>
-        {sessions.length > 0 && (
-          <span className="text-[10px] tabular-nums text-muted-foreground/45">{sessions.length}</span>
-        )}
-      </div>
-
-      <div ref={sessionListRef} className="min-h-0 flex-1 overflow-y-auto py-0.5">
-        {sessions.length === 0 ? (
-          <p className="px-3 py-3 text-xs leading-relaxed text-muted-foreground/60">
-            {props.harness === 'auto-quant' ? t('autoQuant.noResearchYet') : t('chat.noRecentConversations')}
-          </p>
-        ) : sessions.map((row) => (
-          <HarnessSessionRow
-            key={`${row.workspaceId}:${row.resumeId}`}
-            row={row}
-            subtitle={workspaceName.get(row.workspaceId)}
-            isActive={props.isRowActive(row)}
-            onSelect={() => props.onOpenSession(row)}
-            onPause={() => props.onPauseSession(row)}
-            onResume={() => props.onResumeSession(row)}
-            onDelete={() => props.onDeleteSession(row)}
-            onArchive={() => props.onArchiveSession(row)}
-          />
-        ))}
-      </div>
+      <HarnessSessionRoster
+        harness={props.harness}
+        sessions={sessions}
+        emptyCopy={props.harness === 'auto-quant' ? t('autoQuant.noResearchYet') : t('chat.noRecentConversations')}
+        keyFor={(row) => `${row.workspaceId}:${row.resumeId}`}
+        subtitleFor={(row) => workspaceName.get(row.workspaceId)}
+        isRowActive={props.isRowActive}
+        onOpenSession={props.onOpenSession}
+        onPauseSession={props.onPauseSession}
+        onResumeSession={props.onResumeSession}
+        onDeleteSession={props.onDeleteSession}
+        onArchiveSession={props.onArchiveSession}
+      />
 
       {props.workspaces.length === 0 && (
         <div className="border-t border-border/60 p-2">
@@ -783,9 +885,6 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
 function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
   const { t } = useTranslation()
   const sessions = props.sessions
-  const sessionListRef = useReorderMotion<HTMLDivElement>(
-    sessions.map((row) => row.resumeId),
-  )
 
   if (props.loading) {
     return (
@@ -823,34 +922,18 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 px-3 pb-1 pt-1.5">
-        <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
-          {props.harness === 'auto-quant' ? t('autoQuant.recentResearch') : t('chat.recentConversations')}
-        </span>
-        {sessions.length > 0 && (
-          <span className="text-[10px] tabular-nums text-muted-foreground/45">{sessions.length}</span>
-        )}
-      </div>
-
-      <div ref={sessionListRef} className="min-h-0 flex-1 overflow-y-auto py-0.5">
-        {sessions.length === 0 ? (
-          <p className="px-3 py-3 text-xs text-muted-foreground/60">
-            {props.emptyCopy ?? t('chat.noConversationsYet')}
-          </p>
-        ) : sessions.map((row) => (
-          <HarnessSessionRow
-            key={row.resumeId}
-            row={row}
-            isActive={props.isRowActive(row)}
-            onSelect={() => props.onOpenSession(row)}
-            onPause={() => props.onPauseSession(row)}
-            onResume={() => props.onResumeSession(row)}
-            onDelete={() => props.onDeleteSession(row)}
-            onArchive={() => props.onArchiveSession(row)}
-          />
-        ))}
-      </div>
-
+      <HarnessSessionRoster
+        harness={props.harness}
+        sessions={sessions}
+        emptyCopy={props.emptyCopy ?? t('chat.noConversationsYet')}
+        keyFor={(row) => row.resumeId}
+        isRowActive={props.isRowActive}
+        onOpenSession={props.onOpenSession}
+        onPauseSession={props.onPauseSession}
+        onResumeSession={props.onResumeSession}
+        onDeleteSession={props.onDeleteSession}
+        onArchiveSession={props.onArchiveSession}
+      />
     </div>
   )
 }
@@ -990,12 +1073,64 @@ function HarnessSessionRow(props: {
       failed={row.failed}
       canDelete={false}
       onSelect={props.onSelect}
+      onHeadlessBusy={props.onSelect}
       onPause={props.onPause}
       onResume={props.onResume}
       onDelete={props.onDelete}
       onArchive={props.onArchive}
       onRestore={props.onRestore}
     />
+  )
+}
+
+function HeadlessSessionBusyDialog(props: {
+  row: HarnessSession | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}): ReactElement {
+  const { t } = useTranslation()
+  const issueId = props.row?.directory?.latestExecution?.issueId?.trim()
+
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex items-start gap-3 pr-7">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <LoaderCircle
+                size={18}
+                strokeWidth={2.25}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden
+              />
+            </span>
+            <div className="min-w-0 space-y-1.5">
+              <DialogTitle>{t('chat.headlessBusyTitle')}</DialogTitle>
+              <DialogDescription>{t('chat.headlessBusyDescription')}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {props.row && (
+          <div className="rounded-lg border border-border/70 bg-muted/35 px-3.5 py-3">
+            <p className="truncate text-sm font-medium text-foreground" title={props.row.title}>
+              {props.row.title}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {issueId
+                ? t('chat.headlessBusyIssue', { issue: issueId })
+                : t('chat.headlessBusyAgent', { agent: props.row.agent })}
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>
+            {t('common.close')}
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
