@@ -60,7 +60,11 @@ first-writer-wins and registration must agree with that recorded product.
 TraderAlice is the trading product (Lite/Pro remain intensity inside it).
 NanoAlice is an experimental general-purpose product: Guardian never starts
 UTA for that complete home. Product is not a Settings switch; create another
-AliceProject to use a different product.
+AliceProject to use a different product. The Nano chrome hides Market, News,
+Trading as Git, and Portfolio, plus the matching Settings categories
+(Trading, Market Data, News Sources). Bookmarks to those routes return to
+Ask Alice or Settings. AutoQuant and Tracked stay visible until that
+boundary is reviewed separately.
 
 Create a named project from the CLI:
 

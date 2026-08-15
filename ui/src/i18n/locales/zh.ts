@@ -1090,6 +1090,12 @@ export const zh: Resources = {
     quantDeskLabel: '量化组',
     quantDeskTitle: '委派一项可复现研究',
     quantDeskPrompt: '让 AutoQuant 研究短期板块轮动在计入成本后能否预测未来一周的相对收益。要求返回可复现证据、不可变的 Run 或 Report 引用、研究局限，并且不授予交易权限。',
+    codeReviewLabel: '代码审阅',
+    codeReviewTitle: '审阅当前 Workspace',
+    codeReviewPrompt: '阅读此 Workspace 里的代码或笔记，列出风险最高的问题、尚未完成的部分，以及接下来三处具体修改。只停留在这个目录，不要开始市场或交易工作。',
+    inboxTriageLabel: '收件箱',
+    inboxTriageTitle: '整理今天进来的事项',
+    inboxTriagePrompt: '阅读此 Workspace 的 Inbox 和 Issue，总结哪些需要回复、哪些可以稍后处理，以及我该先做的第一件事。不要编造市场或交易任务。',
   },
   autoQuantLanding: {
     heading: '量化组接下来研究什么？',
