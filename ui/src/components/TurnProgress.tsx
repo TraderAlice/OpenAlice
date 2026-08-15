@@ -29,15 +29,15 @@ export function TurnProgress({ progress }: { progress: HeadlessTurnProgress }) {
 
   return (
     <ol
-      className="mt-2 space-y-2"
+      className="mt-2 min-w-0 space-y-2 overflow-hidden"
       aria-label={t('turnProgress.liveLabel')}
       aria-live="polite"
       aria-relevant="additions text"
     >
       {progress.blocks.map((block, index) => (
-        <li key={blockKey(block, index)}>
+        <li key={blockKey(block, index)} className="min-w-0">
           {block.type === 'text' ? (
-            <div className="text-[13px] leading-relaxed text-foreground/85">
+            <div className="min-w-0 break-words text-[13px] leading-relaxed text-foreground/85 [&_.code-block-wrapper]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto">
               <MarkdownContent text={block.text} strikethrough={false} />
             </div>
           ) : block.type === 'tool' ? (
@@ -46,12 +46,12 @@ export function TurnProgress({ progress }: { progress: HeadlessTurnProgress }) {
                 ? <LoaderCircle size={11} className="shrink-0 animate-spin text-primary" aria-hidden />
                 : <Wrench size={11} className={`shrink-0 ${block.status === 'failed' ? 'text-destructive' : ''}`} aria-hidden />}
               <span className="min-w-0 truncate font-mono text-foreground/80">{block.name}</span>
-              <span className={block.status === 'failed' ? 'text-destructive' : 'text-muted-foreground/70'}>
+              <span className={`shrink-0 ${block.status === 'failed' ? 'text-destructive' : 'text-muted-foreground/70'}`}>
                 {t(`turnProgress.status.${block.status}`)}
               </span>
             </div>
           ) : (
-            <p className="text-[12px] leading-snug text-warning">{block.message}</p>
+            <p className="break-words text-[12px] leading-snug text-warning">{block.message}</p>
           )}
         </li>
       ))}

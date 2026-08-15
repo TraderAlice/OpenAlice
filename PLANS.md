@@ -29,9 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/comment-turn-progress.md]] — Feed headless listener blocks back to
-  the comment/inquiry transport. Increments 1 and 3 landed; increment 2 is
-  Issue Activity and Inbox consuming the same compact progress field.
 - [[plans/issue-comment-prompt.md]] — Optional per-Issue `commentPrompt`
   template for comment-reply Input Prompts. Omission keeps the historical
   wrapper; chat desks seed `{comment}`.
