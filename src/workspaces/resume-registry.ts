@@ -315,7 +315,6 @@ export class ResumeRegistry {
     resumeId: string
     wsId: string
     displayName: string | null
-    now?: number
   }): Promise<ResumeIdentityRecord> {
     const record = this.records.get(input.resumeId)
     if (!record) throw new ResumePresenceError('not_found', `resume identity ${input.resumeId} was not found`)
@@ -333,8 +332,6 @@ export class ResumeRegistry {
     })
     if (displayName) record.displayName = displayName
     else delete record.displayName
-    record.updatedAt = input.now ?? Date.now()
-    await this.flush()
     return record
   }
 

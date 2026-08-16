@@ -116,6 +116,8 @@ This is the coworker's nametag:
 - public labels prefer `displayName`, then the native/`fallback`
   conversation `title`, then the sticky launcher `name` (`p1`);
 - native title refresh never overwrites `displayName`;
+- changing the nametag is metadata, not Session activity, and must not update
+  recency or reorder the Session roster;
 - empty or `null` clears the field; the maximum is 120 characters after trim;
 - agents rename only through `alice-workspace session rename` or
   `PATCH /api/workspaces/:id/resumes/:resumeId/metadata`;

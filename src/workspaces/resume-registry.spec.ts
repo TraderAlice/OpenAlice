@@ -176,9 +176,10 @@ describe('ResumeRegistry', () => {
       resumeId: created.resumeId,
       wsId: 'ws-1',
       displayName: 'AAPL desk',
-      now: 2,
     })
-    expect(updated).toMatchObject({ displayName: 'AAPL desk', updatedAt: 2 })
+    // A nametag edit is Workspace metadata, not Session activity. In
+    // particular it must not reorder the recent Session roster.
+    expect(updated).toMatchObject({ displayName: 'AAPL desk', updatedAt: 1 })
 
     const raw = JSON.parse(await readFile(path, 'utf8')) as {
       records: Array<Record<string, unknown>>
@@ -196,7 +197,6 @@ describe('ResumeRegistry', () => {
       resumeId: created.resumeId,
       wsId: 'ws-1',
       displayName: '',
-      now: 3,
     })
     expect(reloaded.get(created.resumeId)).not.toHaveProperty('displayName')
     expect(reloaded.get(created.resumeId)?.runtimeBinding).toEqual({
