@@ -102,6 +102,42 @@ describe('grok composeHeadlessCommand', () => {
     expect(grokAdapter.composeCommand(['claude'], ctx())).toEqual(['grok', '--no-leader']);
     expect(grokAdapter.composeHeadlessCommand!(['claude'], ctx(), 'do x')[0]).toBe('grok');
   });
+
+  it('resumes the last headless session with --continue', () => {
+    expect(grokAdapter.composeHeadlessCommand!(['grok'], ctx({ resume: 'last' }), 'next')).toEqual([
+      'grok',
+      '--no-leader',
+      '--always-approve',
+      '--continue',
+      '--output-format',
+      'streaming-json',
+      '--single=next',
+    ]);
+  });
+
+  it('maps launcher-owned role guidance to --rules', () => {
+    const seeded = grokAdapter.composeCommand(['grok'], ctx({
+      appendSystemPrompt: 'Stay in the Workspace.',
+      initialPrompt: PROMPT,
+    }));
+    expect(seeded).toEqual([
+      'grok', '--no-leader', '--rules', 'Stay in the Workspace.', '--', PROMPT,
+    ]);
+    expect(grokAdapter.composeHeadlessCommand!(
+      ['grok'],
+      ctx({ appendSystemPrompt: 'Stay in the Workspace.' }),
+      'do x',
+    )).toEqual([
+      'grok',
+      '--no-leader',
+      '--always-approve',
+      '--rules',
+      'Stay in the Workspace.',
+      '--output-format',
+      'streaming-json',
+      '--single=do x',
+    ]);
+  });
 });
 
 describe('grok sessionRuntime', () => {
@@ -197,7 +233,7 @@ describe('grok headless extractors', () => {
       stopReason: 'end_turn',
       sessionId: '01a009c7-769a-79b2-8a28-0dc2da5e7e21',
     });
-    expect(grokAdapter.extractHeadlessAssistantText?.(text)).toBe('STREAM');
+    expect(grokAdapter.extractHeadlessAssistantText?.(text)).toBeNull();
     expect(grokAdapter.extractHeadlessOutputEvents?.(text)).toEqual([{ type: 'text', text: 'STREAM', delta: true }]);
     expect(parseHeadlessOutputText({
       text: ['{"type":"text","data":"AL"}', '{"type":"text","data":"ICE_GROK_OK"}', end].join('\n'),
@@ -208,6 +244,132 @@ describe('grok headless extractors', () => {
     );
     expect(grokAdapter.extractHeadlessSessionId?.('  "sessionId": "01a009c6-658f-77e0-9c6f-b498f0c07486",')).toBeNull();
     expect(grokAdapter.extractHeadlessAssistantText?.('  "text": "PONG",')).toBeNull();
+  });
+
+  it('reads live 1.0.4 flattened tool_call / tool_call_update lines', () => {
+    const started = JSON.stringify({
+      type: 'tool_call',
+      toolCallId: 'call-d1588596-788c-40bd-960c-ef0170aa5a06-0',
+      title: 'run_terminal_command',
+      kind: 'execute',
+      status: 'pending',
+      toolName: 'run_terminal_command',
+      rawInput: { command: 'echo PING', description: 'Print PING' },
+      content: [],
+      locations: [],
+    });
+    const pending = JSON.stringify({
+      type: 'tool_call_update',
+      toolCallId: 'call-d1588596-788c-40bd-960c-ef0170aa5a06-0',
+      status: null,
+      content: [{ type: 'content', content: { type: 'text', text: 'Print PING' } }],
+      rawOutput: null,
+    });
+    const progress = JSON.stringify({
+      type: 'tool_call_update',
+      toolCallId: 'call-d1588596-788c-40bd-960c-ef0170aa5a06-0',
+      status: 'in_progress',
+      content: [{ type: 'content', content: { type: 'text', text: 'PING\n' } }],
+      rawOutput: {
+        type: 'Bash',
+        output: [80, 73, 78, 71, 10],
+        output_for_prompt: 'PING\n',
+        exit_code: 0,
+      },
+    });
+    const finished = JSON.stringify({
+      type: 'tool_call_update',
+      toolCallId: 'call-d1588596-788c-40bd-960c-ef0170aa5a06-0',
+      status: 'completed',
+      content: [{ type: 'content', content: { type: 'text', text: 'PING\n' } }],
+      rawOutput: {
+        type: 'Bash',
+        output: [80, 73, 78, 71, 10],
+        output_for_prompt: 'exit: 0\nPING\n',
+        exit_code: 0,
+        command: 'echo PING',
+      },
+    });
+    expect(grokAdapter.extractHeadlessOutputEvents?.(started)).toEqual([{
+      type: 'tool-start',
+      id: 'call-d1588596-788c-40bd-960c-ef0170aa5a06-0',
+      name: 'run_terminal_command',
+      input: { command: 'echo PING', description: 'Print PING' },
+    }]);
+    expect(grokAdapter.extractHeadlessOutputEvents?.(pending)).toEqual([]);
+    expect(grokAdapter.extractHeadlessOutputEvents?.(progress)).toEqual([]);
+    expect(grokAdapter.extractHeadlessOutputEvents?.(finished)).toEqual([{
+      type: 'tool-finish',
+      id: 'call-d1588596-788c-40bd-960c-ef0170aa5a06-0',
+      output: 'exit: 0\nPING\n',
+    }]);
+    expect(parseHeadlessOutputText({
+      text: [
+        '{"type":"thought","data":"ignore"}',
+        '{"type":"text","data":"I will run it."}',
+        started,
+        pending,
+        progress,
+        finished,
+        '{"type":"text","data":"DONE"}',
+      ].join('\n'),
+      extractEvents: grokAdapter.extractHeadlessOutputEvents!.bind(grokAdapter),
+      extractAssistantText: grokAdapter.extractHeadlessAssistantText!.bind(grokAdapter),
+    })).toEqual({
+      schemaVersion: 1,
+      assistantText: 'DONE',
+      blocks: [
+        { type: 'text', text: 'I will run it.' },
+        {
+          type: 'tool',
+          id: 'call-d1588596-788c-40bd-960c-ef0170aa5a06-0',
+          name: 'run_terminal_command',
+          status: 'completed',
+          input: { command: 'echo PING', description: 'Print PING' },
+          output: 'exit: 0\nPING\n',
+        },
+        { type: 'text', text: 'DONE' },
+      ],
+      metrics: { textBlocks: 2, toolCalls: 1, toolFailures: 0 },
+      truncated: false,
+    });
+  });
+
+  it('reads live 1.0.4 list_dir rawOutput and ACP tool names from _meta', () => {
+    const listed = JSON.stringify({
+      type: 'tool_call_update',
+      toolCallId: 'call-list-1',
+      status: 'completed',
+      content: [],
+      rawOutput: {
+        type: 'ListDir',
+        Content: { content: '- /workspace/\n', absolute_root_path: '/workspace/.' },
+      },
+    });
+    expect(grokAdapter.extractHeadlessOutputEvents?.(listed)).toEqual([{
+      type: 'tool-finish',
+      id: 'call-list-1',
+      output: '- /workspace/\n',
+    }]);
+    const acpStart = JSON.stringify({
+      method: 'session/update',
+      params: {
+        sessionId: '01a00086-eb58-7340-aa1a-172a36152128',
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-1',
+          title: 'Execute `alice --help`',
+          rawInput: { command: 'alice --help' },
+          _meta: { 'x.ai/tool': { name: 'run_terminal_command', kind: 'execute' } },
+        },
+      },
+    });
+    expect(grokAdapter.extractHeadlessOutputEvents?.(acpStart)).toEqual([{
+      type: 'tool-start',
+      id: 'call-1',
+      name: 'run_terminal_command',
+      input: { command: 'alice --help' },
+    }]);
   });
 
   it('also accepts ACP session-update lines', () => {
@@ -236,7 +398,10 @@ describe('grok headless extractors', () => {
     expect(grokAdapter.extractHeadlessSessionId?.(started)).toBe(
       '01a00086-eb58-7340-aa1a-172a36152128',
     );
-    expect(grokAdapter.extractHeadlessAssistantText?.(chunk)).toBe('Hello');
+    expect(grokAdapter.extractHeadlessAssistantText?.(chunk)).toBeNull();
+    expect(grokAdapter.extractHeadlessOutputEvents?.(chunk)).toEqual([
+      { type: 'text', text: 'Hello', delta: true },
+    ]);
     expect(grokAdapter.extractHeadlessOutputEvents?.(started)).toEqual([{
       type: 'tool-start',
       id: 'call-1',
@@ -248,6 +413,42 @@ describe('grok headless extractors', () => {
   it('returns null for noise', () => {
     expect(grokAdapter.extractHeadlessSessionId?.('plain text')).toBeNull();
     expect(grokAdapter.extractHeadlessAssistantText?.('{"type":"system"}')).toBeNull();
+  });
+
+  it('keeps terminal tool/text lines and drops thought/usage/progress noise', () => {
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.('{"type":"text","data":"DONE"}')).toBe(true);
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.('{"type":"tool_call","toolCallId":"c1"}')).toBe(true);
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.(
+      '{"type":"tool_call_update","toolCallId":"c1","status":"completed"}',
+    )).toBe(true);
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.('{"type":"thought","data":"hmm"}')).toBe(false);
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.('{"type":"available_commands","tools":[]}')).toBe(false);
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.('{"type":"usage","usage":{}}')).toBe(false);
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.(
+      '{"type":"tool_call_update","toolCallId":"c1","status":"in_progress"}',
+    )).toBe(false);
+    expect(grokAdapter.keepHeadlessDiagnosticLine?.(
+      '{"type":"end","stopReason":"end_turn","sessionId":"01a009ff-50a1-7550-a80f-f5144d904634"}',
+    )).toBe(true);
+  });
+
+  it('marks failed tools and aborted ends as errors', () => {
+    expect(grokAdapter.extractHeadlessOutputEvents?.(JSON.stringify({
+      type: 'tool_call_update',
+      toolCallId: 'call-fail',
+      status: 'failed',
+      rawOutput: { output_for_prompt: 'exit: 1\nnope\n' },
+    }))).toEqual([{
+      type: 'tool-finish',
+      id: 'call-fail',
+      output: 'exit: 1\nnope\n',
+      isError: true,
+    }]);
+    expect(grokAdapter.extractHeadlessOutputEvents?.(JSON.stringify({
+      type: 'end',
+      stopReason: 'aborted',
+      sessionId: '01a009ff-50a1-7550-a80f-f5144d904634',
+    }))).toEqual([{ type: 'error', message: 'Grok stopped: aborted' }]);
   });
 });
 

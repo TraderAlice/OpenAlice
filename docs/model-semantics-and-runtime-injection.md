@@ -77,7 +77,11 @@ runtime's native launch interface:
 
 Writing the same values into native project files is a deprecated compatibility
 export for users who intentionally start the CLI outside OpenAlice. It is not a
-managed Session default, readiness gate, or launch-time fallback.
+managed Session default, readiness gate, or launch-time fallback. Grok Build
+has no workspace-local project file, so it has no `writeAiConfig` export:
+vault keys enter the child as `XAI_API_KEY` (and `GROK_MODELS_BASE_URL` only
+for a custom host). Headless stdout is Grok 1.0.4 flattened `streaming-json`,
+not ACP-wrapped `session/update`.
 
 Claude Code managed-Vault launches select only the `project` settings source
 before projecting the Session's endpoint, credential, model, and effort. Claude
@@ -119,6 +123,7 @@ resolved value:
 - Pi: project `defaultThinkingLevel` (`none` maps to Pi's native `off`);
 - opencode: model-level `options` in the provider SDK's native shape;
 - Claude Code: project `effortLevel` (only values Claude can persist);
+- Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
 - Codex: project `model_reasoning_effort`.
 
 ### Workspace settings and durable Session bindings
@@ -172,6 +177,7 @@ defaults must resolve to a headless-capable Agent.
 |---|---|---|
 | Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
 | Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
+| Grok Build | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` |
 | opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |
 | Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider projection |
 

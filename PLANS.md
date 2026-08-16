@@ -29,6 +29,9 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/grok-build.md]] — PATH-detected Grok Build `CliAdapter` at peer
+  completeness with Claude/Codex/OpenCode/Pi. No `GROK_HOME` isolation, no
+  `config.toml` write, no Docker pin. Draft PR #1108.
 - [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
   (`session.born` / started / stopped / rejected / headless turn assets).
   Occupancy + Office timeline + headless text/tool/completion are in;

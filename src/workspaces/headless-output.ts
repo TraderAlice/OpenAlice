@@ -74,11 +74,14 @@ export class HeadlessOutputAccumulator {
         const text = clipText(raw)
         if (!text) continue
         if (event.delta) {
-          this.assistantText = clipText(`${this.assistantText ?? ''}${text}`)
           const previous = this.blocks[this.blocks.length - 1]
           if (previous?.type === 'text') {
+            this.assistantText = clipText(`${this.assistantText ?? ''}${text}`)
             this.blocks[this.blocks.length - 1] = { type: 'text', text: clipText(`${previous.text}${text}`) }
           } else {
+            // A new utterance after a tool/error is the current reply, not a
+            // concatenation of every earlier narration token.
+            this.assistantText = text
             this.push({ type: 'text', text })
           }
           continue

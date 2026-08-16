@@ -91,5 +91,35 @@ describe('Issue runtime options', () => {
   it('preserves runtime-native effort choices for a custom model id', () => {
     expect(issueEffortOptions({ agent: 'claude', semantics: null, modelKnown: false }))
       .toEqual(['low', 'medium', 'high', 'max'])
+    expect(issueEffortOptions({ agent: 'grok', semantics: null, modelKnown: false }))
+      .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  it('suggests xAI catalog models for a grok vault credential', () => {
+    const xai: SavedCredential = {
+      slug: 'xai-1',
+      vendor: 'xai',
+      authType: 'api-key',
+      wires: { 'openai-chat': 'https://api.x.ai/v1' },
+      resolvedModel: 'grok-4.6',
+    }
+    const xaiPresets: Preset[] = [{
+      id: 'xai-api',
+      label: 'xAI',
+      description: '',
+      category: 'official',
+      defaultName: 'xAI',
+      schema: {},
+      models: [
+        { id: 'grok-4.6', label: 'Grok 4.6' },
+        { id: 'grok-4.5', label: 'Grok 4.5' },
+      ],
+    }]
+    expect(issueModelOptions({
+      agent: 'grok',
+      credential: xai,
+      defaultModel: 'grok-4.6',
+      presets: xaiPresets,
+    }).map((model) => model.id)).toEqual(['grok-4.6', 'grok-4.5'])
   })
 })

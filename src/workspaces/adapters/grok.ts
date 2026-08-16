@@ -89,7 +89,7 @@ function acpUpdate(record: Record<string, unknown>): Record<string, unknown> | n
   return isRecord(update) ? update : null;
 }
 
-function toolName(update: Record<string, unknown>): string {
+function toolName(update: Record<string, unknown>): string | null {
   const meta = update['_meta'];
   if (isRecord(meta)) {
     const tool = meta['x.ai/tool'];
@@ -97,17 +97,96 @@ function toolName(update: Record<string, unknown>): string {
       return tool['name'];
     }
   }
+  if (typeof update['toolName'] === 'string' && update['toolName'].trim()) return update['toolName'];
   if (typeof update['title'] === 'string' && update['title'].trim()) return update['title'];
   if (typeof update['kind'] === 'string' && update['kind'].trim()) return update['kind'];
-  return 'tool';
+  return null;
+}
+
+function bytesToUtf8(value: unknown): string | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  if (!value.every((n) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 255)) {
+    return null;
+  }
+  return Buffer.from(value as number[]).toString('utf8');
 }
 
 function textFromContent(value: unknown): string | null {
   if (typeof value === 'string' && value.trim()) return value;
+  if (Array.isArray(value)) {
+    const parts = value.flatMap((item) => {
+      if (!isRecord(item)) return [];
+      if (item['type'] === 'content') {
+        const inner = textFromContent(item['content']);
+        return inner ? [inner] : [];
+      }
+      const text = textFromContent(item);
+      return text ? [text] : [];
+    });
+    return parts.length > 0 ? parts.join('') : null;
+  }
   if (!isRecord(value)) return null;
   if (typeof value['text'] === 'string' && value['text'].trim()) return value['text'];
   if (typeof value['data'] === 'string' && value['data'].trim()) return value['data'];
   return null;
+}
+
+/** Prefer the prompt-facing string; live Bash `rawOutput.output` is a byte array. */
+function grokToolOutput(record: Record<string, unknown>): unknown {
+  const raw = record['rawOutput'];
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  if (isRecord(raw)) {
+    if (typeof raw['output_for_prompt'] === 'string' && raw['output_for_prompt']) {
+      return raw['output_for_prompt'];
+    }
+    if (typeof raw['output'] === 'string') return raw['output'];
+    const decoded = bytesToUtf8(raw['output']);
+    if (decoded) return decoded;
+    const listed = raw['Content'];
+    if (isRecord(listed) && typeof listed['content'] === 'string') return listed['content'];
+  }
+  const fromContent = textFromContent(record['content']);
+  if (fromContent) return fromContent;
+  if (raw !== undefined && raw !== null) return raw;
+  return undefined;
+}
+
+function grokResumeArgs(resume: SpawnContext['resume']): readonly string[] {
+  if (resume === undefined) return [];
+  if (resume === 'last') return ['--continue'];
+  return ['--resume', resume.sessionId];
+}
+
+function grokRulesArgs(ctx: SpawnContext): readonly string[] {
+  return ctx.appendSystemPrompt ? ['--rules', ctx.appendSystemPrompt] : [];
+}
+
+function grokToolEvents(record: Record<string, unknown>): readonly HeadlessOutputEvent[] {
+  const id = record['toolCallId'];
+  if (typeof id !== 'string') return [];
+  const kind = record['type'];
+  if (kind === 'tool_call') {
+    return [{
+      type: 'tool-start',
+      id,
+      name: toolName(record) ?? 'tool',
+      ...(record['rawInput'] !== undefined ? { input: record['rawInput'] } : {}),
+    }];
+  }
+  if (kind === 'tool_call_update') {
+    const status = record['status'];
+    if (status !== 'completed' && status !== 'failed' && status !== 'error') return [];
+    const name = toolName(record);
+    const output = grokToolOutput(record);
+    return [{
+      type: 'tool-finish',
+      id,
+      ...(name ? { name } : {}),
+      ...(output !== undefined ? { output } : {}),
+      ...(status !== 'completed' ? { isError: true } : {}),
+    }];
+  }
+  return [];
 }
 
 export function readGrokSessionTitleFromSummary(parsed: unknown): string | null {
@@ -188,7 +267,15 @@ async function readSummary(path: string): Promise<Record<string, unknown> | null
  * (1.0.4 creates a new UUID only; it does not resume). Headless `-p/--single`
  * takes the prompt as its value — `-p --output-format` fails — and
  * `--output-format json` pretty-prints a multi-line object the line scanner
- * cannot parse. Use `streaming-json` plus `--single=<prompt>`.
+ * cannot parse. Use `streaming-json` plus `--single=<prompt>`. Help text says
+ * "NDJSON of the agent native ACP session updates"; live 1.0.4 stdout is the
+ * flattened `{type, ...}` projection (`text`/`thought` token deltas,
+ * `tool_call`, `tool_call_update` with `status` null|in_progress|completed,
+ * `end`). On-disk `updates.jsonl` stays ACP-wrapped (`session/update`).
+ * Finish only on terminal tool status; completed Bash `rawOutput.output` is a
+ * byte array — prefer `output_for_prompt`. There is no workspace-local Grok
+ * project file, so this adapter has no deprecated `writeAiConfig` export:
+ * managed Sessions use `sessionRuntime` env only. Trust is read-only.
  */
 export const grokAdapter: CliAdapter = {
   id: 'grok',
@@ -233,13 +320,17 @@ export const grokAdapter: CliAdapter = {
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
     // Ignore the workspace default command (usually `claude`). Codex/opencode/pi
     // do the same; spreading `base` here launched `claude --no-leader`.
-    const cmd = ['grok', '--no-leader', ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
+    const cmd = [
+      'grok',
+      '--no-leader',
+      ...(ctx.sessionRuntime?.interactiveArgs ?? []),
+      ...grokRulesArgs(ctx),
+    ];
     if (ctx.resume === undefined) {
       if (ctx.initialPrompt) return [...cmd, '--', ctx.initialPrompt];
       return cmd;
     }
-    if (ctx.resume === 'last') return [...cmd, '--continue'];
-    return [...cmd, '--resume', ctx.resume.sessionId];
+    return [...cmd, ...grokResumeArgs(ctx.resume)];
   },
 
   composeHeadlessCommand(
@@ -252,11 +343,8 @@ export const grokAdapter: CliAdapter = {
       '--no-leader',
       '--always-approve',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
-      ...(ctx.resume === 'last'
-        ? ['--continue']
-        : ctx.resume
-          ? ['--resume', ctx.resume.sessionId]
-          : []),
+      ...grokRulesArgs(ctx),
+      ...grokResumeArgs(ctx.resume),
       '--output-format',
       'streaming-json',
       `--single=${prompt}`,
@@ -271,11 +359,11 @@ export const grokAdapter: CliAdapter = {
   extractHeadlessAssistantText(line: string): string | null {
     const evt = parseJsonRecord(line);
     if (!evt) return null;
-    const update = acpUpdate(evt);
-    if (update?.['sessionUpdate'] === 'agent_message_chunk') {
-      return textFromContent(update['content']);
+    // Incremental `type:text` / ACP chunks are owned by extractHeadlessOutputEvents.
+    // Returning them here would replace the joined reply with the last token.
+    if (evt['type'] === 'text' || acpUpdate(evt)?.['sessionUpdate'] === 'agent_message_chunk') {
+      return null;
     }
-    if (evt['type'] === 'text') return textFromContent(evt['data'] ?? evt);
     if (typeof evt['text'] === 'string' && evt['text'].trim()) return evt['text'];
     return null;
   },
@@ -291,24 +379,8 @@ export const grokAdapter: CliAdapter = {
         const text = textFromContent(update['content']);
         return text ? [{ type: 'text', text, delta: true }] : [];
       }
-      if (kind === 'tool_call' && typeof update['toolCallId'] === 'string') {
-        return [{
-          type: 'tool-start',
-          id: update['toolCallId'],
-          name: toolName(update),
-          ...(update['rawInput'] !== undefined ? { input: update['rawInput'] } : {}),
-        }];
-      }
-      if (kind === 'tool_call_update' && typeof update['toolCallId'] === 'string') {
-        const status = update['status'];
-        const failed = status === 'failed' || status === 'error';
-        return [{
-          type: 'tool-finish',
-          id: update['toolCallId'],
-          name: toolName(update),
-          ...(update['content'] !== undefined ? { output: update['content'] } : {}),
-          ...(failed ? { isError: true } : {}),
-        }];
+      if (kind === 'tool_call' || kind === 'tool_call_update') {
+        return grokToolEvents({ ...update, type: kind });
       }
       return [];
     }
@@ -316,6 +388,16 @@ export const grokAdapter: CliAdapter = {
     if (evt['type'] === 'text') {
       const text = textFromContent(evt['data'] ?? evt);
       return text ? [{ type: 'text', text, delta: true }] : [];
+    }
+    if (evt['type'] === 'tool_call' || evt['type'] === 'tool_call_update') {
+      return grokToolEvents(evt);
+    }
+    if (evt['type'] === 'end') {
+      const reason = evt['stopReason'];
+      if (reason === 'error' || reason === 'aborted' || reason === 'refused') {
+        return [{ type: 'error', message: `Grok stopped: ${reason}` }];
+      }
+      return [];
     }
     if (typeof evt['text'] === 'string' && evt['text'].trim()) {
       return [{ type: 'text', text: evt['text'] }];
@@ -329,6 +411,28 @@ export const grokAdapter: CliAdapter = {
       return [{ type: 'error', message }];
     }
     return [];
+  },
+
+  keepHeadlessDiagnosticLine(line: string): boolean {
+    if (
+      line.startsWith('{"type":"available_commands"') ||
+      line.startsWith('{"type":"thought"') ||
+      line.startsWith('{"type":"usage"')
+    ) {
+      return false;
+    }
+    if (line.startsWith('{"type":"tool_call_update"')) {
+      const evt = parseJsonRecord(line);
+      const status = evt?.['status'];
+      return status === 'completed' || status === 'failed' || status === 'error';
+    }
+    const update = acpUpdate(parseJsonRecord(line) ?? {});
+    if (update?.['sessionUpdate'] === 'agent_thought_chunk') return false;
+    if (update?.['sessionUpdate'] === 'tool_call_update') {
+      const status = update['status'];
+      return status === 'completed' || status === 'failed' || status === 'error';
+    }
+    return true;
   },
 
   async listOnDisk(cwd: string): Promise<readonly OnDiskSession[]> {

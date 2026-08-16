@@ -349,6 +349,7 @@ export interface CliAdapter {
    * `capabilities.headless` is true.
    *   claude:   [...base, -p, <prompt>, --output-format, json]   // never --bare
    *   codex:    [codex, exec, --json, <prompt>]                  // MCP optional
+   *   grok:     [grok, --no-leader, --always-approve, --output-format, streaming-json, --single=<prompt>]
    *   opencode: [opencode, run, --format, json, <prompt>]
    *   pi:       [pi, -p, --mode, json, <prompt>]
    */
