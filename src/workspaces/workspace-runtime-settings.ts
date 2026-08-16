@@ -230,7 +230,7 @@ function preferenceFromBinding(binding: SessionRuntimeBinding): WorkspaceRuntime
   return {
     accessMode: 'vault',
     credentialSlug: binding.credential.credentialSlug,
-    wireShape: binding.credential.wireShape,
+    ...(binding.credential.wireShape ? { wireShape: binding.credential.wireShape } : {}),
     ...modelAndEffort,
   }
 }

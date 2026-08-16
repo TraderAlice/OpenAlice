@@ -454,6 +454,7 @@ export interface AgentCapabilities {
 export interface AgentProviderCapabilities {
   readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
   readonly wirePreference: readonly WireShape[];
+  readonly directVendors?: readonly string[];
   readonly defaultWire?: WireShape;
   readonly vendorPolicies?: Readonly<Record<string, {
     readonly wirePreference: readonly WireShape[];

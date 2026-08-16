@@ -1,10 +1,13 @@
 /**
  * Cursor Agent first-party model suggestions (August 2026).
  *
- * This is not a vault vendor catalog. `inferCredentialVendor('cursor')` stays
- * `custom`; do not add a `cursor` preset to `preset-catalog.ts`. Cursor keys
- * are Dashboard / login credentials, not generic OpenAI/Anthropic keys.
- * Suggestions are for the Issue / launch picker only. The adapter still
+ * Cursor Dashboard keys are represented by the ordinary provider credential
+ * schema with vendor `cursor`; they are not generic OpenAI/Anthropic keys and
+ * carry no API wire shape. `inferCredentialVendor('cursor')` intentionally
+ * stays `custom` because manual native-config inference cannot prove that an
+ * arbitrary value is a Dashboard key. The explicit Cursor preset owns that
+ * classification. Suggestions are shared by the provider and Issue / launch
+ * pickers. The adapter still
  * passes `--model <id>` through unchanged and does not validate the id —
  * Cursor owns the live list after `cursor-agent login`.
  *

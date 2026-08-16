@@ -70,8 +70,9 @@ runtime's native launch interface:
 - Pi provider/model registration plus `--model` and `--thinking`;
 - opencode provider/model environment plus `--model` and `--variant`;
 - Claude Code endpoint/auth environment plus `--model` and `--effort`;
-- Cursor Agent `CURSOR_API_KEY` / optional `CURSOR_API_ENDPOINT` plus
-  `--model` only (live CLI rejects `id[effort=…]`; catalog ids already
+- Cursor Agent native authentication or a Cursor provider credential projected
+  as `CURSOR_API_KEY`, plus `--model` only (live CLI rejects
+  `id[effort=…]`; catalog ids already
   encode effort as suffixes such as `gpt-5.2-low`);
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
@@ -86,8 +87,13 @@ has no workspace-local project file, so it has no `writeAiConfig` export:
 vault keys enter the child as `XAI_API_KEY` (and `GROK_MODELS_BASE_URL` only
 for a custom host). Headless stdout is Grok 1.0.4 flattened `streaming-json`,
 not ACP-wrapped `session/update`. Cursor Agent likewise has no workspace-local
-project file: vault keys enter as `CURSOR_API_KEY` (and `CURSOR_API_ENDPOINT`
-only for a custom host). Alice launches PATH `cursor-agent` only — never the
+project file. It authenticates through its own login when a Session selects
+native access. A Cursor Dashboard key uses the same provider credential schema
+as every other vault entry, with vendor `cursor`; the adapter consumes that
+provider directly as `CURSOR_API_KEY` rather than pretending it speaks an
+OpenAI wire. Arbitrary OpenAI-compatible keys are not Cursor Dashboard
+credentials and are never projected into the child. Alice launches PATH
+`cursor-agent` only — never the
 colliding `agent` name Grok's installer also claims. Headless stdout is
 documented `stream-json` (`system/init` carries `session_id`). Live print
 mode also emits `thinking` delta/completed events; Alice extractors ignore
@@ -159,8 +165,10 @@ The 0.89.2-beta baseline accepts only the current version 3 interactive/headless
 shape; the unreleased version 1/2 development formats are intentionally not a
 permanent dual-read or migration boundary. Remembered values never become fixed
 defaults merely because an older development build stored them.
-Vault choices store only the credential slug and wire shape; keys and resolved
-provider payloads never enter the Workspace file.
+Vault choices store only the credential slug and, when the provider uses a
+model API protocol, its wire shape. Runtime-direct provider credentials such as
+Cursor omit the inapplicable wire shape. Keys and resolved provider payloads
+never enter the Workspace file.
 
 A fresh Session resolves that surface/Agent preference together with any
 explicit credential, model, or effort choice into one immutable, secret-free
@@ -194,7 +202,7 @@ defaults must resolve to a headless-capable Agent.
 |---|---|---|
 | Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
 | Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
-| Cursor Agent | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `CURSOR_API_KEY` / optional `CURSOR_API_ENDPOINT` |
+| Cursor Agent | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`; native login or Cursor provider credential projected as `CURSOR_API_KEY` |
 | Grok Build | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` |
 | Oh My Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider env |
 | opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |

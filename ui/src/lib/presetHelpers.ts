@@ -173,6 +173,9 @@ export function presetCompatibleAgentIds(
   preset: Preset,
   agents: readonly AgentProviderInfo[],
 ): string[] {
+  if (preset.directAgentId) {
+    return agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
+  }
   const wires: Partial<Record<WireShape, string>> = {}
   for (const region of presetRegions(preset)) Object.assign(wires, region.wires)
   return compatibleAgentIds(wires, agents)
@@ -250,6 +253,7 @@ export const VENDOR_BY_PRESET: Record<string, string> = {
   kimi: 'kimi',
   deepseek: 'deepseek',
   longcat: 'longcat',
+  'cursor-dashboard': 'cursor',
   custom: 'custom',
 }
 

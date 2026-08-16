@@ -18,8 +18,8 @@ describe('built-in adapter provider capabilities', () => {
     });
     expect(registry.get('cursor')?.capabilities.aiProvider).toMatchObject({
       credentialSource: 'runtime-or-workspace',
-      wirePreference: ['openai-chat'],
-      defaultWire: 'openai-chat',
+      wirePreference: [],
+      directVendors: ['cursor'],
     });
     expect(registry.get('cursor')?.capabilities.transcriptDiscovery).toBe('subprocess');
     expect(registry.get('cursor')?.capabilities.assignsSessionId ?? false).toBe(false);

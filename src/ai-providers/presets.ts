@@ -40,6 +40,8 @@ export interface SerializedPreset {
   /** Regions × their per-shape endpoints — the form's region picker + the wire
    *  capabilities a credential created here will declare. */
   regions?: SerializedRegion[]
+  /** Runtime that consumes this provider credential directly without an API wire. */
+  directAgentId?: string
   /** Provider-specific copy that explains the account, key, and model fields. */
   setup?: CredentialSetupGuide
 }
@@ -79,5 +81,6 @@ export const BUILTIN_PRESETS: SerializedPreset[] = PRESET_CATALOG.map(def => ({
   schema: buildJsonSchema(def),
   ...(def.models ? { models: def.models } : {}),
   ...(def.regions ? { regions: def.regions } : {}),
+  ...(def.directAgentId ? { directAgentId: def.directAgentId } : {}),
   ...(def.setup ? { setup: def.setup } : {}),
 }))

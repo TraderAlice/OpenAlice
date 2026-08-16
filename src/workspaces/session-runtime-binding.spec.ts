@@ -162,6 +162,44 @@ describe('durable Session runtime binding', () => {
     expect(resolved.ai).not.toHaveProperty('reasoningEffort')
   })
 
+  it('persists a Cursor provider credential without a synthetic wire shape', async () => {
+    const credential: Credential = {
+      vendor: 'cursor',
+      authType: 'api-key',
+      apiKey: 'cursor-dashboard-key',
+      baseUrl: 'https://api.cursor.example',
+      lastModel: 'cursor-grok-4.6-high-fast',
+    }
+    const resolved = await createSessionRuntimeBinding({
+      adapter: cursorAdapter,
+      cwd: '/workspace',
+      selection: { credentialSlug: 'cursor-1' },
+      credentials: { 'cursor-1': credential },
+    })
+
+    expect(resolved.binding).toEqual({
+      version: 1,
+      credential: { source: 'vault', credentialSlug: 'cursor-1' },
+      model: 'cursor-grok-4.6-high-fast',
+    })
+    expect(JSON.stringify(resolved.binding)).not.toContain('cursor-dashboard-key')
+    expect(resolved.ai).toMatchObject({
+      apiKey: 'cursor-dashboard-key',
+      baseUrl: 'https://api.cursor.example',
+      model: 'cursor-grok-4.6-high-fast',
+    })
+    expect(resolved.ai).not.toHaveProperty('wireShape')
+
+    const resumed = await resolveSessionRuntimeBinding({
+      adapter: cursorAdapter,
+      cwd: '/workspace',
+      binding: resolved.binding,
+      credentials: { 'cursor-1': { ...credential, apiKey: 'rotated-cursor-key' } },
+    })
+    expect(resumed.binding).toEqual(resolved.binding)
+    expect(resumed.ai?.apiKey).toBe('rotated-cursor-key')
+  })
+
   it('treats native login as the fresh default without reading project config', async () => {
     const read = vi.fn(async () => ({ model: 'native-model', reasoningEffort: 'medium' }) as WorkspaceAiCred)
     const adapter = fakeAdapter(read)

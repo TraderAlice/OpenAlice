@@ -160,6 +160,8 @@ describe('credential form catalog', () => {
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',
+      // Runtime-direct provider: `auto` is Cursor routing, not a model API id.
+      cursor: 'auto',
     });
     expect(GLM.models?.map((model) => model.id)).toContain('glm-5.2');
   });

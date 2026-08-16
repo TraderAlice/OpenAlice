@@ -12,7 +12,6 @@ import type {
 } from '../cli-adapter.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
 
-const CURSOR_OFFICIAL_BASE = 'https://api2.cursor.sh';
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,7 +26,7 @@ export function cursorDataDir(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env['CURSOR_DATA_DIR']?.trim();
   const home = env['HOME']?.trim() || homedir();
   if (configured) return expandHome(configured, home);
-  return join(homedir(), '.cursor');
+  return join(home, '.cursor');
 }
 
 /**
@@ -52,12 +51,6 @@ export function cursorChatBucket(cwd: string): string {
 /** Cursor stores CLI chats under `<dataDir>/chats/<md5(resolve(cwd))>/<uuid>/`. */
 export function cursorChatsDir(cwd: string, dataDir = cursorDataDir()): string {
   return join(dataDir, 'chats', cursorChatBucket(cwd));
-}
-
-export function isOfficialCursorBase(url: string | null | undefined): boolean {
-  if (!url) return true;
-  const trimmed = url.trim().replace(/\/+$/, '');
-  return trimmed === '' || trimmed === CURSOR_OFFICIAL_BASE;
 }
 
 /**
@@ -172,8 +165,12 @@ function cursorToolEvents(record: Record<string, unknown>): readonly HeadlessOut
 
 /**
  * Cursor Agent is Cursor's coding-agent CLI. Launch stays on the existing
- * CliAdapter contract: PATH `cursor-agent` only, argv flags, and env
- * projection. Never spawn `agent` — Grok Build's installer occupies that
+ * CliAdapter contract: PATH `cursor-agent` only and argv flags. Authentication
+ * may remain owned by Cursor (`cursor-agent login` or Cursor's own environment),
+ * or OpenAlice may project a normal `vendor: cursor` provider credential into
+ * `CURSOR_API_KEY`. That provider is consumed directly by this adapter rather
+ * than pretending it exposes an OpenAI-compatible wire. Never spawn `agent` —
+ * Grok Build's installer occupies that
  * name on purpose (`~/.grok/bin/agent`). Do not pass `--worktree` /
  * `--workspace` (they leave the managed Workspace), `--api-key` (secrets
  * stay in env), `--plugin-dir` (Cursor plugins, not Alice skills),
@@ -200,8 +197,10 @@ export const cursorAdapter: CliAdapter = {
     headless: true,
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
-      wirePreference: ['openai-chat'],
-      defaultWire: 'openai-chat',
+      // Cursor Dashboard credentials stay in the shared provider vault, but
+      // Cursor consumes them directly rather than through a model API wire.
+      wirePreference: [],
+      directVendors: ['cursor'],
     },
   },
 
@@ -210,11 +209,8 @@ export const cursorAdapter: CliAdapter = {
       const model = cursorModelArg(runtime.binding.model);
       const args = model ? ['--model', model] : [];
       const env: Record<string, string> = {};
-      const ai = runtime.ai;
-      if (ai?.apiKey) env['CURSOR_API_KEY'] = ai.apiKey;
-      if (ai?.baseUrl && !isOfficialCursorBase(ai.baseUrl)) {
-        env['CURSOR_API_ENDPOINT'] = ai.baseUrl;
-      }
+      if (runtime.ai?.apiKey) env['CURSOR_API_KEY'] = runtime.ai.apiKey;
+      if (runtime.ai?.baseUrl) env['CURSOR_API_ENDPOINT'] = runtime.ai.baseUrl;
       return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
     },
   },

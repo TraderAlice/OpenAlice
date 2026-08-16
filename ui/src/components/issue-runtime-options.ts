@@ -117,8 +117,9 @@ function vendorCatalog(input: {
   readonly credential: SavedCredential | null
   readonly presets: readonly Preset[]
 }): readonly PresetModel[] {
-  // Cursor CLI ids are not a vault vendor catalog. A bound DeepSeek/OpenAI
-  // key does not make those model ids valid `--model` values.
+  // Cursor consumes a provider credential directly rather than selecting a
+  // protocol catalog. Its CLI model ids therefore come from the Cursor catalog;
+  // binding some other provider key must not make those ids valid `--model` values.
   if (input.agent === 'cursor') return CURSOR_FIRST_PARTY_MODELS
   const presetId = input.credential
     ? PROVIDER_PRESET_BY_VENDOR[input.credential.vendor] ?? input.credential.vendor

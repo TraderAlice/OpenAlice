@@ -13,7 +13,6 @@ import {
   cursorChatsDir,
   cursorDataDir,
   cursorModelArg,
-  isOfficialCursorBase,
   listCursorOnDisk,
 } from './cursor.js';
 
@@ -35,14 +34,10 @@ describe('cursor session layout', () => {
     );
   });
 
-  it('honors an already-set CURSOR_DATA_DIR and treats official hosts as default', () => {
+  it('honors an isolated HOME and an already-set CURSOR_DATA_DIR', () => {
+    expect(cursorDataDir({ HOME: '/tmp/home' })).toBe(resolve('/tmp/home/.cursor'));
     expect(cursorDataDir({ CURSOR_DATA_DIR: '~/isolated', HOME: '/tmp/home' }))
       .toBe(resolve('/tmp/home/isolated'));
-    expect(isOfficialCursorBase(null)).toBe(true);
-    expect(isOfficialCursorBase('')).toBe(true);
-    expect(isOfficialCursorBase('https://api2.cursor.sh')).toBe(true);
-    expect(isOfficialCursorBase('https://api2.cursor.sh/')).toBe(true);
-    expect(isOfficialCursorBase('https://proxy.example/v1')).toBe(false);
   });
 });
 
@@ -145,11 +140,11 @@ describe('cursor composeHeadlessCommand', () => {
 describe('cursor sessionRuntime', () => {
   const runtimeCtx = { cwd: '/workspace', env: {} };
 
-  it('projects vault secrets into env only and keeps official Cursor off CURSOR_API_ENDPOINT', () => {
+  it('projects a Cursor Dashboard provider credential only through environment variables', () => {
     const projected = cursorAdapter.sessionRuntime!.project(runtimeCtx, {
       binding: {
         version: 1,
-        credential: { source: 'vault', credentialSlug: 'cursor-1', wireShape: 'openai-chat' },
+        credential: { source: 'vault', credentialSlug: 'cursor-1' },
         model: 'gpt-5',
         reasoningEffort: 'high',
       },
@@ -157,11 +152,13 @@ describe('cursor sessionRuntime', () => {
         apiKey: SECRET,
         baseUrl: 'https://api2.cursor.sh',
         model: 'gpt-5',
-        wireShape: 'openai-chat',
         reasoningEffort: 'high',
       },
     });
-    expect(projected.env).toEqual({ CURSOR_API_KEY: SECRET });
+    expect(projected.env).toEqual({
+      CURSOR_API_KEY: SECRET,
+      CURSOR_API_ENDPOINT: 'https://api2.cursor.sh',
+    });
     expect(projected.interactiveArgs).toEqual(['--model', 'gpt-5']);
     const argv = cursorAdapter.composeCommand(['cursor-agent'], {
       ...runtimeCtx,
@@ -170,26 +167,6 @@ describe('cursor sessionRuntime', () => {
     expect(argv.join(' ')).not.toContain(SECRET);
     expect(argv.join(' ')).not.toContain('[effort=');
     expect(argv).toEqual(['cursor-agent', '--model', 'gpt-5']);
-  });
-
-  it('points a custom host at CURSOR_API_ENDPOINT', () => {
-    const projected = cursorAdapter.sessionRuntime!.project(runtimeCtx, {
-      binding: {
-        version: 1,
-        credential: { source: 'vault', credentialSlug: 'gw', wireShape: 'openai-chat' },
-        model: 'local-model',
-      },
-      ai: {
-        apiKey: SECRET,
-        baseUrl: 'https://gw.example.com/v1',
-        model: 'local-model',
-        wireShape: 'openai-chat',
-      },
-    });
-    expect(projected.env).toEqual({
-      CURSOR_API_KEY: SECRET,
-      CURSOR_API_ENDPOINT: 'https://gw.example.com/v1',
-    });
   });
 
   it('ignores Session effort, including ultra, and leaves native login env empty', () => {
