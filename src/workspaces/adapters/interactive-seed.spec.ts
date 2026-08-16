@@ -4,6 +4,7 @@ import type { SpawnContext } from '../cli-adapter.js';
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { grokAdapter } from './grok.js';
+import { ompAdapter } from './omp.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 import { shellAdapter } from './shell.js';
@@ -15,6 +16,7 @@ import { shellAdapter } from './shell.js';
  *   claude   → … -- <prompt>        (`--` terminator; claude accepts it interactive)
  *   codex    → … -- <prompt>        (`--` terminator; codex accepts it top-level)
  *   opencode → … --prompt <prompt>  (flag value; no terminator needed)
+ *   omp      → … -- <prompt>        (`--` terminator; 17.3.4 accepts it)
  *   pi       → … <prompt>           (bare trailing positional; pi REJECTS `--`)
  *   shell    → ignored              (no agent to receive a prompt)
  *
@@ -77,6 +79,13 @@ describe('interactive seed — composeCommand initialPrompt', () => {
       expect(argv).toContain('--no-leader');
       expect(argv).not.toContain('-p');
     });
+
+    it('omp: trailing `-- <prompt>`', () => {
+      const argv = ompAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
+      expect(argv).toEqual(['omp', '--', PROMPT]);
+      expect(argv).not.toContain('-p');
+      expect(argv).not.toContain('--session-id');
+    });
   });
 
   describe('no prompt → no seed argument', () => {
@@ -88,6 +97,9 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     });
     it('pi', () => {
       expect(piAdapter.composeCommand([], ctx())).toEqual(['pi']);
+    });
+    it('omp', () => {
+      expect(ompAdapter.composeCommand([], ctx())).toEqual(['omp']);
     });
   });
 
@@ -118,6 +130,11 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     it('grok resume ignores the prompt', () => {
       const argv = grokAdapter.composeCommand(['grok'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
       expect(argv).toContain('--resume');
+      expect(argv).not.toContain(PROMPT);
+    });
+    it('omp resume ignores the prompt', () => {
+      const argv = ompAdapter.composeCommand(['omp'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
+      expect(argv).toEqual(['omp', '--resume', 'sess-1234abcd']);
       expect(argv).not.toContain(PROMPT);
     });
   });

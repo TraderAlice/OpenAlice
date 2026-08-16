@@ -350,6 +350,7 @@ export interface CliAdapter {
    *   claude:   [...base, -p, <prompt>, --output-format, json]   // never --bare
    *   codex:    [codex, exec, --json, <prompt>]                  // MCP optional
    *   grok:     [grok, --no-leader, --always-approve, --output-format, streaming-json, --single=<prompt>]
+   *   omp:      [omp, -p, --mode, json, --auto-approve, --, <prompt>]
    *   opencode: [opencode, run, --format, json, <prompt>]
    *   pi:       [pi, -p, --mode, json, <prompt>]
    */
@@ -367,6 +368,7 @@ export interface CliAdapter {
    *   codex:    `{"type":"thread.started","thread_id":…}` — equals the rollout
    *             `session_meta.id`, resumable via `codex resume <id>`
    *   opencode: every event carries top-level `sessionID` (`ses_…`)
+   *   omp:      line 1 is `{"type":"session","id":…}` (17.3.4 print JSON)
    *   pi:       line 1 is `{"type":"session","id":…}` (echoes --session-id)
    * The runner calls this per complete line until it returns non-null; the id
    * is recorded on the task so a finished headless run can be REOPENED as a

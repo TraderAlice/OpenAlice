@@ -30,6 +30,14 @@ describe('built-in adapter provider capabilities', () => {
         effortVariants: true,
       },
     });
+    expect(registry.get('omp')?.capabilities.aiProvider).toMatchObject({
+      credentialSource: 'runtime-or-workspace',
+      defaultWire: 'openai-chat',
+      modelRegistration: {
+        contextWindow: true,
+        reasoning: true,
+      },
+    });
     expect(registry.get('pi')?.capabilities.aiProvider).toMatchObject({
       credentialSource: 'runtime-or-workspace',
       defaultWire: 'openai-chat',

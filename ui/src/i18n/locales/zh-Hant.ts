@@ -632,6 +632,11 @@ export const zhHant: Resources = {
         models: 'xAI API 上的 Grok 模型，也可透過自訂 Base URL 接入相容 OpenAI 的端點。',
         auth: '`grok login` 訂閱或 xAI API key。',
       },
+      omp: {
+        blurb: 'Oh My Pi——Pi 的 fork，有自己的家目錄、會話與 print/JSON 協定。',
+        models: 'OpenAI、Anthropic、Google，以及透過原生或相容協定接入的本地模型與代理。',
+        auth: '每個供應方各自的 API key，或在 `omp` 裡 /login。只認 PATH 上的 `omp`。',
+      },
       opencode: {
         blurb: '基於 AI SDK 與 Models.dev、與供應方無關的開源 agent CLI。',
         models: 'Anthropic、OpenAI、Google、OpenRouter、雲端供應方，以及相容 OpenAI 的本地執行環境。',
@@ -1381,7 +1386,7 @@ export const zhHant: Resources = {
         chooseTitle: '選擇一個 agent 執行環境',
         checkingTitle: '正在檢查 agent 執行環境',
         readyBody: '{{runtimes}} 可以啟動 Alice 工作區。',
-        missingBody: '桌面版可以包含受管執行環境；開發環境也可使用 PATH 中的 Codex、Claude Code、Grok Build、opencode 或 Pi。',
+        missingBody: '桌面版可以包含受管執行環境；開發環境也可使用 PATH 中的 Codex、Claude Code、Grok Build、Oh My Pi、opencode 或 Pi。',
         openAlice: '開啟「問 Alice」',
         openSetup: '開啟執行環境設定',
       },

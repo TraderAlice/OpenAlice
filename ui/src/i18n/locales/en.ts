@@ -636,6 +636,11 @@ export const en = {
         models: 'Grok models on the xAI API, plus OpenAI-compatible endpoints through a custom base URL.',
         auth: '`grok login` subscription or an xAI API key.',
       },
+      omp: {
+        blurb: 'Oh My Pi — a Pi fork with its own home, sessions, and print/JSON protocol.',
+        models: 'OpenAI, Anthropic, Google, and custom local or proxy providers across native and compatible protocols.',
+        auth: 'Per-provider API key or `omp` /login. PATH `omp` only.',
+      },
       opencode: {
         blurb: 'Provider-agnostic open-source agent CLI powered by AI SDK and Models.dev.',
         models: 'Anthropic, OpenAI, Google, OpenRouter, cloud providers, and OpenAI-compatible local runtimes.',
@@ -1385,7 +1390,7 @@ export const en = {
         chooseTitle: 'Choose an agent runtime',
         checkingTitle: 'Checking agent runtimes',
         readyBody: '{{runtimes}} can launch Alice workspaces.',
-        missingBody: 'Desktop builds can include a managed runtime; developer installs can also use Codex, Claude Code, Grok Build, opencode, or Pi on PATH.',
+        missingBody: 'Desktop builds can include a managed runtime; developer installs can also use Codex, Claude Code, Grok Build, Oh My Pi, opencode, or Pi on PATH.',
         openAlice: 'Open Ask Alice',
         openSetup: 'Open runtime setup',
       },

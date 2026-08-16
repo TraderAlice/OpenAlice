@@ -625,6 +625,11 @@ export const ja: Resources = {
         models: 'xAI API の Grok モデル。カスタム Base URL で OpenAI 互換エンドポイントにも接続できます。',
         auth: '`grok login` サブスクリプション、または xAI API キー。',
       },
+      omp: {
+        blurb: 'Oh My Pi — 独自のホーム・セッション・print/JSON プロトコルを持つ Pi フォーク。',
+        models: 'OpenAI、Anthropic、Google、およびネイティブ・互換プロトコルのローカルモデルやプロキシ。',
+        auth: 'プロバイダーごとの API キー、または `omp` の /login。PATH 上の `omp` のみ。',
+      },
       opencode: {
         blurb: 'AI SDK と Models.dev を使うプロバイダー非依存のオープンソース agent CLI。',
         models: 'Anthropic、OpenAI、Google、OpenRouter、クラウド各社、OpenAI 互換ローカルランタイム。',
@@ -1374,7 +1379,7 @@ export const ja: Resources = {
         chooseTitle: 'エージェントランタイムを選択',
         checkingTitle: 'エージェントランタイムを確認中',
         readyBody: '{{runtimes}} で Alice ワークスペースを起動できます。',
-        missingBody: 'デスクトップ版には管理ランタイムを同梱できます。開発環境では PATH 上の Codex、Claude Code、Grok Build、opencode、Pi も利用できます。',
+        missingBody: 'デスクトップ版には管理ランタイムを同梱できます。開発環境では PATH 上の Codex、Claude Code、Grok Build、Oh My Pi、opencode、Pi も利用できます。',
         openAlice: 'Alice に質問を開く',
         openSetup: 'ランタイム設定を開く',
       },

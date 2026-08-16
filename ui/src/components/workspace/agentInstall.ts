@@ -38,6 +38,10 @@ export const AGENT_INSTALL: Record<string, AgentInstallHint> = {
     cmd: 'curl -fsSL https://x.ai/cli/install.sh | bash',
     url: 'https://x.ai/cli',
   },
+  omp: {
+    cmd: 'curl -fsSL https://omp.sh/install | sh',
+    url: 'https://omp.sh/',
+  },
 }
 
 export function installHintFor(agentId: string): AgentInstallHint | undefined {

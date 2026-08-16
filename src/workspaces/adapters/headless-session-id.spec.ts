@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { grokAdapter } from './grok.js';
+import { ompAdapter } from './omp.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 
@@ -50,6 +51,18 @@ describe('extractHeadlessSessionId', () => {
     );
   });
 
+  it('omp: line 1 is {"type":"session","id":…} (live 17.3.4)', () => {
+    const line =
+      '{"type":"session","version":3,"id":"01a00adc-0884-7000-b507-017949683107",' +
+      '"timestamp":"2026-08-16T13:56:27.396Z","cwd":"/tmp/omp-alice-probe.d2iMY8/ws"}';
+    expect(ompAdapter.extractHeadlessSessionId?.(line)).toBe(
+      '01a00adc-0884-7000-b507-017949683107',
+    );
+    expect(
+      ompAdapter.extractHeadlessSessionId?.('{"type":"message_end","id":"not-a-session"}'),
+    ).toBeNull();
+  });
+
   it('pi: line 1 is {"type":"session","id":…}', () => {
     const line =
       '{"type":"session","version":3,"id":"c54cdf3b-fc9c-403d-8088-41dd2a8b122b",' +
@@ -64,14 +77,14 @@ describe('extractHeadlessSessionId', () => {
   });
 
   it('non-JSON and irrelevant lines return null everywhere', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessSessionId?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessSessionId?.('{"type":"other"}')).toBeNull();
     }
   });
 
   it('every headless-capable adapter declares an extractor', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessSessionId).toBe('function');
     }

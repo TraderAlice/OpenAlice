@@ -93,6 +93,8 @@ describe('Issue runtime options', () => {
       .toEqual(['low', 'medium', 'high', 'max'])
     expect(issueEffortOptions({ agent: 'grok', semantics: null, modelKnown: false }))
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+    expect(issueEffortOptions({ agent: 'omp', semantics: null, modelKnown: false }))
+      .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
   })
 
   it('suggests xAI catalog models for a grok vault credential', () => {

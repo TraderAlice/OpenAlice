@@ -86,6 +86,10 @@ const GROK_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
   'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
 ]
 
+const OMP_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+]
+
 const PROVIDER_PRESET_BY_VENDOR: Readonly<Record<string, string>> = {
   anthropic: 'claude-api',
   openai: 'codex-api',
@@ -147,6 +151,7 @@ export function runtimeEffortOptions(input: {
   if (input.modelKnown) return []
   if (input.agent === 'claude') return CLAUDE_RUNTIME_EFFORTS
   if (input.agent === 'grok') return GROK_RUNTIME_EFFORTS
+  if (input.agent === 'omp') return OMP_RUNTIME_EFFORTS
   return ALL_RUNTIME_EFFORTS
 }
 

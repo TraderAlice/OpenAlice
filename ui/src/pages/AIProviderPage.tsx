@@ -48,16 +48,16 @@ function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'labe
 
 // ==================== Agent runtimes ====================
 //
-// The four CLI runtimes a workspace can launch. These credentials feed them;
+// The native CLI runtimes a workspace can launch. These credentials feed them;
 // this panel orients the user on what each is and how it authenticates. Editorial
 // copy grounded in the adapters (src/workspaces/adapters/*) — keep it factual.
 
 interface RuntimeInfo {
   id: string
   name: string
-  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
-  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
-  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
+  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.omp.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
+  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.omp.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
+  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.omp.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
 }
 
 const AGENT_RUNTIMES: RuntimeInfo[] = [
@@ -81,6 +81,13 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
     blurbKey: 'aiProvider.runtime.grok.blurb',
     modelsKey: 'aiProvider.runtime.grok.models',
     authKey: 'aiProvider.runtime.grok.auth',
+  },
+  {
+    id: 'omp',
+    name: 'Oh My Pi',
+    blurbKey: 'aiProvider.runtime.omp.blurb',
+    modelsKey: 'aiProvider.runtime.omp.models',
+    authKey: 'aiProvider.runtime.omp.auth',
   },
   {
     id: 'opencode',
