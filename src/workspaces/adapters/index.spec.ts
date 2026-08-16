@@ -16,6 +16,11 @@ describe('built-in adapter provider capabilities', () => {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['openai-responses'],
     });
+    expect(registry.get('grok')?.capabilities.aiProvider).toMatchObject({
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['openai-chat', 'openai-responses'],
+      defaultWire: 'openai-chat',
+    });
     expect(registry.get('opencode')?.capabilities.aiProvider).toMatchObject({
       credentialSource: 'runtime-or-workspace',
       defaultWire: 'openai-chat',

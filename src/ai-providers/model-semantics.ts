@@ -87,6 +87,7 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - DeepSeek models/limits: https://api-docs.deepseek.com/quick_start/pricing
  * - DeepSeek thinking: https://api-docs.deepseek.com/guides/thinking_mode
  * - LongCat Chat API: https://longcat.chat/platform/docs/api/chat.html
+ * - xAI Grok 4.6 reasoning: https://docs.x.ai/developers/model-capabilities/text/reasoning
  *
  * GLM 5.2's reasoning capability is also covered by the provider announcement;
  * its exact context limit is intentionally omitted because public surfaces do
@@ -167,6 +168,23 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
         mode: 'optional',
         efforts: ['none', 'low', 'medium', 'high', 'xhigh'],
         defaultEffort: 'none',
+      },
+    },
+  },
+  xai: {
+    'grok-4.6': {
+      contextWindow: 500_000,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'medium', 'high', 'xhigh'],
+        defaultEffort: 'high',
+      },
+    },
+    'grok-4.5': {
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'medium', 'high'],
+        defaultEffort: 'high',
       },
     },
   },

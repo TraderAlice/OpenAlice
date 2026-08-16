@@ -227,6 +227,39 @@ export const CODEX_API: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
+// ==================== Official: xAI Grok ====================
+
+export const XAI_API: PresetDef = {
+  id: 'xai-api',
+  label: 'xAI (API Key)',
+  description: 'Pay per token via the xAI API',
+  category: 'official',
+  defaultName: 'xAI',
+  hint: 'A Grok subscription is a separate `grok login` and does not belong in this field. Grok Build, opencode, and Pi can use this key.',
+  zodSchema: z.object({
+    backend: z.literal('vercel-ai-sdk'),
+    provider: z.literal('openai-compatible'),
+    model: z.string().default('grok-4.6').describe('Model'),
+    apiKey: z.string().min(1).describe('xAI API key'),
+  }),
+  models: withModelSemantics('xai', [
+    { id: 'grok-4.6', label: 'Grok 4.6 (Flagship)' },
+    { id: 'grok-4.5', label: 'Grok 4.5 (Previous generation)' },
+  ]),
+  regions: [{
+    id: 'official',
+    label: 'xAI (api.x.ai)',
+    wires: { 'openai-chat': 'https://api.x.ai/v1', 'openai-responses': 'https://api.x.ai/v1' },
+  }],
+  setup: {
+    apiKeyLabel: 'xAI API key',
+    apiKeyPlaceholder: 'xai-...',
+    apiKeyHelp: 'Use a key from console.x.ai. Grok.com subscription login stays in the Grok Build CLI.',
+    modelHelp: 'Choose a Grok API model ID, or paste another exact ID enabled for this key. Grok 4.6 is the current flagship.',
+  },
+  writeOnlyFields: ['apiKey'],
+}
+
 // ==================== Third-party: Gemini ====================
 
 export const GEMINI: PresetDef = {
@@ -488,6 +521,7 @@ export const PRESET_CATALOG: PresetDef[] = [
   CLAUDE_API,
   CODEX_OAUTH,
   CODEX_API,
+  XAI_API,
   MINIMAX,
   GLM,
   KIMI,
@@ -509,6 +543,7 @@ export const PRESET_CATALOG: PresetDef[] = [
 export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   anthropic: 'claude-opus-5',
   openai: 'gpt-5.6-sol',
+  xai: 'grok-4.6',
   google: 'gemini-3.6-flash',
   minimax: 'MiniMax-M3',
   glm: 'glm-5.2',

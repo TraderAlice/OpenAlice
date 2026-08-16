@@ -3,7 +3,7 @@
 This guide owns the boundary between AI resource credentials, model semantics,
 Workspace model selection, and native Agent runtime launch projection. Read it
 before changing provider presets, Workspace runtime defaults, model capability
-fields, or the Claude Code, Codex, opencode, and Pi adapters.
+fields, or the Claude Code, Codex, Grok Build, opencode, and Pi adapters.
 
 Related guides: [[docs/project-structure.md]] and
 [[docs/managed-workspace-runtime.md]].
@@ -70,6 +70,8 @@ runtime's native launch interface:
 - Pi provider/model registration plus `--model` and `--thinking`;
 - opencode provider/model environment plus `--model` and `--variant`;
 - Claude Code endpoint/auth environment plus `--model` and `--effort`;
+- Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
+  and `--effort`;
 - Codex provider arguments/environment plus `--model` and
   `model_reasoning_effort` configuration arguments.
 

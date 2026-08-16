@@ -103,7 +103,7 @@ const apiKeysSchema = z.object({
 // ==================== Credential layer (introduced by 0002) ====================
 
 export const credentialVendorEnum = z.enum([
-  'anthropic', 'openai', 'google',
+  'anthropic', 'openai', 'google', 'xai',
   'minimax', 'glm', 'kimi', 'deepseek', 'longcat', 'custom',
 ])
 export type CredentialVendor = z.infer<typeof credentialVendorEnum>
@@ -174,7 +174,7 @@ export function credentialWires(cred: Credential): Partial<Record<CredentialWire
  * A legacy user-level default retained for migration and compatibility. New
  * Workspaces translate it into secret-free `.alice/settings.json` launch
  * preferences; they do not write secrets into native CLI project files.
- * Keyed by agentId (`claude` / `codex` / `opencode` / `pi`).
+ * Keyed by agentId (`claude` / `codex` / `grok` / `opencode` / `pi`).
  * `credentialSlug` points into `credentials`; `model` is the optional run model
  * (absent ⇒ resolved from the cred's `lastModel`, then the vendor flagship).
  * Structurally a superset-compatible mirror of the workspaces layer's

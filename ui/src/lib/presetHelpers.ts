@@ -38,6 +38,7 @@ export const WIRE_SHAPE_GUIDANCE: Record<WireShape, string> = {
 export const AGENT_LABELS: Record<string, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  grok: 'Grok Build',
   opencode: 'opencode',
   pi: 'Pi',
 }
@@ -240,6 +241,7 @@ export function isApiKeyPreset(p: Preset): boolean {
 export const VENDOR_BY_PRESET: Record<string, string> = {
   'claude-api': 'anthropic',
   'codex-api': 'openai',
+  'xai-api': 'xai',
   gemini: 'google',
   minimax: 'minimax',
   glm: 'glm',
@@ -259,6 +261,7 @@ export function vendorPreset(vendor: string, presets: Preset[]): Preset | undefi
 // VENDORS_BY_BASEURL). Kept in sync by hand — it's a tiny, stable map.
 const VENDOR_BY_BASEURL: Array<[RegExp, string]> = [
   [/generativelanguage\.googleapis\.com/i, 'google'],
+  [/api\.x\.ai/i, 'xai'],
   [/bigmodel\.cn|z\.ai/i, 'glm'],
   [/minimaxi\.com|minimax\.io/i, 'minimax'],
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],

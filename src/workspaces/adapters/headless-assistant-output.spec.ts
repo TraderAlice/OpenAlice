@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { grokAdapter } from './grok.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 
@@ -52,6 +53,15 @@ describe('extractHeadlessAssistantText', () => {
     );
   });
 
+  it('grok: reads the documented json text field', () => {
+    const line = JSON.stringify({
+      text: 'ok',
+      stopReason: 'EndTurn',
+      sessionId: '019ff963-4d80-7650-a109-efd64717a05d',
+    });
+    expect(grokAdapter.extractHeadlessAssistantText?.(line)).toBe('ok');
+  });
+
   it('pi: reads assistant message_end but ignores the echoed user message', () => {
     const user = JSON.stringify({
       type: 'message_end',
@@ -69,14 +79,14 @@ describe('extractHeadlessAssistantText', () => {
   });
 
   it('rejects malformed and unrelated output for every adapter', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessAssistantText?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessAssistantText?.('{"type":"system"}')).toBeNull();
     }
   });
 
   it('every headless runtime declares a structured assistant decoder', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessAssistantText).toBe('function');
     }

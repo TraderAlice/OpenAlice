@@ -19,6 +19,7 @@ import type { WireShape } from '../../ai-providers/preset-catalog.js';
 const DEFAULT_WIRE_BY_AGENT: Record<string, WireShape> = {
   claude: 'anthropic',
   codex: 'openai-responses',
+  grok: 'openai-chat',
   opencode: 'openai-chat',
   pi: 'openai-chat',
 };

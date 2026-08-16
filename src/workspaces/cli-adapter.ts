@@ -287,7 +287,7 @@ export interface CliAdapter {
      * The adapter exposes a one-shot HEADLESS mode (consumes a positional
      * prompt, exits at the turn boundary) via `composeHeadlessCommand`. The
      * launcher dispatches automation tasks through it — spawn → run → the agent
-     * reports via `inbox_push` → exit, no human attached. The four agent CLIs
+     * reports via `inbox_push` → exit, no human attached. The agent CLIs
      * set this; `shell` does not (no agent-turn concept).
      */
     readonly headless?: boolean;
@@ -360,7 +360,7 @@ export interface CliAdapter {
 
   /**
    * Extract the agent's OWN session id from one line of headless stdout.
-   * All four agent CLIs announce their session id in the first line(s) of
+   * Agent CLIs announce their session id in the first line(s) of
    * their structured headless output (verified 2026-06-11):
    *   claude:   every stream-json event carries `session_id`
    *   codex:    `{"type":"thread.started","thread_id":…}` — equals the rollout

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { grokAdapter } from './grok.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 
@@ -42,6 +43,13 @@ describe('extractHeadlessSessionId', () => {
     );
   });
 
+  it('grok: documented json object carries sessionId', () => {
+    const line = '{"text":"ok","stopReason":"EndTurn","sessionId":"019ff963-4d80-7650-a109-efd64717a05d"}';
+    expect(grokAdapter.extractHeadlessSessionId?.(line)).toBe(
+      '019ff963-4d80-7650-a109-efd64717a05d',
+    );
+  });
+
   it('pi: line 1 is {"type":"session","id":…}', () => {
     const line =
       '{"type":"session","version":3,"id":"c54cdf3b-fc9c-403d-8088-41dd2a8b122b",' +
@@ -56,14 +64,14 @@ describe('extractHeadlessSessionId', () => {
   });
 
   it('non-JSON and irrelevant lines return null everywhere', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessSessionId?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessSessionId?.('{"type":"other"}')).toBeNull();
     }
   });
 
   it('every headless-capable adapter declares an extractor', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessSessionId).toBe('function');
     }

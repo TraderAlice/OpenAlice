@@ -12,11 +12,13 @@ describe('inferCredentialVendor', () => {
     expect(inferCredentialVendor({ baseUrl: 'https://api.moonshot.cn/v1' })).toBe('kimi')
     expect(inferCredentialVendor({ baseUrl: 'https://api.deepseek.com' })).toBe('deepseek')
     expect(inferCredentialVendor({ baseUrl: 'https://api.longcat.chat/openai' })).toBe('longcat')
+    expect(inferCredentialVendor({ baseUrl: 'https://api.x.ai/v1' })).toBe('xai')
   })
 
   it('falls back to the agent when the baseUrl is unrecognized', () => {
     expect(inferCredentialVendor({ agent: 'claude', baseUrl: 'https://proxy.example.com' })).toBe('anthropic')
     expect(inferCredentialVendor({ agent: 'codex' })).toBe('openai')
+    expect(inferCredentialVendor({ agent: 'grok' })).toBe('xai')
   })
 
   it('recognizes the vendor-specific Google wire without a base URL', () => {

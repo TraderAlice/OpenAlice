@@ -468,7 +468,7 @@ provenance store.
 | `src/workspaces/headless-task-registry.ts` | Durable run records, resume lineage, and capacity projection |
 | `src/workspaces/resume-registry.ts` | Product `resumeId` → backend-native runtime session mapping |
 | `src/workspaces/headless-output.ts` | Vendor-neutral reply/tool block contract and accumulator |
-| `src/workspaces/adapters/{claude,codex,opencode,pi}.ts` | Runtime-specific JSON event translation |
+| `src/workspaces/adapters/{claude,codex,grok,opencode,pi}.ts` | Runtime-specific JSON event translation |
 | `src/webui/routes/headless.ts` | Cross-workspace capacity, task, normalized output, and diagnostic-tail API |
 | `src/webui/routes/inquiries.ts` | Inbox/Issue follow-up dispatch and durable business-object history |
 | `ui/src/pages/AutomationRunsSection.tsx` | Run list, final reply, tool activity, and diagnostics UI |
