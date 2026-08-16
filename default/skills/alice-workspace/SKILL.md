@@ -23,6 +23,7 @@ keep using their native file, search, and Git tools inside any resolved path.
 | `issue` | Durable work, ownership, scheduling, Activity | Ad-hoc questions |
 | `provenance` | Artifact-to-Session attribution | Guessing intent |
 | `signature` | The current Session's safe `@resumeId` | Runtime-native ids |
+| `session` | This Workspace's coworker nametag | Conversation title, AI binding, or launcher nickname |
 | `track` | Shared durable asset/topic index | Work status |
 | `template` | Managed Workspace guidance upgrades | Harness research lifecycle |
 
@@ -173,6 +174,7 @@ alice-workspace provenance show --kind report --workspace-id <workspaceId> \
   --path research/report.md --revision <sha256:...>
 alice-workspace provenance show --resume-id <resumeId>
 alice-workspace signature show
+alice-workspace session rename --resume-id <resumeId> --display-name 'AAPL desk'
 ```
 
 `resumeId` is the product follow-up handle; `taskId` is one execution. Native

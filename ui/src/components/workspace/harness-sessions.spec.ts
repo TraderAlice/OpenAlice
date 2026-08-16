@@ -73,6 +73,14 @@ function entry(overrides: Partial<WorkspaceSessionDirectoryEntry> = {}): Workspa
 }
 
 describe('harness session titles', () => {
+  it('prefers a coworker nametag over the conversation title', () => {
+    expect(harnessSessionTitle(
+      session({ displayName: 'AAPL desk' }),
+      entry({ resumeId: 'resume-interactive', displayName: 'Ignored directory name' }),
+    )).toBe('AAPL desk')
+    expect(harnessSessionTitle(null, entry({ displayName: 'AAPL desk' }))).toBe('AAPL desk')
+  })
+
   it('prefers the interactive title, then preview, issue, then a short resume id', () => {
     expect(harnessSessionTitle(session(), entry({ resumeId: 'resume-interactive' }))).toBe('Interactive thesis')
     expect(harnessSessionTitle(null, entry())).toBe('Morning scan complete. Semis still lead.')

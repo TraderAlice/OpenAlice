@@ -244,6 +244,11 @@ export interface WorkspaceToolContext {
   }
   /** Safe current-Workspace template preview/apply surface. */
   templateUpgrades?: WorkspaceTemplateUpgradeControl
+  /** Rename a product Session in this Workspace. Empty/null clears the nametag. */
+  setSessionDisplayName?: (input: {
+    readonly resumeId: string
+    readonly displayName: string | null
+  }) => Promise<{ resumeId: string; displayName?: string }>
 }
 
 // ==================== Factory shape ====================

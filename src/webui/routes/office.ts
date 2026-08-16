@@ -35,6 +35,7 @@ async function projectRoom(
       resumeId: entry.resumeId,
       agent: entry.agent,
       name: record?.name ?? entry.resumeId,
+      ...(entry.displayName ? { displayName: entry.displayName } : {}),
       ...(record && sessionPreferredTitle(record) ? { title: sessionPreferredTitle(record) } : {}),
       ...(record ? { sessionRecordId: record.id } : {}),
       ...(entry.presence ? { presence: entry.presence } : {}),

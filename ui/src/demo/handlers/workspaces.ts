@@ -915,6 +915,29 @@ export const workspacesHandlers = [
       resumable: true,
     })
   }),
+  http.patch('/api/workspaces/:id/resumes/:resumeId/metadata', async ({ params, request }) => {
+    const resumeId = String(params.resumeId)
+    const body = await request.json().catch(() => ({})) as { displayName?: unknown }
+    if (!Object.prototype.hasOwnProperty.call(body, 'displayName')) {
+      return HttpResponse.json({ error: 'invalid_display_name' }, { status: 400 })
+    }
+    const raw = body.displayName
+    if (raw !== null && typeof raw !== 'string') {
+      return HttpResponse.json({ error: 'invalid_display_name' }, { status: 400 })
+    }
+    const displayName = typeof raw === 'string' ? raw.trim() : ''
+    const workspace = demoWorkspaces.find((candidate) =>
+      candidate.sessions.some((session) => session.resumeId === resumeId),
+    )
+    const session = workspace?.sessions.find((candidate) => candidate.resumeId === resumeId)
+    if (session) {
+      Object.assign(session, displayName ? { displayName } : { displayName: undefined })
+    }
+    return HttpResponse.json({
+      resumeId,
+      ...(displayName ? { displayName } : {}),
+    })
+  }),
   http.patch('/api/workspaces/:id/resumes/:resumeId', async ({ params, request }) => {
     const resumeId = String(params.resumeId)
     const body = await request.json().catch(() => ({})) as { presence?: unknown }

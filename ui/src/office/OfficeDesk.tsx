@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeBubble, OfficeFloorEmployee } from '../api/office'
+import { officeCoworkerLabel } from './label'
 import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { officeStationComposition } from './station'
@@ -31,7 +32,7 @@ export function OfficeDesk({
   const station = officeStationComposition()
   const label = employee
     ? t('office.employeeLabel', {
-      name: employee.title || employee.name,
+      name: officeCoworkerLabel(employee),
       resumeId: employee.resumeId,
       mood: t(`office.mood.${employee.mood}`),
     })
@@ -65,7 +66,7 @@ export function OfficeDesk({
             className="absolute left-1/2 max-w-[92%] -translate-x-1/2 truncate text-[11px] font-semibold text-office-label-foreground"
             style={{ top: station.name.topPx, zIndex: station.name.zIndex }}
           >
-            {employee.name}
+            {officeCoworkerLabel(employee)}
           </span>
         )}
         {!employee && (

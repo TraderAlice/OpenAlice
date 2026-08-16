@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
+import { officeCoworkerLabel } from './label'
 
 export function OfficeInspectRail({
   employee,
@@ -26,7 +27,7 @@ export function OfficeInspectRail({
       <div className="border-b border-border px-4 py-3">
         {employee ? (
           <>
-            <p className="text-sm font-medium text-foreground">{employee.name}</p>
+            <p className="text-sm font-medium text-foreground">{officeCoworkerLabel(employee)}</p>
             {roomName && (
               <p className="text-[11px] text-muted-foreground">{t('office.roomTitle', { name: roomName })}</p>
             )}

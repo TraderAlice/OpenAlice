@@ -47,6 +47,7 @@ describe('OfficeFloor', () => {
             agent: 'codex',
             name: 'c1',
             title: 'Desk mate',
+            displayName: 'AAPL desk',
             mood: 'working',
             surface: 'headless',
             bubble: { kind: 'tool', name: 'workspace_list' },
@@ -59,9 +60,9 @@ describe('OfficeFloor', () => {
         onOpenFiles={vi.fn()}
       />,
     )
-    const desk = screen.getByRole('button', { name: /Desk mate @resume-alice/ })
+    const desk = screen.getByRole('button', { name: /AAPL desk @resume-alice/ })
     expect(screen.getByText('workspace_list')).toBeTruthy()
-    expect(screen.getByText('c1')).toBeTruthy()
+    expect(screen.getByText('AAPL desk')).toBeTruthy()
     await userEvent.click(desk)
     expect(onSelectEmployee).toHaveBeenCalledOnce()
     const occupied = screen.getByTestId('office-desk-resume-alice')

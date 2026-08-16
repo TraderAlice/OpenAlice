@@ -163,6 +163,48 @@ describe('ResumeRegistry', () => {
       .get('resume-runtime-edit')?.runtimeBinding).toEqual(replacement)
   })
 
+  it('hydrates displayName from the Session dossier and never flushes it to the identity ledger', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    const created = await registry.ensure({
+      resumeId: 'resume-named',
+      wsId: 'ws-1',
+      agent: 'pi',
+      runtimeBinding: { version: 1, credential: { source: 'native' } },
+      now: 1,
+    })
+    const updated = await registry.setDisplayName({
+      resumeId: created.resumeId,
+      wsId: 'ws-1',
+      displayName: 'AAPL desk',
+    })
+    // A nametag edit is Workspace metadata, not Session activity. In
+    // particular it must not reorder the recent Session roster.
+    expect(updated).toMatchObject({ displayName: 'AAPL desk', updatedAt: 1 })
+
+    const raw = JSON.parse(await readFile(path, 'utf8')) as {
+      records: Array<Record<string, unknown>>
+    }
+    expect(raw.records[0]).not.toHaveProperty('displayName')
+    expect(raw.records[0]).not.toHaveProperty('runtimeBinding')
+
+    const reloaded = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    expect(reloaded.get(created.resumeId)).toMatchObject({
+      displayName: 'AAPL desk',
+      runtimeBinding: { version: 1, credential: { source: 'native' } },
+    })
+
+    await reloaded.setDisplayName({
+      resumeId: created.resumeId,
+      wsId: 'ws-1',
+      displayName: '',
+    })
+    expect(reloaded.get(created.resumeId)).not.toHaveProperty('displayName')
+    expect(reloaded.get(created.resumeId)?.runtimeBinding).toEqual({
+      version: 1,
+      credential: { source: 'native' },
+    })
+  })
+
   it('keeps legacy UUID identities valid without rewriting them', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const legacyId = '550e8400-e29b-41d4-a716-446655440000'

@@ -34,7 +34,7 @@ import {
   makeWorkspaceResolver,
 } from '../core/workspace-tool-center.js'
 import type { IInboxStore, InboxOrigin } from '../core/inbox-store.js'
-import { sessionDisplayTitle } from '../workspaces/session-registry.js'
+import { sessionCoworkerLabel } from '../workspaces/session-registry.js'
 import type { IEntityStore } from '../core/entity-store.js'
 import { sessionOriginFromInboxOrigin } from '../core/provenance-store.js'
 import type { WorkspaceService } from '../workspaces/service.js'
@@ -102,6 +102,19 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
         ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
         ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
         ...(svc ? { templateUpgrades: svc.templateUpgrades } : {}),
+        ...(svc ? {
+          setSessionDisplayName: async (input) => {
+            const identity = await svc.setSessionDisplayName({
+              wsId: ws.id,
+              resumeId: input.resumeId,
+              displayName: input.displayName,
+            })
+            return {
+              resumeId: identity.resumeId,
+              ...(identity.displayName ? { displayName: identity.displayName } : {}),
+            }
+          },
+        } : {}),
         // Lets workspace_path resolve ANY peer's dir (not just the caller) —
         // the in-workspace cross-workspace addressing path. Shared with the
         // mcp.ts build site so the two never drift.
@@ -127,7 +140,10 @@ export function registerCliRoutes(app: Hono, deps: CliGatewayDeps): void {
                   .map((session) => ({
                     resumeId: session.resumeId,
                     agent: session.agent,
-                    title: sessionDisplayTitle(session),
+                    title: sessionCoworkerLabel(
+                      session,
+                      svc.resumeRegistry.get(session.resumeId)?.displayName,
+                    ) ?? session.name,
                     state: session.state,
                     lastActiveAt: session.lastActiveAt,
                   })),

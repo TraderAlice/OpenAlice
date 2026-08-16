@@ -4,6 +4,7 @@ import { ArrowUpRight, MessageSquarePlus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AgentInfo, PausedSessionRuntimeUpdate, SessionRecord } from './api';
+import { sessionCoworkerLabel } from './display';
 import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
@@ -133,7 +134,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
                     {...(props.label !== undefined ? { label: props.label } : {})}
-                    sessionLabel={s.title?.trim() || s.name}
+                    sessionLabel={sessionCoworkerLabel(s)}
                     headerActions={props.terminalHeaderActions}
                     chrome="canvas"
                     onSessionLost={props.onSessionLost}
@@ -191,7 +192,7 @@ function SessionLibrary(props: {
   const visibleSessions = ordered.filter((session) => {
     if (filter !== 'all' && session.state !== filter) return false;
     if (!normalizedQuery) return true;
-    return [session.title, session.name, session.agent]
+    return [session.displayName, session.title, session.name, session.agent]
       .some((value) => value?.toLocaleLowerCase().includes(normalizedQuery));
   });
 
@@ -293,7 +294,7 @@ function SessionRow(props: {
   const { t } = useTranslation();
   const record = props.record;
   const isPaused = record.state === 'paused';
-  const title = record.title?.trim() || record.name;
+  const title = sessionCoworkerLabel(record);
   const showInternalName = title !== record.name;
   return (
     <li>

@@ -40,6 +40,7 @@ import {
   ResumePresenceError,
   sessionPresence,
 } from '../../workspaces/resume-registry.js';
+import { SessionDisplayNameError } from '../../workspaces/session-runtime-store.js';
 import {
   isAgentRuntime,
   prepareAgentRuntimeWorkspace,
@@ -571,6 +572,7 @@ export function createWorkspaceRoutes(
       webPi: browser,
       headless: svc.isResumeActive(record.resumeId),
       runtimeBinding: binding,
+      ...(identity?.displayName ? { displayName: identity.displayName } : {}),
       ...(identity ? { presence: sessionPresence(identity) } : {}),
     });
   };
@@ -1548,6 +1550,41 @@ export function createWorkspaceRoutes(
     }
   });
 
+  app.patch('/:id/resumes/:resumeId/metadata', async (c) => {
+    const id = c.req.param('id');
+    const resumeId = c.req.param('resumeId');
+    if (!validId(id) || !validId(resumeId)) return c.json({ error: 'not_found' }, 404);
+    if (!svc.registry.get(id)) return c.json({ error: 'workspace_not_found' }, 404);
+    const body = await safeJson(c).catch(() => null);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    if (!Object.prototype.hasOwnProperty.call(fields, 'displayName')) {
+      return c.json({ error: 'invalid_display_name', message: 'displayName must be a string or null' }, 400);
+    }
+    const raw = fields['displayName'];
+    if (raw !== null && typeof raw !== 'string') {
+      return c.json({ error: 'invalid_display_name', message: 'displayName must be a string or null' }, 400);
+    }
+    try {
+      const identity = await svc.setSessionDisplayName({ wsId: id, resumeId, displayName: raw });
+      return c.json({
+        resumeId: identity.resumeId,
+        ...(identity.displayName ? { displayName: identity.displayName } : {}),
+      });
+    } catch (err) {
+      if (err instanceof SessionDisplayNameError) {
+        return c.json({ error: 'invalid_display_name', message: err.message }, 400);
+      }
+      if (err instanceof ResumePresenceError) {
+        const error = err.code === 'not_found' ? 'resume_not_found'
+          : err.code === 'retired' ? 'resume_retired'
+            : err.code === 'wrong_workspace' ? 'resume_wrong_workspace'
+              : 'invalid_display_name';
+        return c.json({ error, message: err.message }, err.code === 'not_found' ? 404 : 409);
+      }
+      throw err;
+    }
+  });
+
   // Materialize one product-owned conversation as a stable interactive
   // Session. The frontend supplies only resumeId; native CLI ids stay in the
   // backend ResumeRegistry.
@@ -1920,6 +1957,7 @@ export function createWorkspaceRoutes(
       return c.json({
         session: projectPublicSession(record, {
           runtimeBinding: resolved.binding,
+          ...(identity?.displayName ? { displayName: identity.displayName } : {}),
           ...(identity ? { presence: sessionPresence(identity) } : {}),
         }),
       });

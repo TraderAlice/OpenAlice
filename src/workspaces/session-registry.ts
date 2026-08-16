@@ -78,6 +78,17 @@ export function sessionDisplayTitle(record: Pick<SessionRecord, 'title' | 'fallb
   return sessionPreferredTitle(record) || record.name;
 }
 
+/** Workspace-owned coworker nametag → conversation title → sticky launcher name. */
+export function sessionCoworkerLabel(
+  record: Pick<SessionRecord, 'title' | 'fallbackTitle' | 'name'> | null | undefined,
+  displayName?: string | null,
+): string | undefined {
+  const named = displayName?.trim();
+  if (named) return named;
+  if (!record) return undefined;
+  return sessionDisplayTitle(record);
+}
+
 export function normalizeSessionTitle(value: string | null | undefined): string | undefined {
   const title = value?.trim();
   return title ? title.slice(0, MAX_SESSION_TITLE) : undefined;

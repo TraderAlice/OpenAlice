@@ -686,6 +686,8 @@ export interface SessionRecord {
   readonly startedAt: number | null;
   /** Resolved native/fallback sidebar title; null for an unseeded, unnamed Session. */
   readonly title: string | null;
+  /** Workspace-owned coworker nametag. Missing means unnamed. */
+  readonly displayName?: string;
   /** First headless run associated with this stable Alice Session. */
   readonly sourceRunId?: string | null;
   /** Visibility projected with the roster so first paint needs no second join. */
@@ -768,6 +770,8 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly lifecycle?: 'active' | 'retired';
   readonly successorResumeId?: string;
   readonly presence?: 'active' | 'archived' | 'deleted';
+  /** Workspace-owned coworker nametag. Missing means unnamed. */
+  readonly displayName?: string;
   readonly resumable: boolean;
   readonly active: boolean;
   /** Present when this product Session was allocated after birth metadata shipped. */
@@ -812,6 +816,31 @@ export interface SessionPresenceResult {
   readonly resumeId: string;
   readonly presence: SessionPresence;
   readonly lifecycle: 'active' | 'retired';
+}
+
+export interface SessionDisplayNameResult {
+  readonly resumeId: string;
+  readonly displayName?: string;
+}
+
+export async function setSessionDisplayName(
+  wsId: string,
+  resumeId: string,
+  displayName: string | null,
+): Promise<SessionDisplayNameResult> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/resumes/${encodeURIComponent(resumeId)}/metadata`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ displayName }),
+    },
+  );
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    throw new Error(parsed?.message ?? parsed?.error ?? `set session display name failed: ${res.status}`);
+  }
+  return res.json() as Promise<SessionDisplayNameResult>;
 }
 
 export async function setSessionPresence(
