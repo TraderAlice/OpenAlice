@@ -22,10 +22,12 @@ interface PerKey {
   readonly pending: Pending[];
 }
 
-/** subprocess-discovery (codex/opencode): no fs event for a DB/global-dir
+/** subprocess-discovery (codex/opencode/grok/omp): no fs event for a DB/global-dir
  *  write, so we poll `adapter.listOnDisk(cwd)` until each pending session's id
  *  appears, then persist it as the record's resumeHint (same channel fs-watch
- *  uses). Keyed by (wsId, cwd). */
+ *  uses). Keyed by (wsId, cwd, adapter id): different runtimes can launch in
+ *  the same Workspace concurrently and their native ids must never share a
+ *  discovery bucket. */
 interface PollEntry {
   readonly cwd: string;
   readonly adapter: CliAdapter;
@@ -42,6 +44,10 @@ const POLL_MAX_MS = 90_000;
 
 function watchKey(wsId: string, dir: string): string {
   return `${wsId}\x00${dir}`;
+}
+
+function pollKey(wsId: string, cwd: string, adapterId: string): string {
+  return `${wsId}\x00${cwd}\x00${adapterId}`;
 }
 
 /**
@@ -177,9 +183,9 @@ export class TranscriptWatcher {
   /**
    * subprocess discovery: snapshot existing session ids, then poll
    * `listOnDisk(cwd)` until each pending session's NEW id shows up. Used by
-   * codex (global session dir, attributed by reading each rollout's cwd) and
-   * opencode (SQLite-backed, listed cwd-scoped via the CLI) — neither emits an
-   * fs event we could watch.
+   * runtimes whose native session store cannot be mapped through one local fs
+   * event (global directories, SQLite-backed stores, or lazily persisted
+   * cwd-bucketed JSONL).
    */
   private async registerSubprocess(session: PersistentSession, adapter: CliAdapter): Promise<void> {
     if (!adapter.listOnDisk) {
@@ -193,7 +199,7 @@ export class TranscriptWatcher {
       this.logger.warn('transcript_watch.list_on_disk_failed', { adapter: adapter.id, cwd: session.cwd, err });
       existing = new Set();
     }
-    const key = watchKey(session.wsId, session.cwd);
+    const key = pollKey(session.wsId, session.cwd, adapter.id);
     let entry = this.pollEntries.get(key);
     if (!entry) {
       entry = { cwd: session.cwd, adapter, pending: [], timer: null, startedAtMs: Date.now() };

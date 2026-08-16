@@ -151,9 +151,10 @@ describe('omp composeHeadlessCommand', () => {
 });
 
 describe('omp identity harvest', () => {
-  it('does not claim a TUI transcript watch or assign a launcher session id', () => {
-    expect(ompAdapter.capabilities.transcriptDiscovery).toBe('none');
+  it('polls on-disk JSONL for a native id and does not assign one at spawn', () => {
+    expect(ompAdapter.capabilities.transcriptDiscovery).toBe('subprocess');
     expect(ompAdapter.capabilities.assignsSessionId ?? false).toBe(false);
+    expect(ompAdapter.listOnDisk).toEqual(expect.any(Function));
     expect(ompAdapter.transcriptDir).toBeUndefined();
     expect(ompAdapter.transcriptFileRe).toBeUndefined();
     expect(ompAdapter.extractSessionId).toBeUndefined();

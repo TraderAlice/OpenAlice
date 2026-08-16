@@ -203,11 +203,14 @@ function sessionIdFromFilename(name: string): string | null {
  * opens a TUI picker when bare). Do not pass `--skill` (that flag is a glob
  * filter, not Pi's path injector). Do not isolate `~/.omp` — `PI_CODING_AGENT_DIR`
  * still writes `~/.omp/run/daemons`. Headless is `-p --mode json`; print JSON
- * line 1 is the session header, then AgentSessionEvent frames. That stdout
- * stream is the only harvestable run identity. The interactive TUI does not
- * expose a stable session stream, so `transcriptDiscovery` stays `none` —
- * do not fs-watch or poll `listOnDisk` as if a PTY turn will announce itself.
- * `listOnDisk` remains for after-the-fact titles once a JSONL exists.
+ * line 1 is the session header, then AgentSessionEvent frames. Interactive
+ * identity is the same JSONL `listOnDisk` already reads: omp mints its own
+ * snowflake id and writes `~/.omp/agent/sessions/<cwd-bucket>/<ts>_<id>.jsonl`
+ * after the first persist (lazy until assistant output). There is no
+ * create-or-reopen `--session-id` (`unknown flag`; `--session` aliases
+ * `--resume` and only opens an existing file). `transcriptDiscovery` is
+ * `subprocess` so the watcher polls for a **new** id, same as Codex / Grok /
+ * opencode. Empty TUI turns that never persist still fall back to `--continue`.
  * `--` is a real POSIX terminator (Pi rejects it). There is no workspace-local
  * omp project file, so this adapter has no deprecated `writeAiConfig` export.
  */
@@ -220,7 +223,7 @@ export const ompAdapter: CliAdapter = {
     parallelPerCwd: true,
     resumeLast: true,
     resumeById: true,
-    transcriptDiscovery: 'none',
+    transcriptDiscovery: 'subprocess',
     headless: true,
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
