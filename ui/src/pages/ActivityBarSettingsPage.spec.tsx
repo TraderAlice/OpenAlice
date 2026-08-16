@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import '../i18n'
@@ -57,13 +57,15 @@ afterEach(() => {
 })
 
 describe('ActivityBarSettingsPage', () => {
-  it('keeps Dev hidden by default and can show it again', () => {
+  it('persists the first visibility edit instead of treating it as hydration', async () => {
     render(<ActivityBarSettingsPage />)
 
     const toggle = screen.getByRole('switch', { name: 'Show Dev Panel' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     fireEvent.click(toggle)
     expect(screen.getByRole('switch', { name: 'Hide Dev Panel' }).getAttribute('aria-checked')).toBe('true')
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce(), { timeout: 1_500 })
+    expect(mocks.save.mock.calls[0]?.[0].hidden).not.toContain('dev')
   })
 
   it('creates a custom group and can reset to the default document', () => {
@@ -77,7 +79,7 @@ describe('ActivityBarSettingsPage', () => {
     expect(mocks.reset).toHaveBeenCalledOnce()
   })
 
-  it('reorders a row while the pointer is still held', () => {
+  it('reorders a row while the pointer is held and persists it on release', async () => {
     const originalRect = HTMLElement.prototype.getBoundingClientRect
     HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
       const item = this.closest('[data-nav-item]')
@@ -105,6 +107,9 @@ describe('ActivityBarSettingsPage', () => {
       const pages = [...document.querySelectorAll('[data-nav-group-card="primary"] [data-nav-item]')]
         .map((node) => node.getAttribute('data-nav-item'))
       expect(pages.slice(0, 2)).toEqual(['inbox', 'chat'])
+      fireEvent.pointerUp(window, { pointerId: 1, clientX: 20, clientY: 70 })
+      await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce(), { timeout: 1_500 })
+      expect(mocks.save.mock.calls[0]?.[0].groups[0]?.items.slice(0, 2)).toEqual(['inbox', 'chat'])
     } finally {
       HTMLElement.prototype.getBoundingClientRect = originalRect
     }

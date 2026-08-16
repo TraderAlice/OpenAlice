@@ -138,6 +138,9 @@ export function ActivityBarSettingsPage() {
       setDirty(false)
     },
     enabled: dirty && !active && !loading,
+    // `enabled` becomes true only after an edit, so the first enabled cycle is
+    // already user intent rather than initial hydration.
+    skipInitialSave: false,
   })
 
   const update = (next: UiLayout) => {
@@ -232,10 +235,7 @@ export function ActivityBarSettingsPage() {
     setActive(null)
     document.body.style.removeProperty('cursor')
     document.body.classList.remove('select-none')
-    if (changed) {
-      setDirty(true)
-      void save(draftRef.current).then(() => setDirty(false))
-    }
+    if (changed) setDirty(true)
   }
 
   const onPointerMove = (event: PointerEvent) => {
@@ -291,6 +291,8 @@ export function ActivityBarSettingsPage() {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
+      document.body.style.removeProperty('cursor')
+      document.body.classList.remove('select-none')
     }
   }, [])
 
