@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import type { SpawnContext } from '../cli-adapter.js';
+import { parseHeadlessOutputText } from '../headless-output.js';
 import {
   grokAdapter,
   grokSessionDir,
@@ -95,6 +96,11 @@ describe('grok composeHeadlessCommand', () => {
     expect(argv).toContain('--single=--looks-like-flag');
     expect(argv).not.toContain('-p');
     expect(argv).not.toContain('--');
+  });
+
+  it('uses the grok binary even when the workspace default command is claude', () => {
+    expect(grokAdapter.composeCommand(['claude'], ctx())).toEqual(['grok', '--no-leader']);
+    expect(grokAdapter.composeHeadlessCommand!(['claude'], ctx(), 'do x')[0]).toBe('grok');
   });
 });
 
@@ -192,7 +198,11 @@ describe('grok headless extractors', () => {
       sessionId: '01a009c7-769a-79b2-8a28-0dc2da5e7e21',
     });
     expect(grokAdapter.extractHeadlessAssistantText?.(text)).toBe('STREAM');
-    expect(grokAdapter.extractHeadlessOutputEvents?.(text)).toEqual([{ type: 'text', text: 'STREAM' }]);
+    expect(grokAdapter.extractHeadlessOutputEvents?.(text)).toEqual([{ type: 'text', text: 'STREAM', delta: true }]);
+    expect(parseHeadlessOutputText({
+      text: ['{"type":"text","data":"AL"}', '{"type":"text","data":"ICE_GROK_OK"}', end].join('\n'),
+      extractEvents: grokAdapter.extractHeadlessOutputEvents!.bind(grokAdapter),
+    }).assistantText).toBe('ALICE_GROK_OK');
     expect(grokAdapter.extractHeadlessSessionId?.(end)).toBe(
       '01a009c7-769a-79b2-8a28-0dc2da5e7e21',
     );

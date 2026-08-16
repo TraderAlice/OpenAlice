@@ -230,8 +230,10 @@ export const grokAdapter: CliAdapter = {
 
   readInteractiveSetupStatus: readGrokInteractiveSetupStatus,
 
-  composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
-    const cmd = [...base, '--no-leader', ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
+  composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
+    // Ignore the workspace default command (usually `claude`). Codex/opencode/pi
+    // do the same; spreading `base` here launched `claude --no-leader`.
+    const cmd = ['grok', '--no-leader', ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
     if (ctx.resume === undefined) {
       if (ctx.initialPrompt) return [...cmd, '--', ctx.initialPrompt];
       return cmd;
@@ -241,12 +243,12 @@ export const grokAdapter: CliAdapter = {
   },
 
   composeHeadlessCommand(
-    base: readonly string[],
+    _base: readonly string[],
     ctx: SpawnContext,
     prompt: string,
   ): readonly string[] {
     return [
-      ...base,
+      'grok',
       '--no-leader',
       '--always-approve',
       ...(ctx.sessionRuntime?.headlessArgs ?? []),
@@ -287,7 +289,7 @@ export const grokAdapter: CliAdapter = {
       const kind = update['sessionUpdate'];
       if (kind === 'agent_message_chunk') {
         const text = textFromContent(update['content']);
-        return text ? [{ type: 'text', text }] : [];
+        return text ? [{ type: 'text', text, delta: true }] : [];
       }
       if (kind === 'tool_call' && typeof update['toolCallId'] === 'string') {
         return [{
@@ -313,7 +315,7 @@ export const grokAdapter: CliAdapter = {
 
     if (evt['type'] === 'text') {
       const text = textFromContent(evt['data'] ?? evt);
-      return text ? [{ type: 'text', text }] : [];
+      return text ? [{ type: 'text', text, delta: true }] : [];
     }
     if (typeof evt['text'] === 'string' && evt['text'].trim()) {
       return [{ type: 'text', text: evt['text'] }];
