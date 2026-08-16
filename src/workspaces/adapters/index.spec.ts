@@ -38,6 +38,8 @@ describe('built-in adapter provider capabilities', () => {
         reasoning: true,
       },
     });
+    expect(registry.get('omp')?.capabilities.transcriptDiscovery).toBe('none');
+    expect(registry.get('omp')?.capabilities.assignsSessionId ?? false).toBe(false);
     expect(registry.get('pi')?.capabilities.aiProvider).toMatchObject({
       credentialSource: 'runtime-or-workspace',
       defaultWire: 'openai-chat',

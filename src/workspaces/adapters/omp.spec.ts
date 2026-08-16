@@ -146,6 +146,22 @@ describe('omp composeHeadlessCommand', () => {
   });
 });
 
+describe('omp identity harvest', () => {
+  it('does not claim a TUI transcript watch or assign a launcher session id', () => {
+    expect(ompAdapter.capabilities.transcriptDiscovery).toBe('none');
+    expect(ompAdapter.capabilities.assignsSessionId ?? false).toBe(false);
+    expect(ompAdapter.transcriptDir).toBeUndefined();
+    expect(ompAdapter.transcriptFileRe).toBeUndefined();
+    expect(ompAdapter.extractSessionId).toBeUndefined();
+  });
+
+  it('harvests headless identity from the print-mode session header', () => {
+    expect(ompAdapter.extractHeadlessSessionId?.(
+      `{"type":"session","version":3,"id":"${LIVE_SESSION_ID}","cwd":"/tmp/ws"}`,
+    )).toBe(LIVE_SESSION_ID);
+  });
+});
+
 describe('omp sessionRuntime', () => {
   it('projects model and thinking, maps none to off, and keeps secrets in env', () => {
     const projected = ompAdapter.sessionRuntime!.project(ctx(), {

@@ -46,10 +46,10 @@ Live error fixture (secret-free, isolated HOME, dummy `OPENAI_API_KEY`):
 ## Decisions
 
 1. **New adapter, keep Pi.** Do not subclass or import `pi.ts`. Duplicate the small JSON extractors; the wire matches Pi today and can drift.
-2. **PATH-detected only.** Install hint: `curl -fsSL https://omp.sh/install | sh`, docs `https://omp.sh/`. Do not hardcode `~/.bun/bin`.
+2. **PATH-detected only.** Install hint: `curl -fsSL https://omp.sh/install | sh`, docs `https://omp.sh/`. Do not hardcode or infer `~/.bun/bin` in Alice spawn PATH. Hang `omp` on a real PATH dir (for example `~/.local/bin`). Deep custom install roots stay on the existing `OPENALICE_EXTRA_AGENT_PATH` hook.
 3. **Do not isolate `~/.omp`.** Do not set `PI_CODING_AGENT_DIR` / `OMP_PROFILE` / `PI_CODING_AGENT_SESSION_DIR`. Listing honors them if the user already set them.
 4. **No `writeAiConfig` / project `.omp` writes.** Vault keys go to env (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` + matching `*_BASE_URL` when custom). Secrets never enter argv.
-5. **Resume by harvested id.** Fresh spawn has no resume flag. Headless harvests `type:session`. Interactive relies on `listOnDisk` after the JSONL appears. `resumeLast` still emits `--continue` (native), but by-id is the reliable Alice path.
+5. **Headless harvests identity. Interactive TUI does not.** Fresh spawn has no resume flag. Headless harvests `type:session` from print JSON. The TUI has no stable run stream, so `transcriptDiscovery` is `none` — do not fs-watch or poll for a PTY announcement. `listOnDisk` is after-the-fact listing/titles once a JSONL exists. `resumeLast` still emits `--continue` (native). `--resume id` is only reliable when Alice already has an id from headless.
 6. **No Web / ACP / `--profile` / `--session-dir` / `--no-session` / `--api-key`.**
 7. **`namePrefix: 'om'`** (`o` is opencode, `p` is Pi).
 8. **`deprecatedExportTab` stays closed** for omp (Launch tab), same as Grok Build.
@@ -70,7 +70,7 @@ displayName: Oh My Pi
 binary: omp
 namePrefix: om
 assignsSessionId: false
-transcriptDiscovery: fs-watch
+transcriptDiscovery: none
 headless: true
 resumeLast / resumeById / parallelPerCwd: true
 ```

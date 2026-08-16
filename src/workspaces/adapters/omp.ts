@@ -203,9 +203,13 @@ function sessionIdFromFilename(name: string): string | null {
  * opens a TUI picker when bare). Do not pass `--skill` (that flag is a glob
  * filter, not Pi's path injector). Do not isolate `~/.omp` — `PI_CODING_AGENT_DIR`
  * still writes `~/.omp/run/daemons`. Headless is `-p --mode json`; print JSON
- * line 1 is the session header, then AgentSessionEvent frames. `--` is a real
- * POSIX terminator (Pi rejects it). There is no workspace-local omp project
- * file, so this adapter has no deprecated `writeAiConfig` export.
+ * line 1 is the session header, then AgentSessionEvent frames. That stdout
+ * stream is the only harvestable run identity. The interactive TUI does not
+ * expose a stable session stream, so `transcriptDiscovery` stays `none` —
+ * do not fs-watch or poll `listOnDisk` as if a PTY turn will announce itself.
+ * `listOnDisk` remains for after-the-fact titles once a JSONL exists.
+ * `--` is a real POSIX terminator (Pi rejects it). There is no workspace-local
+ * omp project file, so this adapter has no deprecated `writeAiConfig` export.
  */
 export const ompAdapter: CliAdapter = {
   id: 'omp',
@@ -216,7 +220,7 @@ export const ompAdapter: CliAdapter = {
     parallelPerCwd: true,
     resumeLast: true,
     resumeById: true,
-    transcriptDiscovery: 'fs-watch',
+    transcriptDiscovery: 'none',
     headless: true,
     aiProvider: {
       credentialSource: 'runtime-or-workspace',
