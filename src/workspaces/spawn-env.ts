@@ -59,6 +59,7 @@ const POSIX_SYSTEM_BIN_DIRS = [
 
 const POSIX_USER_BIN_DIRS = [
   '.local/bin',
+  '.bun/bin',
   '.npm-global/bin',
   'Library/pnpm',
   '.yarn/bin',

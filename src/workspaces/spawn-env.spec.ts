@@ -136,7 +136,7 @@ describe('buildSpawnEnv', () => {
 
       expect(path).toContain(localBin)
       expect(path).toContain(pnpmHome)
-      expect(path).not.toContain(bunBin)
+      expect(path).toContain(bunBin)
       expect(path).toContain('/usr/bin')
       expect(path).toContain('/bin')
     } finally {

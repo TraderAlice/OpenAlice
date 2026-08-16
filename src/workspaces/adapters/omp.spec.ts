@@ -43,13 +43,15 @@ describe('omp session layout', () => {
   });
 
   it('encodes paths outside home and tmp as --<abs>--', () => {
+    const cwd = resolve('/private/tmp/omp-alice-probe.d2iMY8/ws2');
+    const encoded = encodeOmpAbsoluteSessionDirName(cwd);
+
     expect(encodeOmpSessionDirName(
-      '/private/tmp/omp-alice-probe.d2iMY8/ws2',
+      cwd,
       '/Users/ame',
       '/var/folders/xx/tmp',
-    )).toBe('--private-tmp-omp-alice-probe.d2iMY8-ws2--');
-    expect(encodeOmpAbsoluteSessionDirName('/private/tmp/omp-alice-probe.d2iMY8/ws2'))
-      .toBe('--private-tmp-omp-alice-probe.d2iMY8-ws2--');
+    )).toBe(encoded);
+    expect(encoded).toBe(`--${cwd.replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')}--`);
   });
 
   it('lists both the canonical bucket and the legacy abs spelling', () => {
@@ -58,7 +60,9 @@ describe('omp session layout', () => {
       '/Users/ame',
       '/var/folders/xx/tmp',
     );
-    expect(names).toContain('--private-tmp-omp-alice-probe.d2iMY8-ws2--');
+    expect(names).toContain(
+      encodeOmpAbsoluteSessionDirName('/private/tmp/omp-alice-probe.d2iMY8/ws2'),
+    );
   });
 
   it('resolves the default agent dir and honors PI_CODING_AGENT_DIR', () => {

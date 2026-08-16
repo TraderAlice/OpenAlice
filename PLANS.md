@@ -29,9 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/omp-adapter.md]] — Oh My Pi (`omp`) CliAdapter at peer completeness
-  with Claude / Codex / Grok Build / opencode / Pi. PATH-detected only; no
-  WebOmp, no `--session-id`, no `~/.omp` isolation.
 - [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
   (`session.born` / started / stopped / rejected / headless turn assets).
   Occupancy + Office timeline + headless text/tool/completion are in;
