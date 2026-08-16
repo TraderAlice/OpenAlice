@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { cursorAdapter } from './cursor.js';
 import { grokAdapter } from './grok.js';
 import { ompAdapter } from './omp.js';
 import { opencodeAdapter } from './opencode.js';
@@ -44,6 +45,16 @@ describe('extractHeadlessSessionId', () => {
     );
   });
 
+  it('cursor: documented stream-json system/init carries session_id', () => {
+    const line =
+      '{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/Users/user/project",' +
+      '"session_id":"c6b62c6f-7ead-4fd6-9922-e952131177ff","model":"Claude 4 Sonnet",' +
+      '"permissionMode":"default"}';
+    expect(cursorAdapter.extractHeadlessSessionId?.(line)).toBe(
+      'c6b62c6f-7ead-4fd6-9922-e952131177ff',
+    );
+  });
+
   it('grok: documented json object carries sessionId', () => {
     const line = '{"text":"ok","stopReason":"EndTurn","sessionId":"019ff963-4d80-7650-a109-efd64717a05d"}';
     expect(grokAdapter.extractHeadlessSessionId?.(line)).toBe(
@@ -77,14 +88,14 @@ describe('extractHeadlessSessionId', () => {
   });
 
   it('non-JSON and irrelevant lines return null everywhere', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessSessionId?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessSessionId?.('{"type":"other"}')).toBeNull();
     }
   });
 
   it('every headless-capable adapter declares an extractor', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessSessionId).toBe('function');
     }

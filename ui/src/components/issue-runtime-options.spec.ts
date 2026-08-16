@@ -91,6 +91,8 @@ describe('Issue runtime options', () => {
   it('preserves runtime-native effort choices for a custom model id', () => {
     expect(issueEffortOptions({ agent: 'claude', semantics: null, modelKnown: false }))
       .toEqual(['low', 'medium', 'high', 'max'])
+    expect(issueEffortOptions({ agent: 'cursor', semantics: null, modelKnown: false }))
+      .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(issueEffortOptions({ agent: 'grok', semantics: null, modelKnown: false }))
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(issueEffortOptions({ agent: 'omp', semantics: null, modelKnown: false }))

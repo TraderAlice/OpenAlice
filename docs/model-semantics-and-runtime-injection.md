@@ -3,7 +3,7 @@
 This guide owns the boundary between AI resource credentials, model semantics,
 Workspace model selection, and native Agent runtime launch projection. Read it
 before changing provider presets, Workspace runtime defaults, model capability
-fields, or the Claude Code, Codex, Grok Build, Oh My Pi, opencode, and Pi adapters.
+fields, or the Claude Code, Codex, Cursor Agent, Grok Build, Oh My Pi, opencode, and Pi adapters.
 
 Related guides: [[docs/project-structure.md]] and
 [[docs/managed-workspace-runtime.md]].
@@ -23,7 +23,7 @@ Model selection and semantic resolution
                          │
                          ▼
 Per-process runtime projection
-  Claude Code / Codex / opencode / Oh My Pi / Pi argv + env for one immutable Session binding
+  Claude Code / Codex / Cursor Agent / opencode / Oh My Pi / Pi argv + env for one immutable Session binding
 ```
 
 ### Credential access
@@ -70,6 +70,8 @@ runtime's native launch interface:
 - Pi provider/model registration plus `--model` and `--thinking`;
 - opencode provider/model environment plus `--model` and `--variant`;
 - Claude Code endpoint/auth environment plus `--model` and `--effort`;
+- Cursor Agent `CURSOR_API_KEY` / optional `CURSOR_API_ENDPOINT` plus
+  `--model` or `--model '<id>[effort=…]'`;
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
 - Oh My Pi provider env plus `--model` and `--thinking`;
@@ -82,7 +84,12 @@ managed Session default, readiness gate, or launch-time fallback. Grok Build
 has no workspace-local project file, so it has no `writeAiConfig` export:
 vault keys enter the child as `XAI_API_KEY` (and `GROK_MODELS_BASE_URL` only
 for a custom host). Headless stdout is Grok 1.0.4 flattened `streaming-json`,
-not ACP-wrapped `session/update`.
+not ACP-wrapped `session/update`. Cursor Agent likewise has no workspace-local
+project file: vault keys enter as `CURSOR_API_KEY` (and `CURSOR_API_ENDPOINT`
+only for a custom host). Alice launches PATH `cursor-agent` only — never the
+colliding `agent` name Grok's installer also claims. Headless stdout is
+documented `stream-json` (`system/init` carries `session_id`). Do not pass
+`--stream-partial-output`.
 
 Claude Code managed-Vault launches select only the `project` settings source
 before projecting the Session's endpoint, credential, model, and effort. Claude
@@ -124,6 +131,8 @@ resolved value:
 - Pi: project `defaultThinkingLevel` (`none` maps to Pi's native `off`);
 - opencode: model-level `options` in the provider SDK's native shape;
 - Claude Code: project `effortLevel` (only values Claude can persist);
+- Cursor Agent: `--model '<id>[effort=…]'` when both model and effort are set
+  (`none` through `max` / `xhigh`; `ultra` is rejected; effort alone is omitted);
 - Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
 - Codex: project `model_reasoning_effort`.
 
@@ -178,6 +187,7 @@ defaults must resolve to a headless-capable Agent.
 |---|---|---|
 | Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
 | Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
+| Cursor Agent | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model` / `--model '<id>[effort=…]'`, `CURSOR_API_KEY` / optional `CURSOR_API_ENDPOINT` |
 | Grok Build | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` |
 | Oh My Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider env |
 | opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |

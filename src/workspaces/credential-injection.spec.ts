@@ -445,6 +445,10 @@ describe('compatibleCredentials', () => {
     'google-1': googleKey,
   }
 
+  it('cursor accepts openai-chat vault keys only', () => {
+    expect(compatibleCredentials(vault, 'cursor').map(([s]) => s)).toEqual(['openai-1', 'custom-1'])
+  })
+
   it('opencode/pi/omp accept every supported wire including native Google', () => {
     expect(compatibleCredentials(vault, 'opencode').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
     expect(compatibleCredentials(vault, 'pi').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])

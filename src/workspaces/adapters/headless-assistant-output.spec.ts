@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { cursorAdapter } from './cursor.js';
 import { grokAdapter } from './grok.js';
 import { ompAdapter } from './omp.js';
 import { opencodeAdapter } from './opencode.js';
@@ -54,6 +55,22 @@ describe('extractHeadlessAssistantText', () => {
     );
   });
 
+  it('cursor: reads the terminal stream-json result only', () => {
+    const assistant = JSON.stringify({
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'Hello!' }] },
+    });
+    const result = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'Done.',
+      session_id: 'c6b62c6f-7ead-4fd6-9922-e952131177ff',
+    });
+    expect(cursorAdapter.extractHeadlessAssistantText?.(assistant)).toBeNull();
+    expect(cursorAdapter.extractHeadlessAssistantText?.(result)).toBe('Done.');
+  });
+
   it('grok: reads the documented json text field', () => {
     const line = JSON.stringify({
       text: 'ok',
@@ -96,14 +113,14 @@ describe('extractHeadlessAssistantText', () => {
   });
 
   it('rejects malformed and unrelated output for every adapter', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessAssistantText?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessAssistantText?.('{"type":"system"}')).toBeNull();
     }
   });
 
   it('every headless runtime declares a structured assistant decoder', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessAssistantText).toBe('function');
     }

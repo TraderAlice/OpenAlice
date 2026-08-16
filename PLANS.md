@@ -29,6 +29,9 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/cursor-adapter.md]] — Cursor Agent (`cursor-agent`) CliAdapter.
+  PATH `cursor-agent` only; never spawn the colliding `agent` name.
+  Implementation in progress on `feat/cursor-adapter`.
 - [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
   (`session.born` / started / stopped / rejected / headless turn assets).
   Occupancy + Office timeline + headless text/tool/completion are in;

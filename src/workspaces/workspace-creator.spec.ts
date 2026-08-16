@@ -51,23 +51,23 @@ function setPlatform(value: NodeJS.Platform): void {
 }
 
 describe('orderCreateAdapters', () => {
-  const ALL = ['claude', 'codex', 'grok', 'omp', 'opencode', 'pi', 'shell'];
+  const ALL = ['claude', 'codex', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell'];
 
   it('uses template defaults only as a transient preparation order', () => {
     expect(orderCreateAdapters(['codex'], ALL)).toEqual([
-      'codex', 'claude', 'grok', 'omp', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 
   it('first-wins dedupes when the head repeats a registered id', () => {
     expect(orderCreateAdapters(['pi', 'claude'], ALL)).toEqual([
-      'pi', 'claude', 'codex', 'grok', 'omp', 'opencode', 'shell',
+      'pi', 'claude', 'codex', 'cursor', 'grok', 'omp', 'opencode', 'shell',
     ]);
   });
 
   it('keeps utility adapters behind agent runtimes', () => {
     expect(orderCreateAdapters(['shell', 'codex'], ALL)).toEqual([
-      'codex', 'claude', 'grok', 'omp', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 
@@ -77,7 +77,7 @@ describe('orderCreateAdapters', () => {
 
   it('ignores stale template defaults that are not registered', () => {
     expect(orderCreateAdapters(['future-agent', 'codex'], ALL)).toEqual([
-      'codex', 'claude', 'grok', 'omp', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 });

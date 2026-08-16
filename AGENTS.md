@@ -66,7 +66,7 @@ design.
   file-backed state, and the UTA client boundary.
 - `services/uta/` owns broker implementations, accounts, approvals, snapshots,
   FX, and every trading write. Do not move broker state back into Alice.
-- The model loop runs in native CLIs (`claude`, `codex`, `grok`, `opencode`, `pi`).
+- The model loop runs in native CLIs (`claude`, `codex`, `cursor-agent`, `grok`, `omp`, `opencode`, `pi`).
   Alice owns credentials and injection, not an in-process chat-agent loop.
 - New agent-facing capabilities normally ship as Workspace templates, skills,
   or satellite repositories. Do not grow a parallel workflow engine in `src/`.

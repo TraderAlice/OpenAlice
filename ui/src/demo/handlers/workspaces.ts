@@ -765,6 +765,7 @@ export const workspacesHandlers = [
       agents: [
         { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
         { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
+        { id: 'cursor', displayName: 'Cursor Agent', installed: true, binPath: '/usr/local/bin/cursor-agent', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-chat'], defaultWire: 'openai-chat' } } },
         { id: 'grok', displayName: 'Grok Build', installed: true, binPath: '/usr/local/bin/grok', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-chat', 'openai-responses'], defaultWire: 'openai-chat' } } },
         { id: 'omp', displayName: 'Oh My Pi', installed: true, binPath: '/usr/local/bin/omp', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
         { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
@@ -780,6 +781,7 @@ export const workspacesHandlers = [
     const displayName = {
       claude: 'Claude Code',
       codex: 'Codex',
+      cursor: 'Cursor Agent',
       grok: 'Grok Build',
       omp: 'Oh My Pi',
       opencode: 'opencode',
@@ -789,6 +791,7 @@ export const workspacesHandlers = [
     const commands: Record<string, readonly string[]> = {
       claude: ['claude', '--settings', '.claude/openalice-autotrust.json'],
       codex: ['codex', '--sandbox', 'danger-full-access', '--ask-for-approval', 'never'],
+      cursor: ['cursor-agent'],
       grok: ['grok', '--no-leader'],
       omp: ['omp'],
       opencode: ['opencode'],
@@ -813,7 +816,7 @@ export const workspacesHandlers = [
         displayName,
         kind: agent === 'shell' ? 'utility' : 'agent',
         installed: true,
-        binPath: agent === 'shell' ? '/bin/zsh' : `/usr/local/bin/${agent}`,
+        binPath: agent === 'shell' ? '/bin/zsh' : agent === 'cursor' ? '/usr/local/bin/cursor-agent' : `/usr/local/bin/${agent}`,
         capabilities,
       },
       launch: {

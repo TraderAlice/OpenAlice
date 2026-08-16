@@ -82,6 +82,10 @@ const CLAUDE_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
   'low', 'medium', 'high', 'max',
 ]
 
+const CURSOR_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+]
+
 const GROK_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
   'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
 ]
@@ -150,6 +154,7 @@ export function runtimeEffortOptions(input: {
   // fabricated scale. Unknown/private ids preserve the runtime's native knobs.
   if (input.modelKnown) return []
   if (input.agent === 'claude') return CLAUDE_RUNTIME_EFFORTS
+  if (input.agent === 'cursor') return CURSOR_RUNTIME_EFFORTS
   if (input.agent === 'grok') return GROK_RUNTIME_EFFORTS
   if (input.agent === 'omp') return OMP_RUNTIME_EFFORTS
   return ALL_RUNTIME_EFFORTS

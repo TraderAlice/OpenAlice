@@ -38,6 +38,7 @@ export const WIRE_SHAPE_GUIDANCE: Record<WireShape, string> = {
 export const AGENT_LABELS: Record<string, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  cursor: 'Cursor Agent',
   grok: 'Grok Build',
   omp: 'Oh My Pi',
   opencode: 'opencode',
