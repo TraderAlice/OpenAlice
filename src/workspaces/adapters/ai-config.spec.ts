@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { claudeAdapter, readClaudeSessionTitleFile } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { grokAdapter } from './grok.js';
 import { openCodeSessionTitle, opencodeAdapter } from './opencode.js';
 import {
   piAdapter,
@@ -734,6 +735,7 @@ describe('assignsSessionId capability (gates the launcher\'s assign-id-at-spawn 
     expect(piAdapter.capabilities.assignsSessionId).toBe(true);
     expect(claudeAdapter.capabilities.assignsSessionId ?? false).toBe(false);
     expect(codexAdapter.capabilities.assignsSessionId ?? false).toBe(false);
+    expect(grokAdapter.capabilities.assignsSessionId ?? false).toBe(false);
     expect(opencodeAdapter.capabilities.assignsSessionId ?? false).toBe(false);
   });
 });
@@ -741,9 +743,10 @@ describe('assignsSessionId capability (gates the launcher\'s assign-id-at-spawn 
 describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)', () => {
   const ctx = (env: Record<string, string> = {}) => ({ cwd: '/ws', env });
 
-  it('all four agent adapters declare the headless capability', () => {
+  it('all agent adapters declare the headless capability', () => {
     expect(claudeAdapter.capabilities.headless).toBe(true);
     expect(codexAdapter.capabilities.headless).toBe(true);
+    expect(grokAdapter.capabilities.headless).toBe(true);
     expect(opencodeAdapter.capabilities.headless).toBe(true);
     expect(piAdapter.capabilities.headless).toBe(true);
   });
@@ -783,6 +786,17 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
+  it('grok: streaming-json --always-approve --single=<prompt>', () => {
+    expect(grokAdapter.composeHeadlessCommand!(['grok'], ctx(), 'do x')).toEqual([
+      'grok',
+      '--no-leader',
+      '--always-approve',
+      '--output-format',
+      'streaming-json',
+      '--single=do x',
+    ]);
+  });
+
   it('opencode: run --format json -- <prompt> (tools via CLI shims)', () => {
     expect(opencodeAdapter.composeHeadlessCommand!(['opencode'], ctx(), 'do x')).toEqual([
       'opencode',
@@ -819,6 +833,10 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     expect(opencodeAdapter.composeHeadlessCommand!(['opencode'], { ...ctx(), resume }, 'next')).toEqual([
       'opencode', 'run', '--format', 'json', '--session', 'native-session-1', '--', 'next',
     ]);
+    expect(grokAdapter.composeHeadlessCommand!(['grok'], { ...ctx(), resume }, 'next')).toEqual([
+      'grok', '--no-leader', '--always-approve', '--resume', 'native-session-1',
+      '--output-format', 'streaming-json', '--single=next',
+    ]);
     expect(piAdapter.composeHeadlessCommand!(['pi'], { ...ctx(), resume }, 'next')).toEqual([
       'pi', '--session-id', 'native-session-1', '-p', '--mode', 'json', 'next',
     ]);
@@ -831,6 +849,13 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
       expect(argv[argv.length - 1]).toBe(dashy); // prompt is the last token
       expect(argv[argv.length - 2]).toBe('--'); // immediately after the terminator
     }
+  });
+
+  it('grok binds a -leading prompt with --single= because -p consumes the next argv', () => {
+    const dashy = '--help me by explaining X';
+    const argv = grokAdapter.composeHeadlessCommand!(['grok'], ctx(), dashy);
+    expect(argv.at(-1)).toBe(`--single=${dashy}`);
+    expect(argv).not.toContain('--');
   });
 
   it('pi takes the prompt as a bare trailing positional (no -- terminator available)', () => {

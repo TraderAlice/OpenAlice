@@ -34,7 +34,7 @@ import {
   publishTerminalViewAttributes,
   useTerminalAppearance,
 } from '../components/workspace/terminalAppearance'
-import { WorkspaceAIConfigModal } from '../components/workspace/WorkspaceAIConfigModal'
+import { WorkspaceAIConfigModal, type Tab } from '../components/workspace/WorkspaceAIConfigModal'
 import {
   deleteSession as apiDeleteSession,
   type AgentId,
@@ -78,6 +78,11 @@ import {
 import { WorkspaceActionsContext } from './workspace-actions-context'
 import { reconcileWorkspaceList } from './workspace-list-reconcile'
 import { reconcileJsonSnapshot } from '../lib/reconcile-json-state'
+
+function deprecatedExportTab(agent: AgentId | undefined): Tab | undefined {
+  if (agent === 'claude' || agent === 'codex' || agent === 'opencode' || agent === 'pi') return agent
+  return undefined
+}
 
 const LIST_POLL_MS = 3000
 
@@ -743,8 +748,14 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         {configuringAgentTarget !== null && (
           <WorkspaceAIConfigModal
             wsId={configuringAgentTarget.wsId}
-            initialAgent={configuringAgentTarget.agent}
-            initialSection={configuringAgentTarget.section ?? (configuringAgentTarget.agent ? 'ai' : 'general')}
+            initialAgent={deprecatedExportTab(configuringAgentTarget.agent)}
+            initialSection={configuringAgentTarget.section ?? (
+              deprecatedExportTab(configuringAgentTarget.agent)
+                ? 'ai'
+                : configuringAgentTarget.agent
+                  ? 'launch'
+                  : 'general'
+            )}
             onAiSaved={({ model, runtimeLabel, workspaceLabel }) => {
               toast.success(model
                 ? t('workspaceSettings.ai.savedModelToast', {

@@ -1503,11 +1503,12 @@ export interface AgentConfig {
 export interface AgentConfigBundle {
   readonly claude: AgentConfig | null;
   readonly codex: AgentConfig | null;
+  readonly grok?: AgentConfig | null;
   readonly opencode: AgentConfig | null;
   readonly pi: AgentConfig | null;
 }
 
-export type AgentId = 'claude' | 'codex' | 'opencode' | 'pi';
+export type AgentId = 'claude' | 'codex' | 'grok' | 'opencode' | 'pi';
 
 export type AgentCredentialSource =
   | 'runtime-login'

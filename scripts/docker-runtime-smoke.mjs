@@ -42,7 +42,8 @@ Options:
   --ai-credential <slug>
                       Run a real, two-turn conversation using one credential
                       from Alice's local vault (never copied into the image)
-  --ai-agent <id>     claude (default), codex, opencode, or pi
+  --ai-agent <id>     claude (default), codex, grok, opencode, or pi
+                      grok is PATH-detected only and is not pinned in the image
   --keep              Keep the container, volume, and owned image for debugging
   --keep-image        Keep only the temporary image built by this run
   -h, --help          Show this help

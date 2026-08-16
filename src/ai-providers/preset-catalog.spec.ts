@@ -12,6 +12,7 @@ import {
   KIMI,
   LONGCAT,
   MINIMAX,
+  XAI_API,
 } from './preset-catalog.js';
 import { BUILTIN_PRESETS } from './presets.js';
 
@@ -83,6 +84,19 @@ describe('credential form catalog', () => {
       });
   });
 
+  it('offers current Grok API tiers on the official xAI endpoints', () => {
+    expect(XAI_API.models?.map((model) => model.id)).toEqual(['grok-4.6', 'grok-4.5']);
+    expect(DEFAULT_MODEL_BY_VENDOR['xai']).toBe('grok-4.6');
+    expect(XAI_API.regions?.[0]?.wires).toEqual({
+      'openai-chat': 'https://api.x.ai/v1',
+      'openai-responses': 'https://api.x.ai/v1',
+    });
+    expect(XAI_API.models?.find((model) => model.id === 'grok-4.6')?.semantics).toMatchObject({
+      contextWindow: 500_000,
+      reasoning: { efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'high' },
+    });
+  });
+
   it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {
     expect(GEMINI.models?.map((model) => model.id)).toEqual([
       'gemini-3.6-flash',
@@ -139,6 +153,7 @@ describe('credential form catalog', () => {
     expect(DEFAULT_MODEL_BY_VENDOR).toEqual({
       anthropic: 'claude-opus-5',
       openai: 'gpt-5.6-sol',
+      xai: 'grok-4.6',
       google: 'gemini-3.6-flash',
       minimax: 'MiniMax-M3',
       glm: 'glm-5.2',
@@ -189,6 +204,7 @@ describe('credential form catalog', () => {
     const vendorByPreset: Record<string, string> = {
       'claude-api': 'anthropic',
       'codex-api': 'openai',
+      'xai-api': 'xai',
       gemini: 'google',
       minimax: 'minimax',
       glm: 'glm',

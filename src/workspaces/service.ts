@@ -1155,7 +1155,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // A batch-only fallback still resolves viaShell:true; drop a user seed in
     // that legacy case because cmd would re-parse & | < > ^ %. The TUI still
     // opens, just not pre-filled. Resolve the COMPOSED argv0 (the adapter's real
-    // binary), not config.command — codex/opencode/pi ignore the base.
+    // binary), not config.command — grok/codex/opencode/pi ignore the base.
     const compose = (withSeed: boolean): readonly string[] =>
       adapter.composeCommand(
         config.command,

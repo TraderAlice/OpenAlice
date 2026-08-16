@@ -12,6 +12,7 @@ import {
 } from './cli-adapter.js'
 import { claudeAdapter } from './adapters/claude.js'
 import { codexAdapter } from './adapters/codex.js'
+import { grokAdapter } from './adapters/grok.js'
 import { opencodeAdapter } from './adapters/opencode.js'
 import { piAdapter } from './adapters/pi.js'
 import {
@@ -235,7 +236,7 @@ describe('built-in Agent Session runtime projection', () => {
     env: { AQ_LAUNCHER_REPO_ROOT: '/openalice' },
   }
 
-  it.each([claudeAdapter, codexAdapter, opencodeAdapter, piAdapter])(
+  it.each([claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter])(
     '$id implements a secret-free argv projection',
     (adapter) => {
       const projected = adapter.sessionRuntime!.project(ctx, runtime)
@@ -262,7 +263,7 @@ describe('built-in Agent Session runtime projection', () => {
     },
   )
 
-  it.each([claudeAdapter, codexAdapter, opencodeAdapter, piAdapter])(
+  it.each([claudeAdapter, codexAdapter, grokAdapter, opencodeAdapter, piAdapter])(
     '$id accepts a credentialless native binding and still projects model/effort',
     (adapter) => {
       const native = createNativeSessionRuntimeBinding({

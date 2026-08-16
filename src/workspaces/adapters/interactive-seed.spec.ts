@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SpawnContext } from '../cli-adapter.js';
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { grokAdapter } from './grok.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 import { shellAdapter } from './shell.js';
@@ -69,6 +70,13 @@ describe('interactive seed — composeCommand initialPrompt', () => {
       expect(argv).toEqual(['pi', PROMPT]);
       expect(argv).not.toContain('--');
     });
+
+    it('grok: trailing `-- <prompt>` after --no-leader', () => {
+      const argv = grokAdapter.composeCommand(['grok'], ctx({ initialPrompt: PROMPT }));
+      expect(argv.slice(-2)).toEqual(['--', PROMPT]);
+      expect(argv).toContain('--no-leader');
+      expect(argv).not.toContain('-p');
+    });
   });
 
   describe('no prompt → no seed argument', () => {
@@ -105,6 +113,11 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     it('opencode resume ignores the prompt', () => {
       const argv = opencodeAdapter.composeCommand([], ctx({ resume: RESUME, initialPrompt: PROMPT }));
       expect(argv).toContain('--session');
+      expect(argv).not.toContain(PROMPT);
+    });
+    it('grok resume ignores the prompt', () => {
+      const argv = grokAdapter.composeCommand(['grok'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
+      expect(argv).toContain('--resume');
       expect(argv).not.toContain(PROMPT);
     });
   });

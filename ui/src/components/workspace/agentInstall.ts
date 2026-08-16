@@ -34,6 +34,10 @@ export const AGENT_INSTALL: Record<string, AgentInstallHint> = {
     cmd: 'npm install -g @earendil-works/pi-coding-agent',
     url: 'https://github.com/earendil-works/pi',
   },
+  grok: {
+    cmd: 'curl -fsSL https://x.ai/cli/install.sh | bash',
+    url: 'https://x.ai/cli',
+  },
 }
 
 export function installHintFor(agentId: string): AgentInstallHint | undefined {

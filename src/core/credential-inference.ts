@@ -14,6 +14,7 @@ import type { CredentialVendor, CredentialWireShape } from './config.js'
 
 const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
   [/generativelanguage\.googleapis\.com/i, 'google'],
+  [/api\.x\.ai/i, 'xai'],
   [/bigmodel\.cn|z\.ai/i, 'glm'],
   [/minimaxi\.com|minimax\.io/i, 'minimax'],
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
@@ -26,7 +27,7 @@ const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
  * CLI agent tab + the entered baseUrl.
  *
  * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek/LongCat gateways); otherwise the
- * agent decides: claude → anthropic, codex → openai. opencode/pi are
+ * agent decides: claude → anthropic, codex → openai, grok → xai. opencode/pi are
  * OpenAI-compatible against arbitrary endpoints, so an unrecognized baseUrl
  * falls back to 'custom' rather than guessing a first-party vendor.
  */
@@ -45,6 +46,7 @@ export function inferCredentialVendor(opts: {
   if (opts.wireShape === 'google-generative-ai') return 'google'
   if (opts.agent === 'claude') return 'anthropic'
   if (opts.agent === 'codex') return 'openai'
+  if (opts.agent === 'grok') return 'xai'
   return 'custom'
 }
 

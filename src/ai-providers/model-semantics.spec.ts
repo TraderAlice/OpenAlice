@@ -55,6 +55,17 @@ describe('model semantics registry', () => {
     })
   })
 
+  it('records Grok 4.6 as required reasoning with xhigh', () => {
+    expect(resolveModelSemantics('xai', 'grok-4.6')).toEqual({
+      contextWindow: 500_000,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'medium', 'high', 'xhigh'],
+        defaultEffort: 'high',
+      },
+    })
+  })
+
   it('records current Anthropic and Gemini defaults with their native effort contracts', () => {
     expect(resolveModelSemantics('anthropic', 'claude-opus-5')).toMatchObject({
       contextWindow: 1_000_000,

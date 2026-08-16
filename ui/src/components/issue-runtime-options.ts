@@ -82,10 +82,15 @@ const CLAUDE_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
   'low', 'medium', 'high', 'max',
 ]
 
+const GROK_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+]
+
 const PROVIDER_PRESET_BY_VENDOR: Readonly<Record<string, string>> = {
   anthropic: 'claude-api',
   openai: 'codex-api',
   google: 'gemini',
+  xai: 'xai-api',
 }
 
 const NATIVE_PRESET_BY_AGENT: Readonly<Record<string, string>> = {
@@ -140,7 +145,9 @@ export function runtimeEffortOptions(input: {
   // A known model without provider-native effort tiers must not receive a
   // fabricated scale. Unknown/private ids preserve the runtime's native knobs.
   if (input.modelKnown) return []
-  return input.agent === 'claude' ? CLAUDE_RUNTIME_EFFORTS : ALL_RUNTIME_EFFORTS
+  if (input.agent === 'claude') return CLAUDE_RUNTIME_EFFORTS
+  if (input.agent === 'grok') return GROK_RUNTIME_EFFORTS
+  return ALL_RUNTIME_EFFORTS
 }
 
 // Issue properties and interactive launchers deliberately share one catalog

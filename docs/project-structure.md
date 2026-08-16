@@ -32,7 +32,7 @@ Guardian
 ├── built Runtime control    versioned status + self-owned Server stop
 ├── Alice                    Workspace runtime + product/API process
 │   ├── Web UI transport     HTTP/Vite in dev, app:// + IPC in Electron
-│   ├── Workspace PTYs       claude / codex / opencode / pi / shell
+│   ├── Workspace PTYs       claude / codex / grok / opencode / pi / shell
 │   ├── ToolCenter           market, news, analysis, Inbox, UTA bridges
 │   └── file-backed state    config, sessions, issues, schedules, tool-call log
 ├── UTA                      broker carrier and trading authority
@@ -76,7 +76,7 @@ src/                           Alice process
 ├── tool/                      agent-facing tool definitions and bridges
 ├── workspaces/                launcher, PTYs, templates, adapters, issues,
 │   │                          schedules, CLI shims, file/git operations
-│   ├── adapters/              claude / codex / opencode / pi / shell
+│   ├── adapters/              claude / codex / grok / opencode / pi / shell
 │   ├── cli/                   alice, alice-uta, alice-workspace, traderhub
 │   └── templates/             built-in Chat and pinned AutoQuant V2 Harnesses
 ├── services/

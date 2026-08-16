@@ -36,7 +36,7 @@ export interface Profile {
 // ==================== AI Provider Credentials ====================
 
 export type CredentialVendor =
-  | 'anthropic' | 'openai' | 'google'
+  | 'anthropic' | 'openai' | 'google' | 'xai'
   | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat'
   | 'custom'
 

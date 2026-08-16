@@ -55,9 +55,9 @@ function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'labe
 interface RuntimeInfo {
   id: string
   name: string
-  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
-  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
-  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
+  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
+  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
+  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
 }
 
 const AGENT_RUNTIMES: RuntimeInfo[] = [
@@ -74,6 +74,13 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
     blurbKey: 'aiProvider.runtime.codex.blurb',
     modelsKey: 'aiProvider.runtime.codex.models',
     authKey: 'aiProvider.runtime.codex.auth',
+  },
+  {
+    id: 'grok',
+    name: 'Grok Build',
+    blurbKey: 'aiProvider.runtime.grok.blurb',
+    modelsKey: 'aiProvider.runtime.grok.models',
+    authKey: 'aiProvider.runtime.grok.auth',
   },
   {
     id: 'opencode',
