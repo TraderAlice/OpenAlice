@@ -41,6 +41,14 @@ The stable page hierarchy is:
 3. one focused working view;
 4. dialogs, drawers, and popovers for temporary decisions.
 
+The activity rail's items, groups, and visibility are user-arranged from
+Settings → Activity bar and stored in `data/ui-layout.json`. The rail only
+renders the joined result. Deep links to a hidden surface still adopt.
+The Settings editor reorders live: the list opens a gap under the pointer
+while the lifted row follows it. Sibling rows FLIP-animate into that slot.
+`prefers-reduced-motion: reduce` skips the sibling motion; the overlay still
+tracks the pointer.
+
 Avoid duplicating these layers inside the focused view. A page navigator should
 not be restyled as a stack of cards, and a detail surface should not create a
 second page shell inside itself.

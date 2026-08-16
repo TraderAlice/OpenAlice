@@ -7,6 +7,7 @@ import {
   ListChecks,
   Newspaper,
   Palette,
+  PanelLeft,
   Plug,
   ShieldCheck,
   SlidersHorizontal,
@@ -21,6 +22,7 @@ import { SidebarRow } from './SidebarRow'
 const CATEGORIES = [
   { labelKey: 'settings.category.general',     category: 'general',        Icon: SlidersHorizontal },
   { labelKey: 'settings.category.appearance',  category: 'appearance',     Icon: Palette },
+  { labelKey: 'settings.category.activityBar', category: 'activity-bar',   Icon: PanelLeft },
   { labelKey: 'settings.category.aiProvider',  category: 'ai-provider',    Icon: Bot },
   { labelKey: 'settings.category.agentPermissions', category: 'agent-permissions', Icon: ShieldCheck },
   { labelKey: 'settings.category.tools',       category: 'tools',          Icon: Wrench },

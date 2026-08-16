@@ -72,6 +72,13 @@ describe('Settings URL projection', () => {
       params: { category: 'beta' },
     })).toBe('/settings/beta')
   })
+
+  it('projects the Activity bar category onto /settings/activity-bar', () => {
+    expect(getView('settings').toUrl({
+      kind: 'settings',
+      params: { category: 'activity-bar' },
+    })).toBe('/settings/activity-bar')
+  })
 })
 
 describe('shared product shells', () => {

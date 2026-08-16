@@ -22,6 +22,7 @@ import { agentConversationsApi } from './agentConversations'
 import { agentRuntimeLogApi } from './agentRuntimeLog'
 import { officeApi } from './office'
 import { aliceProjectApi } from './aliceProject'
+import { uiLayoutApi } from './ui-layout'
 export const api = {
   config: configApi,
   schedule: scheduleApi,
@@ -43,6 +44,7 @@ export const api = {
   agentRuntime: agentRuntimeLogApi,
   office: officeApi,
   aliceProject: aliceProjectApi,
+  uiLayout: uiLayoutApi,
 }
 
 export type { AliceProject } from './aliceProject'
