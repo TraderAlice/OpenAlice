@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -26,8 +26,10 @@ function ctx(extra: Partial<SpawnContext> = {}): SpawnContext {
 
 describe('grok session layout', () => {
   it('encodes the absolute cwd the way Grok 1.0.4 stores sessions', () => {
-    expect(grokSessionDir('/Users/ame/proj', '/Users/ame/.grok')).toBe(
-      '/Users/ame/.grok/sessions/%2FUsers%2Fame%2Fproj',
+    const cwd = resolve(tmpdir(), 'grok-project');
+    const home = resolve(tmpdir(), 'grok-home');
+    expect(grokSessionDir(cwd, home)).toBe(
+      join(home, 'sessions', encodeURIComponent(cwd)),
     );
   });
 
@@ -507,13 +509,15 @@ describe('grok interactive setup', () => {
 
   it('reports missing login versus missing folder trust', async () => {
     const home = await mkdtemp(join(tmpdir(), 'grok-setup-'));
-    expect(await readGrokInteractiveSetupStatus('/tmp/ws', home)).toBe('runtime-onboarding-required');
+    const cwd = join(home, 'workspace');
+    await mkdir(cwd);
+    expect(await readGrokInteractiveSetupStatus(cwd, home)).toBe('runtime-onboarding-required');
     await writeFile(join(home, 'auth.json'), '{}\n');
-    expect(await readGrokInteractiveSetupStatus('/tmp/ws', home)).toBe('workspace-trust-required');
+    expect(await readGrokInteractiveSetupStatus(cwd, home)).toBe('workspace-trust-required');
     await writeFile(join(home, 'trusted_folders.toml'), [
-      '[folders."/tmp/ws"]',
+      `[folders.${JSON.stringify(cwd)}]`,
       'trusted = true',
     ].join('\n'));
-    expect(await readGrokInteractiveSetupStatus('/tmp/ws', home)).toBe('ready');
+    expect(await readGrokInteractiveSetupStatus(cwd, home)).toBe('ready');
   });
 });
