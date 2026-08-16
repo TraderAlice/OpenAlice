@@ -135,8 +135,11 @@ resolved value:
 - Claude Code: project `effortLevel` (only values Claude can persist);
 - Cursor Agent: `--model <id>` only. Live `2026.08.11-e8db854` treats
   `id[effort=…]` as an unknown model name even though help still documents
-  brackets. Do not invent `--effort` or rewrite ids; pick a catalog id that
-  already includes the suffix when effort matters;
+  brackets. Do not invent `--effort` or rewrite ids. Issue / launch
+  suggestions are the first-party Cursor Models pool plus `auto`
+  (`src/workspaces/adapters/cursor-models.ts`); third-party ids stay
+  free-typed. Effort and Fast are suffixes on the CLI id
+  (`cursor-grok-4.6-high-fast`), not a separate picker;
 - Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
 - Codex: project `model_reasoning_effort`.
 

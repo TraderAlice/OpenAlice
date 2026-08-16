@@ -63,6 +63,7 @@ Documented `stream-json` `system/init` (from Cursor docs, not a live authenticat
 8. **No Web / ACP / worker / `--worktree` / `--workspace` / `--plugin-dir` / `--api-key` / `create-chat` / `ls`.**
 9. **`deprecatedExportTab` stays closed** (Launch tab), same as Grok Build.
 10. **`credentialSource: 'runtime-or-workspace'`.** `wirePreference: ['openai-chat']` is only a form default for an optional custom endpoint. No `modelRegistration` (Cursor owns its model list after login).
+11. **First-party picker suggestions, not a vendor.** Issue / launch suggest the official Cursor Models pool plus `auto` (`cursor-models.ts`). Not a `cursor` vault preset. Not the third-party `cursor-agent models` zoo. Composer 1 stays out (Other Models). Full first-party matrix because effort / Fast live in the id and the effort picker is empty. Free-typed ids still win. Refresh with `cursor-agent models` after login.
 
 ### Alternatives rejected
 
@@ -73,7 +74,9 @@ Documented `stream-json` `system/init` (from Cursor docs, not a live authenticat
 5. **`--output-format json` as the headless wire** — one object at the end, no tool events. `stream-json` matches Alice's line scanner (same reason Grok uses `streaming-json`).
 6. **`--stream-partial-output`** — official docs warn about duplicate assistant flushes.
 7. **Reuse Claude / Grok adapters** — auth, session minting, JSON event names, and the `agent` PATH collision all disagree.
-8. **Add a Cursor vendor preset / WebCursor in the same PR** — product expansion; login + `CURSOR_API_KEY` is enough.
+8. **Add a Cursor vendor preset / WebCursor in the same PR** — product expansion; login + `CURSOR_API_KEY` is enough. First-party CLI suggestions are not a vendor.
+9. **Dump every `cursor-agent models` id into the picker** — the third-party list churns; Alice only curates the Cursor Models pool.
+10. **Short family list without effort/fast suffixes** — the effort picker is empty, so users could not reach `xhigh` without knowing the suffix.
 
 ## Adapter contract
 
@@ -144,6 +147,7 @@ Do not use `~/.openalice` or port 5174. Login was keychain (`cursor-agent status
 - [x] `npx tsc --noEmit`, `cd ui && npx tsc -b`, targeted Vitest + full `pnpm test`
 - [x] Isolated compose-argv replay against `cursor-agent --help` (`2026.08.11-e8db854`)
 - [x] Authenticated live checks (print / resume / TUI harvest / `--force` shell). Effort brackets rejected; projection dropped. Inbox-push shim still open.
+- [x] First-party Cursor Models suggestions (`cursor-models.ts` + Issue/launch picker). Not a vault vendor.
 
 Discovery during implementation: 2026.08.11-e8db854 also has hidden `--new-session-id` (create-only UUIDv4; cannot combine with `--resume` / `--continue`). That is still not create-or-reopen, so `assignsSessionId` stays false. Do not spawn it.
 

@@ -622,7 +622,7 @@ export const ja: Resources = {
       },
       cursor: {
         blurb: 'Cursor の coding-agent CLI。Alice は PATH 上の `cursor-agent` だけを起動し、Grok と衝突する `agent` 名は使いません。',
-        models: '`cursor-agent login` 後の Cursor ホストモデル。任意で Cursor 互換のカスタムエンドポイントも使えます。',
+        models: 'ログイン後のファーストパーティ Cursor Models：Auto、Composer 2.5、Grok 4.6 / 4.5。effort と Fast は CLI id に含まれます。サードパーティ id は手入力のままです。',
         auth: '`cursor-agent login`、または Cursor Dashboard の API キーを `CURSOR_API_KEY` に設定。',
       },
       grok: {

@@ -4,6 +4,7 @@ import type {
   Preset,
   PresetModel,
 } from '../api'
+import { CURSOR_FIRST_PARTY_MODELS } from '../lib/cursor-models'
 import type {
   SavedCredential,
   WorkspaceRuntimeModeSettings,
@@ -111,18 +112,29 @@ function uniqueModels(models: readonly PresetModel[]): PresetModel[] {
   })
 }
 
+function vendorCatalog(input: {
+  readonly agent: string | null
+  readonly credential: SavedCredential | null
+  readonly presets: readonly Preset[]
+}): readonly PresetModel[] {
+  // Cursor CLI ids are not a vault vendor catalog. A bound DeepSeek/OpenAI
+  // key does not make those model ids valid `--model` values.
+  if (input.agent === 'cursor') return CURSOR_FIRST_PARTY_MODELS
+  const presetId = input.credential
+    ? PROVIDER_PRESET_BY_VENDOR[input.credential.vendor] ?? input.credential.vendor
+    : input.agent ? NATIVE_PRESET_BY_AGENT[input.agent] : undefined
+  return presetId
+    ? input.presets.find((preset) => preset.id === presetId)?.models ?? []
+    : []
+}
+
 export function runtimeModelOptions(input: {
   readonly agent: string | null
   readonly credential: SavedCredential | null
   readonly defaultModel: string | null
   readonly presets: readonly Preset[]
 }): PresetModel[] {
-  const presetId = input.credential
-    ? PROVIDER_PRESET_BY_VENDOR[input.credential.vendor] ?? input.credential.vendor
-    : input.agent ? NATIVE_PRESET_BY_AGENT[input.agent] : undefined
-  const catalog = presetId
-    ? input.presets.find((preset) => preset.id === presetId)?.models ?? []
-    : []
+  const catalog = vendorCatalog(input)
   const preferredModel = input.defaultModel
   return uniqueModels([
     ...(preferredModel && !catalog.some((model) => model.id === preferredModel)

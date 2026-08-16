@@ -183,7 +183,9 @@ function cursorToolEvents(record: Record<string, unknown>): readonly HeadlessOut
  * a resume flag. Headless uses `-p --output-format stream-json --force
  * --trust` plus `-- <prompt>`. There is no workspace-local Cursor project
  * file, so this adapter has no deprecated `writeAiConfig` export: managed
- * Sessions use `sessionRuntime` env only.
+ * Sessions use `sessionRuntime` env only. First-party `--model` suggestions
+ * (Cursor Models pool + `auto`) live in `./cursor-models.ts`; this adapter
+ * does not validate the id.
  */
 export const cursorAdapter: CliAdapter = {
   id: 'cursor',

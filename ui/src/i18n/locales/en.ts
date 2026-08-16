@@ -633,7 +633,7 @@ export const en = {
       },
       cursor: {
         blurb: "Cursor's coding-agent CLI. Alice launches PATH `cursor-agent` only — never the colliding `agent` name.",
-        models: 'Cursor-hosted models after `cursor-agent login`, plus an optional custom Cursor-compatible endpoint.',
+        models: 'First-party Cursor Models pool after login: Auto, Composer 2.5, Grok 4.6 / 4.5. Effort and Fast are part of the CLI id. Third-party ids stay free-typed.',
         auth: '`cursor-agent login` or a Cursor Dashboard API key in `CURSOR_API_KEY`.',
       },
       grok: {

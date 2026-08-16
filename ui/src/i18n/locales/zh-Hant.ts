@@ -629,7 +629,7 @@ export const zhHant: Resources = {
       },
       cursor: {
         blurb: 'Cursor 的 coding-agent CLI。Alice 只啟動 PATH 上的 `cursor-agent`，不會使用會和 Grok 衝突的 `agent` 命令。',
-        models: '`cursor-agent login` 之後由 Cursor 託管的模型，也可選自訂的 Cursor 相容端點。',
+        models: '登入後的本家 Cursor Models：Auto、Composer 2.5、Grok 4.6 / 4.5。effort 與 Fast 寫在 CLI id 裡。第三方模型可手輸。',
         auth: '`cursor-agent login`，或把 Cursor Dashboard API key 放進 `CURSOR_API_KEY`。',
       },
       grok: {
