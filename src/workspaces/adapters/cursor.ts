@@ -4,7 +4,6 @@ import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import type { ModelReasoningEffort } from '../../ai-providers/model-semantics.js';
 import type {
   CliAdapter,
   OnDiskSession,
@@ -12,16 +11,6 @@ import type {
   SpawnContext,
 } from '../cli-adapter.js';
 import type { HeadlessOutputEvent } from '../headless-output.js';
-
-const CURSOR_RUN_EFFORTS = new Set<ModelReasoningEffort>([
-  'none',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-]);
 
 const CURSOR_OFFICIAL_BASE = 'https://api2.cursor.sh';
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,15 +60,15 @@ export function isOfficialCursorBase(url: string | null | undefined): boolean {
   return trimmed === '' || trimmed === CURSOR_OFFICIAL_BASE;
 }
 
-export function cursorModelArg(
-  model: string | undefined,
-  effort: ModelReasoningEffort | undefined,
-): string | undefined {
-  if (effort && !CURSOR_RUN_EFFORTS.has(effort)) {
-    throw new Error(`Cursor Agent cannot use Session effort ${effort}`);
-  }
-  if (!model) return undefined;
-  return effort ? `${model}[effort=${effort}]` : model;
+/**
+ * Live `2026.08.11-e8db854` treats `id[effort=…]` as an unknown model name
+ * (help still documents brackets). Effort is already encoded as catalog
+ * suffixes (`gpt-5.2-low`, `composer-2.5-fast`). Do not invent `--effort`
+ * or rewrite ids.
+ */
+export function cursorModelArg(model: string | undefined): string | undefined {
+  const trimmed = model?.trim();
+  return trimmed || undefined;
 }
 
 function parseJsonRecord(line: string): Record<string, unknown> | null {
@@ -125,8 +114,18 @@ function cursorToolName(toolCall: Record<string, unknown>): string {
 function cursorToolEntry(toolCall: Record<string, unknown>): Record<string, unknown> | null {
   const fn = toolCall['function'];
   if (isRecord(fn)) return fn;
+  for (const [key, value] of Object.entries(toolCall)) {
+    if (key.endsWith('ToolCall') && isRecord(value)) return value;
+  }
   for (const value of Object.values(toolCall)) {
-    if (isRecord(value)) return value;
+    if (
+      isRecord(value)
+      && (value['args'] !== undefined
+        || value['arguments'] !== undefined
+        || value['result'] !== undefined)
+    ) {
+      return value;
+    }
   }
   return null;
 }
@@ -206,7 +205,7 @@ export const cursorAdapter: CliAdapter = {
 
   sessionRuntime: {
     project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
-      const model = cursorModelArg(runtime.binding.model, runtime.binding.reasoningEffort);
+      const model = cursorModelArg(runtime.binding.model);
       const args = model ? ['--model', model] : [];
       const env: Record<string, string> = {};
       const ai = runtime.ai;

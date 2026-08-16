@@ -82,10 +82,6 @@ const CLAUDE_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
   'low', 'medium', 'high', 'max',
 ]
 
-const CURSOR_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
-  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
-]
-
 const GROK_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
   'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
 ]
@@ -148,13 +144,15 @@ export function runtimeEffortOptions(input: {
   readonly semantics: ModelSemantics | null
   readonly modelKnown: boolean
 }): readonly ModelReasoningEffort[] {
+  // Live Cursor Agent encodes effort in the model id (`gpt-5.2-low`).
+  // Brackets and a separate effort flag both fail; do not show a fake scale.
+  if (input.agent === 'cursor') return []
   const declared = input.semantics?.reasoning?.efforts
   if (declared) return declared
   // A known model without provider-native effort tiers must not receive a
   // fabricated scale. Unknown/private ids preserve the runtime's native knobs.
   if (input.modelKnown) return []
   if (input.agent === 'claude') return CLAUDE_RUNTIME_EFFORTS
-  if (input.agent === 'cursor') return CURSOR_RUNTIME_EFFORTS
   if (input.agent === 'grok') return GROK_RUNTIME_EFFORTS
   if (input.agent === 'omp') return OMP_RUNTIME_EFFORTS
   return ALL_RUNTIME_EFFORTS

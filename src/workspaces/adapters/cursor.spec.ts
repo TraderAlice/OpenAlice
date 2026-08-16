@@ -162,13 +162,14 @@ describe('cursor sessionRuntime', () => {
       },
     });
     expect(projected.env).toEqual({ CURSOR_API_KEY: SECRET });
-    expect(projected.interactiveArgs).toEqual(['--model', 'gpt-5[effort=high]']);
+    expect(projected.interactiveArgs).toEqual(['--model', 'gpt-5']);
     const argv = cursorAdapter.composeCommand(['cursor-agent'], {
       ...runtimeCtx,
       sessionRuntime: projected,
     });
     expect(argv.join(' ')).not.toContain(SECRET);
-    expect(argv).toEqual(['cursor-agent', '--model', 'gpt-5[effort=high]']);
+    expect(argv.join(' ')).not.toContain('[effort=');
+    expect(argv).toEqual(['cursor-agent', '--model', 'gpt-5']);
   });
 
   it('points a custom host at CURSOR_API_ENDPOINT', () => {
@@ -191,17 +192,33 @@ describe('cursor sessionRuntime', () => {
     });
   });
 
-  it('rejects ultra, omits effort without a model, and leaves native login env empty', () => {
-    expect(() => cursorModelArg('gpt-5', 'ultra')).toThrow(/ultra/);
-    expect(cursorModelArg(undefined, 'high')).toBeUndefined();
-    expect(() => cursorAdapter.sessionRuntime!.project(runtimeCtx, {
+  it('ignores Session effort, including ultra, and leaves native login env empty', () => {
+    expect(cursorModelArg('gpt-5')).toBe('gpt-5');
+    expect(cursorModelArg('  gpt-5.2-low  ')).toBe('gpt-5.2-low');
+    expect(cursorModelArg(undefined)).toBeUndefined();
+    expect(cursorModelArg('')).toBeUndefined();
+
+    const withEffort = cursorAdapter.sessionRuntime!.project(runtimeCtx, {
       binding: {
         version: 1,
         credential: { source: 'native' },
+        model: 'gpt-5.2',
         reasoningEffort: 'ultra',
       },
-      ai: { model: 'gpt-5', reasoningEffort: 'ultra' },
-    })).toThrow(/ultra/);
+      ai: { model: 'gpt-5.2', reasoningEffort: 'ultra' },
+    });
+    expect(withEffort.interactiveArgs).toEqual(['--model', 'gpt-5.2']);
+    expect(withEffort.interactiveArgs.join(' ')).not.toContain('[effort=');
+
+    const effortOnly = cursorAdapter.sessionRuntime!.project(runtimeCtx, {
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        reasoningEffort: 'high',
+      },
+      ai: { reasoningEffort: 'high' },
+    });
+    expect(effortOnly.interactiveArgs).toEqual([]);
 
     const native = cursorAdapter.sessionRuntime!.project(runtimeCtx, {
       binding: {
@@ -367,7 +384,71 @@ describe('cursor headless extractors', () => {
     }))).toEqual([{ type: 'error', message: 'Authentication required.' }]);
   });
 
-  it('keeps tool/result lines and drops system/user chatter', () => {
+  it('reads live 2026.08.11-e8db854 shellToolCall events and ignores extra keys', () => {
+    const liveStarted = JSON.stringify({
+      type: 'tool_call',
+      subtype: 'started',
+      call_id: 'call-live-shell-0',
+      tool_call: {
+        shellToolCall: {
+          args: { command: 'echo ALICE_CURSOR_TOOL_OK' },
+          description: 'Echo ALICE_CURSOR_TOOL_OK marker',
+        },
+        hookAdditionalContexts: [],
+        toolCallId: 'call-live-shell-0',
+        startedAtMs: 1,
+      },
+      session_id: LIVE_SESSION_ID,
+    });
+    const liveCompleted = JSON.stringify({
+      type: 'tool_call',
+      subtype: 'completed',
+      call_id: 'call-live-shell-0',
+      tool_call: {
+        shellToolCall: {
+          args: { command: 'echo ALICE_CURSOR_TOOL_OK' },
+          result: {
+            success: {
+              command: 'echo ALICE_CURSOR_TOOL_OK',
+              exitCode: 0,
+              stdout: 'ALICE_CURSOR_TOOL_OK\n',
+            },
+            isBackground: false,
+          },
+          description: 'Echo ALICE_CURSOR_TOOL_OK marker',
+        },
+        hookAdditionalContexts: [],
+        toolCallId: 'call-live-shell-0',
+        startedAtMs: 1,
+        completedAtMs: 2,
+      },
+      session_id: LIVE_SESSION_ID,
+    });
+    expect(cursorAdapter.extractHeadlessOutputEvents?.(liveStarted)).toEqual([{
+      type: 'tool-start',
+      id: 'call-live-shell-0',
+      name: 'shell',
+      input: { command: 'echo ALICE_CURSOR_TOOL_OK' },
+    }]);
+    expect(cursorAdapter.extractHeadlessOutputEvents?.(liveCompleted)).toEqual([{
+      type: 'tool-finish',
+      id: 'call-live-shell-0',
+      name: 'shell',
+      output: {
+        command: 'echo ALICE_CURSOR_TOOL_OK',
+        exitCode: 0,
+        stdout: 'ALICE_CURSOR_TOOL_OK\n',
+      },
+    }]);
+  });
+
+  it('keeps tool/result lines and drops system/user/thinking chatter', () => {
+    const thinking = JSON.stringify({
+      type: 'thinking',
+      subtype: 'delta',
+      text: 'The response will be exactly ALICE_CURSOR_OK',
+      session_id: LIVE_SESSION_ID,
+    });
     expect(cursorAdapter.keepHeadlessDiagnosticLine?.(started)).toBe(true);
     expect(cursorAdapter.keepHeadlessDiagnosticLine?.(completed)).toBe(true);
     expect(cursorAdapter.keepHeadlessDiagnosticLine?.(result)).toBe(true);
@@ -377,6 +458,9 @@ describe('cursor headless extractors', () => {
     expect(cursorAdapter.keepHeadlessDiagnosticLine?.(
       '{"type":"user","session_id":"c6b62c6f-7ead-4fd6-9922-e952131177ff"}',
     )).toBe(false);
+    expect(cursorAdapter.keepHeadlessDiagnosticLine?.(thinking)).toBe(false);
+    expect(cursorAdapter.extractHeadlessOutputEvents?.(thinking)).toEqual([]);
+    expect(cursorAdapter.extractHeadlessAssistantText?.(thinking)).toBeNull();
     expect(cursorAdapter.keepHeadlessDiagnosticLine?.('plain text')).toBe(false);
   });
 });

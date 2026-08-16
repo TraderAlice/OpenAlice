@@ -92,7 +92,12 @@ describe('Issue runtime options', () => {
     expect(issueEffortOptions({ agent: 'claude', semantics: null, modelKnown: false }))
       .toEqual(['low', 'medium', 'high', 'max'])
     expect(issueEffortOptions({ agent: 'cursor', semantics: null, modelKnown: false }))
-      .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+      .toEqual([])
+    expect(issueEffortOptions({
+      agent: 'cursor',
+      semantics: { reasoning: { mode: 'optional', efforts: ['low', 'high'] } },
+      modelKnown: true,
+    })).toEqual([])
     expect(issueEffortOptions({ agent: 'grok', semantics: null, modelKnown: false }))
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(issueEffortOptions({ agent: 'omp', semantics: null, modelKnown: false }))

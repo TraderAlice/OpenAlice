@@ -71,7 +71,8 @@ runtime's native launch interface:
 - opencode provider/model environment plus `--model` and `--variant`;
 - Claude Code endpoint/auth environment plus `--model` and `--effort`;
 - Cursor Agent `CURSOR_API_KEY` / optional `CURSOR_API_ENDPOINT` plus
-  `--model` or `--model '<id>[effort=…]'`;
+  `--model` only (live CLI rejects `id[effort=…]`; catalog ids already
+  encode effort as suffixes such as `gpt-5.2-low`);
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
 - Oh My Pi provider env plus `--model` and `--thinking`;
@@ -88,8 +89,9 @@ not ACP-wrapped `session/update`. Cursor Agent likewise has no workspace-local
 project file: vault keys enter as `CURSOR_API_KEY` (and `CURSOR_API_ENDPOINT`
 only for a custom host). Alice launches PATH `cursor-agent` only — never the
 colliding `agent` name Grok's installer also claims. Headless stdout is
-documented `stream-json` (`system/init` carries `session_id`). Do not pass
-`--stream-partial-output`.
+documented `stream-json` (`system/init` carries `session_id`). Live print
+mode also emits `thinking` delta/completed events; Alice extractors ignore
+them. Do not pass `--stream-partial-output`.
 
 Claude Code managed-Vault launches select only the `project` settings source
 before projecting the Session's endpoint, credential, model, and effort. Claude
@@ -131,8 +133,10 @@ resolved value:
 - Pi: project `defaultThinkingLevel` (`none` maps to Pi's native `off`);
 - opencode: model-level `options` in the provider SDK's native shape;
 - Claude Code: project `effortLevel` (only values Claude can persist);
-- Cursor Agent: `--model '<id>[effort=…]'` when both model and effort are set
-  (`none` through `max` / `xhigh`; `ultra` is rejected; effort alone is omitted);
+- Cursor Agent: `--model <id>` only. Live `2026.08.11-e8db854` treats
+  `id[effort=…]` as an unknown model name even though help still documents
+  brackets. Do not invent `--effort` or rewrite ids; pick a catalog id that
+  already includes the suffix when effort matters;
 - Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
 - Codex: project `model_reasoning_effort`.
 
@@ -187,7 +191,7 @@ defaults must resolve to a headless-capable Agent.
 |---|---|---|
 | Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
 | Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
-| Cursor Agent | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model` / `--model '<id>[effort=…]'`, `CURSOR_API_KEY` / optional `CURSOR_API_ENDPOINT` |
+| Cursor Agent | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `CURSOR_API_KEY` / optional `CURSOR_API_ENDPOINT` |
 | Grok Build | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` |
 | Oh My Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider env |
 | opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |

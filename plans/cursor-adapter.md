@@ -28,10 +28,10 @@ Sources: [CLI overview](https://cursor.com/docs/cli/overview), [using](https://c
 | `--` | POSIX end-of-options. Live: `-p --output-format text -- --help` treated `--help` as the prompt (then auth-failed). Use `--`. |
 | Interactive | `cursor-agent [--model …] [--trust?] [--resume id\|--continue] -- [prompt]` |
 | Headless | `cursor-agent -p --output-format stream-json --force --trust … -- <prompt>`. Docs: without `--force` / `--yolo`, print mode proposes edits and does not apply them. `--trust` is the documented headless workspace-trust skip. |
-| JSON | `json` is one terminal object with `session_id` + `result` (no tool stream). `stream-json` is NDJSON: `system/init` (has `session_id`), `user`, `assistant`, `tool_call` started/completed, terminal `result`. Do **not** pass `--stream-partial-output` (duplicate assistant flushes). Thinking events are suppressed in print mode. |
+| JSON | `json` is one terminal object with `session_id` + `result` (no tool stream). `stream-json` is NDJSON: `system/init` (has `session_id`), `user`, `thinking` delta/completed (live print does **not** suppress these), `assistant`, `tool_call` started/completed (`shellToolCall` plus extra keys), terminal `result`. Do **not** pass `--stream-partial-output` (duplicate assistant flushes). Extractors ignore `thinking`. |
 | No auth | Print exits 1 with a text error. No `system/init`. |
 | Sessions on disk | CLI chats are `~/.cursor/chats/<md5(path.resolve(cwd))>/<uuid>/store.db` (`create-chat.ts` + `state/index.ts` + `chat-session-list.ts` in 2026.08.11-e8db854). `create-chat` mints a UUID, prints it, then `dispose()` **deletes** an empty store — that is why isolated create-chat left no files and is not a spawn flag. `--continue` / `--resume=-1` calls `getLatestChatId` → cwd-scoped list sorted by `updatedAtMs`. `~/.cursor/projects/` is the IDE cache; do not watch it. |
-| Model / effort | `--model` (e.g. `gpt-5`, `sonnet-4-thinking`). Help: parameterized models accept `'claude-opus-4-8[context=1m,effort=high,fast=false]'`. No `--thinking` / `--effort` flags (`unknown option`). |
+| Model / effort | `--model` (e.g. `gpt-5.2`, `gpt-5.2-low`, `composer-2.5-fast`). Help still documents `'claude-opus-4-8[context=1m,effort=high,fast=false]'`. Live `2026.08.11-e8db854` rejects `id[effort=…]` as an unknown model name. Catalog already encodes effort as suffixes. No `--thinking` / `--effort` flags (`unknown option`). Do not invent a suffix mapper. |
 | Skills | `--plugin-dir` loads Cursor plugins, not Alice skill paths. Ignore `ctx.skills`. CLI already reads `.cursor/rules`, `AGENTS.md`, `CLAUDE.md`. |
 | Role prompt | No `--append-system-prompt`. Ignore `ctx.appendSystemPrompt`. |
 | Approval | Headless: `--force` + `--trust`. Interactive: `--trust` only when `approveProject`. Do not write trust files. |
@@ -59,7 +59,7 @@ Documented `stream-json` `system/init` (from Cursor docs, not a live authenticat
 4. **No `writeAiConfig` / project `.cursor` writes.** Vault keys go to `CURSOR_API_KEY`; a non-default `baseUrl` goes to `CURSOR_API_ENDPOINT`. Secrets never enter argv (`--api-key` is forbidden).
 5. **Cursor keys are not generic LLM keys.** Native login is enough. A Workspace vault binding is a Cursor Dashboard API key (or a custom Cursor-compatible endpoint), not Anthropic/OpenAI. `inferCredentialVendor('cursor')` stays `custom`. Do not add a `cursor` vendor to the catalog in this PR.
 6. **Probe the native id; do not assign it.** Same split as Codex / Grok / opencode: `assignsSessionId` stays false, but Alice still harvests `agentSessionId` into `ResumeRegistry`. Headless: `extractHeadlessSessionId` from `stream-json` `session_id`. Interactive: `transcriptDiscovery: 'subprocess'` polls `listOnDisk` for a **new** UUID directory under the cwd chat bucket (Codex/opencode watcher, 90s). `resumeLast` emits `--continue` (native, cwd-scoped in this build). `--resume id` once Alice has the id. Do not call `create-chat`. Do not watch IDE `projects/`.
-7. **Effort via documented model brackets.** `--model <id>` when only a model is set. When both model and effort are set, `--model '<id>[effort=<effort>]'`. Reject `ultra`. If only effort is set, omit it (no model to hang a bracket on). Live-verify the bracket against a real key; if it fails, drop effort projection rather than invent `--effort`.
+7. **No effort projection.** `--model <id>` only. Live login rejected `sonnet-4-thinking[effort=low]`, `gpt-5.2[effort=low]`, and `composer-2.5[effort=low]` (`Cannot use this model`). Issue/launch effort pickers return `[]` for `cursor`. Bindings may still carry `reasoningEffort`; the adapter ignores it, including `ultra`. Do not invent `--effort` or rewrite ids to `-low`/`-high`.
 8. **No Web / ACP / worker / `--worktree` / `--workspace` / `--plugin-dir` / `--api-key` / `create-chat` / `ls`.**
 9. **`deprecatedExportTab` stays closed** (Launch tab), same as Grok Build.
 10. **`credentialSource: 'runtime-or-workspace'`.** `wirePreference: ['openai-chat']` is only a form default for an optional custom endpoint. No `modelRegistration` (Cursor owns its model list after login).
@@ -94,7 +94,7 @@ Interactive:
 
 ```text
 cursor-agent
-  [--model <id or id[effort=…]>]
+  [--model <id>]
   [--trust]                         # only when approveProject
   [--resume <id> | --continue]
   -- [<initialPrompt>]              # fresh seed only
@@ -106,7 +106,7 @@ Headless:
 cursor-agent
   -p --output-format stream-json
   --force --trust
-  [--model <id or id[effort=…]>]
+  [--model <id>]
   [--resume <id> | --continue]
   -- <prompt>
 ```
@@ -121,17 +121,18 @@ Native-id harvest (same launcher channels as the other adapters):
 
 ## Wiring (same sweep as Grok Build / Oh My Pi)
 
-Registry (`index.ts` after `codex`, before `grok`), `AgentId`, install hint, issue efforts (no `ultra`), demo `/agents` + launch-plan, Workspace Manager specs, credential-inference (`cursor` → `custom`), AI Provider runtime card + i18n, model-semantics table, `DEFAULT_WIRE_BY_AGENT`, `WORKSPACE_AI_AGENT_IDS`, `CONFIGURABLE_AGENTS`, shared extractor / interactive-seed specs.
+Registry (`index.ts` after `codex`, before `grok`), `AgentId`, install hint, issue efforts (`[]` for Cursor — live CLI has no effort flag), demo `/agents` + launch-plan, Workspace Manager specs, credential-inference (`cursor` → `custom`), AI Provider runtime card + i18n, model-semantics table, `DEFAULT_WIRE_BY_AGENT`, `WORKSPACE_AI_AGENT_IDS`, `CONFIGURABLE_AGENTS`, shared extractor / interactive-seed specs.
 
-## Open live-verify (needs a real Cursor login or `CURSOR_API_KEY`)
+## Live-verify (Ame's login, 2026-08-17, isolated `/tmp` cwds)
 
-Do this in an isolated Alice home, not `~/.openalice`, not port 5174.
+Do not use `~/.openalice` or port 5174. Login was keychain (`cursor-agent status`: logged in; `CURSOR_API_KEY` unset).
 
-1. Authenticated `stream-json` one-liner: confirm `system/init.session_id` equals the new `~/.cursor/chats/<md5>/<id>/` directory.
-2. `--resume <that id>` then another print: confirm the same id comes back.
-3. Interactive TUI: watcher captures the new UUID via `listOnDisk` (not `--continue`).
-4. `--model '…[effort=low]'` against a thinking model: accept or reject?
-5. Headless `--force` can run `alice-workspace inbox push` via the injected shim.
+1. [x] Authenticated `stream-json` one-liner: `system/init.session_id` `410c9569-f41a-461b-be01-7734b228098e` equals the new chat dir. Cursor hashed the **physical** cwd (`/private/tmp/…`); `listOnDisk` finds it via the `realpath` alias. Terminal `result` = `ALICE_CURSOR_OK`.
+2. [x] `--resume <that id>`: same id came back. Result `ALICE_CURSOR_RESUME_OK`.
+3. [x] Interactive TUI in a fresh cwd: new UUID `71e6f1a6-dcc4-4829-b861-455113e9e17d` grew `store.db` (not `--continue`). `listOnDisk` on the logical `/tmp` path must see it.
+4. [x] `--model '…[effort=low]'` **rejected** (`Cannot use this model`). Dropped effort projection.
+5. [x] Headless `--force` applied a `shellToolCall` (`echo ALICE_CURSOR_TOOL_OK`). Live events include `shellToolCall` plus `hookAdditionalContexts` / timestamps — not the docs-only `readToolCall` / `function` shapes.
+6. [ ] `alice-workspace inbox push` via an injected shim still needs an isolated Alice home + tool injection. `--force` shell is proven; inbox is the remaining Alice-integration gap.
 
 `--continue` is cwd-scoped in this build (`getLatestChatId` → `chat-session-list` `scope:"cwd"`). Still prefer harvested `--resume <id>` once the watcher or headless extractor has one.
 
@@ -139,10 +140,10 @@ Do this in an isolated Alice home, not `~/.openalice`, not port 5174.
 
 - [x] `src/workspaces/adapters/cursor.ts` + `cursor.spec.ts`
 - [x] Registry after `codex`, before `grok`; `assignsSessionId` false; `transcriptDiscovery: subprocess`
-- [x] Enumeration sweep: `AgentId`, install hint, issue efforts (no `ultra`), demo `/agents` + launch-plan, Workspace Manager specs, credential-inference (`cursor` → `custom`), AI Provider card + i18n, model-semantics table, `DEFAULT_WIRE_BY_AGENT`, `WORKSPACE_AI_AGENT_IDS`, `CONFIGURABLE_AGENTS`, shared extractor / interactive-seed specs
+- [x] Enumeration sweep: `AgentId`, install hint, issue efforts (`[]` for Cursor), demo `/agents` + launch-plan, Workspace Manager specs, credential-inference (`cursor` → `custom`), AI Provider card + i18n, model-semantics table, `DEFAULT_WIRE_BY_AGENT`, `WORKSPACE_AI_AGENT_IDS`, `CONFIGURABLE_AGENTS`, shared extractor / interactive-seed specs
 - [x] `npx tsc --noEmit`, `cd ui && npx tsc -b`, targeted Vitest + full `pnpm test`
 - [x] Isolated compose-argv replay against `cursor-agent --help` (`2026.08.11-e8db854`)
-- [ ] Authenticated live checks (needs a real Cursor login or `CURSOR_API_KEY`)
+- [x] Authenticated live checks (print / resume / TUI harvest / `--force` shell). Effort brackets rejected; projection dropped. Inbox-push shim still open.
 
 Discovery during implementation: 2026.08.11-e8db854 also has hidden `--new-session-id` (create-only UUIDv4; cannot combine with `--resume` / `--continue`). That is still not create-or-reopen, so `assignsSessionId` stays false. Do not spawn it.
 
@@ -152,7 +153,7 @@ Discovery during implementation: 2026.08.11-e8db854 also has hidden `--new-sessi
 - `cd ui && npx tsc -b`
 - Targeted Vitest: adapter + index + interactive-seed + headless extractors + issue-runtime-options + credential-inference + workspace-creator
 - Isolated compose-argv replay against `cursor-agent --help` / the documented `stream-json` fixture (no `~/.openalice`, no port 5174)
-- Authenticated live checks above when a key is available; state the gap if not
+- Authenticated live checks above (print / resume / TUI / `--force` shell done; inbox-push shim still open)
 
 ## Out of scope
 
