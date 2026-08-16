@@ -123,7 +123,7 @@ export const issuesHandlers = [
         return HttpResponse.json({ error: 'invalid_agent' }, { status: 400 })
       } else {
         const agent = body.agent.trim()
-        if (!['claude', 'codex', 'grok', 'opencode', 'pi'].includes(agent)) {
+        if (!['claude', 'codex', 'grok', 'omp', 'opencode', 'pi'].includes(agent)) {
           return HttpResponse.json({ error: 'invalid_agent' }, { status: 400 })
         }
         patch.agent = agent

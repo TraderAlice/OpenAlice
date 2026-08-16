@@ -624,6 +624,11 @@ export const zh: Resources = {
         models: 'xAI API 上的 Grok 模型，也可通过自定义 Base URL 接入兼容 OpenAI 的端点。',
         auth: '`grok login` 订阅或 xAI API key。',
       },
+      omp: {
+        blurb: 'Oh My Pi——Pi 的 fork，有自己的家目录、会话和 print/JSON 协议。',
+        models: 'OpenAI、Anthropic、Google，以及通过原生或兼容协议接入的本地模型和代理。',
+        auth: '每个提供方各自的 API key，或在 `omp` 里 /login。只认 PATH 上的 `omp`。',
+      },
       opencode: {
         blurb: '基于 AI SDK 和 Models.dev 的提供方无关开源 agent CLI。',
         models: 'Anthropic、OpenAI、Google、OpenRouter、云提供方以及兼容 OpenAI 的本地运行时。',
@@ -1373,7 +1378,7 @@ export const zh: Resources = {
         chooseTitle: '选择一个 agent 运行时',
         checkingTitle: '正在检查 agent 运行时',
         readyBody: '{{runtimes}} 可以启动 Alice 工作区。',
-        missingBody: '桌面版可以包含托管运行时；开发环境也可使用 PATH 中的 Codex、Claude Code、Grok Build、opencode 或 Pi。',
+        missingBody: '桌面版可以包含托管运行时；开发环境也可使用 PATH 中的 Codex、Claude Code、Grok Build、Oh My Pi、opencode 或 Pi。',
         openAlice: '打开“问 Alice”',
         openSetup: '打开运行时设置',
       },

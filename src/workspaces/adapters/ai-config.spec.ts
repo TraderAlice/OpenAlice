@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { claudeAdapter, readClaudeSessionTitleFile } from './claude.js';
 import { codexAdapter } from './codex.js';
 import { grokAdapter } from './grok.js';
+import { ompAdapter } from './omp.js';
 import { openCodeSessionTitle, opencodeAdapter } from './opencode.js';
 import {
   piAdapter,
@@ -736,6 +737,7 @@ describe('assignsSessionId capability (gates the launcher\'s assign-id-at-spawn 
     expect(claudeAdapter.capabilities.assignsSessionId ?? false).toBe(false);
     expect(codexAdapter.capabilities.assignsSessionId ?? false).toBe(false);
     expect(grokAdapter.capabilities.assignsSessionId ?? false).toBe(false);
+    expect(ompAdapter.capabilities.assignsSessionId ?? false).toBe(false);
     expect(opencodeAdapter.capabilities.assignsSessionId ?? false).toBe(false);
   });
 });

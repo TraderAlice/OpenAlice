@@ -1508,7 +1508,7 @@ export interface AgentConfigBundle {
   readonly pi: AgentConfig | null;
 }
 
-export type AgentId = 'claude' | 'codex' | 'grok' | 'opencode' | 'pi';
+export type AgentId = 'claude' | 'codex' | 'grok' | 'omp' | 'opencode' | 'pi';
 
 export type AgentCredentialSource =
   | 'runtime-login'

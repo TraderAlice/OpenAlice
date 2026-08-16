@@ -3,7 +3,7 @@
 This guide owns the boundary between AI resource credentials, model semantics,
 Workspace model selection, and native Agent runtime launch projection. Read it
 before changing provider presets, Workspace runtime defaults, model capability
-fields, or the Claude Code, Codex, Grok Build, opencode, and Pi adapters.
+fields, or the Claude Code, Codex, Grok Build, Oh My Pi, opencode, and Pi adapters.
 
 Related guides: [[docs/project-structure.md]] and
 [[docs/managed-workspace-runtime.md]].
@@ -23,7 +23,7 @@ Model selection and semantic resolution
                          │
                          ▼
 Per-process runtime projection
-  Claude Code / Codex / opencode / Pi argv + env for one immutable Session binding
+  Claude Code / Codex / opencode / Oh My Pi / Pi argv + env for one immutable Session binding
 ```
 
 ### Credential access
@@ -72,6 +72,7 @@ runtime's native launch interface:
 - Claude Code endpoint/auth environment plus `--model` and `--effort`;
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
+- Oh My Pi provider env plus `--model` and `--thinking`;
 - Codex provider arguments/environment plus `--model` and
   `model_reasoning_effort` configuration arguments.
 
@@ -178,6 +179,7 @@ defaults must resolve to a headless-capable Agent.
 | Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
 | Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
 | Grok Build | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` |
+| Oh My Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider env |
 | opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |
 | Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider projection |
 

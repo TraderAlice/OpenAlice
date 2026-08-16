@@ -235,7 +235,7 @@ export const XAI_API: PresetDef = {
   description: 'Pay per token via the xAI API',
   category: 'official',
   defaultName: 'xAI',
-  hint: 'A Grok subscription is a separate `grok login` and does not belong in this field. Grok Build, opencode, and Pi can use this key.',
+  hint: 'A Grok subscription is a separate `grok login` and does not belong in this field. Grok Build, Oh My Pi, opencode, and Pi can use this key.',
   zodSchema: z.object({
     backend: z.literal('vercel-ai-sdk'),
     provider: z.literal('openai-compatible'),

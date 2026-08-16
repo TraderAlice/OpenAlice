@@ -25,8 +25,9 @@ describe('inferCredentialVendor', () => {
     expect(inferCredentialVendor({ agent: 'opencode', wireShape: 'google-generative-ai' })).toBe('google')
   })
 
-  it('opencode/pi against an arbitrary endpoint → custom (no first-party guess)', () => {
+  it('opencode/omp/pi against an arbitrary endpoint → custom (no first-party guess)', () => {
     expect(inferCredentialVendor({ agent: 'opencode', baseUrl: 'https://gw.example.com/v1' })).toBe('custom')
+    expect(inferCredentialVendor({ agent: 'omp' })).toBe('custom')
     expect(inferCredentialVendor({ agent: 'pi' })).toBe('custom')
     expect(inferCredentialVendor({})).toBe('custom')
   })

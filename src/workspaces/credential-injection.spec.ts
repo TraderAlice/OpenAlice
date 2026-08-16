@@ -445,9 +445,10 @@ describe('compatibleCredentials', () => {
     'google-1': googleKey,
   }
 
-  it('opencode/pi accept every supported wire including native Google', () => {
+  it('opencode/pi/omp accept every supported wire including native Google', () => {
     expect(compatibleCredentials(vault, 'opencode').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
     expect(compatibleCredentials(vault, 'pi').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
+    expect(compatibleCredentials(vault, 'omp').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
   })
 
   it('claude needs an anthropic wire — only the anthropic key qualifies', () => {

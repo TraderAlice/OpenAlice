@@ -766,6 +766,7 @@ export const workspacesHandlers = [
         { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
         { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
         { id: 'grok', displayName: 'Grok Build', installed: true, binPath: '/usr/local/bin/grok', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-chat', 'openai-responses'], defaultWire: 'openai-chat' } } },
+        { id: 'omp', displayName: 'Oh My Pi', installed: true, binPath: '/usr/local/bin/omp', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
         { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
         { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
       ],
@@ -780,6 +781,7 @@ export const workspacesHandlers = [
       claude: 'Claude Code',
       codex: 'Codex',
       grok: 'Grok Build',
+      omp: 'Oh My Pi',
       opencode: 'opencode',
       pi: 'Pi',
       shell: 'Shell',
@@ -788,6 +790,7 @@ export const workspacesHandlers = [
       claude: ['claude', '--settings', '.claude/openalice-autotrust.json'],
       codex: ['codex', '--sandbox', 'danger-full-access', '--ask-for-approval', 'never'],
       grok: ['grok', '--no-leader'],
+      omp: ['omp'],
       opencode: ['opencode'],
       pi: ['pi', '--session-id', 'demo-fresh-session'],
       shell: ['/bin/zsh', '--login'],
@@ -799,7 +802,7 @@ export const workspacesHandlers = [
           parallelPerCwd: true,
           resumeLast: agent !== 'claude',
           resumeById: true,
-          transcriptDiscovery: agent === 'claude' ? 'fs-watch' as const : agent === 'pi' ? 'none' as const : 'subprocess' as const,
+          transcriptDiscovery: agent === 'claude' ? 'fs-watch' as const : agent === 'pi' || agent === 'omp' ? 'none' as const : 'subprocess' as const,
           headless: true,
         }
     const cwd = workspace?.dir ?? `/demo/workspaces/${wsId}`
@@ -1131,7 +1134,7 @@ export const workspacesHandlers = [
     const now = new Date(startedAt).toISOString()
     const sessionId = `demo-quick-chat-${++demoQuickChatSequence}`
     const resumeId = `demo-resume-quick-chat-${demoQuickChatSequence}`
-    const prefix = ({ claude: 'c', codex: 'x', grok: 'g', opencode: 'o', pi: 'p' } as Record<string, string>)[agent]
+    const prefix = ({ claude: 'c', codex: 'x', grok: 'g', omp: 'om', opencode: 'o', pi: 'p' } as Record<string, string>)[agent]
       ?? agent.slice(0, 1)
     const name = `${prefix}${ws.sessions.filter((session) => session.agent === agent).length + 1}`
     const surface = agent === 'pi' ? 'webpi' as const : 'terminal' as const

@@ -86,7 +86,7 @@ const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'n
 const railControl =
   'h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9'
 
-const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'grok', 'opencode', 'pi']
+const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'grok', 'omp', 'opencode', 'pi']
 
 function isConfigurableAgent(agent: string | null | undefined): agent is AgentId {
   return CONFIGURABLE_AGENTS.includes(agent as AgentId)
