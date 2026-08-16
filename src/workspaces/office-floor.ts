@@ -11,6 +11,16 @@ import type {
 
 export const OFFICE_REVIEW_HOLD_MS = 30_000
 export const OFFICE_DRAWER_LIMIT = 6
+export type OfficeHarness = 'chat' | 'auto-quant' | 'other'
+
+export const OFFICE_CONFIG = {
+  workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
+  harnessMinimumVisibleGroups: {
+    chat: 1,
+    'auto-quant': 1,
+    other: 0,
+  } satisfies Record<OfficeHarness, number>,
+} as const
 
 export type OfficeEmployeeMood =
   | 'idle'
@@ -35,6 +45,7 @@ export interface OfficeRosterPerson {
   readonly sessionRecordId?: string
   readonly presence?: 'active' | 'archived' | 'deleted'
   readonly lifecycle?: 'active' | 'retired'
+  readonly lastInteractionAt: number
 }
 
 export type OfficeDrawerKind = 'report' | 'issue' | 'inbox' | 'trade-decision'
@@ -61,11 +72,14 @@ export interface OfficeFloorEmployee {
   readonly surface?: AgentRuntimeSurface
   readonly bubble: OfficeBubble | null
   readonly lastSeq: number
+  readonly lastInteractionAt: number
   readonly drawers: readonly OfficeDrawerItem[]
 }
 
 export interface OfficeFloor {
   readonly workspaceId: string
+  readonly lastInteractionAt: number
+  readonly sleeping: boolean
   readonly employees: readonly OfficeFloorEmployee[]
 }
 
@@ -155,6 +169,20 @@ export function isOnOfficeFloor(person: OfficeRosterPerson): boolean {
     && person.presence !== 'deleted'
 }
 
+export function isOfficeWorkspaceSleeping(
+  lastInteractionAt: number,
+  now = Date.now(),
+  sleepAfterMs = OFFICE_CONFIG.workspaceSleepAfterMs,
+): boolean {
+  return lastInteractionAt <= 0 || now - lastInteractionAt >= sleepAfterMs
+}
+
+export function officeHarnessForTemplate(template: string): OfficeHarness {
+  if (template === 'chat') return 'chat'
+  if (template === 'auto-quant-v2') return 'auto-quant'
+  return 'other'
+}
+
 /** Chat then Quant, then everyone else. Stable id tie-break. */
 export function compareOfficeRooms(
   a: { readonly tag: string; readonly id: string },
@@ -192,10 +220,9 @@ export function projectOfficeFloor(
     byResume.set(resumeId, current)
   }
 
-  return {
-    workspaceId,
-    employees: present.map((person) => {
+  const employees = present.map((person) => {
       const live = byResume.get(person.resumeId)
+      const lastInteractionAt = Math.max(person.lastInteractionAt, live?.lastTs ?? 0)
       return {
         resumeId: person.resumeId,
         agent: person.agent,
@@ -207,9 +234,19 @@ export function projectOfficeFloor(
         ...(live?.surface ? { surface: live.surface } : {}),
         bubble: live?.bubble ?? null,
         lastSeq: live?.lastSeq ?? 0,
+        lastInteractionAt,
         drawers: [],
       }
-    }),
+    })
+  const lastInteractionAt = employees.reduce(
+    (latest, employee) => Math.max(latest, employee.lastInteractionAt),
+    0,
+  )
+  return {
+    workspaceId,
+    lastInteractionAt,
+    sleeping: isOfficeWorkspaceSleeping(lastInteractionAt, now),
+    employees,
   }
 }
 

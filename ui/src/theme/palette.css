@@ -758,6 +758,20 @@
   --office-floor-sheen: rgba(255, 236, 200, 0.08);
   --office-label: #f4ecd8;
   --office-label-foreground: #1c1a16;
+  --office-window: #183149;
+  --office-prop-muted: #8b8173;
+  --office-prop-blue-gray: #8b9ca2;
+  --office-gba-ink-seed: #25344b;
+  --office-gba-ink-soft-seed: #40546d;
+  --office-gba-cream-seed: #f2e5bb;
+  --office-gba-paper-seed: #fff2cd;
+  --office-gba-moss-seed: #6f9a68;
+  --office-gba-moss-dark-seed: #3d674e;
+  --office-gba-floor-seed: #cfbd83;
+  --office-gba-floor-alt-seed: #c3ad72;
+  --office-gba-water-seed: #6eb4bd;
+  --office-gba-alert-seed: #d86c50;
+  --office-gba-live: #91bd5b;
 }
 
 /* Palette cards are miniature, isolated product surfaces. Keep their chrome

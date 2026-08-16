@@ -76,12 +76,12 @@ export function OfficeRuntimeSection() {
   }, [load])
 
   if (loading && entries.length === 0) {
-    return <div className="text-sm text-muted-foreground">{t('office.loading')}</div>
+    return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
   }
 
   if (error && entries.length === 0) {
     return (
-      <div role="alert" className="text-sm text-destructive">
+      <div role="alert" className="oa-office-runtime__error">
         {t('office.loadFailed')}: {error}
       </div>
     )
@@ -89,25 +89,25 @@ export function OfficeRuntimeSection() {
 
   if (entries.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
+      <div className="oa-office-runtime__empty">
         {t('office.empty')}
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl space-y-3">
+    <div className="oa-office-runtime">
       {error && (
-        <div role="status" className="border-l-2 border-warning/60 bg-warning/5 px-3 py-2 text-xs text-warning">
+        <div role="status" className="oa-office-runtime__error">
           {t('office.paused')}: {error}
         </div>
       )}
-      <div data-testid="runtime-log" className="divide-y divide-border/60 border-y border-border/70">
+      <div data-testid="runtime-log" className="oa-office-runtime__log">
         {entries.map((event) => {
           const payload = event.payload
           const detail = eventDetail(event)
           return (
-            <article key={event.seq} className="min-w-0 space-y-2 px-1 py-3 sm:px-2">
+            <article key={event.seq} className="oa-office-runtime__event">
               <span className={`inline-flex max-w-full rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${STATUS_STYLE[event.type]}`}>
                 {eventLabel(event.type)}
               </span>
@@ -117,11 +117,11 @@ export function OfficeRuntimeSection() {
                   <span className="text-muted-foreground"> · {payload.agent || '—'} · {payload.workspaceId || '—'}</span>
                 </div>
                 {detail && (
-                  <p className="mt-1 line-clamp-3 break-words whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/90">
+                  <p className="oa-office-runtime__detail">
                     {detail}
                   </p>
                 )}
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                <div className="oa-office-runtime__meta">
                   <span>{formatRelativeTime(event.ts)}</span>
                   {payload.surface && <span>{payload.surface}</span>}
                   <span>{causeLabel(event)}</span>
@@ -139,7 +139,7 @@ export function OfficeRuntimeSection() {
               {payload.taskId && (
                 <button
                   type="button"
-                  className="oa-pressable inline-flex max-w-full rounded-md border border-border px-2 py-1 text-xs text-primary hover:bg-primary/10"
+                  className="oa-office-runtime__open"
                   onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
                 >
                   {t('office.openRun')}

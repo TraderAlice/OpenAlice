@@ -10,6 +10,7 @@ const employee = {
   mood: 'idle',
   bubble: null,
   lastSeq: 0,
+  lastInteractionAt: 0,
   drawers: [],
 } as OfficeFloorEmployee
 

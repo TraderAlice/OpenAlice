@@ -9,6 +9,8 @@ export type OfficeEmployeeMood =
   | 'review'
   | 'failed'
 
+export type OfficeHarness = 'chat' | 'auto-quant' | 'other'
+
 export type OfficeBubble =
   | { kind: 'text'; text: string }
   | { kind: 'tool'; name: string }
@@ -39,15 +41,22 @@ export interface OfficeFloorEmployee {
   surface?: AgentRuntimeSurface
   bubble: OfficeBubble | null
   lastSeq: number
+  lastInteractionAt: number
   drawers: OfficeDrawerItem[]
 }
 
 export interface OfficeRoomSnapshot {
-  workspace: { id: string; tag: string }
+  workspace: { id: string; tag: string; harness: OfficeHarness }
+  lastInteractionAt: number
+  sleeping: boolean
   employees: OfficeFloorEmployee[]
 }
 
 export interface OfficeBuildingSnapshot {
+  config: {
+    workspaceSleepAfterMs: number
+    harnessMinimumVisibleGroups: Record<OfficeHarness, number>
+  }
   offices: OfficeRoomSnapshot[]
   lastSeq: number
   firstSeq: number

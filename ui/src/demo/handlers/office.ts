@@ -5,13 +5,20 @@ export const officeHandlers = [
     const asOfRaw = new URL(request.url).searchParams.get('asOfSeq')
     const asOfSeq = asOfRaw == null ? undefined : Number.parseInt(asOfRaw, 10)
     const working = asOfSeq == null || asOfSeq >= 4
+    const now = Date.now()
     return HttpResponse.json({
+      config: {
+        workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
+        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, other: 0 },
+      },
       lastSeq: 6,
       firstSeq: 1,
       ...(asOfSeq != null ? { asOfSeq } : {}),
       offices: [
         {
-          workspace: { id: 'chat-demo', tag: 'chat' },
+          workspace: { id: 'chat-demo', tag: 'chat', harness: 'chat' },
+          lastInteractionAt: now,
+          sleeping: false,
           employees: [
             {
               resumeId: 'resume-chat-demo',
@@ -23,6 +30,7 @@ export const officeHandlers = [
               surface: 'headless',
               bubble: working ? { kind: 'tool', name: 'workspace_list' } : null,
               lastSeq: working ? 4 : 2,
+              lastInteractionAt: now,
               drawers: [{
                 id: 'prov-demo',
                 kind: 'report',
@@ -35,7 +43,9 @@ export const officeHandlers = [
           ],
         },
         {
-          workspace: { id: 'quant-demo', tag: 'auto-quant' },
+          workspace: { id: 'quant-demo', tag: 'auto-quant', harness: 'auto-quant' },
+          lastInteractionAt: now,
+          sleeping: false,
           employees: [],
         },
       ],

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
+import { ScrollText, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
 import { workspaceDisplayName } from '../components/workspace/display'
-import { PageHeader } from '../components/PageHeader'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { useOfficeFloor } from '../hooks/useOfficeFloor'
 import { useInboxSelection } from '../live/inbox-selection'
@@ -11,6 +11,7 @@ import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding } from '../office/OfficeBuilding'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
+import '../office/office.css'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
 import { OfficeRuntimeSection } from './OfficeRuntimeSection'
@@ -30,6 +31,7 @@ export function OfficePage() {
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
+  const [logOpen, setLogOpen] = useState(false)
   const { building, loading, error } = useOfficeFloor(asOfSeq)
 
   const selectedSeat = useMemo(() => {
@@ -44,6 +46,24 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, selected, workspaces])
+  const focusMenu = () => {
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.oa-office-pause-trigger')?.focus()
+    })
+  }
+  const closeLog = () => {
+    setLogOpen(false)
+    focusMenu()
+  }
+  const closeEmployee = () => {
+    const resumeId = selected?.resumeId
+    setSelected(null)
+    requestAnimationFrame(() => {
+      const desks = document.querySelectorAll<HTMLElement>('[data-testid^="office-desk-"]')
+      Array.from(desks).find((desk) =>
+        desk.dataset.testid === `office-desk-${resumeId}`)?.focus()
+    })
+  }
 
   const openEmployee = (workspaceId: string, employee: OfficeFloorEmployee) => {
     const workspace = workspaces.find((item) => item.id === workspaceId)
@@ -98,11 +118,11 @@ export function OfficePage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader
-        title={t('nav.item.office')}
-        description={t('office.description')}
-      />
+    <div className="oa-office-page">
+      <div className="sr-only">
+        <h2>{t('nav.item.office')}</h2>
+        <p>{t('office.description')}</p>
+      </div>
       {error && (
         <p role="alert" className="px-4 pt-3 text-sm text-destructive md:px-6">{t('office.loadFailed')}: {error}</p>
       )}
@@ -113,36 +133,72 @@ export function OfficePage() {
         <p className="px-4 pt-3 text-sm text-muted-foreground md:px-6">{t('office.noWorkspace')}</p>
       )}
       {building && building.offices.length > 0 && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-          <div className="flex min-h-[28rem] min-w-0 flex-1 flex-col">
-            <OfficeBuilding
-              building={building}
-              roomTitle={(workspaceId, tag) => {
-                const workspace = workspaces.find((item) => item.id === workspaceId)
-                return workspace ? workspaceDisplayName(workspace) : tag
-              }}
-              selected={selected}
-              onSelectEmployee={(workspaceId, employee) => setSelected({ workspaceId, resumeId: employee.resumeId })}
-              onOpenEmployee={openEmployee}
-              onOpenFiles={openFiles}
-            />
-            <div className="shrink-0 border-t border-border px-4 py-2 md:px-6">
-              <OfficeReplayBar
-                firstSeq={building.firstSeq}
-                lastSeq={building.lastSeq}
-                asOfSeq={asOfSeq}
-                onAsOfSeq={setAsOfSeq}
+        <div className="oa-office-layout">
+          <div className="oa-office-main">
+            <div
+              className="oa-office-scene"
+              aria-hidden={logOpen || Boolean(selectedSeat) || undefined}
+              inert={logOpen || Boolean(selectedSeat) || undefined}
+            >
+              <OfficeBuilding
+                building={building}
+                groupTitle={(workspaceId, tag) => {
+                  const workspace = workspaces.find((item) => item.id === workspaceId)
+                  return workspace ? workspaceDisplayName(workspace) : tag
+                }}
+                selected={selected}
+                onSelectEmployee={(workspaceId, employee) => {
+                  setSelected({ workspaceId, resumeId: employee.resumeId })
+                  setLogOpen(false)
+                }}
+                onOpenEmployee={openEmployee}
+                onOpenFiles={openFiles}
+                onOpenLog={() => setLogOpen(true)}
               />
             </div>
+            {logOpen && (
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-label={t('office.timeline')}
+                className="oa-office-window oa-office-window--log"
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') closeLog()
+                }}
+              >
+                <header className="oa-office-window__header">
+                  <div>
+                    <ScrollText size={15} />
+                    <span>{t('office.timeline')}</span>
+                  </div>
+                  <button type="button" autoFocus aria-label={t('common.close')} onClick={closeLog}>
+                    <X size={15} />
+                  </button>
+                </header>
+                <div className="oa-office-window__body">
+                  <details className="oa-office-replay-panel">
+                    <summary>{t('office.replay')}</summary>
+                    <OfficeReplayBar
+                      firstSeq={building.firstSeq}
+                      lastSeq={building.lastSeq}
+                      asOfSeq={asOfSeq}
+                      onAsOfSeq={setAsOfSeq}
+                    />
+                  </details>
+                  <OfficeRuntimeSection />
+                </div>
+              </section>
+            )}
+            {!logOpen && selectedSeat && (
+              <OfficeInspectRail
+                employee={selectedSeat.employee}
+                roomName={selectedSeat.roomName}
+                onOpen={() => openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
+                onOpenDrawer={(item) => openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}
+                onClose={closeEmployee}
+              />
+            )}
           </div>
-          <OfficeInspectRail
-            employee={selectedSeat?.employee ?? null}
-            roomName={selectedSeat?.roomName}
-            onOpen={() => selectedSeat && openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
-            onOpenDrawer={(item) => selectedSeat && openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}
-          >
-            <OfficeRuntimeSection />
-          </OfficeInspectRail>
         </div>
       )}
     </div>

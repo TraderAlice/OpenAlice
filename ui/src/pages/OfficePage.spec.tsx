@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
@@ -20,9 +21,18 @@ vi.mock('../contexts/workspaces-context', () => ({
 vi.mock('../hooks/useOfficeFloor', () => ({
   useOfficeFloor: () => ({
     building: {
+      config: {
+        workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
+        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, other: 0 },
+      },
       lastSeq: 1,
       firstSeq: 1,
-      offices: [{ workspace: { id: 'chat-1', tag: 'chat' }, employees: [] }],
+      offices: [{
+        workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
+        lastInteractionAt: Date.now(),
+        sleeping: false,
+        employees: [],
+      }],
     },
     loading: false,
     error: null,
@@ -47,12 +57,20 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('OfficePage localization', () => {
-  it('localizes the Office header and building description', () => {
-    render(<OfficePage />)
+  it('localizes the Office HUD and opens logs on request', async () => {
+    const { container } = render(<OfficePage />)
 
     expect(screen.getByRole('heading', { name: '办公室' })).toBeTruthy()
-    expect(screen.getByText('每个 Workspace 是一间办公室。所有办公室排在同一层，员工坐自己的工位。')).toBeTruthy()
-    expect(screen.getByText('点一张桌子，查看这名员工。')).toBeTruthy()
+    expect(screen.getByText('多个 Harness 办公室共处一个平层。Workspace 是小组，每个 Session 都有自己的工位。')).toBeTruthy()
+    expect(screen.queryByText('Office occupancy')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: '菜单' }))
+    await userEvent.click(screen.getByRole('button', { name: '占用日志' }))
     expect(screen.getByText('Office occupancy')).toBeTruthy()
+    expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByText('Office occupancy')).toBeNull()
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: '菜单' }))
+    })
   })
 })

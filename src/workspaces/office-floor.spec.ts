@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import type { AgentRuntimeEvent } from './agent-runtime-log.js'
 import {
+  OFFICE_CONFIG,
   OFFICE_REVIEW_HOLD_MS,
   compareOfficeRooms,
   eventsThroughSeq,
+  isOfficeWorkspaceSleeping,
+  officeHarnessForTemplate,
   officeProjectionNow,
   projectOfficeDrawers,
   projectOfficeFloor,
@@ -17,6 +20,7 @@ const person: OfficeRosterPerson = {
   name: 'c1',
   title: 'Desk mate',
   sessionRecordId: 'codex-1',
+  lastInteractionAt: 1_000,
 }
 
 function event(
@@ -38,8 +42,8 @@ describe('projectOfficeFloor', () => {
   it('keeps only active roster people on the floor', () => {
     const floor = projectOfficeFloor('office-1', [
       person,
-      { resumeId: 'resume-gone', agent: 'pi', name: 'p1', presence: 'archived' },
-      { resumeId: 'resume-dead', agent: 'pi', name: 'p2', lifecycle: 'retired' },
+      { resumeId: 'resume-gone', agent: 'pi', name: 'p1', presence: 'archived', lastInteractionAt: 1_000 },
+      { resumeId: 'resume-dead', agent: 'pi', name: 'p2', lifecycle: 'retired', lastInteractionAt: 1_000 },
     ], [])
     expect(floor.employees.map((row) => row.resumeId)).toEqual(['resume-alice'])
     expect(floor.employees[0]).toMatchObject({ mood: 'idle', bubble: null, lastSeq: 0 })
@@ -122,6 +126,24 @@ describe('projectOfficeFloor', () => {
       event(1, 'runtime.started', { workspaceId: 'other', resumeId: 'resume-alice', agent: 'codex' }),
     ])
     expect(floor.employees[0]?.mood).toBe('idle')
+  })
+
+  it('puts a Workspace to sleep after the configured inactivity window', () => {
+    const lastInteractionAt = 10_000
+    expect(isOfficeWorkspaceSleeping(
+      lastInteractionAt,
+      lastInteractionAt + OFFICE_CONFIG.workspaceSleepAfterMs - 1,
+    )).toBe(false)
+    expect(isOfficeWorkspaceSleeping(
+      lastInteractionAt,
+      lastInteractionAt + OFFICE_CONFIG.workspaceSleepAfterMs,
+    )).toBe(true)
+  })
+
+  it('maps Workspace templates into Harness offices', () => {
+    expect(officeHarnessForTemplate('chat')).toBe('chat')
+    expect(officeHarnessForTemplate('auto-quant-v2')).toBe('auto-quant')
+    expect(officeHarnessForTemplate('custom')).toBe('other')
   })
 
   it('replays by omitting later seqs and using the as-of timestamp', () => {

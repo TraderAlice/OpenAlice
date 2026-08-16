@@ -22,7 +22,16 @@ beforeEach(() => {
 describe('useOfficeFloor', () => {
   it('loads the building and surfaces errors', async () => {
     floor.mockResolvedValue({
-      offices: [{ workspace: { id: 'office-1', tag: 'chat' }, employees: [] }],
+      config: {
+        workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
+        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, other: 0 },
+      },
+      offices: [{
+        workspace: { id: 'office-1', tag: 'chat', harness: 'chat' },
+        lastInteractionAt: 1,
+        sleeping: false,
+        employees: [],
+      }],
       lastSeq: 0,
       firstSeq: 0,
     })
@@ -40,6 +49,10 @@ describe('useOfficeFloor', () => {
 
   it('passes asOfSeq and does not poll while scrubbing', async () => {
     floor.mockResolvedValue({
+      config: {
+        workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
+        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, other: 0 },
+      },
       offices: [],
       lastSeq: 4,
       firstSeq: 1,
