@@ -37,7 +37,7 @@ One concept has one primary owner:
 
 | Concept | Owner |
 |---|---|
-| Inbox, Issue collaboration, provenance, peer questions | `alice-workspace` |
+| Inbox, Issue collaboration, provenance, peer questions, Session nametags | `alice-workspace` |
 | Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market/fundamental/macro data | `traderhub` |
@@ -66,7 +66,7 @@ flat command bag:
 |---|---|
 | `alice` | Workspace research data, subscribed-feed archive, symbols, and bounded K-line analysis |
 | `traderhub` | Low-frequency boards, fundamentals, macro, and calendars |
-| `alice-workspace` | Peer addressing, Agent conversation, human Inbox delivery, durable work, and provenance |
+| `alice-workspace` | Peer addressing, Agent conversation, human Inbox delivery, durable work, provenance, and Session coworker names |
 | `alice-uta` | Broker reads plus explicit trading mutations and approval flow |
 
 Every export manifest supplies intent-first descriptions for its command

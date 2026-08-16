@@ -17,6 +17,8 @@ export interface WorkspaceSessionDirectoryEntry {
   successorResumeId?: string
   /** Missing means active. */
   presence?: SessionPresence
+  /** Workspace-owned coworker nametag. Missing means unnamed. */
+  displayName?: string
   resumable: boolean
   active: boolean
   /** Secret-free birth stamp when this product Session was first allocated. */
@@ -73,6 +75,7 @@ export function buildWorkspaceSessionDirectory(input: {
         lifecycle: identity.lifecycle ?? 'active',
         ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
         ...(sessionPresence(identity) !== 'active' ? { presence: sessionPresence(identity) } : {}),
+        ...(identity.displayName ? { displayName: identity.displayName } : {}),
         resumable: identity.lifecycle !== 'retired'
           && sessionPresence(identity) !== 'deleted'
           && Boolean(identity.agentSessionId),

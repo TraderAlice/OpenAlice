@@ -22,6 +22,8 @@ export interface PublicSession {
   readonly pid: number | null;
   readonly startedAt: number | null;
   readonly title: string | null;
+  /** Workspace-owned coworker nametag. Missing means unnamed. */
+  readonly displayName?: string;
   readonly sourceRunId: string | null;
   /** Product roster visibility projected from ResumeIdentityRecord. */
   readonly presence?: 'active' | 'archived' | 'deleted';
@@ -39,6 +41,7 @@ export interface PublicSessionProjectionContext {
   /** A one-shot execution currently owns the Session without a PTY/WebPi pid. */
   readonly headless?: boolean;
   readonly runtimeBinding?: SessionRuntimeBinding | null;
+  readonly displayName?: string;
   readonly presence?: 'active' | 'archived' | 'deleted';
 }
 
@@ -69,6 +72,7 @@ export function projectPublicSession(
     pid: terminal?.pid ?? webPi?.pid ?? null,
     startedAt: terminal?.startedAt ?? webPi?.startedAt ?? null,
     title: sessionPreferredTitle(record) ?? null,
+    ...(context.displayName ? { displayName: context.displayName } : {}),
     sourceRunId: record.sourceRunId ?? null,
     ...(context.presence ? { presence: context.presence } : {}),
     ...(binding

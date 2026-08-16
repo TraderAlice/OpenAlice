@@ -46,6 +46,9 @@ export function harnessSessionTitle(
   session: SessionRecord | null,
   entry: WorkspaceSessionDirectoryEntry | null,
 ): string {
+  const coworkerName = session?.displayName?.trim() || entry?.displayName?.trim()
+  if (coworkerName) return coworkerName
+
   const interactiveTitle = session?.title?.trim() || entry?.interactive?.title?.trim()
   if (interactiveTitle) return interactiveTitle
 

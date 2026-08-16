@@ -29,6 +29,9 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/session-display-name.md]] — Workspace-owned Session `displayName`
+  on `.alice/sessions/<resumeId>.json`, sibling of the frozen AI binding.
+  Agents rename through `alice-workspace session rename`.
 - [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
   (`session.born` / started / stopped / rejected / headless turn assets).
   Occupancy + Office timeline + headless text/tool/completion are in;

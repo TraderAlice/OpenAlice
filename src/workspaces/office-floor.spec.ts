@@ -45,6 +45,18 @@ describe('projectOfficeFloor', () => {
     expect(floor.employees[0]).toMatchObject({ mood: 'idle', bubble: null, lastSeq: 0 })
   })
 
+  it('projects a coworker nametag without replacing the sticky name', () => {
+    const floor = projectOfficeFloor('office-1', [{
+      ...person,
+      displayName: 'AAPL desk',
+    }], [])
+    expect(floor.employees[0]).toMatchObject({
+      name: 'c1',
+      title: 'Desk mate',
+      displayName: 'AAPL desk',
+    })
+  })
+
   it('maps occupancy and turn events onto mood and bubble', () => {
     const started = projectOfficeFloor('office-1', [person], [
       event(1, 'session.born', subject),

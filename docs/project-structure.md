@@ -241,7 +241,8 @@ Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
 project skills are copied to `.agents/skills/` and Claude-specific discovery to
 `.claude/skills/`. Managed Session provider/model/effort selection comes from
-`.alice/settings.json`, is frozen into `.alice/sessions/<resumeId>.json`, and
+`.alice/settings.json`, is frozen into `.alice/sessions/<resumeId>.json` as
+the `ai` object (a sibling `displayName` may name the coworker), and
 is projected into the child process by the adapter. Pi's deprecated native-config export
 registers an OpenAlice-managed provider through the Workspace-local
 `.pi/extensions/openalice-provider.ts` and selects it through `.pi/settings.json`;

@@ -24,6 +24,7 @@ describe('buildWorkspaceSessionDirectory', () => {
             fire: 'schedule',
           },
         },
+        displayName: 'AAPL desk',
         runtimeBinding: {
           version: 1,
           credential: { source: 'vault', credentialSlug: 'secret-slug', wireShape: 'openai-responses' },
@@ -66,6 +67,7 @@ describe('buildWorkspaceSessionDirectory', () => {
         policy: 'new-then-resume',
         fire: 'schedule',
       },
+      displayName: 'AAPL desk',
       runtime: { credentialSource: 'vault', credentialSlug: 'secret-slug', model: 'gpt-5.6-terra', reasoningEffort: 'high' },
       interactive: { name: 'c1', title: 'Investigate provenance' },
       latestExecution: { taskId: 'task-1', assistantPreview: 'done' },

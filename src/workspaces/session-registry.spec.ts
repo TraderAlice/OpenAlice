@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   SessionRegistry,
+  sessionCoworkerLabel,
   sessionDisplayTitle,
   type SessionRecord,
 } from './session-registry.js'
@@ -105,6 +106,8 @@ describe('SessionRegistry persistence', () => {
 
     await reg.update(WS, loaded.id, { title: 'Native runtime title' })
     expect(sessionDisplayTitle(reg.get(WS, loaded.id)!)).toBe('Native runtime title')
+    expect(sessionCoworkerLabel(reg.get(WS, loaded.id)!, 'AAPL desk')).toBe('AAPL desk')
+    expect(sessionCoworkerLabel(reg.get(WS, loaded.id)!, '  ')).toBe('Native runtime title')
   })
 
   // The exact path the user hit: a reload both flips orphaned running→paused

@@ -41,6 +41,7 @@ const workspace: Workspace = {
       pid: 42,
       startedAt: 1,
       title: 'Investigate the market',
+      displayName: 'AAPL desk',
     },
   ],
 }
@@ -61,7 +62,7 @@ describe('OverviewCard', () => {
     )
 
     const workspaceButton = screen.getByRole('button', { name: 'Research desk' })
-    const sessionButton = screen.getByRole('button', { name: 'x1 running' })
+    const sessionButton = screen.getByRole('button', { name: 'AAPL desk running' })
     expect(workspaceButton.tagName).toBe('BUTTON')
     expect(sessionButton.tagName).toBe('BUTTON')
     workspaceButton.focus()
@@ -89,6 +90,8 @@ describe('OverviewCard', () => {
         id: `session-${index + 1}`,
         resumeId: `resume-${index + 1}`,
         name: `x${index + 1}`,
+        title: null,
+        displayName: undefined,
         state: index === 0 ? 'running' : 'paused',
         lastActiveAt: `2026-07-28T00:${String(59 - index).padStart(2, '0')}:00.000Z`,
       })),
@@ -127,6 +130,8 @@ describe('OverviewCard', () => {
         id: `session-${index + 1}`,
         resumeId: `resume-${index + 1}`,
         name: `x${index + 1}`,
+        title: null,
+        displayName: undefined,
       })),
     }
 

@@ -174,6 +174,7 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       issue: 'Read the shared work board and manage this Workspace\'s durable work',
       provenance: 'Trace business artifacts to attributable product Sessions',
       signature: 'Show this Session\'s safe product identity',
+      session: 'Rename or inspect this Workspace\'s product Sessions',
       track: 'Maintain the shared index of durable assets and topics',
       template: 'Preview or apply managed Workspace-template updates',
     },
@@ -221,6 +222,9 @@ export const CLI_EXPORTS: Record<string, CliExport> = {
       },
       signature: {
         show: 'session_signature',
+      },
+      session: {
+        rename: 'session_rename',
       },
       // track: the durable cross-workspace tracked-entity index ([[name]]).
       track: {

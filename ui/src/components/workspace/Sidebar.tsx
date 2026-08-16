@@ -14,7 +14,7 @@ import {
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
 import { WorkspaceOffboardingDialog } from './WorkspaceOffboardingDialog';
 import { Skeleton } from '../StateViews';
-import { workspaceDisplayName, workspaceDisplayTitle } from './display';
+import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display';
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
@@ -653,8 +653,8 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const presenceLocked = headlessOccupying || !isPaused;
   const resumable = props.resumable !== false;
   const canDelete = props.canDelete !== false;
-  // The server resolves native title → launch prompt → sticky name.
-  const display = props.displayTitle?.trim() || s.title?.trim() || s.name;
+  // Coworker nametag → native/fallback title → sticky launcher name.
+  const display = props.displayTitle?.trim() || sessionCoworkerLabel(s);
   const resumeLocked = !resumable;
   const resumeLabel = headlessOccupying
     ? t('workspace.sessionRunning', { title: display })
@@ -695,7 +695,7 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   else if (isPaused) metaParts.push(t('workspace.paused'));
   const meta = metaParts.join(' · ');
   // Full message on hover when it's been truncated, then the technical meta.
-  const tooltipParts = [s.title?.trim() || null, props.subtitle, meta].filter(Boolean);
+  const tooltipParts = [display, props.subtitle, meta].filter(Boolean);
   const tooltip = tooltipParts.join('\n');
 
   return (

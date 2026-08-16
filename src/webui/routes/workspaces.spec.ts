@@ -39,6 +39,7 @@ function build(
     resumeIdentity?: any;
     sessionDirectory?: any;
     setSessionPresence?: any;
+    setSessionDisplayName?: any;
     deleteSessionPresence?: any;
     lifecycle?: any;
     templateUpgrades?: any;
@@ -195,6 +196,15 @@ function build(
       lifecycle: 'active',
       ...(input.presence !== 'active' ? { presence: input.presence } : {}),
     })),
+    setSessionDisplayName: opts.setSessionDisplayName ?? vi.fn(async (input: any) => ({
+      resumeId: input.resumeId,
+      wsId: input.wsId,
+      agent: 'claude',
+      createdAt: 1,
+      updatedAt: 2,
+      lifecycle: 'active',
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+    })),
     deleteSessionPresence: opts.deleteSessionPresence ?? vi.fn(async (input: any) => ({
       resumeId: input.resumeId,
       wsId: input.wsId,
@@ -263,6 +273,56 @@ describe('PATCH /:id/resumes/:resumeId', () => {
     const result = await patch(app, '/ws-1/resumes/resume-1', { presence: 'purged' })
     expect(result.status).toBe(400)
     expect(result.body.error).toBe('invalid_presence')
+  })
+})
+
+describe('PATCH /:id/resumes/:resumeId/metadata', () => {
+  async function patch(app: any, path: string, body: unknown) {
+    const res = await app.request(path, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return { status: res.status, body: await res.json().catch(() => null) as any }
+  }
+
+  it('renames a product Session without touching presence', async () => {
+    const setSessionDisplayName = vi.fn(async (input: any) => ({
+      resumeId: input.resumeId,
+      wsId: input.wsId,
+      agent: 'claude',
+      createdAt: 1,
+      updatedAt: 2,
+      lifecycle: 'active',
+      displayName: 'AAPL desk',
+    }))
+    const { app } = build({ setSessionDisplayName })
+    const result = await patch(app, '/ws-1/resumes/resume-1/metadata', { displayName: 'AAPL desk' })
+    expect(result).toEqual({
+      status: 200,
+      body: { resumeId: 'resume-1', displayName: 'AAPL desk' },
+    })
+    expect(setSessionDisplayName).toHaveBeenCalledWith({
+      wsId: 'ws-1',
+      resumeId: 'resume-1',
+      displayName: 'AAPL desk',
+    })
+  })
+
+  it('clears the coworker nametag', async () => {
+    const { app } = build()
+    const result = await patch(app, '/ws-1/resumes/resume-1/metadata', { displayName: null })
+    expect(result).toEqual({
+      status: 200,
+      body: { resumeId: 'resume-1' },
+    })
+  })
+
+  it('rejects a missing displayName field', async () => {
+    const { app } = build()
+    const result = await patch(app, '/ws-1/resumes/resume-1/metadata', {})
+    expect(result.status).toBe(400)
+    expect(result.body.error).toBe('invalid_display_name')
   })
 })
 

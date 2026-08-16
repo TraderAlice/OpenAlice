@@ -54,6 +54,8 @@ export interface ResumeIdentityRecord {
    * keep it immutable; a paused Session may replace it through the explicit
    * edit boundary. */
   runtimeBinding?: SessionRuntimeBinding
+  /** Workspace-owned coworker nametag. Hydrated from the Session dossier; never flushed here. */
+  displayName?: string
   agentSessionId?: string
   latestTaskId?: string
   readonly createdAt: number
@@ -111,7 +113,7 @@ export class ResumeRegistry {
           typeof record['createdAt'] !== 'number' ||
           typeof record['updatedAt'] !== 'number'
         ) throw new Error('resume-identities.json contains an invalid record')
-        const runtimeBinding = await this.runtimeBindings.read({
+        const dossier = await this.runtimeBindings.readDossier({
           wsId: record['wsId'],
           resumeId: record['resumeId'],
           agent: record['agent'],
@@ -132,7 +134,8 @@ export class ResumeRegistry {
           ...(typeof record['latestTaskId'] === 'string'
             ? { latestTaskId: record['latestTaskId'] }
             : {}),
-          ...(runtimeBinding ? { runtimeBinding } : {}),
+          ...(dossier?.ai ? { runtimeBinding: dossier.ai } : {}),
+          ...(dossier?.displayName ? { displayName: dossier.displayName } : {}),
           ...(typeof record['retiredAt'] === 'number'
             ? { retiredAt: record['retiredAt'] }
             : {}),
@@ -308,6 +311,33 @@ export class ResumeRegistry {
     return record
   }
 
+  async setDisplayName(input: {
+    resumeId: string
+    wsId: string
+    displayName: string | null
+    now?: number
+  }): Promise<ResumeIdentityRecord> {
+    const record = this.records.get(input.resumeId)
+    if (!record) throw new ResumePresenceError('not_found', `resume identity ${input.resumeId} was not found`)
+    if (record.wsId !== input.wsId) {
+      throw new ResumePresenceError('wrong_workspace', `resume identity ${input.resumeId} belongs to ${record.wsId}`)
+    }
+    if (record.lifecycle === 'retired') {
+      throw new ResumePresenceError('retired', `resume identity ${input.resumeId} is retired`)
+    }
+    const displayName = await this.runtimeBindings.setDisplayName({
+      wsId: input.wsId,
+      resumeId: input.resumeId,
+      agent: record.agent,
+      displayName: input.displayName,
+    })
+    if (displayName) record.displayName = displayName
+    else delete record.displayName
+    record.updatedAt = input.now ?? Date.now()
+    await this.flush()
+    return record
+  }
+
   async retireWorkspace(
     wsId: string,
     input: { reason: string; successors?: Readonly<Record<string, string>>; now?: number },
@@ -354,7 +384,11 @@ export class ResumeRegistry {
     try {
       await mkdir(dirname(this.path), { recursive: true })
       const tmp = `${this.path}.tmp`
-      const records = [...this.records.values()].map(({ runtimeBinding: _runtimeBinding, ...record }) => record)
+      const records = [...this.records.values()].map(({
+        runtimeBinding: _runtimeBinding,
+        displayName: _displayName,
+        ...record
+      }) => record)
       await writeFile(tmp, JSON.stringify({ version: 1, records }, null, 2), 'utf8')
       await rename(tmp, this.path)
     } catch (err) {

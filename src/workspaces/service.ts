@@ -570,6 +570,12 @@ export interface WorkspaceService {
     resumeId: string
     presence: SessionPresence
   }): Promise<ResumeIdentityRecord>;
+  /** Set or clear the Workspace-owned coworker nametag. Does not touch title or AI. */
+  setSessionDisplayName(input: {
+    wsId: string
+    resumeId: string
+    displayName: string | null
+  }): Promise<ResumeIdentityRecord>;
   /** Move a paused Session through the recoverable archive boundary into the
    *  soft-deleted presence state while holding one resume lease. */
   deleteSessionPresence(input: {
@@ -2477,6 +2483,19 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     }
   }
 
+  const setSessionDisplayName = async (input: {
+    wsId: string
+    resumeId: string
+    displayName: string | null
+  }): Promise<ResumeIdentityRecord> => {
+    const identity = resumeRegistry.get(input.resumeId)
+    if (!identity) throw new ResumePresenceError('not_found', 'resume conversation not found')
+    if (identity.wsId !== input.wsId) {
+      throw new ResumePresenceError('wrong_workspace', 'resume conversation belongs to another workspace')
+    }
+    return resumeRegistry.setDisplayName(input)
+  }
+
   const deleteSessionPresence = async (input: {
     wsId: string
     resumeId: string
@@ -2862,6 +2881,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
         webPi: webPi.get(record.id),
         headless: activeResumeIds.has(record.resumeId),
         runtimeBinding: identity.runtimeBinding,
+        displayName: identity.displayName,
         presence: sessionPresence(identity),
       })];
     });
@@ -3015,6 +3035,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     runIssueNow,
     sessionDirectory,
     setSessionPresence,
+    setSessionDisplayName,
     deleteSessionPresence,
     resolveIssuesByName,
     headlessTasks,

@@ -33,6 +33,7 @@ export interface OfficeFloorEmployee {
   agent: string
   name: string
   title?: string
+  displayName?: string
   sessionRecordId?: string
   mood: OfficeEmployeeMood
   surface?: AgentRuntimeSurface

@@ -3,7 +3,7 @@ import { formatRelativeTime } from '../../lib/intl'
 import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GitLogEntry, Workspace } from './api'
-import { workspaceDisplayName, workspaceDisplayTitle } from './display'
+import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display'
 
 /**
  * Single-workspace card for the Workspaces Overview dashboard. Variant B
@@ -133,14 +133,14 @@ export function OverviewCard({
                 >
                   <button
                     type="button"
-                    aria-label={`${s.name} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
+                    aria-label={`${sessionCoworkerLabel(s)} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
                     onClick={() => onOpenSession(s.id)}
                     className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
                   >
                     <span className="w-3 flex justify-center text-muted-foreground">
                       <AgentGlyph agent={s.agent} />
                     </span>
-                    <span className="font-mono text-[11px] tabular-nums">{s.name}</span>
+                    <span className="truncate text-[12px]">{sessionCoworkerLabel(s)}</span>
                     <span
                       className={`text-[11px] ${
                         s.state === 'running' ? 'text-success' : 'text-muted-foreground'

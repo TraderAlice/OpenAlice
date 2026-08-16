@@ -104,6 +104,28 @@ Rules:
   replace birth;
 - Session Directory projects secret-free `createdBy` for product surfaces.
 
+## Session coworker name
+
+A product Session may carry an optional, mutable `displayName` on the
+Workspace Session dossier at `.alice/sessions/<resumeId>.json`. It sits
+beside the frozen `ai` launch binding, not inside it and not on the
+launcher roster.
+
+This is the coworker's nametag:
+
+- public labels prefer `displayName`, then the native/`fallback`
+  conversation `title`, then the sticky launcher `name` (`p1`);
+- native title refresh never overwrites `displayName`;
+- empty or `null` clears the field; the maximum is 120 characters after trim;
+- agents rename only through `alice-workspace session rename` or
+  `PATCH /api/workspaces/:id/resumes/:resumeId/metadata`;
+- a missing field means unnamed; there is no migration;
+- `workspaces/state/resume-identities.json` hydrates the name in memory and
+  strips it on flush, the same way it treats `runtimeBinding`.
+
+Do not hand-edit the dossier JSON. One bad write can destroy the Session's
+credential, model, or effort binding.
+
 ## Layered Index
 
 OpenAlice should resolve provenance through six layers rather than treating

@@ -31,6 +31,7 @@ export interface OfficeRosterPerson {
   readonly agent: string
   readonly name: string
   readonly title?: string
+  readonly displayName?: string
   readonly sessionRecordId?: string
   readonly presence?: 'active' | 'archived' | 'deleted'
   readonly lifecycle?: 'active' | 'retired'
@@ -54,6 +55,7 @@ export interface OfficeFloorEmployee {
   readonly agent: string
   readonly name: string
   readonly title?: string
+  readonly displayName?: string
   readonly sessionRecordId?: string
   readonly mood: OfficeEmployeeMood
   readonly surface?: AgentRuntimeSurface
@@ -199,6 +201,7 @@ export function projectOfficeFloor(
         agent: person.agent,
         name: person.name,
         ...(person.title ? { title: person.title } : {}),
+        ...(person.displayName ? { displayName: person.displayName } : {}),
         ...(person.sessionRecordId ? { sessionRecordId: person.sessionRecordId } : {}),
         mood: live?.mood ?? 'idle',
         ...(live?.surface ? { surface: live.surface } : {}),

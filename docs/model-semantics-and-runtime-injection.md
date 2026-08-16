@@ -141,9 +141,12 @@ provider payloads never enter the Workspace file.
 A fresh Session resolves that surface/Agent preference together with any
 explicit credential, model, or effort choice into one immutable, secret-free
 `SessionRuntimeBinding` owned by its `resumeId`. It is written to
-`.alice/sessions/<resumeId>.json` in the owning Workspace. The global resume
-registry stores identity, lifecycle, and native-session mapping only; it
-hydrates the binding from the Workspace file when Alice starts. The binding is
+`.alice/sessions/<resumeId>.json` in the owning Workspace, as the `ai`
+object. An optional sibling `displayName` is the mutable coworker nametag
+and is not part of this binding. The global resume registry stores identity,
+lifecycle, and native-session mapping only; it hydrates the binding and
+nametag from the Workspace file when Alice starts and never flushes either
+into `resume-identities.json`. The binding is
 then projected on every launch of that Session:
 interactive TUI, structured Web surface, headless Issue turn, and exact resume.
 It is not a headless-only override.
@@ -363,9 +366,9 @@ runtime's global state. An absent choice means
 “use the runtime default”; it does not mean “pick any compatible credential.”
 Existing Session bindings remain authoritative until that Session is retired
 or the user explicitly replaces the binding while it is paused. A paused edit
-updates the secret-free `.alice/sessions/<resumeId>.json` reference without
-waking the Session; the replacement credential, model, and effort take effect
-on its next resume. OpenAlice never imports a runtime-global secret into its
+updates the secret-free `.alice/sessions/<resumeId>.json` `ai` object without
+waking the Session or rewriting `displayName`; the replacement credential,
+model, and effort take effect on its next resume. OpenAlice never imports a runtime-global secret into its
 vault or a Workspace.
 
 Native “global” state follows the runtime actually launched. A source or

@@ -73,4 +73,11 @@ describe('projectPublicSession', () => {
       presence: 'archived',
     });
   });
+
+  it('projects a coworker nametag without folding it into title', () => {
+    expect(projectPublicSession(record, { displayName: 'AAPL desk' })).toMatchObject({
+      displayName: 'AAPL desk',
+      title: 'Investigate the market',
+    });
+  });
 });

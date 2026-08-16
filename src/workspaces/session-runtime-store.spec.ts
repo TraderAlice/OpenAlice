@@ -4,115 +4,166 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import type { SessionRuntimeBinding } from './cli-adapter.js'
 import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js'
 
-let root: string
-let workspaceDir: string
-let store: WorkspaceSessionRuntimeStore
-
-const binding: SessionRuntimeBinding = {
-  version: 1,
-  credential: {
-    source: 'vault',
-    credentialSlug: 'openai-1',
-    wireShape: 'openai-responses',
-  },
-  model: 'gpt-5.6-terra',
-  reasoningEffort: 'high',
+const binding = {
+  version: 1 as const,
+  credential: { source: 'native' as const },
+  model: 'gpt-5.6-sol',
 }
 
+let dir: string
+let store: WorkspaceSessionRuntimeStore
+
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'workspace-session-runtime-'))
-  workspaceDir = join(root, 'workspace')
-  store = new WorkspaceSessionRuntimeStore(() => [join(workspaceDir, '.alice', 'sessions')])
+  dir = await mkdtemp(join(tmpdir(), 'session-dossier-'))
+  store = new WorkspaceSessionRuntimeStore((wsId) => [join(dir, wsId, '.alice', 'sessions')])
 })
 
-afterEach(async () => rm(root, { recursive: true, force: true }))
+afterEach(async () => rm(dir, { recursive: true, force: true }))
 
-describe('WorkspaceSessionRuntimeStore', () => {
-  it('stores a secret-free Session AI config inside the owning Workspace', async () => {
-    await store.ensure({ wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex', binding })
+describe('WorkspaceSessionRuntimeStore displayName', () => {
+  it('stores displayName beside the frozen AI binding', async () => {
+    await store.ensure({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      binding,
+    })
+    await store.setDisplayName({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      displayName: '  AAPL desk  ',
+    })
 
-    expect(await store.read({ wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex' }))
-      .toEqual(binding)
+    const dossier = await store.readDossier({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+    })
+    expect(dossier).toMatchObject({
+      displayName: 'AAPL desk',
+      ai: binding,
+    })
     const raw = await readFile(
-      join(workspaceDir, '.alice', 'sessions', 'resume-test.json'),
+      join(dir, 'ws-1', '.alice', 'sessions', 'resume-kind-owl-abc123.json'),
       'utf8',
     )
     expect(JSON.parse(raw)).toEqual({
       version: 1,
-      resumeId: 'resume-test',
-      agent: 'codex',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
       ai: binding,
+      displayName: 'AAPL desk',
     })
-    expect(raw).not.toContain('sk-secret')
   })
 
-  it('keeps the first Session binding immutable', async () => {
-    await store.ensure({ wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex', binding })
-    await expect(store.ensure({
+  it('keeps displayName when a later launch writes the same AI binding', async () => {
+    await store.setDisplayName({
       wsId: 'ws-1',
-      resumeId: 'resume-test',
-      agent: 'codex',
-      binding: { ...binding, model: 'gpt-other' },
-    })).rejects.toThrow(/different runtime binding/)
-  })
-
-  it('atomically replaces a binding only through the explicit edit boundary', async () => {
-    await store.ensure({ wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex', binding })
-    const replacement: SessionRuntimeBinding = {
-      version: 1,
-      credential: { source: 'native' },
-      model: 'gpt-5.6-sol',
-      reasoningEffort: 'low',
-    }
-
-    await store.replace({
-      wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex', binding: replacement,
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      displayName: 'AAPL desk',
+    })
+    await store.ensure({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      binding,
     })
 
-    expect(await store.read({ wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex' }))
-      .toEqual(replacement)
+    expect(await store.readDossier({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+    })).toMatchObject({ displayName: 'AAPL desk', ai: binding })
   })
 
-  it('serializes competing first writes so only one binding wins', async () => {
-    const results = await Promise.allSettled([
-      store.ensure({ wsId: 'ws-1', resumeId: 'resume-race', agent: 'codex', binding }),
-      store.ensure({
-        wsId: 'ws-1',
-        resumeId: 'resume-race',
-        agent: 'codex',
-        binding: { ...binding, model: 'gpt-other' },
-      }),
-    ])
+  it('keeps the AI binding when replacing a paused Session binding', async () => {
+    await store.ensure({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      binding,
+    })
+    await store.setDisplayName({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      displayName: 'AAPL desk',
+    })
+    const next = { version: 1 as const, credential: { source: 'native' as const }, model: 'other' }
+    await store.replace({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      binding: next,
+    })
 
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
-    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1)
+    expect(await store.readDossier({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+    })).toMatchObject({ displayName: 'AAPL desk', ai: next })
   })
 
-  it('reads a departed Workspace fallback and rejects corrupt identity metadata', async () => {
-    const departed = join(root, 'departed')
-    const directory = join(departed, '.alice', 'sessions')
-    await mkdir(directory, { recursive: true })
-    await writeFile(join(directory, 'resume-test.json'), JSON.stringify({
+  it('clears displayName without deleting the AI binding', async () => {
+    await store.ensure({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      binding,
+    })
+    await store.setDisplayName({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      displayName: 'AAPL desk',
+    })
+    expect(await store.setDisplayName({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      displayName: '',
+    })).toBeUndefined()
+
+    const raw = JSON.parse(await readFile(
+      join(dir, 'ws-1', '.alice', 'sessions', 'resume-kind-owl-abc123.json'),
+      'utf8',
+    )) as Record<string, unknown>
+    expect(raw['displayName']).toBeUndefined()
+    expect(raw['ai']).toEqual(binding)
+  })
+
+  it('reads a displayName-only dossier that predates the AI binding', async () => {
+    const path = join(dir, 'ws-1', '.alice', 'sessions', 'resume-kind-owl-abc123.json')
+    await mkdir(join(dir, 'ws-1', '.alice', 'sessions'), { recursive: true })
+    await writeFile(path, JSON.stringify({
       version: 1,
-      resumeId: 'another-resume',
-      agent: 'codex',
-      ai: binding,
-    }))
-    const fallbackStore = new WorkspaceSessionRuntimeStore(() => [
-      join(root, 'missing', '.alice', 'sessions'),
-      join(departed, '.alice', 'sessions'),
-    ])
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      displayName: 'Unbound coworker',
+    }, null, 2))
 
-    await expect(fallbackStore.read({
-      wsId: 'ws-1', resumeId: 'resume-test', agent: 'codex',
-    })).rejects.toThrow(/unsupported shape/)
+    expect(await store.read({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+    })).toBeNull()
+    expect(await store.readDossier({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+    })).toMatchObject({ displayName: 'Unbound coworker' })
   })
 
-  it('rejects path-like resume ids', async () => {
-    await expect(store.read({ wsId: 'ws-1', resumeId: '../escape', agent: 'codex' }))
-      .rejects.toThrow(/invalid Session resumeId/)
+  it('rejects an overlong displayName on write', async () => {
+    await expect(store.setDisplayName({
+      wsId: 'ws-1',
+      resumeId: 'resume-kind-owl-abc123',
+      agent: 'pi',
+      displayName: 'x'.repeat(121),
+    })).rejects.toThrow(/at most 120/)
   })
 })
