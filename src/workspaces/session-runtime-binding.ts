@@ -128,7 +128,7 @@ function resolveVault(
     ...(selectedModel ? { model: selectedModel } : {}),
     ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
   })
-  if (!ai?.wireShape) {
+  if (!ai) {
     throw new SessionRuntimeBindingError(
       'credential_incompatible',
       `Credential "${credentialSlug}" is not compatible with ${adapter.displayName}`,
@@ -139,7 +139,7 @@ function resolveVault(
     credential: {
       source: 'vault',
       credentialSlug,
-      wireShape: ai.wireShape,
+      ...(ai.wireShape ? { wireShape: ai.wireShape } : {}),
     },
     ...modelFields(ai.model, ai.reasoningEffort ?? undefined),
   }
@@ -257,6 +257,8 @@ export function parseSessionRuntimeBinding(value: unknown): SessionRuntimeBindin
     source === 'vault'
     && typeof credential['credentialSlug'] === 'string'
     && (
+      credential['wireShape'] === undefined
+      ||
       credential['wireShape'] === 'anthropic'
       || credential['wireShape'] === 'google-generative-ai'
       || credential['wireShape'] === 'openai-chat'
@@ -266,7 +268,7 @@ export function parseSessionRuntimeBinding(value: unknown): SessionRuntimeBindin
     parsedCredential = {
       source: 'vault',
       credentialSlug: credential['credentialSlug'],
-      wireShape: credential['wireShape'],
+      ...(credential['wireShape'] ? { wireShape: credential['wireShape'] } : {}),
     }
   } else if (source === 'workspace' && typeof credential['fingerprint'] === 'string') {
     parsedCredential = { source: 'workspace', fingerprint: credential['fingerprint'] }

@@ -2,7 +2,7 @@
  * Cross-platform launch-command resolution for the workspace spawners.
  *
  * The bug this fixes: the agent CLIs are spawned by BARE NAME (`opencode`,
- * `pi`, `claude`, `codex`, `grok`). On Windows, node-pty hands that name straight to
+ * `pi`, `claude`, `codex`, `cursor-agent`, `grok`). On Windows, node-pty hands that name straight to
  * ConPTY's `CreateProcessW`, which searches PATH but only ever appends `.exe`
  * — it never tries `.cmd`/`.bat`. So:
  *

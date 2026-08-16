@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Preset } from '../api'
 import type { SavedCredential } from './workspace/api'
+import { CURSOR_FIRST_PARTY_MODEL_IDS } from '../lib/cursor-models'
 import {
   issueEffortOptions,
   issueModelOptions,
@@ -91,10 +92,32 @@ describe('Issue runtime options', () => {
   it('preserves runtime-native effort choices for a custom model id', () => {
     expect(issueEffortOptions({ agent: 'claude', semantics: null, modelKnown: false }))
       .toEqual(['low', 'medium', 'high', 'max'])
+    expect(issueEffortOptions({ agent: 'cursor', semantics: null, modelKnown: false }))
+      .toEqual([])
+    expect(issueEffortOptions({
+      agent: 'cursor',
+      semantics: { reasoning: { mode: 'optional', efforts: ['low', 'high'] } },
+      modelKnown: true,
+    })).toEqual([])
     expect(issueEffortOptions({ agent: 'grok', semantics: null, modelKnown: false }))
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(issueEffortOptions({ agent: 'omp', semantics: null, modelKnown: false }))
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  it('suggests Cursor first-party CLI ids even when a vault catalog is bound', () => {
+    expect(issueModelOptions({
+      agent: 'cursor',
+      credential: null,
+      defaultModel: null,
+      presets,
+    }).map((model) => model.id)).toEqual([...CURSOR_FIRST_PARTY_MODEL_IDS])
+    expect(issueModelOptions({
+      agent: 'cursor',
+      credential: deepSeek,
+      defaultModel: 'gpt-5.2-high',
+      presets,
+    }).map((model) => model.id)).toEqual(['gpt-5.2-high', ...CURSOR_FIRST_PARTY_MODEL_IDS])
   })
 
   it('suggests xAI catalog models for a grok vault credential', () => {

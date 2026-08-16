@@ -27,7 +27,7 @@ const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
  * CLI agent tab + the entered baseUrl.
  *
  * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek/LongCat gateways); otherwise the
- * agent decides: claude → anthropic, codex → openai, grok → xai. opencode/omp/pi
+ * agent decides: claude → anthropic, codex → openai, grok → xai. cursor/opencode/omp/pi
  * are OpenAI-compatible against arbitrary endpoints, so an unrecognized baseUrl
  * falls back to 'custom' rather than guessing a first-party vendor.
  */

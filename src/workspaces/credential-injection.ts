@@ -90,7 +90,8 @@ export function compatibleCredentials(
   const capabilities = adapter.capabilities.aiProvider
   if (!capabilities) return []
   return Object.entries(credentials).filter(
-    ([, cred]) => pickAgentWire(credentialWires(cred), capabilities, undefined, cred.vendor) !== null,
+    ([, cred]) => capabilities.directVendors?.includes(cred.vendor)
+      || pickAgentWire(credentialWires(cred), capabilities, undefined, cred.vendor) !== null,
   )
 }
 
@@ -185,6 +186,14 @@ export function credentialToWorkspaceAiCred(
 ): WorkspaceAiCred | null {
   const capabilities = adapter.capabilities.aiProvider
   if (!capabilities) return null
+  if (capabilities.directVendors?.includes(credential.vendor)) {
+    return {
+      baseUrl: credential.baseUrl ?? null,
+      apiKey: credential.apiKey ?? null,
+      model: overrides.model ?? null,
+      ...(overrides.reasoningEffort ? { reasoningEffort: overrides.reasoningEffort } : {}),
+    }
+  }
   const wires = credentialWires(credential as Credential)
   const picked = pickAgentWire(wires, capabilities, overrides.wireShape, credential.vendor)
   if (!picked) return null

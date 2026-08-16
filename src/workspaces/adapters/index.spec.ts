@@ -16,6 +16,14 @@ describe('built-in adapter provider capabilities', () => {
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['openai-responses'],
     });
+    expect(registry.get('cursor')?.capabilities.aiProvider).toMatchObject({
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: [],
+      directVendors: ['cursor'],
+    });
+    expect(registry.get('cursor')?.capabilities.transcriptDiscovery).toBe('subprocess');
+    expect(registry.get('cursor')?.capabilities.assignsSessionId ?? false).toBe(false);
+    expect(registry.get('cursor')?.binary).toBe('cursor-agent');
     expect(registry.get('grok')?.capabilities.aiProvider).toMatchObject({
       credentialSource: 'runtime-or-workspace',
       wirePreference: ['openai-chat', 'openai-responses'],

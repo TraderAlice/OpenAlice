@@ -454,6 +454,7 @@ export interface AgentCapabilities {
 export interface AgentProviderCapabilities {
   readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
   readonly wirePreference: readonly WireShape[];
+  readonly directVendors?: readonly string[];
   readonly defaultWire?: WireShape;
   readonly vendorPolicies?: Readonly<Record<string, {
     readonly wirePreference: readonly WireShape[];
@@ -1508,7 +1509,7 @@ export interface AgentConfigBundle {
   readonly pi: AgentConfig | null;
 }
 
-export type AgentId = 'claude' | 'codex' | 'grok' | 'omp' | 'opencode' | 'pi';
+export type AgentId = 'claude' | 'codex' | 'cursor' | 'grok' | 'omp' | 'opencode' | 'pi';
 
 export type AgentCredentialSource =
   | 'runtime-login'

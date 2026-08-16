@@ -93,6 +93,12 @@ export interface AgentProviderCapabilities {
   readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
   /** Wire protocols this runtime can consume, in native preference order. */
   readonly wirePreference: readonly WireShape[];
+  /**
+   * Provider credentials this runtime consumes directly instead of through a
+   * model API wire. The credential remains in the one shared vault shape;
+   * its adapter owns the native env/argv projection.
+   */
+  readonly directVendors?: readonly string[];
   /** Protocol preselected for a blank manual binding form. */
   readonly defaultWire?: WireShape;
   /** Provider-specific compatibility constraints and legacy repairs. */
@@ -170,7 +176,8 @@ export type SessionCredentialBinding =
   | {
       readonly source: 'vault'
       readonly credentialSlug: string
-      readonly wireShape: WireShape
+      /** Present for wire-backed providers; absent for direct runtime providers. */
+      readonly wireShape?: WireShape
     }
   | {
       readonly source: 'workspace'

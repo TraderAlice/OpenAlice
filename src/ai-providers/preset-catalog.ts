@@ -103,6 +103,8 @@ export interface PresetDef {
    * (free-form).
    */
   regions?: RegionOption[]
+  /** Runtime that consumes this provider credential directly without an API wire. */
+  directAgentId?: string
   /** User-facing guidance for the API-key credential form. */
   setup?: CredentialSetupGuide
   writeOnlyFields?: string[]
@@ -488,6 +490,37 @@ export const LONGCAT: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
+// ==================== Runtime-direct: Cursor ====================
+
+export const CURSOR_DASHBOARD: PresetDef = {
+  id: 'cursor-dashboard',
+  label: 'Cursor Dashboard',
+  description: 'Cursor Agent using a Cursor Dashboard API key',
+  category: 'official',
+  defaultName: 'Cursor Dashboard',
+  directAgentId: 'cursor',
+  hint: 'This credential is consumed directly by Cursor Agent. It is not an OpenAI-compatible endpoint and is never offered to other runtimes.',
+  zodSchema: z.object({
+    backend: z.literal('agent-sdk'),
+    baseUrl: z.string().optional().describe('Optional Cursor API endpoint'),
+    model: z.string().default('auto').describe('Model'),
+    apiKey: z.string().min(1).describe('Cursor Dashboard API key'),
+  }),
+  models: [
+    { id: 'auto', label: 'Auto' },
+    { id: 'composer-2.5-fast', label: 'Composer 2.5 Fast' },
+    { id: 'composer-2.5', label: 'Composer 2.5' },
+    { id: 'cursor-grok-4.6-high-fast', label: 'Cursor Grok 4.6 Fast' },
+    { id: 'cursor-grok-4.6-high', label: 'Cursor Grok 4.6' },
+  ],
+  setup: {
+    apiKeyLabel: 'Cursor Dashboard API key',
+    apiKeyHelp: 'Create an API key in the Cursor Dashboard. OpenAlice passes it only to Cursor Agent as CURSOR_API_KEY.',
+    modelHelp: 'Cursor owns the live model catalog. Auto follows Cursor routing; named models are passed through unchanged.',
+  },
+  writeOnlyFields: ['apiKey'],
+}
+
 // ==================== Custom ====================
 
 export const CUSTOM: PresetDef = {
@@ -528,6 +561,7 @@ export const PRESET_CATALOG: PresetDef[] = [
   DEEPSEEK,
   LONGCAT,
   GEMINI,
+  CURSOR_DASHBOARD,
   CUSTOM,
 ]
 
@@ -550,4 +584,5 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   kimi: 'kimi-k3',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',
+  cursor: 'auto',
 }

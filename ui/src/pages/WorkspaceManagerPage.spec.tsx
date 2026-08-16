@@ -96,10 +96,11 @@ vi.mock('../components/workspace/WebPiView', () => ({
   WebPiView: () => <div data-testid="webpi-view" />,
 }))
 
-const runtimeIds = ['claude', 'codex', 'grok', 'omp', 'opencode', 'pi'] as const
+const runtimeIds = ['claude', 'codex', 'cursor', 'grok', 'omp', 'opencode', 'pi'] as const
 const runtimeAgents: AgentInfo[] = [
   ['claude', 'Claude'],
   ['codex', 'Codex'],
+  ['cursor', 'Cursor Agent'],
   ['grok', 'Grok Build'],
   ['omp', 'Oh My Pi'],
   ['opencode', 'OpenCode'],
@@ -124,6 +125,8 @@ const runtimeAgents: AgentInfo[] = [
           ? ['anthropic' as const]
           : id === 'codex'
             ? ['openai-responses' as const]
+            : id === 'cursor'
+              ? ['openai-chat' as const]
             : id === 'grok'
               ? ['openai-chat' as const, 'openai-responses' as const]
               : ['google-generative-ai' as const, 'openai-chat' as const, 'anthropic' as const, 'openai-responses' as const],

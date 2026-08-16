@@ -443,7 +443,12 @@ describe('compatibleCredentials', () => {
     'openai-1': openaiKey,
     'custom-1': chatOnlyGateway,
     'google-1': googleKey,
+    'cursor-1': { vendor: 'cursor', authType: 'api-key', apiKey: 'cursor-key', baseUrl: 'https://api2.cursor.sh' },
   }
+
+  it('cursor does not treat generic OpenAI Chat keys as Cursor Dashboard credentials', () => {
+    expect(compatibleCredentials(vault, 'cursor').map(([s]) => s)).toEqual(['cursor-1'])
+  })
 
   it('opencode/pi/omp accept every supported wire including native Google', () => {
     expect(compatibleCredentials(vault, 'opencode').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])

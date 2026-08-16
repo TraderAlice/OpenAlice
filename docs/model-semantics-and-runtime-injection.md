@@ -3,7 +3,7 @@
 This guide owns the boundary between AI resource credentials, model semantics,
 Workspace model selection, and native Agent runtime launch projection. Read it
 before changing provider presets, Workspace runtime defaults, model capability
-fields, or the Claude Code, Codex, Grok Build, Oh My Pi, opencode, and Pi adapters.
+fields, or the Claude Code, Codex, Cursor Agent, Grok Build, Oh My Pi, opencode, and Pi adapters.
 
 Related guides: [[docs/project-structure.md]] and
 [[docs/managed-workspace-runtime.md]].
@@ -23,7 +23,7 @@ Model selection and semantic resolution
                          │
                          ▼
 Per-process runtime projection
-  Claude Code / Codex / opencode / Oh My Pi / Pi argv + env for one immutable Session binding
+  Claude Code / Codex / Cursor Agent / opencode / Oh My Pi / Pi argv + env for one immutable Session binding
 ```
 
 ### Credential access
@@ -70,6 +70,10 @@ runtime's native launch interface:
 - Pi provider/model registration plus `--model` and `--thinking`;
 - opencode provider/model environment plus `--model` and `--variant`;
 - Claude Code endpoint/auth environment plus `--model` and `--effort`;
+- Cursor Agent native authentication or a Cursor provider credential projected
+  as `CURSOR_API_KEY`, plus `--model` only (live CLI rejects
+  `id[effort=…]`; catalog ids already
+  encode effort as suffixes such as `gpt-5.2-low`);
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
 - Oh My Pi provider env plus `--model` and `--thinking`;
@@ -82,7 +86,18 @@ managed Session default, readiness gate, or launch-time fallback. Grok Build
 has no workspace-local project file, so it has no `writeAiConfig` export:
 vault keys enter the child as `XAI_API_KEY` (and `GROK_MODELS_BASE_URL` only
 for a custom host). Headless stdout is Grok 1.0.4 flattened `streaming-json`,
-not ACP-wrapped `session/update`.
+not ACP-wrapped `session/update`. Cursor Agent likewise has no workspace-local
+project file. It authenticates through its own login when a Session selects
+native access. A Cursor Dashboard key uses the same provider credential schema
+as every other vault entry, with vendor `cursor`; the adapter consumes that
+provider directly as `CURSOR_API_KEY` rather than pretending it speaks an
+OpenAI wire. Arbitrary OpenAI-compatible keys are not Cursor Dashboard
+credentials and are never projected into the child. Alice launches PATH
+`cursor-agent` only — never the
+colliding `agent` name Grok's installer also claims. Headless stdout is
+documented `stream-json` (`system/init` carries `session_id`). Live print
+mode also emits `thinking` delta/completed events; Alice extractors ignore
+them. Do not pass `--stream-partial-output`.
 
 Claude Code managed-Vault launches select only the `project` settings source
 before projecting the Session's endpoint, credential, model, and effort. Claude
@@ -124,6 +139,13 @@ resolved value:
 - Pi: project `defaultThinkingLevel` (`none` maps to Pi's native `off`);
 - opencode: model-level `options` in the provider SDK's native shape;
 - Claude Code: project `effortLevel` (only values Claude can persist);
+- Cursor Agent: `--model <id>` only. Live `2026.08.11-e8db854` treats
+  `id[effort=…]` as an unknown model name even though help still documents
+  brackets. Do not invent `--effort` or rewrite ids. Issue / launch
+  suggestions are the first-party Cursor Models pool plus `auto`
+  (`src/workspaces/adapters/cursor-models.ts`); third-party ids stay
+  free-typed. Effort and Fast are suffixes on the CLI id
+  (`cursor-grok-4.6-high-fast`), not a separate picker;
 - Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
 - Codex: project `model_reasoning_effort`.
 
@@ -143,8 +165,10 @@ The 0.89.2-beta baseline accepts only the current version 3 interactive/headless
 shape; the unreleased version 1/2 development formats are intentionally not a
 permanent dual-read or migration boundary. Remembered values never become fixed
 defaults merely because an older development build stored them.
-Vault choices store only the credential slug and wire shape; keys and resolved
-provider payloads never enter the Workspace file.
+Vault choices store only the credential slug and, when the provider uses a
+model API protocol, its wire shape. Runtime-direct provider credentials such as
+Cursor omit the inapplicable wire shape. Keys and resolved provider payloads
+never enter the Workspace file.
 
 A fresh Session resolves that surface/Agent preference together with any
 explicit credential, model, or effort choice into one immutable, secret-free
@@ -178,6 +202,7 @@ defaults must resolve to a headless-capable Agent.
 |---|---|---|
 | Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
 | Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
+| Cursor Agent | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`; native login or Cursor provider credential projected as `CURSOR_API_KEY` |
 | Grok Build | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` |
 | Oh My Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider env |
 | opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |

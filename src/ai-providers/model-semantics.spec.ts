@@ -129,6 +129,9 @@ describe('model semantics registry', () => {
 
   it('registers every built-in vendor injection default', () => {
     for (const [vendor, model] of Object.entries(DEFAULT_MODEL_BY_VENDOR)) {
+      // Cursor's provider credential is adapter-direct and `auto` delegates
+      // model selection to Cursor; it is intentionally not an exact model fact.
+      if (vendor === 'cursor') continue
       expect(resolveModelSemantics(vendor, model), `${vendor}/${model}`).not.toBeNull()
     }
   })

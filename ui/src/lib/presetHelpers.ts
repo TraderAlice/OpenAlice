@@ -38,6 +38,7 @@ export const WIRE_SHAPE_GUIDANCE: Record<WireShape, string> = {
 export const AGENT_LABELS: Record<string, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  cursor: 'Cursor Agent',
   grok: 'Grok Build',
   omp: 'Oh My Pi',
   opencode: 'opencode',
@@ -172,6 +173,9 @@ export function presetCompatibleAgentIds(
   preset: Preset,
   agents: readonly AgentProviderInfo[],
 ): string[] {
+  if (preset.directAgentId) {
+    return agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
+  }
   const wires: Partial<Record<WireShape, string>> = {}
   for (const region of presetRegions(preset)) Object.assign(wires, region.wires)
   return compatibleAgentIds(wires, agents)
@@ -249,6 +253,7 @@ export const VENDOR_BY_PRESET: Record<string, string> = {
   kimi: 'kimi',
   deepseek: 'deepseek',
   longcat: 'longcat',
+  'cursor-dashboard': 'cursor',
   custom: 'custom',
 }
 

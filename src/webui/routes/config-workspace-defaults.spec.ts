@@ -83,6 +83,7 @@ beforeEach(() => {
     'anthropic-1': { vendor: 'anthropic', authType: 'api-key', apiKey: 'sk-ant', wires: { anthropic: '' } },
     'openai-1': { vendor: 'openai', authType: 'api-key', apiKey: 'sk-oa', wires: { 'openai-responses': '', 'openai-chat': '' } },
     'chat-1': { vendor: 'custom', authType: 'api-key', apiKey: 'k', wires: { 'openai-chat': 'https://gw/v1' } },
+    'cursor-1': { vendor: 'cursor', authType: 'api-key', apiKey: 'cursor-key', lastModel: 'auto' },
   }
   defaultsStore = {}
   defaultAgentStore = null
@@ -120,6 +121,9 @@ describe('GET /workspace-credential-defaults', () => {
     // opencode/pi speak chat|anthropic|responses → every key qualifies.
     expect(new Set(compat.opencode)).toEqual(new Set(['anthropic-1', 'openai-1', 'chat-1']))
     expect(new Set(compat.pi)).toEqual(new Set(['anthropic-1', 'openai-1', 'chat-1']))
+    // Cursor consumes its own provider credential directly, without claiming
+    // that the Dashboard key speaks an OpenAI-compatible protocol.
+    expect(compat.cursor).toEqual(['cursor-1'])
   })
 })
 
@@ -177,6 +181,29 @@ describe('PUT /credentials/:slug', () => {
     expect(status).toBe(400)
     expect(body!.error).toContain('Workspace default')
     expect(credStore['openai-1']).toEqual(before)
+  })
+
+  it('clears an optional direct-provider endpoint override', async () => {
+    const routes = createConfigRoutes()
+    credStore['cursor-1'] = {
+      ...credStore['cursor-1']!,
+      baseUrl: 'https://api.cursor.example',
+    }
+
+    const { status } = await req(routes, 'PUT', '/credentials/cursor-1', {
+      vendor: 'cursor',
+      wires: {},
+      baseUrl: '',
+      lastModel: 'auto',
+    })
+
+    expect(status).toBe(200)
+    expect(credStore['cursor-1']).toMatchObject({
+      vendor: 'cursor',
+      apiKey: 'cursor-key',
+      lastModel: 'auto',
+    })
+    expect(credStore['cursor-1']).not.toHaveProperty('baseUrl')
   })
 })
 
@@ -316,6 +343,27 @@ describe('PUT /workspace-credential-defaults', () => {
     expect(body!.defaults).toEqual({ opencode: { credentialSlug: 'openai-1' } })
   })
 
+  it('persists a runtime-direct provider default without inventing a wire shape', async () => {
+    const routes = createConfigRoutes()
+    const { status, body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
+      defaults: { cursor: { credentialSlug: 'cursor-1', model: 'auto' } },
+    })
+
+    expect(status).toBe(200)
+    expect(body!.defaults).toEqual({ cursor: { credentialSlug: 'cursor-1', model: 'auto' } })
+  })
+
+  it('rejects a provider credential that belongs to a different runtime', async () => {
+    const routes = createConfigRoutes()
+    const { status, body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
+      defaults: { cursor: { credentialSlug: 'openai-1' } },
+    })
+
+    expect(status).toBe(400)
+    expect(body!.error).toContain('cursor cannot use openai-1')
+    expect(defaultsStore).toEqual({})
+  })
+
   it('rejects an explicit protocol the selected credential or agent cannot speak', async () => {
     const routes = createConfigRoutes()
     const { status, body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
@@ -335,7 +383,7 @@ describe('PUT /workspace-credential-defaults', () => {
     expect(defaultsStore).toEqual({})
   })
 
-  it('ignores unknown agent keys (only the four defaultable agents pass through)', async () => {
+  it('ignores unknown agent keys (only registered defaultable agents pass through)', async () => {
     const routes = createConfigRoutes()
     const { body } = await req(routes, 'PUT', '/workspace-credential-defaults', {
       defaults: { shell: { credentialSlug: 'openai-1' }, bogus: { credentialSlug: 'x' } },

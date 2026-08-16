@@ -104,7 +104,7 @@ const apiKeysSchema = z.object({
 
 export const credentialVendorEnum = z.enum([
   'anthropic', 'openai', 'google', 'xai',
-  'minimax', 'glm', 'kimi', 'deepseek', 'longcat', 'custom',
+  'minimax', 'glm', 'kimi', 'deepseek', 'longcat', 'cursor', 'custom',
 ])
 export type CredentialVendor = z.infer<typeof credentialVendorEnum>
 
@@ -143,7 +143,12 @@ export const credentialSchema = z.object({
    * speaks. Fill the key once.
    */
   wires: z.partialRecord(credentialWireShapeEnum, z.string()).optional(),
-  /** @deprecated legacy single-endpoint fields — read via `credentialWires()`. */
+  /**
+   * Endpoint for a provider credential consumed directly by its native runtime.
+   * For old protocol credentials this may also carry the deprecated flat
+   * endpoint and is read through `credentialWires()` only when `wireShape`
+   * accompanies it.
+   */
   baseUrl: z.string().trim().transform((s) => s || undefined).optional(),
   /** @deprecated legacy single wire shape — superseded by `wires`. */
   wireShape: credentialWireShapeEnum.optional(),
