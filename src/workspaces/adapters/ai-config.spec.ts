@@ -786,16 +786,14 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
-  it('grok: -p json --always-approve -- <prompt>', () => {
+  it('grok: streaming-json --always-approve --single=<prompt>', () => {
     expect(grokAdapter.composeHeadlessCommand!(['grok'], ctx(), 'do x')).toEqual([
       'grok',
       '--no-leader',
       '--always-approve',
-      '-p',
       '--output-format',
-      'json',
-      '--',
-      'do x',
+      'streaming-json',
+      '--single=do x',
     ]);
   });
 
@@ -837,20 +835,27 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
     expect(grokAdapter.composeHeadlessCommand!(['grok'], { ...ctx(), resume }, 'next')).toEqual([
       'grok', '--no-leader', '--always-approve', '--resume', 'native-session-1',
-      '-p', '--output-format', 'json', '--', 'next',
+      '--output-format', 'streaming-json', '--single=next',
     ]);
     expect(piAdapter.composeHeadlessCommand!(['pi'], { ...ctx(), resume }, 'next')).toEqual([
       'pi', '--session-id', 'native-session-1', '-p', '--mode', 'json', 'next',
     ]);
   });
 
-  it('claude/codex/opencode/grok place a -leading prompt after a -- terminator', () => {
+  it('claude/codex/opencode place a -leading prompt after a -- terminator', () => {
     const dashy = '--help me by explaining X';
-    for (const a of [claudeAdapter, codexAdapter, opencodeAdapter, grokAdapter]) {
+    for (const a of [claudeAdapter, codexAdapter, opencodeAdapter]) {
       const argv = a.composeHeadlessCommand!(['bin'], ctx({ OPENALICE_MCP_URL: 'http://x/mcp', AQ_WS_ID: 'w' }), dashy);
       expect(argv[argv.length - 1]).toBe(dashy); // prompt is the last token
       expect(argv[argv.length - 2]).toBe('--'); // immediately after the terminator
     }
+  });
+
+  it('grok binds a -leading prompt with --single= because -p consumes the next argv', () => {
+    const dashy = '--help me by explaining X';
+    const argv = grokAdapter.composeHeadlessCommand!(['grok'], ctx(), dashy);
+    expect(argv.at(-1)).toBe(`--single=${dashy}`);
+    expect(argv).not.toContain('--');
   });
 
   it('pi takes the prompt as a bare trailing positional (no -- terminator available)', () => {

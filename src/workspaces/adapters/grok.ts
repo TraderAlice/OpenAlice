@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -38,9 +38,25 @@ export function grokHomeDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(homedir(), '.grok');
 }
 
+/**
+ * Grok 1.0.4 encodes the physical cwd. On macOS `/tmp/foo` and
+ * `/private/tmp/foo` are the same directory; listing must try both.
+ */
+export function grokSessionKeys(cwd: string): readonly string[] {
+  const resolved = resolve(cwd);
+  const keys = new Set<string>([resolved]);
+  try {
+    keys.add(realpathSync(resolved));
+  } catch {
+    // cwd may not exist yet (tests, first launch)
+  }
+  return [...keys];
+}
+
 /** Grok stores sessions under `~/.grok/sessions/<encodeURIComponent(cwd)>/<id>/`. */
 export function grokSessionDir(cwd: string, home = grokHomeDir()): string {
-  return join(home, 'sessions', encodeURIComponent(resolve(cwd)));
+  const keys = grokSessionKeys(cwd);
+  return join(home, 'sessions', encodeURIComponent(keys[keys.length - 1] ?? resolve(cwd)));
 }
 
 export function isOfficialXaiBase(url: string | null | undefined): boolean {
@@ -169,7 +185,10 @@ async function readSummary(path: string): Promise<Record<string, unknown> | null
  * Grok Build is an xAI-native coding-agent CLI. Launch stays on the existing
  * CliAdapter contract: PATH `grok`, argv flags, and env projection. Do not
  * pass `--worktree` (it leaves the managed Workspace) or `-s/--session-id`
- * (1.0.4 creates a new UUID only; it does not resume).
+ * (1.0.4 creates a new UUID only; it does not resume). Headless `-p/--single`
+ * takes the prompt as its value — `-p --output-format` fails — and
+ * `--output-format json` pretty-prints a multi-line object the line scanner
+ * cannot parse. Use `streaming-json` plus `--single=<prompt>`.
  */
 export const grokAdapter: CliAdapter = {
   id: 'grok',
@@ -236,11 +255,9 @@ export const grokAdapter: CliAdapter = {
         : ctx.resume
           ? ['--resume', ctx.resume.sessionId]
           : []),
-      '-p',
       '--output-format',
-      'json',
-      '--',
-      prompt,
+      'streaming-json',
+      `--single=${prompt}`,
     ];
   },
 
@@ -317,9 +334,13 @@ export const grokAdapter: CliAdapter = {
   },
 
   async readSessionTitle(cwd: string, sessionId: string): Promise<string | null> {
-    return readGrokSessionTitleFromSummary(
-      await readSummary(join(grokSessionDir(cwd), sessionId, 'summary.json')),
-    );
+    for (const key of grokSessionKeys(cwd)) {
+      const title = readGrokSessionTitleFromSummary(
+        await readSummary(join(grokHomeDir(), 'sessions', encodeURIComponent(key), sessionId, 'summary.json')),
+      );
+      if (title) return title;
+    }
+    return null;
   },
 };
 
@@ -327,29 +348,33 @@ export async function listGrokOnDisk(
   cwd: string,
   home = grokHomeDir(),
 ): Promise<readonly OnDiskSession[]> {
-  const dir = grokSessionDir(cwd, home);
-  let names: string[];
-  try {
-    names = await readdir(dir);
-  } catch {
-    return [];
-  }
+  const seen = new Set<string>();
   const out: OnDiskSession[] = [];
-  for (const name of names) {
-    if (!SESSION_ID_RE.test(name)) continue;
-    const sessionDir = join(dir, name);
-    const summaryPath = join(sessionDir, 'summary.json');
+  for (const key of grokSessionKeys(cwd)) {
+    const dir = join(home, 'sessions', encodeURIComponent(key));
+    let names: string[];
     try {
-      const file = existsSync(summaryPath) ? summaryPath : sessionDir;
-      const st = await stat(file);
-      out.push({
-        sessionId: name,
-        file,
-        mtime: st.mtime.toISOString(),
-        sizeBytes: st.size,
-      });
+      names = await readdir(dir);
     } catch {
-      // skip unreadable session dirs
+      continue;
+    }
+    for (const name of names) {
+      if (!SESSION_ID_RE.test(name) || seen.has(name)) continue;
+      const sessionDir = join(dir, name);
+      const summaryPath = join(sessionDir, 'summary.json');
+      try {
+        const file = existsSync(summaryPath) ? summaryPath : sessionDir;
+        const st = await stat(file);
+        seen.add(name);
+        out.push({
+          sessionId: name,
+          file,
+          mtime: st.mtime.toISOString(),
+          sizeBytes: st.size,
+        });
+      } catch {
+        // skip unreadable session dirs
+      }
     }
   }
   return out;

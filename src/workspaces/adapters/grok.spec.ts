@@ -8,6 +8,7 @@ import type { SpawnContext } from '../cli-adapter.js';
 import {
   grokAdapter,
   grokSessionDir,
+  grokSessionKeys,
   grokTrustDecision,
   isOfficialXaiBase,
   listGrokOnDisk,
@@ -61,16 +62,14 @@ describe('grok composeCommand', () => {
 });
 
 describe('grok composeHeadlessCommand', () => {
-  it('uses json output, always-approve, and a `--` prompt terminator', () => {
+  it('uses streaming-json and binds the prompt with --single=', () => {
     expect(grokAdapter.composeHeadlessCommand!(['grok'], ctx(), 'do x')).toEqual([
       'grok',
       '--no-leader',
       '--always-approve',
-      '-p',
       '--output-format',
-      'json',
-      '--',
-      'do x',
+      'streaming-json',
+      '--single=do x',
     ]);
   });
 
@@ -85,12 +84,17 @@ describe('grok composeHeadlessCommand', () => {
       '--always-approve',
       '--resume',
       'native-session-1',
-      '-p',
       '--output-format',
-      'json',
-      '--',
-      'next',
+      'streaming-json',
+      '--single=next',
     ]);
+  });
+
+  it('keeps a dashed prompt inside --single= so clap does not eat it as a flag', () => {
+    const argv = grokAdapter.composeHeadlessCommand!(['grok'], ctx(), '--looks-like-flag');
+    expect(argv).toContain('--single=--looks-like-flag');
+    expect(argv).not.toContain('-p');
+    expect(argv).not.toContain('--');
   });
 });
 
@@ -180,6 +184,22 @@ describe('grok headless extractors', () => {
     expect(grokAdapter.extractHeadlessOutputEvents?.(line)).toEqual([{ type: 'text', text: 'ok' }]);
   });
 
+  it('reads live 1.0.4 streaming-json lines and ignores pretty-printed json fragments', () => {
+    const text = '{"type":"text","data":"STREAM"}';
+    const end = JSON.stringify({
+      type: 'end',
+      stopReason: 'end_turn',
+      sessionId: '01a009c7-769a-79b2-8a28-0dc2da5e7e21',
+    });
+    expect(grokAdapter.extractHeadlessAssistantText?.(text)).toBe('STREAM');
+    expect(grokAdapter.extractHeadlessOutputEvents?.(text)).toEqual([{ type: 'text', text: 'STREAM' }]);
+    expect(grokAdapter.extractHeadlessSessionId?.(end)).toBe(
+      '01a009c7-769a-79b2-8a28-0dc2da5e7e21',
+    );
+    expect(grokAdapter.extractHeadlessSessionId?.('  "sessionId": "01a009c6-658f-77e0-9c6f-b498f0c07486",')).toBeNull();
+    expect(grokAdapter.extractHeadlessAssistantText?.('  "text": "PONG",')).toBeNull();
+  });
+
   it('also accepts ACP session-update lines', () => {
     const started = JSON.stringify({
       method: 'session/update',
@@ -222,6 +242,21 @@ describe('grok headless extractors', () => {
 });
 
 describe('grok on-disk sessions', () => {
+  it('lists sessions from the physical cwd Grok actually writes', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'grok-home-'));
+    const cwd = await mkdtemp(join(tmpdir(), 'grok-cwd-'));
+    const sessionId = '01a009c6-658f-77e0-9c6f-b498f0c07486';
+    const keys = grokSessionKeys(cwd);
+    expect(keys.length).toBeGreaterThan(0);
+    const sessionDir = join(home, 'sessions', encodeURIComponent(keys[keys.length - 1]!), sessionId);
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(join(sessionDir, 'summary.json'), JSON.stringify({
+      generated_title: 'smoke',
+    }));
+    const listed = await listGrokOnDisk(cwd, home);
+    expect(listed.map((row) => row.sessionId)).toEqual([sessionId]);
+  });
+
   it('lists UUID session directories and reads generated titles', async () => {
     const home = await mkdtemp(join(tmpdir(), 'grok-home-'));
     const cwd = '/Users/ame/proj';
