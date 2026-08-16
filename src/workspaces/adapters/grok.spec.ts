@@ -504,6 +504,9 @@ describe('grok interactive setup', () => {
     expect(grokTrustDecision(raw, ['/Users/ame/proj'])).toBe(true);
     expect(grokTrustDecision(raw, ['/Users/ame/other'])).toBe(false);
     expect(grokTrustDecision(raw, ['/Users/ame/missing'])).toBeNull();
+    expect(grokTrustDecision('[folders."C:\\\\Users\\\\ame\\\\proj"]\ntrusted = true', [
+      'C:\\Users\\ame\\proj',
+    ])).toBe(true);
     expect(grokTrustDecision('not toml', ['/Users/ame/proj'])).toBe('unknown');
   });
 

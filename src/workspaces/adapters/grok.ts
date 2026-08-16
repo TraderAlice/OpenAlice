@@ -211,7 +211,19 @@ export function grokTrustDecision(
     const section = /^\s*\[folders\.(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)')\]\s*$/.exec(line);
     if (section) {
       sawSection = true;
-      current = (section[1] ?? section[2] ?? '').replaceAll('\\"', '"').replaceAll("\\'", "'");
+      if (section[1] !== undefined) {
+        try {
+          // TOML basic strings use the same escapes needed by Windows paths
+          // (`C:\\Users\\...`). JSON decoding keeps those paths comparable to
+          // Node's resolved cwd instead of leaving doubled backslashes behind.
+          current = JSON.parse(`"${section[1]}"`) as string;
+        } catch {
+          return 'unknown';
+        }
+      } else {
+        // TOML literal strings do not process backslash escapes.
+        current = section[2] ?? '';
+      }
       continue;
     }
     const trusted = /^\s*trusted\s*=\s*(true|false)\s*$/.exec(line);
