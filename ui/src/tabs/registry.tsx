@@ -17,6 +17,7 @@ import { MarketBoardPage } from '../pages/MarketBoardPage'
 import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
 import { AppearanceSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
+import { ActivityBarSettingsPage } from '../pages/ActivityBarSettingsPage'
 import { BetaSettingsPage } from '../pages/BetaSettingsPage'
 import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AIProviderPage } from '../pages/AIProviderPage'
@@ -273,6 +274,7 @@ const settingsCategoryTitle: Record<
 > = {
   general: 'Settings',
   appearance: 'Appearance',
+  'activity-bar': 'Activity bar',
   'ai-provider': 'AI Provider',
   'agent-permissions': 'Agent Permissions',
   tools: 'Tools',
@@ -289,6 +291,7 @@ function SettingsRouter({ spec }: ViewProps<'settings'>) {
   switch (spec.params.category) {
     case 'general': return <SettingsPage />
     case 'appearance': return <AppearanceSettingsPage />
+    case 'activity-bar': return <ActivityBarSettingsPage />
     case 'ai-provider': return <AIProviderPage />
     case 'agent-permissions': return <AgentPermissionsPage />
     case 'tools': return <ToolsSettingsPage />

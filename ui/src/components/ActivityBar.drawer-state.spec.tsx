@@ -152,7 +152,7 @@ describe('ActivityBar mobile drawer state', () => {
 
     expect(drawer.getAttribute('aria-modal')).toBe('true')
     expect(firstAction.textContent).toContain('Ask Alice')
-    expect(lastAction.textContent).toContain('Dev Panel')
+    expect(lastAction.textContent).toContain('Settings')
     await waitFor(() => expect(document.activeElement).toBe(currentDestination))
     expect(drawer.className).toContain('motion-reduce:transition-none')
     expect(backdrop?.getAttribute('aria-hidden')).toBe('true')

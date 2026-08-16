@@ -10,7 +10,8 @@ import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
 import { useAliceProject } from '../hooks/useAliceProject'
 import { useBetaFeatures } from '../live/beta-features'
-import { filterNavSections, navSectionsForProduct } from './activity-navigation'
+import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
+import { useUiLayout } from '../hooks/useUiLayout'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 /**
@@ -91,9 +92,10 @@ export function ActivityBar({
   const { t } = useTranslation()
   const { project } = useAliceProject()
   const officeNav = useBetaFeatures((s) => s.office)
+  const { layout } = useUiLayout()
   const navSections = useMemo(
-    () => filterNavSections(navSectionsForProduct(project?.product), { office: officeNav }),
-    [officeNav, project?.product],
+    () => joinNavLayout(NAV_SECTIONS, layout, { product: project?.product, office: officeNav }),
+    [layout, officeNav, project?.product],
   )
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
   const setSidebar = useWorkspace((state) => state.setSidebar)
@@ -131,19 +133,19 @@ export function ActivityBar({
         {/* Navigation */}
         <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-0.5' : 'pb-3'} ${compactRail ? 'px-2 md:items-center' : narrowRail ? 'px-2.5' : 'px-3'}`}>
           {navSections.map((section, si) => {
-            const labeled = section.sectionLabel.length > 0
+            const labeled = section.id !== 'primary'
             // User toggle wins over default. The collapse store stores
             // user's explicit preference (true/false); absence means
             // "fall back to defaultCollapsed". Once the user touches a
             // section, their preference is sticky.
-            const stored = labeled ? collapsedSections[section.sectionLabel] : undefined
+            const stored = labeled ? collapsedSections[section.id] : undefined
             const isCollapsed = labeled && (
               stored !== undefined ? stored : Boolean(section.defaultCollapsed)
             )
             const showItems = compactRail ? true : !isCollapsed
             return (
               <div
-                key={si}
+                key={section.id}
                 className={
                   compactRail && si > 0
                     ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-11'} border-t border-border/70`
@@ -160,16 +162,16 @@ export function ActivityBar({
                     description={section.descriptionKey ? t(section.descriptionKey) : undefined}
                     isCollapsed={isCollapsed}
                     onToggleCollapse={() => setCollapsed(
-                      section.sectionLabel,
+                      section.id,
                       !isCollapsed,
                       section.defaultCollapsed,
                     )}
-                    controlsId={`activity-section-${si}`}
+                    controlsId={`activity-section-${section.id}`}
                     showItems={showItems}
                   />
                 )}
                 {showItems && (
-                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${si}`}>
+                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec

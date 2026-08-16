@@ -42,7 +42,7 @@ export type ViewSpec =
   | { kind: 'market-rotation'; params: Record<string, never> }
   | { kind: 'market-board';   params: { board: 'movers' | 'calendar' | 'macro' | 'term-structure' | 'global-macro' | 'shipping' | 'fed' } }
   | { kind: 'market-detail';  params: { assetClass: 'equity' | 'crypto' | 'currency' | 'commodity'; symbol: string; source?: string } }
-  | { kind: 'settings';       params: { category: 'general' | 'appearance' | 'ai-provider' | 'agent-permissions' | 'tools' | 'trading' | 'issues' | 'connectors' | 'mcp' | 'market-data' | 'news-collector' | 'beta' } }
+  | { kind: 'settings';       params: { category: 'general' | 'appearance' | 'activity-bar' | 'ai-provider' | 'agent-permissions' | 'tools' | 'trading' | 'issues' | 'connectors' | 'mcp' | 'market-data' | 'news-collector' | 'beta' } }
   | { kind: 'uta-detail';     params: { id: string } }
   | { kind: 'onboarding';     params: Record<string, never> }
   | { kind: 'design-project'; params: { project: string } }

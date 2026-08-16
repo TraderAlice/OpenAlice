@@ -40,6 +40,12 @@ but never provider keys or resolved endpoints. The referenced secrets remain
 under the complete home and therefore do not travel merely because a Workspace
 repository is copied.
 
+`<OPENALICE_HOME>/data/ui-layout.json` is the Activity Bar layout: group
+order, custom groups, and which rail entries are hidden. It is user chrome,
+not operator config, and travels with the complete home. Missing or
+malformed files equal the default document (Dev Panel hidden). Settings
+cannot be hidden. Deep links to a hidden surface still adopt.
+
 Each product Session created in that Workspace owns a secret-free dossier
 at `.alice/sessions/<resumeId>.json`. The `ai` object records the Agent
 runtime plus the credential reference, model, and effort frozen for that
@@ -201,6 +207,7 @@ failed bootstrap quarantine directories when Windows still holds a handle.
 - `apps/desktop/src/ipc.ts` + `apps/desktop/src/preload.ts` — narrow renderer
   bridge; raw filesystem and Electron APIs never reach the renderer.
 - `ui/src/pages/SettingsPage.tsx` — desktop controls and browser/CLI guidance.
+- `src/core/ui-layout.ts` — Activity Bar layout document at `data/ui-layout.json`.
 - `scripts/guardian/dev-options.ts` — development `--home` parsing.
 
 For changes to this subsystem, run the focused unit/UI specs, Guardian recovery

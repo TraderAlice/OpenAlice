@@ -17,6 +17,7 @@ import { newsListHandlers } from './newsList'
 import { devMiscHandlers } from './devMisc'
 import { headlessHandlers } from './headless'
 import { preferencesHandlers } from './preferences'
+import { uiLayoutHandlers } from './ui-layout'
 import { inquiryHandlers } from './inquiries'
 import { connectorsHandlers } from './connectors'
 import { catchAllHandlers } from './catchAll'
@@ -44,6 +45,7 @@ export const handlers = [
   ...devMiscHandlers,
   ...headlessHandlers,
   ...preferencesHandlers,
+  ...uiLayoutHandlers,
   ...inquiryHandlers,
   ...connectorsHandlers,
   ...catchAllHandlers,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { filterNavSections, NAV_SECTIONS, navSectionsForProduct } from './activity-navigation'
+import { defaultUiLayout, type UiLayout } from '../live/ui-layout'
+import { filterNavSections, joinNavLayout, NAV_SECTIONS, navSectionsForProduct } from './activity-navigation'
 
 describe('ActivityBar navigation hierarchy', () => {
   it('keeps the primary workflow ordered with Quant below Issues', () => {
@@ -40,6 +41,31 @@ describe('ActivityBar navigation hierarchy', () => {
     expect(pages).not.toContain('news')
     expect(pages).not.toContain('trading-as-git')
     expect(pages).not.toContain('portfolio')
+  })
+
+  it('hides Dev on the default joined rail and keeps Settings', () => {
+    const pages = joinNavLayout(NAV_SECTIONS, defaultUiLayout(), { office: false })
+      .flatMap((section) => section.items.map((item) => item.page))
+    expect(pages).not.toContain('dev')
+    expect(pages).toContain('settings')
+    expect(pages).not.toContain('office')
+  })
+
+  it('joins a custom group and still applies Nano and Office gates', () => {
+    const layout: UiLayout = {
+      ...defaultUiLayout(),
+      groups: [
+        { id: 'custom:desk', label: 'Desk', items: ['chat', 'office', 'market'] },
+        ...defaultUiLayout().groups.map((group) => ({
+          ...group,
+          items: group.items.filter((page) => page !== 'chat' && page !== 'office' && page !== 'market'),
+        })),
+      ],
+    }
+    const nano = joinNavLayout(NAV_SECTIONS, layout, { product: 'nano', office: true })
+    expect(nano[0]).toMatchObject({ id: 'custom:desk', sectionLabel: 'Desk' })
+    expect(nano[0]?.items.map((item) => item.page)).toEqual(['chat', 'office'])
+    expect(nano.flatMap((section) => section.items.map((item) => item.page))).not.toContain('market')
   })
 
   it('hides Office unless the beta flag is on', () => {
