@@ -6,6 +6,7 @@ import type {
   OfficeBuildingSnapshot,
   OfficeFloorEmployee,
 } from '../api/office'
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
 import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
 import { OfficeMapPod } from './OfficeMapPod'
 import { layoutOfficeMap } from './map-layout'
@@ -150,21 +151,29 @@ export function OfficeBuilding({
         </div>
 
         <div className="oa-office-hud__actions">
-          <button
-            type="button"
-            className="oa-office-pause-trigger"
-            aria-label={t('office.pauseMenu')}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <X size={15} /> : <Menu size={15} />}
-            {t('office.pauseMenu')}
-          </button>
-          {menuOpen && (
-            <div className="oa-office-pause-menu" aria-label={t('office.floorView')}>
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger
+              render={<button
+                type="button"
+                className="oa-office-pause-trigger"
+                aria-label={t('office.pauseMenu')}
+              />}
+            >
+              {menuOpen ? <X size={15} /> : <Menu size={15} />}
+              {t('office.pauseMenu')}
+            </PopoverTrigger>
+            <PopoverContent
+              role="menu"
+              aria-label={t('office.floorView')}
+              align="end"
+              sideOffset={8}
+              className="oa-office-pause-menu"
+            >
               <button
                 type="button"
+                role="menuitemradio"
                 aria-pressed={!showAll}
+                aria-checked={!showAll}
                 onClick={() => {
                   setShowAll(false)
                   setCamera({ x: 0, y: 0 })
@@ -176,7 +185,9 @@ export function OfficeBuilding({
               </button>
               <button
                 type="button"
+                role="menuitemradio"
                 aria-pressed={showAll}
+                aria-checked={showAll}
                 onClick={() => {
                   setShowAll(true)
                   setCamera({ x: 0, y: 0 })
@@ -187,6 +198,7 @@ export function OfficeBuilding({
               </button>
               <button
                 type="button"
+                role="menuitem"
                 onClick={() => {
                   setMenuOpen(false)
                   onOpenLog?.()
@@ -195,8 +207,8 @@ export function OfficeBuilding({
                 <ScrollText size={13} />
                 {t('office.timeline')}
               </button>
-            </div>
-          )}
+            </PopoverContent>
+          </Popover>
         </div>
       </header>
 

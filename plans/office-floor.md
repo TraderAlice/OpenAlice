@@ -136,7 +136,7 @@ Session、Files 或 provenance。
 - [x] 默认镜头按 Alice + visible pods 自动取景
 - [x] pointer/touch drag 有边界、无点击串扰、切换过滤后保持有效镜头
 - [x] WASD/方向键移动、Reset、focus-visible 和 reduced-motion specs
-- [ ] 窄屏不依靠字体缩小，不把地图对象压成不可点击尺寸
+- [x] 窄屏不依靠字体缩小，不把地图对象压成不可点击尺寸
 
 ### 5. Browser acceptance loop
 
@@ -147,7 +147,7 @@ Session、Files 或 provenance。
 - [x] 选中员工：地图上下文仍可见，对话框不遮住目标
 - [x] Pause/Log：只有一个临时层，关闭后焦点返回
 - [x] 鼠标拖动、键盘移动、Reset 均在真实浏览器执行
-- [ ] Day/Night、reduced motion、窄 viewport 各走一遍
+- [x] Day/Night、reduced motion、窄 viewport 各走一遍
 
 每轮截图后记录：
 
@@ -180,11 +180,12 @@ Current verification (2026-08-16):
 
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
-- `pnpm test` passed: 533 files / 4413 tests, 1 file / 9 tests skipped
+- `pnpm test` passed: 535 files / 4425 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 - Browser passed: Live minimums, All groups, employee dialog, pause/log, keyboard move,
-  pointer pan, Reset, Day and Night
-- Remaining browser matrix: narrow viewport and emulated reduced motion
+  pointer pan, Reset, Day and Night, 760px narrow viewport, and emulated reduced motion
+- Pause menu uses the shared Popover primitive; Escape dismissal, focus return, menu roles,
+  viewport containment, and the occupancy dialog path were rechecked after the migration
 
 ## Completion
 

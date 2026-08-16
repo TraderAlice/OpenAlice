@@ -64,7 +64,7 @@ describe('OfficePage localization', () => {
     expect(screen.getByText('多个 Harness 办公室共处一个平层。Workspace 是小组，每个 Session 都有自己的工位。')).toBeTruthy()
     expect(screen.queryByText('Office occupancy')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: '菜单' }))
-    await userEvent.click(screen.getByRole('button', { name: '占用日志' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: '占用日志' }))
     expect(screen.getByText('Office occupancy')).toBeTruthy()
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
     await userEvent.keyboard('{Escape}')

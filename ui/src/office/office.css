@@ -2999,10 +2999,6 @@
 }
 
 .oa-office-pause-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 30;
   display: grid;
   width: 176px;
   padding: 7px;
