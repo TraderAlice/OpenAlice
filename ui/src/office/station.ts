@@ -4,18 +4,18 @@
  * legs so the sprite is not centered on the tabletop.
  */
 export const OFFICE_STATION = {
-  widthPx: 144,
-  heightPx: 228,
+  widthPx: 110,
+  heightPx: 196,
   desk: {
-    widthPx: 120,
+    widthPx: 98,
     zIndex: 2,
     bottomPx: 0,
   },
   sprite: {
-    scale: 0.5,
+    scale: 0.43,
     zIndex: 1,
     /** Feet sit on the tabletop/leg join — the desk front edge. */
-    bottomPx: 58,
+    bottomPx: 48,
     anchor: 'desk-front-edge',
   },
   name: {

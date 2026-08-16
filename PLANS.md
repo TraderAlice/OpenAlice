@@ -33,9 +33,10 @@ the durable truth after it changes. Git history is the archive.
   (`session.born` / started / stopped / rejected / headless turn assets).
   Occupancy + Office timeline + headless text/tool/completion are in;
   the floor canvas lives in [[plans/office-floor.md]].
-- [[plans/office-floor.md]] — Office floor: Workspace=office, `resumeId`=
-  employee at a desk, files=cabinets. `/office` lays out every office
-  (two rooms side by side first). Codex pet v2 is a swappable pack.
+- [[plans/office-floor.md]] — Office overworld rebuild: one continuous 4:3
+  top-down tilemap; Harness=functional neighborhood, Workspace=furniture pod,
+  `resumeId`=employee. Scene graph, top-down placeholders, game chrome, camera,
+  and browser acceptance remain active.
 - [[plans/issue-comment-prompt.md]] — Optional per-Issue `commentPrompt`
   template for comment-reply Input Prompts. Omission keeps the historical
   wrapper; chat desks seed `{comment}`.

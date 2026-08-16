@@ -3,8 +3,28 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createOfficeRoutes } from './office.js'
 
-function directory(id: string, tag: string, sessions: { resumeId: string; agent: string; lifecycle?: string; presence?: string }[]) {
-  return { workspace: { id, tag }, sessions }
+function directory(
+  id: string,
+  tag: string,
+  sessions: {
+    resumeId: string
+    agent: string
+    lifecycle?: string
+    presence?: string
+    updatedAt?: number
+  }[],
+) {
+  return {
+    workspace: { id, tag },
+    sessions: sessions.map((session) => ({
+      createdAt: session.updatedAt ?? Date.now(),
+      updatedAt: session.updatedAt ?? Date.now(),
+      lifecycle: session.lifecycle ?? 'active',
+      resumable: true,
+      active: false,
+      ...session,
+    })),
+  }
 }
 
 describe('GET /api/office/floor', () => {
@@ -12,12 +32,12 @@ describe('GET /api/office/floor', () => {
     const app = new Hono().route('/', createOfficeRoutes({
       registry: {
         list: () => [
-          { id: 'quant-1', tag: 'auto-quant' },
-          { id: 'chat-1', tag: 'chat' },
+          { id: 'quant-1', tag: 'auto-quant', template: 'auto-quant-v2' },
+          { id: 'chat-1', tag: 'chat', template: 'chat' },
         ],
         get: (id: string) => id === 'chat-1'
-          ? { id, tag: 'chat' }
-          : id === 'quant-1' ? { id, tag: 'auto-quant' } : undefined,
+          ? { id, tag: 'chat', template: 'chat' }
+          : id === 'quant-1' ? { id, tag: 'auto-quant', template: 'auto-quant-v2' } : undefined,
       },
       sessionDirectory: vi.fn(async (id: string) => id === 'chat-1'
         ? directory('chat-1', 'chat', [{ resumeId: 'resume-alice', agent: 'codex', lifecycle: 'active' }])
@@ -33,9 +53,26 @@ describe('GET /api/office/floor', () => {
     } as never))
     const res = await app.request('/floor')
     expect(res.status).toBe(200)
-    const body = await res.json() as { offices: { workspace: { id: string }; employees: unknown[] }[] }
+    const body = await res.json() as {
+      config: {
+        harnessMinimumVisibleGroups: Record<string, number>
+      }
+      offices: {
+        workspace: { id: string; harness: string }
+        sleeping: boolean
+        employees: unknown[]
+      }[]
+    }
     expect(body.offices.map((office) => office.workspace.id)).toEqual(['chat-1', 'quant-1'])
     expect(body.offices[0]?.employees).toHaveLength(1)
+    expect(body.offices[0]?.sleeping).toBe(false)
+    expect(body.offices[1]?.sleeping).toBe(true)
+    expect(body.offices.map((office) => office.workspace.harness)).toEqual(['chat', 'auto-quant'])
+    expect(body.config.harnessMinimumVisibleGroups).toEqual({
+      chat: 1,
+      'auto-quant': 1,
+      other: 0,
+    })
   })
 
   it('returns 404 for an unknown office filter', async () => {
@@ -84,8 +121,8 @@ describe('GET /api/office/floor', () => {
     ])
     const app = new Hono().route('/', createOfficeRoutes({
       registry: {
-        list: () => [{ id: 'office-1', tag: 'chat' }],
-        get: (id: string) => id === 'office-1' ? { id, tag: 'chat' } : undefined,
+        list: () => [{ id: 'office-1', tag: 'chat', template: 'chat' }],
+        get: (id: string) => id === 'office-1' ? { id, tag: 'chat', template: 'chat' } : undefined,
       },
       sessionDirectory: vi.fn(async () => directory('office-1', 'chat', [
         { resumeId: 'resume-alice', agent: 'codex', lifecycle: 'active' },

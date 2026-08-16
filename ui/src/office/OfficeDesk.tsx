@@ -18,6 +18,7 @@ export function OfficeDesk({
   roomName,
   selected,
   reducedMotion,
+  spriteScale,
   onSelect,
   onOpen,
 }: {
@@ -25,6 +26,7 @@ export function OfficeDesk({
   roomName: string
   selected: boolean
   reducedMotion: boolean
+  spriteScale?: number
   onSelect: () => void
   onOpen?: () => void
 }) {
@@ -48,14 +50,20 @@ export function OfficeDesk({
         disabled={!employee}
         onClick={onSelect}
         onDoubleClick={() => employee && onOpen?.()}
-        className={`oa-pressable relative block rounded-sm text-center ${
-          selected ? 'ring-2 ring-primary ring-offset-0' : ''
-        } ${employee ? '' : 'cursor-default'}`}
+        className="oa-office-desk"
+        data-selected={selected}
+        data-occupied={Boolean(employee)}
+        data-mood={employee?.mood}
         style={{ width: station.widthPx, height: station.heightPx }}
       >
+        <span className="oa-office-topdown-station" aria-hidden>
+          <span className="oa-office-topdown-station__desk" />
+          <span className="oa-office-topdown-station__terminal" />
+          <span className="oa-office-topdown-station__chair" />
+        </span>
         {employee?.bubble && (
           <span
-            className="absolute left-1/2 max-w-[92%] -translate-x-1/2 truncate rounded-sm border border-office-trim-shadow/40 bg-office-label px-1.5 py-0.5 text-[10px] text-office-label-foreground"
+            className="oa-office-bubble"
             style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
           >
             <OfficeBubbleText bubble={employee.bubble} />
@@ -63,9 +71,13 @@ export function OfficeDesk({
         )}
         {employee && (
           <span
-            className="absolute left-1/2 max-w-[92%] -translate-x-1/2 truncate text-[11px] font-semibold text-office-label-foreground"
-            style={{ top: station.name.topPx, zIndex: station.name.zIndex }}
+            className="oa-office-nameplate"
+            style={{
+              top: employee.bubble ? station.name.topPx + 20 : station.name.topPx,
+              zIndex: station.name.zIndex,
+            }}
           >
+            <span className="oa-office-nameplate__dot" aria-hidden />
             {officeCoworkerLabel(employee)}
           </span>
         )}
@@ -74,7 +86,7 @@ export function OfficeDesk({
             src={OFFICE_FURNITURE.chair}
             alt=""
             data-slot="office-chair-prop"
-            className="pointer-events-none absolute left-1/2 -translate-x-1/2"
+            className="oa-office-chair"
             style={{
               ...officePixelImg,
               bottom: station.sprite.bottomPx - 16,
@@ -86,7 +98,7 @@ export function OfficeDesk({
         {employee && (
           <span
             data-slot="office-sprite"
-            className="pointer-events-none absolute left-1/2 -translate-x-1/2"
+            className="oa-office-sprite"
             style={{
               bottom: station.sprite.bottomPx,
               zIndex: station.sprite.zIndex,
@@ -96,7 +108,7 @@ export function OfficeDesk({
               mood={employee.mood}
               reducedMotion={reducedMotion}
               label={label}
-              scale={station.sprite.scale}
+              scale={spriteScale ?? station.sprite.scale}
             />
           </span>
         )}
@@ -104,7 +116,7 @@ export function OfficeDesk({
           src={OFFICE_FURNITURE.desk}
           alt=""
           data-slot="office-desk-prop"
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2"
+          className="oa-office-desk-prop"
           style={{
             ...officePixelImg,
             bottom: station.desk.bottomPx,

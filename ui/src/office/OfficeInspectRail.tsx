@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ArrowUpRight, Crosshair, FileText, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
@@ -9,64 +10,112 @@ export function OfficeInspectRail({
   roomName,
   onOpen,
   onOpenDrawer,
+  onClose,
   children,
 }: {
   employee: OfficeFloorEmployee | null
   roomName?: string
   onOpen: () => void
   onOpenDrawer: (item: OfficeDrawerItem) => void
-  children: ReactNode
+  onClose?: () => void
+  children?: ReactNode
 }) {
   const { t } = useTranslation()
 
   return (
     <aside
+      role="dialog"
+      aria-modal="true"
+      aria-label={employee ? officeCoworkerLabel(employee) : t('office.employeeFile')}
       data-testid="office-inspect"
-      className="flex w-full shrink-0 flex-col border-t border-border bg-background md:h-full md:w-72 md:overflow-y-auto md:border-l md:border-t-0"
+      className="oa-office-inspect oa-office-window"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose?.()
+      }}
     >
-      <div className="border-b border-border px-4 py-3">
+      {onClose && (
+        <button type="button" autoFocus className="oa-office-window__close" aria-label={t('common.close')} onClick={onClose}>
+          <X size={15} />
+        </button>
+      )}
+      <div className="oa-office-inspect__profile">
         {employee ? (
           <>
-            <p className="text-sm font-medium text-foreground">{officeCoworkerLabel(employee)}</p>
-            {roomName && (
-              <p className="text-[11px] text-muted-foreground">{t('office.roomTitle', { name: roomName })}</p>
-            )}
-            <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">@{employee.resumeId}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {t(`office.mood.${employee.mood}`)}
-              {employee.surface ? ` · ${employee.surface}` : ''}
-            </p>
+            <div className="oa-office-inspect__kicker">
+              <span className="oa-office-live-dot" aria-hidden />
+              {t('office.employeeFile')}
+            </div>
+            <div className="oa-office-inspect__identity">
+              <span className="oa-office-inspect__avatar" aria-hidden>
+                {officeCoworkerLabel(employee).slice(0, 2).toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate">{officeCoworkerLabel(employee)}</p>
+                <span>@{employee.resumeId}</span>
+              </div>
+            </div>
+            <dl className="oa-office-inspect__facts">
+              <div>
+                <dt>{t('office.status')}</dt>
+                <dd data-mood={employee.mood}>
+                  <span aria-hidden />
+                  {t(`office.mood.${employee.mood}`)}
+                </dd>
+              </div>
+              <div>
+                <dt>{t('office.location')}</dt>
+                <dd>{roomName || '—'}</dd>
+              </div>
+              <div>
+                <dt>{t('office.surface')}</dt>
+                <dd>{employee.surface || '—'}</dd>
+              </div>
+            </dl>
             <button
               type="button"
-              className="oa-pressable mt-3 w-full rounded-md border border-border px-2 py-1.5 text-xs"
+              className="oa-office-inspect__open"
               onClick={onOpen}
             >
               {t('office.openSession')}
+              <ArrowUpRight size={14} />
             </button>
             {employee.drawers.length > 0 && (
-              <ul className="mt-3 space-y-1">
-                {employee.drawers.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className="oa-pressable w-full truncate rounded px-1 py-1 text-left text-[11px] text-muted-foreground hover:text-foreground"
-                      onClick={() => onOpenDrawer(item)}
-                    >
-                      {item.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="oa-office-drawers">
+                <p>{t('office.deskDrawers')}</p>
+                <ul>
+                  {employee.drawers.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className="oa-office-drawer"
+                        onClick={() => onOpenDrawer(item)}
+                      >
+                        <FileText size={13} />
+                        <span>{item.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">{t('office.selectDesk')}</p>
+          <div className="oa-office-inspect__empty">
+            <Crosshair size={24} strokeWidth={1.5} />
+            <p>{t('office.selectDesk')}</p>
+            <span>{t('office.selectDeskHint')}</span>
+          </div>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <h3 className="mb-2 text-xs font-semibold text-muted-foreground">{t('office.timeline')}</h3>
-        {children}
-      </div>
+      {children && (
+        <div className="oa-office-inspect__timeline">
+          <div className="oa-office-inspect__timeline-title">
+            <span>{t('office.timeline')}</span>
+            <span className="oa-office-live-dot" aria-hidden />
+          </div>
+          {children}
+        </div>
+      )}
     </aside>
   )
 }
