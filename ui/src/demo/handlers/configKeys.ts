@@ -89,6 +89,51 @@ export const demoCredentialPresets = [
     regions: [{ id: 'official', label: 'OpenAI (api.openai.com)', wires: { 'openai-responses': '', 'openai-chat': '' } }],
   },
   {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    description: 'One key for many models via OpenRouter',
+    category: 'third-party',
+    defaultName: 'OpenRouter',
+    hint: 'OpenRouter is a gateway. Use provider/model IDs from openrouter.ai.',
+    setup: {
+      apiKeyLabel: 'OpenRouter API key',
+      apiKeyPlaceholder: 'sk-or-...',
+      apiKeyHelp: 'Use a key from openrouter.ai.',
+      modelHelp: 'Use the exact OpenRouter model ID, or paste another catalog ID.',
+    },
+    models: [
+      { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Suggested default)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'max'], defaultEffort: 'high', interleaved: true } } },
+      { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5 (Highest capability)', semantics: { contextWindow: 1_000_000, maxOutputTokens: 128_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
+      { id: 'openai/gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash (Fast / economical)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['medium', 'high'], defaultEffort: 'medium' } } },
+    ],
+    schema: {
+      type: 'object',
+      properties: {
+        apiKey: { type: 'string' },
+        model: {
+          type: 'string',
+          default: 'anthropic/claude-sonnet-4.6',
+          oneOf: [
+            { const: 'anthropic/claude-sonnet-4.6', title: 'Claude Sonnet 4.6 (Suggested default)' },
+            { const: 'anthropic/claude-opus-5', title: 'Claude Opus 5 (Highest capability)' },
+            { const: 'openai/gpt-5.6-sol', title: 'GPT 5.6 Sol (Power)' },
+            { const: 'google/gemini-3.6-flash', title: 'Gemini 3.6 Flash (Fast / economical)' },
+          ],
+        },
+      },
+    },
+    regions: [{
+      id: 'default',
+      label: 'OpenRouter (openrouter.ai)',
+      wires: {
+        'openai-chat': 'https://openrouter.ai/api/v1',
+        'openai-responses': 'https://openrouter.ai/api/v1',
+        anthropic: 'https://openrouter.ai/api',
+      },
+    }],
+  },
+  {
     id: 'gemini',
     label: 'Google Gemini',
     description: 'Google AI via API key',

@@ -105,6 +105,17 @@ describe('model semantics registry', () => {
     })
   })
 
+  it('registers curated OpenRouter slugs with origin-equivalent facts', () => {
+    expect(resolveModelSemantics('openrouter', 'anthropic/claude-sonnet-4.6')).toEqual(
+      resolveModelSemantics('anthropic', 'claude-sonnet-4-6'),
+    )
+    expect(resolveModelSemantics('openrouter', 'openai/gpt-5.6-sol')).toMatchObject({
+      contextWindow: 1_050_000,
+      reasoning: { mode: 'optional', defaultEffort: 'medium' },
+    })
+    expect(resolveModelSemantics('openrouter', 'some-vendor/unknown-model')).toBeNull()
+  })
+
   it('keeps LongCat\'s documented thinking default separate from effort tiers', () => {
     const semantics = resolveModelSemantics('longcat', 'LongCat-2.0')
     expect(semantics?.reasoning).toEqual({ mode: 'optional', defaultEnabled: true })

@@ -88,6 +88,8 @@ const GEMINI_3_CONTEXT = 1_048_576
  * - DeepSeek thinking: https://api-docs.deepseek.com/guides/thinking_mode
  * - LongCat Chat API: https://longcat.chat/platform/docs/api/chat.html
  * - xAI Grok 4.6 reasoning: https://docs.x.ai/developers/model-capabilities/text/reasoning
+ * - OpenRouter Claude Code / Anthropic skin: https://openrouter.ai/docs/cookbook/coding-agents/claude-code-integration
+ * - OpenRouter model slugs: https://openrouter.ai/models
  *
  * GLM 5.2's reasoning capability is also covered by the provider announcement;
  * its exact context limit is intentionally omitted because public surfaces do
@@ -323,6 +325,43 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
       // LongCat documents thinking as enabled by default, but does not expose
       // provider-native effort tiers. Keep that distinct from an effort value.
       reasoning: { mode: 'optional', defaultEnabled: true },
+    },
+  },
+  openrouter: {
+    // OpenRouter slugs are `origin/id`. Facts below match the origin vendor
+    // entries for the same generation; unknown pasted IDs stay unregistered.
+    'anthropic/claude-sonnet-4.6': {
+      contextWindow: 1_000_000,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['low', 'medium', 'high', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    },
+    'anthropic/claude-opus-5': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    },
+    'openai/gpt-5.6-sol': {
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoning: OPENAI_56_REASONING,
+    },
+    'google/gemini-3.6-flash': {
+      contextWindow: GEMINI_3_CONTEXT,
+      maxOutputTokens: 65_536,
+      reasoning: {
+        mode: 'adaptive',
+        efforts: ['medium', 'high'],
+        defaultEffort: 'medium',
+      },
     },
   },
 }

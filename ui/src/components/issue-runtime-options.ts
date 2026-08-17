@@ -96,6 +96,7 @@ const PROVIDER_PRESET_BY_VENDOR: Readonly<Record<string, string>> = {
   openai: 'codex-api',
   google: 'gemini',
   xai: 'xai-api',
+  openrouter: 'openrouter',
 }
 
 const NATIVE_PRESET_BY_AGENT: Readonly<Record<string, string>> = {

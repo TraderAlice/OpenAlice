@@ -12,9 +12,27 @@ import {
   KIMI,
   LONGCAT,
   MINIMAX,
+  OPENROUTER,
   XAI_API,
 } from './preset-catalog.js';
 import { BUILTIN_PRESETS } from './presets.js';
+
+describe('OPENROUTER preset', () => {
+  it('declares OpenAI and Anthropic skins with the documented base URLs', () => {
+    expect(OPENROUTER.regions?.[0]?.wires).toEqual({
+      'openai-chat': 'https://openrouter.ai/api/v1',
+      'openai-responses': 'https://openrouter.ai/api/v1',
+      anthropic: 'https://openrouter.ai/api',
+    });
+    const parsed = OPENROUTER.zodSchema.parse({
+      backend: 'vercel-ai-sdk',
+      provider: 'openai-compatible',
+      apiKey: 'sk-or-test',
+    }) as { baseUrl?: string; model?: string };
+    expect(parsed.baseUrl).toBe('https://openrouter.ai/api/v1');
+    expect(parsed.model).toBe('anthropic/claude-sonnet-4.6');
+  });
+});
 
 describe('LONGCAT preset', () => {
   it('uses the versioned OpenAI base URL required by the OpenAI SDK', () => {
@@ -160,6 +178,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',
+      openrouter: 'anthropic/claude-sonnet-4.6',
       // Runtime-direct provider: `auto` is Cursor routing, not a model API id.
       cursor: 'auto',
     });
@@ -213,6 +232,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi',
       deepseek: 'deepseek',
       longcat: 'longcat',
+      openrouter: 'openrouter',
     };
 
     for (const [presetId, vendor] of Object.entries(vendorByPreset)) {

@@ -66,6 +66,7 @@ const PROVIDER_ACCESS_LABELS: Readonly<Record<string, string>> = {
   kimi: 'Kimi API',
   deepseek: 'DeepSeek API',
   longcat: 'LongCat API',
+  openrouter: 'OpenRouter',
 }
 
 export function credentialAccessLabel(credential: AgentLaunchConfigState['credential']): string {

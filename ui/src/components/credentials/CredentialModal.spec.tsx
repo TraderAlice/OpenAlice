@@ -257,6 +257,54 @@ describe('CredentialModal', () => {
     opener.remove()
   })
 
+  it('groups the provider picker by official, third-party, and custom', () => {
+    render(
+      <CredentialModal
+        mode="add"
+        presets={[openAiPreset, geminiPreset, customPreset]}
+        agents={agents}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Official' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Third-party' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Custom' })).toBeTruthy()
+    expect(screen.getByText('OpenAI')).toBeTruthy()
+    expect(screen.getByText('Google Gemini')).toBeTruthy()
+    expect(screen.getByText('free-form')).toBeTruthy()
+  })
+
+  it('saves an optional display name on a first-party credential', async () => {
+    vi.mocked(api.config.testCredential).mockResolvedValue({ ok: true, response: 'pong' })
+    vi.mocked(api.config.addCredential).mockResolvedValue({ slug: 'openai-1', vendor: 'openai' })
+    const onSaved = vi.fn().mockResolvedValue(undefined)
+    render(
+      <CredentialModal
+        mode="add"
+        presets={[openAiPreset]}
+        agents={agents}
+        initialPresetId={openAiPreset.id}
+        onClose={vi.fn()}
+        onSaved={onSaved}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('e.g. Work key'), { target: { value: 'Office OpenAI' } })
+    fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'sk-office' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.config.addCredential).toHaveBeenCalledWith(expect.objectContaining({
+      vendor: 'openai',
+      label: 'Office OpenAI',
+      apiKey: 'sk-office',
+    })))
+    expect(onSaved).toHaveBeenCalled()
+  })
+
   it('explains provider-specific key, runtime, and model behavior before testing', () => {
     render(
       <CredentialModal
@@ -291,7 +339,7 @@ describe('CredentialModal', () => {
       />,
     )
 
-    fireEvent.change(screen.getByPlaceholderText('e.g. OpenRouter work key'), { target: { value: 'Gateway' } })
+    fireEvent.change(screen.getByPlaceholderText('e.g. Local vLLM'), { target: { value: 'Gateway' } })
     fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'sk-gateway' } })
     fireEvent.change(screen.getByPlaceholderText('Exact provider model ID'), { target: { value: 'gateway-model' } })
 

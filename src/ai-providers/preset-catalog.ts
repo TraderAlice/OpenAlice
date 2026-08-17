@@ -262,6 +262,49 @@ export const XAI_API: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
+// ==================== Third-party: OpenRouter ====================
+
+export const OPENROUTER: PresetDef = {
+  id: 'openrouter',
+  label: 'OpenRouter',
+  description: 'One key for many models via OpenRouter',
+  category: 'third-party',
+  defaultName: 'OpenRouter',
+  hint: 'OpenRouter is a gateway, not a first-party model vendor. One key can reach Anthropic, OpenAI, Google, and other models. Use `provider/model` IDs from openrouter.ai. Claude Code uses the Anthropic-compatible path (`https://openrouter.ai/api`, no `/v1`); Codex uses Responses; Pi, opencode, Oh My Pi, and Grok Build use the OpenAI-compatible path.',
+  zodSchema: z.object({
+    backend: z.literal('vercel-ai-sdk'),
+    provider: z.literal('openai-compatible'),
+    baseUrl: z.string().default('https://openrouter.ai/api/v1').describe('API endpoint'),
+    model: z.string().default('anthropic/claude-sonnet-4.6').describe('Model'),
+    apiKey: z.string().min(1).describe('OpenRouter API key'),
+  }),
+  regions: [{
+    id: 'default',
+    label: 'OpenRouter (openrouter.ai)',
+    wires: {
+      // OpenAI SDK appends `/chat/completions` and `/responses`.
+      'openai-chat': 'https://openrouter.ai/api/v1',
+      'openai-responses': 'https://openrouter.ai/api/v1',
+      // Anthropic SDK appends `/v1/messages`. OpenRouter's Anthropic skin is
+      // `/api` — a `/v1` suffix here causes model-not-found errors.
+      anthropic: 'https://openrouter.ai/api',
+    },
+  }],
+  models: withModelSemantics('openrouter', [
+    { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Suggested default)' },
+    { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5 (Highest capability)' },
+    { id: 'openai/gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)' },
+    { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash (Fast / economical)' },
+  ]),
+  setup: {
+    apiKeyLabel: 'OpenRouter API key',
+    apiKeyPlaceholder: 'sk-or-...',
+    apiKeyHelp: 'Use a key from openrouter.ai. This is not a first-party Anthropic, OpenAI, or Google key.',
+    modelHelp: 'Use the exact OpenRouter model ID (`provider/model`), or paste another ID from the OpenRouter catalog. Sonnet 4.6 is the suggested coding default.',
+  },
+  writeOnlyFields: ['apiKey'],
+}
+
 // ==================== Third-party: Gemini ====================
 
 export const GEMINI: PresetDef = {
@@ -555,6 +598,7 @@ export const PRESET_CATALOG: PresetDef[] = [
   CODEX_OAUTH,
   CODEX_API,
   XAI_API,
+  OPENROUTER,
   MINIMAX,
   GLM,
   KIMI,
@@ -584,5 +628,6 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   kimi: 'kimi-k3',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',
+  openrouter: 'anthropic/claude-sonnet-4.6',
   cursor: 'auto',
 }
