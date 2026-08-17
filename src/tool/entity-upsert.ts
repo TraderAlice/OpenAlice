@@ -38,6 +38,8 @@ export const entityUpsertFactory: WorkspaceToolFactory = {
         '  in prose, so keep it terse and reuse it exactly.',
         '- description: one line — the full identity the terse name leaves out (e.g. name "stock-vst" ->',
         '  "Vistra, Texas independent power producer driven by AI datacenter electricity demand").',
+        '  Prefer this tool over `alice-workspace track add` when the description contains',
+        '  apostrophes or other shell-sensitive characters — the tool path never goes through bash -c.',
         '- type: "asset" (a tradable instrument — has a ticker) or "topic" (a theme grouping assets).',
         '',
         'Before creating, prefer reusing an existing name: call entity_search first so you write',

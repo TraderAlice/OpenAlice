@@ -206,6 +206,27 @@ alice-workspace track search --query uranium
 alice-workspace track add --name uranium-ccj --description 'Cameco — uranium miner'
 ```
 
+Prose flags (`--description`, `--prompt`, `--text`, `--what`, …) go through the
+shell. **Never** write `\'` inside single quotes — bash ends the quote at the
+first `'`, so `McDonald\'s …布林50…` becomes a syntax error before the CLI
+runs. Prefer:
+
+```bash
+# Double quotes for short prose that may contain apostrophes.
+alice-workspace track add --name stock-mcd \
+  --description "McDonald's — low-vol blue chip; Bollinger|MA entry"
+
+# Heredoc for longer Chinese/English prose (safest).
+DESC=$(cat <<'EOF'
+McDonald's — 用户超喜欢的低波动蓝筹。低位低轨买入：布林|MA(布林50<2% 或 MA200<-8%)
+EOF
+)
+alice-workspace track add --name stock-mcd --description "$DESC"
+```
+
+If the runtime exposes `entity_upsert`, prefer that tool for tracking — the
+description never passes through `bash -c`.
+
 ## Upgrade managed Workspace guidance
 
 Preview first; apply only after reviewing the plan:
