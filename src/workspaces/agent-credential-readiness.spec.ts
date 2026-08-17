@@ -71,7 +71,7 @@ beforeEach(() => {
 });
 
 describe('agent credential readiness', () => {
-  it.each(['claude', 'codex', 'opencode', 'pi'])(
+  it.each(['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi'])(
     'treats %s as ready without an Alice credential because the runtime owns login state',
     async (agentId) => {
     const a = adapter(agentId);

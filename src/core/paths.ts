@@ -52,7 +52,7 @@ export function runtimePath(...parts: string[]): string {
   return resolve(USER_DATA_HOME, 'runtime', ...parts)
 }
 
-/** Path under `default/` — shipped templates (persona, heartbeat, skills). */
+/** Path under `default/` — shipped compatibility assets and skills. */
 export function defaultPath(...parts: string[]): string {
   return resolve(APP_RESOURCES_HOME, 'default', ...parts)
 }

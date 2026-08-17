@@ -16,10 +16,7 @@ import {
 
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { installHintFor } from '../components/workspace/agentInstall'
-import {
-  QuickChatError,
-  type Workspace,
-} from '../components/workspace/api'
+import { QuickChatError } from '../components/workspace/api'
 import {
   AgentLaunchDetails,
   AgentLaunchSelectors,
@@ -28,12 +25,16 @@ import {
 import { RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
+import { useAliceProject } from '../hooks/useAliceProject'
 import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
   useWorkspaceAgentLaunchPreferences,
 } from '../hooks/useAgentLaunchConfig'
+import { chatLandingExampleGroups } from '../lib/chat-landing-examples'
+import { resolveChatWorkspaceTarget, workspaceActivityMs } from '../lib/chat-workspace-target'
 import { AutoQuantSetupPage } from './AutoQuantSetupPage'
+import { ChatSetupPage } from './ChatSetupPage'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
 export {
@@ -42,44 +43,15 @@ export {
   resolveAgentLaunchAiDetails as resolveQuickChatAiDetails,
   resolveAgentLaunchCredentialSlug as resolveQuickChatCredentialSlug,
 } from '../hooks/useAgentLaunchConfig'
-
-function workspaceActivityMs(workspace: Pick<Workspace, 'createdAt' | 'sessions'>): number {
-  const sessionActivity = workspace.sessions
-    .map((session) => Date.parse(session.lastActiveAt))
-    .filter(Number.isFinite)
-  if (sessionActivity.length > 0) return Math.max(...sessionActivity)
-  const created = Date.parse(workspace.createdAt)
-  return Number.isFinite(created) ? created : 0
-}
-
-/** Resolve the visible global-composer target. Explicit selection wins, then
- *  the persisted recent Chat workspace, then latest activity for upgrades. */
-export function resolveChatWorkspaceTarget(
-  workspaces: readonly Workspace[],
-  explicitWorkspaceId: string | null,
-  recentWorkspaceId: string | null,
-  templateName = 'chat',
-): Workspace | null {
-  const chats = workspaces.filter((workspace) => workspace.template === templateName)
-  const explicit = explicitWorkspaceId
-    ? chats.find((workspace) => workspace.id === explicitWorkspaceId)
-    : undefined
-  if (explicit) return explicit
-  const recent = recentWorkspaceId
-    ? chats.find((workspace) => workspace.id === recentWorkspaceId)
-    : undefined
-  if (recent) return recent
-  return [...chats].sort((a, b) => workspaceActivityMs(b) - workspaceActivityMs(a))[0] ?? null
-}
+export { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
 
 /**
  * Quick-chat landing — the "type a message → you're in" front door for the
- * "Ask Alice" activity. A single composer: the user types a first message and
- * hits send; `quickChat` reuses-or-creates the chat workspace, spawns a fresh
- * session seeded with that message (the agent CLI opens already working on it),
- * and focuses into the session's terminal tab. No template/CLI pickers in the
- * way — the bottom row shows the workspace type (Chat) and a small runtime
- * picker for agent CLIs. Shell is not an agent runtime and is excluded here.
+ * "Ask Alice" activity. A new Alice Project with no Chat workspace first
+ * shows the shared harness setup page (same chrome as AutoQuant, without a
+ * pinned version). After that, a single composer: the user types a first
+ * message and hits send; `quickChat` reuses the Chat workspace, spawns a
+ * fresh session seeded with that message, and focuses the session tab.
  */
 type HarnessLandingMode = 'chat' | 'auto-quant'
 
@@ -91,6 +63,7 @@ function HarnessLandingPage({
   mode: HarnessLandingMode
 }) {
   const { t } = useTranslation()
+  const { project } = useAliceProject()
   const {
     quickChat,
     agents,
@@ -161,48 +134,7 @@ function HarnessLandingPage({
   const selectedInfo = launchConfig.selectedAgent
   const installHint = selectedInfo ? installHintFor(selectedInfo.id) : undefined
   const exampleGroups = mode === 'chat'
-    ? [
-        [
-          {
-            id: 'market',
-            label: t('chatLanding.marketBriefLabel'),
-            title: t('chatLanding.marketBriefTitle'),
-            prompt: t('chatLanding.marketBriefPrompt'),
-          },
-          {
-            id: 'portfolio',
-            label: t('chatLanding.portfolioReviewLabel'),
-            title: t('chatLanding.portfolioReviewTitle'),
-            prompt: t('chatLanding.portfolioReviewPrompt'),
-          },
-          {
-            id: 'thesis',
-            label: t('chatLanding.researchMemoLabel'),
-            title: t('chatLanding.researchMemoTitle'),
-            prompt: t('chatLanding.researchMemoPrompt'),
-          },
-        ],
-        [
-          {
-            id: 'workspace',
-            label: t('chatLanding.workspaceAuditLabel'),
-            title: t('chatLanding.workspaceAuditTitle'),
-            prompt: t('chatLanding.workspaceAuditPrompt'),
-          },
-          {
-            id: 'automation',
-            label: t('chatLanding.automationLabel'),
-            title: t('chatLanding.automationTitle'),
-            prompt: t('chatLanding.automationPrompt'),
-          },
-          {
-            id: 'quant',
-            label: t('chatLanding.quantDeskLabel'),
-            title: t('chatLanding.quantDeskTitle'),
-            prompt: t('chatLanding.quantDeskPrompt'),
-          },
-        ],
-      ]
+    ? chatLandingExampleGroups((key) => t(key as never), project?.product)
     : [[
         { id: 'quant-1', label: null, title: t('autoQuantLanding.ex1'), prompt: t('autoQuantLanding.ex1') },
         { id: 'quant-2', label: null, title: t('autoQuantLanding.ex2'), prompt: t('autoQuantLanding.ex2') },
@@ -558,7 +490,7 @@ function HarnessLandingPage({
               {t(`${copyKey}.examplesLabel`)}
             </span>
             <span aria-hidden className="h-px min-w-4 flex-1 bg-border/45" />
-            {mode === 'chat' && (
+            {mode === 'chat' && exampleGroups.length > 1 && (
               <button
                 type="button"
                 onClick={() => setExamplePage((page) => (page + 1) % exampleGroups.length)}
@@ -603,6 +535,9 @@ function HarnessLandingPage({
 }
 
 export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+  const ctx = useWorkspaces()
+  const hasChatWorkspace = ctx.workspaces.some((workspace) => workspace.template === 'chat')
+  if (!hasChatWorkspace) return <ChatSetupPage />
   return <HarnessLandingPage spec={spec} mode="chat" />
 }
 

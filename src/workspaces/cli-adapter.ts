@@ -93,6 +93,12 @@ export interface AgentProviderCapabilities {
   readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
   /** Wire protocols this runtime can consume, in native preference order. */
   readonly wirePreference: readonly WireShape[];
+  /**
+   * Provider credentials this runtime consumes directly instead of through a
+   * model API wire. The credential remains in the one shared vault shape;
+   * its adapter owns the native env/argv projection.
+   */
+  readonly directVendors?: readonly string[];
   /** Protocol preselected for a blank manual binding form. */
   readonly defaultWire?: WireShape;
   /** Provider-specific compatibility constraints and legacy repairs. */
@@ -170,7 +176,8 @@ export type SessionCredentialBinding =
   | {
       readonly source: 'vault'
       readonly credentialSlug: string
-      readonly wireShape: WireShape
+      /** Present for wire-backed providers; absent for direct runtime providers. */
+      readonly wireShape?: WireShape
     }
   | {
       readonly source: 'workspace'
@@ -287,7 +294,7 @@ export interface CliAdapter {
      * The adapter exposes a one-shot HEADLESS mode (consumes a positional
      * prompt, exits at the turn boundary) via `composeHeadlessCommand`. The
      * launcher dispatches automation tasks through it — spawn → run → the agent
-     * reports via `inbox_push` → exit, no human attached. The four agent CLIs
+     * reports via `inbox_push` → exit, no human attached. The agent CLIs
      * set this; `shell` does not (no agent-turn concept).
      */
     readonly headless?: boolean;
@@ -349,6 +356,8 @@ export interface CliAdapter {
    * `capabilities.headless` is true.
    *   claude:   [...base, -p, <prompt>, --output-format, json]   // never --bare
    *   codex:    [codex, exec, --json, <prompt>]                  // MCP optional
+   *   grok:     [grok, --no-leader, --always-approve, --output-format, streaming-json, --single=<prompt>]
+   *   omp:      [omp, -p, --mode, json, --auto-approve, --, <prompt>]
    *   opencode: [opencode, run, --format, json, <prompt>]
    *   pi:       [pi, -p, --mode, json, <prompt>]
    */
@@ -360,12 +369,13 @@ export interface CliAdapter {
 
   /**
    * Extract the agent's OWN session id from one line of headless stdout.
-   * All four agent CLIs announce their session id in the first line(s) of
+   * Agent CLIs announce their session id in the first line(s) of
    * their structured headless output (verified 2026-06-11):
    *   claude:   every stream-json event carries `session_id`
    *   codex:    `{"type":"thread.started","thread_id":…}` — equals the rollout
    *             `session_meta.id`, resumable via `codex resume <id>`
    *   opencode: every event carries top-level `sessionID` (`ses_…`)
+   *   omp:      line 1 is `{"type":"session","id":…}` (17.3.4 print JSON)
    *   pi:       line 1 is `{"type":"session","id":…}` (echoes --session-id)
    * The runner calls this per complete line until it returns non-null; the id
    * is recorded on the task so a finished headless run can be REOPENED as a

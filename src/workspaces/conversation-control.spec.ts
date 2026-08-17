@@ -64,6 +64,7 @@ function fakeService(opts: {
     dispatchHeadlessTask,
     headlessTasks: { get: () => opts.task ?? null },
     headlessLogsDir: opts.logsDir ?? '/tmp/logs',
+    recordAgentRuntime: vi.fn(async () => undefined),
   } as unknown as WorkspaceService
   return { svc, adapter, workspace, dispatchHeadlessTask, appendProvenance }
 }
@@ -95,6 +96,38 @@ describe('Workspace conversation target resolution', () => {
       mode: 'exact',
       origin,
       artifact: { kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit' },
+    })
+  })
+
+  it('keeps an archived Session as the exact follow-up target', () => {
+    const identity = {
+      ...origin,
+      wsId: origin.workspaceId,
+      agentSessionId: 'native-private',
+      presence: 'archived' as const,
+    }
+    const { svc } = fakeService({ identity, provenance: issueProvenance() })
+    expect(resolveWorkspaceConversationTarget(svc, {
+      kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit',
+    })).toEqual({
+      mode: 'exact',
+      origin,
+      artifact: { kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit' },
+    })
+  })
+
+  it('does not replace a soft-deleted Session with a fresh worker', () => {
+    const identity = {
+      ...origin,
+      wsId: origin.workspaceId,
+      agentSessionId: 'native-private',
+      presence: 'deleted' as const,
+    }
+    const { svc } = fakeService({ identity, provenance: issueProvenance() })
+    expect(resolveWorkspaceConversationTarget(svc, {
+      kind: 'issue', workspaceId: 'ws-peer', issueId: 'audit',
+    })).toMatchObject({
+      mode: 'unavailable', reason: 'deleted-session', attributedOrigin: origin,
     })
   })
 
@@ -179,6 +212,11 @@ describe('Workspace conversation control', () => {
       undefined,
       undefined,
       expect.anything(),
+      {
+        kind: 'conversation',
+        caller: { kind: 'human' },
+        reason: 'harness-chat',
+      },
     )
   })
 
@@ -215,6 +253,9 @@ describe('Workspace conversation control', () => {
       resolution: { reason: 'autoquant-not-initialized' },
     })
     expect(dispatchHeadlessTask).not.toHaveBeenCalled()
+    expect(svc.recordAgentRuntime).toHaveBeenCalledWith('runtime.rejected', expect.objectContaining({
+      reason: 'autoquant-not-initialized',
+    }))
   })
 
   it('continues the exact Session behind Issue provenance', async () => {
@@ -247,6 +288,7 @@ describe('Workspace conversation control', () => {
         deliveredPrompt: 'Why did you create this?',
         promptMode: 'plain',
       }),
+      undefined,
     )
   })
 
@@ -269,6 +311,11 @@ describe('Workspace conversation control', () => {
       promptMode: 'plain',
       originalPrompt: 'Why did the report reach this conclusion?',
       deliveredPrompt: 'Why did the report reach this conclusion?',
+    })
+    expect((dispatchHeadlessTask.mock.calls as unknown[][])[0]?.[9]).toEqual({
+      kind: 'conversation',
+      caller: { kind: 'human' },
+      reason: 'missing-origin',
     })
     expect(appendProvenance).toHaveBeenCalledWith(expect.objectContaining({
       action: 'reconstructed',

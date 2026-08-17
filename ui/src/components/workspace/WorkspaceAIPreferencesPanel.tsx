@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, BrainCircuit, Check, ChevronDown, Cpu, KeyRound, Pencil, RotateCcw, Settings2 } from 'lucide-react'
+import { Bot, Check, Cpu, KeyRound, Pencil, RotateCcw } from 'lucide-react'
 
 import type { QuickChatLaunchPreference } from '@/api/preferences'
 import { Button } from '@/components/ui/button'
@@ -12,21 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  useAgentLaunchConfig,
-  type AgentLaunchConfigState,
-  type AgentLaunchPreferencesState,
-} from '@/hooks/useAgentLaunchConfig'
-import { credentialAccessDetail, credentialAccessLabel } from './AgentLaunchControls'
+import { usePinnedRuntimeDraft } from '@/hooks/usePinnedRuntimeDraft'
+import { AgentLaunchSelectors, credentialAccessLabel } from './AgentLaunchControls'
 import {
   listAgentCredentials,
   updateWorkspaceRuntimeDefaults,
@@ -104,175 +91,6 @@ function preferenceSummary(
   return { access, inference }
 }
 
-function RuntimePreferenceFields({
-  config,
-  onConfigureProvider,
-}: {
-  readonly config: AgentLaunchConfigState
-  readonly onConfigureProvider: () => void
-}) {
-  const { t } = useTranslation()
-  const modelListId = useId()
-  const [accessMenuOpen, setAccessMenuOpen] = useState(false)
-  const [modelDraft, setModelDraft] = useState(config.launchModel ?? '')
-  const runtimeName = config.selectedAgent?.displayName ?? t('chatLanding.runtimeFallback')
-  const nativeAccess = config.accessMode === 'native' || config.effectiveCredential === null
-  const selectedAccessLabel = nativeAccess
-    ? t('chatLanding.runtimeAccount', { runtime: runtimeName })
-    : credentialAccessLabel(config.credential)
-  const selectedAccessDetail = nativeAccess
-    ? t('chatLanding.runtimeAccountDetail')
-    : t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(config.credential) })
-  const effortOptions = config.selectedReasoningEffort
-    && !config.effortOptions.includes(config.selectedReasoningEffort)
-    ? [config.selectedReasoningEffort, ...config.effortOptions]
-    : config.effortOptions
-  const defaultModelLabel = config.defaultModel
-    ? t('chatLanding.defaultModelValue', { model: config.defaultModel })
-    : t('chatLanding.runtimeDefaultModel')
-
-  useEffect(() => setModelDraft(config.launchModel ?? ''), [config.launchModel])
-
-  const commitModel = () => {
-    const next = modelDraft.trim()
-    if (next !== (config.launchModel ?? '')) config.selectModel(next || null)
-  }
-
-  return (
-    <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
-      <div className="space-y-1.5">
-        <span className="text-[11px] font-medium text-muted-foreground">{t('chatLanding.aiAccess')}</span>
-        <DropdownMenu open={accessMenuOpen} onOpenChange={setAccessMenuOpen}>
-          <DropdownMenuTrigger
-            render={<button
-              type="button"
-              aria-label={t('chatLanding.selectCredential')}
-              className="oa-pressable flex min-h-14 w-full items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-left outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-primary/40"
-            />}
-          >
-            <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium text-foreground">{selectedAccessLabel}</span>
-              <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">{selectedAccessDetail}</span>
-            </span>
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="bottom"
-            align="start"
-            sideOffset={6}
-            positionerClassName="z-[80]"
-            className="z-[80] max-h-52 min-w-[min(28rem,calc(100vw-3rem))] sm:max-h-64"
-          >
-            <div className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
-              {t('chatLanding.credentialMenuTitle', { runtime: runtimeName })}
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuRadioGroup
-              value={nativeAccess ? 'native' : `vault:${config.effectiveCredential ?? ''}`}
-              onValueChange={(value) => {
-                const selected = String(value)
-                if (selected === 'native') config.selectRuntimeDefault()
-                else if (selected.startsWith('vault:')) config.selectCredential(selected.slice('vault:'.length))
-                setAccessMenuOpen(false)
-              }}
-            >
-              <DropdownMenuRadioItem value="native" className="py-2">
-                <span className="min-w-0">
-                  <span className="block truncate text-[12px] font-medium">{t('chatLanding.runtimeAccount', { runtime: runtimeName })}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">{t('chatLanding.runtimeAccountDetail')}</span>
-                </span>
-              </DropdownMenuRadioItem>
-              {config.credentials?.map((credential) => (
-                <DropdownMenuRadioItem
-                  key={credential.slug}
-                  value={`vault:${credential.slug}`}
-                  className="py-2"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-medium">{credentialAccessLabel(credential)}</span>
-                    <span className="block truncate text-[10px] text-muted-foreground">
-                      {t('chatLanding.savedAccessDetail', { credential: credentialAccessDetail(credential) })}
-                    </span>
-                  </span>
-                  {credential.resolvedModel && (
-                    <span className="max-w-32 shrink-0 truncate text-[10px] text-muted-foreground">{credential.resolvedModel}</span>
-                  )}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-            {config.credentials !== null && config.credentials.length === 0 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={onConfigureProvider}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[12px] text-primary hover:bg-muted"
-                >
-                  <Settings2 className="h-4 w-4" />
-                  {t('chatLanding.configureProvider')}
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1.5">
-          <span className="text-[11px] font-medium text-muted-foreground">{t('chatLanding.modelField')}</span>
-          <span className="flex min-h-11 items-center gap-2 rounded-md border border-border bg-background px-3 focus-within:ring-2 focus-within:ring-primary/40">
-            <Cpu className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <input
-              list={modelListId}
-              value={modelDraft}
-              onChange={(event) => setModelDraft(event.target.value)}
-              onBlur={commitModel}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') event.currentTarget.blur()
-                if (event.key === 'Escape') {
-                  setModelDraft(config.launchModel ?? '')
-                  event.currentTarget.blur()
-                }
-              }}
-              aria-label={t('chatLanding.selectModel')}
-              placeholder={defaultModelLabel}
-              className="min-w-0 flex-1 bg-transparent py-2 text-[12px] text-foreground outline-none placeholder:text-muted-foreground"
-            />
-            <datalist id={modelListId}>
-              {config.modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
-            </datalist>
-          </span>
-        </label>
-
-        <label className="space-y-1.5">
-          <span className="text-[11px] font-medium text-muted-foreground">{t('chatLanding.effortField')}</span>
-          <span className="relative flex min-h-11 items-center gap-2 rounded-md border border-border bg-background px-3 focus-within:ring-2 focus-within:ring-primary/40">
-            <BrainCircuit className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <select
-              value={config.selectedReasoningEffort ?? ''}
-              onChange={(event) => config.selectReasoningEffort(
-                event.target.value
-                  ? event.target.value as NonNullable<AgentLaunchConfigState['launchReasoningEffort']>
-                  : null,
-              )}
-              aria-label={t('chatLanding.selectEffort')}
-              className="min-w-0 flex-1 appearance-none bg-transparent py-2 pr-5 text-[12px] text-foreground outline-none"
-            >
-              <option value="">{t('chatLanding.effortNotSpecified')}</option>
-              {effortOptions.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-muted-foreground" />
-          </span>
-        </label>
-      </div>
-
-      <p className="text-[10.5px] leading-relaxed text-muted-foreground">
-        {t('workspaceSettings.preferences.nativeAccessHelp')}
-      </p>
-    </div>
-  )
-}
-
 function RuntimePreferenceDialog({
   open,
   onOpenChange,
@@ -296,36 +114,23 @@ function RuntimePreferenceDialog({
   const [useFixed, setUseFixed] = useState(fixed !== undefined)
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
-  const [draft, setDraft] = useState<QuickChatLaunchPreference>(() => (
-    launchFromPreference(agent.id, fixed ?? recent)
-  ))
+  const initial = useMemo(
+    () => launchFromPreference(agent.id, fixed ?? recent),
+    [agent.id, fixed, recent],
+  )
+  const editor = usePinnedRuntimeDraft({
+    workspaceId,
+    agent: agent.id,
+    agents: [agent],
+    initial,
+    active: open,
+  })
 
   useEffect(() => {
     if (!open) return
     setUseFixed(fixed !== undefined)
-    setDraft(launchFromPreference(agent.id, fixed ?? recent))
     setApplyError(null)
   }, [agent.id, fixed, open, recent])
-
-  const rememberLaunch = useCallback(async (launch: QuickChatLaunchPreference) => {
-    setDraft(launch)
-  }, [])
-  const preferences = useMemo<AgentLaunchPreferencesState>(() => ({
-    lastCredentialByAgent: draft.credentialSlug ? { [agent.id]: draft.credentialSlug } : {},
-    recentChatWorkspaceId: workspaceId,
-    recentLaunch: draft,
-    loaded: true,
-    rememberLaunch,
-    adoptRecentChatWorkspace: () => undefined,
-  }), [agent.id, draft, rememberLaunch, workspaceId])
-  const config = useAgentLaunchConfig({
-    agents: [agent],
-    defaultAgent: agent.id,
-    preferences,
-    workspaceId,
-    hasWorkspace: true,
-    managedWorkspaceLaunch: true,
-  })
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!applying) onOpenChange(nextOpen) }}>
@@ -374,7 +179,20 @@ function RuntimePreferenceDialog({
         </div>
 
         {useFixed && (
-          <RuntimePreferenceFields config={config} onConfigureProvider={onConfigureProvider} />
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+            <AgentLaunchSelectors
+              config={editor.config}
+              onConfigureProvider={onConfigureProvider}
+              showRuntime={false}
+              toolbar
+              layout="settings"
+              menuPlacement="down"
+              menuPositionerClassName="z-[80]"
+            />
+            <p className="text-[10.5px] leading-relaxed text-muted-foreground">
+              {t('workspaceSettings.preferences.nativeAccessHelp')}
+            </p>
+          </div>
         )}
 
         {applyError && <p role="alert" className="text-xs text-destructive">{applyError}</p>}
@@ -384,7 +202,7 @@ function RuntimePreferenceDialog({
           <Button disabled={applying} onClick={() => {
             setApplying(true)
             setApplyError(null)
-            void onApply(useFixed ? preferenceFromLaunch(draft) : null)
+            void onApply(useFixed ? preferenceFromLaunch(editor.draft) : null)
               .then((message) => {
                 if (message) setApplyError(message)
                 else onOpenChange(false)

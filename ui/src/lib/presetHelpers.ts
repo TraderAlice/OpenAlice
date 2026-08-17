@@ -38,6 +38,10 @@ export const WIRE_SHAPE_GUIDANCE: Record<WireShape, string> = {
 export const AGENT_LABELS: Record<string, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  cursor: 'Cursor Agent',
+  agy: 'Antigravity',
+  grok: 'Grok Build',
+  omp: 'Oh My Pi',
   opencode: 'opencode',
   pi: 'Pi',
 }
@@ -170,6 +174,9 @@ export function presetCompatibleAgentIds(
   preset: Preset,
   agents: readonly AgentProviderInfo[],
 ): string[] {
+  if (preset.directAgentId) {
+    return agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
+  }
   const wires: Partial<Record<WireShape, string>> = {}
   for (const region of presetRegions(preset)) Object.assign(wires, region.wires)
   return compatibleAgentIds(wires, agents)
@@ -240,12 +247,15 @@ export function isApiKeyPreset(p: Preset): boolean {
 export const VENDOR_BY_PRESET: Record<string, string> = {
   'claude-api': 'anthropic',
   'codex-api': 'openai',
+  'xai-api': 'xai',
   gemini: 'google',
   minimax: 'minimax',
   glm: 'glm',
   kimi: 'kimi',
   deepseek: 'deepseek',
   longcat: 'longcat',
+  openrouter: 'openrouter',
+  'cursor-dashboard': 'cursor',
   custom: 'custom',
 }
 
@@ -255,20 +265,66 @@ export function vendorPreset(vendor: string, presets: Preset[]): Preset | undefi
   return presets.find((p) => p.id === presetId) ?? presets.find((p) => p.id === 'custom')
 }
 
+/** Human vendor names for vault rows and launch pickers. */
+export const VENDOR_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google Gemini',
+  xai: 'xAI',
+  minimax: 'MiniMax',
+  glm: 'GLM',
+  kimi: 'Kimi',
+  deepseek: 'DeepSeek',
+  longcat: 'LongCat',
+  openrouter: 'OpenRouter',
+  cursor: 'Cursor',
+  custom: 'Custom',
+}
+
+export function vendorLabel(vendor: string): string {
+  return VENDOR_LABELS[vendor] ?? vendor
+}
+
+export function credentialSearchHaystack(cred: {
+  slug: string
+  vendor: string
+  label?: string
+  lastModel?: string
+}): string {
+  return [
+    cred.label,
+    cred.slug,
+    cred.vendor,
+    vendorLabel(cred.vendor),
+    cred.lastModel,
+  ].filter(Boolean).join(' ').toLowerCase()
+}
+
+export function credentialMatchesQuery(
+  cred: { slug: string; vendor: string; label?: string; lastModel?: string },
+  query: string,
+): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  return credentialSearchHaystack(cred).includes(needle)
+}
+
 // Mirrors the backend baseUrl→vendor heuristic (src/core/credential-inference.ts
 // VENDORS_BY_BASEURL). Kept in sync by hand — it's a tiny, stable map.
 const VENDOR_BY_BASEURL: Array<[RegExp, string]> = [
   [/generativelanguage\.googleapis\.com/i, 'google'],
+  [/api\.x\.ai/i, 'xai'],
   [/bigmodel\.cn|z\.ai/i, 'glm'],
   [/minimaxi\.com|minimax\.io/i, 'minimax'],
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
   [/deepseek\.com/i, 'deepseek'],
   [/longcat\.chat/i, 'longcat'],
+  [/openrouter\.ai/i, 'openrouter'],
 ]
 
 /** Mirror the backend's intentionally narrow Anthropic bearer inference. */
 export function anthropicAuthModeForBaseUrl(baseUrl: string | null | undefined): 'x-api-key' | 'bearer' {
-  return /api\.minimaxi\.com|api\.minimax\.io|api\.longcat\.chat/i.test(baseUrl ?? '')
+  return /api\.minimaxi\.com|api\.minimax\.io|api\.longcat\.chat|openrouter\.ai/i.test(baseUrl ?? '')
     ? 'bearer'
     : 'x-api-key'
 }

@@ -6,6 +6,7 @@ import type {
   IssueSnapshot,
 } from '../../api/issues'
 import { demoInboxEntries } from './inbox'
+import { demoTurnProgress } from './turn-progress'
 
 // GET /api/issues aggregates every workspace's declared issues by SCANNING
 // each workspace's `.alice/issues/<id>.md` dir (one markdown file per issue) —
@@ -182,6 +183,8 @@ interface IssueDetailExtras {
   what?: string
   /** Scheduling frontmatter `agent` (adapter id), if set. */
   agent?: string
+  /** Comment-reply Input Prompt template, if set. */
+  commentPrompt?: string
   /** This issue's headless runs, newest-first (Activity feed). */
   runs: IssueRunRecord[]
 }
@@ -465,6 +468,7 @@ export function demoIssueDetail(wsId: string, id: string): IssueDetail | null {
       ...boardIssue,
       what,
       ...(extras?.agent ? { agent: extras.agent } : {}),
+      ...(extras?.commentPrompt ? { commentPrompt: extras.commentPrompt } : {}),
     },
     comments,
     runs,
@@ -510,6 +514,7 @@ export function demoIssueUpdate(
       delete boardIssue.credential
       delete boardIssue.model
       delete boardIssue.effort
+      // timeout is a run budget, not Session birth — keep it.
     }
   }
   if (patch.what !== undefined) {
@@ -520,6 +525,16 @@ export function demoIssueUpdate(
       existing.body = ''
     } else {
       demoIssueExtras[key] = { body: '', what: patch.what, runs: [] }
+    }
+  }
+  if (patch.commentPrompt !== undefined) {
+    const key = `${wsId}/${id}`
+    const existing = demoIssueExtras[key]
+    if (existing) {
+      if (patch.commentPrompt === null) delete existing.commentPrompt
+      else existing.commentPrompt = patch.commentPrompt
+    } else if (patch.commentPrompt !== null) {
+      demoIssueExtras[key] = { body: '', commentPrompt: patch.commentPrompt, runs: [] }
     }
   }
   if (patch.agent !== undefined) {
@@ -556,6 +571,10 @@ export function demoIssueUpdate(
     if (patch.effort === null) delete boardIssue.effort
     else boardIssue.effort = patch.effort
   }
+  if (patch.timeout !== undefined) {
+    if (patch.timeout === null) delete boardIssue.timeout
+    else boardIssue.timeout = patch.timeout
+  }
   return demoIssueDetail(wsId, id)
 }
 
@@ -580,7 +599,12 @@ export function demoIssueAddComment(
     author,
     at: new Date().toISOString(),
     markdown: text,
-    delivery: { state: 'pending' as const, targetResumeId: ownerResumeId, taskId },
+    delivery: {
+      state: 'pending' as const,
+      targetResumeId: ownerResumeId,
+      taskId,
+      progress: demoTurnProgress(),
+    },
   })
   demoIssueComments[key] = comments
   window.setTimeout(() => {
@@ -601,6 +625,36 @@ export function demoIssueAddComment(
       replyTo: commentId,
     })
   }, 900)
+  return demoIssueDetail(wsId, id)
+}
+
+/** POST-run backing: operator-started dispatch without requiring a failed last run. */
+export function demoIssueRunNow(wsId: string, id: string): IssueDetail | null {
+  const boardIssue = findBoardIssue(wsId, id)
+  const extras = demoIssueExtras[`${wsId}/${id}`]
+  if (!boardIssue?.when || boardIssue.status === 'done' || boardIssue.status === 'canceled') {
+    return null
+  }
+  const latest = extras?.runs[0]
+  if (latest?.status === 'running') return null
+  const run: IssueRunRecord = {
+    taskId: `demo-run-${Date.now()}`,
+    resumeId: `demo-resume-run-${Date.now()}`,
+    resumable: false,
+    wsId,
+    issueId: id,
+    agent: boardIssue.agent ?? extras?.agent ?? latest?.agent ?? 'codex',
+    prompt: extras?.runs[0]?.prompt ?? boardIssue.title,
+    status: 'running',
+    startedAt: Date.now(),
+  }
+  if (!extras) return null
+  extras.runs.unshift(run)
+  boardIssue.automationHealth = {
+    state: 'running',
+    message: 'A scheduled run is in progress.',
+    latestTaskId: run.taskId,
+  }
   return demoIssueDetail(wsId, id)
 }
 

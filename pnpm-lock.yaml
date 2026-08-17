@@ -437,10 +437,16 @@ importers:
     dependencies:
       '@grammyjs/auto-retry':
         specifier: ^2.0.2
-        version: 2.0.2(grammy@1.40.0(encoding@0.1.13))
+        version: 2.0.2(grammy@1.45.1(encoding@0.1.13))
       '@hono/node-server':
         specifier: ^2.0.12
         version: 2.0.12(hono@4.12.32)
+      '@slack/socket-mode':
+        specifier: ^3.0.0
+        version: 3.0.0(undici@7.28.0)
+      '@slack/web-api':
+        specifier: ^8.0.0
+        version: 8.0.0
       '@traderalice/connector-protocol':
         specifier: workspace:*
         version: link:../../packages/connector-protocol
@@ -448,8 +454,8 @@ importers:
         specifier: 14.26.5
         version: 14.26.5
       grammy:
-        specifier: ^1.40.0
-        version: 1.40.0(encoding@0.1.13)
+        specifier: ^1.45.1
+        version: 1.45.1(encoding@0.1.13)
       hono:
         specifier: ^4.12.32
         version: 4.12.32
@@ -1196,8 +1202,8 @@ packages:
     peerDependencies:
       grammy: ^1.10.0
 
-  '@grammyjs/types@3.24.0':
-    resolution: {integrity: sha512-qQIEs4lN5WqUdr4aT8MeU6UFpMbGYAvcvYSW1A4OO1PABGJQHz/KLON6qvpf+5RxaNDQBxiY2k2otIhg/AG7RQ==}
+  '@grammyjs/types@4.0.0':
+    resolution: {integrity: sha512-Z8lDLTvOlo12e5Vnly/vQh3JC9ppaitS1dGZ3w068gNitOd/y8tTSiib+Xm38aBGbtYGmUZwOc6afYrLs2CSTg==}
 
   '@hono/node-server@2.0.12':
     resolution: {integrity: sha512-eWpQYr67tqJLeaSUl0Q+TquuYfUdTibpOJlUMV2FfUP7+KqCC5TufnwnlXL6mobZBJbGAYRd7ZvEBDCbLInjhg==}
@@ -1561,6 +1567,24 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
+
+  '@slack/logger@5.0.0':
+    resolution: {integrity: sha512-VGXhmmgsAo9shdQYh4tFDndd+7nsgp0Y5h0UPDaUp8K359pBasI6YdkMqFW3mCOxLQkq09qj7o7cq6f3DuXcJQ==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
+
+  '@slack/socket-mode@3.0.0':
+    resolution: {integrity: sha512-QShO60SB0E+HH+TbcKj3CBEQbodToRyiXnxuSB4t1kvUlqEmuGA1nOOjrRDkDJbOECAZ13PLe4ek9SrntpfoYg==}
+    engines: {node: '>=20', npm: '>=9.6.4'}
+    peerDependencies:
+      undici: ^7.28.0
+
+  '@slack/types@3.0.0':
+    resolution: {integrity: sha512-KNOqpnNAlsFt5Jk9XBclslQ0lobRIg/0tnhpmvZJAglHJx9E8oceN8hC3gaBzkR6UzQ9Wzq4rLsJ98wUcxWPfw==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
+
+  '@slack/web-api@8.0.0':
+    resolution: {integrity: sha512-ORx3XQryQPq2Jnxv5giSKXVoQRUeylrrymIR2S9fPzLjPcCts8RayMeBSZMcpfpAqp6fnBRuPW2UB6dUPUTEZA==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
 
   '@stablelib/base64@1.0.1':
     resolution: {integrity: sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==}
@@ -1968,6 +1992,9 @@ packages:
   '@types/responselike@1.0.3':
     resolution: {integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==}
 
+  '@types/retry@0.12.0':
+    resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
+
   '@types/set-cookie-parser@2.4.10':
     resolution: {integrity: sha512-GGmQVGpQWUe5qglJozEjZV/5dyxbOOZ0LHe/lqyWssB88Y4svNfst0uqBVscdDeIKl5Jy5+aPSvy7mI9tYRguw==}
 
@@ -2102,10 +2129,12 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xterm/addon-fit@0.12.0-beta.287':
     resolution: {integrity: sha512-2MDj+J4x67bjOS/SuBPxSYEWH38NbX6ENV18RbKVOhfRYCX3yERnuHBOrgH9hYdY8rCtsLQmuVgF6cmvCJiV2w==}
@@ -2945,6 +2974,9 @@ packages:
     resolution: {integrity: sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==}
     engines: {node: '>=6'}
 
+  eventemitter3@4.0.7:
+    resolution: {integrity: sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==}
+
   eventemitter3@5.0.1:
     resolution: {integrity: sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA==}
 
@@ -3204,8 +3236,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  grammy@1.40.0:
-    resolution: {integrity: sha512-ssuE7fc1AwqlUxHr931OCVW3fU+oFDjHZGgvIedPKXfTdjXvzP19xifvVGCnPtYVUig1Kz+gwxe4A9M5WdkT4Q==}
+  grammy@1.45.1:
+    resolution: {integrity: sha512-Y4VL/hqJMZZxwlUr5ZgM68CFu2iIeEkNLR1cY3+Ww68CIvWARDsoXFix7+31rmyC0+7L85ZI+Pq3E5JSG5+nLQ==}
     engines: {node: ^12.20.0 || >=14.13.1}
 
   graphql@16.14.0:
@@ -4135,6 +4167,10 @@ packages:
     resolution: {integrity: sha512-BZOr3nRQHOntUjTrH8+Lh54smKHoHyur8We1V8DSMVrl5A2malOOwuJRnKRDjSnkoeBh4at6BwEnb5I7Jl31wg==}
     engines: {node: '>=8'}
 
+  p-finally@1.0.0:
+    resolution: {integrity: sha512-LICb2p9CB7FS+0eR1oqWnHhp0FljGLZCWBE9aix0Uye9W8LTQPwMTYVGWQWIw9RdQiDg4+epXQODwIYJtSJaow==}
+    engines: {node: '>=4'}
+
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
     engines: {node: '>=6'}
@@ -4146,6 +4182,18 @@ packages:
   p-locate@3.0.0:
     resolution: {integrity: sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ==}
     engines: {node: '>=6'}
+
+  p-queue@6.6.2:
+    resolution: {integrity: sha512-RwFpb72c/BhQLEXIZ5K2e+AhgNVmIejGlTgiB9MzZ0e93GRvqZ7uSi0dvRF7/XIXDeNkra2fNHBxTyPDGySpjQ==}
+    engines: {node: '>=8'}
+
+  p-retry@4.6.2:
+    resolution: {integrity: sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==}
+    engines: {node: '>=8'}
+
+  p-timeout@3.2.0:
+    resolution: {integrity: sha512-rhIwUycgwwKcP9yTOOFK/AKsAopjjCakVqLHePO3CC6Mir1Z99xT+R63jZxAT5lFZLa2inS5h+ZS2GvR99/FBg==}
+    engines: {node: '>=8'}
 
   p-try@2.2.0:
     resolution: {integrity: sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ==}
@@ -4563,6 +4611,10 @@ packages:
 
   retry@0.12.0:
     resolution: {integrity: sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==}
+    engines: {node: '>= 4'}
+
+  retry@0.13.1:
+    resolution: {integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==}
     engines: {node: '>= 4'}
 
   rettime@0.11.11:
@@ -6062,14 +6114,14 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@grammyjs/auto-retry@2.0.2(grammy@1.40.0(encoding@0.1.13))':
+  '@grammyjs/auto-retry@2.0.2(grammy@1.45.1(encoding@0.1.13))':
     dependencies:
       debug: 4.4.3
-      grammy: 1.40.0(encoding@0.1.13)
+      grammy: 1.45.1(encoding@0.1.13)
     transitivePeerDependencies:
       - supports-color
 
-  '@grammyjs/types@3.24.0': {}
+  '@grammyjs/types@4.0.0': {}
 
   '@hono/node-server@2.0.12(hono@4.12.32)':
     dependencies:
@@ -6416,6 +6468,31 @@ snapshots:
   '@sindresorhus/is@4.6.0': {}
 
   '@sindresorhus/merge-streams@4.0.0': {}
+
+  '@slack/logger@5.0.0':
+    dependencies:
+      '@types/node': 25.2.3
+
+  '@slack/socket-mode@3.0.0(undici@7.28.0)':
+    dependencies:
+      '@slack/logger': 5.0.0
+      '@slack/web-api': 8.0.0
+      '@types/node': 25.2.3
+      eventemitter3: 5.0.4
+      undici: 7.28.0
+
+  '@slack/types@3.0.0': {}
+
+  '@slack/web-api@8.0.0':
+    dependencies:
+      '@slack/logger': 5.0.0
+      '@slack/types': 3.0.0
+      '@types/node': 25.2.3
+      '@types/retry': 0.12.0
+      eventemitter3: 5.0.4
+      p-queue: 6.6.2
+      p-retry: 4.6.2
+      retry: 0.13.1
 
   '@stablelib/base64@1.0.1': {}
 
@@ -6820,6 +6897,8 @@ snapshots:
   '@types/responselike@1.0.3':
     dependencies:
       '@types/node': 25.2.3
+
+  '@types/retry@0.12.0': {}
 
   '@types/set-cookie-parser@2.4.10':
     dependencies:
@@ -7834,6 +7913,8 @@ snapshots:
 
   event-target-shim@5.0.1: {}
 
+  eventemitter3@4.0.7: {}
+
   eventemitter3@5.0.1: {}
 
   eventemitter3@5.0.4: {}
@@ -8170,9 +8251,9 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  grammy@1.40.0(encoding@0.1.13):
+  grammy@1.45.1(encoding@0.1.13):
     dependencies:
-      '@grammyjs/types': 3.24.0
+      '@grammyjs/types': 4.0.0
       abort-controller: 3.0.0
       debug: 4.4.3
       node-fetch: 2.7.0(encoding@0.1.13)
@@ -8975,6 +9056,8 @@ snapshots:
 
   p-cancelable@2.1.1: {}
 
+  p-finally@1.0.0: {}
+
   p-limit@2.3.0:
     dependencies:
       p-try: 2.2.0
@@ -8986,6 +9069,20 @@ snapshots:
   p-locate@3.0.0:
     dependencies:
       p-limit: 2.3.0
+
+  p-queue@6.6.2:
+    dependencies:
+      eventemitter3: 4.0.7
+      p-timeout: 3.2.0
+
+  p-retry@4.6.2:
+    dependencies:
+      '@types/retry': 0.12.0
+      retry: 0.13.1
+
+  p-timeout@3.2.0:
+    dependencies:
+      p-finally: 1.0.0
 
   p-try@2.2.0: {}
 
@@ -9425,6 +9522,8 @@ snapshots:
       signal-exit: 4.1.0
 
   retry@0.12.0: {}
+
+  retry@0.13.1: {}
 
   rettime@0.11.11: {}
 

@@ -1,6 +1,6 @@
 {
   "name": "open-alice",
-  "version": "0.89.3-beta",
+  "version": "0.89.4-beta",
   "description": "File-based trading agent engine",
   "type": "module",
   "main": "dist/electron/main.js",
@@ -37,6 +37,7 @@
     "electron:smoke:workspace": "node scripts/desktop-packaged-smoke.mjs --workspace-acceptance",
     "electron:smoke:pty": "node scripts/desktop-pty-smoke.mjs",
     "electron:smoke:guardian-recovery": "node scripts/desktop-pty-smoke.mjs --guardian-recovery",
+    "electron:smoke:existing-owner": "node scripts/desktop-existing-owner-smoke.mjs",
     "electron:smoke:upgrade": "node scripts/desktop-upgrade-smoke.mjs",
     "vendor:runtime": "node scripts/vendor-managed-runtime.mjs",
     "test": "vitest run",

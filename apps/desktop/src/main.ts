@@ -29,7 +29,6 @@ import { planUTATransition } from './uta-lifecycle.js'
 import {
   acquireGuardianRuntime,
   currentProcessStartedAt,
-  inspectOpenAliceInstance,
   resolveGuardianTradingMode,
   takeoverRequested,
   type GuardianTradingModePlan,
@@ -56,6 +55,7 @@ import {
   resolveDesktopDataHome,
   type ResolvedDesktopDataHome,
 } from './data-home-desktop.js'
+import { existingOwnerSmokeMode, resolveExistingOwnerStartup } from './existing-owner-startup.js'
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
 import { childIsRunning, stopChild } from './child-shutdown.js'
 
@@ -122,6 +122,14 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ])
+
+if (existingOwnerSmokeMode()) {
+  const smokeUserData = process.env['OPENALICE_ELECTRON_SMOKE_USER_DATA']?.trim()
+  if (smokeUserData) app.setPath('userData', smokeUserData)
+  app.commandLine.appendSwitch('no-sandbox')
+  app.commandLine.appendSwitch('disable-gpu')
+  app.disableHardwareAcceleration()
+}
 
 // ── Cross-platform process-tree kill ─────────────────────────
 // Inline mirror of scripts/guardian/shared.ts:killTree. UTA and Alice each
@@ -616,33 +624,40 @@ app.whenReady().then(async () => {
   let takeover = takeoverRequested()
   const guardianStartedAt = currentProcessStartedAt()
   while (!takeover) {
-    const runtimeInspections = await inspectOpenAliceInstance({ userDataHome, launcherRoot })
-    const activeRuntime = runtimeInspections.find((row) => row.state === 'active' && row.owner)
-    if (!activeRuntime) break
-    const owner = activeRuntime.owner!
-    const staleDetail = activeRuntime.heartbeatStale
-      ? '\n\nThe process is still present, but its health heartbeat is stale.'
-      : ''
-    const canChooseAnother = selectionLock === null
-    const buttons = canChooseAnother
-      ? ['Keep existing instance', 'Choose another data location', 'Stop it and start this OpenAlice']
-      : ['Keep existing instance', 'Stop it and start this OpenAlice']
-    const { response } = await dialog.showMessageBox({
-      type: activeRuntime.heartbeatStale ? 'warning' : 'question',
-      title: 'OpenAlice is already running',
-      message: `Another OpenAlice ${owner.launcher} instance is using this data.`,
-      detail: `PID ${owner.pid}\nData: ${userDataHome}\nLast heartbeat: ${owner.heartbeatAt}${staleDetail}`,
-      buttons,
-      defaultId: activeRuntime.heartbeatStale ? buttons.length - 1 : 0,
-      cancelId: 0,
-      noLink: true,
-    })
-    if (response === 0) {
+    let existingOwner
+    desktopDiagnostics.write(
+      'existing-owner',
+      `inspect home=${userDataHome} launcherRoot=${launcherRoot}`,
+    )
+    try {
+      existingOwner = await resolveExistingOwnerStartup({
+        userDataHome,
+        launcherRoot,
+        canChooseAnother: selectionLock === null,
+        takeoverRequested: false,
+      })
+    } catch (error) {
+      desktopDiagnostics.write(
+        'existing-owner',
+        `inspection failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`,
+      )
+      dialog.showErrorBox(
+        'OpenAlice — existing AliceProject',
+        `${error instanceof Error ? error.message : String(error)}\n\nOpenAlice did not take over the running AliceProject.`,
+      )
       app.quit()
       return
     }
-    if (!canChooseAnother || response === 2) {
-      takeover = true
+    desktopDiagnostics.write(
+      'existing-owner',
+      `resolved action=${existingOwner.action}${existingOwner.action === 'continue' ? ` takeover=${existingOwner.takeover}` : ''}`,
+    )
+    if (existingOwner.action === 'quit') {
+      app.quit()
+      return
+    }
+    if (existingOwner.action === 'continue') {
+      takeover = existingOwner.takeover
       break
     }
 
@@ -651,7 +666,7 @@ app.whenReady().then(async () => {
     if (chosen.path === userDataHome) {
       dialog.showErrorBox(
         'OpenAlice — choose another location',
-        'That folder is the data location already owned by the running instance.',
+        'That folder is the complete home already owned by the running AliceProject.',
       )
       continue
     }

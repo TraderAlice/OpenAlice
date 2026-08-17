@@ -1,14 +1,20 @@
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 
-const INSTANCE_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
+import {
+  aliceProjectEnvironment,
+  resolveAliceProjectIdentity,
+  type AliceProjectIdentity,
+} from './alice-project.ts'
+
+const PROJECT_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
 const DEFAULT_PORT = 47_331
 
 export type LaunchValueSource =
   | 'default'
   | 'installed-runtime'
   | 'machine-config'
-  | 'instance-config'
+  | 'project-config'
   | 'environment'
   | 'cli-flag'
   | 'derived'
@@ -26,20 +32,28 @@ export interface LaunchConfigValues {
 }
 
 export interface MachineSupervisorConfig {
+  defaultProject?: string
+  /** @deprecated Released config boundary only. */
   defaultInstance?: string
   defaults?: LaunchConfigValues
 }
 
-export interface InstanceLaunchConfig extends LaunchConfigValues {
+export interface AliceProjectLaunchConfig extends LaunchConfigValues {
   name?: string
+  displayName?: string
+  /** Immutable product birth. Omitted means trader. */
+  product?: 'trader' | 'nano'
 }
 
 export interface TuiLaunchFlags extends LaunchConfigValues {
+  project?: string
+  /** @deprecated Accepted for released CLI compatibility. */
   instance?: string
 }
 
 export interface ResolvedLaunchContext {
-  instance: string
+  project: string
+  aliceProject: AliceProjectIdentity
   home: string
   port: number
   appDir: string | null
@@ -54,7 +68,7 @@ export interface ResolvedLaunchContext {
     sessionDir: string
   }
   provenance: {
-    instance: LaunchValueProvenance
+    project: LaunchValueProvenance
     home: LaunchValueProvenance
     port: LaunchValueProvenance
     appDir: LaunchValueProvenance
@@ -67,7 +81,7 @@ export interface ResolvedLaunchContext {
 export interface ResolveLaunchContextOptions {
   flags?: TuiLaunchFlags
   machineConfig?: MachineSupervisorConfig | null
-  instanceConfig?: InstanceLaunchConfig | null
+  projectConfig?: AliceProjectLaunchConfig | null
   env?: NodeJS.ProcessEnv
   cwd?: string
   homeDir?: string
@@ -95,13 +109,13 @@ export function resolveLaunchContext(
   const platform = options.platform ?? process.platform
   const flags = options.flags ?? {}
   const machine = options.machineConfig ?? {}
-  const instanceConfig = options.instanceConfig ?? {}
+  const projectConfig = options.projectConfig ?? {}
 
-  const instance = resolveInstance(flags, env, machine)
-  if (instanceConfig.name !== undefined && instanceConfig.name !== instance.value) {
+  const project = resolveProject(flags, env, machine)
+  if (projectConfig.name !== undefined && projectConfig.name !== project.value) {
     throw launchContextError(
-      'EINSTANCECONFIG',
-      `Instance config "${instanceConfig.name}" does not match selected instance "${instance.value}".`,
+      'EPROJECTCONFIG',
+      `AliceProject config "${projectConfig.name}" does not match selected project "${project.value}".`,
     )
   }
 
@@ -109,26 +123,26 @@ export function resolveLaunchContext(
   const home = resolveField<string>(
     candidate(join(homeDir, '.openalice'), 'default', '~/.openalice'),
     pathCandidate(machine.defaults?.home, 'machine-config', 'machine.defaults.home', cwd, homeDir),
-    pathCandidate(instanceConfig.home, 'instance-config', `instance.${instance.value}.home`, cwd, homeDir),
+    pathCandidate(projectConfig.home, 'project-config', `project.${project.value}.home`, cwd, homeDir),
     pathCandidate(env['OPENALICE_HOME'], 'environment', 'OPENALICE_HOME', cwd, homeDir),
     pathCandidate(flags.home, 'cli-flag', '--home', cwd, homeDir),
   )
   if (
-    instance.value !== 'default'
-    && home.provenance.source !== 'instance-config'
+    project.value !== 'default'
+    && home.provenance.source !== 'project-config'
     && home.provenance.source !== 'environment'
     && home.provenance.source !== 'cli-flag'
   ) {
     throw launchContextError(
-      'EINSTANCEHOME',
-      `Instance "${instance.value}" needs an explicit complete home in instance config, OPENALICE_HOME, or --home.`,
+      'EPROJECTHOME',
+      `AliceProject "${project.value}" needs an explicit complete home in project config, OPENALICE_HOME, or --home.`,
     )
   }
 
   const port = resolveField<number>(
     candidate(DEFAULT_PORT, 'default', String(DEFAULT_PORT)),
     numberCandidate(machine.defaults?.port, 'machine-config', 'machine.defaults.port'),
-    numberCandidate(instanceConfig.port, 'instance-config', `instance.${instance.value}.port`),
+    numberCandidate(projectConfig.port, 'project-config', `project.${project.value}.port`),
     env['OPENALICE_WEB_PORT'] === undefined
       ? undefined
       : candidate(parsePort(env['OPENALICE_WEB_PORT'], 'OPENALICE_WEB_PORT'), 'environment', 'OPENALICE_WEB_PORT'),
@@ -144,14 +158,14 @@ export function resolveLaunchContext(
       homeDir,
     ),
     nullablePathCandidate(machine.defaults?.appDir, 'machine-config', 'machine.defaults.appDir', cwd, homeDir),
-    nullablePathCandidate(instanceConfig.appDir, 'instance-config', `instance.${instance.value}.appDir`, cwd, homeDir),
+    nullablePathCandidate(projectConfig.appDir, 'project-config', `project.${project.value}.appDir`, cwd, homeDir),
     nullablePathCandidate(env['OPENALICE_APP_HOME'], 'environment', 'OPENALICE_APP_HOME', cwd, homeDir),
     nullablePathCandidate(flags.appDir, 'cli-flag', '--app-dir', cwd, homeDir),
   )
   const updateChecks = resolveField<boolean>(
     candidate(true, 'default', 'enabled'),
     booleanCandidate(machine.defaults?.updateChecks, 'machine-config', 'machine.defaults.updateChecks'),
-    booleanCandidate(instanceConfig.updateChecks, 'instance-config', `instance.${instance.value}.updateChecks`),
+    booleanCandidate(projectConfig.updateChecks, 'project-config', `project.${project.value}.updateChecks`),
     env['OPENALICE_NO_UPDATE_CHECK'] === undefined
       ? undefined
       : candidate(
@@ -175,7 +189,14 @@ export function resolveLaunchContext(
         contentIdentity: null,
       }
   return deepFreeze({
-    instance: instance.value,
+    project: project.value,
+    aliceProject: resolveAliceProjectIdentity({
+      home: home.value,
+      appRoot: appDir.value,
+      env,
+      key: project.value,
+      displayName: projectConfig.displayName,
+    }),
     home: home.value,
     port: port.value,
     appDir: appDir.value,
@@ -187,7 +208,7 @@ export function resolveLaunchContext(
       sessionDir: join(managedPiRoot, 'sessions'),
     },
     provenance: {
-      instance: instance.provenance,
+      project: project.provenance,
       home: home.provenance,
       port: port.provenance,
       appDir: appDir.provenance,
@@ -219,6 +240,16 @@ export function buildManagedPiEnv(
   return buildManagedPiEnvForHome(context.home, baseEnv)
 }
 
+export function buildAliceProjectEnv(
+  context: ResolvedLaunchContext,
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return {
+    ...baseEnv,
+    ...aliceProjectEnvironment(context.aliceProject),
+  }
+}
+
 export function buildManagedPiEnvForHome(
   home: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
@@ -238,7 +269,9 @@ export function parseTuiLaunchArgs(argv: string[]): TuiLaunchFlags {
   const flags: TuiLaunchFlags = {}
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
-    if (arg === '--instance') {
+    if (arg === '--project') {
+      flags.project = requireValue(argv, ++index, arg)
+    } else if (arg === '--instance') {
       flags.instance = requireValue(argv, ++index, arg)
     } else if (arg === '--home') {
       flags.home = requireValue(argv, ++index, arg)
@@ -261,21 +294,23 @@ export function parseTuiLaunchArgs(argv: string[]): TuiLaunchFlags {
   return flags
 }
 
-function resolveInstance(
+function resolveProject(
   flags: TuiLaunchFlags,
   env: NodeJS.ProcessEnv,
   machine: MachineSupervisorConfig,
 ): Candidate<string> {
   const selected = resolveField<string>(
-    candidate('default', 'default', 'implicit default instance'),
-    stringCandidate(machine.defaultInstance, 'machine-config', 'machine.defaultInstance'),
+    candidate('default', 'default', 'implicit default AliceProject'),
+    stringCandidate(machine.defaultProject ?? machine.defaultInstance, 'machine-config', 'machine.defaultProject'),
     stringCandidate(env['OPENALICE_INSTANCE'], 'environment', 'OPENALICE_INSTANCE'),
+    stringCandidate(env['OPENALICE_PROJECT'], 'environment', 'OPENALICE_PROJECT'),
     stringCandidate(flags.instance, 'cli-flag', '--instance'),
+    stringCandidate(flags.project, 'cli-flag', '--project'),
   )
-  if (!INSTANCE_NAME_PATTERN.test(selected.value)) {
+  if (!PROJECT_KEY_PATTERN.test(selected.value)) {
     throw launchContextError(
-      'EINSTANCENAME',
-      `Invalid OpenAlice instance "${selected.value}". Use a lowercase name beginning with a letter and containing only letters, numbers, "_" or "-".`,
+      'EPROJECTNAME',
+      `Invalid AliceProject "${selected.value}". Use a lowercase key beginning with a letter and containing only letters, numbers, "_" or "-".`,
     )
   }
   return selected

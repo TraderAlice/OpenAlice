@@ -155,6 +155,8 @@ describe('SessionRow actions', () => {
     const user = userEvent.setup()
     const onPause = vi.fn()
     const onDelete = vi.fn()
+    const onSettings = vi.fn()
+    const onArchive = vi.fn()
     const { rerender } = render(
       <SessionRow
         session={session}
@@ -163,6 +165,8 @@ describe('SessionRow actions', () => {
         onPause={onPause}
         onResume={vi.fn()}
         onDelete={onDelete}
+        onArchive={onArchive}
+        onSettings={onSettings}
       />,
     )
 
@@ -171,8 +175,12 @@ describe('SessionRow actions', () => {
     expect(more.getAttribute('aria-haspopup')).toBe('menu')
     more.focus()
     await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings for Review AAPL earnings' }))
+    expect(onSettings).toHaveBeenCalledOnce()
+
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     const deleteItem = screen.getByRole('menuitem', { name: 'Delete Review AAPL earnings' })
-    expect(document.activeElement).toBe(deleteItem)
     fireEvent.click(deleteItem)
     expect(onPause).toHaveBeenCalledOnce()
     expect(onDelete).toHaveBeenCalledOnce()
@@ -186,6 +194,8 @@ describe('SessionRow actions', () => {
         onPause={vi.fn()}
         onResume={onResume}
         onDelete={vi.fn()}
+        onArchive={onArchive}
+        onSettings={onSettings}
       />,
     )
 
@@ -211,5 +221,78 @@ describe('SessionRow actions', () => {
     expect(main.className).toContain('oa-session-row-main')
     expect(main.parentElement?.className).toContain('oa-session-row')
     expect(main.parentElement?.getAttribute('data-active')).toBe('true')
+  })
+
+  it('explains headless occupancy instead of swallowing Session clicks', () => {
+    const onSelect = vi.fn()
+    const onHeadlessBusy = vi.fn()
+    const onResume = vi.fn()
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        headlessOccupying
+        onSelect={onSelect}
+        onHeadlessBusy={onHeadlessBusy}
+        onPause={vi.fn()}
+        onResume={onResume}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const [title, play] = screen.getAllByRole('button', { name: 'Running · Review AAPL earnings' })
+    fireEvent.click(title!)
+    fireEvent.click(play!)
+    expect(onHeadlessBusy).toHaveBeenCalledTimes(2)
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onResume).not.toHaveBeenCalled()
+  })
+
+  it('archives a Session from the More menu instead of deleting the coworker', async () => {
+    const user = userEvent.setup()
+    const onArchive = vi.fn()
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+        onArchive={onArchive}
+      />,
+    )
+
+    const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive Review AAPL earnings' }))
+    expect(onArchive).toHaveBeenCalledOnce()
+  })
+
+  it('does not offer Archive while an interactive Session is running', async () => {
+    const user = userEvent.setup()
+    const onArchive = vi.fn()
+    render(
+      <SessionRow
+        session={session}
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+        onArchive={onArchive}
+      />,
+    )
+
+    const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    const archive = screen.getByRole('menuitem', { name: 'Archive Review AAPL earnings' })
+    expect(archive.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(archive)
+    expect(onArchive).not.toHaveBeenCalled()
   })
 })

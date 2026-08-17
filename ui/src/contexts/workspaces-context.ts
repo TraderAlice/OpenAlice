@@ -53,6 +53,7 @@ export interface WorkspacesContextValue {
   setDefaultAgent(agent: string | null): Promise<void>
   setIssueDefaultAgent(agent: string | null): Promise<void>
   initializeAutoQuant(): Promise<Workspace>
+  initializeChat(): Promise<Workspace>
   setAutoQuantDefaultWorkspace(workspaceId: string): Promise<void>
   quickChat(
     prompt: string,
@@ -68,6 +69,21 @@ export interface WorkspacesContextValue {
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   openWebPiSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
+  setSessionPresence(
+    wsId: string,
+    resumeId: string,
+    presence: import('../components/workspace/api').SessionPresence,
+  ): Promise<void>
+  setSessionDisplayName(
+    wsId: string,
+    resumeId: string,
+    displayName: string | null,
+  ): Promise<void>
+  updateSessionRuntime(
+    wsId: string,
+    sessionId: string,
+    update: import('../components/workspace/api').PausedSessionRuntimeUpdate,
+  ): Promise<void>
   openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,

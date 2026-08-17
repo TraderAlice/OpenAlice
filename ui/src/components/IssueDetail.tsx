@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Brain, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
+import { inputClass } from './form'
 
-import type { HeadlessTaskStatus } from '../api/headless'
+import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
 import type {
   IssueDetail as IssueDetailData,
@@ -15,24 +16,31 @@ import type {
   IssueProvenanceRecord,
   IssueRunRecord,
   IssueStatus,
+  IssueTimeout,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
-import type { ModelReasoningEffort } from '../api/types'
-import type { Preset, PresetModel } from '../api/types'
-import { configApi } from '../api/config'
+import { DEFAULT_ISSUE_COMMENT_PROMPT, ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
+
 import {
   getAgentReadiness,
   getWorkspaceSessionDirectory,
   listAgentCredentials,
+  updateResumeRuntime,
   type AgentCredentialReadiness,
   type AgentId,
+  type AgentInfo,
+  type PausedSessionRuntimeUpdate,
   type SavedCredential,
   type WorkspaceRuntimeModeSettings,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
-import { issuesApi } from '../api/issues'
-import { credentialAccessLabel } from './workspace/AgentLaunchControls'
+import { AgentLaunchSelectors, credentialAccessLabel } from './workspace/AgentLaunchControls'
+import {
+  formatPinnedCapability,
+  pinnedLaunchFromBinding,
+  usePinnedRuntimeDraft,
+} from '../hooks/usePinnedRuntimeDraft'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
@@ -41,10 +49,12 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
+import { ConfirmDialog } from './ConfirmDialog'
 import { AutomationHealthPill, CadencePill, CadenceSummary, PriorityIndicator } from './IssuesBoard'
 import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
+import { hasTurnProgress, TurnProgress } from './TurnProgress'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { CenteredLoading } from './StateViews'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -57,12 +67,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  issueEffortOptions,
-  issueModelOptions,
-  issueModelSemantics,
-  resolveIssueAiSelection,
-} from './issue-runtime-options'
+import { resolveIssueAiSelection } from './issue-runtime-options'
 
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
 // Issue's independent operational history stays consistent with Automation.
@@ -82,7 +87,7 @@ const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'n
 const railControl =
   'h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9'
 
-const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
+const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi']
 
 function isConfigurableAgent(agent: string | null | undefined): agent is AgentId {
   return CONFIGURABLE_AGENTS.includes(agent as AgentId)
@@ -149,51 +154,219 @@ function AssigneeEditor({
   scheduled: boolean
   sessions: readonly WorkspaceSessionDirectoryEntry[]
   disabled?: boolean
-  onChange: (next: string) => void
+  onChange: (next: string) => Promise<boolean>
 }) {
   const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [draftValue, setDraftValue] = useState(value)
+  const [committing, setCommitting] = useState(false)
   const sessionChoices = sessions
-    .filter((session) => session.resumeId && session.agent !== 'shell' && session.resumable)
+    .filter((session) =>
+      session.resumeId
+      && session.agent !== 'shell'
+      && session.resumable
+      && (session.presence ?? 'active') === 'active')
     .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
   const selectedResumeId = value.startsWith('@resume-') ? value.slice(1) : null
+  const draftResumeId = draftValue.startsWith('@resume-') ? draftValue.slice(1) : null
   const hasSelected = !selectedResumeId || sessionChoices.some((session) => session.resumeId === selectedResumeId)
-  const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
+  const contextFor = (session: WorkspaceSessionDirectoryEntry) => {
     const rawContext = session.interactive?.title
       || session.interactive?.name
       || session.latestExecution?.assistantPreview
     const normalizedContext = rawContext?.replace(/\s+/g, ' ').trim()
-    const context = normalizedContext && normalizedContext !== session.resumeId
-      ? normalizedContext.length > 28
-        ? `${normalizedContext.slice(0, 27)}…`
-        : normalizedContext
-      : null
+    if (!normalizedContext || normalizedContext === session.resumeId) return null
+    return normalizedContext.length > 120
+      ? `${normalizedContext.slice(0, 117).trimEnd()}…`
+      : normalizedContext
+  }
+  const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
     const activity = session.active ? 'active' : formatRelativeTime(session.updatedAt)
-    return `@${session.resumeId} · ${session.agent} · ${activity}${context ? ` — ${context}` : ''}`
+    return `${session.resumeId} · ${session.agent} · ${activity}`
+  }
+
+  const policyChoices = scheduled
+    ? [
+        { value: '@new-then-resume', label: t('issues.detail.assigneeNew'), description: t('issues.detail.assigneeNewDescription') },
+        { value: '@new-each-run', label: t('issues.detail.assigneeWorkspaceScheduled'), description: t('issues.detail.assigneeEachDescription') },
+      ]
+    : [
+        { value: '@human', label: t('issues.detail.human'), description: t('issues.detail.assigneeHumanDescription') },
+        { value: '@unassigned', label: t('issues.detail.unassigned'), description: t('issues.detail.assigneeUnassignedDescription') },
+      ]
+  const selectedSession = selectedResumeId
+    ? sessionChoices.find((session) => session.resumeId === selectedResumeId)
+    : null
+  const selectedPolicy = policyChoices.find((choice) => choice.value === value)
+  const selectedLabel = selectedSession
+    ? contextFor(selectedSession) ?? selectedSession.resumeId
+    : selectedPolicy?.label ?? (selectedResumeId ? selectedResumeId : value)
+  const selectedDescription = selectedSession
+    ? `${selectedSession.agent} · ${selectedSession.active ? t('issues.detail.activeNow') : formatRelativeTime(selectedSession.updatedAt)}`
+    : selectedPolicy?.description
+  const draftSession = draftResumeId
+    ? sessionChoices.find((session) => session.resumeId === draftResumeId)
+    : null
+  const draftPolicy = policyChoices.find((choice) => choice.value === draftValue)
+  const draftLabel = draftSession
+    ? contextFor(draftSession) ?? draftSession.resumeId
+    : draftPolicy?.label ?? (draftResumeId ? draftResumeId : draftValue)
+  const draftDescription = draftSession
+    ? `${draftSession.resumeId} · ${draftSession.agent} · ${draftSession.active ? t('issues.detail.activeNow') : formatRelativeTime(draftSession.updatedAt)}`
+    : draftPolicy?.description
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredSessions = normalizedQuery
+    ? sessionChoices.filter((session) => [session.resumeId, session.agent, contextFor(session)]
+        .filter(Boolean)
+        .some((candidate) => candidate!.toLocaleLowerCase().includes(normalizedQuery)))
+    : sessionChoices
+  const close = () => {
+    setOpen(false)
+    setQuery('')
+    setDraftValue(value)
+  }
+  const apply = async () => {
+    if (draftValue === value || committing) return
+    setCommitting(true)
+    try {
+      if (await onChange(draftValue)) {
+        setOpen(false)
+        setQuery('')
+      }
+    } finally {
+      setCommitting(false)
+    }
   }
 
   return (
-    <select
-      className={`${railControl} w-full`}
-      value={value}
-      disabled={disabled}
-      aria-label={t('issues.detail.assignee')}
-      onChange={(event) => onChange(event.target.value)}
+    <Dialog open={open} onOpenChange={(next) => {
+      if (next) {
+        setDraftValue(value)
+        setOpen(true)
+        return
+      }
+      if (!committing) close()
+    }}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={t('issues.detail.assignee')}
+        onClick={() => {
+          setDraftValue(value)
+          setOpen(true)
+        }}
+        className="oa-pressable flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <UserRound size={15} className="shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium text-foreground">{selectedLabel}</span>
+          {selectedDescription && <span className="block truncate text-[11px] text-muted-foreground">{selectedDescription}</span>}
+        </span>
+        <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
+      </button>
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-xl">
+        <DialogHeader className="px-4 pt-4">
+          <DialogTitle>{t('issues.detail.chooseAssignee')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.chooseAssigneeDescription')}</DialogDescription>
+        </DialogHeader>
+        <label className="mx-4 flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-ring/30">
+          <Search size={15} className="text-muted-foreground" aria-hidden />
+          <span className="sr-only">{t('issues.detail.searchSessions')}</span>
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('issues.detail.searchSessions')}
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        <div className="min-h-0 max-w-full overflow-x-hidden overflow-y-auto px-2 pb-4">
+          <p className="px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            {t('issues.detail.assignmentPolicy')}
+          </p>
+          <div className="space-y-0.5">
+            {policyChoices.map((choice) => (
+              <AssigneeChoice
+                key={choice.value}
+                label={choice.label}
+                description={choice.description}
+                selected={draftValue === choice.value}
+                onClick={() => setDraftValue(choice.value)}
+              />
+            ))}
+          </div>
+          <p className="mt-2 border-t border-border/60 px-2 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            {t('issues.detail.workspaceSessions')}
+          </p>
+          <div className="space-y-0.5">
+            {!hasSelected && selectedResumeId && (
+              <AssigneeChoice
+                label={t('issues.detail.signedSession', { resumeId: selectedResumeId })}
+                description={t('issues.detail.sessionUnavailable')}
+                selected={draftValue === value}
+                onClick={() => setDraftValue(value)}
+              />
+            )}
+            {filteredSessions.map((session) => (
+              <AssigneeChoice
+                key={session.resumeId}
+                label={contextFor(session) ?? session.resumeId}
+                description={labelFor(session)}
+                selected={draftResumeId === session.resumeId}
+                onClick={() => setDraftValue(`@${session.resumeId}`)}
+              />
+            ))}
+            {filteredSessions.length === 0 && (
+              <p className="px-3 py-8 text-center text-sm text-muted-foreground">{t('issues.detail.noSessionsFound')}</p>
+            )}
+          </div>
+        </div>
+        <DialogFooter className="mx-0 mb-0 items-center rounded-none px-4 py-3 sm:justify-between">
+          <div className="min-w-0 text-left sm:mr-auto">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+              {t('issues.detail.pendingAssignee')}
+            </span>
+            <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{draftLabel}</span>
+            {draftDescription && <span className="block truncate text-xs text-muted-foreground">{draftDescription}</span>}
+          </div>
+          <div className="flex w-full justify-end gap-2 sm:w-auto">
+            <Button type="button" variant="outline" disabled={committing} onClick={close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" disabled={committing || draftValue === value} onClick={() => void apply()}>
+              {committing ? t('issues.detail.assigning') : t('issues.detail.confirmAssignment')}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function AssigneeChoice({
+  label,
+  description,
+  selected,
+  onClick,
+}: {
+  label: string
+  description?: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-12 w-full min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {scheduled && <option value="@new-then-resume">{t('issues.detail.assigneeNew')}</option>}
-      {scheduled && <option value="@new-each-run">{t('issues.detail.assigneeWorkspaceScheduled')}</option>}
-      {!scheduled && <option value="@human">{t('issues.detail.human')}</option>}
-      {!scheduled && <option value="@unassigned">{t('issues.detail.unassigned')}</option>}
-      <optgroup label={t('issues.detail.workspaceSessions')}>
-        {sessionChoices.map((session) => (
-          <option key={session.resumeId} value={`@${session.resumeId}`}>
-            {labelFor(session)}
-          </option>
-        ))}
-        {!hasSelected && selectedResumeId && (
-          <option value={value}>{t('issues.detail.signedSession', { resumeId: selectedResumeId })}</option>
-        )}
-      </optgroup>
-    </select>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-foreground">{label}</span>
+        {description && <span className="mt-0.5 block truncate text-xs text-muted-foreground">{description}</span>}
+      </span>
+      {selected && <Check size={16} className="shrink-0 text-primary" aria-hidden />}
+    </button>
   )
 }
 
@@ -281,176 +454,171 @@ function AgentEditor({
   )
 }
 
-function ModelEditor({
-  value,
-  defaultModel,
-  models,
-  loadingDefault,
-  disabled,
-  onChange,
-}: {
-  value?: string
-  defaultModel: string | null
-  models: readonly PresetModel[]
-  loadingDefault: boolean
-  disabled?: boolean
-  onChange: (next: string | null) => void
-}) {
-  const { t } = useTranslation()
-  const [customMode, setCustomMode] = useState(Boolean(value))
-  const [draft, setDraft] = useState(value ?? '')
-  const inputRef = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    setCustomMode(Boolean(value))
-    setDraft(value ?? '')
-  }, [value])
-  const commit = () => {
-    const next = draft.trim()
-    if (next !== (value ?? '')) onChange(next || null)
-    if (!next) setCustomMode(false)
-  }
-  const defaultLabel = loadingDefault
-    ? t('issues.detail.defaultLoading')
-    : defaultModel
-      ? t('issues.detail.defaultValue', { value: defaultModel })
-      : t('issues.detail.defaultRuntimeDecides')
-  const knownValue = value && models.some((model) => model.id === value)
-
-  return (
-    <div className="min-w-0 flex-1">
-      <select
-        className={`${railControl} w-full`}
-        value={customMode ? (knownValue ? value : 'custom') : 'default'}
-        disabled={disabled}
-        aria-label={t('issues.detail.runModel')}
-        onChange={(event) => {
-          if (event.target.value === 'default') {
-            setCustomMode(false)
-            setDraft('')
-            if (value) onChange(null)
-            return
-          }
-          if (event.target.value !== 'custom') {
-            setCustomMode(true)
-            setDraft(event.target.value)
-            onChange(event.target.value)
-            return
-          }
-          setCustomMode(true)
-          queueMicrotask(() => inputRef.current?.focus())
-        }}
-      >
-        <option value="default">{defaultLabel}</option>
-        {models.map((model) => (
-          <option key={model.id} value={model.id}>{model.label}</option>
-        ))}
-        <option value="custom">
-          {value ? t('issues.detail.overrideValue', { value }) : t('issues.detail.customModel')}
-        </option>
-      </select>
-      {customMode && !knownValue && (
-        <input
-          ref={inputRef}
-          className={`${railControl} mt-1 w-full`}
-          value={draft}
-          disabled={disabled}
-          placeholder={t('issues.detail.nativeModelPlaceholder')}
-          aria-label={t('issues.detail.customRunModel')}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              commit()
-              event.currentTarget.blur()
-            } else if (event.key === 'Escape' && !value) {
-              setDraft('')
-              setCustomMode(false)
-            }
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
 function credentialLabel(credential: SavedCredential | null | undefined): string {
   return credential ? credentialAccessLabel(credential) : ''
 }
 
+function issuePatchToRuntimeUpdate(patch: IssuePatch): PausedSessionRuntimeUpdate {
+  const vault = Boolean(patch.credential)
+  return {
+    credentialSource: vault ? 'vault' : 'native',
+    ...(vault ? { credentialSlug: patch.credential } : {}),
+    model: patch.model ?? null,
+    reasoningEffort: patch.effort ?? null,
+  }
+}
+
+function runtimeUpdateToIssuePatch(
+  update: PausedSessionRuntimeUpdate,
+  inherit: boolean,
+): IssuePatch {
+  if (inherit) {
+    return {
+      credential: null,
+      credentialSource: null,
+      model: update.model ?? null,
+      effort: update.reasoningEffort ?? null,
+    }
+  }
+  return {
+    credential: update.credentialSource === 'vault' ? update.credentialSlug ?? null : null,
+    credentialSource: update.credentialSource === 'native' ? 'native' : null,
+    model: update.model ?? null,
+    effort: update.reasoningEffort ?? null,
+  }
+}
+
+function ownerSessionBusy(session: WorkspaceSessionDirectoryEntry | undefined): boolean {
+  return Boolean(
+    session?.active
+    || session?.interactive?.state === 'running'
+    || session?.latestExecution?.status === 'running',
+  )
+}
+
+function issueLaunchSeed(
+  agent: string,
+  issue: IssueDetailIssue,
+  mode: WorkspaceRuntimeModeSettings | null,
+): ReturnType<typeof pinnedLaunchFromBinding> {
+  if (issue.credentialSource === 'native') {
+    return pinnedLaunchFromBinding(agent, {
+      credentialSource: 'native',
+      model: issue.model,
+      reasoningEffort: issue.effort,
+    })
+  }
+  if (issue.credential) {
+    return pinnedLaunchFromBinding(agent, {
+      credentialSource: 'vault',
+      credentialSlug: issue.credential,
+      model: issue.model,
+      reasoningEffort: issue.effort,
+    })
+  }
+  const inherited = resolveIssueAiSelection({ mode, agent, issue })
+  return pinnedLaunchFromBinding(agent, {
+    credentialSource: inherited.accessMode,
+    credentialSlug: inherited.credentialSlug,
+    model: issue.model ?? inherited.model,
+    reasoningEffort: issue.effort ?? inherited.reasoningEffort,
+  })
+}
+
 function IssueAiEditor({
+  wsId,
   issue,
   agent,
+  agents,
   mode,
   credentials,
-  presets,
-  loading,
   disabled,
+  bound,
+  boundRuntime,
   onApply,
+  onConfigureProvider,
 }: {
+  wsId: string
   issue: IssueDetailIssue
   agent: string | null
+  agents: readonly AgentInfo[]
   mode: WorkspaceRuntimeModeSettings | null
   credentials: readonly SavedCredential[]
-  presets: readonly Preset[]
-  loading: boolean
   disabled: boolean
-  onApply: (patch: IssuePatch) => void
+  bound?: boolean
+  boundRuntime?: WorkspaceSessionDirectoryEntry['runtime']
+  onApply: (patch: IssuePatch, capability: { from: string; to: string }) => void
+  onConfigureProvider: () => void
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const initialAccess = issue.credentialSource === 'native'
-    ? 'native'
-    : issue.credential
-      ? `vault:${issue.credential}`
-      : 'inherit'
-  const [access, setAccess] = useState(initialAccess)
-  const [model, setModel] = useState<string | null>(issue.model ?? null)
-  const [effort, setEffort] = useState<ModelReasoningEffort | null>(issue.effort ?? null)
+  const inheritsAccess = !bound && issue.credentialSource !== 'native' && !issue.credential
+  const [inherit, setInherit] = useState(inheritsAccess)
+  const agentId = agent ?? 'codex'
+  const initial = bound
+    ? pinnedLaunchFromBinding(agentId, boundRuntime)
+    : issueLaunchSeed(agentId, issue, mode)
+  const editor = usePinnedRuntimeDraft({
+    workspaceId: wsId,
+    agent: agentId,
+    agents,
+    initial,
+    active: open,
+  })
 
   useEffect(() => {
     if (!open) return
-    setAccess(initialAccess)
-    setModel(issue.model ?? null)
-    setEffort(issue.effort ?? null)
-  }, [initialAccess, issue.effort, issue.model, open])
+    setInherit(inheritsAccess)
+  }, [inheritsAccess, open])
 
-  const draftIssue = {
-    ...(access === 'native' ? { credentialSource: 'native' as const } : {}),
-    ...(access.startsWith('vault:') ? { credential: access.slice(6) } : {}),
-    ...(model ? { model } : {}),
-    ...(effort ? { effort } : {}),
-  }
-  const resolved = resolveIssueAiSelection({ mode, agent, issue: draftIssue })
-  const committed = resolveIssueAiSelection({ mode, agent, issue })
-  const selectedCredential = resolved.credentialSlug
-    ? credentials.find((candidate) => candidate.slug === resolved.credentialSlug) ?? null
-    : null
-  const models = issueModelOptions({
-    agent,
-    credential: selectedCredential,
-    defaultModel: resolved.model ?? selectedCredential?.resolvedModel ?? null,
-    presets,
-  })
-  const effectiveModel = model ?? resolved.model ?? selectedCredential?.resolvedModel ?? null
-  const semantics = issueModelSemantics(effectiveModel, models)
-  const efforts = issueEffortOptions({ agent, semantics, modelKnown: semantics !== null })
-  const inheritedEffort = resolved.reasoningEffort ?? selectedCredential?.resolvedReasoningEffort ?? null
-
+  const committed = bound
+    ? {
+        accessMode: (boundRuntime?.credentialSource === 'vault' ? 'vault' : 'native') as 'vault' | 'native',
+        credentialSlug: boundRuntime?.credentialSource === 'vault' ? boundRuntime.credentialSlug : undefined,
+        model: boundRuntime?.model,
+        reasoningEffort: boundRuntime?.reasoningEffort,
+        accessOrigin: 'issue' as const,
+      }
+    : resolveIssueAiSelection({ mode, agent, issue })
+  const accessLabel = (modeValue: string, slug: string | undefined, fallbackCredential: SavedCredential | null) => (
+    modeValue === 'vault' || modeValue.startsWith('vault:')
+      ? credentialLabel(fallbackCredential)
+        || slug
+        || (modeValue.startsWith('vault:') ? modeValue.slice(6) : undefined)
+        || t('issues.detail.savedAccess')
+      : t('issues.detail.agentLogin')
+  )
   const committedCredential = committed.credentialSlug
     ? credentials.find((candidate) => candidate.slug === committed.credentialSlug) ?? null
     : null
-  const summaryAccess = committed.accessMode === 'vault'
-    ? credentialLabel(committedCredential) || committed.credentialSlug || t('issues.detail.savedAccess')
-    : t('issues.detail.agentLogin')
-  const summaryModel = committed.model ?? committedCredential?.resolvedModel ?? t('issues.detail.runtimeDecides')
-  const summaryEffort = committed.reasoningEffort ?? committedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
-  const provenance = committed.accessOrigin === 'workspace-fixed'
-    ? t('issues.detail.workspaceHeadlessFixed')
-    : committed.accessOrigin === 'workspace-recent'
-      ? t('issues.detail.workspaceHeadlessRecent')
-      : committed.accessOrigin === 'runtime'
-        ? t('issues.detail.agentRuntimeDefault')
-        : t('issues.detail.issueOverride')
+  const fallback = {
+    access: t('issues.detail.agentLogin'),
+    model: t('issues.detail.runtimeDecides'),
+    effort: t('issues.detail.runtimeDecides'),
+  }
+  const summaryAccess = accessLabel(committed.accessMode, committed.credentialSlug, committedCredential)
+  const summaryModel = bound
+    ? committed.model ?? t('issues.detail.runtimeDecides')
+    : committed.model ?? committedCredential?.resolvedModel ?? t('issues.detail.runtimeDecides')
+  const summaryEffort = bound
+    ? committed.reasoningEffort ?? t('issues.detail.runtimeDecides')
+    : committed.reasoningEffort ?? committedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
+  const draftCapability = inherit && !bound
+    ? {
+        access: t('issues.detail.followWorkspaceHeadless'),
+        model: editor.capability(fallback).model,
+        effort: editor.capability(fallback).effort,
+      }
+    : editor.capability(fallback)
+  const provenance = bound
+    ? t('issues.detail.sessionBinding')
+    : committed.accessOrigin === 'workspace-fixed'
+      ? t('issues.detail.workspaceHeadlessFixed')
+      : committed.accessOrigin === 'workspace-recent'
+        ? t('issues.detail.workspaceHeadlessRecent')
+        : committed.accessOrigin === 'runtime'
+          ? t('issues.detail.agentRuntimeDefault')
+          : t('issues.detail.issueOverride')
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -472,70 +640,71 @@ function IssueAiEditor({
       <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('issues.detail.aiConfiguration')}</DialogTitle>
-          <DialogDescription>{t('issues.detail.aiConfigurationDescription')}</DialogDescription>
+          <DialogDescription>
+            {t(bound
+              ? 'issues.detail.sessionAiConfigurationDescription'
+              : 'issues.detail.aiConfigurationDescription')}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <label className="block space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><KeyRound size={14} />{t('issues.detail.aiAccess')}</span>
-            <select
-              className={`${railControl} w-full`}
-              aria-label={t('issues.detail.aiAccess')}
-              value={access}
-              disabled={loading}
-              onChange={(event) => {
-                setAccess(event.target.value)
-                setModel(null)
-                setEffort(null)
-              }}
-            >
-              <option value="inherit">{t('issues.detail.followWorkspaceHeadless')}</option>
-              <option value="native">{t('issues.detail.useAgentLogin')}</option>
-              {credentials.map((credential) => (
-                <option key={credential.slug} value={`vault:${credential.slug}`}>
-                  {credentialLabel(credential)} · {credential.vendor}
-                </option>
-              ))}
-              {issue.credential && !credentials.some((credential) => credential.slug === issue.credential) && (
-                <option value={`vault:${issue.credential}`}>{t('issues.detail.missingCredentialValue', { credential: issue.credential })}</option>
-              )}
-            </select>
-            <span className="block text-[11px] leading-relaxed text-muted-foreground">{t('issues.detail.aiAccessDescription')}</span>
-          </label>
-          <div className="space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><Cpu size={14} />{t('issues.detail.model')}</span>
-            <ModelEditor
-              value={model ?? undefined}
-              defaultModel={resolved.model ?? selectedCredential?.resolvedModel ?? null}
-              models={models}
-              loadingDefault={loading}
-              disabled={disabled}
-              onChange={setModel}
+          {!bound && (
+            <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={inherit}
+                disabled={disabled}
+                aria-label={t('issues.detail.followWorkspaceHeadless')}
+                onChange={(event) => {
+                  const next = event.target.checked
+                  setInherit(next)
+                  if (next) return
+                  const resolved = resolveIssueAiSelection({ mode, agent, issue })
+                  if (resolved.accessMode === 'vault' && resolved.credentialSlug) {
+                    editor.config.selectCredential(resolved.credentialSlug)
+                  } else {
+                    editor.config.selectRuntimeDefault()
+                  }
+                }}
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">
+                  {t('issues.detail.followWorkspaceHeadless')}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                  {t('issues.detail.aiAccessDescription')}
+                </span>
+              </span>
+            </label>
+          )}
+          <fieldset disabled={disabled} className="min-w-0 space-y-3 disabled:opacity-60">
+            <AgentLaunchSelectors
+              config={editor.config}
+              onConfigureProvider={onConfigureProvider}
+              showRuntime={false}
+              showAccess={bound || !inherit}
+              toolbar
+              layout="settings"
+              menuPlacement="down"
+              menuPositionerClassName="z-[80]"
             />
-          </div>
-          <label className="block space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><Brain size={14} />{t('issues.detail.effort')}</span>
-            <select
-              className={`${railControl} w-full`}
-              value={effort ?? ''}
-              disabled={disabled}
-              onChange={(event) => setEffort(event.target.value ? event.target.value as ModelReasoningEffort : null)}
-            >
-              <option value="">{inheritedEffort
-                ? t('issues.detail.workspaceValue', { value: inheritedEffort })
-                : t('issues.detail.runtimeDecides')}</option>
-              {efforts.map((candidate) => <option key={candidate} value={candidate}>{candidate}</option>)}
-            </select>
-          </label>
+          </fieldset>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t(bound ? 'issues.detail.sessionAiAccessDescription' : 'issues.detail.aiAccessDescription')}
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
           <Button
             onClick={() => {
-              onApply({
-                credential: access.startsWith('vault:') ? access.slice(6) : null,
-                credentialSource: access === 'native' ? 'native' : null,
-                model,
-                effort,
+              const update = editor.toRuntimeUpdate()
+              onApply(runtimeUpdateToIssuePatch(update, Boolean(!bound && inherit)), {
+                from: formatPinnedCapability({
+                  access: summaryAccess,
+                  model: summaryModel,
+                  effort: summaryEffort,
+                }),
+                to: formatPinnedCapability(draftCapability),
               })
               setOpen(false)
             }}
@@ -548,10 +717,92 @@ function IssueAiEditor({
   )
 }
 
+function SchedulePolicyEditor({
+  issue,
+  saving,
+  onPatch,
+}: {
+  issue: IssueDetailIssue
+  saving: boolean
+  onPatch: (patch: IssuePatch) => Promise<boolean>
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+
+  if (!issue.when) return null
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={saving}
+        onClick={() => setOpen(true)}
+        className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <SlidersHorizontal size={13} aria-hidden />
+        {t('issues.detail.editSchedule')}
+      </Button>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('issues.detail.scheduleSettings')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.scheduleSettingsDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {issue.when.kind === 'cron' && (
+            <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={issue.when.catchUp !== false}
+                disabled={saving}
+                aria-label={t('issues.detail.catchUp')}
+                onChange={(event) => onPatch({ catchUp: event.target.checked })}
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">{t('issues.detail.catchUp')}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                  {t('issues.detail.catchUpDescription')}
+                </span>
+              </span>
+            </label>
+          )}
+          <label className="block space-y-1.5">
+            <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+              <Timer size={14} aria-hidden />
+              {t('issues.detail.timeout')}
+            </span>
+            <select
+              className={`${railControl} w-full`}
+              aria-label={t('issues.detail.timeout')}
+              value={issue.timeout ?? ''}
+              disabled={saving}
+              onChange={(event) => {
+                const value = event.target.value
+                onPatch({ timeout: value === '' ? null : value as IssueTimeout })
+              }}
+            >
+              <option value="">{t('issues.detail.timeoutNone')}</option>
+              {ISSUE_TIMEOUTS.map((timeout) => (
+                <option key={timeout} value={timeout}>{timeout}</option>
+              ))}
+            </select>
+            <span className="block text-[11px] leading-relaxed text-muted-foreground">{t('issues.detail.timeoutHint')}</span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => setOpen(false)}>{t('common.close')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PropertiesRail({
   wsId,
   issue,
-  agentOptions,
+  agents,
   issueDefaultAgent,
   defaultAgent,
   headlessRuntime,
@@ -561,13 +812,17 @@ function PropertiesRail({
   retrying,
   error,
   canRetry,
+  canRunNow,
   onPatch,
   onRetry,
+  onRunNow,
   onConfigureAgent,
+  onRefreshSessions,
+  sessionsLoaded,
 }: {
   wsId: string
   issue: IssueDetailIssue
-  agentOptions: readonly { id: string; displayName: string; installed?: boolean }[]
+  agents: readonly AgentInfo[]
   issueDefaultAgent: string | null
   defaultAgent: string | null
   headlessRuntime: WorkspaceRuntimeModeSettings | null
@@ -577,37 +832,38 @@ function PropertiesRail({
   retrying: boolean
   error: string | null
   canRetry: boolean
-  onPatch: (patch: IssuePatch) => void
-  onRetry: () => void
+  canRunNow: boolean
+  onPatch: (patch: IssuePatch) => Promise<boolean>
+  onRetry: () => Promise<void>
+  onRunNow: () => Promise<void>
   onConfigureAgent: (agent: AgentId) => void
+  onRefreshSessions: () => Promise<void>
+  sessionsLoaded: boolean
 }) {
   const { t } = useTranslation()
+  const [confirmAction, setConfirmAction] = useState<'run' | 'retry' | null>(null)
+  const [pendingCapability, setPendingCapability] = useState<{
+    from: string
+    to: string
+    update: PausedSessionRuntimeUpdate
+  } | null>(null)
+  const [runtimeError, setRuntimeError] = useState<string | null>(null)
   const meta = STATUS_META[issue.status]
-  const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
-  const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
+  const issueDefaultInOptions = issueDefaultAgent && agents.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
+  const defaultInOptions = defaultAgent && agents.some((a) => a.id === defaultAgent) ? defaultAgent : null
   const ownerResumeId = issue.assignee.startsWith('@resume-')
     ? issue.assignee.slice(1)
     : null
   const ownerSession = ownerResumeId
     ? sessions.find((session) => session.resumeId === ownerResumeId)
     : undefined
-  const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
+  const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agents[0]?.id || null
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const [credentialOptions, setCredentialOptions] = useState<{
     agent: string
     loading: boolean
     credentials: SavedCredential[]
   } | null>(null)
-  const [presets, setPresets] = useState<readonly Preset[]>([])
-
-  useEffect(() => {
-    let live = true
-    void configApi.getPresets()
-      .then(({ presets: next }) => { if (live) setPresets(next) })
-      .catch(() => { if (live) setPresets([]) })
-    return () => { live = false }
-  }, [])
-
   useEffect(() => {
     if (!effectiveAgent) {
       setCredentialOptions(null)
@@ -637,16 +893,13 @@ function PropertiesRail({
   const availableCredentials = credentialOptions?.agent === effectiveAgent
     ? credentialOptions.credentials
     : []
-  const credentialsLoading = credentialOptions?.agent === effectiveAgent
-    ? credentialOptions.loading
-    : Boolean(effectiveAgent)
   const resolvedAi = resolveIssueAiSelection({ mode: headlessRuntime, agent: effectiveAgent, issue })
   const agentNeedsCredential = selectedReadiness?.requiresCredential === true
     && !selectedReadiness.ready
     && resolvedAi.accessMode === 'native'
   const automationHealthMessage = useMemo<string | null>(() => {
     const health = issue.automationHealth
-    if (!health) return null
+    if (!health) return issue.when ? t('issues.detail.healthMessage.not_started') : null
     // Failure/interruption messages may contain authoritative runtime diagnostics.
     // Keep those verbatim; only localize launcher-owned, deterministic states.
     if (health.state === 'failed' || health.state === 'interrupted') return health.message
@@ -680,8 +933,58 @@ function PropertiesRail({
       id="issue-work-item"
       className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0 lg:self-start"
     >
-      <div className="overflow-hidden rounded-xl border border-border bg-background">
-        <InspectorSection title={t('issues.detail.workItem')}>
+      <div className="overflow-hidden rounded-xl border border-border bg-background lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto">
+        <h3 className="sr-only">{t('issues.detail.workItem')}</h3>
+
+        {issue.when && (
+          <section className="oa-status-surface px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <AutomationHealthPill
+                health={issue.automationHealth ?? {
+                  state: 'not_started',
+                  message: t('issues.detail.healthMessage.not_started'),
+                }}
+              />
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {t('issues.detail.lastRun')} · {issue.lastFiredAtMs
+                  ? formatRelativeTime(issue.lastFiredAtMs)
+                  : t('issues.detail.never')}
+              </span>
+            </div>
+            {automationHealthMessage && (
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{automationHealthMessage}</p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {issue.lastFiredAtMs && (
+                <a
+                  href="#issue-runs"
+                  className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {t('issues.detail.viewLastRun')}
+                </a>
+              )}
+              {canRetry ? (
+                <Button type="button" size="sm" disabled={retrying} onClick={() => setConfirmAction('retry')} className="ml-auto">
+                  <RotateCcw size={12} aria-hidden />
+                  {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
+                </Button>
+              ) : canRunNow ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={retrying}
+                  onClick={() => setConfirmAction('run')}
+                  className="ml-auto"
+                >
+                  <Play size={12} aria-hidden />
+                  {retrying ? t('issues.detail.runningNow') : t('issues.detail.runNow')}
+                </Button>
+              ) : null}
+            </div>
+          </section>
+        )}
+
+        <InspectorSection title={t('issues.detail.ownership')}>
           <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-2">
             <InspectorField
               label={t('issues.detail.status')}
@@ -740,17 +1043,23 @@ function PropertiesRail({
                   {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
                 </span>
               </div>
+              <div className="mt-1 flex justify-end">
+                <SchedulePolicyEditor issue={issue} saving={saving} onPatch={onPatch} />
+              </div>
             </InspectorSection>
 
-            <InspectorSection title={t('issues.detail.execution')}>
+            <InspectorSection title={t('issues.detail.agent')}>
               <InspectorField label={t('issues.detail.runtime')}>
                 {ownerResumeId ? (
                   <div
-                    className="flex min-h-9 items-center gap-2 rounded-md border border-border bg-muted/25 px-3 py-2"
+                    className="flex min-h-10 items-center gap-2.5 rounded-md border border-border bg-muted/20 px-3 py-2"
                     title={t('issues.detail.sessionDeterminesRuntime')}
                   >
                     <Cpu size={14} className="text-muted-foreground" aria-hidden />
-                    <span>{ownerSession?.agent ?? t('issues.detail.sessionOwned')}</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                      {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{t('issues.detail.sessionBinding')}</span>
                   </div>
                 ) : (
                   <div className="flex min-w-0 items-center gap-2">
@@ -758,7 +1067,7 @@ function PropertiesRail({
                       value={issue.agent}
                       issueDefaultAgent={issueDefaultAgent}
                       defaultAgent={defaultAgent}
-                      options={agentOptions}
+                      options={agents}
                       readiness={agentReadiness}
                       disabled={saving}
                       onChange={(agent) => {
@@ -777,89 +1086,93 @@ function PropertiesRail({
               </InspectorField>
 
               <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
-                {ownerResumeId ? (
-                  <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-md border border-border bg-muted/25 px-3 py-2.5">
-                    <KeyRound size={15} className="text-muted-foreground" aria-hidden />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium">
-                        {ownerSession?.runtime?.credentialSource === 'vault'
-                          ? credentialLabel(availableCredentials.find((candidate) => candidate.slug === ownerSession.runtime?.credentialSlug))
-                            || ownerSession.runtime?.credentialSlug
-                            || t('issues.detail.savedAccess')
-                          : t('issues.detail.agentLogin')}
-                      </span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        {ownerSession?.runtime?.model ?? t('issues.detail.runtimeDecides')} · {ownerSession?.runtime?.reasoningEffort ?? t('issues.detail.runtimeDecides')}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-muted-foreground/75">{t('issues.detail.sessionBinding')}</span>
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex min-w-0">
-                    <IssueAiEditor
-                      issue={issue}
-                      agent={effectiveAgent}
-                      mode={headlessRuntime}
-                      credentials={availableCredentials}
-                      presets={presets}
-                      loading={credentialsLoading}
-                      disabled={saving}
-                      onApply={onPatch}
-                    />
-                  </div>
-                )}
+                <div className="flex min-w-0">
+                  <IssueAiEditor
+                    wsId={wsId}
+                    issue={issue}
+                    agent={effectiveAgent}
+                    agents={agents}
+                    mode={headlessRuntime}
+                    credentials={availableCredentials}
+                    disabled={saving || Boolean(ownerResumeId && (ownerSessionBusy(ownerSession) || (sessionsLoaded && !ownerSession)))}
+                    bound={Boolean(ownerResumeId)}
+                    boundRuntime={ownerSession?.runtime}
+                    onConfigureProvider={() => {
+                      if (effectiveAgent) onConfigureAgent(effectiveAgent as AgentId)
+                    }}
+                    onApply={(patch, capability) => {
+                      if (!ownerResumeId) {
+                        void onPatch(patch)
+                        return
+                      }
+                      if (capability.from === capability.to) return
+                      setRuntimeError(null)
+                      setPendingCapability({
+                        from: capability.from,
+                        to: capability.to,
+                        update: issuePatchToRuntimeUpdate(patch),
+                      })
+                    }}
+                  />
+                </div>
               </InspectorField>
+              {ownerResumeId && ownerSessionBusy(ownerSession) && (
+                <p className="mt-2 text-xs leading-snug text-muted-foreground">{t('issues.detail.sessionTurnInProgress')}</p>
+              )}
+              {ownerResumeId && sessionsLoaded && !ownerSession && (
+                <p className="mt-2 text-xs leading-snug text-muted-foreground">{t('issues.detail.sessionUnavailable')}</p>
+              )}
               {agentNeedsCredential && (
                 <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
               )}
             </InspectorSection>
-
-            {issue.automationHealth && (
-              <InspectorSection title={t('issues.detail.runHealth')}>
-                <div className="oa-status-surface rounded-lg bg-muted/25 px-3 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <AutomationHealthPill health={issue.automationHealth} />
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {t('issues.detail.lastRun')} · {issue.lastFiredAtMs
-                        ? formatRelativeTime(issue.lastFiredAtMs)
-                        : t('issues.detail.never')}
-                    </span>
-                  </div>
-                  {automationHealthMessage && (
-                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{automationHealthMessage}</p>
-                  )}
-                  {(issue.lastFiredAtMs || canRetry) && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {issue.lastFiredAtMs && (
-                        <a
-                          href="#issue-runs"
-                          className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {t('issues.detail.viewLastRun')}
-                        </a>
-                      )}
-                      {canRetry && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={retrying}
-                          onClick={onRetry}
-                          className="border-warning/35 bg-warning/10 text-warning hover:border-warning/60 hover:bg-warning/15 hover:text-warning"
-                        >
-                          <RotateCcw size={12} aria-hidden />
-                          {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </InspectorSection>
-            )}
           </>
         )}
       </div>
-      {error && <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error}</p>}
+      {(error || runtimeError) && (
+        <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error || runtimeError}</p>
+      )}
+      {pendingCapability && ownerResumeId && (
+        <ConfirmDialog
+          title={t('issues.detail.changeAssigneeCapabilitiesTitle')}
+          message={t('issues.detail.changeAssigneeCapabilitiesMessage', {
+            from: pendingCapability.from,
+            to: pendingCapability.to,
+          })}
+          confirmLabel={t('issues.detail.changeAssigneeCapabilitiesConfirm')}
+          cancelLabel={t('common.cancel')}
+          workingLabel={t('issues.detail.changingAssigneeCapabilities')}
+          variant="primary"
+          onConfirm={async () => {
+            try {
+              await updateResumeRuntime(wsId, ownerResumeId, pendingCapability.update)
+              await onRefreshSessions()
+              setPendingCapability(null)
+              setRuntimeError(null)
+            } catch (cause) {
+              setRuntimeError(cause instanceof Error ? cause.message : String(cause))
+              throw cause
+            }
+          }}
+          onClose={() => setPendingCapability(null)}
+        />
+      )}
+      {confirmAction && (
+        <ConfirmDialog
+          title={t(confirmAction === 'retry' ? 'issues.detail.retryNowTitle' : 'issues.detail.runNowTitle')}
+          message={t(confirmAction === 'retry' ? 'issues.detail.retryNowMessage' : 'issues.detail.runNowMessage')}
+          confirmLabel={t(confirmAction === 'retry' ? 'issues.detail.retryNow' : 'issues.detail.runNow')}
+          cancelLabel={t('common.cancel')}
+          workingLabel={t(confirmAction === 'retry' ? 'issues.detail.retrying' : 'issues.detail.runningNow')}
+          variant="primary"
+          onConfirm={async () => {
+            if (confirmAction === 'retry') await onRetry()
+            else await onRunNow()
+            setConfirmAction(null)
+          }}
+          onClose={() => { if (!retrying) setConfirmAction(null) }}
+        />
+      )}
     </aside>
   )
 }
@@ -979,6 +1292,75 @@ function WhatEditor({
         </p>
       </div>
       <MarkdownWhatEditor value={value} onSave={onSave} />
+    </section>
+  )
+}
+
+function CommentPromptEditor({
+  value,
+  onSave,
+}: {
+  value?: string
+  onSave: (commentPrompt: string | null) => Promise<boolean> | void
+}) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  const [saving, setSaving] = useState(false)
+  const stored = value ?? ''
+  const dirty = draft !== (stored || DEFAULT_ISSUE_COMMENT_PROMPT)
+
+  useEffect(() => {
+    setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  }, [value])
+
+  return (
+    <section id="issue-comment-prompt" className="mt-4 scroll-mt-20 border-t border-border/60 pt-4">
+      <div className="mb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">
+          {t('issues.detail.commentPrompt')}
+        </h2>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/65">
+          {t('issues.detail.commentPromptDescription')}
+        </p>
+        <p className="mt-1 font-mono text-[11px] leading-snug text-muted-foreground">
+          {t('issues.detail.commentPromptTokens')}
+        </p>
+      </div>
+      <textarea
+        className={`${inputClass} min-h-28 font-mono text-[12.5px] leading-5`}
+        value={draft}
+        aria-label={t('issues.detail.commentPrompt')}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="oa-pressable inline-flex min-h-9 items-center rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50"
+          disabled={saving || !dirty}
+          onClick={async () => {
+            setSaving(true)
+            await onSave(draft.trim() === DEFAULT_ISSUE_COMMENT_PROMPT ? null : draft)
+            setSaving(false)
+          }}
+        >
+          {saving ? t('issues.detail.whatSaving') : t('issues.detail.commentPromptSave')}
+        </button>
+        {stored ? (
+          <button
+            type="button"
+            className="oa-pressable inline-flex min-h-9 items-center rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true)
+              const ok = await onSave(null)
+              if (ok !== false) setDraft(DEFAULT_ISSUE_COMMENT_PROMPT)
+              setSaving(false)
+            }}
+          >
+            {t('issues.detail.commentPromptReset')}
+          </button>
+        ) : null}
+      </div>
     </section>
   )
 }
@@ -1123,7 +1505,9 @@ function mutationFieldLabel(field: string, t: TFunction): string {
     case 'credential': return t('issues.detail.mutationField.credential')
     case 'model': return t('issues.detail.mutationField.model')
     case 'effort': return t('issues.detail.mutationField.effort')
+    case 'timeout': return t('issues.detail.mutationField.timeout')
     case 'what': return t('issues.detail.mutationField.what')
+    case 'commentPrompt': return t('issues.detail.mutationField.commentPrompt')
     default: return field
   }
 }
@@ -1184,6 +1568,29 @@ function mutationSummary(
     before: mutationValue(change.field, change.before, t),
     after: mutationValue(change.field, change.after, t),
   })
+}
+
+export function IssuePendingReply({
+  targetResumeId,
+  progress,
+}: {
+  targetResumeId: string
+  progress?: HeadlessTurnProgress
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="mt-3 border-t border-border/60 pt-2">
+      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <LoaderCircle size={11} className="shrink-0 animate-spin text-primary" aria-hidden />
+        <span>
+          {t('issues.detail.waitingForPrefix')}{' '}
+          <span className="font-mono text-foreground/75">@{targetResumeId}</span>{' '}
+          {t('issues.detail.waitingForSuffix')}
+        </span>
+      </p>
+      {hasTurnProgress(progress) && <TurnProgress progress={progress} />}
+    </div>
+  )
 }
 
 export function IssueActivity({
@@ -1256,11 +1663,10 @@ export function IssueActivity({
                     </div>
                     <MarkdownContent text={comment.markdown} />
                     {delivery?.state === 'pending' && (
-                      <p className="mt-3 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
-                        {t('issues.detail.waitingForPrefix')}{' '}
-                        <span className="font-mono text-foreground/75">@{delivery.targetResumeId}</span>{' '}
-                        {t('issues.detail.waitingForSuffix')}
-                      </p>
+                      <IssuePendingReply
+                        targetResumeId={delivery.targetResumeId}
+                        progress={delivery.progress}
+                      />
                     )}
                     {delivery?.state === 'failed' && (
                       <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-[11px] leading-snug text-warning">
@@ -1547,6 +1953,7 @@ export function IssueDetail({
   const [actionError, setActionError] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
   const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
   const workspace = workspaces.find((candidate) => candidate.id === wsId) ?? null
@@ -1567,17 +1974,21 @@ export function IssueDetail({
     return () => { live = false }
   }, [wsId])
 
-  useEffect(() => {
-    let live = true
-    getWorkspaceSessionDirectory(wsId)
-      .then((directory) => {
-        if (live) setSessionDirectory(Array.isArray(directory.sessions) ? directory.sessions : [])
-      })
-      .catch(() => {
-        if (live) setSessionDirectory([])
-      })
-    return () => { live = false }
+  const refreshSessions = useCallback(async () => {
+    try {
+      const directory = await getWorkspaceSessionDirectory(wsId)
+      setSessionDirectory(Array.isArray(directory.sessions) ? directory.sessions : [])
+    } catch {
+      setSessionDirectory([])
+    } finally {
+      setSessionsLoaded(true)
+    }
   }, [wsId])
+
+  useEffect(() => {
+    setSessionsLoaded(false)
+    void refreshSessions()
+  }, [refreshSessions])
 
   const gotoIssue = useCallback(
     (ref: WikilinkIssueRef) => {
@@ -1678,6 +2089,19 @@ export function IssueDetail({
     }
   }, [retrying, wsId, id, mutate])
 
+  const onRunNow = useCallback(async () => {
+    if (retrying) return
+    setRetrying(true)
+    setActionError(null)
+    try {
+      mutate(await issuesApi.runNow(wsId, id))
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRetrying(false)
+    }
+  }, [retrying, wsId, id, mutate])
+
   const backToBoard = (
     <button
       type="button"
@@ -1727,6 +2151,12 @@ export function IssueDetail({
     && latestRun?.failure?.retryable
     && (latestRun.status === 'failed' || latestRun.status === 'interrupted'),
   )
+  const canRunNow = Boolean(
+    issue.when
+    && issue.status !== 'done'
+    && issue.status !== 'canceled'
+    && latestRun?.status !== 'running',
+  )
   const comments = data.comments ?? []
   const inboxReports = data.inboxReports ?? []
   const provenance = data.provenance ?? []
@@ -1759,7 +2189,7 @@ export function IssueDetail({
         <PropertiesRail
           wsId={wsId}
           issue={issue}
-          agentOptions={agentOptions}
+          agents={agentOptions}
           issueDefaultAgent={workspaceIssueDefaultAgent}
           defaultAgent={workspaceLegacyDefaultAgent}
           headlessRuntime={workspace?.runtimeSettings?.runtime.headless ?? null}
@@ -1769,9 +2199,13 @@ export function IssueDetail({
           retrying={retrying}
           error={actionError}
           canRetry={canRetry}
+          canRunNow={canRunNow}
           onPatch={onPatch}
-          onRetry={() => void onRetry()}
+          onRetry={onRetry}
+          onRunNow={onRunNow}
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
+          onRefreshSessions={refreshSessions}
+          sessionsLoaded={sessionsLoaded}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">
           <WhatEditor
@@ -1779,6 +2213,11 @@ export function IssueDetail({
             value={issue.what}
             scheduled={Boolean(issue.when)}
             onSave={(what) => onPatch({ what })}
+          />
+          <CommentPromptEditor
+            key={`${wsId}:${id}:comment-prompt`}
+            value={issue.commentPrompt}
+            onSave={(commentPrompt) => onPatch({ commentPrompt })}
           />
           <IssueActivity
             activity={activity}

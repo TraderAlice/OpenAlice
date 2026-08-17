@@ -26,6 +26,18 @@ async function askInbox(entryId: string) {
   return { response, body: await response.json() }
 }
 
+async function waitForInquiry(entryId: string, status: 'running' | 'done') {
+  const deadline = Date.now() + 2_000
+  while (Date.now() < deadline) {
+    const history = await fetch(
+      `${baseUrl}/api/inquiries/inbox/${entryId}`,
+    ).then((result) => result.json()) as { inquiries: Array<{ status: string; progress?: unknown }> }
+    if (history.inquiries[0]?.status === status) return history
+    await new Promise((resolve) => setTimeout(resolve, 40))
+  }
+  throw new Error(`demo inquiry did not reach ${status}`)
+}
+
 describe('demo Inquiry handlers', () => {
   it('continues the known Codex Inbox sender in the original Workspace', async () => {
     const { response, body } = await askInbox('demo-inbox-headless-session')
@@ -39,13 +51,20 @@ describe('demo Inquiry handlers', () => {
       resolution: { mode: 'exact' },
     })
 
-    const history = await fetch(
-      `${baseUrl}/api/inquiries/inbox/demo-inbox-headless-session`,
-    ).then((result) => result.json())
+    const running = await waitForInquiry('demo-inbox-headless-session', 'running')
+    expect(running.inquiries[0]?.progress).toEqual(expect.objectContaining({
+      blocks: expect.arrayContaining([
+        expect.objectContaining({ type: 'text' }),
+        expect.objectContaining({ type: 'tool', name: 'Read' }),
+      ]),
+    }))
+
+    const history = await waitForInquiry('demo-inbox-headless-session', 'done')
     expect(history.inquiries).toEqual([
       expect.objectContaining({
         workspaceId: DEMO_WORKSPACE_ID,
         agent: 'codex',
+        status: 'done',
         inquiry: expect.objectContaining({
           question: 'Which assumption is driving the result?',
           resolution: { mode: 'exact' },

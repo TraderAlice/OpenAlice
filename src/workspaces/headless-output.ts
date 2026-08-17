@@ -1,7 +1,7 @@
 /** Vendor-neutral structured output for one-shot agent runs. */
 
 export type HeadlessOutputEvent =
-  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'text'; readonly text: string; readonly delta?: boolean }
   | { readonly type: 'tool-start'; readonly id: string; readonly name: string; readonly input?: unknown }
   | {
       readonly type: 'tool-finish'
@@ -70,8 +70,22 @@ export class HeadlessOutputAccumulator {
   add(events: readonly HeadlessOutputEvent[]): void {
     for (const event of events) {
       if (event.type === 'text') {
-        const text = clipText(event.text.trim())
+        const raw = event.delta ? event.text : event.text.trim()
+        const text = clipText(raw)
         if (!text) continue
+        if (event.delta) {
+          const previous = this.blocks[this.blocks.length - 1]
+          if (previous?.type === 'text') {
+            this.assistantText = clipText(`${this.assistantText ?? ''}${text}`)
+            this.blocks[this.blocks.length - 1] = { type: 'text', text: clipText(`${previous.text}${text}`) }
+          } else {
+            // A new utterance after a tool/error is the current reply, not a
+            // concatenation of every earlier narration token.
+            this.assistantText = text
+            this.push({ type: 'text', text })
+          }
+          continue
+        }
         this.assistantText = text
         const previous = this.blocks[this.blocks.length - 1]
         if (previous?.type === 'text' && previous.text === text) continue

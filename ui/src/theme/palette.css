@@ -743,6 +743,37 @@
   );
 }
 
+/*
+ * Office floor is a painted pixel scene, not themed chrome. These stay on
+ * :root so the room does not restyle with Day/Night palettes.
+ */
+:root {
+  --office-wall: #8d7a5c;
+  --office-wall-grain: rgba(40, 28, 16, 0.12);
+  --office-wall-crown: #6a553a;
+  --office-trim: #5c4630;
+  --office-trim-shadow: #3d2d1c;
+  --office-floor: #c4a36a;
+  --office-floor-plank: rgba(70, 42, 16, 0.22);
+  --office-floor-sheen: rgba(255, 236, 200, 0.08);
+  --office-label: #f4ecd8;
+  --office-label-foreground: #1c1a16;
+  --office-window: #183149;
+  --office-prop-muted: #8b8173;
+  --office-prop-blue-gray: #8b9ca2;
+  --office-gba-ink-seed: #25344b;
+  --office-gba-ink-soft-seed: #40546d;
+  --office-gba-cream-seed: #f2e5bb;
+  --office-gba-paper-seed: #fff2cd;
+  --office-gba-moss-seed: #6f9a68;
+  --office-gba-moss-dark-seed: #3d674e;
+  --office-gba-floor-seed: #cfbd83;
+  --office-gba-floor-alt-seed: #c3ad72;
+  --office-gba-water-seed: #6eb4bd;
+  --office-gba-alert-seed: #d86c50;
+  --office-gba-live: #91bd5b;
+}
+
 /* Palette cards are miniature, isolated product surfaces. Keep their chrome
  * bound directly to the preview card's variables so the active app palette
  * cannot make all four choices look alike. */

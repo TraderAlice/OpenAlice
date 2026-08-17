@@ -124,6 +124,36 @@ const demoChatSessions: SessionRecord[] = [
     startedAt: null,
     title: '解释一下美债收益率曲线倒挂意味着什么',
   },
+  {
+    id: 'demo-chat-headless-codex',
+    resumeId: 'resume-demo-headless-colleague',
+    wsId: DEMO_CHAT_WORKSPACE_ID,
+    agent: 'codex',
+    name: 'x2',
+    createdAt: new Date(Date.now() - 3_600_000).toISOString(),
+    lastActiveAt: new Date(Date.now() - 120_000).toISOString(),
+    state: 'paused',
+    surface: 'headless',
+    pid: null,
+    startedAt: null,
+    title: 'Morning semiconductor scan',
+    sourceRunId: 'demo-headless-colleague-run',
+  },
+  {
+    id: 'demo-chat-headless-claude',
+    resumeId: 'resume-demo-headless-running',
+    wsId: DEMO_CHAT_WORKSPACE_ID,
+    agent: 'claude',
+    name: 'c1',
+    createdAt: new Date(Date.now() - 720_000).toISOString(),
+    lastActiveAt: new Date(Date.now() - 5_000).toISOString(),
+    state: 'running',
+    surface: 'headless',
+    pid: null,
+    startedAt: null,
+    title: 'Open issue scan',
+    sourceRunId: 'demo-headless-running',
+  },
 ]
 
 export const demoChatWorkspace: Workspace = {
@@ -195,12 +225,16 @@ export const autoQuantTemplate: TemplateInfo = {
   description: 'Agent-native quantitative research desk pinned to an approved AutoQuant V2 release.',
   groupOrder: 20,
   defaultAgents: ['codex', 'claude'],
-  version: '1.0.0',
+  version: '1.1.5',
   hasReadme: true,
   source: {
     repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-    defaultVersion: 'v0.8.31',
+    defaultVersion: 'v0.9.31',
     versions: [
+      {
+        version: 'v0.9.31',
+        commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36',
+      },
       {
         version: 'v0.8.31',
         commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',

@@ -1,0 +1,17 @@
+/**
+ * Scene props for the spatial floor. Independent of OfficeSpritePack —
+ * swap the employee atlas without replacing desks and cabinets.
+ */
+export const OFFICE_FURNITURE = {
+  desk: '/office/furniture/desk.png',
+  chair: '/office/furniture/chair.png',
+  cabinet: '/office/furniture/cabinet.png',
+  coffee: '/office/furniture/coffee.png',
+  plant: '/office/furniture/plant.png',
+} as const
+
+export const OFFICE_MIN_DESKS = 2
+
+export const officePixelImg = {
+  imageRendering: 'pixelated' as const,
+}

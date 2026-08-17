@@ -52,7 +52,7 @@ function autoQuantMeta(): TemplateMeta {
     version: '1.0.0',
     defaultAgents: ['claude', 'codex'],
     injectTools: true,
-    injectPersona: false,
+    injectInstructions: false,
     bundledSkills: [],
   };
 }
@@ -78,7 +78,7 @@ function chatMeta(): TemplateMeta {
     version: '1.0.0',
     defaultAgents: ['claude', 'codex'],
     injectTools: true,
-    injectPersona: true,
+    injectInstructions: true,
     bundledSkills: ['scan-value-chain', 'delegate-autoquant'],
   };
 }

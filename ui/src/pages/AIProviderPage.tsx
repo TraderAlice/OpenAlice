@@ -33,10 +33,12 @@ import {
   WIRE_SHAPE_GUIDANCE,
   agentWireShapes,
   compatibleAgentIds,
+  credentialMatchesQuery,
   describeModelSemantics,
   isApiKeyPreset,
   presetDefaultModel,
   presetModel,
+  vendorLabel,
   vendorPreset,
 } from '../lib/presetHelpers'
 import { notifyWorkspaceDefaultsChanged } from '../lib/workspaceAiEvents'
@@ -48,16 +50,16 @@ function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'labe
 
 // ==================== Agent runtimes ====================
 //
-// The four CLI runtimes a workspace can launch. These credentials feed them;
+// The native CLI runtimes a workspace can launch. These credentials feed them;
 // this panel orients the user on what each is and how it authenticates. Editorial
 // copy grounded in the adapters (src/workspaces/adapters/*) — keep it factual.
 
 interface RuntimeInfo {
   id: string
   name: string
-  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
-  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
-  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
+  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.cursor.blurb' | 'aiProvider.runtime.agy.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.omp.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
+  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.cursor.models' | 'aiProvider.runtime.agy.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.omp.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
+  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.cursor.auth' | 'aiProvider.runtime.agy.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.omp.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
 }
 
 const AGENT_RUNTIMES: RuntimeInfo[] = [
@@ -74,6 +76,34 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
     blurbKey: 'aiProvider.runtime.codex.blurb',
     modelsKey: 'aiProvider.runtime.codex.models',
     authKey: 'aiProvider.runtime.codex.auth',
+  },
+  {
+    id: 'cursor',
+    name: 'Cursor Agent',
+    blurbKey: 'aiProvider.runtime.cursor.blurb',
+    modelsKey: 'aiProvider.runtime.cursor.models',
+    authKey: 'aiProvider.runtime.cursor.auth',
+  },
+  {
+    id: 'agy',
+    name: 'Antigravity',
+    blurbKey: 'aiProvider.runtime.agy.blurb',
+    modelsKey: 'aiProvider.runtime.agy.models',
+    authKey: 'aiProvider.runtime.agy.auth',
+  },
+  {
+    id: 'grok',
+    name: 'Grok Build',
+    blurbKey: 'aiProvider.runtime.grok.blurb',
+    modelsKey: 'aiProvider.runtime.grok.models',
+    authKey: 'aiProvider.runtime.grok.auth',
+  },
+  {
+    id: 'omp',
+    name: 'Oh My Pi',
+    blurbKey: 'aiProvider.runtime.omp.blurb',
+    modelsKey: 'aiProvider.runtime.omp.models',
+    authKey: 'aiProvider.runtime.omp.auth',
   },
   {
     id: 'opencode',
@@ -101,6 +131,7 @@ export function AIProviderPage() {
   const [presets, setPresets] = useState<Preset[]>([])
   const [modal, setModal] = useState<{ mode: 'add' } | { mode: 'edit'; cred: CredentialSummary } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<CredentialSummary | null>(null)
+  const [vaultQuery, setVaultQuery] = useState('')
 
   const reload = useCallback(async () => {
     setCredentials(null)
@@ -120,6 +151,10 @@ export function AIProviderPage() {
   }, [reload])
 
   const apiKeyPresets = useMemo(() => presets.filter(isApiKeyPreset), [presets])
+  const visibleCredentials = useMemo(
+    () => (credentials ?? []).filter((cred) => credentialMatchesQuery(cred, vaultQuery)),
+    [credentials, vaultQuery],
+  )
 
   const handleDelete = async (slug: string): Promise<boolean> => {
     try {
@@ -169,7 +204,19 @@ export function AIProviderPage() {
             </div>
 
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.credentials')}</h2>
+              <div className="flex min-w-0 items-baseline gap-1.5">
+                <h2 className="text-[13px] font-semibold text-foreground uppercase tracking-wide">{t('aiProvider.credentials')}</h2>
+                {credentials.length > 0 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    {vaultQuery.trim()
+                      ? t('aiProvider.credentialsFiltered', {
+                          shown: visibleCredentials.length,
+                          total: credentials.length,
+                        })
+                      : t('aiProvider.credentialsCount', { count: credentials.length })}
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => setModal({ mode: 'add' })}
                 className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-primary hover:border-primary transition-colors"
@@ -178,18 +225,28 @@ export function AIProviderPage() {
               </button>
             </div>
 
+            {credentials.length > 0 && (
+              <input
+                className={`${inputClass} mb-3`}
+                value={vaultQuery}
+                onChange={(event) => setVaultQuery(event.target.value)}
+                placeholder={t('aiProvider.searchCredentials')}
+                aria-label={t('aiProvider.searchCredentials')}
+              />
+            )}
+
             <div className="space-y-2.5">
-              {credentials.map((cred) => {
+              {visibleCredentials.map((cred) => {
                 const compatibleAgents = compatibleAgentIds(cred.wires, agents)
                 return (
                   <div key={cred.slug} className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3 sm:flex-row sm:items-center">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[13px] font-medium text-foreground">{credentialLabel(cred)}</span>
+                        <span className="text-[11px] text-muted-foreground">{vendorLabel(cred.vendor)}</span>
                         {cred.label && (
-                          <span className="text-[11px] text-muted-foreground">{cred.vendor}</span>
+                          <span className="text-[11px] text-muted-foreground font-mono">{cred.slug}</span>
                         )}
-                        <span className="text-[11px] text-muted-foreground font-mono">{cred.slug}</span>
                         {compatibleAgents.map((agentId) => (
                           <span key={agentId} className="text-[10px] text-muted-foreground border border-border rounded px-1">{AGENT_LABELS[agentId] ?? agentId}</span>
                         ))}
@@ -234,6 +291,12 @@ export function AIProviderPage() {
                   </div>
                 )
               })}
+
+              {credentials.length > 0 && visibleCredentials.length === 0 && (
+                <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
+                  {t('aiProvider.noCredentialMatches', { query: vaultQuery })}
+                </p>
+              )}
 
               {credentials.length === 0 && (
                 <button

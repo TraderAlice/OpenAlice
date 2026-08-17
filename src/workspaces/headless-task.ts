@@ -72,6 +72,8 @@ export interface HeadlessTaskArgs {
   readonly extractAssistantText?: (line: string) => string | null;
   /** Adapter-owned JSONL translator for response and tool blocks. */
   readonly extractOutputEvents?: (line: string) => readonly HeadlessOutputEvent[];
+  /** Live structured snapshot for comment/inquiry progress. */
+  readonly onProgress?: (snapshot: HeadlessStructuredOutput) => void;
   /** Adapter-owned compaction filter for persisted stdout diagnostics. */
   readonly keepDiagnosticLine?: (line: string) => boolean;
   /**
@@ -346,7 +348,9 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
         onAssistantText: (text) => {
           assistantText = text.slice(-ASSISTANT_TEXT_MAX_CHARS);
           structuredOutput.setAssistantText(assistantText);
-          structuredWriter?.schedule(structuredOutput.snapshot(true));
+          const snapshot = structuredOutput.snapshot(true);
+          structuredWriter?.schedule(snapshot);
+          args.onProgress?.(snapshot);
         },
         onOutputEvents: (events) => {
           structuredOutput.add(events);
@@ -354,6 +358,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
             const snapshot = structuredOutput.snapshot(true);
             assistantText = snapshot.assistantText;
             structuredWriter?.schedule(snapshot);
+            args.onProgress?.(snapshot);
           }
         },
         ...(args.keepDiagnosticLine
@@ -398,6 +403,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
       ...(details.systemCode ? { systemCode: details.systemCode } : {}),
     });
     const structured = structuredOutput.snapshot(false);
+    args.onProgress?.(structured);
     await structuredWriter?.finish(structured);
     await Promise.all([outFile?.end(), errFile?.end()]);
     return {
@@ -525,6 +531,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
   scanner?.finish();
   const structured = structuredOutput.snapshot(false);
   assistantText = structured.assistantText;
+  args.onProgress?.(structured);
   await structuredWriter?.finish(structured);
   await Promise.all([outFile?.end(), errFile?.end()]);
   const durationMs = Date.now() - start;

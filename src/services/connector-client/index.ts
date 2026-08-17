@@ -5,7 +5,9 @@ import {
   ConnectorClient,
   MAX_CONNECTOR_ATTACHMENT_BYTES,
   MAX_CONNECTOR_ATTACHMENTS,
+  artifactFailureMessage,
   connectorServiceHealthSchema,
+  type ConnectorArtifactFailureReason,
   type ConnectorAttachment,
   type ConnectorServiceHealth,
   type InboxNotification,
@@ -51,6 +53,10 @@ export interface InboxAttachmentProjection {
   sourcePath: string
   attachment: ConnectorAttachment
 }
+
+export type InboxDocProjectionResult =
+  | { ok: true; sourcePath: string; attachment: ConnectorAttachment }
+  | { ok: false; reason: ConnectorArtifactFailureReason; message: string }
 
 export function resolveConnectorUrl(): string {
   return process.env['OPENALICE_CONNECTOR_URL']?.trim()
@@ -196,65 +202,22 @@ export async function projectInboxAttachments(
 ): Promise<InboxAttachmentProjection[]> {
   const reportDocs: Array<{ doc: InboxDoc; mediaType: ConnectorTextMediaType }> = []
   for (const doc of entry.docs ?? []) {
-    const extension = extname(doc.path).toLowerCase()
-    if (extension === '.md' || extension === '.markdown') {
-      reportDocs.push({ doc, mediaType: 'text/markdown' })
-    } else if (extension === '.html') {
-      reportDocs.push({ doc, mediaType: 'text/html' })
-    }
+    const mediaType = textMediaTypeForPath(doc.path)
+    if (mediaType) reportDocs.push({ doc, mediaType })
   }
   if (reportDocs.length === 0 || !resolveWorkspace) return []
 
-  const workspace = resolveWorkspace(entry.workspaceId)
-  if (!workspace) {
-    warn(`Workspace unavailable for Inbox attachments: ${entry.workspaceId}`)
-    return []
-  }
-
-  let workspaceRoot: string
-  try {
-    workspaceRoot = await realpath(workspace.dir)
-  } catch (error) {
-    warn(`Workspace path unavailable for Inbox attachments: ${message(error)}`)
+  const workspaceRoot = await resolveWorkspaceRoot(entry.workspaceId, resolveWorkspace)
+  if (!workspaceRoot.ok) {
+    warn(workspaceRoot.message)
     return []
   }
 
   const projections: InboxAttachmentProjection[] = []
   const usedNames = new Set<string>()
-  for (const { doc, mediaType } of reportDocs.slice(0, MAX_CONNECTOR_ATTACHMENTS)) {
+  for (const { doc } of reportDocs.slice(0, MAX_CONNECTOR_ATTACHMENTS)) {
     try {
-      const target = await resolveSafeWorkspaceFile(workspaceRoot, doc.path)
-      const info = await stat(target)
-      if (!info.isFile()) throw new Error('not a regular file')
-      if (info.size > MAX_CONNECTOR_ATTACHMENT_BYTES) {
-        throw new Error(`file exceeds ${MAX_CONNECTOR_ATTACHMENT_BYTES} bytes`)
-      }
-      const content = await readFile(target)
-      const sourceDigest = createHash('sha256').update(content).digest('hex')
-      const delivery = normalizeConnectorTextAttachment(content, mediaType)
-      if (delivery.warning) warn(`Inbox attachment encoding unchanged (${doc.path}): ${delivery.warning}`)
-      if (delivery.content.byteLength > MAX_CONNECTOR_ATTACHMENT_BYTES) {
-        throw new Error(`encoding-normalized file exceeds ${MAX_CONNECTOR_ATTACHMENT_BYTES} bytes`)
-      }
-      const filename = uniqueFilename(basename(doc.path), usedNames)
-      projections.push({
-        sourcePath: doc.path,
-        attachment: {
-          filename,
-          mediaType: delivery.mediaType,
-          sizeBytes: delivery.content.byteLength,
-          contentSha256: createHash('sha256').update(delivery.content).digest('hex'),
-          source: {
-            sizeBytes: content.byteLength,
-            contentSha256: sourceDigest,
-            ...(delivery.detectedEncoding ? { detectedEncoding: delivery.detectedEncoding } : {}),
-            ...(delivery.detectionConfidence !== undefined
-              ? { detectionConfidence: delivery.detectionConfidence }
-              : {}),
-          },
-          contentBase64: delivery.content.toString('base64'),
-        },
-      })
+      projections.push(await materializeWorkspaceDoc(workspaceRoot.root, doc.path, usedNames, warn))
     } catch (error) {
       warn(`Inbox attachment skipped (${doc.path}): ${message(error)}`)
     }
@@ -263,6 +226,129 @@ export async function projectInboxAttachments(
     warn(`Inbox attachment limit reached; skipped ${reportDocs.length - MAX_CONNECTOR_ATTACHMENTS} file(s)`)
   }
   return projections
+}
+
+/** Materialize one Inbox doc by server-validated index. Never trusts a raw path
+ * from Connector. Does not change Inbox read state. */
+export async function projectInboxDoc(
+  entry: InboxEntry,
+  docIndex: number,
+  resolveWorkspace: InboxConnectorBridgeDeps['resolveWorkspace'],
+  warn: (message: string) => void = () => undefined,
+): Promise<InboxDocProjectionResult> {
+  const doc = entry.docs?.[docIndex]
+  if (!doc?.path) {
+    return {
+      ok: false,
+      reason: 'doc_not_found',
+      message: artifactFailureMessage('doc_not_found'),
+    }
+  }
+  if (!resolveWorkspace) {
+    return {
+      ok: false,
+      reason: 'workspace_unavailable',
+      message: artifactFailureMessage('workspace_unavailable'),
+    }
+  }
+  const workspaceRoot = await resolveWorkspaceRoot(entry.workspaceId, resolveWorkspace)
+  if (!workspaceRoot.ok) {
+    return {
+      ok: false,
+      reason: 'workspace_unavailable',
+      message: artifactFailureMessage('workspace_unavailable'),
+    }
+  }
+  try {
+    const projection = await materializeWorkspaceDoc(workspaceRoot.root, doc.path, new Set(), warn)
+    return { ok: true, sourcePath: projection.sourcePath, attachment: projection.attachment }
+  } catch (error) {
+    const reason = classifyMaterializeError(error)
+    const displayName = basename(doc.path).trim() || undefined
+    return { ok: false, reason, message: artifactFailureMessage(reason, displayName) }
+  }
+}
+
+async function resolveWorkspaceRoot(
+  workspaceId: string,
+  resolveWorkspace: NonNullable<InboxConnectorBridgeDeps['resolveWorkspace']>,
+): Promise<{ ok: true; root: string } | { ok: false; message: string }> {
+  const workspace = resolveWorkspace(workspaceId)
+  if (!workspace) {
+    return { ok: false, message: `Workspace unavailable for Inbox attachments: ${workspaceId}` }
+  }
+  try {
+    return { ok: true, root: await realpath(workspace.dir) }
+  } catch (error) {
+    return { ok: false, message: `Workspace path unavailable for Inbox attachments: ${message(error)}` }
+  }
+}
+
+async function materializeWorkspaceDoc(
+  workspaceRoot: string,
+  relativePath: string,
+  usedNames: Set<string>,
+  warn: (message: string) => void,
+): Promise<InboxAttachmentProjection> {
+  const target = await resolveSafeWorkspaceFile(workspaceRoot, relativePath)
+  const info = await stat(target)
+  if (!info.isFile()) throw new Error('not a regular file')
+  if (info.size > MAX_CONNECTOR_ATTACHMENT_BYTES) {
+    throw Object.assign(new Error(`file exceeds ${MAX_CONNECTOR_ATTACHMENT_BYTES} bytes`), { code: 'ETOOLARGE' })
+  }
+  const content = await readFile(target)
+  const sourceDigest = createHash('sha256').update(content).digest('hex')
+  const textType = textMediaTypeForPath(relativePath)
+  let deliveryBytes: Buffer = content
+  let mediaType = 'application/octet-stream'
+  let detectedEncoding: string | undefined
+  let detectionConfidence: number | undefined
+  if (textType) {
+    const delivery = normalizeConnectorTextAttachment(content, textType)
+    if (delivery.warning) warn(`Inbox attachment encoding unchanged (${relativePath}): ${delivery.warning}`)
+    if (delivery.content.byteLength > MAX_CONNECTOR_ATTACHMENT_BYTES) {
+      throw Object.assign(
+        new Error(`encoding-normalized file exceeds ${MAX_CONNECTOR_ATTACHMENT_BYTES} bytes`),
+        { code: 'ETOOLARGE' },
+      )
+    }
+    deliveryBytes = delivery.content
+    mediaType = delivery.mediaType
+    detectedEncoding = delivery.detectedEncoding
+    detectionConfidence = delivery.detectionConfidence
+  }
+  const filename = uniqueFilename(basename(relativePath), usedNames)
+  return {
+    sourcePath: relativePath,
+    attachment: {
+      filename,
+      mediaType,
+      sizeBytes: deliveryBytes.byteLength,
+      contentSha256: createHash('sha256').update(deliveryBytes).digest('hex'),
+      source: {
+        sizeBytes: content.byteLength,
+        contentSha256: sourceDigest,
+        ...(detectedEncoding ? { detectedEncoding } : {}),
+        ...(detectionConfidence !== undefined ? { detectionConfidence } : {}),
+      },
+      contentBase64: deliveryBytes.toString('base64'),
+    },
+  }
+}
+
+function textMediaTypeForPath(path: string): ConnectorTextMediaType | undefined {
+  const extension = extname(path).toLowerCase()
+  if (extension === '.md' || extension === '.markdown') return 'text/markdown'
+  if (extension === '.html') return 'text/html'
+  return undefined
+}
+
+function classifyMaterializeError(error: unknown): ConnectorArtifactFailureReason {
+  const err = error as NodeJS.ErrnoException
+  const text = message(error)
+  if (err.code === 'ETOOLARGE' || text.includes('file exceeds')) return 'file_too_large'
+  if (text.includes('path escapes') || text.includes('symlink target escapes')) return 'path_escape'
+  return 'file_missing'
 }
 
 async function resolveSafeWorkspaceFile(workspaceRoot: string, relativePath: string): Promise<string> {

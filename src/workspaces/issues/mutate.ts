@@ -30,21 +30,26 @@ import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
   ISSUES_DIR_REL,
+  isIssueTimeout,
   issueAssigneeResumeId,
   issueAssigneeSchema,
   issueFrontmatterSchema,
+  issueWhenSchema,
   parseIssueContent,
   splitLegacyIssueDocument,
   splitFrontmatter,
   type IssuePriority,
   type IssueRecord,
   type IssueStatus,
+  type IssueTimeout,
 } from './declaration.js'
+import { parseIssueCommentPrompt } from './comment-prompt.js'
 export { appendIssueComment } from './comments.js'
 
 /** Fields a human/agent may patch on an existing issue. Most scheduling
- *  frontmatter is preserved untouched; `agent` is intentionally editable from
- *  the UI because it controls which runtime the scheduler uses next fire. */
+ *  frontmatter is preserved untouched; `agent` and `timeout` are intentionally
+ *  editable from the UI because they control the next scheduled fire's runtime
+ *  and optional watchdog. */
 export interface IssueFieldPatch {
   status?: IssueStatus
   priority?: IssuePriority
@@ -59,8 +64,18 @@ export interface IssueFieldPatch {
   model?: string | null
   /** Reasoning effort for one scheduled fire; null inherits Workspace/runtime. */
   effort?: ModelReasoningEffort | null
+  /** Optional scheduled-run watchdog; null removes the limit. */
+  timeout?: IssueTimeout | null
   /** Canonical markdown work definition; exact scheduled prompt. */
   what?: string
+  /** Comment-reply Input Prompt template; null restores the default wrapper. */
+  commentPrompt?: string | null
+  /** Cron missed-fire policy; only valid when the Issue already has a cron `when`. */
+  catchUp?: boolean
+  /** Settings-only cadence edit for the phone desk. */
+  when?: unknown
+  /** Settings-only: `true` binds the desk; `null` removes the flag. */
+  telegramConnector?: true | null
 }
 
 /** Input to `createIssue`. `id` is optional — derived as a kebab slug from the
@@ -78,9 +93,14 @@ export interface CreateIssueInput {
   credentialSource?: 'native'
   model?: string
   effort?: ModelReasoningEffort
+  timeout?: IssueTimeout
+  /** Comment-reply Input Prompt template. Omission keeps the default wrapper. */
+  commentPrompt?: string
   /** @deprecated Compatibility alias for callers written before What became the
    * sole markdown document. New callers must use `what`. */
   body?: string
+  /** Only the Settings Telegram chat helper may set this. */
+  telegramConnector?: true
 }
 
 /** Result of an edit that targets an existing issue. */
@@ -133,6 +153,7 @@ export async function updateIssueFields(
   wsDir: string,
   id: string,
   patch: IssueFieldPatch,
+  options?: { allowTelegramConnector?: boolean },
 ): Promise<MutateResult> {
   if (!ID_RE.test(id)) return { ok: false, reason: 'not_found' }
   const raw = await readWorkspaceFile(wsDir, relFor(id))
@@ -190,6 +211,7 @@ export async function updateIssueFields(
       delete data.credentialSource
       delete data.model
       delete data.effort
+      // `timeout` is a run budget, not Session birth — keep it.
     }
   }
   if (patch.agent !== undefined) {
@@ -239,6 +261,50 @@ export async function updateIssueFields(
       data.effort = patch.effort
     }
   }
+  if (patch.timeout !== undefined) {
+    if (patch.timeout === null) {
+      delete data.timeout
+    } else if (!isIssueTimeout(patch.timeout)) {
+      return { ok: false, reason: 'invalid', error: 'timeout must be 15m, 30m, 45m, or 60m' }
+    } else {
+      data.timeout = patch.timeout
+    }
+  }
+  if (patch.commentPrompt !== undefined) {
+    if (patch.commentPrompt === null || !patch.commentPrompt.trim()) {
+      delete data.commentPrompt
+    } else {
+      const parsed = parseIssueCommentPrompt(patch.commentPrompt)
+      if (!parsed.ok) return { ok: false, reason: 'invalid', error: parsed.error }
+      data.commentPrompt = parsed.template
+    }
+  }
+  if (patch.telegramConnector !== undefined) {
+    if (!options?.allowTelegramConnector) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: 'telegramConnector can only be changed from Connector Settings',
+      }
+    }
+    if (patch.telegramConnector === null) delete data.telegramConnector
+    else data.telegramConnector = true
+  }
+  if (patch.when !== undefined) {
+    const when = issueWhenSchema.safeParse(patch.when)
+    if (!when.success) return { ok: false, reason: 'invalid', error: 'invalid when' }
+    data.when = when.data
+  }
+  if (patch.catchUp !== undefined) {
+    const when = data.when
+    if (!when || typeof when !== 'object' || Array.isArray(when) || !('kind' in when) || when.kind !== 'cron') {
+      return { ok: false, reason: 'invalid', error: 'catchUp is only valid on a cron schedule' }
+    }
+    const cron: Record<string, unknown> = { ...when }
+    if (patch.catchUp) delete cron.catchUp
+    else cron.catchUp = false
+    data.when = cron
+  }
   let what = current.issue.what
   if (patch.what !== undefined) {
     what = patch.what.trim()
@@ -264,7 +330,11 @@ export async function updateIssueFields(
  * the assembled frontmatter against the issue schema. Returns the freshly-read
  * record on success.
  */
-export async function createIssue(wsDir: string, input: CreateIssueInput): Promise<CreateResult> {
+export async function createIssue(
+  wsDir: string,
+  input: CreateIssueInput,
+  options?: { allowTelegramConnector?: boolean },
+): Promise<CreateResult> {
   const title = input.title?.trim()
   if (!title) return { ok: false, reason: 'invalid', error: 'title is required' }
 
@@ -304,6 +374,22 @@ export async function createIssue(wsDir: string, input: CreateIssueInput): Promi
   if (input.credentialSource !== undefined) data.credentialSource = input.credentialSource
   if (input.model !== undefined) data.model = input.model
   if (input.effort !== undefined) data.effort = input.effort
+  if (input.timeout !== undefined) data.timeout = input.timeout
+  if (input.commentPrompt !== undefined) {
+    const parsed = parseIssueCommentPrompt(input.commentPrompt)
+    if (!parsed.ok) return { ok: false, reason: 'invalid', error: parsed.error }
+    data.commentPrompt = parsed.template
+  }
+  if (input.telegramConnector === true) {
+    if (!options?.allowTelegramConnector) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        error: 'telegramConnector can only be set from Connector Settings',
+      }
+    }
+    data.telegramConnector = true
+  }
 
   const parsed = issueFrontmatterSchema.safeParse(data)
   if (!parsed.success) {

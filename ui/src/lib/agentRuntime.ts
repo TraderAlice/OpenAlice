@@ -7,7 +7,7 @@ export function requiresWorkspaceCredential(
   return agent?.capabilities.aiProvider?.credentialSource === 'workspace-required'
 }
 
-const WORKSPACE_AI_AGENT_IDS = new Set<AgentId>(['claude', 'codex', 'opencode', 'pi'])
+const WORKSPACE_AI_AGENT_IDS = new Set<AgentId>(['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi'])
 
 /** Native runtimes supported by the per-Workspace AI configuration modal. */
 export function isWorkspaceAiAgent(agentId: string | null): agentId is AgentId {

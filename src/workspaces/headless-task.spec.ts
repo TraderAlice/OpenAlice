@@ -157,6 +157,7 @@ describe('runHeadlessTask', () => {
     const script =
       `process.stdout.write(${JSON.stringify(first + '\n')});` +
       `process.stdout.write(${JSON.stringify(second)});`;
+    const snapshots: string[] = [];
     const r = await runHeadlessTask({
       command: ['node', '-e', script],
       cwd: process.cwd(),
@@ -176,10 +177,15 @@ describe('runHeadlessTask', () => {
           return [];
         }
       },
+      onProgress: (snapshot) => {
+        snapshots.push(snapshot.assistantText ?? '');
+      },
     });
     expect(r.assistantText).toBe('Hello 👋');
     expect(r.structured.assistantText).toBe('Hello 👋');
     expect(r.structured.blocks).toHaveLength(2);
+    expect(snapshots).toContain('Hello');
+    expect(snapshots.at(-1)).toBe('Hello 👋');
   });
 
   it('streams stdout/stderr diagnostics beyond the 16KB in-memory tails', async () => {

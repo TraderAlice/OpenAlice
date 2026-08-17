@@ -51,23 +51,23 @@ function setPlatform(value: NodeJS.Platform): void {
 }
 
 describe('orderCreateAdapters', () => {
-  const ALL = ['claude', 'codex', 'opencode', 'pi', 'shell'];
+  const ALL = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell'];
 
   it('uses template defaults only as a transient preparation order', () => {
     expect(orderCreateAdapters(['codex'], ALL)).toEqual([
-      'codex', 'claude', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 
   it('first-wins dedupes when the head repeats a registered id', () => {
     expect(orderCreateAdapters(['pi', 'claude'], ALL)).toEqual([
-      'pi', 'claude', 'codex', 'opencode', 'shell',
+      'pi', 'claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'shell',
     ]);
   });
 
   it('keeps utility adapters behind agent runtimes', () => {
     expect(orderCreateAdapters(['shell', 'codex'], ALL)).toEqual([
-      'codex', 'claude', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 
@@ -77,7 +77,7 @@ describe('orderCreateAdapters', () => {
 
   it('ignores stale template defaults that are not registered', () => {
     expect(orderCreateAdapters(['future-agent', 'codex'], ALL)).toEqual([
-      'codex', 'claude', 'opencode', 'pi', 'shell',
+      'codex', 'claude', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi', 'shell',
     ]);
   });
 });
@@ -91,12 +91,13 @@ describe('resolveTemplateSource', () => {
     version: '1.0.0',
     defaultAgents: ['codex'],
     injectTools: true,
-    injectPersona: false,
+    injectInstructions: false,
     bundledSkills: [],
     source: {
       repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      defaultVersion: 'v0.8.31',
+      defaultVersion: 'v0.9.31',
       versions: [
+        { version: 'v0.9.31', commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36' },
         { version: 'v0.8.31', commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967' },
         { version: 'v0.8.30', commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f' },
         { version: 'v0.8.27', commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3' },
@@ -106,8 +107,8 @@ describe('resolveTemplateSource', () => {
 
   it('uses the catalog default when the caller omits a version', () => {
     expect(resolveTemplateSource(template)).toEqual({
-      version: 'v0.8.31',
-      commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
+      version: 'v0.9.31',
+      commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36',
     });
   });
 

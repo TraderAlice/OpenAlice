@@ -36,8 +36,9 @@ export interface Profile {
 // ==================== AI Provider Credentials ====================
 
 export type CredentialVendor =
-  | 'anthropic' | 'openai' | 'google'
-  | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat'
+  | 'anthropic' | 'openai' | 'google' | 'xai'
+  | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat' | 'openrouter'
+  | 'cursor'
   | 'custom'
 
 export type CredentialAuthType = 'api-key' | 'subscription'
@@ -120,6 +121,8 @@ export interface Preset {
   /** Regions × their per-shape endpoints — the form picks a region; the
    *  credential captures that region's whole wires map (its capabilities). */
   regions?: SerializedRegion[]
+  /** Runtime that consumes this credential directly rather than through a wire. */
+  directAgentId?: string
   /** Provider-aware guidance for the API-key credential form. */
   setup?: CredentialSetupGuide
 }
@@ -365,7 +368,21 @@ export interface Position {
 export interface WalletCommitLog {
   hash: string
   message: string
-  operations: Array<{ symbol: string; action: string; change: string; status: string }>
+  operations: Array<{
+    symbol: string
+    action: string
+    change: string
+    status: string
+    order?: {
+      side?: string
+      orderType?: string
+      totalQuantity?: string
+      cashQuantity?: string
+      limitPrice?: string
+      auxPrice?: string
+      timeInForce?: string
+    }
+  }>
   timestamp: string
   round?: number
 }

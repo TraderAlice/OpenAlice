@@ -368,6 +368,17 @@ export class TradingGit implements ITradingGit {
         action: op.action,
         change: this.formatOperationChange(op, result),
         status: result?.status || 'rejected',
+        ...(op.action === 'placeOrder' ? {
+          order: {
+            side: op.order?.action,
+            orderType: op.order?.orderType,
+            totalQuantity: this.formatOptionalDecimal(op.order?.totalQuantity),
+            cashQuantity: this.formatOptionalDecimal(op.order?.cashQty),
+            limitPrice: this.formatOptionalDecimal(op.order?.lmtPrice),
+            auxPrice: this.formatOptionalDecimal(op.order?.auxPrice),
+            timeInForce: op.order?.tif,
+          },
+        } : {}),
       })
     }
 
@@ -383,15 +394,22 @@ export class TradingGit implements ITradingGit {
         const hasQty = qty && !qty.equals(UNSET_DECIMAL)
         const hasCash = cashQty && !cashQty.equals(UNSET_DECIMAL) && cashQty.gt(0)
         const sizeStr = hasCash ? `$${cashQty.toFixed()}` : hasQty ? `${qty.toFixed()}` : '?'
+        const terms = [
+          op.order?.orderType,
+          this.formatOptionalDecimal(op.order?.lmtPrice, '@'),
+          this.formatOptionalDecimal(op.order?.auxPrice, 'stop @'),
+          op.order?.tif,
+        ].filter(Boolean).join(' ')
+        const orderSummary = `${side} ${sizeStr}${terms ? ` ${terms}` : ''}`
 
         if (result?.status === 'user-rejected') {
-          return `${side} ${sizeStr} (user-rejected)`
+          return `${orderSummary} (user-rejected)`
         }
         if (result?.status === 'filled') {
-          const price = result.execution?.price ? ` @${result.execution.price}` : ''
-          return `${side} ${sizeStr}${price}`
+          const price = result.execution?.price ? ` → filled @${result.execution.price}` : ' (filled)'
+          return `${orderSummary}${price}`
         }
-        return `${side} ${sizeStr} (${result?.status || 'unknown'})`
+        return `${orderSummary} (${result?.status || 'unknown'})`
       }
 
       case 'closePosition': {
@@ -436,6 +454,11 @@ export class TradingGit implements ITradingGit {
         return `${direction} ${delta.abs().toFixed()} @${op.markPrice}`
       }
     }
+  }
+
+  private formatOptionalDecimal(value: Decimal | undefined, prefix = ''): string | undefined {
+    if (!value || value.equals(UNSET_DECIMAL)) return undefined
+    return `${prefix}${value.toFixed()}`
   }
 
   show(hash: CommitHash): GitCommit | null {

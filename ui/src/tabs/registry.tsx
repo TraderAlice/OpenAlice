@@ -6,16 +6,20 @@ import { PortfolioPage } from '../pages/PortfolioPage'
 import { TradingAsGitPage } from '../pages/TradingAsGitPage'
 import { IssuePage } from '../pages/IssuePage'
 import { IssueSettingsPage } from '../pages/IssueSettingsPage'
+import { HarnessSettingsPage } from '../pages/HarnessSettingsPage'
 import { IssueDetailPage } from '../pages/IssueDetailPage'
 import { TrackedIssueDetailPage } from '../pages/TrackedIssueDetailPage'
 import { AutomationPage } from '../pages/AutomationPage'
+import { OfficePage } from '../pages/OfficePage'
 import { NewsPage } from '../pages/NewsPage'
 import { MarketPage } from '../pages/MarketPage'
 import { MarketRotationPage } from '../pages/MarketRotationPage'
 import { MarketBoardPage } from '../pages/MarketBoardPage'
 import { MARKET_BOARD_TITLES } from '../pages/market-board-titles'
 import { MarketDetailPage } from '../pages/MarketDetailPage'
-import { SettingsPage } from '../pages/SettingsPage'
+import { AppearanceSettingsPage, SettingsPage, ToolsSettingsPage } from '../pages/SettingsPage'
+import { ActivityBarSettingsPage } from '../pages/ActivityBarSettingsPage'
+import { BetaSettingsPage } from '../pages/BetaSettingsPage'
 import { AgentPermissionsPage } from '../pages/AgentPermissionsPage'
 import { AIProviderPage } from '../pages/AIProviderPage'
 import { TradingPage } from '../pages/TradingPage'
@@ -185,6 +189,13 @@ const automationModule: ViewModule<'automation'> = {
   ),
 }
 
+const officeModule: ViewModule<'office'> = {
+  kind: 'office',
+  title: () => 'Office',
+  toUrl: () => '/office',
+  Component: () => <OfficePage />,
+}
+
 const newsModule: ViewModule<'news'> = {
   kind: 'news',
   title: () => 'News',
@@ -263,27 +274,37 @@ const settingsCategoryTitle: Record<
   string
 > = {
   general: 'Settings',
+  appearance: 'Appearance',
+  'activity-bar': 'Activity bar',
   'ai-provider': 'AI Provider',
   'agent-permissions': 'Agent Permissions',
+  tools: 'Tools',
   trading: 'Trading',
   issues: 'Issues',
+  harness: 'Harness',
   connectors: 'Connectors',
   mcp: 'MCP Server',
   'market-data': 'Market Data',
   'news-collector': 'News Sources',
+  beta: 'Beta',
 }
 
 function SettingsRouter({ spec }: ViewProps<'settings'>) {
   switch (spec.params.category) {
     case 'general': return <SettingsPage />
+    case 'appearance': return <AppearanceSettingsPage />
+    case 'activity-bar': return <ActivityBarSettingsPage />
     case 'ai-provider': return <AIProviderPage />
     case 'agent-permissions': return <AgentPermissionsPage />
+    case 'tools': return <ToolsSettingsPage />
     case 'trading': return <TradingPage />
     case 'issues': return <IssueSettingsPage />
+    case 'harness': return <HarnessSettingsPage />
     case 'connectors': return <ConnectorsPage />
     case 'mcp': return <MCPPage />
     case 'market-data': return <MarketDataPage />
     case 'news-collector': return <NewsCollectorPage />
+    case 'beta': return <BetaSettingsPage />
   }
 }
 
@@ -579,6 +600,7 @@ const VIEWS = {
   'issue-detail': issueDetailModule,
   'tracked-issue-detail': trackedIssueDetailModule,
   automation: automationModule,
+  office: officeModule,
   news: newsModule,
   'market-list': marketListModule,
   'market-rotation': marketRotationModule,

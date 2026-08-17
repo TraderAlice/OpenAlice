@@ -8,13 +8,17 @@
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
 import {
+  connectorArtifactDeliverySchema,
+  connectorArtifactFailureSchema,
   connectorDeliveryReceiptSchema,
   inboxNotificationSchema,
+  ownerChatMessageSchema,
 } from '@traderalice/connector-protocol'
 import { ConnectorRegistry } from './core/adapter.js'
 import { DeliveryManager } from './core/delivery-manager.js'
 import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
+import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
@@ -30,6 +34,7 @@ async function main(): Promise<void> {
   const registry = new ConnectorRegistry()
   registry.register(discordConnectorRegistration())
   registry.register(telegramConnectorRegistration())
+  registry.register(slackConnectorRegistration())
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -42,7 +47,10 @@ async function main(): Promise<void> {
     recorder: journal,
     updateAdapterSettings: (id, patch) => configStore.patchAdapter(id, patch),
   })
-  await manager.start()
+  // Install before opening the loopback port so health can say `starting`
+  // instead of "configured but not running". Adapter SDKs reach the network
+  // only after Guardian can already probe the process.
+  manager.installEnabledAdapters()
 
   const app = new Hono()
   app.get('/__connector/health', (c) => c.json(manager.health()))
@@ -50,6 +58,26 @@ async function main(): Promise<void> {
   app.post('/v1/notifications/inbox', async (c) => {
     const notification = inboxNotificationSchema.parse(await c.req.json())
     return c.json(connectorDeliveryReceiptSchema.parse(manager.enqueue(notification)), 202)
+  })
+  app.post('/v1/notifications/owner-chat', async (c) => {
+    const message = ownerChatMessageSchema.parse(await c.req.json())
+    return c.json(connectorDeliveryReceiptSchema.parse(manager.enqueueOwnerChat(message)), 202)
+  })
+  app.post('/v1/inbound/drain', async (c) => {
+    return c.json({ messages: manager.drainInbound() })
+  })
+  app.post('/v1/actions/drain', (c) => {
+    return c.json({ requests: manager.drainActions() })
+  })
+  app.post('/v1/artifacts/deliver', async (c) => {
+    const delivery = connectorArtifactDeliverySchema.parse(await c.req.json())
+    await manager.deliverArtifact(delivery)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: delivery.requestId }))
+  })
+  app.post('/v1/artifacts/fail', async (c) => {
+    const failure = connectorArtifactFailureSchema.parse(await c.req.json())
+    await manager.failArtifact(failure)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
   })
   app.post('/v1/connectors/:id/test', async (c) => {
     const probeId = await manager.sendTest(c.req.param('id'))
@@ -75,6 +103,8 @@ async function main(): Promise<void> {
   }
   process.on('SIGINT', () => { void shutdown('SIGINT') })
   process.on('SIGTERM', () => { void shutdown('SIGTERM') })
+
+  await manager.start()
 }
 
 main().catch((error) => {

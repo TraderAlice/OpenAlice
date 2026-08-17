@@ -6,6 +6,7 @@ import {
   Clock3,
   LayoutGrid,
   MessageSquare,
+  RotateCcw,
   Search,
 } from 'lucide-react'
 
@@ -17,8 +18,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { formatRelativeTime } from '../../lib/intl'
-import type { SessionRecord, Workspace } from './api'
+import type { SessionRecord, Workspace, WorkspaceSessionDirectory } from './api'
 import { workspaceDisplayName, workspaceDisplayTitle } from './display'
+import {
+  joinWorkspaceHarnessSessions,
+  type HarnessSession,
+} from './harness-sessions'
 import { orderSessionsForSidebar } from './sidebar-order'
 
 interface DialogFocusProps {
@@ -26,6 +31,7 @@ interface DialogFocusProps {
 }
 
 export interface WorkspacePickerDialogProps extends DialogFocusProps {
+  harness?: 'chat' | 'auto-quant'
   open: boolean
   workspaces: readonly Workspace[]
   currentWorkspaceId: string | null
@@ -35,6 +41,7 @@ export interface WorkspacePickerDialogProps extends DialogFocusProps {
 
 export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactElement {
   const { t } = useTranslation()
+  const isAutoQuant = props.harness === 'auto-quant'
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLInputElement | null>(null)
 
@@ -61,7 +68,9 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
       >
         <DialogHeader className="border-b border-border/70 px-5 py-4 pr-12">
           <DialogTitle>{t('chat.switchWorkspace')}</DialogTitle>
-          <DialogDescription>{t('chat.workspacePickerDescription')}</DialogDescription>
+          <DialogDescription>
+            {isAutoQuant ? t('autoQuant.workspacePickerDescription') : t('chat.workspacePickerDescription')}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="border-b border-border/60 px-4 py-3 sm:px-5">
@@ -120,7 +129,9 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
                           {workspace.displayName?.trim() && workspace.displayName.trim() !== workspace.tag && (
                             <span className="truncate font-mono">{workspace.tag}</span>
                           )}
-                          <span>{t('chat.workspaceSessionCount', { count: workspace.sessions.length })}</span>
+                          <span>{isAutoQuant
+                            ? t('autoQuant.workspaceSessionCount', { count: workspace.sessions.length })
+                            : t('chat.workspaceSessionCount', { count: workspace.sessions.length })}</span>
                           {lastActiveAt && <span>{formatRelativeTime(lastActiveAt)}</span>}
                         </span>
                       </span>
@@ -138,19 +149,25 @@ export function WorkspacePickerDialog(props: WorkspacePickerDialogProps): ReactE
 }
 
 type ConversationScope = 'current' | 'all'
-type ConversationStateFilter = 'all' | SessionRecord['state']
+type ConversationStateFilter = 'all' | SessionRecord['state'] | 'archived'
 
 export interface ConversationBrowserDialogProps extends DialogFocusProps {
+  harness?: 'chat' | 'auto-quant'
   open: boolean
   workspaces: readonly Workspace[]
+  directories?: ReadonlyMap<string, WorkspaceSessionDirectory>
+  includeHeadlessBornSessions?: boolean
   currentWorkspaceId: string | null
-  activeSessionId: string | null
+  isRowActive?: (row: HarnessSession) => boolean
+  activeSessionId?: string | null
   onOpenChange: (open: boolean) => void
-  onSelectSession: (workspaceId: string, sessionId: string) => void
+  onSelectSession: (row: HarnessSession) => void
+  onRestoreSession?: (row: HarnessSession) => void
 }
 
 export function ConversationBrowserDialog(props: ConversationBrowserDialogProps): ReactElement {
   const { t } = useTranslation()
+  const isAutoQuant = props.harness === 'auto-quant'
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<ConversationScope>('current')
   const [stateFilter, setStateFilter] = useState<ConversationStateFilter>('all')
@@ -165,22 +182,38 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
 
   const sessions = useMemo(() => props.workspaces
     .filter((workspace) => scope === 'all' || workspace.id === props.currentWorkspaceId)
-    .flatMap((workspace) => workspace.sessions.map((session) => ({ workspace, session })))
-    .sort((a, b) => {
-      const active = Date.parse(b.session.lastActiveAt) - Date.parse(a.session.lastActiveAt)
-      if (active !== 0) return active
-      return b.session.id.localeCompare(a.session.id)
-    }), [props.currentWorkspaceId, props.workspaces, scope])
+    .flatMap((workspace) => {
+      const rows = joinWorkspaceHarnessSessions(
+        workspace,
+        props.directories?.get(workspace.id) ?? null,
+        {
+          presence: stateFilter === 'archived' ? 'archived' : 'active',
+          includeHeadlessBornSessions: props.includeHeadlessBornSessions,
+        },
+      )
+      return rows.map((row) => ({ workspace, row }))
+    })
+    .sort((left, right) => {
+      const running = Number(right.row.occupancyRunning) - Number(left.row.occupancyRunning)
+      if (running !== 0) return running
+      const occupancy = right.row.occupancyAt - left.row.occupancyAt
+      if (occupancy !== 0) return occupancy
+      return left.row.resumeId.localeCompare(right.row.resumeId)
+    }), [props.currentWorkspaceId, props.directories, props.includeHeadlessBornSessions, props.workspaces, scope, stateFilter])
 
   const visibleSessions = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()
-    return sessions.filter(({ workspace, session }) => {
-      if (stateFilter !== 'all' && session.state !== stateFilter) return false
+    return sessions.filter(({ workspace, row }) => {
+      if (stateFilter === 'running' && !row.occupancyRunning) return false
+      if (stateFilter === 'paused' && row.occupancyRunning) return false
       if (!normalized) return true
       return [
-        session.title,
-        session.name,
-        session.agent,
+        row.title,
+        row.resumeId,
+        row.agent,
+        row.directory?.latestExecution?.issueId,
+        row.directory?.latestExecution?.assistantPreview,
+        row.session?.name,
         workspace.displayName,
         workspace.tag,
       ].some((value) => value?.toLocaleLowerCase().includes(normalized))
@@ -195,6 +228,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
     { value: 'all', label: t('workspace.filterAll') },
     { value: 'running', label: t('workspace.filterRunning') },
     { value: 'paused', label: t('workspace.filterPaused') },
+    { value: 'archived', label: t('workspace.filterArchived') },
   ]
 
   return (
@@ -205,25 +239,29 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
         finalFocus={props.restoreFocusRef}
       >
         <DialogHeader className="border-b border-border/70 px-5 py-4 pr-12">
-          <DialogTitle>{t('chat.browseWorkspace')}</DialogTitle>
-          <DialogDescription>{t('chat.conversationBrowserDescription')}</DialogDescription>
+          <DialogTitle>{isAutoQuant ? t('autoQuant.browseResearch') : t('chat.browseWorkspace')}</DialogTitle>
+          <DialogDescription>
+            {isAutoQuant ? t('autoQuant.researchBrowserDescription') : t('chat.conversationBrowserDescription')}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 border-b border-border/60 px-4 py-3 sm:px-5">
           <label className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
             <Search size={15} strokeWidth={2} className="shrink-0 text-muted-foreground" aria-hidden />
-            <span className="sr-only">{t('chat.conversationSearchPlaceholder')}</span>
+            <span className="sr-only">
+              {isAutoQuant ? t('autoQuant.researchSearchPlaceholder') : t('chat.conversationSearchPlaceholder')}
+            </span>
             <input
               ref={searchRef}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('chat.conversationSearchPlaceholder')}
+              placeholder={isAutoQuant ? t('autoQuant.researchSearchPlaceholder') : t('chat.conversationSearchPlaceholder')}
               className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/65"
             />
           </label>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex rounded-lg bg-muted/70 p-0.5" role="group" aria-label={t('chat.conversationScope')}>
+            <div className="flex rounded-lg bg-muted/70 p-0.5" role="group" aria-label={isAutoQuant ? t('autoQuant.researchScope') : t('chat.conversationScope')}>
               {scopeOptions.map((option) => (
                 <button
                   key={option.value}
@@ -261,53 +299,79 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
 
         <div className="min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3">
           <span className="sr-only" role="status" aria-live="polite">
-            {t('chat.conversationResultCount', { count: visibleSessions.length })}
+            {isAutoQuant
+              ? t('autoQuant.researchResultCount', { count: visibleSessions.length })
+              : t('chat.conversationResultCount', { count: visibleSessions.length })}
           </span>
           {visibleSessions.length === 0 ? (
             <div className="flex h-full min-h-40 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-              {t('chat.noConversationMatches')}
+              {isAutoQuant ? t('autoQuant.noResearchMatches') : t('chat.noConversationMatches')}
             </div>
           ) : (
             <ul className="space-y-1">
-              {visibleSessions.map(({ workspace, session }) => {
-                const title = session.title?.trim() || session.name
-                const active = workspace.id === props.currentWorkspaceId && session.id === props.activeSessionId
+              {visibleSessions.map(({ workspace, row }) => {
+                const title = row.headlessOccupying
+                  ? t('workspace.sessionRunning', { title: row.title })
+                  : row.title
+                const active = props.isRowActive?.(row)
+                  ?? (workspace.id === props.currentWorkspaceId && row.session?.id === props.activeSessionId)
+                const occupancyIso = row.occupancyAt > 0
+                  ? new Date(row.occupancyAt).toISOString()
+                  : row.session?.lastActiveAt
                 return (
-                  <li key={`${workspace.id}:${session.id}`}>
+                  <li key={`${workspace.id}:${row.resumeId}`} className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => props.onSelectSession(workspace.id, session.id)}
+                      onClick={() => {
+                        if (!row.headlessOccupying) props.onSelectSession(row)
+                      }}
+                      disabled={row.headlessOccupying}
                       aria-label={title}
                       aria-current={active ? 'page' : undefined}
-                      className={`oa-nav-row flex min-h-16 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                      className={`oa-nav-row flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
                         active ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-muted'
-                      }`}
+                      } disabled:cursor-default disabled:opacity-70`}
                     >
                       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
-                        session.state === 'running'
+                        row.occupancyRunning
                           ? 'border-success/25 bg-success/10 text-success'
                           : 'border-border/70 bg-secondary text-muted-foreground'
                       }`}>
                         <Bot size={16} strokeWidth={2} aria-hidden />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium" title={title}>{title}</span>
+                        <span className={`block truncate text-sm font-medium ${row.failed ? 'text-muted-foreground/70' : ''}`} title={row.title}>{row.title}</span>
                         <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
                           <span className="truncate">{workspaceDisplayName(workspace)}</span>
-                          <span className="font-mono">{session.agent}</span>
-                          <span>{formatRelativeTime(session.lastActiveAt)}</span>
+                          <span className="font-mono">{row.agent}</span>
+                          {occupancyIso && <span>{formatRelativeTime(occupancyIso)}</span>}
                         </span>
                       </span>
                       <span className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-medium sm:inline-flex ${
-                        session.state === 'running'
-                          ? 'bg-success/10 text-success'
-                          : 'bg-muted text-muted-foreground'
+                        row.presence === 'archived'
+                          ? 'bg-muted text-muted-foreground'
+                          : row.occupancyRunning
+                            ? 'bg-success/10 text-success'
+                            : 'bg-muted text-muted-foreground'
                       }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${session.state === 'running' ? 'bg-success' : 'bg-muted-foreground/45'}`} aria-hidden />
-                        {session.state === 'running' ? t('workspace.filterRunning') : t('workspace.paused')}
+                        <span className={`h-1.5 w-1.5 rounded-full ${row.occupancyRunning && row.presence !== 'archived' ? 'bg-success' : 'bg-muted-foreground/45'}`} aria-hidden />
+                        {row.presence === 'archived'
+                          ? t('workspace.filterArchived')
+                          : row.occupancyRunning ? t('workspace.filterRunning') : t('workspace.paused')}
                       </span>
                       <Clock3 size={14} strokeWidth={2} className="shrink-0 text-muted-foreground/50" aria-hidden />
                     </button>
+                    {row.presence === 'archived' && props.onRestoreSession && (
+                      <button
+                        type="button"
+                        onClick={() => props.onRestoreSession?.(row)}
+                        disabled={row.headlessOccupying}
+                        aria-label={t('workspace.restoreSession', { title: row.title })}
+                        className="oa-icon-action flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+                      >
+                        <RotateCcw size={15} strokeWidth={2} aria-hidden />
+                      </button>
+                    )}
                   </li>
                 )
               })}

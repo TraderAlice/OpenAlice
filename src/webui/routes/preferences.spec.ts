@@ -238,4 +238,30 @@ describe('preferences routes', () => {
     expect(response.status).toBe(400)
     expect(save).not.toHaveBeenCalled()
   })
+
+  it('reads and persists harness roster visibility', async () => {
+    const read = vi.fn(async () => ({ showHeadlessBornSessions: false }))
+    const save = vi.fn(async (next: { showHeadlessBornSessions: boolean }) => next)
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: vi.fn(),
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      readHarnessPreferences: read,
+      saveHarnessPreferences: save,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    })
+
+    expect(await (await app.request('/harness')).json()).toEqual({
+      showHeadlessBornSessions: false,
+    })
+    const response = await app.request('/harness', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ showHeadlessBornSessions: true }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ showHeadlessBornSessions: true })
+    expect(save).toHaveBeenCalledWith({ showHeadlessBornSessions: true })
+  })
 })

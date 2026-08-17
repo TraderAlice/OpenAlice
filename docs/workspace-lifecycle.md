@@ -31,6 +31,7 @@ business desk merely because the user opened management chat.
     ├── workspace-catalog.json      complete lifecycle history
     ├── resume-identities.json      identity, lifecycle, and native mappings
     ├── headless-tasks.json         immutable execution history
+    ├── agent-runtime.jsonl         desk occupancy lifecycle journal
     └── artifact-provenance.json    immutable attribution history
 ```
 
@@ -61,15 +62,28 @@ active -> retired
    +---------+  Workspace restore / explicit recall
 ```
 
-`SessionRecord` is only an interactive seat. Removing or pausing one does not
-retire the coworker. `resumeId` is the coworker identity; retirement is stored
-on `ResumeIdentityRecord` and retains the native runtime mapping, run history,
-Inbox links, and provenance. Its secret-free AI configuration lives with the
-desk at `.alice/sessions/<resumeId>.json`, so offboarding moves it into the
-departed checkout and restore recalls the same binding instead of re-resolving
-changed Workspace defaults. A retired Session is not schedulable or resumable.
-It may carry `successorResumeId` for explicit handoff. OpenAlice never silently
-pretends a successor authored the predecessor's work.
+In-desk floor presence (independent of `lifecycle`):
+
+```text
+active <-> archived <-> deleted
+```
+
+`presence` answers whether the coworker is on the Ask Alice roster, filed in
+the archive, or softly dismissed. Missing `presence` is `active`. `lifecycle:
+retired` still means the coworker left with the Workspace; restore recalls the
+desk without washing archived or deleted people back onto the floor.
+
+`SessionRecord` is the durable launcher roster row shared by headless and
+interactive execution. Pausing, archiving, soft-deleting, or retiring a Session
+does not destroy that row. `resumeId` remains the coworker identity; retirement
+is stored on `ResumeIdentityRecord` and retains the roster row, native runtime
+mapping, run history, Inbox links, and provenance. Its secret-free AI
+configuration lives with the desk at `.alice/sessions/<resumeId>.json`, so
+offboarding moves it into the departed checkout and restore recalls the same
+binding instead of re-resolving changed Workspace defaults. A retired Session
+is not schedulable or resumable. It may carry `successorResumeId` for explicit
+handoff. OpenAlice never silently pretends a successor authored the
+predecessor's work.
 
 ## Offboarding Transaction
 

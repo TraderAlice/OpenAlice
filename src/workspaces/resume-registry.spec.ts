@@ -36,6 +36,54 @@ describe('ResumeRegistry', () => {
     })
   })
 
+  it('persists immutable birth metadata on first create only', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    const created = await registry.ensure({
+      wsId: 'ws-1',
+      agent: 'pi',
+      now: 1,
+      metadata: { createdBy: { kind: 'interactive', surface: 'quick-chat' } },
+    })
+    expect(created.metadata).toEqual({
+      createdBy: { kind: 'interactive', surface: 'quick-chat' },
+    })
+
+    const again = await registry.ensure({
+      resumeId: created.resumeId,
+      wsId: 'ws-1',
+      agent: 'pi',
+      now: 2,
+      metadata: { createdBy: { kind: 'headless', surface: 'api' } },
+    })
+    expect(again.metadata).toEqual({
+      createdBy: { kind: 'interactive', surface: 'quick-chat' },
+    })
+
+    const reloaded = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    expect(reloaded.get(created.resumeId)?.metadata).toEqual({
+      createdBy: { kind: 'interactive', surface: 'quick-chat' },
+    })
+  })
+
+  it('loads identities with malformed metadata by dropping only the bag', async () => {
+    await writeFile(path, JSON.stringify({
+      version: 1,
+      records: [{
+        resumeId: 'resume-calm-amber-river-a1b2c3',
+        wsId: 'ws-1',
+        agent: 'pi',
+        createdAt: 1,
+        updatedAt: 1,
+        lifecycle: 'active',
+        metadata: { createdBy: { kind: 'interactive', surface: 'not-a-surface' } },
+      }],
+    }, null, 2), 'utf8')
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    const record = registry.get('resume-calm-amber-river-a1b2c3')
+    expect(record).toMatchObject({ wsId: 'ws-1', agent: 'pi', lifecycle: 'active' })
+    expect(record?.metadata).toBeUndefined()
+  })
+
   it('refuses to move an identity across workspace or runtime boundaries', async () => {
     const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
     const created = await registry.ensure({ wsId: 'ws-1', agent: 'pi' })
@@ -113,6 +161,48 @@ describe('ResumeRegistry', () => {
     expect(updated).toMatchObject({ runtimeBinding: replacement, updatedAt: 2 })
     expect((await ResumeRegistry.load(path, noopLogger, runtimeStore))
       .get('resume-runtime-edit')?.runtimeBinding).toEqual(replacement)
+  })
+
+  it('hydrates displayName from the Session dossier and never flushes it to the identity ledger', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    const created = await registry.ensure({
+      resumeId: 'resume-named',
+      wsId: 'ws-1',
+      agent: 'pi',
+      runtimeBinding: { version: 1, credential: { source: 'native' } },
+      now: 1,
+    })
+    const updated = await registry.setDisplayName({
+      resumeId: created.resumeId,
+      wsId: 'ws-1',
+      displayName: 'AAPL desk',
+    })
+    // A nametag edit is Workspace metadata, not Session activity. In
+    // particular it must not reorder the recent Session roster.
+    expect(updated).toMatchObject({ displayName: 'AAPL desk', updatedAt: 1 })
+
+    const raw = JSON.parse(await readFile(path, 'utf8')) as {
+      records: Array<Record<string, unknown>>
+    }
+    expect(raw.records[0]).not.toHaveProperty('displayName')
+    expect(raw.records[0]).not.toHaveProperty('runtimeBinding')
+
+    const reloaded = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    expect(reloaded.get(created.resumeId)).toMatchObject({
+      displayName: 'AAPL desk',
+      runtimeBinding: { version: 1, credential: { source: 'native' } },
+    })
+
+    await reloaded.setDisplayName({
+      resumeId: created.resumeId,
+      wsId: 'ws-1',
+      displayName: '',
+    })
+    expect(reloaded.get(created.resumeId)).not.toHaveProperty('displayName')
+    expect(reloaded.get(created.resumeId)?.runtimeBinding).toEqual({
+      version: 1,
+      credential: { source: 'native' },
+    })
   })
 
   it('keeps legacy UUID identities valid without rewriting them', async () => {
@@ -195,5 +285,37 @@ describe('ResumeRegistry', () => {
     })
     expect(registry.get('resume-owner')).not.toHaveProperty('retiredAt')
     expect(registry.get('resume-owner')).not.toHaveProperty('successorResumeId')
+  })
+
+  it('archives and restores floor presence without rewriting workspace retirement', async () => {
+    const registry = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    await registry.ensure({
+      resumeId: 'resume-owner', wsId: 'ws-1', agent: 'pi', agentSessionId: 'native-1', now: 1,
+    })
+    await registry.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'archived', now: 2 })
+    expect(registry.get('resume-owner')).toMatchObject({ presence: 'archived', lifecycle: 'active' })
+
+    const reloaded = await ResumeRegistry.load(path, noopLogger, runtimeStore)
+    expect(reloaded.get('resume-owner')?.presence).toBe('archived')
+    await reloaded.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'active', now: 3 })
+    expect(reloaded.get('resume-owner')).not.toHaveProperty('presence')
+
+    await expect(reloaded.setPresence({
+      resumeId: 'resume-owner', wsId: 'ws-1', presence: 'deleted', now: 4,
+    })).rejects.toThrow(/cannot move/)
+
+    await reloaded.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'archived', now: 5 })
+    await reloaded.setPresence({ resumeId: 'resume-owner', wsId: 'ws-1', presence: 'deleted', now: 6 })
+    await expect(reloaded.ensure({ resumeId: 'resume-owner', wsId: 'ws-1', agent: 'pi' }))
+      .rejects.toThrow(/deleted/)
+    await expect(reloaded.setPresence({
+      resumeId: 'resume-owner', wsId: 'ws-1', presence: 'active', now: 7,
+    })).rejects.toThrow(/cannot move/)
+
+    await reloaded.retireWorkspace('ws-1', { reason: 'desk left', now: 8 })
+    await expect(reloaded.setPresence({
+      resumeId: 'resume-owner', wsId: 'ws-1', presence: 'archived', now: 9,
+    })).rejects.toThrow(/retired/)
+    expect(reloaded.get('resume-owner')).toMatchObject({ lifecycle: 'retired', presence: 'deleted' })
   })
 })

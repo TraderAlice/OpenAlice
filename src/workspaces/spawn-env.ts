@@ -59,10 +59,10 @@ const POSIX_SYSTEM_BIN_DIRS = [
 
 const POSIX_USER_BIN_DIRS = [
   '.local/bin',
+  '.bun/bin',
   '.npm-global/bin',
   'Library/pnpm',
   '.yarn/bin',
-  '.bun/bin',
   '.cargo/bin',
   '.volta/bin',
 ] as const;
@@ -122,8 +122,10 @@ export function buildSpawnEnv(
  *
  * macOS apps launched from Finder do not inherit the user's login-shell PATH,
  * so Homebrew / pnpm / ~/.local installs disappear even though `codex` or
- * `claude` works in Terminal. Keep this pure and synchronous: it is used both
- * for `/agents` availability probes and for the actual PTY spawn env.
+ * `claude` works in Terminal. Do not infer `~/.bun/bin`; hang a bun-global
+ * CLI on a real PATH dir or set OPENALICE_EXTRA_AGENT_PATH. Keep this pure
+ * and synchronous: it is used both for `/agents` availability probes and for
+ * the actual PTY spawn env.
  */
 export function buildCliPath(env: NodeJS.ProcessEnv = process.env): string {
   const path = env['PATH'] ?? env['Path'] ?? '';

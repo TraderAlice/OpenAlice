@@ -1,5 +1,5 @@
 /**
- * Runtime detection for the agent CLIs (claude / codex / opencode / pi).
+ * Runtime detection for the agent CLIs (claude / codex / cursor-agent / agy / grok / omp / opencode / pi).
  *
  * The launcher registers all adapters unconditionally — registration means
  * "the launcher knows HOW to drive this CLI", NOT "the CLI is installed on

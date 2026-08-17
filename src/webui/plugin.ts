@@ -19,7 +19,8 @@ import { createTradingConfigRoutes } from './routes/trading-config.js'
 import { createToolsRoutes } from './routes/tools.js'
 import { createAgentStatusRoutes } from './routes/agent-status.js'
 import { createAgentConversationRoutes } from './routes/agent-conversations.js'
-import { createPersonaRoutes } from './routes/persona.js'
+import { createAgentRuntimeLogRoutes } from './routes/agent-runtime.js'
+import { createOfficeRoutes } from './routes/office.js'
 import { createNewsRoutes } from './routes/news.js'
 import { createMarketRoutes } from './routes/market.js'
 import { createBarsRoutes } from './routes/bars.js'
@@ -28,8 +29,10 @@ import { createInboxRoutes } from './routes/inbox.js'
 import { createEntityRoutes } from './routes/entities.js'
 import { createWikilinkRoutes } from './routes/wikilink.js'
 import { createVersionRoutes } from './routes/version.js'
+import { createAliceProjectRoutes } from './routes/alice-project.js'
 import { createAuthRoutes } from './routes/auth.js'
 import { createPreferencesRoutes } from './routes/preferences.js'
+import { createUiLayoutRoutes } from './routes/ui-layout.js'
 import { initializeWindowsWorkspaceShellPreference } from '../core/windows-workspace-shell.js'
 import { createAuthMiddleware } from './middleware/auth.js'
 import { mountMarketDataCompat } from '../server/market-data-compat.js'
@@ -217,8 +220,11 @@ export class WebPlugin implements Plugin {
     app.route('/api/channels', createChannelsRoutes({ sessions, sseByChannel: this.sseByChannel }))
     app.route('/api/media', createMediaRoutes())
     app.route('/api/config', createConfigRoutes({ ctx }))
-    app.route('/api/connectors', createConnectorRoutes())
+    app.route('/api/connectors', createConnectorRoutes({
+      getWorkspaceService: () => this.workspaceService,
+    }))
     app.route('/api/preferences', createPreferencesRoutes())
+    app.route('/api/ui-layout', createUiLayoutRoutes())
     app.route('/api/market-data', createMarketDataRoutes(ctx))
     app.route('/api/trading/config', createTradingConfigRoutes(ctx))
     // `/api/trading/*` and `/api/simulator/*` are proxied to the UTA carrier.
@@ -239,9 +245,9 @@ export class WebPlugin implements Plugin {
     app.route('/api/market', createMarketRoutes(ctx))
     app.route('/api/bars', createBarsRoutes(ctx))
     app.route('/api/reference', createReferenceRoutes(ctx))
-    app.route('/api/persona', createPersonaRoutes())
     app.route('/api/inbox', createInboxRoutes({ inboxStore: ctx.inboxStore }))
     app.route('/api/version', createVersionRoutes())
+    app.route('/api/alice-project', createAliceProjectRoutes())
 
     // ==================== Workspaces (launcher-style PTY) ====================
     // Self-contained subsystem ported from auto-quant-launcher. Owns its own
@@ -263,6 +269,8 @@ export class WebPlugin implements Plugin {
     app.route('/api/agent-runtimes', createAgentRuntimeRoutes(this.workspaceService))
     app.route('/api/headless', createHeadlessRoutes(this.workspaceService))
     app.route('/api/agent-conversations', createAgentConversationRoutes(this.workspaceService.agentConversationLog))
+    app.route('/api/agent-runtime', createAgentRuntimeLogRoutes(this.workspaceService))
+    app.route('/api/office', createOfficeRoutes(this.workspaceService))
     app.route('/api/schedule', createScheduleRoutes(this.workspaceService))
     app.route('/api/issues', createIssuesRoutes(this.workspaceService))
     app.route('/api/inquiries', createInquiryRoutes({

@@ -11,7 +11,8 @@ Current code, tests, rendered behavior, and GitHub state override stale prose.
 
 Durable subsystem truth lives under [[docs/README.md]]. Active multi-step
 implementation work lives under [[PLANS.md]]. Keep both indexes current when a
-change introduces a new owner guide or execution plan.
+change introduces a new owner guide or execution plan, or deletes a completed
+plan.
 
 ## Start Here
 
@@ -65,7 +66,7 @@ design.
   file-backed state, and the UTA client boundary.
 - `services/uta/` owns broker implementations, accounts, approvals, snapshots,
   FX, and every trading write. Do not move broker state back into Alice.
-- The model loop runs in native CLIs (`claude`, `codex`, `opencode`, `pi`).
+- The model loop runs in native CLIs (`claude`, `codex`, `cursor-agent`, `agy`, `grok`, `omp`, `opencode`, `pi`).
   Alice owns credentials and injection, not an in-process chat-agent loop.
 - New agent-facing capabilities normally ship as Workspace templates, skills,
   or satellite repositories. Do not grow a parallel workflow engine in `src/`.
@@ -217,8 +218,9 @@ contract.
   truth rather than intent.
 - Keep one canonical plan per initiative. Extend or supersede it explicitly
   instead of creating parallel TODO notes.
-- Active plans stay in `plans/`; completed plans remain as a concise execution
-  record and move to the Completed section of [[PLANS.md]].
+- Active plans stay in `plans/` and [[PLANS.md]]. When a plan is accepted,
+  delete the file and its index bullet in the same change. Git history is the
+  archive; do not accumulate a Completed section.
 - GitHub issues remain the external defect/deferred-work surface. Reference
   related issues and PRs from the plan; do not use a plan to hide actionable
   deferred findings from the issue tracker.
@@ -230,6 +232,8 @@ Read the relevant guide before editing its subsystem:
 - [[docs/README.md]] — [Owner-guide index](docs/README.md) and maintenance rules.
 - [[docs/project-structure.md]] — [Project structure](docs/project-structure.md): process boundaries,
   directories, state roots, and architectural ownership.
+- [[docs/alice-project.md]] — [AliceProject](docs/alice-project.md): top-level runtime
+  identity, complete-home ownership, concurrent projects, and discovery.
 - [[docs/development-workflow.md]] — [Development workflow](docs/development-workflow.md): branches, PRs,
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron

@@ -1,5 +1,5 @@
 import { ChevronDown, Info, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
@@ -8,7 +8,10 @@ import { usePendingPushCount } from '../live/trading-push'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
-import { NAV_SECTIONS } from './activity-navigation'
+import { useAliceProject } from '../hooks/useAliceProject'
+import { useBetaFeatures } from '../live/beta-features'
+import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
+import { useUiLayout } from '../hooks/useUiLayout'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 /**
@@ -30,6 +33,7 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'portfolio':            return 'portfolio'
     case 'issue':                return 'issue'
     case 'automation':           return 'automation'
+    case 'office':               return 'office'
     case 'news':                 return 'news'
   }
 }
@@ -86,6 +90,13 @@ export function ActivityBar({
   returnFocusRef,
 }: ActivityBarProps) {
   const { t } = useTranslation()
+  const { project } = useAliceProject()
+  const officeNav = useBetaFeatures((s) => s.office)
+  const { layout } = useUiLayout()
+  const navSections = useMemo(
+    () => joinNavLayout(NAV_SECTIONS, layout, { product: project?.product, office: officeNav }),
+    [layout, officeNav, project?.product],
+  )
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
@@ -121,20 +132,20 @@ export function ActivityBar({
 
         {/* Navigation */}
         <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-0.5' : 'pb-3'} ${compactRail ? 'px-2 md:items-center' : narrowRail ? 'px-2.5' : 'px-3'}`}>
-          {NAV_SECTIONS.map((section, si) => {
-            const labeled = section.sectionLabel.length > 0
+          {navSections.map((section, si) => {
+            const labeled = section.id !== 'primary'
             // User toggle wins over default. The collapse store stores
             // user's explicit preference (true/false); absence means
             // "fall back to defaultCollapsed". Once the user touches a
             // section, their preference is sticky.
-            const stored = labeled ? collapsedSections[section.sectionLabel] : undefined
+            const stored = labeled ? collapsedSections[section.id] : undefined
             const isCollapsed = labeled && (
               stored !== undefined ? stored : Boolean(section.defaultCollapsed)
             )
             const showItems = compactRail ? true : !isCollapsed
             return (
               <div
-                key={si}
+                key={section.id}
                 className={
                   compactRail && si > 0
                     ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-11'} border-t border-border/70`
@@ -151,16 +162,16 @@ export function ActivityBar({
                     description={section.descriptionKey ? t(section.descriptionKey) : undefined}
                     isCollapsed={isCollapsed}
                     onToggleCollapse={() => setCollapsed(
-                      section.sectionLabel,
+                      section.id,
                       !isCollapsed,
                       section.defaultCollapsed,
                     )}
-                    controlsId={`activity-section-${si}`}
+                    controlsId={`activity-section-${section.id}`}
                     showItems={showItems}
                   />
                 )}
                 {showItems && (
-                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${si}`}>
+                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec

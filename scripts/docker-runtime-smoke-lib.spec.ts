@@ -43,7 +43,7 @@ describe('Docker runtime smoke plan', () => {
       '[docker-smoke] --ai-agent requires --ai-credential <slug>',
     )
     expect(buildDockerRuntimeSmokePlan(['--ai-credential', 'custom-1', '--ai-agent', 'ghost']).errors).toContain(
-      '[docker-smoke] --ai-agent must be claude, codex, opencode, or pi',
+      '[docker-smoke] --ai-agent must be claude, codex, cursor, grok, opencode, or pi',
     )
   })
 

@@ -1,7 +1,15 @@
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from './headless-task-registry.js'
-import type { ResumeIdentityRecord } from './resume-registry.js'
+import {
+  sessionPresence,
+  type ResumeIdentityRecord,
+  type SessionPresence,
+} from './resume-registry.js'
 import { sessionPreferredTitle, type SessionRecord } from './session-registry.js'
-import type { ModelReasoningEffort } from '@/ai-providers/model-semantics.js'
+import type { SessionCreatedBy } from './session-metadata.js'
+import {
+  projectPublicSessionRuntime,
+  type PublicSessionRuntime,
+} from './public-session.js'
 
 export interface WorkspaceSessionDirectoryEntry {
   resumeId: string
@@ -10,14 +18,15 @@ export interface WorkspaceSessionDirectoryEntry {
   updatedAt: number
   lifecycle: ResumeIdentityRecord['lifecycle']
   successorResumeId?: string
+  /** Missing means active. */
+  presence?: SessionPresence
+  /** Workspace-owned coworker nametag. Missing means unnamed. */
+  displayName?: string
   resumable: boolean
   active: boolean
-  runtime?: {
-    credentialSource: 'native' | 'vault' | 'workspace'
-    credentialSlug?: string
-    model?: string
-    reasoningEffort?: ModelReasoningEffort
-  }
+  /** Secret-free birth stamp when this product Session was first allocated. */
+  createdBy?: SessionCreatedBy
+  runtime?: PublicSessionRuntime
   latestExecution?: {
     taskId: string
     status: HeadlessTaskStatus
@@ -63,21 +72,15 @@ export function buildWorkspaceSessionDirectory(input: {
         updatedAt: identity.updatedAt,
         lifecycle: identity.lifecycle ?? 'active',
         ...(identity.successorResumeId ? { successorResumeId: identity.successorResumeId } : {}),
-        resumable: identity.lifecycle !== 'retired' && Boolean(identity.agentSessionId),
+        ...(sessionPresence(identity) !== 'active' ? { presence: sessionPresence(identity) } : {}),
+        ...(identity.displayName ? { displayName: identity.displayName } : {}),
+        resumable: identity.lifecycle !== 'retired'
+          && sessionPresence(identity) !== 'deleted'
+          && Boolean(identity.agentSessionId),
         active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
+        ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
         ...(identity.runtimeBinding
-          ? {
-              runtime: {
-                credentialSource: identity.runtimeBinding.credential.source,
-                ...(identity.runtimeBinding.credential.source === 'vault'
-                  ? { credentialSlug: identity.runtimeBinding.credential.credentialSlug }
-                  : {}),
-                ...(identity.runtimeBinding.model ? { model: identity.runtimeBinding.model } : {}),
-                ...(identity.runtimeBinding.reasoningEffort
-                  ? { reasoningEffort: identity.runtimeBinding.reasoningEffort }
-                  : {}),
-              },
-            }
+          ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
           : {}),
         ...(execution
           ? {

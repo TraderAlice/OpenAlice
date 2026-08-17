@@ -2,12 +2,12 @@
  * Cross-platform launch-command resolution for the workspace spawners.
  *
  * The bug this fixes: the agent CLIs are spawned by BARE NAME (`opencode`,
- * `pi`, `claude`, `codex`). On Windows, node-pty hands that name straight to
+ * `pi`, `claude`, `codex`, `cursor-agent`, `agy`, `grok`). On Windows, node-pty hands that name straight to
  * ConPTY's `CreateProcessW`, which searches PATH but only ever appends `.exe`
  * — it never tries `.cmd`/`.bat`. So:
  *
- *   - claude / codex ship NATIVE executables (`claude.exe`, `codex.exe`) →
- *     resolve fine.
+ *   - claude / codex / grok ship NATIVE executables (`claude.exe`, `codex.exe`,
+ *     `grok.exe`) → resolve fine.
  *   - opencode / pi install as npm shims — on Windows that's a `.cmd` (+ a
  *     `.ps1` and an extensionless sh script), NO `.exe`. CreateProcess looking
  *     for `opencode.exe` / `pi.exe` finds nothing → the workspace never

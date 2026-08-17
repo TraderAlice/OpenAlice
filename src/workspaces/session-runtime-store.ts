@@ -5,11 +5,32 @@ import { dirname, join } from 'node:path'
 import type { SessionRuntimeBinding } from './cli-adapter.js'
 import { parseSessionRuntimeBinding } from './session-runtime-binding.js'
 
+export const MAX_SESSION_DISPLAY_NAME = 120
+
+export class SessionDisplayNameError extends Error {
+  constructor(
+    readonly code: 'too_long',
+    message: string,
+  ) {
+    super(message)
+    this.name = 'SessionDisplayNameError'
+  }
+}
+
+export interface SessionDossier {
+  readonly version: 1
+  readonly resumeId: string
+  readonly agent: string
+  readonly ai?: SessionRuntimeBinding
+  readonly displayName?: string
+}
+
 interface SessionRuntimeFile {
   readonly version: 1
   readonly resumeId: string
   readonly agent: string
-  readonly ai: SessionRuntimeBinding
+  readonly ai?: SessionRuntimeBinding
+  readonly displayName?: string
 }
 
 export interface SessionRuntimeBindingStore {
@@ -18,6 +39,11 @@ export interface SessionRuntimeBindingStore {
     readonly resumeId: string
     readonly agent: string
   }): Promise<SessionRuntimeBinding | null>
+  readDossier(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+  }): Promise<SessionDossier | null>
   ensure(input: {
     readonly wsId: string
     readonly resumeId: string
@@ -30,6 +56,12 @@ export interface SessionRuntimeBindingStore {
     readonly agent: string
     readonly binding: SessionRuntimeBinding
   }): Promise<void>
+  setDisplayName(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+    readonly displayName: string | null
+  }): Promise<string | undefined>
 }
 
 function assertedFileName(resumeId: string): string {
@@ -39,38 +71,58 @@ function assertedFileName(resumeId: string): string {
   return `${resumeId}.json`
 }
 
-function parsedFile(value: unknown, input: {
+export function normalizeSessionDisplayName(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const displayName = value.trim()
+  if (!displayName) return undefined
+  return displayName.slice(0, MAX_SESSION_DISPLAY_NAME)
+}
+
+function parseDossier(value: unknown, input: {
   readonly resumeId: string
   readonly agent: string
-}): SessionRuntimeFile {
+}): SessionDossier {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`Session AI config ${input.resumeId} has an unsupported shape`)
+    throw new Error(`Session dossier ${input.resumeId} has an unsupported shape`)
   }
   const record = value as Record<string, unknown>
-  const ai = parseSessionRuntimeBinding(record['ai'])
   if (
     record['version'] !== 1
     || record['resumeId'] !== input.resumeId
     || record['agent'] !== input.agent
-    || !ai
   ) {
+    throw new Error(`Session dossier ${input.resumeId} has an unsupported shape`)
+  }
+  const hasAi = Object.prototype.hasOwnProperty.call(record, 'ai')
+  const ai = hasAi ? parseSessionRuntimeBinding(record['ai']) : undefined
+  if (hasAi && !ai) {
     throw new Error(`Session AI config ${input.resumeId} has an unsupported shape`)
   }
+  const displayName = normalizeSessionDisplayName(record['displayName'])
   return {
     version: 1,
     resumeId: input.resumeId,
     agent: input.agent,
-    ai,
+    ...(ai ? { ai } : {}),
+    ...(displayName ? { displayName } : {}),
+  }
+}
+
+function serializeDossier(file: SessionRuntimeFile): SessionRuntimeFile {
+  return {
+    version: 1,
+    resumeId: file.resumeId,
+    agent: file.agent,
+    ...(file.ai ? { ai: file.ai } : {}),
+    ...(file.displayName ? { displayName: file.displayName } : {}),
   }
 }
 
 /**
- * Workspace-owned, secret-free AI launch configuration for product Sessions.
- *
- * The resolver returns the current Workspace session-config directory first
- * and may include a departed checkout as a read fallback. Writes always target
- * the first path. The launcher-owned Workspace Manager may resolve to its own
- * state directory because its cwd is the active-floor root, not a Workspace.
+ * Workspace-owned Session dossier: frozen AI launch binding plus a mutable
+ * coworker displayName. Writes always target the first resolved directory.
+ * The launcher-owned Workspace Manager may resolve to its own state directory
+ * because its cwd is the active-floor root, not a Workspace.
  */
 export class WorkspaceSessionRuntimeStore implements SessionRuntimeBindingStore {
   private writeChain: Promise<void> = Promise.resolve()
@@ -90,10 +142,18 @@ export class WorkspaceSessionRuntimeStore implements SessionRuntimeBindingStore 
     readonly resumeId: string
     readonly agent: string
   }): Promise<SessionRuntimeBinding | null> {
+    return (await this.readDossier(input))?.ai ?? null
+  }
+
+  async readDossier(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+  }): Promise<SessionDossier | null> {
     for (const path of this.paths(input.wsId, input.resumeId)) {
       try {
         const value = JSON.parse(await readFile(path, 'utf8')) as unknown
-        return parsedFile(value, input).ai
+        return parseDossier(value, input)
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
         throw error
@@ -122,9 +182,20 @@ export class WorkspaceSessionRuntimeStore implements SessionRuntimeBindingStore 
     readonly agent: string
     readonly binding: SessionRuntimeBinding
   }): Promise<void> {
-    const next = this.writeChain.then(() => this.writeNow(input))
+    const next = this.writeChain.then(() => this.replaceNow(input))
     this.writeChain = next.catch(() => undefined)
     await next
+  }
+
+  async setDisplayName(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+    readonly displayName: string | null
+  }): Promise<string | undefined> {
+    const next = this.writeChain.then(() => this.setDisplayNameNow(input))
+    this.writeChain = next.then(() => undefined, () => undefined)
+    return next
   }
 
   private async ensureNow(input: {
@@ -133,34 +204,82 @@ export class WorkspaceSessionRuntimeStore implements SessionRuntimeBindingStore 
     readonly agent: string
     readonly binding: SessionRuntimeBinding
   }): Promise<void> {
-    const existing = await this.read(input)
-    if (existing) {
-      if (JSON.stringify(existing) !== JSON.stringify(input.binding)) {
+    const existing = await this.readDossier(input)
+    if (existing?.ai) {
+      if (JSON.stringify(existing.ai) !== JSON.stringify(input.binding)) {
         throw new Error(`Session ${input.resumeId} already owns a different runtime binding`)
       }
       return
     }
+    await this.writeNow({
+      wsId: input.wsId,
+      resumeId: input.resumeId,
+      agent: input.agent,
+      ai: input.binding,
+      displayName: existing?.displayName,
+    })
+  }
 
-    await this.writeNow(input)
+  private async replaceNow(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+    readonly binding: SessionRuntimeBinding
+  }): Promise<void> {
+    const existing = await this.readDossier(input)
+    await this.writeNow({
+      wsId: input.wsId,
+      resumeId: input.resumeId,
+      agent: input.agent,
+      ai: input.binding,
+      displayName: existing?.displayName,
+    })
+  }
+
+  private async setDisplayNameNow(input: {
+    readonly wsId: string
+    readonly resumeId: string
+    readonly agent: string
+    readonly displayName: string | null
+  }): Promise<string | undefined> {
+    if (typeof input.displayName === 'string' && input.displayName.trim().length > MAX_SESSION_DISPLAY_NAME) {
+      throw new SessionDisplayNameError(
+        'too_long',
+        `displayName must be at most ${MAX_SESSION_DISPLAY_NAME} characters`,
+      )
+    }
+    const displayName = normalizeSessionDisplayName(input.displayName)
+    const existing = await this.readDossier(input)
+    if (!existing && !displayName) return undefined
+    await this.writeNow({
+      wsId: input.wsId,
+      resumeId: input.resumeId,
+      agent: input.agent,
+      ai: existing?.ai,
+      displayName,
+    })
+    return displayName
   }
 
   private async writeNow(input: {
     readonly wsId: string
     readonly resumeId: string
     readonly agent: string
-    readonly binding: SessionRuntimeBinding
+    readonly ai?: SessionRuntimeBinding
+    readonly displayName?: string
   }): Promise<void> {
     const [path] = this.paths(input.wsId, input.resumeId)
-    if (!path) throw new Error(`Workspace ${input.wsId} is unavailable for Session AI config storage`)
+    if (!path) throw new Error(`Workspace ${input.wsId} is unavailable for Session dossier storage`)
     const directory = dirname(path)
     await mkdir(directory, { recursive: true })
     const temp = join(directory, `.${randomUUID()}.tmp`)
-    const file: SessionRuntimeFile = {
+    const file = serializeDossier({
       version: 1,
       resumeId: input.resumeId,
       agent: input.agent,
-      ai: input.binding,
-    }
+      ...(input.ai ? { ai: input.ai } : {}),
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+    })
     await writeFile(temp, `${JSON.stringify(file, null, 2)}\n`, { mode: 0o600 })
     await rename(temp, path)
   }

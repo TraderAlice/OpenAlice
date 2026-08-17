@@ -56,6 +56,16 @@
   --color-backdrop: var(--backdrop);
   --color-code-background: var(--code-background);
   --color-report-canvas: var(--report-canvas);
+  --color-office-wall: var(--office-wall);
+  --color-office-wall-grain: var(--office-wall-grain);
+  --color-office-wall-crown: var(--office-wall-crown);
+  --color-office-trim: var(--office-trim);
+  --color-office-trim-shadow: var(--office-trim-shadow);
+  --color-office-floor: var(--office-floor);
+  --color-office-floor-plank: var(--office-floor-plank);
+  --color-office-floor-sheen: var(--office-floor-sheen);
+  --color-office-label: var(--office-label);
+  --color-office-label-foreground: var(--office-label-foreground);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
@@ -444,6 +454,27 @@ body {
   animation: oa-suggestion-enter var(--motion-standard) var(--motion-ease-out) backwards;
 }
 
+.oa-sortable-placeholder {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+  outline: 1px dashed color-mix(in srgb, var(--primary) 32%, var(--border));
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+.oa-sortable-placeholder > * {
+  visibility: hidden;
+}
+
+.oa-sortable-overlay {
+  pointer-events: none;
+  z-index: 80;
+  will-change: transform;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: var(--secondary);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
 /* ==================== Typography scale ====================
    Five semantic sizes covering the entire app. New code should
    prefer these over arbitrary `text-[Npx]` so size choices stay
@@ -748,6 +779,9 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-popover-enter,
   .oa-suggestion-enter {
     animation: none;
+  }
+  .oa-sortable-overlay {
+    box-shadow: none;
   }
   .oa-tracked-graph-node-enter,
   .oa-tracked-graph-edge,

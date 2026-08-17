@@ -1,6 +1,6 @@
 {
   "name": "@traderalice/openalice-cli",
-  "version": "0.89.3-beta",
+  "version": "0.89.4-beta",
   "description": "OpenAlice local runtime and remote connection CLI",
   "type": "module",
   "bin": {
@@ -9,6 +9,11 @@
   "files": [
     "bin/openalice.ts",
     "bin/openalice.mjs",
+    "src/alice-project.ts",
+    "src/alice-project-product.ts",
+    "src/ai-credential-copy.ts",
+    "src/create-alice-project.ts",
+    "src/project-command.ts",
     "src/launch-context.ts",
     "src/main.ts",
     "src/managed-source.ts",
@@ -34,7 +39,7 @@
     "src/update.mjs"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit && node --check bin/openalice.ts && node --check bin/openalice.mjs && node --check src/managed-source.ts && node --check src/supervisor-config.ts && node --check src/doctor.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/logs.mjs && node --check src/observability-command.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-bundle.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
+    "build": "tsc -p tsconfig.json --noEmit && node --check bin/openalice.ts && node --check bin/openalice.mjs && node --check src/alice-project.ts && node --check src/alice-project-product.ts && node --check src/ai-credential-copy.ts && node --check src/create-alice-project.ts && node --check src/project-command.ts && node --check src/managed-source.ts && node --check src/supervisor-config.ts && node --check src/doctor.mjs && node --check src/install-layout.mjs && node --check src/install-source.mjs && node --check src/lifecycle-command.mjs && node --check src/lifecycle.mjs && node --check src/local-start.mjs && node --check src/logs.mjs && node --check src/observability-command.mjs && node --check src/remote.mjs && node --check src/runtime-deps.mjs && node --check src/runtime-bundle.mjs && node --check src/runtime-client.mjs && node --check src/server.mjs && node --check src/server-control.mjs && node --check src/ssh-connect.mjs && node --check src/uninstall.mjs && node --check src/update.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --root ../.. --config vitest.config.ts --project node packages/cli/src"
   },

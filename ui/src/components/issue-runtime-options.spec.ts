@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { Preset } from '../api'
 import type { SavedCredential } from './workspace/api'
+import { AGY_FIRST_PARTY_MODEL_IDS } from '../lib/agy-models'
+import { CURSOR_FIRST_PARTY_MODEL_IDS } from '../lib/cursor-models'
 import {
   issueEffortOptions,
   issueModelOptions,
@@ -91,5 +93,78 @@ describe('Issue runtime options', () => {
   it('preserves runtime-native effort choices for a custom model id', () => {
     expect(issueEffortOptions({ agent: 'claude', semantics: null, modelKnown: false }))
       .toEqual(['low', 'medium', 'high', 'max'])
+    expect(issueEffortOptions({ agent: 'cursor', semantics: null, modelKnown: false }))
+      .toEqual([])
+    expect(issueEffortOptions({ agent: 'agy', semantics: null, modelKnown: false }))
+      .toEqual(['low', 'medium', 'high'])
+    expect(issueEffortOptions({ agent: 'agy', semantics: null, modelKnown: true }))
+      .toEqual([])
+    expect(issueEffortOptions({
+      agent: 'cursor',
+      semantics: { reasoning: { mode: 'optional', efforts: ['low', 'high'] } },
+      modelKnown: true,
+    })).toEqual([])
+    expect(issueEffortOptions({ agent: 'grok', semantics: null, modelKnown: false }))
+      .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+    expect(issueEffortOptions({ agent: 'omp', semantics: null, modelKnown: false }))
+      .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  it('suggests Antigravity first-party Gemini slugs even when a vault catalog is bound', () => {
+    expect(issueModelOptions({
+      agent: 'agy',
+      credential: null,
+      defaultModel: null,
+      presets,
+    }).map((model) => model.id)).toEqual([...AGY_FIRST_PARTY_MODEL_IDS])
+    expect(issueModelOptions({
+      agent: 'agy',
+      credential: deepSeek,
+      defaultModel: 'gemini-3.5-flash',
+      presets,
+    }).map((model) => model.id)).toEqual([...AGY_FIRST_PARTY_MODEL_IDS])
+  })
+
+  it('suggests Cursor first-party CLI ids even when a vault catalog is bound', () => {
+    expect(issueModelOptions({
+      agent: 'cursor',
+      credential: null,
+      defaultModel: null,
+      presets,
+    }).map((model) => model.id)).toEqual([...CURSOR_FIRST_PARTY_MODEL_IDS])
+    expect(issueModelOptions({
+      agent: 'cursor',
+      credential: deepSeek,
+      defaultModel: 'gpt-5.2-high',
+      presets,
+    }).map((model) => model.id)).toEqual(['gpt-5.2-high', ...CURSOR_FIRST_PARTY_MODEL_IDS])
+  })
+
+  it('suggests xAI catalog models for a grok vault credential', () => {
+    const xai: SavedCredential = {
+      slug: 'xai-1',
+      vendor: 'xai',
+      authType: 'api-key',
+      wires: { 'openai-chat': 'https://api.x.ai/v1' },
+      resolvedModel: 'grok-4.6',
+    }
+    const xaiPresets: Preset[] = [{
+      id: 'xai-api',
+      label: 'xAI',
+      description: '',
+      category: 'official',
+      defaultName: 'xAI',
+      schema: {},
+      models: [
+        { id: 'grok-4.6', label: 'Grok 4.6' },
+        { id: 'grok-4.5', label: 'Grok 4.5' },
+      ],
+    }]
+    expect(issueModelOptions({
+      agent: 'grok',
+      credential: xai,
+      defaultModel: 'grok-4.6',
+      presets: xaiPresets,
+    }).map((model) => model.id)).toEqual(['grok-4.6', 'grok-4.5'])
   })
 })

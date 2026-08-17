@@ -4,6 +4,7 @@ import { ArrowUpRight, MessageSquarePlus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AgentInfo, PausedSessionRuntimeUpdate, SessionRecord } from './api';
+import { sessionCoworkerLabel } from './display';
 import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
@@ -37,6 +38,10 @@ export interface WorkspaceViewProps {
   readonly onUpdateSessionRuntime?: (
     sessionId: string,
     update: PausedSessionRuntimeUpdate,
+  ) => Promise<void>;
+  readonly onSaveSessionDisplayName?: (
+    resumeId: string,
+    displayName: string | null,
   ) => Promise<void>;
   readonly onOpenWebPi: (sessionId: string) => Promise<void>;
   /** Navigate to an already-running session without re-spawning it. Library
@@ -108,6 +113,12 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
             onUpdateRuntime={props.onUpdateSessionRuntime
               ? (update) => props.onUpdateSessionRuntime!(props.activeRecord!.id, update)
               : undefined}
+            onSaveDisplayName={props.onSaveSessionDisplayName && props.activeRecord.resumeId
+              ? (displayName) => props.onSaveSessionDisplayName!(
+                props.activeRecord!.resumeId,
+                displayName,
+              )
+              : undefined}
             onResume={() => props.onResume(props.activeRecord!.id)}
             onOpenWebPi={() => props.onOpenWebPi(props.activeRecord!.id)}
           />
@@ -133,7 +144,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
                     {...(props.label !== undefined ? { label: props.label } : {})}
-                    sessionLabel={s.title?.trim() || s.name}
+                    sessionLabel={sessionCoworkerLabel(s)}
                     headerActions={props.terminalHeaderActions}
                     chrome="canvas"
                     onSessionLost={props.onSessionLost}
@@ -191,7 +202,7 @@ function SessionLibrary(props: {
   const visibleSessions = ordered.filter((session) => {
     if (filter !== 'all' && session.state !== filter) return false;
     if (!normalizedQuery) return true;
-    return [session.title, session.name, session.agent]
+    return [session.displayName, session.title, session.name, session.agent]
       .some((value) => value?.toLocaleLowerCase().includes(normalizedQuery));
   });
 
@@ -293,7 +304,7 @@ function SessionRow(props: {
   const { t } = useTranslation();
   const record = props.record;
   const isPaused = record.state === 'paused';
-  const title = record.title?.trim() || record.name;
+  const title = sessionCoworkerLabel(record);
   const showInternalName = title !== record.name;
   return (
     <li>

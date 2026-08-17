@@ -47,34 +47,103 @@ runs in an interactive PTY or headless process.
 - a new worker, even with the same runtime in the same Workspace, receives a
   new `resumeId` and is therefore a different product Session.
 
-The current `SessionRecord.id` is a durable UI/PTY materialization record. A
-`taskId` is one headless execution. `agentSessionId` is the native CLI's private
+The current `SessionRecord.id` is a durable launcher roster and process-
+attachment key, created for headless and interactive Sessions alike. A `taskId`
+is one headless execution. `agentSessionId` is the native CLI's private
 conversation locator. None replaces `resumeId` as product identity.
 
 ```mermaid
 flowchart LR
   W["Workspace"] --> S["Product Session: resumeId"]
-  S --> T1["Interactive materialization"]
+  S --> SR["Durable SessionRecord"]
+  SR --> T1["Interactive process attachment"]
   S --> T2["Headless turn: taskId"]
   S --> A["Created artifacts"]
   S --> R["Runtime kind"]
   S -. backend mapping .-> N["Native agent session id"]
 ```
 
-In the office analogy, the Workspace is the desk and the product Session is one
-particular colleague-with-context. `pi`, `codex`, `opencode`, and `claude` are
-worker kinds, not unique colleagues.
+In the Office surface, a Workspace is one office and the product Session
+(`resumeId`) is an employee at their own desk. Files are filing cabinets in
+that office. `/office` shows every business Workspace as its own room on one
+floor; two offices sit side by side when the viewport allows. `pi`, `codex`, `opencode`, and `claude` are worker kinds, not
+unique colleagues. Identity rules are unchanged: `resumeId` is the person,
+`taskId` is one shift, and `SessionRecord.id` is the seat attachment.
+
+Ask Alice and AutoQuant list those colleagues from persistent
+`SessionRecord`s in the first Workspace payload. The Workspace Session
+Directory (`GET /api/workspaces/:id/resumes`) decorates those rows with
+identity, presence, birth, and latest-execution facts; it never invents roster
+membership. Settings → Harness controls whether a headless-born Session that
+has never opened a TUI or WebPi appears on that shared roster (default off);
+the Issue page still owns those rows. The roster shows only
+`presence=active` coworkers; Archive files them without destroying either
+their `resumeId` or Session record. Soft-delete (`presence=deleted`) is still
+that person for provenance, but follow-up is unavailable (`deleted-session`)
+and no new turn starts. A headless turn occupying that `resumeId` locks TUI
+spawn/resume and Archive; Automation continues to list dispatch records
+(`taskId`), not this roster.
+
+## Session birth metadata
+
+Product Sessions may carry an optional, immutable `metadata.createdBy` bag on
+the `ResumeIdentityRecord`. It answers how the coworker was hired, not what a
+later turn is doing:
+
+| `createdBy.kind` | Meaning |
+|---|---|
+| `interactive` | Frontend interactive spawn (`spawn` / `quick-chat` / `auto-quant` / `manager`) |
+| `issue` | Scheduled or retried Issue that recruited a fresh Session (`new-each-run` or first `new-then-resume`) |
+| `headless` | Direct async headless API dispatch without Issue/conversation wrapper |
+| `conversation` | Fresh worker from `conversation_ask` / UI inquiry / Issue comment reply |
+
+Rules:
+
+- stamped only when `ResumeRegistry.ensure` allocates a new `resumeId`;
+- first-write-wins; continue/resume never rewrites birth;
+- historical identities without metadata are unknown;
+- headless `trigger` / `inquiry` remain execution-level sources and do not
+  replace birth;
+- Session Directory projects secret-free `createdBy` for product surfaces.
+
+## Session coworker name
+
+A product Session may carry an optional, mutable `displayName` on the
+Workspace Session dossier at `.alice/sessions/<resumeId>.json`. It sits
+beside the frozen `ai` launch binding, not inside it and not on the
+launcher roster.
+
+This is the coworker's nametag:
+
+- public labels prefer `displayName`, then the native/`fallback`
+  conversation `title`, then the sticky launcher `name` (`p1`);
+- native title refresh never overwrites `displayName`;
+- changing the nametag is metadata, not Session activity, and must not update
+  recency or reorder the Session roster;
+- empty or `null` clears the field; the maximum is 120 characters after trim;
+- agents rename only through `alice-workspace session rename` or
+  `PATCH /api/workspaces/:id/resumes/:resumeId/metadata`;
+- the Ask Alice / Quant Session row overflow menu exposes **Settings** for the
+  nametag plus paused credential/model/effort editing (same dialog as the
+  paused Resume CTA); Archive stays a separate overflow action;
+- a missing field means unnamed; there is no migration;
+- `workspaces/state/resume-identities.json` hydrates the name in memory and
+  strips it on flush, the same way it treats `runtimeBinding`.
+
+Do not hand-edit the dossier JSON. One bad write can destroy the Session's
+credential, model, or effort binding.
 
 ## Layered Index
 
-OpenAlice should resolve provenance through five layers rather than treating
+OpenAlice should resolve provenance through six layers rather than treating
 every identifier as a kind of Session:
 
 | Layer | Canonical key | Meaning |
 |---|---|---|
 | Workspace | `workspaceId` | The durable desk, files, capabilities, and local context |
 | Product Session | `resumeId` | The unique stateful agent conversation and follow-up target |
-| Execution | `taskId` or `SessionRecord.id` | One headless turn or one interactive materialization |
+| Launcher roster | `SessionRecord.id` | Durable UI row and process-attachment target for one product Session |
+| Execution | `taskId` or live process | One headless turn or one interactive process incarnation |
 | Artifact | Typed business reference | Report, Inbox entry, Issue, or trade decision created by a Session |
 | Runtime transport | `(agent, agentSessionId)` | Backend-only native CLI continuation locator |
 
@@ -101,7 +170,7 @@ support activity feeds and auditing, but do not change the forward semantics.
 | `{ workspaceId, path, revision? }` | Report/document identity; revision disambiguates mutable content | Yes |
 | `taskId` / `runId` | Global id for one headless turn | Yes, as execution evidence |
 | `resumeId` | Global durable product Session id | **Yes; canonical follow-up handle** |
-| `SessionRecord.id` | Launcher-owned interactive materialization | Only where UI attachment needs it |
+| `SessionRecord.id` | Launcher-owned durable roster/attachment key | Only where UI attachment needs it |
 | `agent` | Runtime kind repeated across many Sessions | Yes, but never as unique identity |
 | `agentSessionId` | Vendor/runtime scoped native locator | No; backend only |
 | PID/live PTY | Ephemeral process incarnation | No |
@@ -134,7 +203,7 @@ interface SessionOrigin {
 - `resumeId` says **who** to ask.
 - `workspaceId` says where that Session's context lives.
 - `agent` describes the runtime kind and is useful for display/diagnostics.
-- `execution` identifies the exact headless turn or attended materialization
+- `execution` identifies the exact headless turn or attended process attachment
   that produced the occurrence.
 
 OpenAlice stamps this envelope from authoritative spawn/session context. An
@@ -194,6 +263,7 @@ type FollowUpResolution =
         | 'missing-session'
         | 'missing-native-session'
         | 'retired-session'
+        | 'deleted-session'
         | 'departed-workspace'
         | 'purged-workspace'
         | 'deleted-workspace'
@@ -297,9 +367,27 @@ Issue-file edits that bypass UI/CLI mutation routes. Such edits are attributed
 to a Session only when exactly one Session could have made them; concurrent
 edits remain explicitly unknown rather than crediting the wrong coworker.
 
+The Alice Project's Telegram phone-desk Issue uses this same comment sidecar as
+its chat transcript. Owner private-chat text arrives as a human comment with
+`via: telegram` and `origin.kind: external`. Scheduled-fire replies and Alice
+comments are projected back unless they contain `[[no-reply]]`. Connector does
+not create a second conversation object.
+
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
-delivered to that exact Session. The final assistant response is recorded as a
+delivered to that exact Session. The Input Prompt is `commentPrompt` when set,
+otherwise the historical wrapper around the comment. The final assistant response is recorded as a
 reply comment, linked by `replyTo`; delivery state stays on the source comment.
+While that delivery is `pending`, compact turn progress (semantic text blocks
+and tool status, never tool payloads) may ride on the same record so Inbox,
+Issue, and Connector can watch the turn without each parsing headless logs.
+This bounded snapshot is live transport, not durable transcript history, and
+is removed from the task record at terminal state.
+
+Issue Activity and Inbox reply threads render the same snapshot as a compact
+live timeline. The Telegram phone desk already ships sealed mid-turn `text`
+blocks from that progress; tool and error blocks stay local to the workstation
+surfaces.
+
 For a human comment without a fixed owner, OpenAlice follows the Issue creation
 provenance and uses the universal follow-up rule: continue the attributable
 creator, or recruit a reconstructed Agent in the Issue Workspace when creation
@@ -606,6 +694,15 @@ Every dispatched Workspace conversation also appends a
   guidance changed it;
 - terminal status, final assistant text, duration, and compact error.
 
+Desk occupancy and headless turn assets — Session birth, process start,
+spawn failure, stop, declined asks, plus translated text/tool/error
+blocks — are a separate append-only journal at
+`<launcherRoot>/state/agent-runtime.jsonl`. Completion keeps assistant
+text and metrics on `runtime.stopped`. It is a replay projection for
+Office, not a dispatch authority and not a prompt or tool-I/O log. TUI
+internals are not extracted yet. See
+[[docs/workspace-issues-and-scheduling.md]].
+
 The file is private launcher state (`0600` where supported), not Workspace Git
 content. It can contain complete prompts and replies and must be treated as
 sensitive local conversation history. Native runtime session ids and raw tool
@@ -653,7 +750,7 @@ No feature should invent its own meaning of “the agent who made this.”
 
 | Area | Current foundation | Phase 1 trail/index | Phase 2 collaboration |
 |---|---|---|---|
-| Product Session | `ResumeRegistry`, headless `resumeId`, interactive materialization | Standard origin projection and read-only lookup | Continue exact or create reconstructed Session |
+| Product Session | Paired `ResumeRegistry` identity + persistent `SessionRecord` roster row | Standard origin projection and read-only lookup | Continue exact or create reconstructed Session |
 | Execution | `HeadlessTaskRegistry`, `parentTaskId`, normalized output | Bind every attributable occurrence to the execution and `resumeId` | Poll/stream the peer reply and tool activity |
 | Inbox | Server-stamped run/session origin | Safe exposure and legacy/unknown classification | Ask sender or reconstruct at Workspace |
 | Issue | `{ workspaceId, issueId }`, Activity, Runs, and Inbox reports | Creator/mutation edges, structured comment threads, plus explicit Workspace/Session ownership | Comment to the fixed owner; human comments may reconstruct; explicitly ask creator or one selected run |
@@ -671,7 +768,8 @@ shapes should point back here rather than restating the rules differently.
 |---|---|
 | `src/workspaces/resume-registry.ts` | Product Session -> native runtime mapping |
 | `src/workspaces/headless-task-registry.ts` | Per-turn history and Session lineage |
-| `src/workspaces/session-registry.ts` | Interactive materializations and resume indexes |
+| `src/workspaces/session-registry.ts` | Durable product Session roster and resume indexes |
+| `src/workspaces/product-session-coordinator.ts` | Paired identity/roster birth, transition, and crash repair |
 | `src/workspaces/service.ts` | Dispatch, resume, and per-Session concurrency |
 | `src/workspaces/conversation-control.ts` | Provenance resolution plus exact/reconstructed headless dispatch |
 | `src/workspaces/agent-conversation-log.ts` | Private append-only peer-message prompt/reply event stream |

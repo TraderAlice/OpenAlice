@@ -1,5 +1,3 @@
-import { readFile, writeFile, mkdir } from 'fs/promises'
-import { dirname } from 'path'
 import {
   acquireOpenAliceRuntimeLocks,
   takeoverRequested,
@@ -10,7 +8,7 @@ import {
 // runs go through headless workspace dispatch (cron → workspace).
 import { loadConfig, readMarketDataConfig } from './core/config.js'
 import { printLegacyDataNotice } from './core/legacy-data-notice.js'
-import { dataPath, defaultPath, userDataHome } from '@/core/paths.js'
+import { userDataHome } from '@/core/paths.js'
 import { resolveLauncherRoot } from '@/workspaces/config.js'
 import type { Plugin, EngineContext } from './core/types.js'
 import { McpPlugin } from './server/mcp.js'
@@ -53,6 +51,9 @@ import { createEconomyTools } from './tool/economy.js'
 import { SessionStore } from './core/session.js'
 import { createInboxStore } from './core/inbox-store.js'
 import { startInboxConnectorBridge } from './services/connector-client/index.js'
+import { startConnectorActionBridge } from './services/connector-client/action-bridge.js'
+import { createWorkspaceConversationControl } from './workspaces/conversation-control.js'
+import { startTelegramDeskInboundPoll, telegramDeskHasRunningWork } from './workspaces/issues/telegram-desk-chat.js'
 import { ToolCenter } from './core/tool-center.js'
 import { WorkspaceToolCenter } from './core/workspace-tool-center.js'
 import { inboxPushFactory } from './tool/inbox-push.js'
@@ -66,17 +67,13 @@ import { entityUpsertFactory } from './tool/entity-upsert.js'
 import { entitySearchFactory } from './tool/entity-search.js'
 import { issueToolFactories } from './tool/issue-tools.js'
 import { sessionSignatureFactory } from './tool/session-signature.js'
+import { sessionRenameFactory } from './tool/session-rename.js'
 import { provenanceShowFactory } from './tool/provenance-show.js'
 import { conversationToolFactories } from './tool/conversation.js'
 import { artifactConversationToolFactories } from './tool/conversation-artifacts.js'
 import { createToolCallLog } from './core/tool-call-log.js'
 import { NewsCollectorStore, NewsCollector } from './domain/news/index.js'
 import { createNewsArchiveTools } from './tool/news.js'
-
-// ==================== Persistence paths ====================
-
-const PERSONA_FILE = dataPath('brain', 'persona.md')
-const PERSONA_DEFAULT = defaultPath('persona.default.md')
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 let runtimeLock: OpenAliceRuntimeLock | null = null
@@ -85,17 +82,6 @@ async function releaseRuntimeLock(): Promise<void> {
   const current = runtimeLock
   runtimeLock = null
   await current?.release()
-}
-
-/** Read a file, copying from default if it doesn't exist yet. */
-async function readWithDefault(target: string, defaultFile: string): Promise<string> {
-  try { return await readFile(target, 'utf-8') } catch { /* not found — copy default */ }
-  try {
-    const content = await readFile(defaultFile, 'utf-8')
-    await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, content)
-    return content
-  } catch { return '' }
 }
 
 async function main() {
@@ -125,6 +111,7 @@ async function main() {
   workspaceToolCenter.register(entitySearchFactory)
   for (const f of issueToolFactories) workspaceToolCenter.register(f)
   workspaceToolCenter.register(sessionSignatureFactory)
+  workspaceToolCenter.register(sessionRenameFactory)
   workspaceToolCenter.register(provenanceShowFactory)
   for (const f of conversationToolFactories) workspaceToolCenter.register(f)
   for (const f of artifactConversationToolFactories) workspaceToolCenter.register(f)
@@ -166,11 +153,6 @@ async function main() {
     unavailableReason: () => liteUnavailableReason(currentTradingModePolicy()),
     readonlyMutationReason: () => readonlyMutationReason(currentTradingModePolicy()),
   })
-
-  // ==================== Persona ====================
-  // The persona file is seeded on first run so the user has an editable
-  // override (consumed by the workspace context-injector).
-  await readWithDefault(PERSONA_FILE, PERSONA_DEFAULT)
 
   // ==================== News Collector Store ====================
 
@@ -310,6 +292,21 @@ async function main() {
   // skip (see cron listener). Created here so cron dispatch can hold it.
   const workspaceServiceRef = createWorkspaceServiceRef()
   startInboxConnectorBridge(inboxStore, () => workspaceServiceRef.current)
+  startConnectorActionBridge(inboxStore, () => workspaceServiceRef.current)
+  startTelegramDeskInboundPoll({
+    listWorkspaces: () => workspaceServiceRef.current?.registry.list() ?? [],
+    getWorkspace: (id) => workspaceServiceRef.current?.registry.get(id),
+    provenanceStore: () => workspaceServiceRef.current?.provenanceStore,
+    conversation: () => {
+      const service = workspaceServiceRef.current
+      return service ? createWorkspaceConversationControl(service) : undefined
+    },
+    deskGenerating: (desk) => {
+      const service = workspaceServiceRef.current
+      if (!service) return false
+      return telegramDeskHasRunningWork(service.headlessTasks.list({ status: 'running' }), desk)
+    },
+  })
 
   // Snapshot scheduler lives in UTA after Step 6 — Alice no longer
   // drives the periodic equity-curve writes. The UTA service starts

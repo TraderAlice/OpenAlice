@@ -181,12 +181,80 @@ describe('updateIssueFields', () => {
     expect(issue?.what).toBe('keep the fire prompt')
   })
 
+  it('stores a commentPrompt override and can clear it', async () => {
+    await createIssue(dir, { id: 'talk', title: 'Talk', what: 'desc', commentPrompt: '{comment}' })
+    const stored = await readBack('talk')
+    expect(stored.issue?.commentPrompt).toBe('{comment}')
+
+    const cleared = await updateIssueFields(dir, 'talk', { commentPrompt: null })
+    expect(cleared.ok).toBe(true)
+    if (!cleared.ok) return
+    expect(cleared.issue.commentPrompt).toBeUndefined()
+    expect((await readBack('talk')).issue?.commentPrompt).toBeUndefined()
+  })
+
   it('clears an issue agent override with null', async () => {
     await createIssue(dir, { id: 'agent-clear', title: 'T', agent: 'claude' })
     const res = await updateIssueFields(dir, 'agent-clear', { agent: null })
     expect(res.ok).toBe(true)
     const { issue } = await readBack('agent-clear')
     expect(issue?.agent).toBeUndefined()
+  })
+
+  it('sets and clears an optional scheduled-run timeout', async () => {
+    await createIssue(dir, {
+      id: 'budget',
+      title: 'Budget',
+      when: { kind: 'every', every: '15m' },
+      timeout: '45m',
+    })
+    let { issue } = await readBack('budget')
+    expect(issue?.timeout).toBe('45m')
+
+    const cleared = await updateIssueFields(dir, 'budget', { timeout: null })
+    expect(cleared.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBeUndefined()
+
+    const set = await updateIssueFields(dir, 'budget', { timeout: '15m' })
+    expect(set.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBe('15m')
+  })
+
+  it('toggles cron catchUp without rewriting the rest of when', async () => {
+    await createIssue(dir, {
+      id: 'morning',
+      title: 'Morning',
+      when: { kind: 'cron', cron: '0 9 * * *', timezone: 'America/New_York' },
+    })
+    const off = await updateIssueFields(dir, 'morning', { catchUp: false })
+    expect(off.ok).toBe(true)
+    let { issue } = await readBack('morning')
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+      catchUp: false,
+    })
+
+    const on = await updateIssueFields(dir, 'morning', { catchUp: true })
+    expect(on.ok).toBe(true)
+    ;({ issue } = await readBack('morning'))
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+    })
+
+    const every = await createIssue(dir, {
+      id: 'heartbeat',
+      title: 'Heartbeat',
+      when: { kind: 'every', every: '4h' },
+    })
+    expect(every.ok).toBe(true)
+    const refused = await updateIssueFields(dir, 'heartbeat', { catchUp: false })
+    expect(refused).toMatchObject({ ok: false, reason: 'invalid' })
   })
 
   it('switches atomically between vault access, native login, and inheritance', async () => {
@@ -220,6 +288,7 @@ describe('updateIssueFields', () => {
       credential: 'openai-primary',
       model: 'gpt-5.6',
       effort: 'high',
+      timeout: '30m',
     })
     const res = await updateIssueFields(dir, 'owned', {
       assignee: '@resume-kind-owl-abc123',
@@ -232,6 +301,7 @@ describe('updateIssueFields', () => {
     expect(issue?.credentialSource).toBeUndefined()
     expect(issue?.model).toBeUndefined()
     expect(issue?.effort).toBeUndefined()
+    expect(issue?.timeout).toBe('30m')
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
   })
 

@@ -24,7 +24,8 @@ export async function main(
 Open the local OpenAlice Supervisor TUI. Detaching never stops the Runtime.
 
 Options:
-  --instance <name>  Select a named complete-home instance
+  --project <key>    Select an AliceProject
+  --instance <key>   Deprecated alias for --project
   --home <path>      Override the selected complete home
   --port <port>      Runtime Web port for a start/restart
   --app-dir <path>   Source Runtime checkout

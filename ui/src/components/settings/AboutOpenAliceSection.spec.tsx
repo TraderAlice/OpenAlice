@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 const mocks = vi.hoisted(() => ({
   getVersion: vi.fn(),
   checkVersion: vi.fn(),
+  getAliceProject: vi.fn(),
 }))
 
 vi.mock('../../api', () => ({
@@ -13,6 +14,9 @@ vi.mock('../../api', () => ({
     version: {
       get: mocks.getVersion,
       check: mocks.checkVersion,
+    },
+    aliceProject: {
+      get: mocks.getAliceProject,
     },
   },
 }))
@@ -31,6 +35,14 @@ const currentVersion = {
   error: null,
 }
 
+const currentProject = {
+  id: 'alice-project-test',
+  key: 'research',
+  displayName: 'Research AliceProject',
+  home: '/tmp/openalice-research',
+  appRoot: '/tmp/openalice-app',
+}
+
 beforeAll(async () => {
   await i18n.changeLanguage('en')
 })
@@ -38,6 +50,7 @@ beforeAll(async () => {
 beforeEach(() => {
   mocks.getVersion.mockResolvedValue(currentVersion)
   mocks.checkVersion.mockResolvedValue(currentVersion)
+  mocks.getAliceProject.mockResolvedValue({ project: currentProject })
 })
 
 afterEach(() => {
@@ -53,6 +66,9 @@ describe('AboutOpenAliceSection', () => {
     expect(await screen.findByText('v0.82.0-beta')).toBeTruthy()
     expect(screen.getByText('You’re up to date.')).toBeTruthy()
     expect(screen.getByText('Browser / server')).toBeTruthy()
+    expect(await screen.findByText('Research AliceProject')).toBeTruthy()
+    expect(screen.getByText('/tmp/openalice-research')).toBeTruthy()
+    expect(screen.getByText('alice-project-test')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Check for updates' }).className).toContain('min-h-10')
     expect(screen.getByRole('button', { name: 'View releases' }).className).toContain('min-h-10')
 

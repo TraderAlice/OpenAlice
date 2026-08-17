@@ -103,13 +103,13 @@ export interface TemplateMeta {
    *                   surface. The launcher injects NO MCP into workspaces;
    *                   `false` = a template that ships its own tool docs
    *                   (e.g. auto-quant).
-   *   injectPersona — compose Alice persona + this template's instruction.md
-   *                   into CLAUDE.md / AGENTS.md
+   *   injectInstructions — copy this template's instruction.md into
+   *                        CLAUDE.md / AGENTS.md
    *   bundledSkills — names under `default/skills/` to copy into the
    *                   workspace's `.claude/skills` + `.agents/skills`
    */
   readonly injectTools: boolean;
-  readonly injectPersona: boolean;
+  readonly injectInstructions: boolean;
   readonly bundledSkills: readonly string[];
   /**
    * Optional immutable upstream-source catalog. This is deliberately separate
@@ -120,7 +120,7 @@ export interface TemplateMeta {
   readonly source?: TemplateSourceCatalog;
   /**
    * Opt-in lifecycle policy for merging launcher-managed assets into older
-   * Workspaces. `managed-context` means README/persona/skill files can use the
+   * Workspaces. `managed-context` means README/instruction/skill files can use the
    * three-way Template Upgrade flow. Absence deliberately means recreate or
    * migrate with template-specific tooling; bootstrap output is never guessed
    * to be safely mergeable.
@@ -193,7 +193,7 @@ export class TemplateRegistry {
         version,
         defaultAgents: tplMeta.defaultAgents,
         injectTools: tplMeta.injectTools,
-        injectPersona: tplMeta.injectPersona,
+        injectInstructions: tplMeta.injectInstructions,
         bundledSkills: tplMeta.bundledSkills,
         ...(tplMeta.source !== undefined ? { source: tplMeta.source } : {}),
         ...(tplMeta.upgradeStrategy !== undefined
@@ -245,7 +245,7 @@ interface ParsedTemplateMeta {
   readonly community?: boolean;
   readonly defaultAgents: readonly string[];
   readonly injectTools: boolean;
-  readonly injectPersona: boolean;
+  readonly injectInstructions: boolean;
   readonly bundledSkills: readonly string[];
   readonly source?: TemplateSourceCatalog;
   readonly upgradeStrategy?: 'managed-context';
@@ -302,7 +302,7 @@ function extractVersion(raw: string): string {
 
 async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
   const fallback: ParsedTemplateMeta = {
-    defaultAgents: ['claude'], injectTools: false, injectPersona: false, bundledSkills: [],
+    defaultAgents: ['claude'], injectTools: false, injectInstructions: false, bundledSkills: [],
   };
   try {
     if (!statSync(path).isFile()) return fallback;
@@ -325,7 +325,12 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
       ? obj['defaultAgents'].filter((a): a is string => typeof a === 'string')
       : null;
     const injectTools = obj['injectTools'] === true;
-    const injectPersona = obj['injectPersona'] === true;
+    // `injectPersona` shipped in 0.89.3-beta as the old manifest spelling.
+    // Keep that spelling as a narrow parser alias for released third-party
+    // templates, but map it only to the template-owned instruction copy. It
+    // must never resurrect the retired installation-wide Persona layer.
+    const injectInstructions =
+      obj['injectInstructions'] === true || obj['injectPersona'] === true;
     // Skill names become directory names under `.claude/skills/` — reject any
     // with path separators / traversal as a defensive measure.
     const bundledSkills = Array.isArray(obj['bundledSkills'])
@@ -345,7 +350,7 @@ async function readTemplateMeta(path: string): Promise<ParsedTemplateMeta> {
       ...(community !== undefined ? { community } : {}),
       defaultAgents: defaultAgents && defaultAgents.length > 0 ? defaultAgents : ['claude'],
       injectTools,
-      injectPersona,
+      injectInstructions,
       bundledSkills,
       ...(source !== undefined ? { source } : {}),
       ...(upgradeStrategy !== undefined ? { upgradeStrategy } : {}),

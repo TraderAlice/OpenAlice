@@ -4,10 +4,12 @@ import {
   agentWireShapes,
   anthropicAuthModeForBaseUrl,
   baseUrlToVendor,
+  credentialMatchesQuery,
   describeModelSemantics,
   pickAgentWire,
   presetModel,
   savedCredentialModel,
+  vendorLabel,
 } from './presetHelpers'
 import type { Preset } from '../api'
 import type { AgentInfo } from '../components/workspace/api'
@@ -116,11 +118,37 @@ describe('provider inference', () => {
     expect(baseUrlToVendor('https://generativelanguage.googleapis.com/v1beta')).toBe('google')
   })
 
+  it('recognizes the official xAI endpoint', () => {
+    expect(baseUrlToVendor('https://api.x.ai/v1')).toBe('xai')
+  })
+
+  it('recognizes the OpenRouter gateway', () => {
+    expect(baseUrlToVendor('https://openrouter.ai/api/v1')).toBe('openrouter')
+    expect(baseUrlToVendor('https://openrouter.ai/api')).toBe('openrouter')
+  })
+
   it('keeps UI Anthropic auth inference aligned with the backend', () => {
     expect(anthropicAuthModeForBaseUrl('https://api.minimaxi.com/anthropic')).toBe('bearer')
     expect(anthropicAuthModeForBaseUrl('https://api.minimax.io/anthropic')).toBe('bearer')
     expect(anthropicAuthModeForBaseUrl('https://api.longcat.chat/anthropic')).toBe('bearer')
+    expect(anthropicAuthModeForBaseUrl('https://openrouter.ai/api')).toBe('bearer')
     expect(anthropicAuthModeForBaseUrl('https://api.anthropic.com')).toBe('x-api-key')
+  })
+})
+
+describe('vault catalog helpers', () => {
+  it('matches vault rows by nickname, vendor label, slug, or remembered model', () => {
+    const cred = {
+      slug: 'openrouter-1',
+      vendor: 'openrouter',
+      label: 'Work key',
+      lastModel: 'anthropic/claude-sonnet-5',
+    }
+    expect(vendorLabel('openrouter')).toBe('OpenRouter')
+    expect(credentialMatchesQuery(cred, 'openrouter')).toBe(true)
+    expect(credentialMatchesQuery(cred, 'work')).toBe(true)
+    expect(credentialMatchesQuery(cred, 'sonnet')).toBe(true)
+    expect(credentialMatchesQuery(cred, 'minimax')).toBe(false)
   })
 })
 

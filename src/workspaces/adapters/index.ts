@@ -1,6 +1,10 @@
 import { AdapterRegistry } from '../cli-adapter.js';
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { agyAdapter } from './agy.js';
+import { cursorAdapter } from './cursor.js';
+import { grokAdapter } from './grok.js';
+import { ompAdapter } from './omp.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 import { shellAdapter } from './shell.js';
@@ -13,6 +17,10 @@ import { shellAdapter } from './shell.js';
 export const BUILTIN_ADAPTERS = [
   claudeAdapter,
   codexAdapter,
+  cursorAdapter,
+  agyAdapter,
+  grokAdapter,
+  ompAdapter,
   opencodeAdapter,
   piAdapter,
   shellAdapter,

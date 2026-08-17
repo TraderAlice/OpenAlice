@@ -5,6 +5,7 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
+[[docs/alice-project.md]],
 [[docs/model-semantics-and-runtime-injection.md]],
 [[docs/cli-installer.md]], [[docs/local-runtime.md]], [[docs/broker-packs.md]],
 [[docs/data-locations.md]],
@@ -16,6 +17,13 @@ Related guides: [[docs/managed-workspace-runtime.md]],
 
 ## Runtime Topology
 
+The top-level product unit is an **AliceProject**. One AliceProject owns one
+complete `OPENALICE_HOME`, one Guardian tree, one Alice backend, and one
+logical frontend endpoint. Browser windows attach to that endpoint; they are
+not additional backend instances. Multiple AliceProjects run concurrently by
+using separate complete homes. See [[docs/alice-project.md]] for identity,
+registry, discovery, and lifecycle semantics.
+
 OpenAlice has two principal long-running service processes plus an optional
 Connector Service supervised by Guardian:
 
@@ -24,7 +32,7 @@ Guardian
 ├── built Runtime control    versioned status + self-owned Server stop
 ├── Alice                    Workspace runtime + product/API process
 │   ├── Web UI transport     HTTP/Vite in dev, app:// + IPC in Electron
-│   ├── Workspace PTYs       claude / codex / opencode / pi / shell
+│   ├── Workspace PTYs       claude / codex / cursor-agent / agy / grok / omp / opencode / pi / shell
 │   ├── ToolCenter           market, news, analysis, Inbox, UTA bridges
 │   └── file-backed state    config, sessions, issues, schedules, tool-call log
 ├── UTA                      broker carrier and trading authority
@@ -68,7 +76,7 @@ src/                           Alice process
 ├── tool/                      agent-facing tool definitions and bridges
 ├── workspaces/                launcher, PTYs, templates, adapters, issues,
 │   │                          schedules, CLI shims, file/git operations
-│   ├── adapters/              claude / codex / opencode / pi / shell
+│   ├── adapters/              claude / codex / cursor / agy / grok / omp / opencode / pi / shell
 │   ├── cli/                   alice, alice-uta, alice-workspace, traderhub
 │   └── templates/             built-in Chat and pinned AutoQuant V2 Harnesses
 ├── services/
@@ -124,10 +132,15 @@ Chat uses that boundary deliberately:
 
 - **New conversation** creates a Session inside the recent Chat Workspace.
 - **New Workspace** explicitly creates a new durable context container.
+- A new Alice Project with no Chat Workspace first shows **Initialize Ask
+  Alice**, the same setup chrome as AutoQuant, without a pinned Harness
+  version. Initialize creates the stable starter workspace at the latest Chat
+  Harness, then the composer appears.
 - The global Ask Alice composer stores `quickChat.recentChatWorkspaceId` in
   `data/preferences.json`. A missing or stale pointer falls back to the most
   recently active Chat Workspace; only a user with no Chat Workspace gets a
-  new stable starter workspace.
+  new stable starter workspace (from that setup page, or as a fallback on
+  first send).
 - Chat navigation treats a Workspace as a potentially large conversation
   container. Its sidebar disclosure is a bounded recent/running preview; the
   Workspace page is the searchable, lifecycle-filtered catalog for the full
@@ -198,18 +211,20 @@ provenance link:
   identify the same stateful Session by this id.
 - `taskId` identifies one headless execution. Every follow-up turn gets a new
   task id, so run history remains append-only.
-- `SessionRecord.id` is Alice's durable interactive materialization key. Tabs,
-  PTY attachment, and pause/resume routes use it; it is not Session identity.
+- `SessionRecord.id` is Alice's durable launcher-owned roster/attachment key.
+  Every non-purged product Session receives one at the same birth boundary as
+  its `resumeId`; tabs, process attachment, and pause/resume routes use it, but
+  it is not the product Session identity.
 - `agentSessionId` is the backend-only native CLI conversation id. The
   `ResumeRegistry` maps `resumeId` to this adapter-specific value; it must not
   appear in frontend resume requests or Inbox provenance.
-- `sourceRunId` is present when a finished headless run has been materialized
-  as an interactive Session and preserves execution provenance.
+- `sourceRunId` preserves the first associated headless execution provenance.
 
-Do not use a headless task id directly as a PTY/session id, and do not create a
-new interactive materialization every time the same `resumeId` is opened. The
-run is execution provenance; `resumeId` is the product Session; the
-`SessionRecord` is one durable interactive surface.
+Do not use a headless task id directly as a roster or process-attachment id,
+and do not create another `SessionRecord` when the same `resumeId` changes
+between headless, terminal, and WebPi execution. The run is execution
+provenance; `resumeId` is the product identity; `SessionRecord` is its one
+durable launcher-owned roster record.
 
 For the broader “ask the agent who produced this” model — including mutable
 Issues, Inbox deliveries, document revisions, reconstruction fallback, and
@@ -226,7 +241,8 @@ Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
 project skills are copied to `.agents/skills/` and Claude-specific discovery to
 `.claude/skills/`. Managed Session provider/model/effort selection comes from
-`.alice/settings.json`, is frozen into `.alice/sessions/<resumeId>.json`, and
+`.alice/settings.json`, is frozen into `.alice/sessions/<resumeId>.json` as
+the `ai` object (a sibling `displayName` may name the coworker), and
 is projected into the child process by the adapter. Pi's deprecated native-config export
 registers an OpenAlice-managed provider through the Workspace-local
 `.pi/extensions/openalice-provider.ts` and selects it through `.pi/settings.json`;
@@ -283,9 +299,10 @@ issue/schedule -> headless Workspace run -> native agent -> inbox_push -> Inbox
 
 Inbox is the durable agent-to-user delivery surface. Agents publish reports or
 status by calling the injected `inbox_push` capability. Alice stamps the
-interactive Session or headless run identity out-of-band. The user can return
-to the exact originating interactive Session; a finished headless run is
-materialized once and then reused as a normal Session for follow-up.
+product Session and exact execution identity out-of-band. The user can return
+to the exact originating Session regardless of whether its first turn was
+headless or interactive; opening TUI/WebPi attaches a process to the existing
+durable Session record.
 
 ## Persistent State
 

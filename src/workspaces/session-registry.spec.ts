@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   SessionRegistry,
+  sessionCoworkerLabel,
   sessionDisplayTitle,
   type SessionRecord,
 } from './session-registry.js'
@@ -58,10 +59,15 @@ describe('SessionRegistry persistence', () => {
     }))
     await reg.create(rec({
       id: 'claude-clear-copper-harbor',
+      resumeId: 'resume-clear-copper-harbor-d4e5f6',
       name: 'c2',
       fallbackTitle: '解释一下美债收益率曲线倒挂',
     }))
-    await reg.create(rec({ id: 'claude-quiet-silver-meadow', name: 'c3' })) // unseeded — no title
+    await reg.create(rec({
+      id: 'claude-quiet-silver-meadow',
+      resumeId: 'resume-quiet-silver-meadow-g7h8i9',
+      name: 'c3',
+    })) // unseeded — no title
 
     // A fresh instance over the same dir = a server restart.
     const reloaded = await SessionRegistry.load(root, noopLogger)
@@ -100,6 +106,8 @@ describe('SessionRegistry persistence', () => {
 
     await reg.update(WS, loaded.id, { title: 'Native runtime title' })
     expect(sessionDisplayTitle(reg.get(WS, loaded.id)!)).toBe('Native runtime title')
+    expect(sessionCoworkerLabel(reg.get(WS, loaded.id)!, 'AAPL desk')).toBe('AAPL desk')
+    expect(sessionCoworkerLabel(reg.get(WS, loaded.id)!, '  ')).toBe('Native runtime title')
   })
 
   // The exact path the user hit: a reload both flips orphaned running→paused
@@ -144,6 +152,7 @@ describe('SessionRegistry persistence', () => {
       agent: 'codex',
       name: 'x1',
       sourceRunId: 'run-2026-07-11',
+      surface: 'headless',
       resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
     }))
 
@@ -155,5 +164,30 @@ describe('SessionRegistry persistence', () => {
       sourceRunId: 'run-2026-07-11',
       resumeHint: { kind: 'agent-session-id', value: '019eb75e-0b1b-7fa2' },
     })
+  })
+
+  it('rejects a second roster row for the same resume identity', async () => {
+    const reg = await SessionRegistry.load(root, noopLogger)
+    await reg.create(rec())
+
+    await expect(reg.create(rec({
+      id: 'claude-second-row',
+      name: 'c2',
+    }))).rejects.toThrow('already exists for resume identity')
+  })
+
+  it('rejects duplicate resume identities while loading a persisted file', async () => {
+    const sessionsDir = join(root, 'sessions')
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(join(sessionsDir, `${WS}.json`), JSON.stringify({
+      version: 4,
+      records: [
+        rec({ state: 'paused' }),
+        rec({ id: 'claude-second-row', name: 'c2', state: 'paused' }),
+      ],
+    }))
+
+    await expect(SessionRegistry.load(root, noopLogger))
+      .rejects.toThrow('duplicate resume identity')
   })
 })

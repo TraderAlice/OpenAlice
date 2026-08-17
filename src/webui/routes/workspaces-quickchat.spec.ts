@@ -102,13 +102,29 @@ function build(opts: {
     list: () => opts.workspaces ?? [],
     get: (id: string) => (opts.workspaces ?? []).find((w) => w.id === id) ?? (id === META.id ? META : undefined),
   };
+  const sessionRecords = new Map<string, any>(
+    Object.entries(opts.sessionsByWorkspace ?? {}).flatMap(([wsId, rows]) =>
+      rows.map((row) => [`${wsId}:${row.id}`, row] as const)),
+  );
+  const sessionsFor = (wsId: string) => [...sessionRecords.entries()]
+    .filter(([key]) => key.startsWith(`${wsId}:`))
+    .map(([, row]) => row);
   const sessionRegistry = {
     ensureLoaded: vi.fn(async () => {}),
-    listFor: vi.fn((wsId: string) => opts.sessionsByWorkspace?.[wsId] ?? []),
-    findById: vi.fn(() => undefined),
+    listFor: vi.fn(sessionsFor),
+    findById: vi.fn((id: string) => [...sessionRecords.values()].find((row) => row.id === id)),
+    findByResumeId: vi.fn((wsId: string, resumeId: string) =>
+      sessionsFor(wsId).find((row) => row.resumeId === resumeId)),
+    get: vi.fn((wsId: string, id: string) => sessionRecords.get(`${wsId}:${id}`)),
     nextName: () => 'o1',
-    create: vi.fn(async () => {}),
-    remove: vi.fn(async () => {}),
+    create: vi.fn(async (record: any) => { sessionRecords.set(`${record.wsId}:${record.id}`, record); }),
+    update: vi.fn(async (wsId: string, id: string, patch: any) => {
+      const record = sessionRecords.get(`${wsId}:${id}`);
+      if (!record) return undefined;
+      Object.assign(record, patch);
+      return record;
+    }),
+    remove: vi.fn(async (wsId: string, id: string) => sessionRecords.delete(`${wsId}:${id}`)),
   };
   const resumeRecords = new Map<string, any>();
   const resumeRegistry = {
@@ -117,6 +133,41 @@ function build(opts: {
       const resumeId = input.resumeId ?? `resume-${resumeRecords.size + 1}`;
       const record = { resumeId, ...input };
       resumeRecords.set(resumeId, record);
+      return record;
+    }),
+  };
+  const sessionCoordinator = {
+    ensure: vi.fn(async (input: any) => {
+      const identity = await resumeRegistry.ensure(input);
+      const existing = sessionRegistry.findByResumeId(input.wsId, identity.resumeId);
+      if (existing) {
+        Object.assign(existing, {
+          state: input.state ?? existing.state,
+          surface: input.surface ?? existing.surface,
+        });
+        return { identity, session: existing, created: false };
+      }
+      const now = '2026-07-12T00:00:00.000Z';
+      const record = {
+        id: `${input.agent}-test-${resumeRecords.size}`,
+        resumeId: identity.resumeId,
+        wsId: input.wsId,
+        agent: input.agent,
+        name: sessionRegistry.nextName(),
+        createdAt: now,
+        lastActiveAt: now,
+        state: input.state ?? 'paused',
+        surface: input.surface ?? 'headless',
+        ...(input.fallbackTitle ? { fallbackTitle: input.fallbackTitle } : {}),
+        ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+      };
+      await sessionRegistry.create(record);
+      return { identity, session: record, created: true };
+    }),
+    transition: vi.fn(async (input: any) => {
+      const record = sessionRegistry.findByResumeId(input.wsId, input.resumeId);
+      if (!record) throw new Error('missing test SessionRecord');
+      Object.assign(record, { state: input.state, surface: input.surface });
       return record;
     }),
   };
@@ -149,6 +200,7 @@ function build(opts: {
     },
     sessionRegistry,
     resumeRegistry,
+    sessionCoordinator,
     pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
     publicMeta: vi.fn(async (workspace: any) => workspace),
     config: { launcherRepoRoot: '/repo' },
@@ -770,6 +822,36 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     expect(r.body.error).toBe('auto_quant_not_initialized');
     expect(creator.create).not.toHaveBeenCalled();
     expect(rememberRecentChatWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('initializes the first Chat workspace without pinning a Harness version', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'chat', template: 'chat' });
+    expect(creator.create).toHaveBeenCalledWith('chat', 'chat');
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('reuses an existing Chat workspace instead of creating another', async () => {
+    const existing = {
+      id: 'chat-existing',
+      dir: '/chat',
+      template: 'chat',
+      tag: 'chat',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, rememberRecentChatWorkspace } = build({ workspaces: [existing] });
+
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      workspace: { id: 'chat-existing', template: 'chat' },
+    });
+    expect(creator.create).not.toHaveBeenCalled();
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('chat-existing');
   });
 
   it('initializes the first AutoQuant Workspace and stores it as the default', async () => {

@@ -54,6 +54,9 @@ export interface HeadlessTaskRecord {
   signal?: string | null
   killed?: boolean
   error?: string
+  /** Positive watchdog budget, `null` for an explicitly unlimited new run,
+   * absent only on historical records. */
+  timeoutMs?: number | null
   /** Backend has resolved this product identity to a native runtime session. */
   resumable: boolean
   output?: {
@@ -63,6 +66,22 @@ export interface HeadlessTaskRecord {
     toolCalls: number
     toolFailures: number
   }
+  /** Compact live timeline for comment/inquiry consumers. */
+  progress?: HeadlessTurnProgress
+}
+
+export type HeadlessProgressToolStatus = 'running' | 'completed' | 'failed'
+
+export type HeadlessProgressBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool'; id: string; name: string; status: HeadlessProgressToolStatus }
+  | { type: 'error'; message: string }
+
+export interface HeadlessTurnProgress {
+  updatedAt: number
+  assistantText: string | null
+  blocks: HeadlessProgressBlock[]
+  metrics: { textBlocks: number; toolCalls: number; toolFailures: number }
 }
 
 export type HeadlessToolStatus = 'running' | 'completed' | 'failed'

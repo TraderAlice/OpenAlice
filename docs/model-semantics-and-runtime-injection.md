@@ -3,7 +3,7 @@
 This guide owns the boundary between AI resource credentials, model semantics,
 Workspace model selection, and native Agent runtime launch projection. Read it
 before changing provider presets, Workspace runtime defaults, model capability
-fields, or the Claude Code, Codex, opencode, and Pi adapters.
+fields, or the Claude Code, Codex, Cursor Agent, Grok Build, Oh My Pi, opencode, and Pi adapters.
 
 Related guides: [[docs/project-structure.md]] and
 [[docs/managed-workspace-runtime.md]].
@@ -23,7 +23,7 @@ Model selection and semantic resolution
                          │
                          ▼
 Per-process runtime projection
-  Claude Code / Codex / opencode / Pi argv + env for one immutable Session binding
+  Claude Code / Codex / Cursor Agent / opencode / Oh My Pi / Pi argv + env for one immutable Session binding
 ```
 
 ### Credential access
@@ -31,6 +31,19 @@ Per-process runtime projection
 A credential answers **how the user may reach an AI resource**. It owns the
 secret, authentication kind, vendor identity, and the wire-shape-to-endpoint
 map accepted by that key. It does not own a model's capabilities.
+
+OpenRouter is a third-party gateway credential, not a first-party model
+vendor. One key declares three wires: OpenAI Chat and Responses at
+`https://openrouter.ai/api/v1`, and Anthropic Messages at
+`https://openrouter.ai/api` (no `/v1`; the Anthropic SDK appends
+`/v1/messages`). The Anthropic skin uses Bearer auth
+(`ANTHROPIC_AUTH_TOKEN`). Suggested model IDs are OpenRouter slugs
+(`provider/model`); any other catalog ID may be pasted. The current coding
+default is `openai/gpt-5.6-luna`. The suggestion list also includes
+OpenRouter's current top-weekly text models (`deepseek/deepseek-v4-flash-0731`,
+`tencent/hy3`, `openai/gpt-5.6-luna`, `z-ai/glm-5.2`, `xiaomi/mimo-v2.5`).
+Existing Custom credentials that already point at `openrouter.ai` keep
+working as `custom`.
 
 `Credential.lastModel` is a remembered selection hint. It saves the user from
 retyping the last model used with an account, but it does not make the model an
@@ -70,12 +83,40 @@ runtime's native launch interface:
 - Pi provider/model registration plus `--model` and `--thinking`;
 - opencode provider/model environment plus `--model` and `--variant`;
 - Claude Code endpoint/auth environment plus `--model` and `--effort`;
+- Cursor Agent native authentication or a Cursor provider credential projected
+  as `CURSOR_API_KEY`, plus `--model` only (live CLI rejects
+  `id[effort=…]`; catalog ids already
+  encode effort as suffixes such as `gpt-5.2-low`);
+- Antigravity native authentication or an optional Gemini key projected as
+  `GEMINI_API_KEY` (and `GOOGLE_GEMINI_BASE_URL` only for a custom host), plus
+  `--model` and `--effort low|medium|high`. `GEMINI_API_KEY` alone has no
+  effect unless the user already set `modelProvider: "gemini"` in
+  `~/.gemini/antigravity-cli/settings.json`; Alice does not write that file.
+  Alice launches PATH `agy` only — never `antigravity` or `gemini`;
+- Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
+  and `--effort`;
+- Oh My Pi provider env plus `--model` and `--thinking`;
 - Codex provider arguments/environment plus `--model` and
   `model_reasoning_effort` configuration arguments.
 
 Writing the same values into native project files is a deprecated compatibility
 export for users who intentionally start the CLI outside OpenAlice. It is not a
-managed Session default, readiness gate, or launch-time fallback.
+managed Session default, readiness gate, or launch-time fallback. Grok Build
+has no workspace-local project file, so it has no `writeAiConfig` export:
+vault keys enter the child as `XAI_API_KEY` (and `GROK_MODELS_BASE_URL` only
+for a custom host). Headless stdout is Grok 1.0.4 flattened `streaming-json`,
+not ACP-wrapped `session/update`. Cursor Agent likewise has no workspace-local
+project file. It authenticates through its own login when a Session selects
+native access. A Cursor Dashboard key uses the same provider credential schema
+as every other vault entry, with vendor `cursor`; the adapter consumes that
+provider directly as `CURSOR_API_KEY` rather than pretending it speaks an
+OpenAI wire. Arbitrary OpenAI-compatible keys are not Cursor Dashboard
+credentials and are never projected into the child. Alice launches PATH
+`cursor-agent` only — never the
+colliding `agent` name Grok's installer also claims. Headless stdout is
+documented `stream-json` (`system/init` carries `session_id`). Live print
+mode also emits `thinking` delta/completed events; Alice extractors ignore
+them. Do not pass `--stream-partial-output`.
 
 Claude Code managed-Vault launches select only the `project` settings source
 before projecting the Session's endpoint, credential, model, and effort. Claude
@@ -117,6 +158,24 @@ resolved value:
 - Pi: project `defaultThinkingLevel` (`none` maps to Pi's native `off`);
 - opencode: model-level `options` in the provider SDK's native shape;
 - Claude Code: project `effortLevel` (only values Claude can persist);
+- Cursor Agent: `--model <id>` only. Live `2026.08.11-e8db854` treats
+  `id[effort=…]` as an unknown model name even though help still documents
+  brackets. Do not invent `--effort` or rewrite ids. Issue / launch
+  suggestions are the first-party Cursor Models pool plus `auto`
+  (`src/workspaces/adapters/cursor-models.ts`); third-party ids stay
+  free-typed. Effort and Fast are suffixes on the CLI id
+  (`cursor-grok-4.6-high-fast`), not a separate picker;
+- Antigravity: `--model <slug>` plus `--effort low|medium|high`. `agy models`
+  is filtered by auth type and billing tier — a free Gemini API key returns
+  raw API ids; an Antigravity account returns effort-suffixed slugs. Do not
+  invent a suffix mapper. Issue / launch suggestions are the union of those
+  Gemini pools (`src/workspaces/adapters/agy-models.ts`); Claude and other
+  third-party ids stay free-typed. `ultra` / `xhigh` / `max` / `none` /
+  `minimal` are rejected. Headless stdout is documented `stream-json`
+  (`init` carries `conversation_id`). Resume is `--conversation` /
+  `--continue`, not `--resume`. Bind the prompt with `-p <prompt>`; do not
+  use a `--` terminator;
+- Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
 - Codex: project `model_reasoning_effort`.
 
 ### Workspace settings and durable Session bindings
@@ -135,15 +194,20 @@ The 0.89.2-beta baseline accepts only the current version 3 interactive/headless
 shape; the unreleased version 1/2 development formats are intentionally not a
 permanent dual-read or migration boundary. Remembered values never become fixed
 defaults merely because an older development build stored them.
-Vault choices store only the credential slug and wire shape; keys and resolved
-provider payloads never enter the Workspace file.
+Vault choices store only the credential slug and, when the provider uses a
+model API protocol, its wire shape. Runtime-direct provider credentials such as
+Cursor omit the inapplicable wire shape. Keys and resolved provider payloads
+never enter the Workspace file.
 
 A fresh Session resolves that surface/Agent preference together with any
 explicit credential, model, or effort choice into one immutable, secret-free
 `SessionRuntimeBinding` owned by its `resumeId`. It is written to
-`.alice/sessions/<resumeId>.json` in the owning Workspace. The global resume
-registry stores identity, lifecycle, and native-session mapping only; it
-hydrates the binding from the Workspace file when Alice starts. The binding is
+`.alice/sessions/<resumeId>.json` in the owning Workspace, as the `ai`
+object. An optional sibling `displayName` is the mutable coworker nametag
+and is not part of this binding. The global resume registry stores identity,
+lifecycle, and native-session mapping only; it hydrates the binding and
+nametag from the Workspace file when Alice starts and never flushes either
+into `resume-identities.json`. The binding is
 then projected on every launch of that Session:
 interactive TUI, structured Web surface, headless Issue turn, and exact resume.
 It is not a headless-only override.
@@ -167,6 +231,9 @@ defaults must resolve to a headless-capable Agent.
 |---|---|---|
 | Claude Code | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, credential env |
 | Codex | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `-c model_reasoning_effort=...`, provider projection |
+| Cursor Agent | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`; native login or Cursor provider credential projected as `CURSOR_API_KEY` |
+| Grok Build | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--effort`, `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` |
+| Oh My Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider env |
 | opencode | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--variant`, provider projection |
 | Pi | `.alice/settings.json` interactive/headless fixed then recent tuple | `--model`, `--thinking`, provider projection |
 
@@ -184,8 +251,14 @@ Session binding when its owner is `@new-then-resume` or `@new-each-run`.
 `credential` is
 only an OpenAlice-vault slug. Omitting both inherits the Workspace headless
 tuple. Neither form ever contains a key or endpoint. Once an exact
-`@resumeId` exists, those fields cannot replace its credential source, model, or
-effort. Follow-up turns replay the stored binding instead of consulting newly
+`@resumeId` exists, Issue frontmatter cannot replace its credential source,
+model, or effort. The Issue page and paused Session settings may still replace
+those three dimensions on the stored binding; the Agent runtime stays frozen.
+Those editors, plus Workspace interactive/headless preference rows, share one
+pinned runtime draft (`usePinnedRuntimeDraft`) and `AgentLaunchSelectors`.
+Unknown model ids are typed through the shared custom-model dialog; they are
+not limited to the preset catalog.
+Follow-up turns replay the stored binding instead of consulting newly
 changed Workspace defaults.
 
 The persisted credential component records only an ownership reference:
@@ -363,9 +436,9 @@ runtime's global state. An absent choice means
 “use the runtime default”; it does not mean “pick any compatible credential.”
 Existing Session bindings remain authoritative until that Session is retired
 or the user explicitly replaces the binding while it is paused. A paused edit
-updates the secret-free `.alice/sessions/<resumeId>.json` reference without
-waking the Session; the replacement credential, model, and effort take effect
-on its next resume. OpenAlice never imports a runtime-global secret into its
+updates the secret-free `.alice/sessions/<resumeId>.json` `ai` object without
+waking the Session or rewriting `displayName`; the replacement credential,
+model, and effort take effect on its next resume. OpenAlice never imports a runtime-global secret into its
 vault or a Workspace.
 
 Native “global” state follows the runtime actually launched. A source or

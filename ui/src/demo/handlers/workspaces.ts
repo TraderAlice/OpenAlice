@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import {
   DEMO_AUTO_QUANT_WORKSPACE_ID,
+  DEMO_CHAT_WORKSPACE_ID,
   demoChatWorkspace,
   demoWorkspaces,
   demoTemplates,
@@ -24,6 +25,15 @@ import type {
   WorkspaceMetadataPatch,
   WorkspaceRuntimePreference,
 } from '../../components/workspace/api'
+
+const demoSessionPresence = new Map<string, 'active' | 'archived' | 'deleted'>()
+const demoResumeRuntimes = new Map<string, NonNullable<SessionRecord['runtime']>>([
+  ['resume-demo-thesis-owner', {
+    credentialSource: 'native',
+    model: 'claude-opus-4-6',
+    reasoningEffort: 'high',
+  }],
+])
 
 const demoManagerSession = {
   id: 'demo-manager-session',
@@ -74,6 +84,12 @@ export function resetDemoWorkspaceWebPiState(): void {
   demoManagerMessages = []
   demoQuickChatSequence = 0
   demoWebPiSessions = createSeededWebPiSessions()
+  demoResumeRuntimes.clear()
+  demoResumeRuntimes.set('resume-demo-thesis-owner', {
+    credentialSource: 'native',
+    model: 'claude-opus-4-6',
+    reasoningEffort: 'high',
+  })
   for (let index = 0; index < demoWorkspaces.length; index += 1) {
     const workspace = demoWorkspaces[index]!
     demoWorkspaces[index] = {
@@ -345,6 +361,13 @@ export const workspacesHandlers = [
     }
     demoAutoQuantDefaultWorkspaceId = workspace.id
     return HttpResponse.json({ defaultWorkspaceId: workspace.id, ready: true })
+  }),
+  http.post('/api/workspaces/chat/initialize', () => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.template === 'chat')
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    return HttpResponse.json({ workspace })
   }),
   http.post('/api/workspaces/auto-quant/initialize', () => {
     const workspace = demoWorkspaces.find((candidate) =>
@@ -755,6 +778,10 @@ export const workspacesHandlers = [
       agents: [
         { id: 'claude', displayName: 'Claude Code', installed: true, binPath: '/usr/local/bin/claude', capabilities: { parallelPerCwd: true, resumeLast: false, resumeById: true, transcriptDiscovery: 'fs-watch', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['anthropic'], defaultWire: 'anthropic' } } },
         { id: 'codex', displayName: 'Codex', installed: true, binPath: '/usr/local/bin/codex', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-responses'], defaultWire: 'openai-responses' } } },
+        { id: 'cursor', displayName: 'Cursor Agent', installed: true, binPath: '/usr/local/bin/cursor-agent', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: [], directVendors: ['cursor'] } } },
+        { id: 'agy', displayName: 'Antigravity', installed: true, binPath: '/usr/local/bin/agy', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai'], defaultWire: 'google-generative-ai' } } },
+        { id: 'grok', displayName: 'Grok Build', installed: true, binPath: '/usr/local/bin/grok', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['openai-chat', 'openai-responses'], defaultWire: 'openai-chat' } } },
+        { id: 'omp', displayName: 'Oh My Pi', installed: true, binPath: '/usr/local/bin/omp', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
         { id: 'opencode', displayName: 'opencode', installed: true, binPath: '/usr/local/bin/opencode', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true, effortVariants: true } } } },
         { id: 'pi', displayName: 'Pi', installed: true, binPath: '/usr/local/bin/pi', capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'none', headless: true, aiProvider: { credentialSource: 'runtime-or-workspace', wirePreference: ['google-generative-ai', 'openai-chat', 'anthropic', 'openai-responses'], defaultWire: 'openai-chat', vendorPolicies: { minimax: { wirePreference: ['anthropic'], legacyRequestedWireFallbacks: { 'openai-chat': 'anthropic' } } }, modelRegistration: { contextWindow: true, reasoning: true } } } },
       ],
@@ -768,6 +795,10 @@ export const workspacesHandlers = [
     const displayName = {
       claude: 'Claude Code',
       codex: 'Codex',
+      cursor: 'Cursor Agent',
+      agy: 'Antigravity',
+      grok: 'Grok Build',
+      omp: 'Oh My Pi',
       opencode: 'opencode',
       pi: 'Pi',
       shell: 'Shell',
@@ -775,6 +806,10 @@ export const workspacesHandlers = [
     const commands: Record<string, readonly string[]> = {
       claude: ['claude', '--settings', '.claude/openalice-autotrust.json'],
       codex: ['codex', '--sandbox', 'danger-full-access', '--ask-for-approval', 'never'],
+      cursor: ['cursor-agent'],
+      agy: ['agy'],
+      grok: ['grok', '--no-leader'],
+      omp: ['omp'],
       opencode: ['opencode'],
       pi: ['pi', '--session-id', 'demo-fresh-session'],
       shell: ['/bin/zsh', '--login'],
@@ -797,7 +832,7 @@ export const workspacesHandlers = [
         displayName,
         kind: agent === 'shell' ? 'utility' : 'agent',
         installed: true,
-        binPath: agent === 'shell' ? '/bin/zsh' : `/usr/local/bin/${agent}`,
+        binPath: agent === 'shell' ? '/bin/zsh' : agent === 'cursor' ? '/usr/local/bin/cursor-agent' : `/usr/local/bin/${agent}`,
         capabilities,
       },
       launch: {
@@ -905,6 +940,61 @@ export const workspacesHandlers = [
       resumable: true,
     })
   }),
+  http.patch('/api/workspaces/:id/resumes/:resumeId/metadata', async ({ params, request }) => {
+    const resumeId = String(params.resumeId)
+    const body = await request.json().catch(() => ({})) as { displayName?: unknown }
+    if (!Object.prototype.hasOwnProperty.call(body, 'displayName')) {
+      return HttpResponse.json({ error: 'invalid_display_name' }, { status: 400 })
+    }
+    const raw = body.displayName
+    if (raw !== null && typeof raw !== 'string') {
+      return HttpResponse.json({ error: 'invalid_display_name' }, { status: 400 })
+    }
+    const displayName = typeof raw === 'string' ? raw.trim() : ''
+    const workspace = demoWorkspaces.find((candidate) =>
+      candidate.sessions.some((session) => session.resumeId === resumeId),
+    )
+    const session = workspace?.sessions.find((candidate) => candidate.resumeId === resumeId)
+    if (session) {
+      Object.assign(session, displayName ? { displayName } : { displayName: undefined })
+    }
+    return HttpResponse.json({
+      resumeId,
+      ...(displayName ? { displayName } : {}),
+    })
+  }),
+  http.put('/api/workspaces/:id/resumes/:resumeId/runtime', async ({ params, request }) => {
+    const resumeId = String(params.resumeId)
+    const body = await request.json().catch(() => ({})) as Partial<PausedSessionRuntimeUpdate>
+    if (
+      (body.credentialSource !== 'native' && body.credentialSource !== 'vault')
+      || (body.credentialSource === 'vault' && !body.credentialSlug)
+    ) {
+      return HttpResponse.json({ error: 'bad_request' }, { status: 400 })
+    }
+    const runtime = {
+      credentialSource: body.credentialSource,
+      ...(body.credentialSource === 'vault' ? { credentialSlug: body.credentialSlug! } : {}),
+      ...(body.model ? { model: body.model } : {}),
+      ...(body.reasoningEffort ? { reasoningEffort: body.reasoningEffort } : {}),
+    }
+    demoResumeRuntimes.set(resumeId, runtime)
+    return HttpResponse.json({
+      resumeId,
+      agent: resumeId === 'resume-demo-thesis-owner' ? 'claude' : 'pi',
+      runtime,
+    })
+  }),
+  http.patch('/api/workspaces/:id/resumes/:resumeId', async ({ params, request }) => {
+    const resumeId = String(params.resumeId)
+    const body = await request.json().catch(() => ({})) as { presence?: unknown }
+    const presence = body.presence
+    if (presence !== 'active' && presence !== 'archived' && presence !== 'deleted') {
+      return HttpResponse.json({ error: 'invalid_presence' }, { status: 400 })
+    }
+    demoSessionPresence.set(resumeId, presence)
+    return HttpResponse.json({ resumeId, presence, lifecycle: 'active' })
+  }),
   http.get('/api/workspaces/:id/resumes', ({ params }) => {
     const wsId = String(params.id)
     if (wsId === DEMO_AUTO_QUANT_WORKSPACE_ID) {
@@ -914,32 +1004,120 @@ export const workspacesHandlers = [
           resumeId: 'resume-demo-thesis-owner', agent: 'claude',
           createdAt: Date.now() - 86_400_000, updatedAt: Date.now() - 60_000,
           lifecycle: 'active', resumable: true, active: false,
+          runtime: demoResumeRuntimes.get('resume-demo-thesis-owner'),
           latestExecution: {
             taskId: 'demo-thesis-owner-run', status: 'done',
-            startedAt: Date.now() - 60_000,
+            startedAt: Date.now() - 180_000,
+            finishedAt: Date.now() - 60_000,
             assistantPreview: 'Reviewed the active thesis invalidation rules.',
           },
         }],
       })
     }
     const workspace = demoWorkspaces.find((candidate) => candidate.id === wsId)
+    const sessions: Array<{
+      resumeId: string
+      agent: string
+      createdAt: number
+      updatedAt: number
+      lifecycle: 'active' | 'retired'
+      presence?: 'active' | 'archived' | 'deleted'
+      resumable: boolean
+      active: boolean
+      runtime?: SessionRecord['runtime']
+      interactive?: {
+        name: string
+        title?: string
+        state: 'running' | 'paused'
+        lastActiveAt: string
+      }
+      latestExecution?: {
+        taskId: string
+        status: 'running' | 'done' | 'failed' | 'interrupted'
+        startedAt: number
+        finishedAt?: number
+        issueId?: string
+        assistantPreview?: string
+      }
+    }> = (workspace?.sessions ?? []).map((session) => ({
+      resumeId: session.resumeId,
+      agent: session.agent,
+      createdAt: Date.parse(session.createdAt),
+      updatedAt: Date.parse(session.lastActiveAt),
+      lifecycle: 'active',
+      resumable: session.agent !== 'shell',
+      active: session.state === 'running',
+      runtime: demoResumeRuntimes.get(session.resumeId) ?? session.runtime,
+      ...(session.surface === 'headless'
+        ? {}
+        : {
+            interactive: {
+              name: session.name,
+              ...(session.title ? { title: session.title } : {}),
+              state: session.state,
+              lastActiveAt: session.lastActiveAt,
+            },
+          }),
+    }))
+    if (wsId === DEMO_CHAT_WORKSPACE_ID) {
+      const completedHeadless = sessions.find(
+        (session) => session.resumeId === 'resume-demo-headless-colleague',
+      )
+      if (completedHeadless) {
+        completedHeadless.latestExecution = {
+          taskId: 'demo-headless-colleague-run',
+          status: 'done',
+          startedAt: Date.now() - 180_000,
+          finishedAt: Date.now() - 120_000,
+          assistantPreview: 'Morning scan complete. Semis still lead.',
+        }
+      }
+      const runningHeadless = sessions.find(
+        (session) => session.resumeId === 'resume-demo-headless-running',
+      )
+      if (runningHeadless) {
+        runningHeadless.latestExecution = {
+          taskId: 'demo-headless-running',
+          status: 'running',
+          startedAt: Date.now() - 30_000,
+          issueId: 'scan-open',
+        }
+      }
+      sessions.push(
+        {
+          resumeId: 'resume-demo-archived-colleague',
+          agent: 'pi',
+          createdAt: Date.now() - 2_400_000,
+          updatedAt: Date.now() - 1_800_000,
+          lifecycle: 'active',
+          presence: 'archived',
+          resumable: true,
+          active: false,
+          latestExecution: {
+            taskId: 'demo-archived-colleague-run',
+            status: 'done',
+            startedAt: Date.now() - 2_000_000,
+            finishedAt: Date.now() - 1_800_000,
+            assistantPreview: 'Filed last week’s metals watch.',
+          },
+        },
+        {
+          resumeId: 'resume-demo-headless-retired',
+          agent: 'pi',
+          createdAt: Date.now() - 86_400_000,
+          updatedAt: Date.now() - 86_000_000,
+          lifecycle: 'retired',
+          resumable: false,
+          active: false,
+        },
+      )
+    }
     return HttpResponse.json({
       workspace: { id: wsId, tag: workspace?.tag ?? wsId },
-      sessions: (workspace?.sessions ?? []).map((session) => ({
-        resumeId: session.resumeId,
-        agent: session.agent,
-        createdAt: Date.parse(session.createdAt),
-        updatedAt: Date.parse(session.lastActiveAt),
-        lifecycle: 'active',
-        resumable: session.agent !== 'shell',
-        active: session.state === 'running',
-        interactive: {
-          name: session.name,
-          ...(session.title ? { title: session.title } : {}),
-          state: session.state,
-          lastActiveAt: session.lastActiveAt,
-        },
-      })),
+      sessions: sessions.map((session) => {
+        const presence = demoSessionPresence.get(session.resumeId) ?? session.presence
+        return presence && presence !== 'active' ? { ...session, presence } : session
+      }),
     })
   }),
   http.post('/api/workspaces/:id/resumes/:resumeId/session', async ({ params, request }) => {
@@ -1004,7 +1182,7 @@ export const workspacesHandlers = [
     const now = new Date(startedAt).toISOString()
     const sessionId = `demo-quick-chat-${++demoQuickChatSequence}`
     const resumeId = `demo-resume-quick-chat-${demoQuickChatSequence}`
-    const prefix = ({ claude: 'c', codex: 'x', opencode: 'o', pi: 'p' } as Record<string, string>)[agent]
+    const prefix = ({ claude: 'c', codex: 'x', grok: 'g', omp: 'om', opencode: 'o', pi: 'p' } as Record<string, string>)[agent]
       ?? agent.slice(0, 1)
     const name = `${prefix}${ws.sessions.filter((session) => session.agent === agent).length + 1}`
     const surface = agent === 'pi' ? 'webpi' as const : 'terminal' as const

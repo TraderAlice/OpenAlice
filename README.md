@@ -74,7 +74,7 @@ That loop is the main product surface today. A timer does not call a magic tradi
 
 | Surface | What it does |
 | --- | --- |
-| **Workspaces** | Per-task git repositories with a persistent terminal running `claude`, `codex`, `opencode`, `pi`, or `shell`. |
+| **Workspaces** | Per-task git repositories with a persistent terminal running `claude`, `codex`, `grok`, `opencode`, `pi`, or `shell`. |
 | **Issue Board** | Markdown-backed work items with status, priority, assignee, comments, links, and optional schedule metadata. |
 | **Tracked Entities** | A durable graph for tickers, themes, sectors, people, risks, and theses. |
 | **Inbox** | A delivery surface for reports, scheduled run output, and agent status updates. |

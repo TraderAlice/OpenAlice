@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { agyAdapter } from './agy.js';
+import { cursorAdapter } from './cursor.js';
+import { grokAdapter } from './grok.js';
+import { ompAdapter } from './omp.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 
@@ -42,6 +46,44 @@ describe('extractHeadlessSessionId', () => {
     );
   });
 
+  it('agy: documented stream-json init carries conversation_id', () => {
+    const line =
+      '{"event":"init","conversation_id":"c3b66b04-872b-4fbe-a3a4-058a026ef20a",' +
+      '"init":{"cwd":"/home/user/project","tools":["ask_permission"],"permission_mode":"request-review"}}';
+    expect(agyAdapter.extractHeadlessSessionId?.(line)).toBe(
+      'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
+    );
+  });
+
+  it('cursor: documented stream-json system/init carries session_id', () => {
+    const line =
+      '{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/Users/user/project",' +
+      '"session_id":"c6b62c6f-7ead-4fd6-9922-e952131177ff","model":"Claude 4 Sonnet",' +
+      '"permissionMode":"default"}';
+    expect(cursorAdapter.extractHeadlessSessionId?.(line)).toBe(
+      'c6b62c6f-7ead-4fd6-9922-e952131177ff',
+    );
+  });
+
+  it('grok: documented json object carries sessionId', () => {
+    const line = '{"text":"ok","stopReason":"EndTurn","sessionId":"019ff963-4d80-7650-a109-efd64717a05d"}';
+    expect(grokAdapter.extractHeadlessSessionId?.(line)).toBe(
+      '019ff963-4d80-7650-a109-efd64717a05d',
+    );
+  });
+
+  it('omp: line 1 is {"type":"session","id":…} (live 17.3.4)', () => {
+    const line =
+      '{"type":"session","version":3,"id":"01a00adc-0884-7000-b507-017949683107",' +
+      '"timestamp":"2026-08-16T13:56:27.396Z","cwd":"/tmp/omp-alice-probe.d2iMY8/ws"}';
+    expect(ompAdapter.extractHeadlessSessionId?.(line)).toBe(
+      '01a00adc-0884-7000-b507-017949683107',
+    );
+    expect(
+      ompAdapter.extractHeadlessSessionId?.('{"type":"message_end","id":"not-a-session"}'),
+    ).toBeNull();
+  });
+
   it('pi: line 1 is {"type":"session","id":…}', () => {
     const line =
       '{"type":"session","version":3,"id":"c54cdf3b-fc9c-403d-8088-41dd2a8b122b",' +
@@ -56,14 +98,14 @@ describe('extractHeadlessSessionId', () => {
   });
 
   it('non-JSON and irrelevant lines return null everywhere', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessSessionId?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessSessionId?.('{"type":"other"}')).toBeNull();
     }
   });
 
   it('every headless-capable adapter declares an extractor', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessSessionId).toBe('function');
     }

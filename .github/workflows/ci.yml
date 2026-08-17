@@ -142,6 +142,7 @@ jobs:
   cross-platform-test:
     needs: change-scope
     if: needs.change-scope.outputs.cross_platform == 'true'
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

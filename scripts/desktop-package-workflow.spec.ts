@@ -16,6 +16,7 @@ interface WorkflowJob {
 }
 
 interface Workflow {
+  on?: Record<string, unknown>
   concurrency?: {
     group?: string
     'cancel-in-progress'?: boolean
@@ -29,6 +30,12 @@ const workflow = YAML.parse(
 ) as Workflow
 
 describe('Desktop Package Smoke workflow critical path', () => {
+  it('keeps manual and pull-request coverage without duplicating master releases', () => {
+    expect(workflow.on).toHaveProperty('workflow_dispatch')
+    expect(workflow.on).toHaveProperty('pull_request')
+    expect(workflow.on).not.toHaveProperty('push')
+  })
+
   it('cancels superseded runs for the same pull request or ref', () => {
     expect(workflow.concurrency).toEqual({
       group: 'desktop-package-smoke-${{ github.event.pull_request.number || github.ref }}',
@@ -70,5 +77,27 @@ describe('Desktop Package Smoke workflow critical path', () => {
     for (const stepName of brokerPackSteps) {
       expect(desktop.steps?.map((step) => step.name)).not.toContain(stepName)
     }
+  })
+
+  it('smokes Guardian takeover and existing-owner browser handoff before packaging', () => {
+    const steps = workflow.jobs.package.steps ?? []
+    const names = steps.map((step) => step.name)
+    expect(names).toEqual(expect.arrayContaining([
+      'Build Alice + UTA + desktop shell',
+      'Smoke Guardian takeover through Electron',
+      'Smoke existing-owner browser handoff through Electron',
+      'Package unpacked desktop app',
+    ]))
+    expect(names.indexOf('Build Alice + UTA + desktop shell')).toBeLessThan(
+      names.indexOf('Smoke Guardian takeover through Electron'),
+    )
+    expect(names.indexOf('Smoke Guardian takeover through Electron')).toBeLessThan(
+      names.indexOf('Smoke existing-owner browser handoff through Electron'),
+    )
+    expect(names.indexOf('Smoke existing-owner browser handoff through Electron')).toBeLessThan(
+      names.indexOf('Package unpacked desktop app'),
+    )
+    expect(steps.find((step) => step.name === 'Smoke existing-owner browser handoff through Electron')?.run)
+      .toContain('pnpm electron:smoke:existing-owner --skip-build')
   })
 })

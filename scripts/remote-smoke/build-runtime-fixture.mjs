@@ -37,7 +37,6 @@ for (const path of [
 const files = new Map([
   ['dist/main.js', 'export {}\n'],
   ['ui/dist/index.html', '<!doctype html><title>OpenAlice remote fixture</title>\n'],
-  ['default/persona.default.md', '# OpenAlice\n'],
   ['src/workspaces/templates/.keep', 'fixture\n'],
   ['src/workspaces/cli/bin/openalice-cli.cjs', 'module.exports = {}\n'],
   ['src/workspaces/cli/bin/pi-session-provider.ts', 'export {}\n'],

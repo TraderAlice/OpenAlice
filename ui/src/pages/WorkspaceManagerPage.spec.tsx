@@ -96,10 +96,14 @@ vi.mock('../components/workspace/WebPiView', () => ({
   WebPiView: () => <div data-testid="webpi-view" />,
 }))
 
-const runtimeIds = ['claude', 'codex', 'opencode', 'pi'] as const
+const runtimeIds = ['claude', 'codex', 'cursor', 'agy', 'grok', 'omp', 'opencode', 'pi'] as const
 const runtimeAgents: AgentInfo[] = [
   ['claude', 'Claude'],
   ['codex', 'Codex'],
+  ['cursor', 'Cursor Agent'],
+  ['agy', 'Antigravity'],
+  ['grok', 'Grok Build'],
+  ['omp', 'Oh My Pi'],
   ['opencode', 'OpenCode'],
   ['pi', 'Pi'],
   ['shell', 'Shell'],
@@ -122,8 +126,14 @@ const runtimeAgents: AgentInfo[] = [
           ? ['anthropic' as const]
           : id === 'codex'
             ? ['openai-responses' as const]
-            : ['google-generative-ai' as const, 'openai-chat' as const, 'anthropic' as const, 'openai-responses' as const],
-        ...(id === 'opencode' || id === 'pi'
+            : id === 'cursor'
+              ? ['openai-chat' as const]
+            : id === 'agy'
+              ? ['google-generative-ai' as const]
+            : id === 'grok'
+              ? ['openai-chat' as const, 'openai-responses' as const]
+              : ['google-generative-ai' as const, 'openai-chat' as const, 'anthropic' as const, 'openai-responses' as const],
+        ...(id === 'omp' || id === 'opencode' || id === 'pi'
           ? { modelRegistration: { contextWindow: true, reasoning: true } }
           : {}),
       },
@@ -170,12 +180,16 @@ function context(
     setDefaultAgent: mocks.setDefaultAgent,
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    initializeChat: vi.fn(async () => { throw new Error('not used') }),
     setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: vi.fn(async () => ''),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: mocks.resumeSession,
     openWebPiSession: mocks.openWebPiSession,
     requestDeleteSession: vi.fn(),
+    setSessionPresence: vi.fn(async () => undefined),
+    setSessionDisplayName: vi.fn(async () => undefined),
+    updateSessionRuntime: vi.fn(async () => undefined),
     openAgentConfig: mocks.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),

@@ -57,9 +57,16 @@ describe('HeadlessTaskRegistry', () => {
   it('complete updates status; get returns it; runningCount drops', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
     const a = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1 })
+    await reg.setProgress(a.taskId, {
+      updatedAt: 1,
+      assistantText: 'working',
+      blocks: [{ type: 'text', text: 'working' }],
+      metrics: { textBlocks: 1, toolCalls: 0, toolFailures: 0 },
+    })
     await reg.complete(a.taskId, { status: 'done', exitCode: 0, durationMs: 5, finishedAt: 2 })
     expect(reg.get(a.taskId)?.status).toBe('done')
     expect(reg.get(a.taskId)?.exitCode).toBe(0)
+    expect(reg.get(a.taskId)?.progress).toBeUndefined()
     expect(reg.runningCount()).toBe(0)
   })
 
@@ -107,6 +114,24 @@ describe('HeadlessTaskRegistry', () => {
     // Persists across reload.
     const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
     expect(reg2.get(fired.taskId)?.trigger?.issueId).toBe('daily-scan')
+  })
+
+  it('persists an explicit unlimited watchdog separately from historical absence', async () => {
+    const reg = await HeadlessTaskRegistry.load(path, noopLogger)
+    const unlimited = await createTask(reg, {
+      wsId: 'w1',
+      agent: 'codex',
+      prompt: 'x',
+      startedAt: 1,
+      trigger: { kind: 'issue', workspaceId: 'home', issueId: 'daily-scan' },
+    })
+    const manual = await createTask(reg, {
+      wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2,
+    })
+
+    const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
+    expect(reg2.get(unlimited.taskId)).toHaveProperty('timeoutMs', null)
+    expect(reg2.get(manual.taskId)).not.toHaveProperty('timeoutMs')
   })
 
   it('persists requested one-run model and effort', async () => {

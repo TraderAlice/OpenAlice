@@ -1,12 +1,13 @@
 ---
-version: 1.8.3
+version: 1.8.5
 ---
 
 # Chat
 
 A general-purpose Alice workspace. The agent boots with Alice's full tool
 surface — market/research data plus trading, through the `alice*` / `traderhub`
-CLIs on its PATH — and Alice's persona pre-loaded as CLAUDE.md / AGENTS.md.
+CLIs on its PATH — with the Workspace-owned Alice instruction contract loaded
+as CLAUDE.md / AGENTS.md.
 
 ## What this workspace does
 

@@ -12,8 +12,44 @@ import {
   KIMI,
   LONGCAT,
   MINIMAX,
+  OPENROUTER,
+  XAI_API,
 } from './preset-catalog.js';
 import { BUILTIN_PRESETS } from './presets.js';
+
+describe('OPENROUTER preset', () => {
+  it('declares OpenAI and Anthropic skins with the documented base URLs', () => {
+    expect(OPENROUTER.regions?.[0]?.wires).toEqual({
+      'openai-chat': 'https://openrouter.ai/api/v1',
+      'openai-responses': 'https://openrouter.ai/api/v1',
+      anthropic: 'https://openrouter.ai/api',
+    });
+    const parsed = OPENROUTER.zodSchema.parse({
+      backend: 'vercel-ai-sdk',
+      provider: 'openai-compatible',
+      apiKey: 'sk-or-test',
+    }) as { baseUrl?: string; model?: string };
+    expect(parsed.baseUrl).toBe('https://openrouter.ai/api/v1');
+    expect(parsed.model).toBe('openai/gpt-5.6-luna');
+    expect(OPENROUTER.models?.map((model) => model.id)).toEqual([
+      'openai/gpt-5.6-luna',
+      'anthropic/claude-sonnet-5',
+      'deepseek/deepseek-v4-flash-0731',
+      'tencent/hy3',
+      'z-ai/glm-5.2',
+      'xiaomi/mimo-v2.5',
+      'anthropic/claude-opus-5',
+      'anthropic/claude-fable-5',
+      'openai/gpt-5.6-sol',
+      'openai/gpt-5.6-terra',
+      'x-ai/grok-4.6',
+      'google/gemini-3.7-flash',
+      'minimax/minimax-m3',
+      'moonshotai/kimi-k3',
+      'deepseek/deepseek-v4-pro',
+    ]);
+  });
+});
 
 describe('LONGCAT preset', () => {
   it('uses the versioned OpenAI base URL required by the OpenAI SDK', () => {
@@ -83,6 +119,19 @@ describe('credential form catalog', () => {
       });
   });
 
+  it('offers current Grok API tiers on the official xAI endpoints', () => {
+    expect(XAI_API.models?.map((model) => model.id)).toEqual(['grok-4.6', 'grok-4.5']);
+    expect(DEFAULT_MODEL_BY_VENDOR['xai']).toBe('grok-4.6');
+    expect(XAI_API.regions?.[0]?.wires).toEqual({
+      'openai-chat': 'https://api.x.ai/v1',
+      'openai-responses': 'https://api.x.ai/v1',
+    });
+    expect(XAI_API.models?.find((model) => model.id === 'grok-4.6')?.semantics).toMatchObject({
+      contextWindow: 500_000,
+      reasoning: { efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'high' },
+    });
+  });
+
   it('offers current general-purpose Gemini tiers without mixing in media-only models', () => {
     expect(GEMINI.models?.map((model) => model.id)).toEqual([
       'gemini-3.6-flash',
@@ -139,12 +188,16 @@ describe('credential form catalog', () => {
     expect(DEFAULT_MODEL_BY_VENDOR).toEqual({
       anthropic: 'claude-opus-5',
       openai: 'gpt-5.6-sol',
+      xai: 'grok-4.6',
       google: 'gemini-3.6-flash',
       minimax: 'MiniMax-M3',
       glm: 'glm-5.2',
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',
+      openrouter: 'openai/gpt-5.6-luna',
+      // Runtime-direct provider: `auto` is Cursor routing, not a model API id.
+      cursor: 'auto',
     });
     expect(GLM.models?.map((model) => model.id)).toContain('glm-5.2');
   });
@@ -189,12 +242,14 @@ describe('credential form catalog', () => {
     const vendorByPreset: Record<string, string> = {
       'claude-api': 'anthropic',
       'codex-api': 'openai',
+      'xai-api': 'xai',
       gemini: 'google',
       minimax: 'minimax',
       glm: 'glm',
       kimi: 'kimi',
       deepseek: 'deepseek',
       longcat: 'longcat',
+      openrouter: 'openrouter',
     };
 
     for (const [presetId, vendor] of Object.entries(vendorByPreset)) {

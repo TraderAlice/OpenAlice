@@ -206,7 +206,9 @@ export const useWorkspace = create<WorkspaceStore>()(
       // that tab open on every reload. Bump clears the loop.
       // v6: introduced the `chat-landing` ViewKind; clear stale persisted
       // tab state so no rehydrate references an unknown kind.
-      version: 6,
+      // v7: occupancy log moved from automation.runtime to the Office
+      // view; drop persisted Automation Runtime tabs.
+      version: 7,
       // Persist only the data shape — actions are recreated by the store factory.
       partialize: (state) => ({
         tabs: state.tabs,

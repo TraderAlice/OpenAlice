@@ -184,6 +184,9 @@ export function WorkspacePage({ spec, visible }: Props) {
           onSpawnFresh={spawnDefault}
           onResume={(id) => ctx.resumeSession(wsId, id, source)}
           onUpdateSessionRuntime={(_id, update) => updateRuntime(update).then(() => undefined)}
+          onSaveSessionDisplayName={(resumeId, displayName) => (
+            ctx.setSessionDisplayName(wsId, resumeId, displayName)
+          )}
           onOpenWebPi={(id) => ctx.openWebPiSession(wsId, id, source)}
           onSelectSession={(id) => {
             // Running session — already alive on the server, just

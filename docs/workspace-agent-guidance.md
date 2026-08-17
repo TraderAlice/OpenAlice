@@ -8,11 +8,12 @@ contract, discoverable skills, and the live CLI surface.
 
 ### 1. Always-loaded contract
 
-`src/workspaces/templates/<template>/files/instruction.md` is composed with the
-Alice persona and written to both `CLAUDE.md` and `AGENTS.md` by
-`src/workspaces/context-injector.ts`.
+`src/workspaces/templates/<template>/files/instruction.md` is written to both
+`CLAUDE.md` and `AGENTS.md` by `src/workspaces/context-injector.ts`. The Chat
+template owns Alice's baseline identity directly in this file; there is no
+mutable installation-wide persona source.
 
-Templates may opt out of this persona layer with `injectPersona: false`.
+Templates may opt out of this instruction layer with `injectInstructions: false`.
 AutoQuant V2 does so to preserve the upstream `AGENTS.md`; OpenAlice adds only
 discoverable collaboration/data/trading skills alongside it.
 
@@ -36,7 +37,7 @@ One concept has one primary owner:
 
 | Concept | Owner |
 |---|---|
-| Inbox, Issue collaboration, provenance, peer questions | `alice-workspace` |
+| Inbox, Issue collaboration, provenance, peer questions, Session nametags | `alice-workspace` |
 | Delegating quantitative research from Chat to AutoQuant | `delegate-autoquant` |
 | Issue file shape, ownership, schedules, headless delivery | `self-scheduling` |
 | Low-frequency market/fundamental/macro data | `traderhub` |
@@ -65,7 +66,7 @@ flat command bag:
 |---|---|
 | `alice` | Workspace research data, subscribed-feed archive, symbols, and bounded K-line analysis |
 | `traderhub` | Low-frequency boards, fundamentals, macro, and calendars |
-| `alice-workspace` | Peer addressing, Agent conversation, human Inbox delivery, durable work, and provenance |
+| `alice-workspace` | Peer addressing, Agent conversation, human Inbox delivery, durable work, provenance, and Session coworker names |
 | `alice-uta` | Broker reads plus explicit trading mutations and approval flow |
 
 Every export manifest supplies intent-first descriptions for its command

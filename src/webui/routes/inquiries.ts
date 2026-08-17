@@ -12,6 +12,7 @@ import { Hono } from 'hono'
 import type { IInboxStore } from '../../core/inbox-store.js'
 import { makeInboxEntryOriginResolver } from '../../core/workspace-tool-center.js'
 import { createWorkspaceConversationControl } from '../../workspaces/conversation-control.js'
+import { projectTurnProgress } from '../../workspaces/headless-progress.js'
 import type { HeadlessInquiryScope, HeadlessInquirySubject, HeadlessTaskRecord } from '../../workspaces/headless-task-registry.js'
 import { issueAssigneeResumeId } from '../../workspaces/issues/declaration.js'
 import { HeadlessCapacityError, HeadlessResumeError, type WorkspaceService } from '../../workspaces/service.js'
@@ -58,6 +59,8 @@ async function inquiryProjection(
   task: HeadlessTaskRecord,
 ) {
   const current = await conversation.read(task.taskId)
+  const progress = task.progress
+    ?? (current?.structured ? projectTurnProgress(current.structured) : null)
   return {
     taskId: task.taskId,
     resumeId: task.resumeId,
@@ -69,7 +72,8 @@ async function inquiryProjection(
     ...(task.durationMs !== undefined ? { durationMs: task.durationMs } : {}),
     ...(task.error ? { error: task.error } : {}),
     inquiry: task.inquiry!,
-    assistantText: current?.structured?.assistantText ?? null,
+    assistantText: current?.structured?.assistantText ?? task.progress?.assistantText ?? null,
+    ...(progress ? { progress } : {}),
   }
 }
 

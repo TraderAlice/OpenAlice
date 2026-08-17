@@ -43,7 +43,7 @@ You have two equivalent paths, and both write the **same**
    with no separate path.
 2. **Editing the file directly** with your normal file tools. Reach for this when
    you are writing rich markdown **What** or scheduling frontmatter
-  (`when` / `assignee` / `agent` / `credential` / `credentialSource` / `model` / `effort`) — the CLI verbs cover the board fields, What, and
+  (`when` / `assignee` / `agent` / `credential` / `credentialSource` / `model` / `effort` / `timeout` / `commentPrompt`) — the CLI verbs cover the board fields, What, timeout, comment prompt, and
    comments, but the document and schedule shape read most clearly as text. The
    file is always the single source of truth either way.
 
@@ -64,10 +64,11 @@ alice-workspace issue create --title "Split the data fetcher" \
   --priority medium \
   --what "src/fetch.ts mixes the HTTP call with the normalization step."
 
-# update — patch board fields or canonical What; scheduling frontmatter is left
-# untouched. Setting status done|canceled is how
+# update — patch board fields, canonical What, or the optional run timeout;
+# scheduling cadence (`when`) is left untouched. Setting status done|canceled is how
 # you silence a self-scheduled issue (there is no separate enabled flag).
 alice-workspace issue update --id morning-scan --status done
+alice-workspace issue update --id morning-scan --timeout 30m
 
 # comment — append markdown to the structured `<id>.comments.json` sidecar. An
 # attributable Session signs with @resumeId. If somebody else comments on an
@@ -176,6 +177,9 @@ plain tracked item; add a `when` and it starts firing.
     zone such as `America/New_York` for a market clock (pre-open scans). The
     zone handles daylight-saving changes. Omitted timezone remains machine-local
     only for compatibility with old files; new Issues should write it explicitly.
+    A missed admission (busy Session, full worker pool) **retries that slot by
+    default**, same as `every`. Write `catchUp: false` only when a miss should
+    discard all elapsed slots and wait for the next future calendar time.
   - `{ kind: at, at: "2026-03-01T13:30:00Z" }` — run ONCE at an ISO timestamp,
     then never again.
 - **`agent`** *(optional)* — runtime override for `@new-then-resume` / `@new-each-run`
@@ -192,10 +196,21 @@ plain tracked item; add a `when` and it starts firing.
 - **`effort`** *(optional)* — one-run reasoning effort: `none`, `minimal`,
   `low`, `medium`, `high`, `xhigh`, or `max`. Use a level supported by the
   selected runtime; omit it to inherit.
+- **`timeout`** *(optional)* — scheduled-run watchdog: `15m`, `30m`, `45m`, or
+  `60m`. Omit it for no limit (the agent may run until it exits). This is a run
+  budget, not Session birth, so an exact `@resumeId` owner may still set it.
+- **`commentPrompt`** *(optional)* — template for the Input Prompt sent when a
+  comment needs a reply. Omit it to keep the default wrapper (Issue identity
+  plus “reply directly; do not call `issue comment`”). Override replaces that
+  whole structure. Tokens: `{comment}`, `{title}`, `{id}`, `{workspaceId}`,
+  `{author}`, `{what}`. Must include `{comment}`. Chat-style Issues use
+  `{comment}` alone.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 They are valid only for `@new-then-resume` / `@new-each-run`; an exact `@resumeId` Session owns
-the complete tuple. The scheduler freezes explicit values into the fresh Session runtime
+the complete tuple, so do not write those fields back onto the Issue file. Humans may still
+change that Session's credential, model, and effort from the Issue page; the Agent runtime
+stays locked. The scheduler freezes explicit values into the fresh Session runtime
 binding and does not rewrite persistent Workspace configuration.
 
 > **Deprecated assignee aliases:** never write `@workspace` or `@new` in a new

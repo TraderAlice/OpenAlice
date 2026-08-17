@@ -2,10 +2,14 @@ import { http, HttpResponse } from 'msw'
 
 import type { InquiryRecord, InquirySubject } from '../../api/inquiries'
 import { demoInboxEntries } from '../fixtures/inbox'
+import { demoTurnProgress } from '../fixtures/turn-progress'
 
 const records: InquiryRecord[] = []
+const timers: number[] = []
 
 export function resetDemoInquiryState(): void {
+  for (const timer of timers) window.clearTimeout(timer)
+  timers.length = 0
   records.length = 0
 }
 
@@ -20,27 +24,34 @@ function list(subject: InquirySubject) {
   })
 }
 
-function completed(
+function startInquiry(
   subject: InquirySubject,
   question: string,
   context: Partial<Pick<InquiryRecord, 'workspaceId' | 'agent'>> = {},
 ): InquiryRecord {
-  return {
+  const record: InquiryRecord = {
     taskId: `demo-inquiry-${records.length + 1}`,
     resumeId: `demo-inquiry-resume-${records.length + 1}`,
     workspaceId: context.workspaceId ?? (subject.kind === 'issue' ? subject.workspaceId : 'demo-ws'),
     agent: context.agent ?? 'pi',
-    status: 'done',
+    status: 'running',
     startedAt: Date.now(),
-    finishedAt: Date.now(),
-    durationMs: 1200,
-    assistantText: 'Demo reply: I checked the original Workspace context and answered from the available evidence.',
+    assistantText: null,
+    progress: demoTurnProgress(),
     inquiry: {
       subject,
       question,
       resolution: { mode: 'exact' },
     },
   }
+  timers.push(window.setTimeout(() => {
+    record.status = 'done'
+    record.finishedAt = Date.now()
+    record.durationMs = Date.now() - record.startedAt
+    record.assistantText = 'Demo reply: I checked the original Workspace context and answered from the available evidence.'
+    delete record.progress
+  }, 800))
+  return record
 }
 
 export const inquiryHandlers = [
@@ -51,7 +62,7 @@ export const inquiryHandlers = [
     const body = await request.json() as { prompt?: string }
     const entryId = String(params.id)
     const entry = demoInboxEntries.find((candidate) => candidate.id === entryId)
-    const record = completed(
+    const record = startInquiry(
       { kind: 'inbox', entryId },
       body.prompt ?? '',
       {
@@ -79,7 +90,7 @@ export const inquiryHandlers = [
       kind: 'issue', workspaceId: String(params.wsId), issueId: String(params.id),
       relation: body.relation ?? 'creator', ...(body.runId ? { runId: body.runId } : {}),
     }
-    const record = completed(subject, body.prompt ?? '')
+    const record = startInquiry(subject, body.prompt ?? '')
     records.unshift(record)
     return HttpResponse.json({
       status: 'dispatched', taskId: record.taskId, resumeId: record.resumeId,

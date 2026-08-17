@@ -382,6 +382,29 @@ describe('TradingGit', () => {
       expect(entries[0].operations[0].symbol).toBe('AAPL')
       expect(entries[0].operations[0].action).toBe('placeOrder')
     })
+
+    it('keeps limit-order review terms in structured and text summaries', async () => {
+      const operation = buyOp('MU')
+      if (operation.action !== 'placeOrder') throw new Error('expected placeOrder')
+      operation.order.orderType = 'LMT'
+      operation.order.lmtPrice = new Decimal('971')
+      operation.order.tif = 'GTC'
+      git.add(operation)
+      git.commit('MU entry')
+      await git.push()
+
+      const [entry] = git.log()
+      expect(entry.operations[0].change).toBe('BUY 10 LMT @971 GTC (submitted)')
+      expect(entry.operations[0].order).toEqual({
+        side: 'BUY',
+        orderType: 'LMT',
+        totalQuantity: '10',
+        cashQuantity: undefined,
+        limitPrice: '971',
+        auxPrice: undefined,
+        timeInForce: 'GTC',
+      })
+    })
   })
 
   // ==================== show ====================

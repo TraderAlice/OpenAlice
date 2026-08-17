@@ -78,6 +78,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const [customName, setCustomName] = useState<string>(cred?.label ?? '')
   const [customShape, setCustomShape] = useState<WireShape>(customInit)
   const [customUrl, setCustomUrl] = useState<string>(cred?.wires?.[customInit] ?? '')
+  const [directUrl, setDirectUrl] = useState<string>(cred?.baseUrl ?? '')
   const [apiKey, setApiKey] = useState(cred?.apiKey ?? initialApiKey ?? '')
   const [presetQuery, setPresetQuery] = useState('')
   const [showKey, setShowKey] = useState(false)
@@ -88,7 +89,8 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const gate = useTestGate()
 
   const regions = presetRegions(preset)
-  const isCustom = !!preset && regions.length === 0
+  const isDirect = !!preset?.directAgentId
+  const isCustom = !!preset && !isDirect && regions.length === 0
   const usingStoredRegion = !isCustom && regionId === STORED_REGION_ID
   const region = usingStoredRegion ? undefined : regionById(preset, regionId)
   const models = preset ? presetModels(preset) : []
@@ -106,11 +108,14 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   const primaryShape = shapes[0]
   const primaryUrl = primaryShape ? (wires[primaryShape] ?? '') : ''
   const compatibilityWires = isCustom ? { [customShape]: customUrl.trim() } : wires
-  const compatibleAgents = compatibleAgentIds(compatibilityWires, agents)
+  const compatibleAgents = isDirect && preset?.directAgentId
+    ? agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
+    : compatibleAgentIds(compatibilityWires, agents)
 
   const pickPreset = (next: Preset) => {
     setPreset(next)
     setRegionId(presetRegions(next)[0]?.id ?? '')
+    setDirectUrl('')
     setModel(presetDefaultModel(next))
     setError('')
     gate.reset()
@@ -126,7 +131,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
   }, [presetQuery, presets])
 
   // The fields the test covers. Editing any of them re-locks Save.
-  const testKey = `${JSON.stringify(wires)}|${apiKey.trim()}|${model.trim()}`
+  const testKey = `${JSON.stringify(wires)}|${directUrl.trim()}|${apiKey.trim()}|${model.trim()}`
   const customLabel = customName.trim()
   const formProblem = !preset
     ? t('aiProvider.credentialModal.chooseProvider')
@@ -134,9 +139,11 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
       ? t('aiProvider.credentialModal.providerNameRequired')
       : isCustom && !customUrl.trim()
         ? t('aiProvider.credentialModal.customUrlRequired')
-        : isCustom && !validEndpoint(customUrl.trim())
+      : isCustom && !validEndpoint(customUrl.trim())
           ? t('aiProvider.credentialModal.customUrlInvalid')
-          : Object.keys(wires).length === 0 || !primaryShape
+        : isDirect && directUrl.trim() && !validEndpoint(directUrl.trim())
+          ? t('aiProvider.credentialModal.customUrlInvalid')
+        : !isDirect && (Object.keys(wires).length === 0 || !primaryShape)
             ? t('aiProvider.credentialModal.endpointRequired')
             : !apiKey.trim()
               ? t('aiProvider.credentialModal.keyRequired', { label: preset.setup?.apiKeyLabel?.toLowerCase() ?? t('aiProvider.credentialModal.apiKey') })
@@ -144,7 +151,9 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 ? t('aiProvider.credentialModal.modelRequired')
                 : ''
   const canTest = formProblem.length === 0
-  const needsTest = mode === 'add' || !!apiKey.trim()
+  // Direct runtime providers have no generic HTTP wire to probe. Their adapter
+  // validates the credential on the first real launch.
+  const needsTest = !isDirect && (mode === 'add' || !!apiKey.trim())
   const canSave = !saving && (!needsTest || gate.passedFor(testKey))
 
   const handleTest = () => {
@@ -173,8 +182,8 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
     const label = isCustom
       ? customLabel
       : vendor === 'custom'
-        ? preset.label
-        : undefined
+        ? (customLabel || preset.label)
+        : customLabel
     setSaving(true)
     setError('')
     try {
@@ -182,7 +191,10 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
         await api.config.updateCredential(cred.slug, {
           vendor,
           wires,
-          ...(label ? { label } : {}),
+          // Direct-provider endpoints are optional, but an explicit empty value
+          // must still reach the API so editing can restore the runtime default.
+          ...(isDirect ? { baseUrl: directUrl.trim() } : {}),
+          label,
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
           ...(model.trim() ? { lastModel: model.trim() } : {}),
         })
@@ -190,6 +202,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
         await api.config.addCredential({
           vendor,
           wires,
+          ...(isDirect && directUrl.trim() ? { baseUrl: directUrl.trim() } : {}),
           apiKey: apiKey.trim(),
           ...(label ? { label } : {}),
           ...(model.trim() ? { lastModel: model.trim() } : {}),
@@ -284,7 +297,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   </button>
                 ))}
                 {visiblePresets.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
+                  <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
                     {t('aiProvider.credentialModal.noMatches', { query: presetQuery })}
                   </p>
                 )}
@@ -306,7 +319,34 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 <p className="text-[11px] text-muted-foreground bg-muted rounded-lg px-3 py-2.5 leading-relaxed">{preset.hint}</p>
               )}
 
-              {isCustom ? (
+              {!isCustom && (
+                <Field
+                  label={t('aiProvider.credentialModal.displayName')}
+                  description={t('aiProvider.credentialModal.displayNameHelp')}
+                >
+                  <input
+                    className={inputClass}
+                    value={customName}
+                    onChange={(event) => setCustomName(event.target.value)}
+                    placeholder={t('aiProvider.credentialModal.displayNamePlaceholder')}
+                    maxLength={80}
+                  />
+                </Field>
+              )}
+
+              {isDirect ? (
+                <Field label={t('aiProvider.credentialModal.baseUrl')} description={t('aiProvider.credentialModal.directBaseUrlHelp')}>
+                  <input
+                    className={inputClass + ' font-mono text-[12px]'}
+                    value={directUrl}
+                    onChange={(event) => setDirectUrl(event.target.value)}
+                    placeholder="Cursor default endpoint"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                  />
+                </Field>
+              ) : isCustom ? (
                 <>
                   <Field label={t('aiProvider.credentialModal.providerName')} description={t('aiProvider.credentialModal.providerNameHelp')}>
                     <input
@@ -412,7 +452,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 />
               </Field>
 
-              <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
+              {!isDirect && <details className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
                 <summary className="cursor-pointer select-none text-[11px] text-muted-foreground hover:text-foreground">
                   {t('aiProvider.credentialModal.endpointDetails')}
                 </summary>
@@ -425,11 +465,13 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                     </div>
                   ))}
                 </div>
-              </details>
+              </details>}
 
-              <p className="rounded-lg bg-muted px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
-                {t('aiProvider.credentialModal.testExplanation', { model: model.trim() || t('aiProvider.credentialModal.selectedModel') })}
-              </p>
+              {!isDirect && (
+                <p className="rounded-lg bg-muted px-3 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
+                  {t('aiProvider.credentialModal.testExplanation', { model: model.trim() || t('aiProvider.credentialModal.selectedModel') })}
+                </p>
+              )}
 
               {error && (
                 <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-[12px] text-destructive">{error}</p>
@@ -483,6 +525,8 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 <span className="h-2 w-2 shrink-0 rounded-full bg-destructive" />
                 {t('aiProvider.credentialModal.fixAndRetry')}
               </span>
+            ) : isDirect ? (
+              <span>{preset.hint}</span>
             ) : (
               <span>{t('aiProvider.credentialModal.testBeforeSave')}</span>
             )}

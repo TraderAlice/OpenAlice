@@ -1,7 +1,7 @@
-# Data Locations and Concurrent Instances
+# Data Locations and Concurrent AliceProjects
 
 This guide owns OpenAlice data-location selection, desktop launcher
-preferences, and the isolation contract for concurrent local instances.
+preferences, and the isolation contract for concurrent local AliceProjects.
 Runtime lock recovery itself belongs to `packages/guardian-runtime/`; the
 persistent state layout belongs to [[docs/project-structure.md]].
 
@@ -21,15 +21,17 @@ parts together:
 └── sealing.key           machine-bound encryption key
 ```
 
-Two OpenAlice instances may run concurrently when they use different complete
+Two AliceProjects may run concurrently when they use different complete
 homes and unpinned ports. Two writers must never share one home. Default ports
 probe upward independently, while explicitly pinned ports still fail if they
 collide.
 
 Workspace launcher state includes the private
-`workspaces/state/agent-conversations.jsonl` prompt/reply event stream. It moves
-with the complete home, is not part of any Workspace repository, and should be
-treated as sensitive conversation history when backing up or sharing a home.
+`workspaces/state/agent-conversations.jsonl` prompt/reply event stream and
+`workspaces/state/agent-runtime.jsonl` occupancy journal. Both move with the
+complete home and are not part of any Workspace repository. Treat the
+conversation stream as sensitive history when backing up or sharing a home;
+the occupancy journal has no prompt bodies.
 
 Each Workspace repository carries `.alice/settings.json`, a versioned,
 secret-free description of its recent interactive and headless Agent runtime
@@ -38,13 +40,21 @@ but never provider keys or resolved endpoints. The referenced secrets remain
 under the complete home and therefore do not travel merely because a Workspace
 repository is copied.
 
-Each product Session created in that Workspace owns a secret-free launch file
-at `.alice/sessions/<resumeId>.json`. It records the Agent runtime plus the
-credential reference, model, and effort frozen for that Session. The global
-`workspaces/state/resume-identities.json` remains only the product-to-native
-Session identity ledger; it does not own AI configuration. Copying or archiving
-a Workspace therefore carries its Session launch semantics, but never the vault
-secret referenced by a credential slug. The launcher-owned Workspace Manager is
+`<OPENALICE_HOME>/data/ui-layout.json` is the Activity Bar layout: group
+order, custom groups, and which rail entries are hidden. It is user chrome,
+not operator config, and travels with the complete home. Missing or
+malformed files equal the default document (Dev Panel hidden). Settings
+cannot be hidden. Deep links to a hidden surface still adopt.
+
+Each product Session created in that Workspace owns a secret-free dossier
+at `.alice/sessions/<resumeId>.json`. The `ai` object records the Agent
+runtime plus the credential reference, model, and effort frozen for that
+Session. An optional sibling `displayName` is the mutable coworker nametag.
+The global `workspaces/state/resume-identities.json` remains only the
+product-to-native Session identity ledger; it does not own AI configuration
+or the nametag. Copying or archiving a Workspace therefore carries its
+Session launch semantics and coworker names, but never the vault secret
+referenced by a credential slug. The launcher-owned Workspace Manager is
 the deliberate exception: because its cwd is the active Workspace floor rather
 than a business Workspace, its files live under
 `workspaces/state/workspace-manager-sessions/` instead of creating `.alice/` at
@@ -76,9 +86,16 @@ is introduced.
 
 **Settings → General → Data location** shows the effective root and its source.
 The desktop can open the current folder, choose another folder and restart,
-reuse a recent folder, or ask which location to use on every startup. If an
-already-running instance owns the selected home, the recovery dialog offers a
-third path: choose another data location without stopping the existing owner.
+reuse a recent folder, or ask which location to use on every startup. If a
+healthy development or CLI Server Runtime already owns the selected home,
+Electron's primary action is **Open in browser**: it probes the advertised
+loopback Web endpoint, opens that page, and quits without taking the lock.
+**Choose another data location** remains available when the home is not
+environment-locked. Dismissing the dialog keeps the existing AliceProject and
+quits the redundant desktop launch. Takeover stays an explicit, destructive
+secondary action.
+Electron-owned, stale, starting, unhealthy, and incompatible owners keep
+tailored recovery dialogs and never receive a misleading browser button.
 
 The launcher preference is machine-local metadata stored at:
 
@@ -112,7 +129,7 @@ development/CLI operation that may stop an owner of the same home. Separate
 homes are the normal choice for concurrent worktrees; takeover is recovery,
 not concurrency.
 
-Bare `openalice` exposes those separate homes through `i Instances`. The
+Bare `openalice` exposes those separate homes through `i AliceProjects`. The
 machine-local Supervisor registry lives outside every complete home. It always
 retains the implicit `default`, may register named homes, and remembers the
 selected name for the next bare start. Creating or selecting an entry does not
@@ -121,17 +138,25 @@ separate Home; equal and nested registered paths are rejected. An inherited
 existing target must be empty or recognizable as an OpenAlice home. An
 accepted target is created/canonicalized during registration; if that
 registered path later disappears, a bare Supervisor launch keeps the entry,
-falls back to an available instance, and directs the user to `i Instances` to
+falls back to an available project, and directs the user to `i AliceProjects` to
 repair the remembered selection. An explicit environment/flag selection fails
 instead of falling back, so automation cannot accidentally target another
 Home. The missing path is never silently recreated. An inherited Web port
-remains automatic from 47331 so concurrent instances probe upward, while a
-configured port is intentionally pinned.
+remains automatic from 47331 so concurrent AliceProjects probe upward, while a
+configured port is intentionally pinned. First Alice boot must not write
+`data/config/ports.json` merely to materialize that default: a file `web`
+value is a pin, so a seeded `3002` (or `47331`) would refuse to move when
+another home already holds it. Existing shipped `{ "web": 3002 }` files stay
+pins; delete the key or the file to restore probing. `openalice up --port`
+and `OPENALICE_WEB_PORT` remain one-run pins and do not rewrite the file.
 
-`OPENALICE_INSTANCE`, `OPENALICE_HOME`, `--instance`, and `--home` remain
-higher-priority one-run/automation inputs. When they fix the selected instance
-or Home, the TUI explains that instance selection is read-only rather than
+`OPENALICE_PROJECT`, `OPENALICE_HOME`, `--project`, and `--home` remain
+higher-priority one-run/automation inputs. When they fix the selected project
+or Home, the TUI explains that AliceProject selection is read-only rather than
 persisting a choice that cannot affect the current process.
+
+`OPENALICE_INSTANCE` and `--instance` remain deprecated compatibility aliases
+for released automation only.
 
 ## Switching and Failure Safety
 
@@ -139,6 +164,12 @@ Switching never moves, copies, merges, or deletes current data. The desktop
 validates the target, saves the selection, then performs a full Guardian
 restart. The newly selected home may be empty or an existing OpenAlice home.
 A non-empty unrelated directory requires confirmation.
+
+`openalice project copy-ai-creds` is the explicit exception for AI credential
+rows in `<home>/data/config/ai-provider-manager.json`. It merges only the
+`credentials` map into the destination home, never prints secrets, and does not
+copy Workspace launch preferences, broker accounts, `sealing.key`, or
+`provider-keys.json`.
 
 The following cases fail visibly before another backend starts:
 
@@ -167,15 +198,22 @@ failed bootstrap quarantine directories when Windows still holds a handle.
   resolution, Settings controller, and relaunch requests.
 - `apps/desktop/src/main.ts` — Guardian wiring, duplicate-owner choice, safe
   relaunch, and the machine-local preference location.
+- `apps/desktop/src/existing-owner-startup.ts` — existing-owner dialog and
+  verified loopback browser handoff.
+- `packages/guardian-runtime/src/existing-owner-startup.ts` — owner/state/
+  endpoint decision table consumed by Electron.
 - `apps/desktop/src/data-home-smoke.ts` — real Electron preload and Settings
   rendering assertion for isolated launches.
 - `apps/desktop/src/ipc.ts` + `apps/desktop/src/preload.ts` — narrow renderer
   bridge; raw filesystem and Electron APIs never reach the renderer.
 - `ui/src/pages/SettingsPage.tsx` — desktop controls and browser/CLI guidance.
+- `src/core/ui-layout.ts` — Activity Bar layout document at `data/ui-layout.json`.
 - `scripts/guardian/dev-options.ts` — development `--home` parsing.
 
 For changes to this subsystem, run the focused unit/UI specs, Guardian recovery
 tests, strict desktop and UI type checks, and an isolated packaged onboarding
 or Workspace smoke. Manually verify a fresh startup prompt, a saved recent
 location, a missing saved location, and the duplicate-owner “choose another”
-path. Never use a real user home for these checks.
+path. For healthy foreign `dev` / CLI Server owners, also run
+`pnpm electron:smoke:existing-owner` on disposable homes. Never use a real
+user home for these checks.

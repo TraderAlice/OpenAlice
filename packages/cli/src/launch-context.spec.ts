@@ -9,7 +9,7 @@ import {
 } from './launch-context.ts'
 
 describe('ResolvedLaunchContext', () => {
-  it('resolves defaults < machine < instance < env < CLI with field provenance', () => {
+  it('resolves defaults < machine < AliceProject < env < CLI with field provenance', () => {
     const context = resolveLaunchContext({
       homeDir: '/Users/alice',
       cwd: '/repo',
@@ -23,11 +23,11 @@ describe('ResolvedLaunchContext', () => {
           updateChecks: false,
         },
       },
-      instanceConfig: {
+      projectConfig: {
         name: 'desk',
-        home: '/instance-home',
+        home: '/project-home',
         port: 42_000,
-        appDir: '/instance-app',
+        appDir: '/project-app',
         updateChecks: true,
       },
       env: {
@@ -46,7 +46,7 @@ describe('ResolvedLaunchContext', () => {
     })
 
     expect(context).toMatchObject({
-      instance: 'desk',
+      project: 'desk',
       home: resolve('/repo', 'flag-home'),
       port: 44_000,
       appDir: resolve('/repo', 'flag-app'),
@@ -57,7 +57,7 @@ describe('ResolvedLaunchContext', () => {
         sessionDir: join(resolve('/repo', 'flag-home'), 'runtime', 'pi', 'sessions'),
       },
       provenance: {
-        instance: { source: 'cli-flag', detail: '--instance' },
+        project: { source: 'cli-flag', detail: '--instance' },
         home: { source: 'cli-flag', detail: '--home' },
         port: { source: 'cli-flag', detail: '--port' },
         appDir: { source: 'cli-flag', detail: '--app-dir' },
@@ -77,9 +77,9 @@ describe('ResolvedLaunchContext', () => {
         defaultInstance: 'research',
         defaults: { port: 41_000, updateChecks: true },
       },
-      instanceConfig: {
+      projectConfig: {
         name: 'research',
-        home: '/instance-home',
+        home: '/project-home',
         port: 42_000,
         updateChecks: true,
       },
@@ -145,7 +145,7 @@ describe('ResolvedLaunchContext', () => {
     })).toThrow(/CONTENT_IDENTITY/)
   })
 
-  it('requires a complete home for a named non-default instance', () => {
+  it('requires a complete home for a named non-default AliceProject', () => {
     expect(() => resolveLaunchContext({
       homeDir: '/home/alice',
       env: { OPENALICE_INSTANCE: 'research' },
@@ -156,15 +156,15 @@ describe('ResolvedLaunchContext', () => {
         defaultInstance: 'research',
         defaults: { home: '/shared-machine-home' },
       },
-      instanceConfig: { name: 'research' },
+      projectConfig: { name: 'research' },
       env: {},
     })).toThrow(/needs an explicit complete home/)
   })
 
-  it('rejects malformed instance, port, and boolean environment values', () => {
+  it('rejects malformed project, port, and boolean environment values', () => {
     expect(() => resolveLaunchContext({
       env: { OPENALICE_INSTANCE: '../escape', OPENALICE_HOME: '/tmp/home' },
-    })).toThrow(/Invalid OpenAlice instance/)
+    })).toThrow(/Invalid AliceProject/)
     expect(() => resolveLaunchContext({
       env: { OPENALICE_WEB_PORT: 'nope' },
     })).toThrow(/integer between 1 and 65535/)
@@ -173,7 +173,7 @@ describe('ResolvedLaunchContext', () => {
     })).toThrow(/must be one of/)
   })
 
-  it('projects instance-private Pi roots without mutating the caller environment', () => {
+  it('projects AliceProject-private Pi roots without mutating the caller environment', () => {
     const base = {
       PATH: '/bin',
       OPENALICE_MANAGED_PI_PATH: '/managed/pi/cli.js',
