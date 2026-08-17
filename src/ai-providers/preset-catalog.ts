@@ -490,6 +490,38 @@ export const LONGCAT: PresetDef = {
   writeOnlyFields: ['apiKey'],
 }
 
+// ==================== Third-party: Atlas Cloud ====================
+
+export const ATLAS_CLOUD: PresetDef = {
+  id: 'atlas-cloud',
+  label: 'Atlas Cloud',
+  description: 'Atlas Cloud models via its OpenAI-compatible API',
+  category: 'third-party',
+  defaultName: 'Atlas Cloud',
+  hint: 'Uses Atlas Cloud\'s OpenAI-compatible Chat Completions endpoint. This credential can drive OpenCode and Pi.',
+  zodSchema: z.object({
+    backend: z.literal('vercel-ai-sdk'),
+    provider: z.literal('openai-compatible'),
+    baseUrl: z.string().default('https://api.atlascloud.ai/v1').describe('API endpoint'),
+    model: z.string().default('deepseek-ai/deepseek-v4-pro').describe('Model'),
+    apiKey: z.string().min(1).describe('Atlas Cloud API key'),
+  }),
+  regions: [{
+    id: 'default',
+    label: 'Atlas Cloud (api.atlascloud.ai)',
+    wires: { 'openai-chat': 'https://api.atlascloud.ai/v1' },
+  }],
+  models: withModelSemantics('atlas-cloud', [
+    { id: 'deepseek-ai/deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+  ]),
+  setup: {
+    apiKeyLabel: 'Atlas Cloud API key',
+    apiKeyHelp: 'Use an API key from the Atlas Cloud console.',
+    modelHelp: 'Choose a model available to the key, or paste another exact Atlas Cloud model ID.',
+  },
+  writeOnlyFields: ['apiKey'],
+}
+
 // ==================== Runtime-direct: Cursor ====================
 
 export const CURSOR_DASHBOARD: PresetDef = {
@@ -560,6 +592,7 @@ export const PRESET_CATALOG: PresetDef[] = [
   KIMI,
   DEEPSEEK,
   LONGCAT,
+  ATLAS_CLOUD,
   GEMINI,
   CURSOR_DASHBOARD,
   CUSTOM,
@@ -584,5 +617,6 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   kimi: 'kimi-k3',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',
+  'atlas-cloud': 'deepseek-ai/deepseek-v4-pro',
   cursor: 'auto',
 }

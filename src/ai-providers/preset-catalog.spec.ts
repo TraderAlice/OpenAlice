@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ATLAS_CLOUD,
   CLAUDE_API,
   CLAUDE_OAUTH,
   CODEX_API,
@@ -25,6 +26,21 @@ describe('LONGCAT preset', () => {
       apiKey: 'test-key',
     }) as { baseUrl?: string };
     expect(parsed.baseUrl).toBe('https://api.longcat.chat/openai/v1');
+  });
+});
+
+describe('ATLAS_CLOUD preset', () => {
+  it('uses the versioned OpenAI-compatible endpoint and nested model id', () => {
+    expect(ATLAS_CLOUD.regions?.[0]?.wires['openai-chat']).toBe('https://api.atlascloud.ai/v1');
+    const parsed = ATLAS_CLOUD.zodSchema.parse({
+      backend: 'vercel-ai-sdk',
+      provider: 'openai-compatible',
+      apiKey: 'test-key',
+    }) as { baseUrl?: string; model?: string };
+    expect(parsed).toMatchObject({
+      baseUrl: 'https://api.atlascloud.ai/v1',
+      model: 'deepseek-ai/deepseek-v4-pro',
+    });
   });
 });
 
@@ -160,6 +176,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',
+      'atlas-cloud': 'deepseek-ai/deepseek-v4-pro',
       // Runtime-direct provider: `auto` is Cursor routing, not a model API id.
       cursor: 'auto',
     });
@@ -213,6 +230,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi',
       deepseek: 'deepseek',
       longcat: 'longcat',
+      'atlas-cloud': 'atlas-cloud',
     };
 
     for (const [presetId, vendor] of Object.entries(vendorByPreset)) {
