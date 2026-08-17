@@ -38,7 +38,8 @@ describe('agy session layout', () => {
   });
 
   it('honors HOME for the Antigravity store and treats official Gemini hosts as default', () => {
-    expect(agyHomeDir({ HOME: '/tmp/home' })).toBe(resolve('/tmp/home/.gemini/antigravity-cli'));
+    const home = resolve('/tmp/home');
+    expect(agyHomeDir({ HOME: home })).toBe(join(home, '.gemini', 'antigravity-cli'));
     expect(isOfficialGeminiBase(null)).toBe(true);
     expect(isOfficialGeminiBase('')).toBe(true);
     expect(isOfficialGeminiBase('https://generativelanguage.googleapis.com')).toBe(true);
