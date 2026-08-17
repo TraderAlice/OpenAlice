@@ -54,6 +54,14 @@ function record(patch?: Partial<SessionRecord>): SessionRecord {
 
 beforeEach(async () => {
   await i18n.changeLanguage('en')
+  Object.assign(launchConfig, {
+    effectiveAgent: 'claude',
+    accessMode: 'vault',
+    launchCredentialSlug: 'deepseek-1',
+    launchModel: 'deepseek-v4-flash',
+    launchReasoningEffort: 'high',
+    credentialSelectionReady: true,
+  })
 })
 
 afterEach(cleanup)
@@ -116,6 +124,35 @@ describe('SessionSettingsDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(onSaveDisplayName).toHaveBeenCalledWith('Earnings desk'))
+    expect(onSaveRuntime).not.toHaveBeenCalled()
+  })
+
+  it('does not let a normalized read-only AI draft block a running rename', async () => {
+    const onSaveDisplayName = vi.fn(async () => {})
+    const onSaveRuntime = vi.fn(async () => {})
+    Object.assign(launchConfig, {
+      accessMode: 'native',
+      launchCredentialSlug: null,
+      launchModel: null,
+      launchReasoningEffort: null,
+    })
+
+    render(<SessionSettingsDialog
+      open
+      onOpenChange={vi.fn()}
+      record={record({ state: 'running', pid: 42, startedAt: 1 })}
+      agents={[]}
+      workspaceId="workspace-1"
+      onSaveDisplayName={onSaveDisplayName}
+      onSaveRuntime={onSaveRuntime}
+    />)
+
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Macro desk' } })
+    const save = screen.getByRole('button', { name: 'Save changes' })
+    expect(save).not.toHaveProperty('disabled', true)
+    fireEvent.click(save)
+
+    await waitFor(() => expect(onSaveDisplayName).toHaveBeenCalledWith('Macro desk'))
     expect(onSaveRuntime).not.toHaveBeenCalled()
   })
 

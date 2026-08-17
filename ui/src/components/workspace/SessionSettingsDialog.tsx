@@ -150,10 +150,6 @@ export function SessionSettingsDialog({
 
   const submit = async () => {
     if (!canSave) return
-    if (launchDirty && !aiEditable) {
-      setError(t('workspace.sessionSettings.pauseRequired'))
-      return
-    }
     setSaving(true)
     setError(null)
     try {
@@ -258,7 +254,7 @@ export function SessionSettingsDialog({
           <Button
             type="button"
             onClick={() => void submit()}
-            disabled={!canSave || (launchDirty && !aiEditable)}
+            disabled={!canSave}
           >
             {saving ? t('workspace.sessionSettings.saving') : t('workspace.sessionSettings.save')}
           </Button>
