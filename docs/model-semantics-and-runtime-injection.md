@@ -254,6 +254,10 @@ tuple. Neither form ever contains a key or endpoint. Once an exact
 `@resumeId` exists, Issue frontmatter cannot replace its credential source,
 model, or effort. The Issue page and paused Session settings may still replace
 those three dimensions on the stored binding; the Agent runtime stays frozen.
+Those editors, plus Workspace interactive/headless preference rows, share one
+pinned runtime draft (`usePinnedRuntimeDraft`) and `AgentLaunchSelectors`.
+Unknown model ids are typed through the shared custom-model dialog; they are
+not limited to the preset catalog.
 Follow-up turns replay the stored binding instead of consulting newly
 changed Workspace defaults.
 

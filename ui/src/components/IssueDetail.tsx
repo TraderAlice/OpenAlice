@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Brain, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
 import { inputClass } from './form'
 
 import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
@@ -21,9 +21,7 @@ import type {
   WikilinkResolution,
 } from '../api/issues'
 import { DEFAULT_ISSUE_COMMENT_PROMPT, ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
-import type { ModelReasoningEffort } from '../api/types'
-import type { Preset, PresetModel } from '../api/types'
-import { configApi } from '../api/config'
+
 import {
   getAgentReadiness,
   getWorkspaceSessionDirectory,
@@ -31,12 +29,18 @@ import {
   updateResumeRuntime,
   type AgentCredentialReadiness,
   type AgentId,
+  type AgentInfo,
   type PausedSessionRuntimeUpdate,
   type SavedCredential,
   type WorkspaceRuntimeModeSettings,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
-import { credentialAccessLabel } from './workspace/AgentLaunchControls'
+import { AgentLaunchSelectors, credentialAccessLabel } from './workspace/AgentLaunchControls'
+import {
+  formatPinnedCapability,
+  pinnedLaunchFromBinding,
+  usePinnedRuntimeDraft,
+} from '../hooks/usePinnedRuntimeDraft'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
@@ -63,12 +67,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  issueEffortOptions,
-  issueModelOptions,
-  issueModelSemantics,
-  resolveIssueAiSelection,
-} from './issue-runtime-options'
+import { resolveIssueAiSelection } from './issue-runtime-options'
 
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
 // Issue's independent operational history stays consistent with Automation.
@@ -455,104 +454,8 @@ function AgentEditor({
   )
 }
 
-function ModelEditor({
-  value,
-  defaultModel,
-  models,
-  loadingDefault,
-  disabled,
-  onChange,
-}: {
-  value?: string
-  defaultModel: string | null
-  models: readonly PresetModel[]
-  loadingDefault: boolean
-  disabled?: boolean
-  onChange: (next: string | null) => void
-}) {
-  const { t } = useTranslation()
-  const [customMode, setCustomMode] = useState(Boolean(value))
-  const [draft, setDraft] = useState(value ?? '')
-  const inputRef = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    setCustomMode(Boolean(value))
-    setDraft(value ?? '')
-  }, [value])
-  const commit = () => {
-    const next = draft.trim()
-    if (next !== (value ?? '')) onChange(next || null)
-    if (!next) setCustomMode(false)
-  }
-  const defaultLabel = loadingDefault
-    ? t('issues.detail.defaultLoading')
-    : defaultModel
-      ? t('issues.detail.defaultValue', { value: defaultModel })
-      : t('issues.detail.defaultRuntimeDecides')
-  const knownValue = value && models.some((model) => model.id === value)
-
-  return (
-    <div className="min-w-0 flex-1">
-      <select
-        className={`${railControl} w-full`}
-        value={customMode ? (knownValue ? value : 'custom') : 'default'}
-        disabled={disabled}
-        aria-label={t('issues.detail.runModel')}
-        onChange={(event) => {
-          if (event.target.value === 'default') {
-            setCustomMode(false)
-            setDraft('')
-            if (value) onChange(null)
-            return
-          }
-          if (event.target.value !== 'custom') {
-            setCustomMode(true)
-            setDraft(event.target.value)
-            onChange(event.target.value)
-            return
-          }
-          setCustomMode(true)
-          queueMicrotask(() => inputRef.current?.focus())
-        }}
-      >
-        <option value="default">{defaultLabel}</option>
-        {models.map((model) => (
-          <option key={model.id} value={model.id}>{model.label}</option>
-        ))}
-        <option value="custom">
-          {value ? t('issues.detail.overrideValue', { value }) : t('issues.detail.customModel')}
-        </option>
-      </select>
-      {customMode && !knownValue && (
-        <input
-          ref={inputRef}
-          className={`${railControl} mt-1 w-full`}
-          value={draft}
-          disabled={disabled}
-          placeholder={t('issues.detail.nativeModelPlaceholder')}
-          aria-label={t('issues.detail.customRunModel')}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              commit()
-              event.currentTarget.blur()
-            } else if (event.key === 'Escape' && !value) {
-              setDraft('')
-              setCustomMode(false)
-            }
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
 function credentialLabel(credential: SavedCredential | null | undefined): string {
   return credential ? credentialAccessLabel(credential) : ''
-}
-
-function formatAiCapability(parts: { access: string; model: string; effort: string }): string {
-  return `${parts.access} · ${parts.model} · ${parts.effort}`
 }
 
 function issuePatchToRuntimeUpdate(patch: IssuePatch): PausedSessionRuntimeUpdate {
@@ -565,6 +468,26 @@ function issuePatchToRuntimeUpdate(patch: IssuePatch): PausedSessionRuntimeUpdat
   }
 }
 
+function runtimeUpdateToIssuePatch(
+  update: PausedSessionRuntimeUpdate,
+  inherit: boolean,
+): IssuePatch {
+  if (inherit) {
+    return {
+      credential: null,
+      credentialSource: null,
+      model: update.model ?? null,
+      effort: update.reasoningEffort ?? null,
+    }
+  }
+  return {
+    credential: update.credentialSource === 'vault' ? update.credentialSlug ?? null : null,
+    credentialSource: update.credentialSource === 'native' ? 'native' : null,
+    model: update.model ?? null,
+    effort: update.reasoningEffort ?? null,
+  }
+}
+
 function ownerSessionBusy(session: WorkspaceSessionDirectoryEntry | undefined): boolean {
   return Boolean(
     session?.active
@@ -573,60 +496,81 @@ function ownerSessionBusy(session: WorkspaceSessionDirectoryEntry | undefined): 
   )
 }
 
+function issueLaunchSeed(
+  agent: string,
+  issue: IssueDetailIssue,
+  mode: WorkspaceRuntimeModeSettings | null,
+): ReturnType<typeof pinnedLaunchFromBinding> {
+  if (issue.credentialSource === 'native') {
+    return pinnedLaunchFromBinding(agent, {
+      credentialSource: 'native',
+      model: issue.model,
+      reasoningEffort: issue.effort,
+    })
+  }
+  if (issue.credential) {
+    return pinnedLaunchFromBinding(agent, {
+      credentialSource: 'vault',
+      credentialSlug: issue.credential,
+      model: issue.model,
+      reasoningEffort: issue.effort,
+    })
+  }
+  const inherited = resolveIssueAiSelection({ mode, agent, issue })
+  return pinnedLaunchFromBinding(agent, {
+    credentialSource: inherited.accessMode,
+    credentialSlug: inherited.credentialSlug,
+    model: issue.model ?? inherited.model,
+    reasoningEffort: issue.effort ?? inherited.reasoningEffort,
+  })
+}
+
 function IssueAiEditor({
+  wsId,
   issue,
   agent,
+  agents,
   mode,
   credentials,
-  presets,
-  loading,
   disabled,
   bound,
   boundRuntime,
   onApply,
+  onConfigureProvider,
 }: {
+  wsId: string
   issue: IssueDetailIssue
   agent: string | null
+  agents: readonly AgentInfo[]
   mode: WorkspaceRuntimeModeSettings | null
   credentials: readonly SavedCredential[]
-  presets: readonly Preset[]
-  loading: boolean
   disabled: boolean
   bound?: boolean
   boundRuntime?: WorkspaceSessionDirectoryEntry['runtime']
   onApply: (patch: IssuePatch, capability: { from: string; to: string }) => void
+  onConfigureProvider: () => void
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const initialAccess = bound
-    ? (boundRuntime?.credentialSource === 'vault' && boundRuntime.credentialSlug
-      ? `vault:${boundRuntime.credentialSlug}`
-      : 'native')
-    : issue.credentialSource === 'native'
-      ? 'native'
-      : issue.credential
-        ? `vault:${issue.credential}`
-        : 'inherit'
-  const initialModel = bound ? boundRuntime?.model ?? null : issue.model ?? null
-  const initialEffort = bound ? boundRuntime?.reasoningEffort ?? null : issue.effort ?? null
-  const [access, setAccess] = useState(initialAccess)
-  const [model, setModel] = useState<string | null>(initialModel)
-  const [effort, setEffort] = useState<ModelReasoningEffort | null>(initialEffort)
+  const inheritsAccess = !bound && issue.credentialSource !== 'native' && !issue.credential
+  const [inherit, setInherit] = useState(inheritsAccess)
+  const agentId = agent ?? 'codex'
+  const initial = bound
+    ? pinnedLaunchFromBinding(agentId, boundRuntime)
+    : issueLaunchSeed(agentId, issue, mode)
+  const editor = usePinnedRuntimeDraft({
+    workspaceId: wsId,
+    agent: agentId,
+    agents,
+    initial,
+    active: open,
+  })
 
   useEffect(() => {
     if (!open) return
-    setAccess(initialAccess)
-    setModel(initialModel)
-    setEffort(initialEffort)
-  }, [initialAccess, initialEffort, initialModel, open])
+    setInherit(inheritsAccess)
+  }, [inheritsAccess, open])
 
-  const draftIssue = {
-    ...(access === 'native' ? { credentialSource: 'native' as const } : {}),
-    ...(access.startsWith('vault:') ? { credential: access.slice(6) } : {}),
-    ...(model ? { model } : {}),
-    ...(effort ? { effort } : {}),
-  }
-  const resolved = resolveIssueAiSelection({ mode, agent, issue: draftIssue })
   const committed = bound
     ? {
         accessMode: (boundRuntime?.credentialSource === 'vault' ? 'vault' : 'native') as 'vault' | 'native',
@@ -636,25 +580,6 @@ function IssueAiEditor({
         accessOrigin: 'issue' as const,
       }
     : resolveIssueAiSelection({ mode, agent, issue })
-  const selectedCredential = resolved.credentialSlug
-    ? credentials.find((candidate) => candidate.slug === resolved.credentialSlug) ?? null
-    : null
-  const models = issueModelOptions({
-    agent,
-    credential: selectedCredential,
-    defaultModel: bound
-      ? model ?? selectedCredential?.resolvedModel ?? null
-      : resolved.model ?? selectedCredential?.resolvedModel ?? null,
-    presets,
-  })
-  const effectiveModel = model
-    ?? (bound ? null : resolved.model ?? selectedCredential?.resolvedModel ?? null)
-  const semantics = issueModelSemantics(effectiveModel, models)
-  const efforts = issueEffortOptions({ agent, semantics, modelKnown: semantics !== null })
-  const inheritedEffort = bound
-    ? null
-    : resolved.reasoningEffort ?? selectedCredential?.resolvedReasoningEffort ?? null
-
   const accessLabel = (modeValue: string, slug: string | undefined, fallbackCredential: SavedCredential | null) => (
     modeValue === 'vault' || modeValue.startsWith('vault:')
       ? credentialLabel(fallbackCredential)
@@ -666,6 +591,11 @@ function IssueAiEditor({
   const committedCredential = committed.credentialSlug
     ? credentials.find((candidate) => candidate.slug === committed.credentialSlug) ?? null
     : null
+  const fallback = {
+    access: t('issues.detail.agentLogin'),
+    model: t('issues.detail.runtimeDecides'),
+    effort: t('issues.detail.runtimeDecides'),
+  }
   const summaryAccess = accessLabel(committed.accessMode, committed.credentialSlug, committedCredential)
   const summaryModel = bound
     ? committed.model ?? t('issues.detail.runtimeDecides')
@@ -673,17 +603,13 @@ function IssueAiEditor({
   const summaryEffort = bound
     ? committed.reasoningEffort ?? t('issues.detail.runtimeDecides')
     : committed.reasoningEffort ?? committedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
-  const draftAccess = accessLabel(
-    resolved.accessMode,
-    resolved.credentialSlug,
-    selectedCredential,
-  )
-  const draftModel = bound
-    ? model ?? t('issues.detail.runtimeDecides')
-    : model ?? resolved.model ?? selectedCredential?.resolvedModel ?? t('issues.detail.runtimeDecides')
-  const draftEffort = bound
-    ? effort ?? t('issues.detail.runtimeDecides')
-    : effort ?? resolved.reasoningEffort ?? selectedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
+  const draftCapability = inherit && !bound
+    ? {
+        access: t('issues.detail.followWorkspaceHeadless'),
+        model: editor.capability(fallback).model,
+        effort: editor.capability(fallback).effort,
+      }
+    : editor.capability(fallback)
   const provenance = bound
     ? t('issues.detail.sessionBinding')
     : committed.accessOrigin === 'workspace-fixed'
@@ -721,89 +647,64 @@ function IssueAiEditor({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <label className="block space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><KeyRound size={14} />{t('issues.detail.aiAccess')}</span>
-            <select
-              className={`${railControl} w-full`}
-              aria-label={t('issues.detail.aiAccess')}
-              value={access}
-              disabled={loading}
-              onChange={(event) => {
-                setAccess(event.target.value)
-                setModel(null)
-                setEffort(null)
-              }}
-            >
-              {!bound && (
-                <option value="inherit">{t('issues.detail.followWorkspaceHeadless')}</option>
-              )}
-              <option value="native">{t('issues.detail.useAgentLogin')}</option>
-              {credentials.map((credential) => (
-                <option key={credential.slug} value={`vault:${credential.slug}`}>
-                  {credentialLabel(credential)} · {credential.vendor}
-                </option>
-              ))}
-              {issue.credential && !credentials.some((credential) => credential.slug === issue.credential) && (
-                <option value={`vault:${issue.credential}`}>{t('issues.detail.missingCredentialValue', { credential: issue.credential })}</option>
-              )}
-              {bound && boundRuntime?.credentialSlug
-                && !credentials.some((credential) => credential.slug === boundRuntime.credentialSlug)
-                && (
-                  <option value={`vault:${boundRuntime.credentialSlug}`}>
-                    {t('issues.detail.missingCredentialValue', { credential: boundRuntime.credentialSlug })}
-                  </option>
-                )}
-            </select>
-            <span className="block text-[11px] leading-relaxed text-muted-foreground">
-              {t(bound ? 'issues.detail.sessionAiAccessDescription' : 'issues.detail.aiAccessDescription')}
-            </span>
-          </label>
-          <div className="space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><Cpu size={14} />{t('issues.detail.model')}</span>
-            <ModelEditor
-              value={model ?? undefined}
-              defaultModel={bound ? null : resolved.model ?? selectedCredential?.resolvedModel ?? null}
-              models={models}
-              loadingDefault={loading}
-              disabled={disabled}
-              onChange={setModel}
+          {!bound && (
+            <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={inherit}
+                disabled={disabled}
+                aria-label={t('issues.detail.followWorkspaceHeadless')}
+                onChange={(event) => {
+                  const next = event.target.checked
+                  setInherit(next)
+                  if (next) return
+                  const resolved = resolveIssueAiSelection({ mode, agent, issue })
+                  if (resolved.accessMode === 'vault' && resolved.credentialSlug) {
+                    editor.config.selectCredential(resolved.credentialSlug)
+                  } else {
+                    editor.config.selectRuntimeDefault()
+                  }
+                }}
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">
+                  {t('issues.detail.followWorkspaceHeadless')}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                  {t('issues.detail.aiAccessDescription')}
+                </span>
+              </span>
+            </label>
+          )}
+          <fieldset disabled={disabled} className="min-w-0 space-y-3 disabled:opacity-60">
+            <AgentLaunchSelectors
+              config={editor.config}
+              onConfigureProvider={onConfigureProvider}
+              showRuntime={false}
+              showAccess={bound || !inherit}
+              toolbar
+              layout="settings"
+              menuPlacement="down"
+              menuPositionerClassName="z-[80]"
             />
-          </div>
-          <label className="block space-y-1.5">
-            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><Brain size={14} />{t('issues.detail.effort')}</span>
-            <select
-              className={`${railControl} w-full`}
-              value={effort ?? ''}
-              disabled={disabled}
-              onChange={(event) => setEffort(event.target.value ? event.target.value as ModelReasoningEffort : null)}
-            >
-              <option value="">{inheritedEffort
-                ? t('issues.detail.workspaceValue', { value: inheritedEffort })
-                : t('issues.detail.runtimeDecides')}</option>
-              {efforts.map((candidate) => <option key={candidate} value={candidate}>{candidate}</option>)}
-            </select>
-          </label>
+          </fieldset>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t(bound ? 'issues.detail.sessionAiAccessDescription' : 'issues.detail.aiAccessDescription')}
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
           <Button
             onClick={() => {
-              onApply({
-                credential: access.startsWith('vault:') ? access.slice(6) : null,
-                credentialSource: access === 'native' ? 'native' : null,
-                model,
-                effort,
-              }, {
-                from: formatAiCapability({
+              const update = editor.toRuntimeUpdate()
+              onApply(runtimeUpdateToIssuePatch(update, Boolean(!bound && inherit)), {
+                from: formatPinnedCapability({
                   access: summaryAccess,
                   model: summaryModel,
                   effort: summaryEffort,
                 }),
-                to: formatAiCapability({
-                  access: draftAccess,
-                  model: draftModel,
-                  effort: draftEffort,
-                }),
+                to: formatPinnedCapability(draftCapability),
               })
               setOpen(false)
             }}
@@ -901,7 +802,7 @@ function SchedulePolicyEditor({
 function PropertiesRail({
   wsId,
   issue,
-  agentOptions,
+  agents,
   issueDefaultAgent,
   defaultAgent,
   headlessRuntime,
@@ -921,7 +822,7 @@ function PropertiesRail({
 }: {
   wsId: string
   issue: IssueDetailIssue
-  agentOptions: readonly { id: string; displayName: string; installed?: boolean }[]
+  agents: readonly AgentInfo[]
   issueDefaultAgent: string | null
   defaultAgent: string | null
   headlessRuntime: WorkspaceRuntimeModeSettings | null
@@ -948,31 +849,21 @@ function PropertiesRail({
   } | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
   const meta = STATUS_META[issue.status]
-  const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
-  const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
+  const issueDefaultInOptions = issueDefaultAgent && agents.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
+  const defaultInOptions = defaultAgent && agents.some((a) => a.id === defaultAgent) ? defaultAgent : null
   const ownerResumeId = issue.assignee.startsWith('@resume-')
     ? issue.assignee.slice(1)
     : null
   const ownerSession = ownerResumeId
     ? sessions.find((session) => session.resumeId === ownerResumeId)
     : undefined
-  const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
+  const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agents[0]?.id || null
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
   const [credentialOptions, setCredentialOptions] = useState<{
     agent: string
     loading: boolean
     credentials: SavedCredential[]
   } | null>(null)
-  const [presets, setPresets] = useState<readonly Preset[]>([])
-
-  useEffect(() => {
-    let live = true
-    void configApi.getPresets()
-      .then(({ presets: next }) => { if (live) setPresets(next) })
-      .catch(() => { if (live) setPresets([]) })
-    return () => { live = false }
-  }, [])
-
   useEffect(() => {
     if (!effectiveAgent) {
       setCredentialOptions(null)
@@ -1002,9 +893,6 @@ function PropertiesRail({
   const availableCredentials = credentialOptions?.agent === effectiveAgent
     ? credentialOptions.credentials
     : []
-  const credentialsLoading = credentialOptions?.agent === effectiveAgent
-    ? credentialOptions.loading
-    : Boolean(effectiveAgent)
   const resolvedAi = resolveIssueAiSelection({ mode: headlessRuntime, agent: effectiveAgent, issue })
   const agentNeedsCredential = selectedReadiness?.requiresCredential === true
     && !selectedReadiness.ready
@@ -1179,7 +1067,7 @@ function PropertiesRail({
                       value={issue.agent}
                       issueDefaultAgent={issueDefaultAgent}
                       defaultAgent={defaultAgent}
-                      options={agentOptions}
+                      options={agents}
                       readiness={agentReadiness}
                       disabled={saving}
                       onChange={(agent) => {
@@ -1200,15 +1088,18 @@ function PropertiesRail({
               <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
                 <div className="flex min-w-0">
                   <IssueAiEditor
+                    wsId={wsId}
                     issue={issue}
                     agent={effectiveAgent}
+                    agents={agents}
                     mode={headlessRuntime}
                     credentials={availableCredentials}
-                    presets={presets}
-                    loading={credentialsLoading}
                     disabled={saving || Boolean(ownerResumeId && (ownerSessionBusy(ownerSession) || (sessionsLoaded && !ownerSession)))}
                     bound={Boolean(ownerResumeId)}
                     boundRuntime={ownerSession?.runtime}
+                    onConfigureProvider={() => {
+                      if (effectiveAgent) onConfigureAgent(effectiveAgent as AgentId)
+                    }}
                     onApply={(patch, capability) => {
                       if (!ownerResumeId) {
                         void onPatch(patch)
@@ -2298,7 +2189,7 @@ export function IssueDetail({
         <PropertiesRail
           wsId={wsId}
           issue={issue}
-          agentOptions={agentOptions}
+          agents={agentOptions}
           issueDefaultAgent={workspaceIssueDefaultAgent}
           defaultAgent={workspaceLegacyDefaultAgent}
           headlessRuntime={workspace?.runtimeSettings?.runtime.headless ?? null}

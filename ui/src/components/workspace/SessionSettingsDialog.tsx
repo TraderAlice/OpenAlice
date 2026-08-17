@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -11,11 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { QuickChatLaunchPreference } from '../../api/preferences'
-import {
-  useAgentLaunchConfig,
-  type AgentLaunchPreferencesState,
-} from '../../hooks/useAgentLaunchConfig'
+import { pinnedLaunchFromBinding, usePinnedRuntimeDraft } from '../../hooks/usePinnedRuntimeDraft'
 import { AgentLaunchSelectors } from './AgentLaunchControls'
 import { sessionCoworkerLabel } from './display'
 import type {
@@ -46,28 +42,9 @@ export interface SessionSettingsDialogProps {
   readonly onPause?: () => void
 }
 
-function runtimeLaunch(record: SessionRecord): QuickChatLaunchPreference {
-  const runtime = record.runtime
-  const vault = runtime?.credentialSource === 'vault' && Boolean(runtime.credentialSlug)
-  return {
-    agent: record.agent,
-    accessMode: vault ? 'vault' : 'native',
-    credentialSlug: vault ? runtime?.credentialSlug ?? null : null,
-    model: runtime?.model ?? null,
-    reasoningEffort: runtime?.reasoningEffort ?? null,
-  }
-}
-
 function normalizeDisplayName(value: string): string | null {
   const trimmed = value.trim()
   return trimmed ? trimmed.slice(0, DISPLAY_NAME_MAX) : null
-}
-
-function launchEquals(a: QuickChatLaunchPreference, b: QuickChatLaunchPreference): boolean {
-  return a.accessMode === b.accessMode
-    && (a.credentialSlug ?? null) === (b.credentialSlug ?? null)
-    && (a.model ?? null) === (b.model ?? null)
-    && (a.reasoningEffort ?? null) === (b.reasoningEffort ?? null)
 }
 
 /**
@@ -86,66 +63,40 @@ export function SessionSettingsDialog({
   onPause,
 }: SessionSettingsDialogProps) {
   const { t } = useTranslation()
-  const initialLaunch = useMemo(() => runtimeLaunch(record), [record])
-  const initialLaunchKey = JSON.stringify(initialLaunch)
+  const initialLaunch = useMemo(
+    () => pinnedLaunchFromBinding(record.agent, record.runtime),
+    [record.agent, record.runtime],
+  )
   const initialDisplayName = record.displayName ?? ''
   const [displayName, setDisplayName] = useState(initialDisplayName)
-  const [draft, setDraft] = useState<QuickChatLaunchPreference>(initialLaunch)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const paused = record.state === 'paused'
   const supportsAi = record.agent !== 'shell' && Boolean(onSaveRuntime)
   const aiEditable = supportsAi && paused
+  const editor = usePinnedRuntimeDraft({
+    workspaceId,
+    agent: record.agent,
+    agents,
+    initial: initialLaunch,
+    active: open,
+  })
+  const config = editor.config
 
   useEffect(() => {
     if (!open) return
     setDisplayName(initialDisplayName)
-    setDraft(initialLaunch)
     setError(null)
-    // Reset only when this dialog opens for a different persisted binding.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDisplayName, initialLaunchKey, open])
+  }, [initialDisplayName, open])
 
-  const rememberLaunch = useCallback(async (launch: QuickChatLaunchPreference) => {
-    setDraft(launch)
-  }, [])
-  const preferences = useMemo<AgentLaunchPreferencesState>(() => ({
-    lastCredentialByAgent: draft.credentialSlug
-      ? { [record.agent]: draft.credentialSlug }
-      : {},
-    recentChatWorkspaceId: workspaceId,
-    recentLaunch: draft,
-    loaded: true,
-    rememberLaunch,
-    adoptRecentChatWorkspace: () => undefined,
-  }), [draft, record.agent, rememberLaunch, workspaceId])
-  const runtimeAgents = useMemo(
-    () => agents.filter((agent) => agent.id === record.agent),
-    [agents, record.agent],
-  )
-  const config = useAgentLaunchConfig({
-    agents: runtimeAgents,
-    defaultAgent: record.agent,
-    preferences,
-    workspaceId,
-    hasWorkspace: true,
-    managedWorkspaceLaunch: true,
-  })
-  const runtimeName = runtimeAgents[0]?.displayName ?? record.agent
+  const runtimeName = config.selectedAgent?.displayName ?? record.agent
   const coworkerLabel = sessionCoworkerLabel(record)
 
   const nextDisplayName = normalizeDisplayName(displayName)
   const currentDisplayName = normalizeDisplayName(initialDisplayName)
   const displayNameDirty = nextDisplayName !== currentDisplayName
-  const launchDirty = supportsAi && !launchEquals({
-    agent: record.agent,
-    accessMode: config.accessMode,
-    credentialSlug: config.launchCredentialSlug ?? null,
-    model: config.launchModel ?? null,
-    reasoningEffort: config.launchReasoningEffort ?? null,
-  }, initialLaunch)
-  const canSaveAi = aiEditable && launchDirty && config.credentialSelectionReady && Boolean(config.effectiveAgent)
+  const canSaveAi = aiEditable && editor.dirty && config.credentialSelectionReady && Boolean(config.effectiveAgent)
   const canSave = !saving && (displayNameDirty || canSaveAi)
 
   const submit = async () => {
@@ -157,13 +108,7 @@ export function SessionSettingsDialog({
         await onSaveDisplayName(nextDisplayName)
       }
       if (canSaveAi && onSaveRuntime) {
-        const vault = config.accessMode === 'vault' && Boolean(config.launchCredentialSlug)
-        await onSaveRuntime({
-          credentialSource: vault ? 'vault' : 'native',
-          ...(vault ? { credentialSlug: config.launchCredentialSlug } : {}),
-          model: config.launchModel ?? null,
-          reasoningEffort: config.launchReasoningEffort ?? null,
-        })
+        await onSaveRuntime(editor.toRuntimeUpdate())
       }
       onOpenChange(false)
     } catch (cause) {
