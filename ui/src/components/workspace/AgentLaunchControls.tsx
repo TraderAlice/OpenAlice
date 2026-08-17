@@ -89,12 +89,16 @@ export interface AgentLaunchSelectorsProps {
   readonly onConfigureProvider: () => void
   readonly showRuntime?: boolean
   readonly showAi?: boolean
+  /** Hide the access menu when a surface owns inherit / native / vault itself. */
+  readonly showAccess?: boolean
   readonly menuPlacement?: 'up' | 'down'
   readonly labeled?: boolean
   /** Visually recede selectors into a composer toolbar until hover/focus. */
   readonly toolbar?: boolean
   /** Present AI controls as full-width setting rows instead of composer chips. */
   readonly layout?: 'inline' | 'settings'
+  /** Raise menus above a parent settings dialog. */
+  readonly menuPositionerClassName?: string
 }
 
 export interface AgentLaunchSelectorsHandle {
@@ -245,10 +249,12 @@ function AgentLaunchInferenceMenu({
   config,
   menuPlacement,
   settings = false,
+  menuPositionerClassName,
 }: {
   config: AgentLaunchConfigState
   menuPlacement: 'up' | 'down'
   settings?: boolean
+  menuPositionerClassName?: string
 }) {
   const { t } = useTranslation()
   const pendingCustomModelRef = useRef(false)
@@ -334,6 +340,7 @@ function AgentLaunchInferenceMenu({
           align="start"
           side={settings ? 'top' : menuPlacement === 'down' ? 'bottom' : 'top'}
           sideOffset={6}
+          positionerClassName={menuPositionerClassName}
           aria-label={t('chatLanding.selectModelAndEffort')}
           className="w-[280px] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 bg-secondary p-1.5 shadow-lg ring-0"
         >
@@ -412,7 +419,7 @@ function AgentLaunchInferenceMenu({
       </DropdownMenu>
 
       <Dialog open={customModelOpen} onOpenChange={setCustomModelOpen}>
-        <DialogContent>
+        <DialogContent overlayClassName="z-[80]" className="z-[80]">
           <DialogHeader>
             <DialogTitle>{t('chatLanding.customModelTitle')}</DialogTitle>
             <DialogDescription>{t('chatLanding.customModelDescription')}</DialogDescription>
@@ -453,10 +460,12 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
     onConfigureProvider,
     showRuntime = true,
     showAi = true,
+    showAccess = true,
     menuPlacement = 'up',
     labeled = false,
     toolbar = false,
     layout = 'inline',
+    menuPositionerClassName,
   },
   ref,
 ) {
@@ -585,7 +594,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         )}
       </div>}
 
-      {showAi && config.needsCredential && config.noCredentials && (
+      {showAi && showAccess && config.needsCredential && config.noCredentials && (
         <button
           type="button"
           onClick={onConfigureProvider}
@@ -596,7 +605,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
         </button>
       )}
 
-      {showAi && config.canSelectCredential && !config.noCredentials && config.credentials && (
+      {showAi && showAccess && config.canSelectCredential && !config.noCredentials && config.credentials && (
         <DropdownMenu open={credentialMenuOpen} onOpenChange={setCredentialMenuOpen}>
           <DropdownMenuTrigger
             type="button"
@@ -627,6 +636,7 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
             align="start"
             side={menuPlacement === 'down' ? 'bottom' : 'top'}
             sideOffset={6}
+            positionerClassName={menuPositionerClassName}
             className="w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border border-border/70 bg-secondary p-1.5 shadow-lg ring-0"
           >
             <DropdownMenuGroup>
@@ -695,7 +705,12 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
           className={settingsLayout ? 'w-full min-w-0' : `contents sm:flex sm:shrink-0 sm:items-center ${toolbar ? 'sm:gap-1' : 'sm:gap-2'}`}
         >
           {toolbar ? (
-            <AgentLaunchInferenceMenu config={config} menuPlacement={menuPlacement} settings={settingsLayout} />
+            <AgentLaunchInferenceMenu
+              config={config}
+              menuPlacement={menuPlacement}
+              settings={settingsLayout}
+              menuPositionerClassName={menuPositionerClassName}
+            />
           ) : (
             <>
               <AgentLaunchModelEditor config={config} labeled={labeled} />
