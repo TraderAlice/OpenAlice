@@ -23,6 +23,8 @@ const actions = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
   setSessionPresence: vi.fn(async () => undefined),
+  setSessionDisplayName: vi.fn(async () => undefined),
+  updateSessionRuntime: vi.fn(async () => undefined),
   openAgentConfig: vi.fn(),
 }))
 const directoryState = vi.hoisted(() => ({
@@ -119,6 +121,8 @@ function workspaceContext(
     openWebPiSession: actions.openWebPiSession,
     requestDeleteSession: actions.requestDeleteSession,
     setSessionPresence: actions.setSessionPresence,
+    setSessionDisplayName: actions.setSessionDisplayName,
+    updateSessionRuntime: actions.updateSessionRuntime,
     openAgentConfig: actions.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),

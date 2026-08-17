@@ -15,6 +15,8 @@ const actions = vi.hoisted(() => ({
   resumeSession: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
   setSessionPresence: vi.fn(async () => undefined),
+  setSessionDisplayName: vi.fn(async () => undefined),
+  updateSessionRuntime: vi.fn(async () => undefined),
   setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
 }))
 
@@ -108,6 +110,8 @@ function context(): WorkspacesContextValue {
     openWebPiSession: vi.fn(async () => undefined),
     requestDeleteSession: actions.requestDeleteSession,
     setSessionPresence: actions.setSessionPresence,
+    setSessionDisplayName: actions.setSessionDisplayName,
+    updateSessionRuntime: actions.updateSessionRuntime,
     openAgentConfig: vi.fn(),
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),

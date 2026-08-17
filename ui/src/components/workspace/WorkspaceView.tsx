@@ -39,6 +39,10 @@ export interface WorkspaceViewProps {
     sessionId: string,
     update: PausedSessionRuntimeUpdate,
   ) => Promise<void>;
+  readonly onSaveSessionDisplayName?: (
+    resumeId: string,
+    displayName: string | null,
+  ) => Promise<void>;
   readonly onOpenWebPi: (sessionId: string) => Promise<void>;
   /** Navigate to an already-running session without re-spawning it. Library
    *  rows call this for running entries; paused entries go through `onResume`. */
@@ -108,6 +112,12 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
             workspaceId={props.wsId}
             onUpdateRuntime={props.onUpdateSessionRuntime
               ? (update) => props.onUpdateSessionRuntime!(props.activeRecord!.id, update)
+              : undefined}
+            onSaveDisplayName={props.onSaveSessionDisplayName && props.activeRecord.resumeId
+              ? (displayName) => props.onSaveSessionDisplayName!(
+                props.activeRecord!.resumeId,
+                displayName,
+              )
               : undefined}
             onResume={() => props.onResume(props.activeRecord!.id)}
             onOpenWebPi={() => props.onOpenWebPi(props.activeRecord!.id)}

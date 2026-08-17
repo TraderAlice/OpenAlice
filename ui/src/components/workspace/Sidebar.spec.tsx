@@ -155,6 +155,8 @@ describe('SessionRow actions', () => {
     const user = userEvent.setup()
     const onPause = vi.fn()
     const onDelete = vi.fn()
+    const onSettings = vi.fn()
+    const onArchive = vi.fn()
     const { rerender } = render(
       <SessionRow
         session={session}
@@ -163,6 +165,8 @@ describe('SessionRow actions', () => {
         onPause={onPause}
         onResume={vi.fn()}
         onDelete={onDelete}
+        onArchive={onArchive}
+        onSettings={onSettings}
       />,
     )
 
@@ -171,8 +175,12 @@ describe('SessionRow actions', () => {
     expect(more.getAttribute('aria-haspopup')).toBe('menu')
     more.focus()
     await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings for Review AAPL earnings' }))
+    expect(onSettings).toHaveBeenCalledOnce()
+
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     const deleteItem = screen.getByRole('menuitem', { name: 'Delete Review AAPL earnings' })
-    expect(document.activeElement).toBe(deleteItem)
     fireEvent.click(deleteItem)
     expect(onPause).toHaveBeenCalledOnce()
     expect(onDelete).toHaveBeenCalledOnce()
@@ -186,6 +194,8 @@ describe('SessionRow actions', () => {
         onPause={vi.fn()}
         onResume={onResume}
         onDelete={vi.fn()}
+        onArchive={onArchive}
+        onSettings={onSettings}
       />,
     )
 

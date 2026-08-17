@@ -53,14 +53,17 @@ import {
   quickChat as apiQuickChat,
   quickStartWorkspaceManager as apiQuickStartWorkspaceManager,
   resumeSession as apiResumeSession,
+  setSessionDisplayName as apiSetSessionDisplayName,
   setSessionPresence as apiSetSessionPresence,
   type SessionPresence,
   setIssueDefaultAgent as apiSetIssueDefaultAgent,
   setAutoQuantDefaultWorkspace as apiSetAutoQuantDefaultWorkspace,
   setWorkspaceDefaultAgent as apiSetWorkspaceDefaultAgent,
   spawnSession,
+  updatePausedSessionRuntime as apiUpdatePausedSessionRuntime,
   updateWorkspaceMetadata,
   type AgentInfo,
+  type PausedSessionRuntimeUpdate,
   MANAGER_WORKSPACE_ID,
   type ManagerQuickStartResult,
   type ManagerWorkspaceSnapshot,
@@ -642,6 +645,65 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     }
   }, [refresh, t, toast])
 
+  const setSessionDisplayName = useCallback(async (
+    wsId: string,
+    resumeId: string,
+    displayName: string | null,
+  ): Promise<void> => {
+    const result = await apiSetSessionDisplayName(wsId, resumeId, displayName)
+    // Clearing removes the field rather than writing an empty string.
+    setWorkspaces((prev) => prev.map((workspace) => {
+      if (workspace.id !== wsId) return workspace
+      return {
+        ...workspace,
+        sessions: workspace.sessions.map((session) => {
+          if (session.resumeId !== resumeId) return session
+          if (result.displayName) return { ...session, displayName: result.displayName }
+          const { displayName: _cleared, ...rest } = session
+          return rest
+        }),
+      }
+    }))
+    if (wsId === MANAGER_WORKSPACE_ID) {
+      setWorkspaceManager((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          sessions: current.sessions.map((session) => {
+            if (session.resumeId !== resumeId) return session
+            if (result.displayName) return { ...session, displayName: result.displayName }
+            const { displayName: _cleared, ...rest } = session
+            return rest
+          }),
+        }
+      })
+      void refreshWorkspaceManager()
+    } else {
+      void refresh()
+    }
+  }, [refresh, refreshWorkspaceManager])
+
+  const updateSessionRuntime = useCallback(async (
+    wsId: string,
+    sessionId: string,
+    update: PausedSessionRuntimeUpdate,
+  ): Promise<void> => {
+    const updated = await apiUpdatePausedSessionRuntime(wsId, sessionId, update)
+    if (wsId === MANAGER_WORKSPACE_ID) {
+      setWorkspaceManager((current) => patchManagerSession(current, sessionId, {
+        runtime: updated.runtime,
+        ...(updated.displayName ? { displayName: updated.displayName } : {}),
+      }))
+      void refreshWorkspaceManager()
+    } else {
+      setWorkspaces((prev) => patchSession(prev, wsId, sessionId, {
+        runtime: updated.runtime,
+        ...(updated.displayName ? { displayName: updated.displayName } : {}),
+      }))
+      void refresh()
+    }
+  }, [refresh, refreshWorkspaceManager])
+
   const openAgentConfig = useCallback((
     wsId: string,
     agent?: AgentId,
@@ -690,6 +752,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     openWebPiSession,
     requestDeleteSession,
     setSessionPresence,
+    setSessionDisplayName,
+    updateSessionRuntime,
     openAgentConfig,
     saveWorkspaceMetadata,
     renameWorkspace,
@@ -717,6 +781,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     renameWorkspace,
     requestDeleteSession,
     setSessionPresence,
+    setSessionDisplayName,
+    updateSessionRuntime,
     resumeSession,
     saveWorkspaceMetadata,
     setAutoQuantDefaultWorkspace,

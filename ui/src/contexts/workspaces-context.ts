@@ -74,6 +74,16 @@ export interface WorkspacesContextValue {
     resumeId: string,
     presence: import('../components/workspace/api').SessionPresence,
   ): Promise<void>
+  setSessionDisplayName(
+    wsId: string,
+    resumeId: string,
+    displayName: string | null,
+  ): Promise<void>
+  updateSessionRuntime(
+    wsId: string,
+    sessionId: string,
+    update: import('../components/workspace/api').PausedSessionRuntimeUpdate,
+  ): Promise<void>
   openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,
