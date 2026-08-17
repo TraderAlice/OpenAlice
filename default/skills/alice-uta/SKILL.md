@@ -103,6 +103,18 @@ alice-uta git reject --help            # reject a staged change
 alice-uta git sync --help              # reconcile against the venue
 ```
 
+Shells expand `$` inside double-quoted values. For any trading thesis that
+contains currency, either use single quotes or the generated file-backed flag:
+
+```bash
+alice-uta order place ... --commit-message 'Buy below $971 after support confirmation'
+alice-uta order place ... --commit-message-file /path/to/thesis.txt
+```
+
+Never put a dollar-denominated thesis in a double-quoted `--commit-message`;
+`"$971"` can reach OpenAlice as `"71"`. File-backed string flags accept `-` to
+read stdin when the exact value is already available as a stream.
+
 ## Market clock & simulator
 
 ```bash

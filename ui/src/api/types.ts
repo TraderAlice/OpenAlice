@@ -368,7 +368,21 @@ export interface Position {
 export interface WalletCommitLog {
   hash: string
   message: string
-  operations: Array<{ symbol: string; action: string; change: string; status: string }>
+  operations: Array<{
+    symbol: string
+    action: string
+    change: string
+    status: string
+    order?: {
+      side?: string
+      orderType?: string
+      totalQuantity?: string
+      cashQuantity?: string
+      limitPrice?: string
+      auxPrice?: string
+      timeInForce?: string
+    }
+  }>
   timestamp: string
   round?: number
 }
