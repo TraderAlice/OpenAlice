@@ -1,6 +1,6 @@
 # Plan: Session Settings from the sidebar overflow
 
-**Status:** active (investigation + design; not implementing yet)  
+**Status:** active (implementation in progress on this branch)  
 **Owner guides:** [[docs/conversation-provenance.md]],
 [[docs/model-semantics-and-runtime-injection.md]],
 [[docs/ui-interaction-and-motion.md]]  
@@ -91,18 +91,18 @@ Archive / Restore / Delete 仍留在菜单里，不并进 Settings。
 
 ### In
 
-- [ ] Extend or replace `SessionRuntimeEditorDialog` → Session Settings
+- [x] Extend or replace `SessionRuntimeEditorDialog` → Session Settings
   (display name + AI); keep unit/render specs green
-- [ ] `SessionRow` / `HarnessSessionRow` / `ChatWorkspaceSection` wire
+- [x] `SessionRow` / `HarnessSessionRow` / `ChatWorkspaceSection` wire
   `onOpenSessionSettings` + agents / workspaceId / save callbacks
-- [ ] `setSessionDisplayName` from the dialog; optimistic or refetch roster
+- [x] `setSessionDisplayName` from the dialog; optimistic or refetch roster
   label without reordering
-- [ ] Resume CTA Change AI → same dialog
-- [ ] Demo handler already covers metadata + runtime; add UI specs for menu
+- [x] Resume CTA Change AI → same dialog
+- [x] Demo handler already covers metadata + runtime; add UI specs for menu
   entry + save paths
-- [ ] Owner-guide touch: one short paragraph under Session coworker name /
+- [x] Owner-guide touch: one short paragraph under Session coworker name /
   paused binding UI pointing at the sidebar Settings entry
-- [ ] i18n for dialog + menu label
+- [x] i18n for dialog + menu label
 
 ### Out
 

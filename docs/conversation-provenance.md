@@ -121,6 +121,9 @@ This is the coworker's nametag:
 - empty or `null` clears the field; the maximum is 120 characters after trim;
 - agents rename only through `alice-workspace session rename` or
   `PATCH /api/workspaces/:id/resumes/:resumeId/metadata`;
+- the Ask Alice / Quant Session row overflow menu exposes **Settings** for the
+  nametag plus paused credential/model/effort editing (same dialog as the
+  paused Resume CTA); Archive stays a separate overflow action;
 - a missing field means unnamed; there is no migration;
 - `workspaces/state/resume-identities.json` hydrates the name in memory and
   strips it on flush, the same way it treats `runtimeBinding`.

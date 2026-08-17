@@ -643,6 +643,7 @@ export interface SessionRowProps {
   onDelete: () => void;
   onArchive?: () => void;
   onRestore?: () => void;
+  onSettings?: () => void;
 }
 
 export function SessionRow(props: SessionRowProps): ReactElement {
@@ -665,7 +666,14 @@ export function SessionRow(props: SessionRowProps): ReactElement {
   const deleteLabel = t('workspace.deleteSession', { title: display });
   const archiveLabel = t('workspace.archiveSession', { title: display });
   const restoreLabel = t('workspace.restoreSession', { title: display });
+  const settingsLabel = t('workspace.sessionSettings.openFor', { title: display });
   const menuItems = [
+    ...(props.onSettings ? [{
+      label: t('workspace.sessionSettings.action'),
+      ariaLabel: settingsLabel,
+      icon: <SettingsIcon size={13} strokeWidth={2} />,
+      onSelect: props.onSettings,
+    }] : []),
     ...(props.onArchive ? [{
       label: t('workspace.archiveSessionAction'),
       ariaLabel: archiveLabel,

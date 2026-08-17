@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
 import { Bot, ChevronDown, Settings2, SquareTerminal } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
-import { SessionRuntimeEditorDialog } from './SessionRuntimeEditorDialog';
+import { SessionSettingsDialog } from './SessionSettingsDialog';
+import { sessionCoworkerLabel } from './display';
 import type {
   AgentInfo,
   PausedSessionRuntimeUpdate,
@@ -15,6 +17,7 @@ export interface ResumeCtaProps {
   readonly agents?: readonly AgentInfo[];
   readonly workspaceId?: string;
   readonly onUpdateRuntime?: (update: PausedSessionRuntimeUpdate) => Promise<void>;
+  readonly onSaveDisplayName?: (displayName: string | null) => Promise<void>;
   readonly onResume: () => Promise<void>;
   readonly onOpenWebPi?: () => Promise<void>;
 }
@@ -39,12 +42,14 @@ export interface ResumeCtaProps {
  *      `resume --last`; shell fresh + scrollback restore).
  */
 export function ResumeCta(props: ResumeCtaProps): ReactElement {
+  const { t } = useTranslation();
   const [resuming, setResuming] = useState<'terminal' | 'webpi' | null>(null);
-  const [runtimeEditorOpen, setRuntimeEditorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const r = props.record;
-  const sessionTitle = r.title?.trim() || r.name;
+  const sessionTitle = sessionCoworkerLabel(r);
   const runtimeFacts = sessionRuntimeFacts(r);
+  const canOpenSettings = Boolean(props.workspaceId && props.onSaveDisplayName);
 
   const run = async (surface: 'terminal' | 'webpi'): Promise<void> => {
     if (resuming) return;
@@ -86,16 +91,16 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
             </dl>
 
             <div className="resume-cta-actions">
-              {props.agents && props.workspaceId && props.onUpdateRuntime && r.agent !== 'shell' && (
+              {canOpenSettings && (
                 <button
                   type="button"
                   className="resume-cta-btn is-config oa-pressable"
-                  onClick={() => setRuntimeEditorOpen(true)}
+                  onClick={() => setSettingsOpen(true)}
                   disabled={resuming !== null}
-                  aria-label="Change Session AI configuration"
+                  aria-label={t('workspace.sessionSettings.openFor', { title: sessionTitle })}
                 >
                   <Settings2 size={14} strokeWidth={2.1} aria-hidden="true" />
-                  <span>Change AI</span>
+                  <span>{t('workspace.sessionSettings.action')}</span>
                 </button>
               )}
               <button
@@ -158,14 +163,17 @@ export function ResumeCta(props: ResumeCtaProps): ReactElement {
           </details>
         </section>
       </div>
-      {props.agents && props.workspaceId && props.onUpdateRuntime && (
-        <SessionRuntimeEditorDialog
-          open={runtimeEditorOpen}
-          onOpenChange={setRuntimeEditorOpen}
+      {canOpenSettings && props.workspaceId && props.onSaveDisplayName && (
+        <SessionSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
           record={r}
-          agents={props.agents}
+          agents={props.agents ?? []}
           workspaceId={props.workspaceId}
-          onSave={props.onUpdateRuntime}
+          onSaveDisplayName={props.onSaveDisplayName}
+          {...(props.onUpdateRuntime && r.agent !== 'shell'
+            ? { onSaveRuntime: props.onUpdateRuntime }
+            : {})}
         />
       )}
     </div>
@@ -255,7 +263,9 @@ function agentDisplayName(agent: string): string {
   return agent;
 }
 
-function sessionRuntimeFacts(record: SessionRecord): readonly { label: string; value: string }[] {
+function sessionRuntimeFacts(
+  record: SessionRecord,
+): readonly { label: string; value: string }[] {
   const runtime = record.runtime;
   return [
     { label: 'Credential', value: credentialDisplay(runtime) },

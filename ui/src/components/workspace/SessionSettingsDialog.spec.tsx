@@ -1,0 +1,134 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { i18n } from '../../i18n'
+import type { AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
+import type { SessionRecord } from './api'
+import { SessionSettingsDialog } from './SessionSettingsDialog'
+
+const launchConfig = {
+  effectiveAgent: 'claude',
+  accessMode: 'vault',
+  launchCredentialSlug: 'deepseek-1',
+  launchModel: 'deepseek-v4-flash',
+  launchReasoningEffort: 'high',
+  credentialSelectionReady: true,
+  selectRuntimeDefault: vi.fn(),
+} as unknown as AgentLaunchConfigState
+
+vi.mock('../../hooks/useAgentLaunchConfig', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../hooks/useAgentLaunchConfig')>()),
+  useAgentLaunchConfig: () => launchConfig,
+}))
+
+vi.mock('./AgentLaunchControls', () => ({
+  AgentLaunchSelectors: () => <div>AI selectors</div>,
+}))
+
+function record(patch?: Partial<SessionRecord>): SessionRecord {
+  return {
+    id: 'session-1',
+    resumeId: 'resume-1',
+    wsId: 'workspace-1',
+    agent: 'claude',
+    name: 'c1',
+    createdAt: '2026-08-11T00:00:00.000Z',
+    lastActiveAt: '2026-08-11T00:01:00.000Z',
+    state: 'paused',
+    surface: 'terminal',
+    pid: null,
+    startedAt: null,
+    title: 'Paused session',
+    displayName: 'AAPL desk',
+    runtime: {
+      credentialSource: 'vault',
+      credentialSlug: 'deepseek-1',
+      model: 'deepseek-v4-flash',
+      reasoningEffort: 'high',
+    },
+    ...patch,
+  }
+}
+
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
+})
+
+afterEach(cleanup)
+
+describe('SessionSettingsDialog', () => {
+  it('saves the selected credential, model, and effort without resuming', async () => {
+    const onOpenChange = vi.fn()
+    const onSaveDisplayName = vi.fn(async () => {})
+    const onSaveRuntime = vi.fn(async () => {})
+    // Force a dirty AI save by changing the mocked launch selection.
+    Object.assign(launchConfig, {
+      launchModel: 'deepseek-v4-pro',
+      launchReasoningEffort: 'xhigh',
+    })
+
+    render(<SessionSettingsDialog
+      open
+      onOpenChange={onOpenChange}
+      record={record()}
+      agents={[]}
+      workspaceId="workspace-1"
+      onSaveDisplayName={onSaveDisplayName}
+      onSaveRuntime={onSaveRuntime}
+    />)
+
+    expect(screen.getByText('AI selectors')).toBeTruthy()
+    expect(screen.getByText(/stays paused/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(onSaveRuntime).toHaveBeenCalledWith({
+      credentialSource: 'vault',
+      credentialSlug: 'deepseek-1',
+      model: 'deepseek-v4-pro',
+      reasoningEffort: 'xhigh',
+    }))
+    expect(onSaveDisplayName).not.toHaveBeenCalled()
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('saves a coworker display name while the Session is still running', async () => {
+    const onSaveDisplayName = vi.fn(async () => {})
+    const onSaveRuntime = vi.fn(async () => {})
+    Object.assign(launchConfig, {
+      launchModel: 'deepseek-v4-flash',
+      launchReasoningEffort: 'high',
+    })
+
+    render(<SessionSettingsDialog
+      open
+      onOpenChange={vi.fn()}
+      record={record({ state: 'running', pid: 42, startedAt: 1 })}
+      agents={[]}
+      workspaceId="workspace-1"
+      onSaveDisplayName={onSaveDisplayName}
+      onSaveRuntime={onSaveRuntime}
+    />)
+
+    expect(screen.getByText(/Pause this Session before changing/i)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Earnings desk' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(onSaveDisplayName).toHaveBeenCalledWith('Earnings desk'))
+    expect(onSaveRuntime).not.toHaveBeenCalled()
+  })
+
+  it('hides AI controls for shell Sessions', () => {
+    render(<SessionSettingsDialog
+      open
+      onOpenChange={vi.fn()}
+      record={record({ agent: 'shell', runtime: undefined })}
+      agents={[]}
+      workspaceId="workspace-1"
+      onSaveDisplayName={vi.fn(async () => {})}
+    />)
+
+    expect(screen.queryByText('AI selectors')).toBeNull()
+  })
+})

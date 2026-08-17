@@ -31,7 +31,7 @@ the durable truth after it changes. Git history is the archive.
 
 - [[plans/session-settings.md]] — Session row `...` → Settings for display
   name plus credential/model/effort; reuse paused runtime editor, keep
-  Archive separate. Design recorded; implementation not started.
+  Archive separate. Implementation on this branch.
 - [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
   (`session.born` / started / stopped / rejected / headless turn assets).
   Occupancy + Office timeline + headless text/tool/completion are in;
