@@ -170,7 +170,7 @@ function operationDisplay(op: WalletOperation, t: TFunction): OperationDisplay {
   }
 }
 
-function historyOperationDisplay(op: WalletCommitLog['operations'][number]): OperationDisplay {
+function historyOperationDisplay(op: WalletCommitLog['operations'][number], t: TFunction): OperationDisplay {
   const action = op.action.toUpperCase()
   const marker: OperationDisplay['marker'] =
     action.includes('BUY') || action.includes('PLACE') ? '+'
@@ -181,6 +181,33 @@ function historyOperationDisplay(op: WalletCommitLog['operations'][number]): Ope
       : marker === '+' ? 'buy'
         : marker === '-' ? 'sell'
           : 'modify'
+  if (op.order) {
+    const sideRaw = (op.order.side || '').toUpperCase()
+    const side = sideRaw === 'BUY'
+      ? t('tradingReview.operation.buy')
+      : sideRaw === 'SELL'
+        ? t('tradingReview.operation.sell')
+        : sideRaw || t('tradingReview.operation.order')
+    const quantity = op.order.totalQuantity || op.order.cashQuantity
+    const detailParts = [
+      orderTypeLabel(op.order.orderType, t),
+      quantity ? t('tradingReview.operation.quantityShort', { value: quantity }) : null,
+      op.order.limitPrice ? t('tradingReview.operation.limitPrice', { value: op.order.limitPrice }) : null,
+      op.order.auxPrice ? t('tradingReview.operation.auxPrice', { value: op.order.auxPrice }) : null,
+      op.order.timeInForce,
+    ].filter(Boolean)
+    return {
+      marker,
+      tone,
+      title: t('tradingReview.operation.placeTitle', {
+        side,
+        symbol: op.symbol !== 'unknown' ? op.symbol : t('tradingReview.operation.unknown'),
+      }),
+      detail: detailParts.join(' · '),
+      symbol: op.symbol,
+      status: op.status,
+    }
+  }
   return {
     marker,
     tone,
@@ -230,6 +257,14 @@ function itemTimestamp(item: ReviewItem): string | null {
 function itemTitle(item: ReviewItem, t: TFunction): string {
   if (item.kind === 'pending') return item.status.pendingMessage || t('tradingReview.pendingPush')
   if (item.kind === 'staged') return t('tradingReview.stagedOperations')
+  const primaryOrder = item.commit.operations.find((operation) => operation.order)
+  if (primaryOrder?.order) {
+    const operation = historyOperationDisplay(primaryOrder, t)
+    const quantity = primaryOrder.order.totalQuantity
+      || (primaryOrder.order.cashQuantity ? `$${primaryOrder.order.cashQuantity}` : '')
+    const price = primaryOrder.order.limitPrice ? `@ ${primaryOrder.order.limitPrice}` : ''
+    return [operation.title, quantity, price].filter(Boolean).join(' · ')
+  }
   return item.commit.message
 }
 
@@ -239,7 +274,7 @@ function itemAccountLabel(item: ReviewItem): string {
 }
 
 function itemOperations(item: ReviewItem, t: TFunction): OperationDisplay[] {
-  if (item.kind === 'history') return item.commit.operations.map(historyOperationDisplay)
+  if (item.kind === 'history') return item.commit.operations.map((operation) => historyOperationDisplay(operation, t))
   return item.status.staged.map((operation) => operationDisplay(operation, t))
 }
 
@@ -860,6 +895,11 @@ function ReviewDetail({
                   )}
                 </div>
                 <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+                {item.kind === 'history' && title !== item.commit.message && (
+                  <p className="mt-1.5 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
+                    {item.commit.message}
+                  </p>
+                )}
                 <div className="mt-1 text-[12px] text-muted-foreground">
                   {item.kind === 'history'
                     ? t('tradingReview.pushedAgo', { time: formatRelativeTime(item.commit.timestamp) })

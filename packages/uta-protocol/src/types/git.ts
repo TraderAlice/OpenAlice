@@ -143,6 +143,18 @@ export interface OperationSummary {
   action: OperationAction
   change: string
   status: OperationStatus
+  /** Structured order terms for review surfaces. Kept alongside `change` so
+   * text-only CLI consumers remain useful while UI clients can render exact
+   * price, size, and time-in-force without fetching the full commit. */
+  order?: {
+    side?: string
+    orderType?: string
+    totalQuantity?: string
+    cashQuantity?: string
+    limitPrice?: string
+    auxPrice?: string
+    timeInForce?: string
+  }
 }
 
 export interface CommitLogEntry {

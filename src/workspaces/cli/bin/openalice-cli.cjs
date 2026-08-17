@@ -91,7 +91,7 @@ async function main() {
   if (wantsHelp) return printVerbHelp(group, verb, cmd)
 
   // Run it.
-  const args = parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema, { group, verb })
+  const args = await parseFlags(argv.slice(argv.indexOf(verb) + 1), cmd.schema, { group, verb })
   const res = await invoke(base, cmd.tool, args)
   process.stdout.write(res.endsWith('\n') ? res : res + '\n')
 }
@@ -200,7 +200,7 @@ async function fetchSocketJson(socketPath, path, opts) {
 
 // ---- flag parsing ---------------------------------------------------------
 
-function parseFlags(tokens, schema, command) {
+async function parseFlags(tokens, schema, command) {
   const args = {}
   const meta = {}
   const docs = []
@@ -239,11 +239,21 @@ function parseFlags(tokens, schema, command) {
     // Preserve an exact schema key first (some data tools intentionally use
     // hyphenated keys), then normalize only when the camelCase key exists.
     const camelKey = key.replace(/-([a-zA-Z0-9])/g, (_, ch) => ch.toUpperCase())
-    const schemaKey = Object.prototype.hasOwnProperty.call(properties, key)
+    const directSchemaKey = Object.prototype.hasOwnProperty.call(properties, key)
       ? key
       : Object.prototype.hasOwnProperty.call(properties, camelKey)
         ? camelKey
         : key
+    // A file-backed string flag avoids the caller shell interpreting values
+    // such as "$971" before this process receives them. Every string option
+    // automatically gains `--<name>-file <path>`; `-` reads stdin.
+    const fileBaseKey = key.endsWith('-file') ? key.slice(0, -5) : ''
+    const fileBaseCamelKey = fileBaseKey.replace(/-([a-zA-Z0-9])/g, (_, ch) => ch.toUpperCase())
+    const fileSchemaKey = !Object.prototype.hasOwnProperty.call(properties, directSchemaKey) &&
+      fileBaseKey && properties[fileBaseCamelKey]?.type === 'string'
+      ? fileBaseCamelKey
+      : null
+    const schemaKey = fileSchemaKey || directSchemaKey
     const propertySchema = properties[schemaKey]
     const supportedAlias =
       (schemaKey === 'meta' && Object.prototype.hasOwnProperty.call(properties, 'metadataFilter')) ||
@@ -260,7 +270,14 @@ function parseFlags(tokens, schema, command) {
           `Run \`${BIN} ${command.group} ${command.verb} --help\` before retrying.`,
       )
     }
-    if (propertySchema && propertySchema.type === 'boolean' && typeof val === 'string') {
+    if (fileSchemaKey) {
+      const { readFileSync } = await import('node:fs')
+      try {
+        val = readFileSync(val === '-' ? 0 : String(val), 'utf8').replace(/\r?\n$/, '')
+      } catch (error) {
+        fail(`cannot read --${key} value from "${val}": ${error && error.message ? error.message : String(error)}`)
+      }
+    } else if (propertySchema && propertySchema.type === 'boolean' && typeof val === 'string') {
       if (val === 'true') val = true
       else if (val === 'false') val = false
     }
@@ -339,6 +356,9 @@ function printVerbHelp(group, verb, cmd) {
         : ''
     const repeatable = type === 'array' ? ' (repeatable)' : ''
     out(`  --${flag}${valueHint}${req}${repeatable}   ${firstLine(p.description || '')}`)
+    if (type === 'string') {
+      out(`  --${flag}-file <path>   Read the exact value from a file (use - for stdin; avoids shell interpolation).`)
+    }
   }
 }
 

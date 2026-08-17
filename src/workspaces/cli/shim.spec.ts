@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -360,6 +360,67 @@ describe('CLI launchers and payload', () => {
         stderr: expect.stringContaining('unexpected positional argument "alpaca-paper"'),
       })
       expect(invocations).toBe(0)
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads string values from files without shell interpolation', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-cli-shim-string-file-'))
+    const socketPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\openalice-cli-shim-string-file-${process.pid}-${Date.now()}`
+      : join(dir, 'tools.sock')
+    const messagePath = join(dir, 'message.txt')
+    await writeFile(messagePath, 'Buy MU below $971 after support confirmation\n')
+    let invocation: { tool?: string; args?: Record<string, unknown> } | null = null
+    const server = createServer((req, res) => {
+      if (req.method === 'POST') {
+        const chunks: Buffer[] = []
+        req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+        req.on('end', () => {
+          invocation = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ content: [{ type: 'text', text: '{"ok":true}' }] }))
+        })
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({
+        description: 'UTA test manifest',
+        groups: {
+          order: {
+            place: {
+              tool: 'placeOrder',
+              description: 'Place an order',
+              schema: {
+                type: 'object',
+                properties: { commitMessage: { type: 'string', description: 'Trading thesis' } },
+              },
+            },
+          },
+        },
+      }))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    const env = {
+      ...process.env,
+      AQ_WS_ID: 'ws1',
+      OPENALICE_TOOL_SOCKET: socketPath,
+      OPENALICE_TOOL_URL: '/cli',
+    }
+    try {
+      const help = await runCli('alice-uta', ['order', 'place', '--help'], env)
+      expect(help.stdout).toContain('--commit-message-file <path>')
+
+      await runCli('alice-uta', ['order', 'place', '--commit-message-file', messagePath], env)
+      expect(invocation).toEqual({
+        tool: 'placeOrder',
+        args: { commitMessage: 'Buy MU below $971 after support confirmation' },
+      })
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
       await rm(dir, { recursive: true, force: true })
