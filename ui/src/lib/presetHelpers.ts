@@ -254,6 +254,7 @@ export const VENDOR_BY_PRESET: Record<string, string> = {
   kimi: 'kimi',
   deepseek: 'deepseek',
   longcat: 'longcat',
+  openrouter: 'openrouter',
   'cursor-dashboard': 'cursor',
   custom: 'custom',
 }
@@ -262,6 +263,50 @@ export const VENDOR_BY_PRESET: Record<string, string> = {
 export function vendorPreset(vendor: string, presets: Preset[]): Preset | undefined {
   const presetId = Object.entries(VENDOR_BY_PRESET).find(([, v]) => v === vendor)?.[0]
   return presets.find((p) => p.id === presetId) ?? presets.find((p) => p.id === 'custom')
+}
+
+/** Human vendor names for vault rows and launch pickers. */
+export const VENDOR_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google Gemini',
+  xai: 'xAI',
+  minimax: 'MiniMax',
+  glm: 'GLM',
+  kimi: 'Kimi',
+  deepseek: 'DeepSeek',
+  longcat: 'LongCat',
+  openrouter: 'OpenRouter',
+  cursor: 'Cursor',
+  custom: 'Custom',
+}
+
+export function vendorLabel(vendor: string): string {
+  return VENDOR_LABELS[vendor] ?? vendor
+}
+
+export function credentialSearchHaystack(cred: {
+  slug: string
+  vendor: string
+  label?: string
+  lastModel?: string
+}): string {
+  return [
+    cred.label,
+    cred.slug,
+    cred.vendor,
+    vendorLabel(cred.vendor),
+    cred.lastModel,
+  ].filter(Boolean).join(' ').toLowerCase()
+}
+
+export function credentialMatchesQuery(
+  cred: { slug: string; vendor: string; label?: string; lastModel?: string },
+  query: string,
+): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  return credentialSearchHaystack(cred).includes(needle)
 }
 
 // Mirrors the backend baseUrl→vendor heuristic (src/core/credential-inference.ts
@@ -274,11 +319,12 @@ const VENDOR_BY_BASEURL: Array<[RegExp, string]> = [
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],
   [/deepseek\.com/i, 'deepseek'],
   [/longcat\.chat/i, 'longcat'],
+  [/openrouter\.ai/i, 'openrouter'],
 ]
 
 /** Mirror the backend's intentionally narrow Anthropic bearer inference. */
 export function anthropicAuthModeForBaseUrl(baseUrl: string | null | undefined): 'x-api-key' | 'bearer' {
-  return /api\.minimaxi\.com|api\.minimax\.io|api\.longcat\.chat/i.test(baseUrl ?? '')
+  return /api\.minimaxi\.com|api\.minimax\.io|api\.longcat\.chat|openrouter\.ai/i.test(baseUrl ?? '')
     ? 'bearer'
     : 'x-api-key'
 }

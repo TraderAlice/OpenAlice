@@ -32,6 +32,19 @@ A credential answers **how the user may reach an AI resource**. It owns the
 secret, authentication kind, vendor identity, and the wire-shape-to-endpoint
 map accepted by that key. It does not own a model's capabilities.
 
+OpenRouter is a third-party gateway credential, not a first-party model
+vendor. One key declares three wires: OpenAI Chat and Responses at
+`https://openrouter.ai/api/v1`, and Anthropic Messages at
+`https://openrouter.ai/api` (no `/v1`; the Anthropic SDK appends
+`/v1/messages`). The Anthropic skin uses Bearer auth
+(`ANTHROPIC_AUTH_TOKEN`). Suggested model IDs are OpenRouter slugs
+(`provider/model`); any other catalog ID may be pasted. The current coding
+default is `openai/gpt-5.6-luna`. The suggestion list also includes
+OpenRouter's current top-weekly text models (`deepseek/deepseek-v4-flash-0731`,
+`tencent/hy3`, `openai/gpt-5.6-luna`, `z-ai/glm-5.2`, `xiaomi/mimo-v2.5`).
+Existing Custom credentials that already point at `openrouter.ai` keep
+working as `custom`.
+
 `Credential.lastModel` is a remembered selection hint. It saves the user from
 retyping the last model used with an account, but it does not make the model an
 intrinsic property of the credential and must never store a copied capability

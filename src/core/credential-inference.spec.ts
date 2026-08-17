@@ -12,6 +12,7 @@ describe('inferCredentialVendor', () => {
     expect(inferCredentialVendor({ baseUrl: 'https://api.moonshot.cn/v1' })).toBe('kimi')
     expect(inferCredentialVendor({ baseUrl: 'https://api.deepseek.com' })).toBe('deepseek')
     expect(inferCredentialVendor({ baseUrl: 'https://api.longcat.chat/openai' })).toBe('longcat')
+    expect(inferCredentialVendor({ baseUrl: 'https://openrouter.ai/api/v1' })).toBe('openrouter')
     expect(inferCredentialVendor({ baseUrl: 'https://api.x.ai/v1' })).toBe('xai')
   })
 
@@ -50,6 +51,7 @@ describe('resolveAnthropicAuthMode', () => {
 
   it('infers bearer for LongCat anthropic compatibility', () => {
     expect(resolveAnthropicAuthMode({ baseUrl: 'https://api.longcat.chat/anthropic' })).toBe('bearer')
+    expect(resolveAnthropicAuthMode({ baseUrl: 'https://openrouter.ai/api' })).toBe('bearer')
   })
 
   it('infers the documented bearer mode for MiniMax China too', () => {
