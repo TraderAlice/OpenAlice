@@ -329,12 +329,13 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
   },
   openrouter: {
     // OpenRouter slugs are `origin/id`. Facts below match the origin vendor
-    // entries for the same generation; unknown pasted IDs stay unregistered.
-    'anthropic/claude-sonnet-4.6': {
+    // entries for the same generation when those exist; unknown pasted IDs
+    // stay unregistered.
+    'anthropic/claude-sonnet-5': {
       contextWindow: 1_000_000,
       reasoning: {
         mode: 'adaptive',
-        efforts: ['low', 'medium', 'high', 'max'],
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
         defaultEffort: 'high',
         interleaved: true,
       },
@@ -349,18 +350,68 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
         interleaved: true,
       },
     },
+    'anthropic/claude-fable-5': {
+      contextWindow: 1_000_000,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    },
     'openai/gpt-5.6-sol': {
       contextWindow: 1_050_000,
       maxOutputTokens: 128_000,
       reasoning: OPENAI_56_REASONING,
     },
-    'google/gemini-3.6-flash': {
+    'openai/gpt-5.6-terra': {
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoning: OPENAI_56_REASONING,
+    },
+    'openai/gpt-5.6-luna': {
+      contextWindow: 400_000,
+      maxOutputTokens: 128_000,
+      reasoning: OPENAI_56_REASONING,
+    },
+    'x-ai/grok-4.6': {
+      contextWindow: 500_000,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'medium', 'high', 'xhigh'],
+        defaultEffort: 'high',
+      },
+    },
+    // Gemini 3.7 Flash is current on OpenRouter (2026-08-14) and is not yet
+    // the first-party Gemini catalog default. Register the advertised 1M
+    // window; effort tiers follow the 3.x Flash family until Google publishes
+    // a distinct 3.7 contract.
+    'google/gemini-3.7-flash': {
       contextWindow: GEMINI_3_CONTEXT,
       maxOutputTokens: 65_536,
       reasoning: {
         mode: 'adaptive',
         efforts: ['medium', 'high'],
         defaultEffort: 'medium',
+      },
+    },
+    'moonshotai/kimi-k3': {
+      contextWindow: 1_048_576,
+      reasoning: {
+        mode: 'required',
+        efforts: ['low', 'high', 'max'],
+        defaultEffort: 'max',
+        interleaved: true,
+      },
+    },
+    'deepseek/deepseek-v4-pro': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 384_000,
+      reasoning: {
+        mode: 'optional',
+        efforts: ['high', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
       },
     },
   },

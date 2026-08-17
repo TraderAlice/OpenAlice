@@ -156,7 +156,7 @@ describe('vault catalog helpers', () => {
       slug: 'openrouter-1',
       vendor: 'openrouter',
       label: 'Work key',
-      lastModel: 'anthropic/claude-sonnet-4.6',
+      lastModel: 'anthropic/claude-sonnet-5',
     }
     expect(vendorLabel('openrouter')).toBe('OpenRouter')
     expect(credentialMatchesQuery(cred, 'openrouter')).toBe(true)

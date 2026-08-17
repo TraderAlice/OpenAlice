@@ -133,7 +133,7 @@ describe('AIProviderPage', () => {
           wires: { 'openai-chat': 'https://openrouter.ai/api/v1' },
           apiKey: null,
           hasApiKey: true,
-          lastModel: 'anthropic/claude-sonnet-4.6',
+          lastModel: 'anthropic/claude-sonnet-5',
         },
       ],
     })

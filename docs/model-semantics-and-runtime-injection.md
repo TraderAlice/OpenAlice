@@ -38,8 +38,9 @@ vendor. One key declares three wires: OpenAI Chat and Responses at
 `https://openrouter.ai/api` (no `/v1`; the Anthropic SDK appends
 `/v1/messages`). The Anthropic skin uses Bearer auth
 (`ANTHROPIC_AUTH_TOKEN`). Suggested model IDs are OpenRouter slugs
-(`provider/model`); any other catalog ID may be pasted. Existing Custom
-credentials that already point at `openrouter.ai` keep working as `custom`.
+(`provider/model`); any other catalog ID may be pasted. The current coding
+default is `anthropic/claude-sonnet-5`. Existing Custom credentials that
+already point at `openrouter.ai` keep working as `custom`.
 
 `Credential.lastModel` is a remembered selection hint. It saves the user from
 retyping the last model used with an account, but it does not make the model an

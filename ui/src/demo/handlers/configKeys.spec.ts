@@ -37,10 +37,16 @@ describe('demo credential catalog', () => {
       'claude-sonnet-4-6',
     ])
     expect(modelIds('openrouter')).toEqual([
-      'anthropic/claude-sonnet-4.6',
+      'anthropic/claude-sonnet-5',
       'anthropic/claude-opus-5',
+      'anthropic/claude-fable-5',
       'openai/gpt-5.6-sol',
-      'google/gemini-3.6-flash',
+      'openai/gpt-5.6-terra',
+      'openai/gpt-5.6-luna',
+      'x-ai/grok-4.6',
+      'google/gemini-3.7-flash',
+      'moonshotai/kimi-k3',
+      'deepseek/deepseek-v4-pro',
     ])
     expect(modelIds('gemini')).toEqual([
       'gemini-3.6-flash',

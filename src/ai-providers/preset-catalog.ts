@@ -275,7 +275,7 @@ export const OPENROUTER: PresetDef = {
     backend: z.literal('vercel-ai-sdk'),
     provider: z.literal('openai-compatible'),
     baseUrl: z.string().default('https://openrouter.ai/api/v1').describe('API endpoint'),
-    model: z.string().default('anthropic/claude-sonnet-4.6').describe('Model'),
+    model: z.string().default('anthropic/claude-sonnet-5').describe('Model'),
     apiKey: z.string().min(1).describe('OpenRouter API key'),
   }),
   regions: [{
@@ -291,16 +291,22 @@ export const OPENROUTER: PresetDef = {
     },
   }],
   models: withModelSemantics('openrouter', [
-    { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6 (Suggested default)' },
-    { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5 (Highest capability)' },
+    { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5 (Suggested default)' },
+    { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5 (Complex agents)' },
+    { id: 'anthropic/claude-fable-5', label: 'Claude Fable 5 (Highest capability)' },
     { id: 'openai/gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)' },
-    { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash (Fast / economical)' },
+    { id: 'openai/gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)' },
+    { id: 'openai/gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)' },
+    { id: 'x-ai/grok-4.6', label: 'Grok 4.6 (Flagship)' },
+    { id: 'google/gemini-3.7-flash', label: 'Gemini 3.7 Flash (Fast / current)' },
+    { id: 'moonshotai/kimi-k3', label: 'Kimi K3' },
+    { id: 'deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
   ]),
   setup: {
     apiKeyLabel: 'OpenRouter API key',
     apiKeyPlaceholder: 'sk-or-...',
     apiKeyHelp: 'Use a key from openrouter.ai. This is not a first-party Anthropic, OpenAI, or Google key.',
-    modelHelp: 'Use the exact OpenRouter model ID (`provider/model`), or paste another ID from the OpenRouter catalog. Sonnet 4.6 is the suggested coding default.',
+    modelHelp: 'Use the exact OpenRouter model ID (`provider/model`), or paste another ID from the OpenRouter catalog. Sonnet 5 is the suggested coding default; Opus 5 and Fable 5 are the heavier Anthropic tiers.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -628,6 +634,6 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   kimi: 'kimi-k3',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',
-  openrouter: 'anthropic/claude-sonnet-4.6',
+  openrouter: 'anthropic/claude-sonnet-5',
   cursor: 'auto',
 }

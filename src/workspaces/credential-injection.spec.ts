@@ -265,12 +265,12 @@ describe('credentialToWorkspaceAiCred', () => {
 
   it('routes an OpenRouter key by each runtime\'s preferred compatible wire', () => {
     expect(credentialToWorkspaceAiCred(openrouterKey, 'claude', {
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
     })).toMatchObject({
       baseUrl: 'https://openrouter.ai/api',
       wireShape: 'anthropic',
       authMode: 'bearer',
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
     })
     expect(credentialToWorkspaceAiCred(openrouterKey, 'codex', {
       model: 'openai/gpt-5.6-sol',
@@ -279,7 +279,7 @@ describe('credentialToWorkspaceAiCred', () => {
       wireShape: 'openai-responses',
     })
     expect(credentialToWorkspaceAiCred(openrouterKey, 'pi', {
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'anthropic/claude-sonnet-5',
     })).toMatchObject({
       baseUrl: 'https://openrouter.ai/api/v1',
       wireShape: 'openai-chat',
@@ -538,7 +538,7 @@ describe('resolveInjectionModel', () => {
     expect(resolveInjectionModel({ vendor: 'google' })).toBe('gemini-3.6-flash')
     expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.2')
     expect(resolveInjectionModel({ vendor: 'longcat' })).toBe('LongCat-2.0')
-    expect(resolveInjectionModel({ vendor: 'openrouter' })).toBe('anthropic/claude-sonnet-4.6')
+    expect(resolveInjectionModel({ vendor: 'openrouter' })).toBe('anthropic/claude-sonnet-5')
   })
 
   it('returns null for a vendor with no catalog default (custom)', () => {

@@ -30,7 +30,19 @@ describe('OPENROUTER preset', () => {
       apiKey: 'sk-or-test',
     }) as { baseUrl?: string; model?: string };
     expect(parsed.baseUrl).toBe('https://openrouter.ai/api/v1');
-    expect(parsed.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(parsed.model).toBe('anthropic/claude-sonnet-5');
+    expect(OPENROUTER.models?.map((model) => model.id)).toEqual([
+      'anthropic/claude-sonnet-5',
+      'anthropic/claude-opus-5',
+      'anthropic/claude-fable-5',
+      'openai/gpt-5.6-sol',
+      'openai/gpt-5.6-terra',
+      'openai/gpt-5.6-luna',
+      'x-ai/grok-4.6',
+      'google/gemini-3.7-flash',
+      'moonshotai/kimi-k3',
+      'deepseek/deepseek-v4-pro',
+    ]);
   });
 });
 
@@ -178,7 +190,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',
-      openrouter: 'anthropic/claude-sonnet-4.6',
+      openrouter: 'anthropic/claude-sonnet-5',
       // Runtime-direct provider: `auto` is Cursor routing, not a model API id.
       cursor: 'auto',
     });

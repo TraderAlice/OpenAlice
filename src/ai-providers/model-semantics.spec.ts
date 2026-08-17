@@ -106,9 +106,16 @@ describe('model semantics registry', () => {
   })
 
   it('registers curated OpenRouter slugs with origin-equivalent facts', () => {
-    expect(resolveModelSemantics('openrouter', 'anthropic/claude-sonnet-4.6')).toEqual(
-      resolveModelSemantics('anthropic', 'claude-sonnet-4-6'),
+    expect(resolveModelSemantics('openrouter', 'anthropic/claude-sonnet-5')).toEqual(
+      resolveModelSemantics('anthropic', 'claude-sonnet-5'),
     )
+    expect(resolveModelSemantics('openrouter', 'x-ai/grok-4.6')).toEqual(
+      resolveModelSemantics('xai', 'grok-4.6'),
+    )
+    expect(resolveModelSemantics('openrouter', 'google/gemini-3.7-flash')).toMatchObject({
+      contextWindow: 1_048_576,
+      reasoning: { mode: 'adaptive', defaultEffort: 'medium' },
+    })
     expect(resolveModelSemantics('openrouter', 'openai/gpt-5.6-sol')).toMatchObject({
       contextWindow: 1_050_000,
       reasoning: { mode: 'optional', defaultEffort: 'medium' },
