@@ -12,19 +12,23 @@ describe('inferCredentialVendor', () => {
     expect(inferCredentialVendor({ baseUrl: 'https://api.moonshot.cn/v1' })).toBe('kimi')
     expect(inferCredentialVendor({ baseUrl: 'https://api.deepseek.com' })).toBe('deepseek')
     expect(inferCredentialVendor({ baseUrl: 'https://api.longcat.chat/openai' })).toBe('longcat')
+    expect(inferCredentialVendor({ baseUrl: 'https://api.x.ai/v1' })).toBe('xai')
   })
 
   it('falls back to the agent when the baseUrl is unrecognized', () => {
     expect(inferCredentialVendor({ agent: 'claude', baseUrl: 'https://proxy.example.com' })).toBe('anthropic')
     expect(inferCredentialVendor({ agent: 'codex' })).toBe('openai')
+    expect(inferCredentialVendor({ agent: 'grok' })).toBe('xai')
   })
 
   it('recognizes the vendor-specific Google wire without a base URL', () => {
     expect(inferCredentialVendor({ agent: 'opencode', wireShape: 'google-generative-ai' })).toBe('google')
   })
 
-  it('opencode/pi against an arbitrary endpoint → custom (no first-party guess)', () => {
+  it('opencode/omp/pi/cursor against an arbitrary endpoint → custom (no first-party guess)', () => {
     expect(inferCredentialVendor({ agent: 'opencode', baseUrl: 'https://gw.example.com/v1' })).toBe('custom')
+    expect(inferCredentialVendor({ agent: 'omp' })).toBe('custom')
+    expect(inferCredentialVendor({ agent: 'cursor' })).toBe('custom')
     expect(inferCredentialVendor({ agent: 'pi' })).toBe('custom')
     expect(inferCredentialVendor({})).toBe('custom')
   })

@@ -12,8 +12,8 @@
  *    control bytes (verified across all four adapters).
  *  - **Exit is the done signal.** One-shot modes (`-p` / `exec` / `run`) exit
  *    at the turn boundary, so we wait on exit rather than timeout-killing the
- *    way probe must (interactive TUIs never exit). The watchdog is a backstop
- *    (codex can hang under heavy logging).
+ *    way probe must (interactive TUIs never exit). Callers may opt into a
+ *    watchdog when they need a hard execution deadline.
  *  - **NOT routed through SessionPool/PersistentSession**, whose respawn-on-exit
  *    circuit is anti-semantic for a one-shot task (exit == completion).
  *
@@ -48,8 +48,8 @@ export interface HeadlessTaskArgs {
   readonly command: readonly string[];
   readonly cwd: string;
   readonly env: Readonly<Record<string, string>>;
-  /** Watchdog: SIGTERM at `timeoutMs`, SIGKILL after a grace window. */
-  readonly timeoutMs: number;
+  /** Optional watchdog: SIGTERM at `timeoutMs`, SIGKILL after a grace window. */
+  readonly timeoutMs?: number;
   readonly logger: Logger;
   /**
    * Stream stdout/stderr to bounded operator logs (16MB per stream; the
@@ -72,6 +72,8 @@ export interface HeadlessTaskArgs {
   readonly extractAssistantText?: (line: string) => string | null;
   /** Adapter-owned JSONL translator for response and tool blocks. */
   readonly extractOutputEvents?: (line: string) => readonly HeadlessOutputEvent[];
+  /** Live structured snapshot for comment/inquiry progress. */
+  readonly onProgress?: (snapshot: HeadlessStructuredOutput) => void;
   /** Adapter-owned compaction filter for persisted stdout diagnostics. */
   readonly keepDiagnosticLine?: (line: string) => boolean;
   /**
@@ -346,7 +348,9 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
         onAssistantText: (text) => {
           assistantText = text.slice(-ASSISTANT_TEXT_MAX_CHARS);
           structuredOutput.setAssistantText(assistantText);
-          structuredWriter?.schedule(structuredOutput.snapshot(true));
+          const snapshot = structuredOutput.snapshot(true);
+          structuredWriter?.schedule(snapshot);
+          args.onProgress?.(snapshot);
         },
         onOutputEvents: (events) => {
           structuredOutput.add(events);
@@ -354,6 +358,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
             const snapshot = structuredOutput.snapshot(true);
             assistantText = snapshot.assistantText;
             structuredWriter?.schedule(snapshot);
+            args.onProgress?.(snapshot);
           }
         },
         ...(args.keepDiagnosticLine
@@ -398,6 +403,7 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
       ...(details.systemCode ? { systemCode: details.systemCode } : {}),
     });
     const structured = structuredOutput.snapshot(false);
+    args.onProgress?.(structured);
     await structuredWriter?.finish(structured);
     await Promise.all([outFile?.end(), errFile?.end()]);
     return {
@@ -499,9 +505,9 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
     });
   });
 
-  // Watchdog armed BEFORE the await so it covers the wait: SIGTERM at
-  // timeoutMs, SIGKILL after the grace window.
-  const softKill = setTimeout(() => {
+  // An explicit watchdog is armed BEFORE the await so it covers the whole
+  // process lifetime. Without one, a one-shot Agent runs to its natural exit.
+  const softKill = timeoutMs === undefined ? undefined : setTimeout(() => {
     killed = true;
     try {
       child.kill('SIGTERM');
@@ -509,22 +515,23 @@ export async function runHeadlessTask(args: HeadlessTaskArgs): Promise<HeadlessT
       /* already gone */
     }
   }, timeoutMs);
-  softKill.unref();
-  const hardKill = setTimeout(() => {
+  softKill?.unref();
+  const hardKill = timeoutMs === undefined ? undefined : setTimeout(() => {
     try {
       child.kill('SIGKILL');
     } catch {
       /* ignore */
     }
   }, timeoutMs + KILL_GRACE_MS);
-  hardKill.unref();
+  hardKill?.unref();
 
   await closePromise;
-  clearTimeout(softKill);
-  clearTimeout(hardKill);
+  if (softKill) clearTimeout(softKill);
+  if (hardKill) clearTimeout(hardKill);
   scanner?.finish();
   const structured = structuredOutput.snapshot(false);
   assistantText = structured.assistantText;
+  args.onProgress?.(structured);
   await structuredWriter?.finish(structured);
   await Promise.all([outFile?.end(), errFile?.end()]);
   const durationMs = Date.now() - start;

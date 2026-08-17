@@ -1,70 +1,23 @@
 /**
- * Ordered registry of all migrations.
+ * Ordered registry of migrations introduced after the 0.89.2-beta baseline.
  *
- * Order is determined by array position — keep entries in numeric ID
- * order. Never reorder a migration that has already shipped; the
- * journal records ids, so reordering would cause runners to try to
- * apply already-applied work in a different order.
+ * The development-era 0001–0038 chain is intentionally retired. It accumulated
+ * assumptions about obsolete Workspace layouts and could be replayed by an old
+ * or isolated process against a newer Workspace root. Fresh 0.89.2-beta homes
+ * are seeded directly from current schemas and defaults instead.
  *
- * Adding a migration: import it here and append. The
- * `pnpm build:migration-index` script regenerates
- * `src/migrations/INDEX.md` from this list at build time.
- *
- * NOTE: migrations 0001–0007 were retired at the 0.40 baseline — the World-B
- * deletion + Workspace pivot turned the pre-0.40 data shapes over completely, so
- * pre-0.40 installs rebuild `data/` rather than migrate. The framework stays for
- * future upgrades. Numbering continues FORWARD from the highest id ever shipped
- * (next: 0030) — never reuse a retired id, since existing installs' journals
- * recorded the old ones.
+ * Keep future entries in numeric order and never reuse a retired id. The next
+ * migration id is exported below. `pnpm build:migration-index` regenerates INDEX.md.
  */
 
 import type { Migration } from './types.js'
-import { migration as migration_0008_disable_targetless_cron_jobs } from './0008_disable_targetless_cron_jobs/index.js'
-import { migration as migration_0009_seal_broker_credentials } from './0009_seal_broker_credentials/index.js'
-import { migration as migration_0010_workspace_issues_to_markdown } from './0010_workspace_issues_to_markdown/index.js'
-import { migration as migration_0011_workspace_issue_assignee_defaults } from './0011_workspace_issue_assignee_defaults/index.js'
-import { migration as migration_0012_recent_chat_workspace_preference } from './0012_recent_chat_workspace_preference/index.js'
-import { migration as migration_0013_session_run_source } from './0013_session_run_source/index.js'
-import { migration as migration_0014_headless_resume_identity } from './0014_headless_resume_identity/index.js'
-import { migration as migration_0015_resume_identity_registry } from './0015_resume_identity_registry/index.js'
-import { migration as migration_0016_artifact_provenance_store } from './0016_artifact_provenance_store/index.js'
-import { migration as migration_0017_issue_what_and_comment_sidecars } from './0017_issue_what_and_comment_sidecars/index.js'
-import { migration as migration_0018_issue_assignee_ownership } from './0018_issue_assignee_ownership/index.js'
-import { migration as migration_0019_issue_session_signatures } from './0019_issue_session_signatures/index.js'
-import { migration as migration_0020_headless_issue_trigger } from './0020_headless_issue_trigger/index.js'
-import { migration as migration_0021_workspace_departure_catalog } from './0021_workspace_departure_catalog/index.js'
-import { migration as migration_0022_connector_service_config } from './0022_connector_service_config/index.js'
-import { migration as migration_0023_google_native_credentials } from './0023_google_native_credentials/index.js'
-import { migration as migration_0024_pi_native_workspace_config } from './0024_pi_native_workspace_config/index.js'
-import { migration as migration_0025_retire_global_compaction_config } from './0025_retire_global_compaction_config/index.js'
-import { migration as migration_0026_agent_conversation_log } from './0026_agent_conversation_log/index.js'
-import { migration as migration_0027_repair_snapshot_interval } from './0027_repair_snapshot_interval/index.js'
-import { migration as migration_0028_auto_quant_default_workspace } from './0028_auto_quant_default_workspace/index.js'
-import { migration as migration_0029_session_native_titles } from './0029_session_native_titles/index.js'
-import { migration as migration_0030_retire_workspace_agent_pins } from './0030_retire_workspace_agent_pins/index.js'
+import { migration as migration_0039_workspace_session_runtime_bindings } from './0039_workspace_session_runtime_bindings/index.js'
+import { migration as migration_0040_unified_session_records } from './0040_unified_session_records/index.js'
+
+export const MIGRATION_BASELINE = '0.89.2-beta'
+export const NEXT_MIGRATION_NUMBER = 41
 
 export const REGISTRY: Migration[] = [
-  migration_0008_disable_targetless_cron_jobs,
-  migration_0009_seal_broker_credentials,
-  migration_0010_workspace_issues_to_markdown,
-  migration_0011_workspace_issue_assignee_defaults,
-  migration_0012_recent_chat_workspace_preference,
-  migration_0013_session_run_source,
-  migration_0014_headless_resume_identity,
-  migration_0015_resume_identity_registry,
-  migration_0016_artifact_provenance_store,
-  migration_0017_issue_what_and_comment_sidecars,
-  migration_0018_issue_assignee_ownership,
-  migration_0019_issue_session_signatures,
-  migration_0020_headless_issue_trigger,
-  migration_0021_workspace_departure_catalog,
-  migration_0022_connector_service_config,
-  migration_0023_google_native_credentials,
-  migration_0024_pi_native_workspace_config,
-  migration_0025_retire_global_compaction_config,
-  migration_0026_agent_conversation_log,
-  migration_0027_repair_snapshot_interval,
-  migration_0028_auto_quant_default_workspace,
-  migration_0029_session_native_titles,
-  migration_0030_retire_workspace_agent_pins,
+  migration_0039_workspace_session_runtime_bindings,
+  migration_0040_unified_session_records,
 ]

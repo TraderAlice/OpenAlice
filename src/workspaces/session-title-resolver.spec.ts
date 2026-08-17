@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { AdapterRegistry, type CliAdapter } from './cli-adapter.js'
+import { AdapterRegistry, emptyAgentSessionRuntime, type CliAdapter } from './cli-adapter.js'
 import type { Logger } from './logger.js'
 import type { ResumeRegistry } from './resume-registry.js'
 import { SessionRegistry, sessionDisplayTitle } from './session-registry.js'
@@ -50,6 +50,7 @@ describe('NativeSessionTitleResolver', () => {
     const adapter: CliAdapter = {
       id: 'codex',
       displayName: 'Codex',
+      sessionRuntime: emptyAgentSessionRuntime,
       capabilities: {
         parallelPerCwd: true,
         resumeLast: true,
@@ -103,6 +104,7 @@ describe('NativeSessionTitleResolver', () => {
     adapters.register({
       id: 'pi',
       displayName: 'Pi',
+      sessionRuntime: emptyAgentSessionRuntime,
       capabilities: {
         parallelPerCwd: true,
         resumeLast: true,
@@ -147,6 +149,7 @@ describe('NativeSessionTitleResolver', () => {
     adapters.register({
       id: 'codex',
       displayName: 'Codex',
+      sessionRuntime: emptyAgentSessionRuntime,
       capabilities: {
         parallelPerCwd: true,
         resumeLast: true,

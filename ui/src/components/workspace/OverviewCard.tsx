@@ -1,15 +1,16 @@
 import { useMemo } from 'react'
 import { formatRelativeTime } from '../../lib/intl'
-import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Settings, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
+import { ArrowUpCircle, Bot, ChevronRight, Code, Cpu, GitBranch, ScrollText, Sparkles, Terminal, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GitLogEntry, Workspace } from './api'
-import { workspaceDisplayName, workspaceDisplayTitle } from './display'
+import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } from './display'
 
 /**
  * Single-workspace card for the Workspaces Overview dashboard. Variant B
  * from the design discussion — header (status dot + tag), template +
- * relative-activity subtitle, sessions list (each clickable), provider
- * override + latest commit footer (rendered only when present).
+ * relative-activity subtitle, sessions list (each clickable), and provenance
+ * footer (rendered only when present). Deprecated native-config exports are
+ * intentionally absent from this primary Workspace surface.
  *
  * A full-card button opens the workspace tab. It is a sibling of the
  * interactive session, upgrade, and provider controls so the whole card stays
@@ -39,7 +40,6 @@ interface Props {
   lastCommit: GitLogEntry | null
   onOpen: () => void
   onOpenSession: (sessionId: string) => void
-  onConfigure?: () => void
   /** Open the reviewed Template Upgrade preview. */
   onUpgrade?: () => void
 }
@@ -49,7 +49,6 @@ export function OverviewCard({
   lastCommit,
   onOpen,
   onOpenSession,
-  onConfigure,
   onUpgrade,
 }: Props) {
   const { t } = useTranslation()
@@ -73,12 +72,6 @@ export function OverviewCard({
     : w.sessions.length > 0
       ? 'bg-muted-foreground/40'
       : 'border border-border'
-
-  const overrideAgents: string[] = []
-  if (w.agentOverride?.claude) overrideAgents.push('claude')
-  if (w.agentOverride?.codex) overrideAgents.push('codex')
-  if (w.agentOverride?.opencode) overrideAgents.push('opencode')
-  if (w.agentOverride?.pi) overrideAgents.push('pi')
 
   return (
     <article
@@ -140,14 +133,14 @@ export function OverviewCard({
                 >
                   <button
                     type="button"
-                    aria-label={`${s.name} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
+                    aria-label={`${sessionCoworkerLabel(s)} ${t(s.state === 'running' ? 'workspace.running' : 'workspace.paused')}`}
                     onClick={() => onOpenSession(s.id)}
                     className="oa-nav-row pointer-events-auto flex min-h-10 w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-foreground hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0"
                   >
                     <span className="w-3 flex justify-center text-muted-foreground">
                       <AgentGlyph agent={s.agent} />
                     </span>
-                    <span className="font-mono text-[11px] tabular-nums">{s.name}</span>
+                    <span className="truncate text-[12px]">{sessionCoworkerLabel(s)}</span>
                     <span
                       className={`text-[11px] ${
                         s.state === 'running' ? 'text-success' : 'text-muted-foreground'
@@ -186,7 +179,7 @@ export function OverviewCard({
         </div>
 
         {/* Footer — only rendered when there's something to show */}
-        {(overrideAgents.length > 0 || lastCommit || w.harnessSource || (w.template && w.spawnedFromVersion)) && (
+        {(lastCommit || w.harnessSource || (w.template && w.spawnedFromVersion)) && (
           <div className="border-t border-border pt-3 space-y-1.5">
             {w.harnessSource && (
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -211,22 +204,6 @@ export function OverviewCard({
                     version: w.spawnedFromVersion,
                   })}
                 </span>
-              </div>
-            )}
-            {overrideAgents.length > 0 && onConfigure && (
-              <button
-                type="button"
-                onClick={onConfigure}
-                className="pointer-events-auto flex min-h-10 w-full items-center gap-2 text-left text-[11px] text-muted-foreground transition-colors hover:text-foreground sm:min-h-0"
-              >
-                <Settings size={11} strokeWidth={2.25} className="shrink-0" />
-                <span>{t('workspace.override', { agents: overrideAgents.join(', ') })}</span>
-              </button>
-            )}
-            {overrideAgents.length > 0 && !onConfigure && (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <Settings size={11} strokeWidth={2.25} className="shrink-0" />
-                <span>{t('workspace.override', { agents: overrideAgents.join(', ') })}</span>
               </div>
             )}
             {lastCommit && (

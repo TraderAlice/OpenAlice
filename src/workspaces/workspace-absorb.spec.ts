@@ -12,6 +12,7 @@ import { ResumeRegistry } from './resume-registry.js'
 import { ScrollbackStore } from './scrollback-store.js'
 import type { SessionPool } from './session-pool.js'
 import { SessionRegistry } from './session-registry.js'
+import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js'
 import { WorkspaceAbsorbError, WorkspaceAbsorbManager } from './workspace-absorb.js'
 import { WorkspaceCatalog } from './workspace-catalog.js'
 import { WorkspaceLifecycleManager } from './workspace-lifecycle.js'
@@ -50,12 +51,23 @@ beforeEach(async () => {
     [source, target],
     noopLogger,
   )
-  resumes = await ResumeRegistry.load(join(root, 'state', 'resume-identities.json'), noopLogger)
+  resumes = await ResumeRegistry.load(
+    join(root, 'state', 'resume-identities.json'),
+    noopLogger,
+    new WorkspaceSessionRuntimeStore((wsId) => {
+      const active = registry.get(wsId)
+      const historical = catalog.get(wsId)
+      return [active?.dir, historical?.departedDir, historical?.activeDir]
+        .filter((value): value is string => Boolean(value))
+        .map((directory) => join(directory, '.alice', 'sessions'))
+    }),
+  )
   await resumes.ensure({
     resumeId: 'resume-source-owner',
     wsId: source.id,
     agent: 'pi',
     agentSessionId: 'native-source-session',
+    runtimeBinding: { version: 1, credential: { source: 'native' }, model: 'source-model' },
     now: 1,
   })
   const sessions = await SessionRegistry.load(join(root, 'state'), noopLogger)
@@ -141,6 +153,10 @@ describe('WorkspaceAbsorbManager', () => {
     expect(registry.get(source.id)).toBeUndefined()
     expect(existsSync(source.dir)).toBe(false)
     expect(existsSync(result.departedDir)).toBe(true)
+    expect(await readFile(
+      join(result.departedDir, '.alice', 'sessions', 'resume-source-owner.json'),
+      'utf8',
+    )).toContain('source-model')
     expect(resumes.get('resume-source-owner')?.lifecycle).toBe('retired')
 
     expect((await lifecycle.restore(source.id)).ok).toBe(true)
@@ -283,7 +299,7 @@ async function createSource(dir: string): Promise<void> {
   await writeFile(join(dir, 'research', 'same.md'), 'same copy\n')
   await writeFile(join(dir, 'research', 'conflict.md'), 'source copy\n')
   await writeFile(join(dir, '.alice', 'issues', 'scheduled.md'), [
-    '---', 'title: Scheduled', 'status: todo', 'assignee: "@workspace"',
+    '---', 'title: Scheduled', 'status: todo', 'assignee: "@new-each-run"',
     'when: { kind: every, every: "1h" }', '---', '', 'Run later.',
   ].join('\n'))
   await git(dir, ['init', '-q'])

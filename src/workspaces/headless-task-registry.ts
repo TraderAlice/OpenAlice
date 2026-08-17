@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path'
 
 import type { ModelReasoningEffort } from '../ai-providers/model-semantics.js'
 import type { HeadlessLaunchErrorCode } from './headless-task.js'
+import { progressChanged, type HeadlessTurnProgress } from './headless-progress.js'
 import type { Logger } from './logger.js'
 
 export type HeadlessTaskStatus = 'running' | 'done' | 'failed' | 'interrupted'
@@ -114,6 +115,10 @@ export interface HeadlessTaskRecord {
   signal?: string | null
   killed?: boolean
   error?: string
+  /** Watchdog policy recorded at dispatch time. A positive number is the armed
+   * budget, `null` explicitly records a new unlimited scheduled-Issue run, and
+   * absence is reserved for historical records or non-Issue dispatches. */
+  timeoutMs?: number | null
   /**
    * The agent CLI's OWN session id, captured from the run's stdout (adapter's
    * `extractHeadlessSessionId`). This is what makes a headless run REOPENABLE:
@@ -124,6 +129,8 @@ export interface HeadlessTaskRecord {
   agentSessionId?: string
   /** Compact list-view projection; full normalized blocks stay in the log API. */
   output?: HeadlessTaskOutputSummary
+  /** Live compact timeline. Present only while the child is running. */
+  progress?: HeadlessTurnProgress
 }
 
 /** Task-log file paths — shared by the writer (service) and reader (route). */
@@ -176,6 +183,7 @@ export class HeadlessTaskRegistry {
       if (t.status === 'running') {
         t.status = 'interrupted'
         t.finishedAt = t.finishedAt ?? t.startedAt
+        delete t.progress
         changed = true
       }
     }
@@ -197,6 +205,8 @@ export class HeadlessTaskRegistry {
     trigger?: HeadlessTaskTrigger
     /** Business follow-up metadata; omitted for automation/manual runs. */
     inquiry?: HeadlessTaskInquiry
+    /** Watchdog budget when this dispatch armed one. */
+    timeoutMs?: number
   }): Promise<HeadlessTaskRecord> {
     let taskId = randomTaskId()
     while (this.tasks.some((task) => task.taskId === taskId)) taskId = randomTaskId()
@@ -214,6 +224,11 @@ export class HeadlessTaskRegistry {
       // Keep the field absent (not `undefined`) on manual runs so the JSON stays clean.
       ...(input.trigger ? { trigger: input.trigger } : {}),
       ...(input.inquiry ? { inquiry: input.inquiry } : {}),
+      ...(input.timeoutMs !== undefined
+        ? { timeoutMs: input.timeoutMs }
+        : input.trigger?.kind === 'issue'
+          ? { timeoutMs: null }
+          : {}),
     }
     this.tasks.push(rec)
     await this.flush()
@@ -241,6 +256,15 @@ export class HeadlessTaskRegistry {
     const rec = this.tasks.find((t) => t.taskId === taskId)
     if (!rec) return
     Object.assign(rec, patch)
+    if (rec.status !== 'running') delete rec.progress
+    await this.flush()
+  }
+
+  /** Compact live timeline for comment/inquiry consumers. */
+  async setProgress(taskId: string, progress: HeadlessTurnProgress): Promise<void> {
+    const rec = this.tasks.find((t) => t.taskId === taskId)
+    if (!rec || !progressChanged(rec.progress, progress)) return
+    rec.progress = progress
     await this.flush()
   }
 

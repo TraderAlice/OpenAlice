@@ -14,9 +14,11 @@
   "dependencies": {
     "@grammyjs/auto-retry": "^2.0.2",
     "@hono/node-server": "^2.0.12",
+    "@slack/socket-mode": "^3.0.0",
+    "@slack/web-api": "^8.0.0",
     "@traderalice/connector-protocol": "workspace:*",
     "discord.js": "14.26.5",
-    "grammy": "^1.40.0",
+    "grammy": "^1.45.1",
     "hono": "^4.12.32",
     "zod": "^4.3.6"
   },

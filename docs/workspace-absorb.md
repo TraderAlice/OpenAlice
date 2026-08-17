@@ -50,7 +50,8 @@ Absorb never rewrites historical authorship:
 - the Catalog records `absorbedIntoWorkspaceId`, `absorbedAt`, and the target
   Git commit so the UI can explain where the desk went;
 - the source checkout moves intact to `departed-workspaces/<workspaceId>` and
-  can still be inspected or explicitly restored.
+  can still be inspected or explicitly restored, including its
+  `.alice/sessions/` AI launch configuration.
 
 Copied files are new target assets with an audit commit. They do not make the
 target Session the author of the source's old work.

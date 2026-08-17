@@ -1,9 +1,10 @@
 import { fetchJson } from './client'
+import type { ModelReasoningEffort } from './types'
 
 export type ScheduleWhen =
   | { kind: 'at'; at: string }
   | { kind: 'every'; every: string }
-  | { kind: 'cron'; cron: string; timezone?: string }
+  | { kind: 'cron'; cron: string; timezone?: string; catchUp?: boolean }
 
 export interface ScheduleTask {
   id: string
@@ -12,6 +13,9 @@ export interface ScheduleTask {
   when: ScheduleWhen
   what: string
   agent?: string
+  credential?: string
+  model?: string
+  effort?: ModelReasoningEffort
   assignee: string
   enabled: boolean
   /** When the scanner last fired this task (epoch ms), null if never. */

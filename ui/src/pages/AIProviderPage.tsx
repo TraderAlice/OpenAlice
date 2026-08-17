@@ -2,8 +2,9 @@
  * AI Provider — Alice's credential vault.
  *
  * Post-Workspace-pivot the in-process model loop is gone; the only thing this
- * page manages is the central set of api-key credentials that get injected into
- * workspaces (and pulled/pushed from the per-workspace AI config modal). It is
+ * page manages is the central set of api-key credentials that can be selected
+ * for per-process Workspace Session bindings. The native-project config editor
+ * is retained separately as a deprecated compatibility export. This page is
  * NOT a profile editor anymore — no backend/loginMethod, no active profile, no
  * SDK adapters, and Test runs the lightweight HTTP probe, not the old provider
  * router.
@@ -47,16 +48,16 @@ function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'labe
 
 // ==================== Agent runtimes ====================
 //
-// The four CLI runtimes a workspace can launch. These credentials feed them;
+// The native CLI runtimes a workspace can launch. These credentials feed them;
 // this panel orients the user on what each is and how it authenticates. Editorial
 // copy grounded in the adapters (src/workspaces/adapters/*) — keep it factual.
 
 interface RuntimeInfo {
   id: string
   name: string
-  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
-  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
-  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
+  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.cursor.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.omp.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
+  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.cursor.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.omp.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
+  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.cursor.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.omp.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
 }
 
 const AGENT_RUNTIMES: RuntimeInfo[] = [
@@ -73,6 +74,27 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
     blurbKey: 'aiProvider.runtime.codex.blurb',
     modelsKey: 'aiProvider.runtime.codex.models',
     authKey: 'aiProvider.runtime.codex.auth',
+  },
+  {
+    id: 'cursor',
+    name: 'Cursor Agent',
+    blurbKey: 'aiProvider.runtime.cursor.blurb',
+    modelsKey: 'aiProvider.runtime.cursor.models',
+    authKey: 'aiProvider.runtime.cursor.auth',
+  },
+  {
+    id: 'grok',
+    name: 'Grok Build',
+    blurbKey: 'aiProvider.runtime.grok.blurb',
+    modelsKey: 'aiProvider.runtime.grok.models',
+    authKey: 'aiProvider.runtime.grok.auth',
+  },
+  {
+    id: 'omp',
+    name: 'Oh My Pi',
+    blurbKey: 'aiProvider.runtime.omp.blurb',
+    modelsKey: 'aiProvider.runtime.omp.models',
+    authKey: 'aiProvider.runtime.omp.auth',
   },
   {
     id: 'opencode',
@@ -320,14 +342,9 @@ export function AIProviderPage() {
   )
 }
 
-// ==================== Default workspace credentials ====================
-//
-// A user-level "inject my usual key on every new workspace" setting. Per agent,
-// pick a vault credential to seed into each new workspace's file-based AI config
-// at create time. opencode/pi are the primary case (loginless — they need a key
-// to run); Claude Code / Codex run on their own CLI login by default, so they're
-// behind an "advanced" reveal — present (some users drive them via an unofficial
-// API key) but never pushed.
+// ==================== Legacy new-Workspace creation seeds ====================
+// Existing installation-level defaults are translated into the new Workspace's
+// secret-free `.alice/settings.json`. They never write native CLI project files.
 
 const PRIMARY_DEFAULT_AGENTS = [
   { id: 'opencode', name: 'opencode' },

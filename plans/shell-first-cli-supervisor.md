@@ -36,7 +36,9 @@ Research:
 
 Predecessor:
 
-- [[plans/cli-lifecycle-quality.md]]
+- CLI lifecycle quality shipped in PR #847. The durable contract is
+  [[docs/cli-installer.md]]. The execution plan is git history
+  `git show <deletion-commit>^:plans/cli-lifecycle-quality.md`.
 
 ## Objective
 
@@ -111,7 +113,9 @@ openalice status [--instance <name>] [--json]
 openalice open [--instance <name>]
 openalice logs [--instance <name>] [--component <name>] [--follow] [--json]
 openalice doctor [--instance <name>] [--json] [--fix]
-openalice instance list [--json]
+openalice project list [--json]
+openalice project use <key>
+openalice project copy-ai-creds [--from <key>] [--to <key>] [--yes]
 openalice instance delete <name>
 openalice update [--check] [--yes]
 openalice uninstall [--plan] [--yes]
@@ -331,6 +335,8 @@ and verification before the next dependent branch starts from updated `dev`.
 - [x] Add read-only Doctor checks for provenance, Node/runtime requirements,
   ownership, ports, components, update metadata, and source/bundle integrity.
 - [x] Exercise old-client/new-server and new-client/old-server fixtures.
+- [x] Publish one read-only discovery contract from dev and built Guardians so
+  foreign surfaces can inspect/open an owner without gaining stop authority.
 
 ### 3. TypeScript CLI application shell and PTY harness
 
@@ -452,8 +458,8 @@ running Guardian, and TUI stop returned the home to absent.
 
 - [x] Inventory server/UI/Guardian outputs, production dependencies, native
   modules, Broker Pack boundary, and managed Pi injection.
-- [ ] Produce deterministic platform/architecture archives.
-- [ ] Define authenticated manifest, version, compatibility, Node requirement,
+- [x] Produce deterministic platform/architecture archives.
+- [x] Define authenticated manifest, version, compatibility, Node requirement,
   file hashes, and content identity.
 - [x] Install immutable Runtime versions and validate without a checkout.
 - [x] Add providers for bundle, source-development, Docker, Electron, and
@@ -504,6 +510,9 @@ source-tool planning.
 
 ### 9. Atomic Runtime update, activation, and rollback
 
+- [x] Separate immutable install provenance from update-channel policy so a
+  release-owned exact-tag install remains on stable while explicit
+  `--version` installs stay pinned.
 - [ ] Stage matching CLI, Pi, and Runtime as one product release.
 - [ ] Plan compatibility and active-work impact for running instances.
 - [ ] Keep compatible old processes alive with pending activation.
@@ -536,7 +545,7 @@ source-tool planning.
 | `up` from running | Idempotent verified endpoint; no signal |
 | shell/TUI detach | Runtime remains alive |
 | `run` interrupted | Self-owned Runtime stops cleanly |
-| Electron owner | Inspect/open allowed; down refused |
+| Electron owner | Ownership visible; browser handoff planned; down refused |
 | takeover | Guardian recovery ordering only |
 | foreign machine | Never reclaimed from heartbeat |
 | JSON status | Stable absent/starting/running/degraded/incompatible/stopping schema |
@@ -787,3 +796,29 @@ This plan is complete only when:
   acceptance deletes only that dependency from an otherwise healthy release,
   verifies that the installer preserves the damaged evidence, replaces the
   release atomically, and confirms the repaired closure before continuing.
+- 2026-08-02: Dogfood found that release-owned installers recorded their
+  embedded tag as an explicit pin, disabling both startup notices and the TUI
+  update action. Install provenance v2 now keeps the immutable tag for exact
+  SSH/source reproduction and records update policy separately. Release
+  generation embeds `stable`, human `--version` remains pinned, legacy v1
+  metadata remains readable, and the release-installer transformation plus
+  stable-ref install/check path have dedicated regression coverage.
+- 2026-08-07: Closed the dev-owner discovery gap. Source `pnpm dev` now
+  publishes the same private `runtime.status` envelope as built Guardians,
+  including its owner, Vite endpoint, source provenance, and
+  component health, while deliberately omitting `runtime.stop`. The real dev
+  smoke proves CLI discovery, rejected stop, duplicate-writer refusal, and
+  survival of the original owner in one isolated journey.
+- 2026-08-13: Plan-index audit against current `dev`. Increment 7's
+  platform/arch archives and hashed `runtime-manifest.json` already ship
+  through `pnpm build:headless-runtime` and the release matrix
+  (darwin/linux × arm64/x64), including an outside-checkout install/boot/
+  Doctor/`down` gate. Remaining increment 7 proof is still clean-host
+  Workspace PTY, optional components, and Pi. Increment 3 is still a hybrid
+  TypeScript/`mjs` CLI without `@xterm/headless`. Increment 4 still lacks a
+  dedicated component panel. Increment 5 still lacks log
+  filter/follow/pause, copyable Doctor remediation, update plan/progress
+  screens, and active-work disclosure. Increment 6 still lacks
+  `openalice config check`, last-known-good live reload, and registry-only
+  deletion. Increments 9–10 (atomic update/rollback and N-1 release gates)
+  remain unstarted. The plan stays Active.

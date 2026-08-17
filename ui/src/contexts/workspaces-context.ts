@@ -40,6 +40,9 @@ export interface WorkspacesContextValue {
     prompt: string,
     agent: string,
     credentialSlug?: string,
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
+    credentialSource?: 'native',
   ): Promise<ManagerQuickStartResult>
   spawn(wsId: string, opts?: SpawnOpts, source?: WorkspaceSource): Promise<void>
   openHeadlessRun(
@@ -50,6 +53,7 @@ export interface WorkspacesContextValue {
   setDefaultAgent(agent: string | null): Promise<void>
   setIssueDefaultAgent(agent: string | null): Promise<void>
   initializeAutoQuant(): Promise<Workspace>
+  initializeChat(): Promise<Workspace>
   setAutoQuantDefaultWorkspace(workspaceId: string): Promise<void>
   quickChat(
     prompt: string,
@@ -57,15 +61,33 @@ export interface WorkspacesContextValue {
     credentialSlug?: string,
     targetWsId?: string,
     template?: 'chat' | 'auto-quant-v2',
+    model?: string | null,
+    reasoningEffort?: import('../api').ModelReasoningEffort,
+    credentialSource?: 'native',
   ): Promise<string>
   pauseSession(wsId: string, sessionId: string): Promise<void>
   resumeSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   openWebPiSession(wsId: string, sessionId: string, source?: WorkspaceSource): Promise<void>
   requestDeleteSession(wsId: string, sessionId: string): void
-  openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'ai' | 'template' | 'absorb'): void
+  setSessionPresence(
+    wsId: string,
+    resumeId: string,
+    presence: import('../components/workspace/api').SessionPresence,
+  ): Promise<void>
+  setSessionDisplayName(
+    wsId: string,
+    resumeId: string,
+    displayName: string | null,
+  ): Promise<void>
+  updateSessionRuntime(
+    wsId: string,
+    sessionId: string,
+    update: import('../components/workspace/api').PausedSessionRuntimeUpdate,
+  ): Promise<void>
+  openAgentConfig(wsId: string, agent?: AgentId, section?: 'general' | 'launch' | 'ai' | 'template' | 'absorb'): void
   saveWorkspaceMetadata(
     wsId: string,
-    metadata: { displayName?: string | null; description?: string | null },
+    metadata: { displayName?: string | null; description?: string | null; defaultAgent?: string | null },
   ): Promise<void>
   renameWorkspace(wsId: string, displayName: string): Promise<void>
 }

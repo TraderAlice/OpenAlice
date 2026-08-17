@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { resolveInstalledLayout } from './install-layout.mjs'
-import { readInstallSource } from './install-source.mjs'
+import { installSourceUpdateChannel, readInstallSource } from './install-source.mjs'
 
 const CURRENT_VERSION = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
@@ -36,7 +36,7 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
   const installSource = options.installSource ?? await (
     dependencies.readInstallSourceImpl ?? readInstallSource
   )()
-  const channel = updateChannel(installSource)
+  const channel = installSourceUpdateChannel(installSource)
   if (channel !== 'stable') {
     return {
       status: 'unsupported',
@@ -307,19 +307,6 @@ function runProcess(spawnImpl, command, args, options) {
       else rejectPromise(new Error(`installer exited with code=${String(code)}, signal=${String(signal)}`))
     })
   })
-}
-
-function updateChannel(source) {
-  if (source?.selector?.kind === 'version') return 'pinned'
-  if (
-    source?.selector?.kind === 'branch'
-    && source.selector.value === 'master'
-    && source.installerUrl === 'https://openalice.ai/install'
-  ) {
-    return 'stable'
-  }
-  if (source?.selector?.kind === 'branch' && source.selector.value === 'master') return 'custom'
-  return 'development'
 }
 
 function unsupportedChannelMessage(source, channel) {

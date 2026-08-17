@@ -7,6 +7,12 @@ interface UseAutoSaveOptions<T> {
   save: (data: T) => Promise<void>
   delay?: number
   enabled?: boolean
+  /**
+   * Skip the first enabled save cycle. This is useful for forms that become
+   * enabled after their initial data loads. Dirty-gated editors should set
+   * this to false so their first user edit is not mistaken for hydration.
+   */
+  skipInitialSave?: boolean
 }
 
 export function useAutoSave<T>({
@@ -14,6 +20,7 @@ export function useAutoSave<T>({
   save,
   delay = 600,
   enabled = true,
+  skipInitialSave = true,
 }: UseAutoSaveOptions<T>): { status: SaveStatus; flush: () => void; retry: () => void } {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -56,14 +63,14 @@ export function useAutoSave<T>({
     if (!enabled) return
     if (initialRef.current) {
       initialRef.current = false
-      return
+      if (skipInitialSave) return
     }
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(doSave, delay)
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [data, delay, enabled, doSave])
+  }, [data, delay, enabled, skipInitialSave, doSave])
 
   useEffect(() => {
     return () => {

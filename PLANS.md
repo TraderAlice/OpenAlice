@@ -1,8 +1,8 @@
 # OpenAlice Implementation Plans
 
-This file indexes substantial, multi-step implementation work. Plans describe
+This file indexes **active** multi-step implementation work. Plans describe
 how repository truth will change; owner guides under [[docs/README.md]] describe
-the durable truth after it changes.
+the durable truth after it changes. Git history is the archive.
 
 ## Plan Contract
 
@@ -14,43 +14,52 @@ the durable truth after it changes.
   step complete before its code and required verification exist.
 - Record material discoveries and changed decisions in the plan. Move stable
   architectural conclusions into the linked owner guide.
-- Keep completed plans in the repository as concise execution history and move
-  their index entry from Active to Completed.
+- Completing a plan is a deletion: remove `plans/<topic>.md` and its Active
+  bullet in the same change that records acceptance. Do not keep a Completed
+  section, tombstone bullets, or an on-tree `plans/archive/`. Recover a
+  finished plan from git:
+
+  ```bash
+  git log --diff-filter=D --summary -- plans/
+  git show <deletion-commit>^:plans/<topic>.md
+  ```
+
 - Use GitHub issues for externally visible defects and deferred findings; plans
   may coordinate those issues but do not replace them.
 
 ## Active
 
+- [[plans/agent-runtime-log.md]] — Append-only agent runtime lifecycle log
+  (`session.born` / started / stopped / rejected / headless turn assets).
+  Occupancy + Office timeline + headless text/tool/completion are in;
+  the floor canvas lives in [[plans/office-floor.md]].
+- [[plans/office-floor.md]] — Office overworld rebuild: one continuous 4:3
+  top-down tilemap; Harness=functional neighborhood, Workspace=furniture pod,
+  `resumeId`=employee. Scene graph, top-down placeholders, game chrome, camera,
+  and browser acceptance remain active.
+- [[plans/issue-comment-prompt.md]] — Optional per-Issue `commentPrompt`
+  template for comment-reply Input Prompts. Omission keeps the historical
+  wrapper; chat desks seed `{comment}`.
+- [[plans/telegram-connector-issue.md]] — One Issue per Alice Project is the
+  Telegram phone desk: What is the heartbeat prompt, comments are the chat,
+  Connector only transports. Increment 1 bound the desk in Settings.
+  Increment 2 projects comments unless `[[no-reply]]`.
+- [[plans/connector-inbox-commands.md]] — Connectors declare `inbox` and
+  `settings` capabilities and implement their own slash-command forms.
+  Telegram uses a bounded `/inbox` summary plus on-demand file pull;
+  Discord/Slack stay placeholders. `inboxPush` can mute push without
+  touching the phone desk.
+- [[plans/session-presence.md]] — Give product Sessions an in-desk presence
+  (`active` / `archived` / `deleted`) separate from workspace `retired`, uncap
+  the Ask Alice roster, and make Archive the floor action instead of deleting
+  a coworker. Increment 1 landed in PR #1069; persisted presence remains open.
+- [[plans/release-feedback-reliability.md]] — Batch 1 (deterministic/early
+  release feedback) landed in PR #1061. Batch 2 still needs per-platform N-1
+  fan-in and accepted-tree provenance without weakening release gates.
 - [[plans/shell-first-cli-supervisor.md]] — Delivers a first-class Shell
   Supervisor TUI, persistent Guardian-owned Runtime lifecycle, standalone
   headless release bundle, atomic update/rollback, and real N-1 plus PTY
-  acceptance through serial increments.
-
-## Completed
-
-- [[plans/retire-workspace-adapter-pins.md]] — Retires the legacy per-Workspace
-  adapter allowlist so runtime availability comes from the live installation
-  registry and future default-enabled choices can live in global preferences.
-- [[plans/auto-quant-v2-harness.md]] — Adds AutoQuant V2 as a first-class
-  version-pinned Harness, then refines it into an explicitly initialized
-  default desk with Session-first daily UI and pinned `v0.8.31` source.
-- [[plans/cli-lifecycle-quality.md]] — Aligns the computer-level CLI with the
-  OpenAlice product version and adds bounded update discovery, installer-backed
-  updates, and state-preserving CLI uninstall. Delivered in PR #847.
-- [[plans/agent-conversation-log-ui.md]] — Adds a read-only, paginated Agent
-  collaboration view to Dev Logs without exposing launcher file paths or
-  introducing a new dispatch surface. Delivered in PR #742.
-- [[plans/agent-conversation-semantics.md]] — Separates ordinary peer
-  conversation from explicit artifact reconstruction, documents synchronous
-  and asynchronous delegation, and records cross-Agent exchanges in a
-  dedicated local event log. Delivered in PR #741.
-- [[plans/broker-pack-release-safety.md]] — Repaired the v0.85 existing-user
-  Broker Pack upgrade gap, shipped v0.86.0-beta, and made N-1→N reconciliation
-  a blocking release contract.
-- [[plans/workspace-launch-configuration.md]] — Made the next Workspace runtime
-  launch plan inspectable from the existing Workspace settings panel.
-- [[plans/windows-headless-launch.md]] — Safely launches Windows npm Agent
-  runtimes for scheduled work and makes pre-process failures observable.
-- [[plans/issue-model-effort-overrides.md]] — Separated login-backed Workspace
-  model defaults from provider isolation and added per-run Issue model/effort
-  overrides. Delivered in PR #715; closed GitHub issues #706 and #710.
+  acceptance through serial increments. Increments 1–2 and most of 4/6/7 are
+  in `dev`; remaining work is the TypeScript CLI conversion, logs/Doctor/update
+  UX, config check, registry deletion, authenticity-hardened updates, and
+  release-gate N-1.

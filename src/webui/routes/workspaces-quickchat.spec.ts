@@ -1,13 +1,15 @@
 /**
- * POST /quick-chat — the loginless-runtime credential injection (opencode/pi).
- * claude/codex carry their own CLI login and must NOT be injected; opencode/pi
- * are seeded from the vault before spawn, and dead-end (no compatible cred) with
- * a 400 the composer turns into a "configure a provider" bounce.
+ * POST /quick-chat — native runtime authentication plus explicit or remembered
+ * Workspace launch bindings. Managed launches never rewrite native CLI project
+ * configuration.
  *
  * core/config is partial-mocked so we can drive the vault per-test without
  * touching the real ai-provider-manager.json.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { createWorkspaceRoutes } from './workspaces.js';
 import {
@@ -23,6 +25,12 @@ import {
   TemplateWorkspaceResolver,
 } from '../../workspaces/chat-workspace-resolver.js';
 import { createBuiltinAdapterRegistry } from '../../workspaces/adapters/index.js';
+import { writeWorkspaceMetadata } from '../../workspaces/workspace-metadata.js';
+import {
+  emptyWorkspaceRuntimeSettings,
+  readWorkspaceRuntimeSettings,
+  writeWorkspaceRuntimeSettings,
+} from '../../workspaces/workspace-runtime-settings.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -60,24 +68,19 @@ function build(opts: {
     createdAt: '2026-07-01T00:00:00.000Z',
   };
   const opencode = {
-    id: 'opencode',
-    namePrefix: 'o',
-    capabilities: builtinAdapters.get('opencode')!.capabilities,
+    ...builtinAdapters.get('opencode')!,
+    lifecycle: undefined,
     writeAiConfig: vi.fn(async () => {}),
     readAiConfig: vi.fn(async () => opts.opencodeConfig ?? null),
   };
   const claude = {
-    id: 'claude',
-    namePrefix: 'c',
-    capabilities: builtinAdapters.get('claude')!.capabilities,
+    ...builtinAdapters.get('claude')!,
+    lifecycle: undefined,
     readAiConfig: vi.fn(async () => opts.claudeConfig ?? null),
     readInteractiveSetupStatus: vi.fn(async () => opts.claudeInteractiveSetupStatus ?? 'ready'),
   };
   const shell = {
-    id: 'shell',
-    kind: 'utility',
-    namePrefix: 'sh',
-    capabilities: builtinAdapters.get('shell')!.capabilities,
+    ...builtinAdapters.get('shell')!,
   };
   const adapters: Record<string, any> = { opencode, claude, shell };
   const spawn = vi.fn((_wsId: string, ctx: any) => ({
@@ -99,13 +102,29 @@ function build(opts: {
     list: () => opts.workspaces ?? [],
     get: (id: string) => (opts.workspaces ?? []).find((w) => w.id === id) ?? (id === META.id ? META : undefined),
   };
+  const sessionRecords = new Map<string, any>(
+    Object.entries(opts.sessionsByWorkspace ?? {}).flatMap(([wsId, rows]) =>
+      rows.map((row) => [`${wsId}:${row.id}`, row] as const)),
+  );
+  const sessionsFor = (wsId: string) => [...sessionRecords.entries()]
+    .filter(([key]) => key.startsWith(`${wsId}:`))
+    .map(([, row]) => row);
   const sessionRegistry = {
     ensureLoaded: vi.fn(async () => {}),
-    listFor: vi.fn((wsId: string) => opts.sessionsByWorkspace?.[wsId] ?? []),
-    findById: vi.fn(() => undefined),
+    listFor: vi.fn(sessionsFor),
+    findById: vi.fn((id: string) => [...sessionRecords.values()].find((row) => row.id === id)),
+    findByResumeId: vi.fn((wsId: string, resumeId: string) =>
+      sessionsFor(wsId).find((row) => row.resumeId === resumeId)),
+    get: vi.fn((wsId: string, id: string) => sessionRecords.get(`${wsId}:${id}`)),
     nextName: () => 'o1',
-    create: vi.fn(async () => {}),
-    remove: vi.fn(async () => {}),
+    create: vi.fn(async (record: any) => { sessionRecords.set(`${record.wsId}:${record.id}`, record); }),
+    update: vi.fn(async (wsId: string, id: string, patch: any) => {
+      const record = sessionRecords.get(`${wsId}:${id}`);
+      if (!record) return undefined;
+      Object.assign(record, patch);
+      return record;
+    }),
+    remove: vi.fn(async (wsId: string, id: string) => sessionRecords.delete(`${wsId}:${id}`)),
   };
   const resumeRecords = new Map<string, any>();
   const resumeRegistry = {
@@ -114,6 +133,41 @@ function build(opts: {
       const resumeId = input.resumeId ?? `resume-${resumeRecords.size + 1}`;
       const record = { resumeId, ...input };
       resumeRecords.set(resumeId, record);
+      return record;
+    }),
+  };
+  const sessionCoordinator = {
+    ensure: vi.fn(async (input: any) => {
+      const identity = await resumeRegistry.ensure(input);
+      const existing = sessionRegistry.findByResumeId(input.wsId, identity.resumeId);
+      if (existing) {
+        Object.assign(existing, {
+          state: input.state ?? existing.state,
+          surface: input.surface ?? existing.surface,
+        });
+        return { identity, session: existing, created: false };
+      }
+      const now = '2026-07-12T00:00:00.000Z';
+      const record = {
+        id: `${input.agent}-test-${resumeRecords.size}`,
+        resumeId: identity.resumeId,
+        wsId: input.wsId,
+        agent: input.agent,
+        name: sessionRegistry.nextName(),
+        createdAt: now,
+        lastActiveAt: now,
+        state: input.state ?? 'paused',
+        surface: input.surface ?? 'headless',
+        ...(input.fallbackTitle ? { fallbackTitle: input.fallbackTitle } : {}),
+        ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+      };
+      await sessionRegistry.create(record);
+      return { identity, session: record, created: true };
+    }),
+    transition: vi.fn(async (input: any) => {
+      const record = sessionRegistry.findByResumeId(input.wsId, input.resumeId);
+      if (!record) throw new Error('missing test SessionRecord');
+      Object.assign(record, { state: input.state, surface: input.surface });
       return record;
     }),
   };
@@ -146,6 +200,7 @@ function build(opts: {
     },
     sessionRegistry,
     resumeRegistry,
+    sessionCoordinator,
     pool: { spawn, get: vi.fn(() => undefined), setTerminalViewAttributes },
     publicMeta: vi.fn(async (workspace: any) => workspace),
     config: { launcherRepoRoot: '/repo' },
@@ -191,6 +246,7 @@ function build(opts: {
     app,
     opencode,
     spawn,
+    resumeRecords,
     creator,
     rememberRecentChatWorkspace,
     rememberAutoQuantDefaultWorkspace,
@@ -280,9 +336,8 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     expect(result.body.credentials).toEqual([
       expect.objectContaining({
         slug: 'google-1',
-        resolvedModel: 'gemini-3.1-flash-lite',
+        resolvedModel: 'gemini-3.6-flash',
         resolvedReasoning: true,
-        resolvedReasoningEffort: 'minimal',
         resolvedReasoningMode: 'adaptive',
       }),
     ]);
@@ -491,37 +546,27 @@ describe('GET /credentials — Quick Chat launch metadata', () => {
     expect(opencode.writeAiConfig).toHaveBeenCalledWith('/manager', {
       ...config,
       reasoning: true,
-      reasoningEffort: 'medium',
     });
   });
 });
 
-describe('POST /quick-chat — loginless credential injection', () => {
-  it('opencode + empty vault → 400 no_ai_credential, no inject, no spawn', async () => {
+describe('POST /quick-chat — native auth and explicit credential overrides', () => {
+  it('opencode + empty vault → native launch without injection', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app, opencode, spawn } = build();
     const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
-    expect(r.status).toBe(400);
-    expect(r.body.error).toBe('no_ai_credential');
-    expect(r.body.settingsTarget).toBe('ai-provider'); // the composer's bounce target
+    expect(r.status).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
-    expect(spawn).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('opencode + compatible cred → injects the current vendor recommendation then spawns', async () => {
+  it('opencode + compatible cred → keeps native auth until the credential is explicitly selected', async () => {
     vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
     const { app, opencode, spawn } = build();
     const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
     expect(r.status).toBe(201);
-    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
-    const cred = (opencode.writeAiConfig.mock.calls[0] as any[])[1];
-    expect(cred.apiKey).toBe('sk-oa');
-    expect(cred.wireShape).toBe('openai-chat');
-    expect(cred.model).toBe('gpt-5.6'); // current vendor recommendation — no lastModel yet
-    expect(cred.contextWindow).toBe(1_050_000);
-    expect(cred.reasoning).toBe(true);
-    // model remembered on the cred for next time
-    expect(vi.mocked(setCredentialLastModel)).toHaveBeenCalledWith('openai-1', 'gpt-5.6');
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect(vi.mocked(setCredentialLastModel)).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
   });
 
@@ -537,8 +582,97 @@ describe('POST /quick-chat — loginless credential injection', () => {
     const r = await quickChat(app, { prompt: 'hi', agent: 'opencode' });
 
     expect(r.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it('uses and updates the target Workspace Ask Alice recent binding', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-settings-'));
+    try {
+      const settings = emptyWorkspaceRuntimeSettings();
+      settings.runtime.interactive.recent.agent = 'opencode';
+      settings.runtime.interactive.recent.agents.opencode = {
+        accessMode: 'vault',
+        credentialSlug: 'openai-2',
+        wireShape: 'openai-chat',
+        model: 'remembered-model',
+        reasoningEffort: 'medium',
+      };
+      await writeWorkspaceRuntimeSettings(dir, settings);
+      vi.mocked(readCredentials).mockResolvedValue({
+        'openai-2': { ...openaiKey, apiKey: 'sk-second' },
+      });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const launch = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(launch.status, JSON.stringify(launch.body)).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1]).toMatchObject({
+        agentId: 'opencode',
+        sessionRuntime: {
+          binding: {
+            credential: { source: 'vault', credentialSlug: 'openai-2' },
+            model: 'remembered-model',
+            reasoningEffort: 'medium',
+          },
+          ai: { apiKey: 'sk-second' },
+        },
+      });
+
+      const updated = await readWorkspaceRuntimeSettings(dir);
+      expect(updated).toMatchObject({
+        ok: true,
+        settings: {
+          runtime: {
+            interactive: {
+              recent: {
+                agent: 'opencode',
+                agents: {
+                  opencode: {
+                    accessMode: 'vault',
+                    credentialSlug: 'openai-2',
+                    model: 'remembered-model',
+                    reasoningEffort: 'medium',
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('explicit native access bypasses an existing Workspace provider', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+    const { app, opencode, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'workspace-key',
+        model: 'workspace-model',
+        wireShape: 'openai-chat',
+      },
+    });
+
+    const result = await quickChat(app, {
+      prompt: 'use my opencode account',
+      agent: 'opencode',
+      credentialSource: 'native',
+      model: 'native-model',
+    });
+
+    expect(result.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toEqual({
+      binding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'native-model',
+      },
+      ai: { model: 'native-model', reasoningEffort: null },
+    });
   });
 
   it('honors an explicit credentialSlug pick', async () => {
@@ -546,11 +680,49 @@ describe('POST /quick-chat — loginless credential injection', () => {
       'openai-1': openaiKey,
       'openai-2': { ...openaiKey, apiKey: 'sk-second', lastModel: 'gpt-5.5-mini' },
     });
-    const { app, opencode } = build();
-    await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
-    const cred = (opencode.writeAiConfig.mock.calls[0] as any[])[1];
-    expect(cred.apiKey).toBe('sk-second');
-    expect(cred.model).toBe('gpt-5.5-mini'); // remembered lastModel wins over flagship
+    const { app, opencode, spawn } = build();
+    const launch = await quickChat(app, { prompt: 'hi', agent: 'opencode', credentialSlug: 'openai-2' });
+    expect(launch.status, JSON.stringify(launch.body)).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    const runtime = (spawn.mock.calls[0] as any[])[1].sessionRuntime;
+    expect(runtime.binding).toMatchObject({
+      credential: { source: 'vault', credentialSlug: 'openai-2' },
+      model: 'gpt-5.5-mini',
+    });
+    expect(runtime.ai.apiKey).toBe('sk-second');
+  });
+
+  it('upgrades a legacy resumed Session to native ownership without reading current Workspace credentials', async () => {
+    vi.mocked(readCredentials).mockResolvedValue({});
+    const { app, opencode, resumeRecords, spawn } = build({
+      opencodeConfig: {
+        apiKey: 'workspace-key-added-after-session-creation',
+        model: 'workspace-model-added-later',
+        wireShape: 'openai-chat',
+      },
+    });
+    resumeRecords.set('resume-legacy', {
+      resumeId: 'resume-legacy',
+      wsId: 'ws-1',
+      agent: 'opencode',
+      agentSessionId: 'native-session-1',
+    });
+
+    const result = await spawnSession(app, {
+      agent: 'opencode',
+      resumeId: 'resume-legacy',
+    });
+
+    expect(result.status).toBe(201);
+    expect(opencode.readAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toEqual({
+      binding: { version: 1, credential: { source: 'native' } },
+      ai: null,
+    });
+    expect(resumeRecords.get('resume-legacy').runtimeBinding).toEqual({
+      version: 1,
+      credential: { source: 'native' },
+    });
   });
 
   it('explicit credential pick overrides a globally-ready opencode config', async () => {
@@ -565,11 +737,14 @@ describe('POST /quick-chat — loginless credential injection', () => {
       credentialSlug: 'openai-2',
     });
 
-    expect(r.status).toBe(201);
-    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
-    expect((opencode.writeAiConfig.mock.calls[0] as any[])[1]).toMatchObject({
-      apiKey: 'sk-second',
-      model: 'gpt-5.5-mini',
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
+    expect((spawn.mock.calls[0] as any[])[1].sessionRuntime).toMatchObject({
+      binding: {
+        credential: { source: 'vault', credentialSlug: 'openai-2' },
+        model: 'gpt-5.5-mini',
+      },
+      ai: { apiKey: 'sk-second' },
     });
     expect(spawn).toHaveBeenCalledOnce();
   });
@@ -647,6 +822,36 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(r.body.error).toBe('auto_quant_not_initialized');
     expect(creator.create).not.toHaveBeenCalled();
     expect(rememberRecentChatWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('initializes the first Chat workspace without pinning a Harness version', async () => {
+    const { app, creator, rememberRecentChatWorkspace } = build();
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'chat', template: 'chat' });
+    expect(creator.create).toHaveBeenCalledWith('chat', 'chat');
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('reuses an existing Chat workspace instead of creating another', async () => {
+    const existing = {
+      id: 'chat-existing',
+      dir: '/chat',
+      template: 'chat',
+      tag: 'chat',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, rememberRecentChatWorkspace } = build({ workspaces: [existing] });
+
+    const response = await app.request('/chat/initialize', { method: 'POST' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      workspace: { id: 'chat-existing', template: 'chat' },
+    });
+    expect(creator.create).not.toHaveBeenCalled();
+    expect(rememberRecentChatWorkspace).toHaveBeenCalledWith('chat-existing');
   });
 
   it('initializes the first AutoQuant Workspace and stores it as the default', async () => {
@@ -765,6 +970,23 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
   });
 
+  it('omitted agent prefers the target Workspace runtime over the installation default', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'quick-chat-runtime-'));
+    try {
+      await writeWorkspaceMetadata(dir, { defaultAgent: 'opencode' });
+      vi.mocked(readWorkspaceDefaultAgent).mockResolvedValue('claude');
+      vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
+      const workspace = { id: 'ws-1', dir, template: 'chat', tag: 'chat-x' };
+      const { app, spawn } = build({ workspaces: [workspace] });
+
+      const r = await quickChat(app, { prompt: 'hi', targetWsId: 'ws-1' });
+      expect(r.status).toBe(201);
+      expect((spawn.mock.calls[0] as any[])[1].agentId).toBe('opencode');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('unknown targetWsId → 404 workspace_not_found, no spawn', async () => {
     const { app, spawn, creator } = build();
     const r = await quickChat(app, { prompt: 'hi', targetWsId: 'nope' });
@@ -774,30 +996,29 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(spawn).not.toHaveBeenCalled();
   });
 
-  it('normal opencode spawn + empty vault/config → 400 no_ai_credential', async () => {
+  it('normal opencode spawn + empty vault/config → native launch', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app, opencode, spawn } = build();
 
     const r = await spawnSession(app, { agent: 'opencode' });
 
-    expect(r.status).toBe(400);
-    expect(r.body.error).toBe('no_ai_credential');
+    expect(r.status).toBe(201);
     expect(opencode.writeAiConfig).not.toHaveBeenCalled();
-    expect(spawn).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('normal opencode spawn + compatible cred → injects and spawns', async () => {
+  it('normal opencode spawn + compatible cred → does not infer an override', async () => {
     vi.mocked(readCredentials).mockResolvedValue({ 'openai-1': openaiKey });
     const { app, opencode, spawn } = build();
 
     const r = await spawnSession(app, { agent: 'opencode' });
 
     expect(r.status).toBe(201);
-    expect(opencode.writeAiConfig).toHaveBeenCalledOnce();
+    expect(opencode.writeAiConfig).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledOnce();
   });
 
-  it('agent-readiness reports missing credential for loginless runtimes', async () => {
+  it('agent-readiness delegates authentication to the native runtime', async () => {
     vi.mocked(readCredentials).mockResolvedValue({});
     const { app } = build();
 
@@ -807,10 +1028,9 @@ describe('POST /quick-chat — loginless credential injection', () => {
     expect(res.status).toBe(200);
     expect(body).toMatchObject({
       agent: 'opencode',
-      ready: false,
-      requiresCredential: true,
-      source: 'missing',
-      settingsTarget: 'ai-provider',
+      ready: true,
+      requiresCredential: false,
+      source: 'runtime-login',
     });
   });
 });

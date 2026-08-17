@@ -165,10 +165,14 @@ export function failedRuntimeReadinessRow(opts: {
 }
 
 export function classifyRuntimeReadinessFailure(
-  result: Pick<HeadlessTaskResult, 'killed' | 'exitCode' | 'stdoutTail' | 'stderrTail' | 'assistantText'>,
+  result: Pick<
+    HeadlessTaskResult,
+    'killed' | 'exitCode' | 'stdoutTail' | 'stderrTail' | 'assistantText' | 'structured'
+  >,
 ): AgentRuntimeReadinessStatus {
   if (result.killed) return 'timeout';
-  const text = `${result.stderrTail}\n${result.stdoutTail}`.toLowerCase();
+  const structuredError = latestStructuredRuntimeError(result);
+  const text = `${structuredError ?? ''}\n${result.stderrTail}\n${result.stdoutTail}`.toLowerCase();
   if (/\b(unauthorized|unauthorised|forbidden|401|403|oauth|log in|login|sign in|signin|auth|authentication|not authenticated)\b/.test(text)) {
     return 'auth_required';
   }
@@ -176,6 +180,10 @@ export function classifyRuntimeReadinessFailure(
     return 'provider_required';
   }
   if (result.exitCode !== 0) return 'failed';
+  // Some CLIs exit 0 after reporting an in-band provider/runtime error. That
+  // is a recognized failure, not an unknown output shape. Preserve it so the
+  // launch surface can show the actual provider response (for example 429).
+  if (structuredError) return 'failed';
   if (!result.assistantText?.trim()) return 'output_unrecognized';
   return 'failed';
 }
@@ -194,7 +202,11 @@ function repairTargetForStatus(
       ? 'cli-login'
       : 'ai-provider';
   }
-  if (status === 'provider_required') return 'ai-provider';
+  if (status === 'provider_required') {
+    return adapter.capabilities.aiProvider?.credentialSource === 'runtime-or-workspace'
+      ? 'cli-login'
+      : 'ai-provider';
+  }
   if (status === 'not_installed') return 'runtime-install';
   return 'retry';
 }
@@ -209,13 +221,27 @@ function summarizeRuntimeReadinessFailure(
   if (status === 'output_unrecognized') {
     return 'The runtime exited successfully, but OpenAlice could not read an assistant reply from its structured output.';
   }
-  const tail = `${result.stderrTail || result.stdoutTail}`.trim().replace(/\s+/g, ' ');
+  const structuredError = latestStructuredRuntimeError(result);
+  const tail = `${structuredError || result.stderrTail || result.stdoutTail}`.trim().replace(/\s+/g, ' ');
   const detail = tail ? ` ${tail.slice(0, 280)}` : '';
   if (status === 'auth_required') {
     return `The runtime appears to need CLI login or authentication.${detail}`;
   }
   if (status === 'provider_required') {
-    return `The runtime appears to need provider or API-key configuration.${detail}`;
+    return `The runtime appears to need native CLI login or provider configuration.${detail}`;
+  }
+  if (structuredError) {
+    return `The runtime reported an error:${detail}`;
   }
   return `The runtime readiness probe failed.${detail}`;
+}
+
+function latestStructuredRuntimeError(
+  result: Pick<HeadlessTaskResult, 'structured'>,
+): string | null {
+  for (let index = result.structured.blocks.length - 1; index >= 0; index -= 1) {
+    const block = result.structured.blocks[index];
+    if (block?.type === 'error' && block.message.trim()) return block.message.trim();
+  }
+  return null;
 }

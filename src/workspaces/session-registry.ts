@@ -11,8 +11,8 @@ import type { Logger } from './logger.js';
  * WebSocket query, REST route) — what we previously called `sessionToken`
  * (transient, in-memory).
  *
- * `state` is the launcher's view: 'running' means we have a live PTY in the
- * pool keyed by this id; 'paused' means the record exists but no PTY. On a
+ * `state` is the launcher's view: 'running' means this product Session owns a
+ * live terminal, WebPi, or headless execution; 'paused' means it owns none. On
  * crash recovery we flip any 'running' to 'paused' (see `bootFixup`).
  *
  * `resumeId` is the product-level conversation identity. `resumeHint` remains
@@ -33,8 +33,9 @@ export interface SessionRecord {
   readonly createdAt: string;
   lastActiveAt: string;
   state: 'running' | 'paused';
-  /** Preferred/live presentation for this Session. The runtime remains Pi. */
-  surface?: 'terminal' | 'webpi';
+  /** Last/live execution surface. A headless turn is a first-class Session
+   * execution, not a directory-only identity waiting for a UI wrapper. */
+  surface?: 'terminal' | 'webpi' | 'headless';
   resumeHint?: { kind: 'agent-session-id'; value: string };
   scrollbackFile?: string;
   /**
@@ -49,18 +50,16 @@ export interface SessionRecord {
    */
   readonly fallbackTitle?: string;
   /**
-   * The headless run this launcher-owned Session was materialized from.
-   * Optional in the v2 registry because ordinary interactive Sessions have no
-   * source run. The loader still accepts v1 files during migration. This is the
-   * durable run -> Session index used by Inbox and automation surfaces to make
-   * repeated "continue this run" actions return to one conversation instead
-   * of spawning duplicate wrappers around the same agent transcript.
+   * The first headless run associated with this launcher-owned Session.
+   * Optional because an interactive-born Session has no source run. This is
+   * the durable first-run -> Session index used by Inbox and automation
+   * surfaces to return to one conversation instead of spawning duplicates.
    */
   readonly sourceRunId?: string;
 }
 
 interface FileShape {
-  readonly version: 3;
+  readonly version: 4;
   readonly records: SessionRecord[];
 }
 
@@ -77,6 +76,17 @@ export function sessionPreferredTitle(
 /** Preferred title → sticky launcher name. */
 export function sessionDisplayTitle(record: Pick<SessionRecord, 'title' | 'fallbackTitle' | 'name'>): string {
   return sessionPreferredTitle(record) || record.name;
+}
+
+/** Workspace-owned coworker nametag → conversation title → sticky launcher name. */
+export function sessionCoworkerLabel(
+  record: Pick<SessionRecord, 'title' | 'fallbackTitle' | 'name'> | null | undefined,
+  displayName?: string | null,
+): string | undefined {
+  const named = displayName?.trim();
+  if (named) return named;
+  if (!record) return undefined;
+  return sessionDisplayTitle(record);
 }
 
 export function normalizeSessionTitle(value: string | null | undefined): string | undefined {
@@ -178,7 +188,10 @@ export class SessionRegistry {
       this.byWs.set(wsId, map);
     } catch (err) {
       this.logger.error('session_registry.load_failed', { wsId, path, err });
-      this.byWs.set(wsId, new Map());
+      // A malformed roster is product-identity corruption, not an empty
+      // Workspace. Treating it as absent lets startup reconciliation overwrite
+      // the damaged file and silently lose otherwise valid Session rows.
+      throw err;
     }
     this.loaded.add(wsId);
   }
@@ -189,6 +202,11 @@ export class SessionRegistry {
     return Array.from(records.values()).sort((a, b) =>
       a.createdAt < b.createdAt ? -1 : 1,
     );
+  }
+
+  /** All records loaded during boot plus any lazily opened Workspace files. */
+  listAll(): SessionRecord[] {
+    return Array.from(this.byWs.values()).flatMap((records) => [...records.values()]);
   }
 
   get(wsId: string, id: string): SessionRecord | undefined {
@@ -204,7 +222,7 @@ export class SessionRegistry {
     return undefined;
   }
 
-  /** Find the stable interactive Session materialized from a headless run. */
+  /** Find the product Session whose first headless execution was this run. */
   findBySourceRunId(wsId: string, sourceRunId: string): SessionRecord | undefined {
     const records = this.byWs.get(wsId);
     if (!records) return undefined;
@@ -214,7 +232,7 @@ export class SessionRegistry {
     return undefined;
   }
 
-  /** Find the interactive wrapper for one product-owned conversation. */
+  /** Find the one durable roster record for a product-owned conversation. */
   findByResumeId(wsId: string, resumeId: string): SessionRecord | undefined {
     const records = this.byWs.get(wsId);
     if (!records) return undefined;
@@ -229,6 +247,11 @@ export class SessionRegistry {
     const records = this.byWs.get(record.wsId)!;
     if (records.has(record.id)) {
       throw new Error(`session record already exists: ${record.id}`);
+    }
+    for (const existing of records.values()) {
+      if (existing.resumeId === record.resumeId) {
+        throw new Error(`session record already exists for resume identity: ${record.resumeId}`);
+      }
     }
     records.set(record.id, record);
     await this.flush(record.wsId);
@@ -295,7 +318,7 @@ export class SessionRegistry {
     const records = this.byWs.get(wsId);
     if (!records) return;
     const payload: FileShape = {
-      version: 3,
+      version: 4,
       records: Array.from(records.values()),
     };
     const path = join(this.dir, `${wsId}.json`);
@@ -315,13 +338,15 @@ function validateFile(value: unknown): SessionRecord[] {
     throw new Error('sessions.json: root must be an object');
   }
   const v = value as Record<string, unknown>;
-  if (v['version'] !== 1 && v['version'] !== 2 && v['version'] !== 3) {
+  if (v['version'] !== 1 && v['version'] !== 2 && v['version'] !== 3 && v['version'] !== 4) {
     throw new Error(`sessions.json: unsupported version ${String(v['version'])}`);
   }
   if (!Array.isArray(v['records'])) {
     throw new Error('sessions.json: records must be an array');
   }
   const out: SessionRecord[] = [];
+  const ids = new Set<string>();
+  const resumeIds = new Set<string>();
   for (let i = 0; i < v['records'].length; i++) {
     const e = v['records'][i];
     if (typeof e !== 'object' || e === null) {
@@ -348,15 +373,17 @@ function validateFile(value: unknown): SessionRecord[] {
       createdAt: r['createdAt'],
       lastActiveAt: r['lastActiveAt'],
       state: r['state'],
-      ...(r['surface'] === 'terminal' || r['surface'] === 'webpi'
+      ...(r['surface'] === 'terminal' || r['surface'] === 'webpi' || r['surface'] === 'headless'
         ? { surface: r['surface'] }
         : {}),
       // Before v3 `title` meant "the launch prompt". Treat it as a fallback so
       // a native runtime title discovered after upgrade can replace it.
-      ...(v['version'] === 3 && typeof r['title'] === 'string' ? { title: r['title'] } : {}),
+      ...((v['version'] === 3 || v['version'] === 4) && typeof r['title'] === 'string'
+        ? { title: r['title'] }
+        : {}),
       ...(typeof r['fallbackTitle'] === 'string'
         ? { fallbackTitle: r['fallbackTitle'] }
-        : v['version'] !== 3 && typeof r['title'] === 'string'
+        : v['version'] !== 3 && v['version'] !== 4 && typeof r['title'] === 'string'
           ? { fallbackTitle: r['title'] }
           : {}),
       ...(typeof r['sourceRunId'] === 'string' ? { sourceRunId: r['sourceRunId'] } : {}),
@@ -372,6 +399,12 @@ function validateFile(value: unknown): SessionRecord[] {
     if (typeof r['scrollbackFile'] === 'string') {
       base.scrollbackFile = r['scrollbackFile'];
     }
+    if (ids.has(base.id)) throw new Error(`sessions.json: duplicate record id ${base.id}`);
+    if (resumeIds.has(base.resumeId)) {
+      throw new Error(`sessions.json: duplicate resume identity ${base.resumeId}`);
+    }
+    ids.add(base.id);
+    resumeIds.add(base.resumeId);
     out.push(base);
   }
   return out;

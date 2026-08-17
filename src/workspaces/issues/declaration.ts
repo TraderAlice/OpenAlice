@@ -20,14 +20,20 @@
  *   title: <required, short human title>
  *   status: backlog | todo | in_progress | done | canceled   (optional → 'todo')
  *   priority: urgent | high | medium | low | none             (optional → 'none')
- *   assignee: "@workspace" | "@new" | "@human" | "@unassigned" | "@<resumeId>"
- *             (optional → scheduled '@new', otherwise '@workspace')
+ *   assignee: "@new-each-run" | "@new-then-resume" | "@human" |
+ *             "@unassigned" | "@<resumeId>"
+ *             (optional → scheduled '@new-then-resume', otherwise '@unassigned')
  *   when: { kind: at, at } | { kind: every, every } |
  *         { kind: cron, cron, timezone?: local | IANA zone }  (OPTIONAL — present iff scheduled)
  *   what: <legacy fire prompt; migrated into the markdown What body>
  *   agent: <optional adapter id for the scheduled run>
+ *   credential: <optional OpenAlice vault slug for one scheduled Session>
+ *   credentialSource: native <optional explicit Agent-runtime login>
  *   model: <optional native model id for one scheduled run>
  *   effort: none | minimal | low | medium | high | xhigh | max
+ *   timeout: 15m | 30m | 45m | 60m  (optional run budget; omit = no watchdog)
+ *   commentPrompt: <optional template for the comment-reply Input Prompt>
+ *   telegramConnector: true  (optional; at most one per Alice Project)
  *   ---
  *   <markdown What — the exact work definition and scheduled prompt>
  *
@@ -47,12 +53,15 @@ import {
   type ModelReasoningEffort,
 } from '../../ai-providers/model-semantics.js'
 import {
+  DEPRECATED_NEW_ASSIGNEE,
+  DEPRECATED_WORKSPACE_ASSIGNEE,
   HUMAN_ASSIGNEE,
-  NEW_ASSIGNEE,
+  NEW_EACH_RUN_ASSIGNEE,
+  NEW_THEN_RESUME_ASSIGNEE,
   UNASSIGNED_ASSIGNEE,
-  WORKSPACE_ASSIGNEE,
   resumeIdFromSignature,
 } from '../session-signature.js'
+import { parseIssueCommentPrompt } from './comment-prompt.js'
 
 /** Directory of per-issue markdown files, relative to a workspace's `dir`. */
 export const ISSUES_DIR_REL = join('.alice', 'issues')
@@ -66,8 +75,29 @@ const MAX_BYTES = 64 * 1024
 
 export const ISSUE_STATUSES = ['backlog', 'todo', 'in_progress', 'done', 'canceled'] as const
 export const ISSUE_PRIORITIES = ['urgent', 'high', 'medium', 'low', 'none'] as const
+/** Optional scheduled-run watchdog. Omission means the agent may run until it exits. */
+export const ISSUE_TIMEOUTS = ['15m', '30m', '45m', '60m'] as const
 export type IssueStatus = (typeof ISSUE_STATUSES)[number]
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number]
+export type IssueTimeout = (typeof ISSUE_TIMEOUTS)[number]
+
+const ISSUE_TIMEOUT_SET: ReadonlySet<string> = new Set(ISSUE_TIMEOUTS)
+const ISSUE_TIMEOUT_MS: Record<IssueTimeout, number> = {
+  '15m': 15 * 60_000,
+  '30m': 30 * 60_000,
+  '45m': 45 * 60_000,
+  '60m': 60 * 60_000,
+}
+
+export function isIssueTimeout(value: unknown): value is IssueTimeout {
+  return typeof value === 'string' && ISSUE_TIMEOUT_SET.has(value)
+}
+
+/** Convert a declared Issue timeout into the headless watchdog budget.
+ *  `undefined` means do not arm a watchdog. */
+export function issueTimeoutMs(timeout?: IssueTimeout): number | undefined {
+  return timeout === undefined ? undefined : ISSUE_TIMEOUT_MS[timeout]
+}
 
 /** Statuses at which a scheduled issue stops firing (it's resolved/abandoned).
  *  This is how a schedule is turned off under the board model — there is no
@@ -89,18 +119,27 @@ export const issueWhenSchema = z.discriminatedUnion('kind', [
     /** Omitted is legacy machine-local time; explicit `local` is recommended
      * for personal reminders, while market clocks should use an IANA zone. */
     timezone: z.string().min(1).refine(isValidScheduleTimezone, 'timezone must be `local` or a valid IANA timezone').optional(),
+    /** Omit/`true` retries a missed slot. `false` waits for the next calendar time. */
+    catchUp: z.boolean().optional(),
   }),
 ])
 
-/** Who owns the Issue. Workspace ownership recruits a fresh Session for each
- * scheduled fire; `@new` recruits once and is replaced by the allocated
- * `@resumeId`; Session ownership resumes exactly one product Session. */
+/** Canonical writable assignees. Deprecated aliases live only in the file
+ * reader below; every product/API/CLI writer uses this strict schema. */
 export const issueAssigneeSchema = z.union([
-  z.literal(WORKSPACE_ASSIGNEE),
-  z.literal(NEW_ASSIGNEE),
+  z.literal(NEW_EACH_RUN_ASSIGNEE),
+  z.literal(NEW_THEN_RESUME_ASSIGNEE),
   z.literal(HUMAN_ASSIGNEE),
   z.literal(UNASSIGNED_ASSIGNEE),
   z.string().regex(/^@resume-[^\s]+$/, 'Session assignee must be @<resumeId>'),
+])
+
+/** Deprecated files remain readable, but aliases are deliberately excluded
+ * from `issueAssigneeSchema` so no writer can keep producing that vocabulary. */
+const issueAssigneeFileSchema = z.union([
+  issueAssigneeSchema,
+  z.literal(DEPRECATED_WORKSPACE_ASSIGNEE),
+  z.literal(DEPRECATED_NEW_ASSIGNEE),
 ])
 
 /** Exact product Session owner encoded by the single assignee contract. */
@@ -110,7 +149,7 @@ export function issueAssigneeResumeId(assignee: string): string | null {
 
 /** Transitional ownership: the first dispatch claims one durable Session. */
 export function issueAssigneeClaimsFirstSession(assignee: string): boolean {
-  return assignee === NEW_ASSIGNEE
+  return assignee === NEW_THEN_RESUME_ASSIGNEE
 }
 
 /**
@@ -123,24 +162,38 @@ const issueFrontmatterObjectSchema = z.object({
   title: z.string().min(1),
   status: z.enum(ISSUE_STATUSES).default('todo'),
   priority: z.enum(ISSUE_PRIORITIES).default('none'),
-  assignee: issueAssigneeSchema.optional(),
+  assignee: issueAssigneeFileSchema.optional(),
   /** Present iff the issue self-schedules. Absent ⇒ pure board work item. */
   when: issueWhenSchema.optional(),
-  /** Legacy compatibility only. New files keep What in the markdown document
-   * below frontmatter so the human-visible work definition and runtime prompt
-   * cannot drift. Migration 0017 removes this key from existing files. */
+  /** Deprecated read compatibility only. New files keep What in the markdown
+   * document below frontmatter so the human-visible work definition and runtime
+   * prompt cannot drift. */
   what: z.string().min(1).optional(),
   /** Runtime override for Workspace-owned scheduled work. A Session owner
    * already carries its runtime identity and therefore cannot set this. */
   agent: z.string().min(1).optional(),
-  /** One-run model selection. Provider routing and authentication remain
-   * inherited from the Workspace/native login. */
+  /** Secret-free vault reference frozen into a fresh Session binding. */
+  credential: z.string().min(1).optional(),
+  /** Explicitly use the Agent runtime's own login for a fresh Session. When
+   * omitted with `credential`, the Issue inherits the Workspace headless
+   * preference instead. */
+  credentialSource: z.literal('native').optional(),
+  /** One-run model selection for the selected credential/runtime source. */
   model: z.string().min(1).optional(),
   /** One-run reasoning effort, projected through the selected native CLI. */
   effort: z.custom<ModelReasoningEffort>(isModelReasoningEffort, {
     message: 'effort must be none, minimal, low, medium, high, xhigh, or max',
   }).optional(),
-  /** Migration 0018 removes the former parallel ownership field. Keeping a
+  /** Optional headless watchdog for a scheduled fire. Omission means no limit.
+   * This is a run budget, not Session birth, so an exact `@resumeId` may set it. */
+  timeout: z.enum(ISSUE_TIMEOUTS).optional(),
+  /** Optional template for the comment-reply Input Prompt. Omission keeps the
+   *  historical wrapper. Must include `{comment}`. */
+  commentPrompt: z.string().min(1).optional(),
+  /** Present only on the Alice Project's Telegram phone-desk Issue.
+   *  Omission is a normal Issue. Any value other than literal `true` is invalid. */
+  telegramConnector: z.literal(true).optional(),
+  /** The former parallel ownership field is outside the baseline. Keeping a
    * `never` key makes stale files fail loudly instead of being silently read. */
   execution: z.never().optional(),
 })
@@ -148,30 +201,55 @@ const issueFrontmatterObjectSchema = z.object({
 export const issueFrontmatterSchema = issueFrontmatterObjectSchema
   .transform((value) => ({
     ...value,
-    assignee: value.assignee ?? (value.when ? NEW_ASSIGNEE : WORKSPACE_ASSIGNEE),
+    assignee:
+      value.assignee === DEPRECATED_WORKSPACE_ASSIGNEE
+        ? value.when ? NEW_EACH_RUN_ASSIGNEE : UNASSIGNED_ASSIGNEE
+        : value.assignee === DEPRECATED_NEW_ASSIGNEE
+          ? NEW_THEN_RESUME_ASSIGNEE
+          : value.assignee ?? (value.when ? NEW_THEN_RESUME_ASSIGNEE : UNASSIGNED_ASSIGNEE),
   }))
   .superRefine((value, ctx) => {
+    if (value.credential && value.credentialSource) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['credentialSource'],
+        message: 'credential and credentialSource are mutually exclusive',
+      })
+    }
     if (value.when && (value.assignee === HUMAN_ASSIGNEE || value.assignee === UNASSIGNED_ASSIGNEE)) {
       ctx.addIssue({
         code: 'custom',
         path: ['assignee'],
-        message: 'scheduled issues must be assigned to @workspace, @new, or an exact @resumeId',
+        message: 'scheduled issues must use @new-each-run, @new-then-resume, or an exact @resumeId',
       })
     }
-    if (!value.when && value.assignee === NEW_ASSIGNEE) {
+    if (!value.when && (
+      value.assignee === NEW_EACH_RUN_ASSIGNEE
+      || value.assignee === NEW_THEN_RESUME_ASSIGNEE
+    )) {
       ctx.addIssue({
         code: 'custom',
         path: ['assignee'],
-        message: '@new needs a schedule so its first run can claim a Session',
+        message: `${value.assignee} needs a schedule`,
       })
     }
     if (issueAssigneeResumeId(value.assignee)) {
-      for (const field of ['agent', 'model', 'effort'] as const) {
+      for (const field of ['agent', 'credential', 'credentialSource', 'model', 'effort'] as const) {
         if (!value[field]) continue
         ctx.addIssue({
           code: 'custom',
           path: [field],
           message: `session assignee owns its runtime; remove the ${field} override`,
+        })
+      }
+    }
+    if (value.commentPrompt !== undefined) {
+      const parsed = parseIssueCommentPrompt(value.commentPrompt)
+      if (!parsed.ok) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['commentPrompt'],
+          message: parsed.error,
         })
       }
     }
@@ -203,6 +281,18 @@ export type ReadIssuesResult =
 /** Does an issue self-schedule AND is it still live (non-terminal)? */
 export function isFireable(issue: IssueRecord): issue is IssueRecord & { when: Schedule } {
   return issue.when !== undefined && !isTerminalStatus(issue.status)
+}
+
+export function isTelegramConnectorIssue(
+  issue: Pick<IssueRecord, 'telegramConnector'>,
+): issue is Pick<IssueRecord, 'telegramConnector'> & { telegramConnector: true } {
+  return issue.telegramConnector === true
+}
+
+/** Same-workspace extras after the first id (sorted). Caller maps them to `invalid`. */
+export function extraTelegramConnectorIssueIds(issues: readonly IssueRecord[]): Set<string> {
+  const phone = issues.filter(isTelegramConnectorIssue).map((issue) => issue.id).sort()
+  return new Set(phone.slice(1))
 }
 
 /** The prompt a scheduled fire hands to the headless run. `what` is already the
@@ -251,6 +341,22 @@ export async function readWorkspaceIssues(wsDir: string): Promise<ReadIssuesResu
     const one = await readOneIssue(join(dir, file), id)
     if (one.ok) issues.push(one.issue)
     else invalid.push({ id, error: one.error })
+  }
+  const extras = extraTelegramConnectorIssueIds(issues)
+  if (extras.size > 0) {
+    const kept: IssueRecord[] = []
+    for (const issue of issues) {
+      if (extras.has(issue.id)) {
+        invalid.push({
+          id: issue.id,
+          error: 'telegramConnector: only one Telegram phone-desk Issue is allowed in this Alice Project',
+        })
+      } else {
+        kept.push(issue)
+      }
+    }
+    issues.length = 0
+    issues.push(...kept)
   }
   return { ok: true, issues, invalid }
 }

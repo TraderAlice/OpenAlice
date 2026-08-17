@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useMobilePageNavigation, MobilePageNavigationProvider } from '../contexts/MobilePageNavigationContext'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
-import { PageSidebarLayout } from './PageSidebarLayout'
+import {
+  calculatePageSidebarConstraints,
+  calculatePageSidebarOverdrag,
+  PageSidebarLayout,
+  shouldCollapsePageSidebar,
+} from './PageSidebarLayout'
 
 class ResizeObserverStub {
   observe() {}
@@ -35,7 +41,58 @@ afterEach(() => {
 })
 
 describe('PageSidebarLayout', () => {
-  it('registers its phone navigator into the app context bar without rendering a second bar', () => {
+  it('applies diminishing resistance and a deliberate overdrag commit boundary', () => {
+    expect(calculatePageSidebarOverdrag(-1)).toBe(0)
+    expect(calculatePageSidebarOverdrag(0)).toBe(0)
+    expect(calculatePageSidebarOverdrag(16)).toBeCloseTo(11.67, 1)
+    expect(calculatePageSidebarOverdrag(40)).toBeCloseTo(22.14, 1)
+    expect(calculatePageSidebarOverdrag(64)).toBeCloseTo(27.69, 1)
+    expect(calculatePageSidebarOverdrag(200)).toBeLessThanOrEqual(34)
+    expect(shouldCollapsePageSidebar(77.9)).toBe(false)
+    expect(shouldCollapsePageSidebar(78)).toBe(true)
+  })
+
+  it('keeps responsive panel minimums feasible while preserving the former content reserve', () => {
+    expect(calculatePageSidebarConstraints(0)).toEqual({
+      navigatorMaxWidth: 420,
+      contentMinWidth: 0,
+    })
+
+    expect(calculatePageSidebarConstraints(616)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 415,
+    })
+    expect(calculatePageSidebarConstraints(700)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 499,
+    })
+    expect(calculatePageSidebarConstraints(701)).toEqual({
+      navigatorMaxWidth: 200,
+      contentMinWidth: 500,
+    })
+    expect(calculatePageSidebarConstraints(941)).toEqual({
+      navigatorMaxWidth: 319,
+      contentMinWidth: 500,
+    })
+    expect(calculatePageSidebarConstraints(1_200)).toEqual({
+      navigatorMaxWidth: 420,
+      contentMinWidth: 500,
+    })
+
+    for (let containerWidth = 201; containerWidth <= 1_600; containerWidth += 7) {
+      const { navigatorMaxWidth, contentMinWidth } = calculatePageSidebarConstraints(containerWidth)
+      const panelBudget = containerWidth - 1
+
+      expect(navigatorMaxWidth).toBeGreaterThanOrEqual(200)
+      expect(navigatorMaxWidth).toBeLessThanOrEqual(420)
+      expect(contentMinWidth).toBeGreaterThanOrEqual(0)
+      expect(contentMinWidth).toBeLessThanOrEqual(500)
+      expect(200 + contentMinWidth).toBeLessThanOrEqual(panelBudget)
+    }
+  })
+
+  it('registers its phone navigator into the app context bar without rendering a second bar', async () => {
+    const user = userEvent.setup()
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({
       matches: false,
       media: '',
@@ -73,17 +130,20 @@ describe('PageSidebarLayout', () => {
 
     expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
     const contextTrigger = screen.getByRole('button', { name: 'Context Inbox' })
+    expect(contextTrigger.getAttribute('aria-controls')).toBeTruthy()
+    expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
+
+    await user.click(contextTrigger)
     const drawer = screen.getByTestId('page-sidebar-drawer')
     expect(contextTrigger.getAttribute('aria-controls')).toBe(drawer.id)
-
-    fireEvent.click(contextTrigger)
-    expect(drawer.getAttribute('data-state')).toBe('open')
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(drawer.getAttribute('data-state')).toBe('closed')
+    expect(drawer.hasAttribute('data-open')).toBe(true)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
     expect(document.activeElement).toBe(contextTrigger)
   })
 
-  it('persists the desktop focus mode and restores the full sidebar', () => {
+  it('persists the desktop focus mode and restores the full sidebar', async () => {
+    window.localStorage.setItem('openalice.page-sidebar-width.market.v1', '312')
     const view = render(
       <PageSidebarLayout storageKey="market" title="Market" sidebar={<div>Market navigation</div>}>
         <div>Market content</div>
@@ -93,17 +153,23 @@ describe('PageSidebarLayout', () => {
     const desktopSidebar = screen.getByTestId('page-sidebar-desktop')
     const expandedSurface = screen.getByTestId('page-sidebar-expanded')
     const collapsedSurface = screen.getByTestId('page-sidebar-collapsed')
+    const separator = screen.getByRole('separator')
     expect(desktopSidebar.getAttribute('data-state')).toBe('expanded')
-    expect(desktopSidebar.getAttribute('style')).toContain('width: 270px')
-    expect(desktopSidebar.className).toContain('transition-[width]')
-    expect(desktopSidebar.className).toContain('motion-reduce:transition-none')
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(separator.getAttribute('data-slot')).toBe('resizable-handle')
+    expect(separator.getAttribute('aria-label')).toBe('Resize Market')
+    expect(separator.className).toContain('w-px')
+    expect(desktopSidebar.className).not.toContain('border-r')
+    expect(separator.tabIndex).toBe(0)
     expect(expandedSurface.hasAttribute('inert')).toBe(false)
     expect(collapsedSurface.hasAttribute('inert')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse Market' }))
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
+    await waitFor(() => {
+      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('1')
+    })
+    expect(window.localStorage.getItem('openalice.page-sidebar-width.market.v1')).toBe('312')
     expect(desktopSidebar.getAttribute('data-state')).toBe('collapsed')
-    expect(desktopSidebar.getAttribute('style')).toContain('width: 44px')
     expect(expandedSurface.hasAttribute('inert')).toBe(true)
     expect(collapsedSurface.hasAttribute('inert')).toBe(false)
     expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()
@@ -117,13 +183,16 @@ describe('PageSidebarLayout', () => {
     expect(screen.getByRole('button', { name: 'Open Market' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Market' }))
-    expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
+    await waitFor(() => {
+      expect(window.localStorage.getItem('openalice.page-sidebar-collapsed.market.v1')).toBe('0')
+    })
     expect(screen.getByTestId('page-sidebar-desktop').getAttribute('data-state')).toBe('expanded')
     expect(screen.getByTestId('page-sidebar-expanded').hasAttribute('inert')).toBe(false)
     expect(screen.getByText('Market navigation')).toBeTruthy()
   })
 
-  it('lets a phone sidebar selection close the navigation drawer', () => {
+  it('lets a phone sidebar selection close the navigation drawer', async () => {
+    const user = userEvent.setup()
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
       matches: false,
       media: query,
@@ -147,37 +216,31 @@ describe('PageSidebarLayout', () => {
       </PageSidebarLayout>,
     )
 
-    const drawer = screen.getByTestId('page-sidebar-drawer')
     const opener = screen.getByRole('button', { name: 'Open Inbox' })
-    expect(drawer.getAttribute('data-state')).toBe('closed')
-    expect(drawer.getAttribute('aria-hidden')).toBe('true')
-    expect(drawer.hasAttribute('inert')).toBe(true)
+    expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
     expect(opener.getAttribute('aria-expanded')).toBe('false')
-    expect(opener.getAttribute('aria-controls')).toBe(drawer.id)
+    expect(opener.getAttribute('aria-controls')).toBeTruthy()
     expect(opener.getAttribute('aria-haspopup')).toBe('dialog')
 
-    fireEvent.click(opener)
-    expect(drawer.getAttribute('data-state')).toBe('open')
-    expect(drawer.getAttribute('aria-hidden')).toBe('false')
-    expect(drawer.hasAttribute('inert')).toBe(false)
+    await user.click(opener)
+    const drawer = screen.getByTestId('page-sidebar-drawer')
+    expect(drawer.hasAttribute('data-open')).toBe(true)
+    expect(opener.getAttribute('aria-controls')).toBe(drawer.id)
     expect(drawer.getAttribute('role')).toBe('dialog')
-    expect(drawer.getAttribute('aria-label')).toBe('Inbox')
     expect(drawer.getAttribute('aria-modal')).toBe('true')
     expect(opener.getAttribute('aria-expanded')).toBe('true')
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close Inbox' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close Inbox' })))
     expect(screen.getByText('Inbox message').closest('[inert]')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select message' }))
-    expect(drawer.getAttribute('data-state')).toBe('closed')
-    expect(drawer.getAttribute('aria-hidden')).toBe('true')
-    expect(drawer.hasAttribute('inert')).toBe(true)
-    expect(drawer.hasAttribute('aria-modal')).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Select message' }))
+    expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
     expect(opener.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(opener)
     expect(screen.getByText('Inbox message').closest('[inert]')).toBeNull()
   })
 
-  it('contains phone drawer focus and closes on Escape', () => {
+  it('contains phone drawer focus and closes on Escape', async () => {
+    const user = userEvent.setup()
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
       matches: false,
       media: query,
@@ -206,29 +269,28 @@ describe('PageSidebarLayout', () => {
     )
 
     const opener = screen.getByRole('button', { name: 'Open Tracked' })
-    fireEvent.click(opener)
+    await user.click(opener)
 
     const close = screen.getByRole('button', { name: 'Close Tracked' })
     const current = screen.getByRole('button', { name: 'Current item' })
     const last = screen.getByRole('button', { name: 'Last item' })
-    expect(document.activeElement).toBe(current)
+    await waitFor(() => expect(document.activeElement).toBe(current))
 
     last.focus()
-    fireEvent.keyDown(document, { key: 'Tab' })
-    expect(document.activeElement).toBe(close)
+    await user.tab()
+    await waitFor(() => expect(document.activeElement).toBe(close))
 
     close.focus()
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(last)
+    await user.tab({ shift: true })
+    await waitFor(() => expect(document.activeElement).toBe(last))
 
-    fireEvent.keyDown(document, { key: 'Escape' })
-    const drawer = screen.getByTestId('page-sidebar-drawer')
-    expect(drawer.getAttribute('data-state')).toBe('closed')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
     expect(document.activeElement).toBe(opener)
-    expect(drawer.className).toContain('oa-page-sidebar-dialog')
   })
 
-  it('keeps a page navigator in the drawer below its custom desktop breakpoint', () => {
+  it('keeps a page navigator in the drawer below its custom desktop breakpoint', async () => {
+    const user = userEvent.setup()
     render(
       <PageSidebarLayout
         storageKey="settings"
@@ -243,19 +305,13 @@ describe('PageSidebarLayout', () => {
     )
 
     expect(window.matchMedia).toHaveBeenCalledWith('(min-width: 960px)')
+    expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Open Settings' }))
     const drawer = screen.getByTestId('page-sidebar-drawer')
-    expect(drawer.getAttribute('data-state')).toBe('closed')
-    expect(drawer.getAttribute('aria-hidden')).toBe('true')
-    expect(drawer.hasAttribute('inert')).toBe(true)
+    expect(drawer.hasAttribute('data-open')).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }))
-    expect(drawer.getAttribute('data-state')).toBe('open')
-    expect(drawer.getAttribute('aria-hidden')).toBe('false')
-    expect(drawer.hasAttribute('inert')).toBe(false)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Select General' }))
-    expect(drawer.getAttribute('data-state')).toBe('closed')
-    expect(drawer.getAttribute('aria-hidden')).toBe('true')
-    expect(drawer.hasAttribute('inert')).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Select General' }))
+    expect(screen.queryByTestId('page-sidebar-drawer')).toBeNull()
   })
 })

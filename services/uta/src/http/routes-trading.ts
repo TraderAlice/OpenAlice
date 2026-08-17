@@ -252,7 +252,7 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
   })
 
   // Sub-accounts (wallets) — one element for ordinary brokers, >1 for
-  // separate-wallet venues (CCXT Binance: spot / derivatives).
+  // separate-wallet venues (CCXT Binance / Bitget Classic).
   app.get('/uta/:id/subaccounts', async (c) => {
     const account = resolveAccount(ctx, c)
     if (!account) return c.json({ error: 'Account not found' }, 404)

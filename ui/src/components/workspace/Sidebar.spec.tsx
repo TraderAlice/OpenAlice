@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../../i18n'
@@ -39,7 +40,6 @@ afterEach(() => {
 describe('WorkspaceRow session launcher', () => {
   it('keeps the default runtime one click away while the full runtime menu remains discoverable', () => {
     const onSpawn = vi.fn()
-    const onSetDefaultAgent = vi.fn()
     render(
       <WorkspaceRow
         workspace={workspace}
@@ -50,7 +50,6 @@ describe('WorkspaceRow session launcher', () => {
         onSelectSession={vi.fn()}
         onSpawn={onSpawn}
         onOpenHeadlessRun={vi.fn()}
-        onSetDefaultAgent={onSetDefaultAgent}
         onPauseSession={vi.fn()}
         onResumeSession={vi.fn()}
         onDeleteSession={vi.fn()}
@@ -66,7 +65,6 @@ describe('WorkspaceRow session launcher', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Shell (sh)' }))
 
     expect(onSpawn).toHaveBeenLastCalledWith(workspace.id, { agent: 'shell' })
-    expect(onSetDefaultAgent).not.toHaveBeenCalled()
   })
 
   it('uses the primary plus button as the chooser when no default runtime exists', () => {
@@ -80,7 +78,6 @@ describe('WorkspaceRow session launcher', () => {
         onSelectSession={vi.fn()}
         onSpawn={vi.fn()}
         onOpenHeadlessRun={vi.fn()}
-        onSetDefaultAgent={vi.fn()}
         onPauseSession={vi.fn()}
         onResumeSession={vi.fn()}
         onDeleteSession={vi.fn()}
@@ -93,7 +90,8 @@ describe('WorkspaceRow session launcher', () => {
     expect(screen.getByRole('menuitem', { name: 'Shell (sh)' })).toBeTruthy()
   })
 
-  it('groups secondary workspace actions behind a target-scoped More menu', () => {
+  it('groups secondary workspace actions behind a target-scoped More menu', async () => {
+    const user = userEvent.setup()
     const onRenameWorkspace = vi.fn()
     const onConfigureWorkspace = vi.fn()
     const onDelete = vi.fn(async () => undefined)
@@ -108,7 +106,6 @@ describe('WorkspaceRow session launcher', () => {
         onSelectSession={vi.fn()}
         onSpawn={vi.fn()}
         onOpenHeadlessRun={vi.fn()}
-        onSetDefaultAgent={vi.fn()}
         onPauseSession={vi.fn()}
         onResumeSession={vi.fn()}
         onDeleteSession={vi.fn()}
@@ -122,15 +119,18 @@ describe('WorkspaceRow session launcher', () => {
     const more = screen.getByRole('button', { name: 'More actions for chat' })
     expect(more.className).not.toContain('opacity-0')
 
-    fireEvent.click(more)
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rename workspace' }))
     expect(onRenameWorkspace).toHaveBeenCalledWith(workspace.id, 'Research desk')
 
-    fireEvent.click(more)
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Configure this workspace' }))
     expect(onConfigureWorkspace).toHaveBeenCalledWith(workspace.id)
 
-    fireEvent.click(more)
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Offboard workspace' }))
     expect(onDelete).toHaveBeenCalledWith(workspace.id)
   })
@@ -151,9 +151,12 @@ describe('SessionRow actions', () => {
     title: 'Review AAPL earnings',
   }
 
-  it('names destructive and lifecycle actions for their target session', () => {
+  it('names destructive and lifecycle actions for their target session', async () => {
+    const user = userEvent.setup()
     const onPause = vi.fn()
     const onDelete = vi.fn()
+    const onSettings = vi.fn()
+    const onArchive = vi.fn()
     const { rerender } = render(
       <SessionRow
         session={session}
@@ -162,15 +165,22 @@ describe('SessionRow actions', () => {
         onPause={onPause}
         onResume={vi.fn()}
         onDelete={onDelete}
+        onArchive={onArchive}
+        onSettings={onSettings}
       />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop Review AAPL earnings' }))
     const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
     expect(more.getAttribute('aria-haspopup')).toBe('menu')
-    fireEvent.click(more)
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings for Review AAPL earnings' }))
+    expect(onSettings).toHaveBeenCalledOnce()
+
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     const deleteItem = screen.getByRole('menuitem', { name: 'Delete Review AAPL earnings' })
-    expect(document.activeElement).toBe(deleteItem)
     fireEvent.click(deleteItem)
     expect(onPause).toHaveBeenCalledOnce()
     expect(onDelete).toHaveBeenCalledOnce()
@@ -184,6 +194,8 @@ describe('SessionRow actions', () => {
         onPause={vi.fn()}
         onResume={onResume}
         onDelete={vi.fn()}
+        onArchive={onArchive}
+        onSettings={onSettings}
       />,
     )
 
@@ -204,6 +216,83 @@ describe('SessionRow actions', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Review AAPL earnings' }).getAttribute('aria-current')).toBe('page')
+    const main = screen.getByRole('button', { name: 'Review AAPL earnings' })
+    expect(main.getAttribute('aria-current')).toBe('page')
+    expect(main.className).toContain('oa-session-row-main')
+    expect(main.parentElement?.className).toContain('oa-session-row')
+    expect(main.parentElement?.getAttribute('data-active')).toBe('true')
+  })
+
+  it('explains headless occupancy instead of swallowing Session clicks', () => {
+    const onSelect = vi.fn()
+    const onHeadlessBusy = vi.fn()
+    const onResume = vi.fn()
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        headlessOccupying
+        onSelect={onSelect}
+        onHeadlessBusy={onHeadlessBusy}
+        onPause={vi.fn()}
+        onResume={onResume}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const [title, play] = screen.getAllByRole('button', { name: 'Running · Review AAPL earnings' })
+    fireEvent.click(title!)
+    fireEvent.click(play!)
+    expect(onHeadlessBusy).toHaveBeenCalledTimes(2)
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onResume).not.toHaveBeenCalled()
+  })
+
+  it('archives a Session from the More menu instead of deleting the coworker', async () => {
+    const user = userEvent.setup()
+    const onArchive = vi.fn()
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+        onArchive={onArchive}
+      />,
+    )
+
+    const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive Review AAPL earnings' }))
+    expect(onArchive).toHaveBeenCalledOnce()
+  })
+
+  it('does not offer Archive while an interactive Session is running', async () => {
+    const user = userEvent.setup()
+    const onArchive = vi.fn()
+    render(
+      <SessionRow
+        session={session}
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+        onArchive={onArchive}
+      />,
+    )
+
+    const more = screen.getByRole('button', { name: 'More actions for Review AAPL earnings' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    const archive = screen.getByRole('menuitem', { name: 'Archive Review AAPL earnings' })
+    expect(archive.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(archive)
+    expect(onArchive).not.toHaveBeenCalled()
   })
 })

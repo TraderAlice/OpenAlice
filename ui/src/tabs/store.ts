@@ -7,6 +7,7 @@ import {
   type TabGroup,
   type ActivitySection,
   specEquals,
+  specTabIdentityEquals,
   getFocusedGroup,
 } from './types'
 import { reloadOnHotUpdate } from '../lib/hmr'
@@ -105,11 +106,22 @@ export const useWorkspace = create<WorkspaceStore>()(
           // Match existing tab by spec equality
           const existingId = group.tabIds.find((id) => {
             const tab = state.tabs[id]
-            return tab != null && specEquals(tab.spec, spec)
+            return tab != null && specTabIdentityEquals(tab.spec, spec)
           })
           if (existingId) {
-            if (group.activeTabId === existingId) return state
-            return withFocusedGroup(state, (g) => ({ ...g, activeTabId: existingId }))
+            const existing = state.tabs[existingId]
+            const specChanged = !specEquals(existing.spec, spec)
+            const focusChanged = group.activeTabId !== existingId
+            if (!specChanged && !focusChanged) return state
+            return {
+              ...state,
+              tabs: specChanged
+                ? { ...state.tabs, [existingId]: { ...existing, spec } }
+                : state.tabs,
+              tree: focusChanged
+                ? { kind: 'leaf', group: { ...group, activeTabId: existingId } }
+                : state.tree,
+            }
           }
 
           // Append new tab + focus
@@ -194,7 +206,9 @@ export const useWorkspace = create<WorkspaceStore>()(
       // that tab open on every reload. Bump clears the loop.
       // v6: introduced the `chat-landing` ViewKind; clear stale persisted
       // tab state so no rehydrate references an unknown kind.
-      version: 6,
+      // v7: occupancy log moved from automation.runtime to the Office
+      // view; drop persisted Automation Runtime tabs.
+      version: 7,
       // Persist only the data shape — actions are recreated by the store factory.
       partialize: (state) => ({
         tabs: state.tabs,

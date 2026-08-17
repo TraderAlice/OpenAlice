@@ -34,7 +34,7 @@ describe('createIssue', () => {
       // Defaults applied on read-back.
       expect(res.issue.status).toBe('todo')
       expect(res.issue.priority).toBe('none')
-      expect(res.issue.assignee).toBe('@workspace')
+      expect(res.issue.assignee).toBe('@unassigned')
     }
     const { issue } = await readBack('fix-the-login-bug')
     expect(issue?.title).toBe('Fix the Login Bug!')
@@ -64,25 +64,25 @@ describe('createIssue', () => {
     expect(issue?.what).toBe('run the research routine')
   })
 
-  it('accepts @new only for scheduled work that will choose its first owner', async () => {
+  it('accepts @new-then-resume only for scheduled work that will choose its first owner', async () => {
     const scheduled = await createIssue(dir, {
       id: 'choose-owner',
       title: 'Choose one owner',
-      assignee: '@new',
+      assignee: '@new-then-resume',
       when: { kind: 'every', every: '30m' },
       agent: 'pi',
     })
-    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new')
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new-then-resume')
 
     const unscheduled = await createIssue(dir, {
       id: 'no-trigger',
       title: 'No trigger',
-      assignee: '@new',
+      assignee: '@new-then-resume',
     })
     expect(unscheduled.ok).toBe(false)
     if (!unscheduled.ok) {
       expect(unscheduled.reason).toBe('invalid')
-      if (unscheduled.reason === 'invalid') expect(unscheduled.error).toContain('@new needs a schedule')
+      if (unscheduled.reason === 'invalid') expect(unscheduled.error).toContain('@new-then-resume needs a schedule')
     }
   })
 
@@ -92,7 +92,27 @@ describe('createIssue', () => {
       title: 'Default scheduled owner',
       when: { kind: 'every', every: '30m' },
     })
-    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new')
+    expect(scheduled.ok && scheduled.issue.assignee).toBe('@new-then-resume')
+  })
+
+  it('rejects deprecated assignee aliases with their canonical replacements', async () => {
+    const oldWorkspace = await createIssue(dir, {
+      id: 'old-workspace',
+      title: 'Old workspace spelling',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@workspace',
+    })
+    expect(oldWorkspace.ok).toBe(false)
+    if (!oldWorkspace.ok && oldWorkspace.reason === 'invalid') {
+      expect(oldWorkspace.error).toBe('@workspace is deprecated; use @new-each-run')
+    }
+
+    await createIssue(dir, { id: 'canonical', title: 'Canonical' })
+    const oldNew = await updateIssueFields(dir, 'canonical', { assignee: '@new' })
+    expect(oldNew.ok).toBe(false)
+    if (!oldNew.ok && oldNew.reason === 'invalid') {
+      expect(oldNew.error).toBe('@new is deprecated; use @new-then-resume')
+    }
   })
 
   it('refuses to overwrite an existing issue (conflict)', async () => {
@@ -132,8 +152,9 @@ describe('updateIssueFields', () => {
     const res = await updateIssueFields(dir, 'task-1', {
       status: 'in_progress',
       priority: 'urgent',
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'medium',
     })
@@ -141,21 +162,35 @@ describe('updateIssueFields', () => {
     if (res.ok) {
       expect(res.issue.status).toBe('in_progress')
       expect(res.issue.priority).toBe('urgent')
-      expect(res.issue.assignee).toBe('@workspace')
+      expect(res.issue.assignee).toBe('@new-each-run')
       expect(res.issue.agent).toBe('pi')
+      expect(res.issue.credential).toBe('gemini-primary')
     }
     const { issue } = await readBack('task-1')
     expect(issue).toMatchObject({
       status: 'in_progress',
       priority: 'urgent',
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       what: 'keep the fire prompt',
       agent: 'pi',
+      credential: 'gemini-primary',
       model: 'gemini-3.5-pro',
       effort: 'medium',
     })
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
     expect(issue?.what).toBe('keep the fire prompt')
+  })
+
+  it('stores a commentPrompt override and can clear it', async () => {
+    await createIssue(dir, { id: 'talk', title: 'Talk', what: 'desc', commentPrompt: '{comment}' })
+    const stored = await readBack('talk')
+    expect(stored.issue?.commentPrompt).toBe('{comment}')
+
+    const cleared = await updateIssueFields(dir, 'talk', { commentPrompt: null })
+    expect(cleared.ok).toBe(true)
+    if (!cleared.ok) return
+    expect(cleared.issue.commentPrompt).toBeUndefined()
+    expect((await readBack('talk')).issue?.commentPrompt).toBeUndefined()
   })
 
   it('clears an issue agent override with null', async () => {
@@ -166,15 +201,94 @@ describe('updateIssueFields', () => {
     expect(issue?.agent).toBeUndefined()
   })
 
+  it('sets and clears an optional scheduled-run timeout', async () => {
+    await createIssue(dir, {
+      id: 'budget',
+      title: 'Budget',
+      when: { kind: 'every', every: '15m' },
+      timeout: '45m',
+    })
+    let { issue } = await readBack('budget')
+    expect(issue?.timeout).toBe('45m')
+
+    const cleared = await updateIssueFields(dir, 'budget', { timeout: null })
+    expect(cleared.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBeUndefined()
+
+    const set = await updateIssueFields(dir, 'budget', { timeout: '15m' })
+    expect(set.ok).toBe(true)
+    ;({ issue } = await readBack('budget'))
+    expect(issue?.timeout).toBe('15m')
+  })
+
+  it('toggles cron catchUp without rewriting the rest of when', async () => {
+    await createIssue(dir, {
+      id: 'morning',
+      title: 'Morning',
+      when: { kind: 'cron', cron: '0 9 * * *', timezone: 'America/New_York' },
+    })
+    const off = await updateIssueFields(dir, 'morning', { catchUp: false })
+    expect(off.ok).toBe(true)
+    let { issue } = await readBack('morning')
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+      catchUp: false,
+    })
+
+    const on = await updateIssueFields(dir, 'morning', { catchUp: true })
+    expect(on.ok).toBe(true)
+    ;({ issue } = await readBack('morning'))
+    expect(issue?.when).toEqual({
+      kind: 'cron',
+      cron: '0 9 * * *',
+      timezone: 'America/New_York',
+    })
+
+    const every = await createIssue(dir, {
+      id: 'heartbeat',
+      title: 'Heartbeat',
+      when: { kind: 'every', every: '4h' },
+    })
+    expect(every.ok).toBe(true)
+    const refused = await updateIssueFields(dir, 'heartbeat', { catchUp: false })
+    expect(refused).toMatchObject({ ok: false, reason: 'invalid' })
+  })
+
+  it('switches atomically between vault access, native login, and inheritance', async () => {
+    await createIssue(dir, { id: 'access', title: 'Access', credential: 'openai-primary' })
+    const native = await updateIssueFields(dir, 'access', { credentialSource: 'native' })
+    expect(native.ok).toBe(true)
+    let { issue } = await readBack('access')
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBe('native')
+
+    const vault = await updateIssueFields(dir, 'access', { credential: 'deepseek-1' })
+    expect(vault.ok).toBe(true)
+    ;({ issue } = await readBack('access'))
+    expect(issue?.credential).toBe('deepseek-1')
+    expect(issue?.credentialSource).toBeUndefined()
+
+    const inherited = await updateIssueFields(dir, 'access', { credential: null, credentialSource: null })
+    expect(inherited.ok).toBe(true)
+    ;({ issue } = await readBack('access'))
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBeUndefined()
+  })
+
   it('changes scheduled ownership without disturbing the schedule', async () => {
     await createIssue(dir, {
       id: 'owned',
       title: 'Owned',
       when: { kind: 'every', every: '15m' },
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       agent: 'codex',
+      credential: 'openai-primary',
       model: 'gpt-5.6',
       effort: 'high',
+      timeout: '30m',
     })
     const res = await updateIssueFields(dir, 'owned', {
       assignee: '@resume-kind-owl-abc123',
@@ -183,8 +297,11 @@ describe('updateIssueFields', () => {
     const { issue } = await readBack('owned')
     expect(issue?.assignee).toBe('@resume-kind-owl-abc123')
     expect(issue?.agent).toBeUndefined()
+    expect(issue?.credential).toBeUndefined()
+    expect(issue?.credentialSource).toBeUndefined()
     expect(issue?.model).toBeUndefined()
     expect(issue?.effort).toBeUndefined()
+    expect(issue?.timeout).toBe('30m')
     expect(issue?.when).toEqual({ kind: 'every', every: '15m' })
   })
 

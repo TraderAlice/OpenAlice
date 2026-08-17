@@ -9,6 +9,7 @@ import {
   readQuickChatPreferences,
   rememberAutoQuantDefaultWorkspace,
   rememberQuickChatCredential,
+  rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
 } from './preferences.js'
 
@@ -29,7 +30,7 @@ describe('preferences', () => {
     const path = await preferenceFile()
     expect(await readPreferences(path)).toEqual({
       version: 1,
-      quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null },
+      quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null, recentLaunch: null },
       autoQuant: { defaultWorkspaceId: null },
     })
 
@@ -66,6 +67,49 @@ describe('preferences', () => {
       lastCredentialByAgent: { opencode: 'glm-1' },
       recentChatWorkspaceId: null,
     })
+  })
+
+  it('remembers the complete secret-free Session launch tuple', async () => {
+    const path = await preferenceFile()
+    await rememberQuickChatLaunch({
+      agent: 'pi',
+      accessMode: 'vault',
+      credentialSlug: 'deepseek-1',
+      model: 'deepseek-v4-flash',
+      reasoningEffort: 'high',
+    }, path)
+
+    expect(await readQuickChatPreferences(path)).toEqual({
+      lastCredentialByAgent: { pi: 'deepseek-1' },
+      recentChatWorkspaceId: null,
+      recentLaunch: {
+        agent: 'pi',
+        accessMode: 'vault',
+        credentialSlug: 'deepseek-1',
+        model: 'deepseek-v4-flash',
+        reasoningEffort: 'high',
+      },
+    })
+    expect(await readFile(path, 'utf-8')).not.toContain('apiKey')
+  })
+
+  it('reads a pre-access-mode saved credential as a vault choice', async () => {
+    const path = await preferenceFile()
+    await writeFile(path, JSON.stringify({
+      version: 1,
+      quickChat: {
+        lastCredentialByAgent: { pi: 'deepseek-1' },
+        recentChatWorkspaceId: null,
+        recentLaunch: {
+          agent: 'pi',
+          credentialSlug: 'deepseek-1',
+          model: null,
+          reasoningEffort: null,
+        },
+      },
+    }), 'utf-8')
+
+    expect((await readQuickChatPreferences(path)).recentLaunch?.accessMode).toBe('vault')
   })
 
   it('remembers a recent chat workspace without disturbing runtime credentials', async () => {

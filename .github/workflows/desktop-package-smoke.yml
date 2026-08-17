@@ -16,15 +16,21 @@ on:
       - "scripts/desktop-package-artifact.mjs"
       - "scripts/desktop-packaged-smoke.mjs"
       - "scripts/desktop-packaged-smoke-plan.mjs"
+      - "scripts/desktop-upgrade-smoke.mjs"
+      - "scripts/desktop-upgrade-smoke-lib.mjs"
+      - "scripts/desktop-existing-owner-smoke.mjs"
       - "scripts/build-broker-packs.ts"
       - "scripts/broker-pack-upgrade-smoke.ts"
       - "scripts/guardian/**"
       - "scripts/pnpm-command.mjs"
       - "scripts/pnpm-command.spec.ts"
       - "scripts/prepare-desktop-release-assets.mjs"
+      - "scripts/verify-desktop-update-assets.mjs"
       - "scripts/smoke-packaged-toolchain.mjs"
       - "scripts/verify-broker-packs.ts"
       - "scripts/workspace-acceptance-ai-mock.mjs"
+      - "scripts/workspace-acceptance-receipt.mjs"
+      - "scripts/workspace-acceptance-receipt.spec.ts"
       - "scripts/vendor-managed-runtime.mjs"
       - "default/**"
       - "src/ai-providers/**"
@@ -40,50 +46,72 @@ on:
       - "services/connector/**"
       - "packages/connector-protocol/**"
       - "packages/uta-broker-*/**"
-  push:
-    # Keep push package smoke master-only: PRs into dev get coverage, while
-    # routine dev integration pushes do not burn the expensive desktop matrix.
-    branches: [master]
-    paths:
-      - ".github/workflows/desktop-package-smoke.yml"
-      - ".github/workflows/release.yml"
-      - "apps/desktop/**"
-      - "packages/guardian-runtime/**"
-      - "build/entitlements*.plist"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "scripts/assert-desktop-package.mjs"
-      - "scripts/desktop-package-artifact.mjs"
-      - "scripts/desktop-packaged-smoke.mjs"
-      - "scripts/desktop-packaged-smoke-plan.mjs"
-      - "scripts/build-broker-packs.ts"
-      - "scripts/broker-pack-upgrade-smoke.ts"
-      - "scripts/guardian/**"
-      - "scripts/pnpm-command.mjs"
-      - "scripts/pnpm-command.spec.ts"
-      - "scripts/prepare-desktop-release-assets.mjs"
-      - "scripts/smoke-packaged-toolchain.mjs"
-      - "scripts/verify-broker-packs.ts"
-      - "scripts/workspace-acceptance-ai-mock.mjs"
-      - "scripts/vendor-managed-runtime.mjs"
-      - "default/**"
-      - "src/ai-providers/**"
-      - "src/core/**"
-      - "src/server/cli.ts"
-      - "src/server/cli-commands.ts"
-      - "src/tool/**"
-      - "src/webui/plugin.ts"
-      - "src/webui/routes/issues.ts"
-      - "src/webui/routes/workspaces.ts"
-      - "src/workspaces/**"
-      - "services/uta/**"
-      - "services/connector/**"
-      - "packages/connector-protocol/**"
-      - "packages/uta-broker-*/**"
+concurrency:
+  group: desktop-package-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  preflight:
+    name: fast preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify CI workflow contracts
+        run: >-
+          pnpm exec vitest run
+          scripts/ci-workflow.spec.ts
+          scripts/desktop-package-workflow.spec.ts
+          scripts/release-workflow.spec.ts
+
+      - name: Typecheck root workspace
+        run: npx tsc --noEmit
+        timeout-minutes: 5
+
+  broker-packs-windows:
+    name: broker-packs windows-latest
+    needs: preflight
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the N-1 Broker Pack smoke resolves the previous release tag
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build optional Broker Packs on Windows
+        run: pnpm broker-packs:build
+        timeout-minutes: 10
+
+      - name: Prove previous-release Broker Pack upgrade on Windows
+        run: pnpm broker-packs:upgrade-smoke
+        timeout-minutes: 10
+
   package:
     name: package ${{ matrix.os }}
+    needs: preflight
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -112,16 +140,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build optional Broker Packs on Windows
-        if: runner.os == 'Windows'
-        run: pnpm broker-packs:build
-        timeout-minutes: 10
-
-      - name: Prove previous-release Broker Pack upgrade on Windows
-        if: runner.os == 'Windows'
-        run: pnpm broker-packs:upgrade-smoke
-        timeout-minutes: 10
-
       # macOS still uses dugite's embedded Git. Windows keeps only dugite's JS
       # wrapper and routes it to managed PortableGit in the packaged smoke.
       - name: Verify bundled git (dugite) was fetched
@@ -135,6 +153,10 @@ jobs:
 
       - name: Smoke Guardian takeover through Electron
         run: pnpm electron:smoke:guardian-recovery --skip-build
+        timeout-minutes: 5
+
+      - name: Smoke existing-owner browser handoff through Electron
+        run: pnpm electron:smoke:existing-owner --skip-build
         timeout-minutes: 5
 
       - name: Vendor managed workspace runtime
@@ -183,3 +205,18 @@ jobs:
           name: workspace-acceptance-${{ matrix.os }}
           path: ${{ runner.temp }}/openalice-workspace-acceptance.json
           if-no-files-found: warn
+
+      - name: Prove previous desktop release state upgrades to the candidate
+        run: >-
+          pnpm electron:smoke:upgrade --
+          --candidate-package-root dist/electron-app
+          --receipt "${{ runner.temp }}/openalice-desktop-upgrade.json"
+        timeout-minutes: 15
+
+      - name: Upload desktop upgrade acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-upgrade-acceptance-${{ matrix.os }}
+          path: ${{ runner.temp }}/openalice-desktop-upgrade.json
+          if-no-files-found: error

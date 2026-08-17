@@ -116,6 +116,10 @@ describe('provider inference', () => {
     expect(baseUrlToVendor('https://generativelanguage.googleapis.com/v1beta')).toBe('google')
   })
 
+  it('recognizes the official xAI endpoint', () => {
+    expect(baseUrlToVendor('https://api.x.ai/v1')).toBe('xai')
+  })
+
   it('keeps UI Anthropic auth inference aligned with the backend', () => {
     expect(anthropicAuthModeForBaseUrl('https://api.minimaxi.com/anthropic')).toBe('bearer')
     expect(anthropicAuthModeForBaseUrl('https://api.minimax.io/anthropic')).toBe('bearer')

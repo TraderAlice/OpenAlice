@@ -18,7 +18,7 @@ import { extractMcpShape, wrapToolExecute } from '../core/mcp-export.js'
 import { registerCliRoutes } from './cli.js'
 import { resolveInboxOrigin } from './inbox-origin.js'
 import { createWorkspaceConversationControl } from '../workspaces/conversation-control.js'
-import { sessionDisplayTitle } from '../workspaces/session-registry.js'
+import { sessionCoworkerLabel } from '../workspaces/session-registry.js'
 
 /**
  * MCP Plugin — exposes OpenAlice tools via Streamable HTTP, plus the CLI gateway.
@@ -107,6 +107,19 @@ export class McpPlugin implements Plugin {
         ...(svc ? { provenanceStore: svc.provenanceStore } : {}),
         ...(svc ? { conversation: createWorkspaceConversationControl(svc) } : {}),
         ...(svc ? { templateUpgrades: svc.templateUpgrades } : {}),
+        ...(svc ? {
+          setSessionDisplayName: async (input) => {
+            const identity = await svc.setSessionDisplayName({
+              wsId,
+              resumeId: input.resumeId,
+              displayName: input.displayName,
+            })
+            return {
+              resumeId: identity.resumeId,
+              ...(identity.displayName ? { displayName: identity.displayName } : {}),
+            }
+          },
+        } : {}),
         // Parity with the CLI gateway so external MCP consumers get the same
         // workspace_path resolution — shared helper, so the two can't drift.
         resolveWorkspace: makeWorkspaceResolver(getWorkspaceService),
@@ -131,7 +144,10 @@ export class McpPlugin implements Plugin {
                   .map((session) => ({
                     resumeId: session.resumeId,
                     agent: session.agent,
-                    title: sessionDisplayTitle(session),
+                    title: sessionCoworkerLabel(
+                      session,
+                      svc.resumeRegistry.get(session.resumeId)?.displayName,
+                    ) ?? session.name,
                     state: session.state,
                     lastActiveAt: session.lastActiveAt,
                   })),

@@ -3,7 +3,8 @@ import type { ReactElement, ReactNode } from 'react';
 import { ArrowUpRight, MessageSquarePlus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { SessionRecord } from './api';
+import type { AgentInfo, PausedSessionRuntimeUpdate, SessionRecord } from './api';
+import { sessionCoworkerLabel } from './display';
 import { FilesPanel } from './FilesPanel';
 import { ResumeCta, prefixOf } from './ResumeCta';
 import { formatRelativeTime } from '../../lib/intl';
@@ -28,12 +29,21 @@ export interface WorkspaceViewProps {
    * and filters this complete collection.
    */
   readonly sessions: readonly SessionRecord[];
+  readonly agents?: readonly AgentInfo[];
   readonly label?: string;
   /** Actions promoted into the live terminal's shared titlebar. */
   readonly terminalHeaderActions?: ReactNode;
   readonly onSpawnFresh: () => void;
-  readonly onResume: (sessionId: string) => void;
-  readonly onOpenWebPi: (sessionId: string) => void;
+  readonly onResume: (sessionId: string) => Promise<void>;
+  readonly onUpdateSessionRuntime?: (
+    sessionId: string,
+    update: PausedSessionRuntimeUpdate,
+  ) => Promise<void>;
+  readonly onSaveSessionDisplayName?: (
+    resumeId: string,
+    displayName: string | null,
+  ) => Promise<void>;
+  readonly onOpenWebPi: (sessionId: string) => Promise<void>;
   /** Navigate to an already-running session without re-spawning it. Library
    *  rows call this for running entries; paused entries go through `onResume`. */
   readonly onSelectSession: (sessionId: string) => void;
@@ -98,6 +108,17 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
         {showPausedCta && props.activeRecord && (
           <ResumeCta
             record={props.activeRecord}
+            agents={props.agents}
+            workspaceId={props.wsId}
+            onUpdateRuntime={props.onUpdateSessionRuntime
+              ? (update) => props.onUpdateSessionRuntime!(props.activeRecord!.id, update)
+              : undefined}
+            onSaveDisplayName={props.onSaveSessionDisplayName && props.activeRecord.resumeId
+              ? (displayName) => props.onSaveSessionDisplayName!(
+                props.activeRecord!.resumeId,
+                displayName,
+              )
+              : undefined}
             onResume={() => props.onResume(props.activeRecord!.id)}
             onOpenWebPi={() => props.onOpenWebPi(props.activeRecord!.id)}
           />
@@ -123,7 +144,7 @@ export function WorkspaceView(props: WorkspaceViewProps): ReactElement {
                     sessionId={s.id}
                     renderer={s.agent === 'opencode' ? 'dom' : 'auto'}
                     {...(props.label !== undefined ? { label: props.label } : {})}
-                    sessionLabel={s.title?.trim() || s.name}
+                    sessionLabel={sessionCoworkerLabel(s)}
                     headerActions={props.terminalHeaderActions}
                     chrome="canvas"
                     onSessionLost={props.onSessionLost}
@@ -181,7 +202,7 @@ function SessionLibrary(props: {
   const visibleSessions = ordered.filter((session) => {
     if (filter !== 'all' && session.state !== filter) return false;
     if (!normalizedQuery) return true;
-    return [session.title, session.name, session.agent]
+    return [session.displayName, session.title, session.name, session.agent]
       .some((value) => value?.toLocaleLowerCase().includes(normalizedQuery));
   });
 
@@ -283,7 +304,7 @@ function SessionRow(props: {
   const { t } = useTranslation();
   const record = props.record;
   const isPaused = record.state === 'paused';
-  const title = record.title?.trim() || record.name;
+  const title = sessionCoworkerLabel(record);
   const showInternalName = title !== record.name;
   return (
     <li>

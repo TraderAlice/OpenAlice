@@ -20,7 +20,7 @@ import { useLocale } from './i18n/useLocale'
  * Each maps to one or more tab kinds via tabs/registry.ts (defaultSpecForActivity).
  */
 export type Page =
-  | 'chat' | 'auto-quant' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'automation' | 'market'
+  | 'chat' | 'auto-quant' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'office' | 'automation' | 'market'
   | 'issue'
   | 'trading-as-git'
   | 'connectors'
@@ -93,17 +93,6 @@ function AppShellContent() {
   useEffect(() => {
     if (isDesktop) setSidebarOpen(false)
   }, [isDesktop])
-
-  // Lock body scroll while a drawer is open so the page behind doesn't drift
-  // under the backdrop. Restores the previous value on close/unmount.
-  useEffect(() => {
-    if (!sidebarOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [sidebarOpen])
 
   const mainContent = (
     <main className="flex flex-col min-w-0 min-h-0 bg-background h-full">

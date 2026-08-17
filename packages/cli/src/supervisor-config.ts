@@ -23,16 +23,21 @@ import {
 import {
   resolveLaunchContext,
   resolveSupervisorRootPath,
-  type InstanceLaunchConfig,
+  type AliceProjectLaunchConfig,
   type LaunchConfigValues,
   type MachineSupervisorConfig,
   type ResolvedLaunchContext,
   type ResolveSupervisorRootOptions,
   type TuiLaunchFlags,
 } from './launch-context.ts'
+import {
+  parseAliceProjectProduct,
+  writeAliceProjectProductStamp,
+  type AliceProjectProduct,
+} from './alice-project-product.ts'
 
-const CONFIG_SCHEMA_VERSION = 1
-const INSTANCE_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
+const CONFIG_SCHEMA_VERSION = 2
+const PROJECT_KEY_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/
 const CONFIG_FILE_NAME = 'config.json'
 const IGNORED_HOME_ENTRIES = new Set([
   '.DS_Store',
@@ -50,85 +55,104 @@ const OPENALICE_HOME_MARKERS = [
   ['state', 'runtime.lock'],
   ['runtime', 'broker-packs'],
 ] as const
-const CONFIG_KEYS = new Set([
+const LEGACY_CONFIG_KEYS = new Set([
   'schemaVersion',
   'defaultInstance',
   'defaults',
   'instances',
 ])
+const CONFIG_KEYS = new Set([
+  'schemaVersion',
+  'defaultProject',
+  'defaults',
+  'projects',
+])
 const LAUNCH_VALUE_KEYS = new Set([
   'name',
+  'displayName',
   'home',
   'port',
   'appDir',
   'updateChecks',
+  'product',
 ])
 
 export interface SupervisorConfigDocument {
+  schemaVersion: 2
+  defaultProject?: string
+  defaults?: LaunchConfigValues
+  projects?: Record<string, AliceProjectLaunchConfig>
+}
+
+interface LegacySupervisorConfigDocument {
   schemaVersion: 1
   defaultInstance?: string
   defaults?: LaunchConfigValues
-  instances?: Record<string, InstanceLaunchConfig>
+  instances?: Record<string, AliceProjectLaunchConfig>
 }
+
+type SupervisorConfigInput = SupervisorConfigDocument | LegacySupervisorConfigDocument
 
 export interface StoredLaunchContextOptions
   extends ResolveSupervisorRootOptions {
-  selectedInstance?: string
+  selectedProject?: string
   checkStoredHome?: (
     path: string,
-    instance: string,
+    project: string,
   ) => Promise<void>
   readConfig?: (
     supervisorRoot: string,
-  ) => Promise<SupervisorConfigDocument>
+  ) => Promise<SupervisorConfigInput>
 }
 
-export interface PersistInstanceConfigOptions {
+export interface PersistAliceProjectConfigOptions {
   cwd?: string
   homeDir?: string
   platform?: NodeJS.Platform
   readConfig?: (
     supervisorRoot: string,
-  ) => Promise<SupervisorConfigDocument>
+  ) => Promise<SupervisorConfigInput>
   writeConfig?: (
     supervisorRoot: string,
     config: SupervisorConfigDocument,
   ) => Promise<void>
 }
 
-export interface SupervisorInstanceSummary {
-  name: string
+export interface SupervisorAliceProjectSummary {
+  id: string
+  key: string
+  displayName: string
   home: string
   port: number
   portAutomatic: boolean
   isDefault: boolean
 }
 
-export interface SupervisorInstanceRegistry {
-  defaultInstance: string
-  instances: SupervisorInstanceSummary[]
+export interface SupervisorAliceProjectRegistry {
+  defaultProject: string
+  projects: SupervisorAliceProjectSummary[]
 }
 
-export async function readInstanceLaunchConfig(
+export async function readAliceProjectLaunchConfig(
   context: ResolvedLaunchContext,
-  options: Pick<PersistInstanceConfigOptions, 'readConfig'> = {},
-): Promise<InstanceLaunchConfig> {
-  const config = await (
+  options: Pick<PersistAliceProjectConfigOptions, 'readConfig'> = {},
+): Promise<AliceProjectLaunchConfig> {
+  const config = parseSupervisorConfig(await (
     options.readConfig ?? readSupervisorConfig
-  )(context.supervisorRoot)
+  )(context.supervisorRoot))
   return {
-    ...config.instances?.[context.instance],
-    name: context.instance,
+    ...config.projects?.[context.project],
+    name: context.project,
   }
 }
 
 export async function readMachineLaunchConfig(
   context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
-  options: Pick<PersistInstanceConfigOptions, 'readConfig'> = {},
+  options: Pick<PersistAliceProjectConfigOptions, 'readConfig'> = {},
 ): Promise<LaunchConfigValues> {
-  const config = await (
+  const config = parseSupervisorConfig(await (
     options.readConfig ?? readSupervisorConfig
-  )(context.supervisorRoot)
+  )(context.supervisorRoot))
   return { ...config.defaults }
 }
 
@@ -138,32 +162,35 @@ export async function resolveStoredLaunchContext(
 ): Promise<ResolvedLaunchContext> {
   const env = options.env ?? process.env
   const supervisorRoot = resolveSupervisorRootPath(options)
-  const config = await (
+  const config = parseSupervisorConfig(await (
     options.readConfig ?? readSupervisorConfig
-  )(supervisorRoot)
-  const selectedInstance = flags.instance
+  )(supervisorRoot))
+  const selectedProject = flags.project
+    ?? flags.instance
+    ?? env['OPENALICE_PROJECT']
     ?? env['OPENALICE_INSTANCE']
-    ?? options.selectedInstance
-    ?? config.defaultInstance
+    ?? options.selectedProject
+    ?? config.defaultProject
     ?? 'default'
   const machineConfig: MachineSupervisorConfig = {
-    defaultInstance: options.selectedInstance ?? config.defaultInstance,
+    defaultProject: options.selectedProject
+      ?? config.defaultProject,
     defaults: config.defaults,
   }
 
   const context = resolveLaunchContext({
     flags,
     machineConfig,
-    instanceConfig: config.instances?.[selectedInstance],
+    projectConfig: config.projects?.[selectedProject],
     env,
     cwd: options.cwd,
     homeDir: options.homeDir,
     platform: options.platform,
   })
-  if (context.provenance.home.source === 'instance-config') {
+  if (context.provenance.home.source === 'project-config') {
     await (
       options.checkStoredHome ?? assertStoredHomePresent
-    )(context.home, context.instance)
+    )(context.home, context.project)
   }
   return context
 }
@@ -172,12 +199,12 @@ export async function resolveAvailableStoredLaunchContext(
   options: StoredLaunchContextOptions = {},
 ): Promise<ResolvedLaunchContext> {
   const supervisorRoot = resolveSupervisorRootPath(options)
-  const config = await (
+  const config = parseSupervisorConfig(await (
     options.readConfig ?? readSupervisorConfig
-  )(supervisorRoot)
+  )(supervisorRoot))
   const candidates = [
     'default',
-    ...Object.keys(config.instances ?? {})
+    ...Object.keys(config.projects ?? {})
       .filter((name) => name !== 'default')
       .sort(),
   ]
@@ -186,7 +213,7 @@ export async function resolveAvailableStoredLaunchContext(
     try {
       return await resolveStoredLaunchContext({}, {
         ...options,
-        selectedInstance: name,
+        selectedProject: name,
         readConfig: async () => config,
       })
     } catch (error: unknown) {
@@ -195,7 +222,7 @@ export async function resolveAvailableStoredLaunchContext(
     }
   }
   throw unavailable ?? configError(
-    'No available OpenAlice instance could be selected.',
+    'No available AliceProject could be selected.',
   )
 }
 
@@ -210,39 +237,41 @@ export function isStoredHomeUnavailableError(
     )
 }
 
-export async function persistInstanceLaunchConfig(
+export async function persistAliceProjectLaunchConfig(
   context: ResolvedLaunchContext,
   patch: LaunchConfigValues,
-  options: PersistInstanceConfigOptions = {},
+  options: PersistAliceProjectConfigOptions = {},
 ): Promise<void> {
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
-  const current = await readConfig(context.supervisorRoot)
-  const existing = current.instances?.[context.instance] ?? {
-    name: context.instance,
+  const current = parseSupervisorConfig(await readConfig(context.supervisorRoot))
+  const existing = current.projects?.[context.project] ?? {
+    name: context.project,
   }
   if (
-    context.instance !== 'default'
+    context.project !== 'default'
     && Object.hasOwn(patch, 'home')
     && patch.home === undefined
   ) {
     throw configError(
-      `Instance "${context.instance}" must keep an explicit complete home.`,
+      `AliceProject "${context.project}" must keep an explicit complete home.`,
     )
   }
   const normalizedPatch = { ...patch }
   if (typeof patch.home === 'string') {
     normalizedPatch.home = resolveConfiguredHome(
-      context.instance,
+      context.project,
       patch.home,
       options,
     )
   }
-  const instance: InstanceLaunchConfig = {
+  const project: AliceProjectLaunchConfig = {
     ...existing,
     ...normalizedPatch,
-    name: context.instance,
+    name: context.project,
+    ...(existing.product === 'nano' ? { product: 'nano' } : {}),
   }
+  if (existing.product !== 'nano') delete project.product
   for (const key of [
     'home',
     'port',
@@ -250,22 +279,22 @@ export async function persistInstanceLaunchConfig(
     'updateChecks',
   ] as const) {
     if (Object.hasOwn(patch, key) && patch[key] === undefined) {
-      delete instance[key]
+      delete project[key]
     }
   }
   const next: SupervisorConfigDocument = {
     ...current,
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    instances: {
-      ...current.instances,
-      [context.instance]: instance,
+    projects: {
+      ...current.projects,
+      [context.project]: project,
     },
   }
   await assertRegistryHomesSeparate(next, options)
   if (typeof normalizedPatch.home === 'string') {
     await mkdir(normalizedPatch.home, { recursive: true, mode: 0o700 })
     await assertHomeCandidateUsable(normalizedPatch.home)
-    instance.home = await realpath(normalizedPatch.home)
+    project.home = await realpath(normalizedPatch.home)
     await assertRegistryHomesSeparate(next, options)
   }
   await writeConfig(context.supervisorRoot, next)
@@ -274,11 +303,11 @@ export async function persistInstanceLaunchConfig(
 export async function persistMachineLaunchConfig(
   context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
   patch: LaunchConfigValues,
-  options: PersistInstanceConfigOptions = {},
+  options: PersistAliceProjectConfigOptions = {},
 ): Promise<void> {
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
-  const current = await readConfig(context.supervisorRoot)
+  const current = parseSupervisorConfig(await readConfig(context.supervisorRoot))
   const defaults: LaunchConfigValues = {
     ...current.defaults,
     ...patch,
@@ -311,90 +340,101 @@ export async function persistMachineLaunchConfig(
   await writeConfig(context.supervisorRoot, next)
 }
 
-export async function readSupervisorInstanceRegistry(
+export async function readSupervisorAliceProjectRegistry(
   context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
   options: StoredLaunchContextOptions = {},
-): Promise<SupervisorInstanceRegistry> {
-  const config = await (
+): Promise<SupervisorAliceProjectRegistry> {
+  const config = parseSupervisorConfig(await (
     options.readConfig ?? readSupervisorConfig
-  )(context.supervisorRoot)
+  )(context.supervisorRoot))
   await assertRegistryHomesSeparate(config, options)
-  return buildInstanceRegistry(config, options)
+  return buildAliceProjectRegistry(config, options)
 }
 
-export async function persistSelectedSupervisorInstance(
+export async function persistSelectedSupervisorAliceProject(
   context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
   name: string,
-  options: PersistInstanceConfigOptions = {},
+  options: PersistAliceProjectConfigOptions = {},
 ): Promise<void> {
-  requireInstanceName(name, 'instance')
+  requireProjectKey(name, 'project')
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
-  const current = await readConfig(context.supervisorRoot)
-  if (name !== 'default' && !current.instances?.[name]) {
-    throw configError(`Instance "${name}" is not registered.`)
+  const current = parseSupervisorConfig(await readConfig(context.supervisorRoot))
+  if (name !== 'default' && !current.projects?.[name]) {
+    throw configError(`AliceProject "${name}" is not registered.`)
   }
-  if (name !== 'default' && !current.instances?.[name]?.home) {
+  if (name !== 'default' && !current.projects?.[name]?.home) {
     throw configError(
-      `Instance "${name}" needs an explicit complete home before it can become the default.`,
+      `AliceProject "${name}" needs an explicit complete home before it can become the default.`,
     )
   }
   await assertRegistryHomesSeparate(current, options)
-  if (name !== 'default' || current.instances?.default?.home) {
-    const selected = buildInstanceRegistry(current, options)
-      .instances
-      .find((entry) => entry.name === name)
+  if (name !== 'default' || current.projects?.default?.home) {
+    const selected = buildAliceProjectRegistry(current, options)
+      .projects
+      .find((entry) => entry.key === name)
     if (!selected) {
-      throw configError(`Instance "${name}" is not registered.`)
+      throw configError(`AliceProject "${name}" is not registered.`)
     }
     await assertStoredHomePresent(selected.home, name)
   }
   await writeConfig(context.supervisorRoot, {
     ...current,
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    defaultInstance: name === 'default' ? undefined : name,
+    defaultProject: name === 'default' ? undefined : name,
   })
 }
 
-export async function createSupervisorInstance(
+export async function createSupervisorAliceProject(
   context: Pick<ResolvedLaunchContext, 'supervisorRoot'>,
   name: string,
   home: string,
-  options: PersistInstanceConfigOptions = {},
+  options: PersistAliceProjectConfigOptions & {
+    product?: AliceProjectProduct
+  } = {},
 ): Promise<void> {
-  requireInstanceName(name, 'instance')
+  requireProjectKey(name, 'project')
   if (name === 'default') {
-    throw configError('The implicit "default" instance already exists.')
+    throw configError('The implicit "default" AliceProject already exists.')
   }
+  const product = options.product ?? 'trader'
   const readConfig = options.readConfig ?? readSupervisorConfig
   const writeConfig = options.writeConfig ?? writeSupervisorConfig
-  const current = await readConfig(context.supervisorRoot)
-  if (current.instances?.[name]) {
-    throw configError(`Instance "${name}" is already registered.`)
+  const current = parseSupervisorConfig(await readConfig(context.supervisorRoot))
+  if (current.projects?.[name]) {
+    throw configError(`AliceProject "${name}" is already registered.`)
   }
   let normalizedHome = resolveConfiguredHome(name, home, options)
+  const projectEntry: AliceProjectLaunchConfig = {
+    name,
+    home: normalizedHome,
+    ...(product === 'nano' ? { product } : {}),
+  }
   const candidate: SupervisorConfigDocument = {
     ...current,
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    defaultInstance: name,
-    instances: {
-      ...current.instances,
-      [name]: {
-        name,
-        home: normalizedHome,
-      },
+    defaultProject: name,
+    projects: {
+      ...current.projects,
+      [name]: projectEntry,
     },
   }
   await assertRegistryHomesSeparate(candidate, options)
   await mkdir(normalizedHome, { recursive: true, mode: 0o700 })
   await assertHomeCandidateUsable(normalizedHome)
   normalizedHome = await realpath(normalizedHome)
+  const stampedProduct = await writeAliceProjectProductStamp(normalizedHome, product)
+  if (stampedProduct !== product) {
+    throw configError(
+      `AliceProject home ${normalizedHome} was born as ${stampedProduct}; it cannot be registered as ${product}`,
+    )
+  }
   const next: SupervisorConfigDocument = {
     ...candidate,
-    instances: {
-      ...candidate.instances,
+    projects: {
+      ...candidate.projects,
       [name]: {
-        name,
+        ...projectEntry,
         home: normalizedHome,
       },
     },
@@ -453,6 +493,9 @@ export function parseSupervisorConfig(
   value: unknown,
 ): SupervisorConfigDocument {
   const root = requireRecord(value, 'Supervisor configuration')
+  if (root['schemaVersion'] === 1) {
+    return parseLegacySupervisorConfig(root)
+  }
   rejectUnknownKeys(root, CONFIG_KEYS, 'Supervisor configuration')
   if (root['schemaVersion'] !== CONFIG_SCHEMA_VERSION) {
     throw configError(
@@ -460,47 +503,96 @@ export function parseSupervisorConfig(
     )
   }
 
-  const defaultInstance = optionalInstanceName(
+  const defaultProject = optionalProjectKey(
+    root['defaultProject'],
+    'defaultProject',
+  )
+  const defaults = root['defaults'] === undefined
+    ? undefined
+    : parseLaunchValues(root['defaults'], 'defaults', false)
+  let projects: Record<string, AliceProjectLaunchConfig> | undefined
+  if (root['projects'] !== undefined) {
+    const rawProjects = requireRecord(root['projects'], 'projects')
+    projects = {}
+    for (const [name, entry] of Object.entries(rawProjects)) {
+      requireProjectKey(name, `projects.${name}`)
+      const parsed = parseLaunchValues(
+        entry,
+        `projects.${name}`,
+        true,
+      ) as AliceProjectLaunchConfig
+      if (parsed.name !== undefined && parsed.name !== name) {
+        throw configError(
+          `projects.${name}.name must match its registry key.`,
+        )
+      }
+      projects[name] = { ...parsed, name }
+    }
+  }
+  if (
+    defaultProject !== undefined
+    && defaultProject !== 'default'
+    && !projects?.[defaultProject]
+  ) {
+    throw configError(
+      `defaultProject "${defaultProject}" is not present in projects.`,
+    )
+  }
+
+  return {
+    schemaVersion: CONFIG_SCHEMA_VERSION,
+    ...(defaultProject === undefined ? {} : { defaultProject }),
+    ...(defaults === undefined ? {} : { defaults }),
+    ...(projects === undefined ? {} : { projects }),
+  }
+}
+
+function parseLegacySupervisorConfig(
+  root: Record<string, unknown>,
+): SupervisorConfigDocument {
+  rejectUnknownKeys(root, LEGACY_CONFIG_KEYS, 'Supervisor configuration')
+  const defaultProject = optionalProjectKey(
     root['defaultInstance'],
     'defaultInstance',
   )
   const defaults = root['defaults'] === undefined
     ? undefined
     : parseLaunchValues(root['defaults'], 'defaults', false)
-  let instances: Record<string, InstanceLaunchConfig> | undefined
+  let projects: Record<string, AliceProjectLaunchConfig> | undefined
   if (root['instances'] !== undefined) {
-    const rawInstances = requireRecord(root['instances'], 'instances')
-    instances = {}
-    for (const [name, entry] of Object.entries(rawInstances)) {
-      requireInstanceName(name, `instances.${name}`)
+    const legacyInstances = requireRecord(root['instances'], 'instances')
+    projects = {}
+    for (const [key, value] of Object.entries(legacyInstances)) {
+      requireProjectKey(key, `instances.${key}`)
       const parsed = parseLaunchValues(
-        entry,
-        `instances.${name}`,
+        value,
+        `instances.${key}`,
         true,
-      ) as InstanceLaunchConfig
-      if (parsed.name !== undefined && parsed.name !== name) {
-        throw configError(
-          `instances.${name}.name must match its registry key.`,
-        )
+      ) as AliceProjectLaunchConfig
+      if (parsed.name !== undefined && parsed.name !== key) {
+        throw configError(`instances.${key}.name must match its registry key.`)
       }
-      instances[name] = { ...parsed, name }
+      projects[key] = {
+        ...parsed,
+        name: key,
+        displayName: parsed.displayName ?? humanizeProjectKey(key),
+      }
     }
   }
   if (
-    defaultInstance !== undefined
-    && defaultInstance !== 'default'
-    && !instances?.[defaultInstance]
+    defaultProject !== undefined
+    && defaultProject !== 'default'
+    && !projects?.[defaultProject]
   ) {
     throw configError(
-      `defaultInstance "${defaultInstance}" is not present in instances.`,
+      `defaultInstance "${defaultProject}" is not present in instances.`,
     )
   }
-
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    ...(defaultInstance === undefined ? {} : { defaultInstance }),
+    ...(defaultProject === undefined ? {} : { defaultProject }),
     ...(defaults === undefined ? {} : { defaults }),
-    ...(instances === undefined ? {} : { instances }),
+    ...(projects === undefined ? {} : { projects }),
   }
 }
 
@@ -508,63 +600,63 @@ export function supervisorConfigPath(supervisorRoot: string): string {
   return join(supervisorRoot, CONFIG_FILE_NAME)
 }
 
-export function validateSupervisorInstanceName(
+export function validateSupervisorAliceProjectKey(
   value: string,
 ): string | undefined {
-  if (!INSTANCE_NAME_PATTERN.test(value)) {
+  if (!PROJECT_KEY_PATTERN.test(value)) {
     return 'Use 1-32 lowercase letters, numbers, "_" or "-", beginning with a letter.'
   }
   if (value === 'default') {
-    return 'The implicit "default" instance already exists.'
+    return 'The implicit "default" AliceProject already exists.'
   }
   return undefined
 }
 
-function buildInstanceRegistry(
+function buildAliceProjectRegistry(
   config: SupervisorConfigDocument,
   options: ResolveSupervisorRootOptions,
-): SupervisorInstanceRegistry {
-  const defaultInstance = config.defaultInstance ?? 'default'
+): SupervisorAliceProjectRegistry {
+  const defaultProject = config.defaultProject ?? 'default'
   const names = [
     'default',
-    ...Object.keys(config.instances ?? {})
+    ...Object.keys(config.projects ?? {})
       .filter((name) => name !== 'default')
       .sort(),
   ]
   const machineConfig: MachineSupervisorConfig = {
-    defaultInstance: config.defaultInstance,
+    defaultProject: config.defaultProject,
     defaults: config.defaults,
   }
-  return {
-    defaultInstance,
-    instances: names.map((name) => {
+  const projects = names.map((name) => {
       const resolved = resolveLaunchContext({
-        flags: { instance: name },
+        flags: { project: name },
         machineConfig,
-        instanceConfig: config.instances?.[name],
+        projectConfig: config.projects?.[name],
         env: {},
         cwd: options.cwd,
         homeDir: options.homeDir,
         platform: options.platform,
       })
       return {
-        name,
+        id: resolved.aliceProject.id,
+        key: name,
+        displayName: resolved.aliceProject.displayName,
         home: resolved.home,
         port: resolved.port,
         portAutomatic: resolved.provenance.port.source === 'default',
-        isDefault: name === defaultInstance,
+        isDefault: name === defaultProject,
       }
-    }),
-  }
+    })
+  return { defaultProject, projects }
 }
 
 function resolveConfiguredHome(
-  instance: string,
+  project: string,
   home: string,
-  options: Pick<PersistInstanceConfigOptions, 'cwd' | 'homeDir' | 'platform'>,
+  options: Pick<PersistAliceProjectConfigOptions, 'cwd' | 'homeDir' | 'platform'>,
 ): string {
   return resolveLaunchContext({
-    flags: { instance, home },
+    flags: { project, home },
     env: {},
     cwd: options.cwd,
     homeDir: options.homeDir,
@@ -574,10 +666,10 @@ function resolveConfiguredHome(
 
 async function assertRegistryHomesSeparate(
   config: SupervisorConfigDocument,
-  options: Pick<PersistInstanceConfigOptions, 'cwd' | 'homeDir' | 'platform'>,
+  options: Pick<PersistAliceProjectConfigOptions, 'cwd' | 'homeDir' | 'platform'>,
 ): Promise<void> {
-  const registry = buildInstanceRegistry(config, options)
-  const homes = await Promise.all(registry.instances.map(async (entry) => ({
+  const registry = buildAliceProjectRegistry(config, options)
+  const homes = await Promise.all(registry.projects.map(async (entry) => ({
     ...entry,
     physicalHome: await physicalPath(entry.home),
   })))
@@ -594,7 +686,7 @@ async function assertRegistryHomesSeparate(
         || pathContains(right.physicalHome, left.physicalHome)
       ) {
         throw configError(
-          `Complete home ${right.home} for instance "${right.name}" overlaps instance "${left.name}" at ${left.home}. Choose a separate directory.`,
+          `Complete home ${right.home} for AliceProject "${right.displayName}" overlaps AliceProject "${left.displayName}" at ${left.home}. Choose a separate directory.`,
         )
       }
     }
@@ -653,13 +745,13 @@ async function assertHomeCandidateUsable(path: string): Promise<void> {
 
 async function assertStoredHomePresent(
   path: string,
-  instance: string,
+  project: string,
 ): Promise<void> {
   try {
     const info = await stat(path)
     if (!info.isDirectory()) {
       throw configError(
-        `Registered complete home ${path} for instance "${instance}" is not a directory.`,
+        `Registered complete home ${path} for AliceProject "${project}" is not a directory.`,
         'ESTOREDHOMEUNAVAILABLE',
       )
     }
@@ -670,7 +762,7 @@ async function assertStoredHomePresent(
       ? 'is missing'
       : 'is unavailable or not writable'
     throw configError(
-      `Registered complete home ${path} for instance "${instance}" ${missing}. Reconnect it or choose another instance.`,
+      `Registered complete home ${path} for AliceProject "${project}" ${missing}. Reconnect it or choose another AliceProject.`,
       isNodeError(error, 'ENOENT')
         ? 'ESTOREDHOMEMISSING'
         : 'ESTOREDHOMEUNAVAILABLE',
@@ -709,18 +801,28 @@ function parseLaunchValues(
   value: unknown,
   label: string,
   allowName: boolean,
-): LaunchConfigValues | InstanceLaunchConfig {
+): LaunchConfigValues | AliceProjectLaunchConfig {
   const record = requireRecord(value, label)
   rejectUnknownKeys(
     record,
     allowName
       ? LAUNCH_VALUE_KEYS
-      : new Set([...LAUNCH_VALUE_KEYS].filter((key) => key !== 'name')),
+      : new Set([...LAUNCH_VALUE_KEYS].filter((key) => key !== 'name' && key !== 'product')),
     label,
   )
-  const result: InstanceLaunchConfig = {}
+  const result: AliceProjectLaunchConfig = {}
   if (allowName && record['name'] !== undefined) {
-    result.name = requireInstanceName(record['name'], `${label}.name`)
+    result.name = requireProjectKey(record['name'], `${label}.name`)
+  }
+  if (allowName && record['displayName'] !== undefined) {
+    result.displayName = requireDisplayName(record['displayName'], `${label}.displayName`)
+  }
+  if (allowName && record['product'] !== undefined) {
+    const product = parseAliceProjectProduct(record['product'])
+    if (!product) {
+      throw configError(`${label}.product must be "trader" or "nano".`)
+    }
+    if (product === 'nano') result.product = product
   }
   if (record['home'] !== undefined) {
     result.home = requireNonEmptyString(record['home'], `${label}.home`)
@@ -746,16 +848,16 @@ function parseLaunchValues(
   return result
 }
 
-function optionalInstanceName(
+function optionalProjectKey(
   value: unknown,
   label: string,
 ): string | undefined {
-  return value === undefined ? undefined : requireInstanceName(value, label)
+  return value === undefined ? undefined : requireProjectKey(value, label)
 }
 
-function requireInstanceName(value: unknown, label: string): string {
+function requireProjectKey(value: unknown, label: string): string {
   const name = requireNonEmptyString(value, label)
-  if (!INSTANCE_NAME_PATTERN.test(name)) {
+  if (!PROJECT_KEY_PATTERN.test(name)) {
     throw configError(
       `${label} must begin with a lowercase letter and contain only lowercase letters, numbers, "_" or "-".`,
     )
@@ -768,6 +870,23 @@ function requireNonEmptyString(value: unknown, label: string): string {
     throw configError(`${label} must be a non-empty string.`)
   }
   return value
+}
+
+function requireDisplayName(value: unknown, label: string): string {
+  const displayName = requireNonEmptyString(value, label).trim()
+  if (displayName.length > 80) {
+    throw configError(`${label} must contain at most 80 characters.`)
+  }
+  return displayName
+}
+
+function humanizeProjectKey(value: string): string {
+  if (value === 'default') return 'Default AliceProject'
+  return value
+    .split(/[-_]+/u)
+    .filter(Boolean)
+    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
+    .join(' ')
 }
 
 function requireRecord(

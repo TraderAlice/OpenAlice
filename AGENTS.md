@@ -11,7 +11,8 @@ Current code, tests, rendered behavior, and GitHub state override stale prose.
 
 Durable subsystem truth lives under [[docs/README.md]]. Active multi-step
 implementation work lives under [[PLANS.md]]. Keep both indexes current when a
-change introduces a new owner guide or execution plan.
+change introduces a new owner guide or execution plan, or deletes a completed
+plan.
 
 ## Start Here
 
@@ -34,6 +35,30 @@ Before changing files:
    stop and establish the intended base before editing.
 4. Start from the real surface: reproduce UI/runtime behavior, inspect the
    relevant current code, and read the applicable owner guide before designing.
+5. Before adding a data migration, compatibility parser, or dual-read path,
+   establish whether the affected persisted shape shipped in a released
+   version. Unreleased `dev`-only shapes are not supported upgrade boundaries:
+   replace them directly, adjust local development state once when necessary,
+   and do not leave permanent migration or compatibility code behind.
+
+## UI Design Workflow
+
+For frontend visual, layout, or interaction changes, separate product design
+from implementation instead of treating the first workable patch as the
+design.
+
+- In serial/interactive work, first present multiple viable approaches with
+  their user impact and tradeoffs, recommend one, and align with the maintainer
+  before moving into detailed design and implementation.
+- After alignment, state the chosen interaction model, responsive behavior,
+  accessibility implications, and shared primitive ownership before editing
+  the feature surface. Verify the result in the real browser route.
+- In autonomous/topic work, follow the same sequence without waiting for live
+  approval: record the alternatives and comparison in the execution plan or PR,
+  explicitly choose one, and explain why it is the best fit before implementing
+  it. Do not imply that the maintainer approved an autonomously selected design.
+- Keep the ceremony proportional for small fixes, but do not skip the design
+  decision merely because implementation is easy.
 
 ## Product and Architecture Boundaries
 
@@ -41,7 +66,7 @@ Before changing files:
   file-backed state, and the UTA client boundary.
 - `services/uta/` owns broker implementations, accounts, approvals, snapshots,
   FX, and every trading write. Do not move broker state back into Alice.
-- The model loop runs in native CLIs (`claude`, `codex`, `opencode`, `pi`).
+- The model loop runs in native CLIs (`claude`, `codex`, `cursor-agent`, `grok`, `omp`, `opencode`, `pi`).
   Alice owns credentials and injection, not an in-process chat-agent loop.
 - New agent-facing capabilities normally ship as Workspace templates, skills,
   or satellite repositories. Do not grow a parallel workflow engine in `src/`.
@@ -130,7 +155,7 @@ Add checks according to the touched surface:
 | Desktop, IPC, PTY, managed Pi, shell, packaging | Follow [Managed Workspace runtime](docs/managed-workspace-runtime.md) and run the matching Electron/package smoke |
 | Root installer or distributed CLI payload | Follow [CLI installer](docs/cli-installer.md) and run `pnpm test:install:docker`; manually walk the interactive playground before release |
 | Docker/server image, Compose, remote deployment | Follow [Docker deployment](docs/docker-deployment.md) and run `pnpm docker:smoke`; before release, opt into the credentialed agent/CLI check documented there |
-| Persisted data shape | Add an idempotent migration + spec, register it, then run `pnpm build:migration-index` |
+| Persisted data shape | First apply the release-boundary rule above. For a shipped shape, add an idempotent migration + spec, register it, then run `pnpm build:migration-index`; replace unreleased shapes directly |
 | Onboarding/first run/auth | Use isolated data; exercise dev and packaged onboarding paths where relevant |
 
 `pnpm test:e2e` is non-trading: it must never load configured broker accounts
@@ -193,8 +218,9 @@ contract.
   truth rather than intent.
 - Keep one canonical plan per initiative. Extend or supersede it explicitly
   instead of creating parallel TODO notes.
-- Active plans stay in `plans/`; completed plans remain as a concise execution
-  record and move to the Completed section of [[PLANS.md]].
+- Active plans stay in `plans/` and [[PLANS.md]]. When a plan is accepted,
+  delete the file and its index bullet in the same change. Git history is the
+  archive; do not accumulate a Completed section.
 - GitHub issues remain the external defect/deferred-work surface. Reference
   related issues and PRs from the plan; do not use a plan to hide actionable
   deferred findings from the issue tracker.
@@ -206,6 +232,8 @@ Read the relevant guide before editing its subsystem:
 - [[docs/README.md]] — [Owner-guide index](docs/README.md) and maintenance rules.
 - [[docs/project-structure.md]] — [Project structure](docs/project-structure.md): process boundaries,
   directories, state roots, and architectural ownership.
+- [[docs/alice-project.md]] — [AliceProject](docs/alice-project.md): top-level runtime
+  identity, complete-home ownership, concurrent projects, and discovery.
 - [[docs/development-workflow.md]] — [Development workflow](docs/development-workflow.md): branches, PRs,
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron
@@ -260,5 +288,13 @@ the tagline, pillars, or other marketing copy.
 - Strict TypeScript, ES2023 target.
 - Zod for config schemas; TypeBox for tool parameter schemas.
 - `decimal.js` for financial arithmetic.
+- For standard UI controls, prefer the shared shadcn/Base UI primitives under
+  `ui/src/components/ui/`. Extend that layer before hand-rolling portals,
+  positioning, focus, dismissal, keyboard behavior, or bespoke control styling
+  inside a feature component.
+- Frontend reads of backend-owned data must go through a domain hook rather
+  than calling an API or reaching into a transport/polling context from a
+  feature component. Keep presentation components prop-driven, and cover each
+  data hook with unit tests for its selection plus loading/error semantics.
 - Prefer structured Workspace launcher logs; the main process currently uses
   `console` and does not have a universal pino sink.

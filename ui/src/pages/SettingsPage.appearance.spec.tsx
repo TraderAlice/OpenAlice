@@ -30,6 +30,8 @@ beforeEach(() => {
     theme: 'auto',
     dayPalette: 'paper',
     nightPalette: 'graphite',
+    uiStyle: 'default',
+    stylePaletteMode: 'saved',
   })
 })
 
@@ -41,6 +43,48 @@ afterEach(() => {
 })
 
 describe('AppearanceSection palette pair editor', () => {
+  it('switches component style immediately without changing the palette pair', () => {
+    render(<AppearanceSection />)
+
+    expect(screen.getByRole('radio', { name: 'Default' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
+
+    expect(useThemeStore.getState().uiStyle).toBe('win98')
+    expect(useThemeStore.getState().dayPalette).toBe('paper')
+    expect(useThemeStore.getState().nightPalette).toBe('graphite')
+    expect(useThemeStore.getState().stylePaletteMode).toBe('saved')
+    expect(screen.getByRole('radio', { name: 'Windows 98' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Use recommended colors' })).toBeTruthy()
+  })
+
+  it('scopes the selected style recommendation without rewriting saved colors', () => {
+    render(<AppearanceSection />)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
+    expect(useThemeStore.getState().dayPalette).toBe('paper')
+    expect(useThemeStore.getState().nightPalette).toBe('graphite')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use recommended colors' }))
+
+    expect(useThemeStore.getState().theme).toBe('auto')
+    expect(useThemeStore.getState().dayPalette).toBe('paper')
+    expect(useThemeStore.getState().nightPalette).toBe('graphite')
+    expect(useThemeStore.getState().stylePaletteMode).toBe('recommended')
+    expect(screen.getByText('Currently using Day · Windows Classic')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Use saved colors' }).getAttribute('aria-pressed'))
+      .toBe('true')
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Default' }))
+    expect(screen.getByText('Currently using Day · Paper')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Edit Day palette: Paper' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Windows 98' }))
+    expect(screen.getByText('Currently using Day · Windows Classic')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Use saved colors' }))
+    expect(useThemeStore.getState().stylePaletteMode).toBe('saved')
+    expect(screen.getByText('Currently using Day · Paper')).toBeTruthy()
+  })
+
   it('does not expose the retired editor tab strip preference', () => {
     localStorage.setItem('openalice.editor-tabs.v1', JSON.stringify({
       state: { showEditorTabs: true },

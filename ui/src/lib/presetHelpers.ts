@@ -38,6 +38,9 @@ export const WIRE_SHAPE_GUIDANCE: Record<WireShape, string> = {
 export const AGENT_LABELS: Record<string, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  cursor: 'Cursor Agent',
+  grok: 'Grok Build',
+  omp: 'Oh My Pi',
   opencode: 'opencode',
   pi: 'Pi',
 }
@@ -170,6 +173,9 @@ export function presetCompatibleAgentIds(
   preset: Preset,
   agents: readonly AgentProviderInfo[],
 ): string[] {
+  if (preset.directAgentId) {
+    return agents.some((agent) => agent.id === preset.directAgentId) ? [preset.directAgentId] : []
+  }
   const wires: Partial<Record<WireShape, string>> = {}
   for (const region of presetRegions(preset)) Object.assign(wires, region.wires)
   return compatibleAgentIds(wires, agents)
@@ -240,12 +246,14 @@ export function isApiKeyPreset(p: Preset): boolean {
 export const VENDOR_BY_PRESET: Record<string, string> = {
   'claude-api': 'anthropic',
   'codex-api': 'openai',
+  'xai-api': 'xai',
   gemini: 'google',
   minimax: 'minimax',
   glm: 'glm',
   kimi: 'kimi',
   deepseek: 'deepseek',
   longcat: 'longcat',
+  'cursor-dashboard': 'cursor',
   custom: 'custom',
 }
 
@@ -259,6 +267,7 @@ export function vendorPreset(vendor: string, presets: Preset[]): Preset | undefi
 // VENDORS_BY_BASEURL). Kept in sync by hand — it's a tiny, stable map.
 const VENDOR_BY_BASEURL: Array<[RegExp, string]> = [
   [/generativelanguage\.googleapis\.com/i, 'google'],
+  [/api\.x\.ai/i, 'xai'],
   [/bigmodel\.cn|z\.ai/i, 'glm'],
   [/minimaxi\.com|minimax\.io/i, 'minimax'],
   [/moonshot\.cn|moonshot\.ai/i, 'kimi'],

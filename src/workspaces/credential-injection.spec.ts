@@ -6,7 +6,7 @@ import {
   matchCredentialByApiKey,
   resolveInjectionModel,
 } from './credential-injection.js'
-import { AdapterRegistry, type CliAdapter, type WorkspaceAiCred } from './cli-adapter.js'
+import { AdapterRegistry, emptyAgentSessionRuntime, type CliAdapter, type WorkspaceAiCred } from './cli-adapter.js'
 import { createBuiltinAdapterRegistry } from './adapters/index.js'
 import type { Credential } from '@/core/config.js'
 import type { Logger } from './logger.js'
@@ -56,6 +56,7 @@ describe('credentialToWorkspaceAiCred', () => {
     const futureAdapter: CliAdapter = {
       id: 'future',
       displayName: 'Future Runtime',
+      sessionRuntime: emptyAgentSessionRuntime,
       capabilities: {
         parallelPerCwd: true,
         resumeLast: false,
@@ -82,8 +83,10 @@ describe('credentialToWorkspaceAiCred', () => {
       wireShape: 'google-generative-ai',
       contextWindow: 1_048_576,
       reasoning: true,
-      reasoningEffort: 'minimal',
     })
+    expect(projectCredentialToWorkspace(googleKey, futureAdapter, {
+      model: 'gemini-3.1-flash-lite',
+    })).not.toHaveProperty('reasoningEffort')
     expect(projectCredentialToWorkspace(openaiKey, futureAdapter)).toBeNull()
   })
 
@@ -220,7 +223,6 @@ describe('credentialToWorkspaceAiCred', () => {
     })).toMatchObject({
       contextWindow: 1_000_000,
       reasoning: true,
-      reasoningEffort: 'minimal',
     })
 
     expect(credentialToWorkspaceAiCred(minimaxIntl, 'opencode', {
@@ -232,15 +234,19 @@ describe('credentialToWorkspaceAiCred', () => {
     })
   })
 
-  it('projects a known model default effort into every compatible runtime', () => {
+  it('keeps registered provider defaults descriptive until effort is explicit', () => {
     for (const agent of ['claude', 'opencode', 'pi']) {
       expect(credentialToWorkspaceAiCred(anthropicKey, agent, {
         model: 'claude-sonnet-4-6',
-      })).toMatchObject({ reasoningEffort: 'high' })
+      })).not.toHaveProperty('reasoningEffort')
     }
     expect(credentialToWorkspaceAiCred(openaiKey, 'codex', {
       model: 'gpt-5.6',
-    })).toMatchObject({ reasoningEffort: 'medium' })
+    })).not.toHaveProperty('reasoningEffort')
+    expect(credentialToWorkspaceAiCred(openaiKey, 'codex', {
+      model: 'gpt-5.6',
+      reasoningEffort: 'high',
+    })).toMatchObject({ reasoningEffort: 'high' })
   })
 
   it('does not fabricate an effort tier for a provider with only a thinking switch', () => {
@@ -270,6 +276,7 @@ function stubAdapter(id: string, calls: WriteCall[], writeable = true): CliAdapt
   const adapter: CliAdapter = {
     id,
     displayName: id,
+    sessionRuntime: emptyAgentSessionRuntime,
     capabilities: {
       parallelPerCwd: true,
       resumeLast: false,
@@ -436,11 +443,17 @@ describe('compatibleCredentials', () => {
     'openai-1': openaiKey,
     'custom-1': chatOnlyGateway,
     'google-1': googleKey,
+    'cursor-1': { vendor: 'cursor', authType: 'api-key', apiKey: 'cursor-key', baseUrl: 'https://api2.cursor.sh' },
   }
 
-  it('opencode/pi accept every supported wire including native Google', () => {
+  it('cursor does not treat generic OpenAI Chat keys as Cursor Dashboard credentials', () => {
+    expect(compatibleCredentials(vault, 'cursor').map(([s]) => s)).toEqual(['cursor-1'])
+  })
+
+  it('opencode/pi/omp accept every supported wire including native Google', () => {
     expect(compatibleCredentials(vault, 'opencode').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
     expect(compatibleCredentials(vault, 'pi').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
+    expect(compatibleCredentials(vault, 'omp').map(([s]) => s)).toEqual(['anthropic-1', 'openai-1', 'custom-1', 'google-1'])
   })
 
   it('claude needs an anthropic wire — only the anthropic key qualifies', () => {
@@ -482,8 +495,10 @@ describe('resolveInjectionModel', () => {
   })
 
   it('falls back to the vendor recommendation when no lastModel', () => {
-    expect(resolveInjectionModel({ vendor: 'anthropic' })).toBe('claude-opus-4-8')
-    expect(resolveInjectionModel({ vendor: 'openai' })).toBe('gpt-5.6')
+    expect(resolveInjectionModel({ vendor: 'anthropic' })).toBe('claude-opus-5')
+    expect(resolveInjectionModel({ vendor: 'openai' })).toBe('gpt-5.6-sol')
+    expect(resolveInjectionModel({ vendor: 'xai' })).toBe('grok-4.6')
+    expect(resolveInjectionModel({ vendor: 'google' })).toBe('gemini-3.6-flash')
     expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.2')
     expect(resolveInjectionModel({ vendor: 'longcat' })).toBe('LongCat-2.0')
   })

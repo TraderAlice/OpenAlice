@@ -59,13 +59,13 @@ export interface SpawnContext {
    * Set only after an explicit user action enters a launcher-owned surface.
    */
   readonly approveProject?: boolean;
-}
-
-/** Explicit selection for one headless turn. Authentication, provider routing,
- * and every omitted field remain inherited from the Workspace/native runtime. */
-export interface HeadlessRunOverrides {
-  readonly model?: string
-  readonly reasoningEffort?: ModelReasoningEffort
+  /**
+   * Adapter-owned projection of the product Session's durable runtime binding.
+   * The service resolves vault references immediately before launch, then asks
+   * the same adapter to project that selection for every surface. Secrets may
+   * exist in `env`, but never in the argv arrays.
+   */
+  readonly sessionRuntime?: AgentSessionRuntimeProjection;
 }
 
 export interface AgentRuntimeWorkspaceContext {
@@ -93,6 +93,12 @@ export interface AgentProviderCapabilities {
   readonly credentialSource: 'runtime-or-workspace' | 'workspace-required';
   /** Wire protocols this runtime can consume, in native preference order. */
   readonly wirePreference: readonly WireShape[];
+  /**
+   * Provider credentials this runtime consumes directly instead of through a
+   * model API wire. The credential remains in the one shared vault shape;
+   * its adapter owns the native env/argv projection.
+   */
+  readonly directVendors?: readonly string[];
   /** Protocol preselected for a blank manual binding form. */
   readonly defaultWire?: WireShape;
   /** Provider-specific compatibility constraints and legacy repairs. */
@@ -164,6 +170,65 @@ export interface WorkspaceAiCred {
   authMode?: 'x-api-key' | 'bearer';
 }
 
+/** Secret-free credential ownership persisted with one product Session. */
+export type SessionCredentialBinding =
+  | { readonly source: 'native' }
+  | {
+      readonly source: 'vault'
+      readonly credentialSlug: string
+      /** Present for wire-backed providers; absent for direct runtime providers. */
+      readonly wireShape?: WireShape
+    }
+  | {
+      readonly source: 'workspace'
+      /** Detects replacement without persisting the key or provider payload. */
+      readonly fingerprint: string
+    }
+
+/**
+ * Immutable launch selection owned by a product `resumeId`. Omitted model
+ * delegates model selection to the credential/runtime. Omitted effort means
+ * exactly "not specified": it remains absent from adapter argv/config even
+ * when the selected model publishes a provider default. An adapter still must
+ * implement Session projection for this valid empty dimension.
+ */
+export interface SessionRuntimeBinding {
+  readonly version: 1
+  readonly credential: SessionCredentialBinding
+  readonly model?: string
+  readonly reasoningEffort?: ModelReasoningEffort
+}
+
+/** Just-in-time secret-bearing resolution. Never persist or expose this shape. */
+export interface ResolvedSessionRuntimeBinding {
+  readonly binding: SessionRuntimeBinding
+  readonly ai: WorkspaceAiCred | null
+}
+
+/**
+ * Native projection produced by an Agent adapter for one Session launch.
+ * Argument groups are separated because several CLIs place run-only flags
+ * after a subcommand. Credential material belongs exclusively in `env`.
+ */
+export interface AgentSessionRuntimeProjection {
+  readonly env: Readonly<Record<string, string>>
+  readonly interactiveArgs: readonly string[]
+  readonly headlessArgs: readonly string[]
+  readonly webArgs?: readonly string[]
+}
+
+export interface AgentSessionRuntimeAdapter {
+  project(
+    ctx: Pick<SpawnContext, 'cwd' | 'env'>,
+    runtime: ResolvedSessionRuntimeBinding,
+  ): AgentSessionRuntimeProjection
+}
+
+/** Test/utility implementation for synthetic Agent adapters with no AI knobs. */
+export const emptyAgentSessionRuntime: AgentSessionRuntimeAdapter = {
+  project: () => ({ env: {}, interactiveArgs: [], headlessArgs: [], webArgs: [] }),
+}
+
 export interface EnvOverrides {
   /**
    * Substrings that, when found anywhere in an env var name, cause the var to
@@ -229,7 +294,7 @@ export interface CliAdapter {
      * The adapter exposes a one-shot HEADLESS mode (consumes a positional
      * prompt, exits at the turn boundary) via `composeHeadlessCommand`. The
      * launcher dispatches automation tasks through it — spawn → run → the agent
-     * reports via `inbox_push` → exit, no human attached. The four agent CLIs
+     * reports via `inbox_push` → exit, no human attached. The agent CLIs
      * set this; `shell` does not (no agent-turn concept).
      */
     readonly headless?: boolean;
@@ -240,6 +305,9 @@ export interface CliAdapter {
      */
     readonly aiProvider?: AgentProviderCapabilities;
   };
+
+  /** Required for Agent runtimes; utility adapters explicitly set `null`. */
+  readonly sessionRuntime: AgentSessionRuntimeAdapter | null;
 
   /** Runtime-specific hooks executed through the shared launcher lifecycle. */
   readonly lifecycle?: AgentRuntimeLifecycle;
@@ -288,6 +356,8 @@ export interface CliAdapter {
    * `capabilities.headless` is true.
    *   claude:   [...base, -p, <prompt>, --output-format, json]   // never --bare
    *   codex:    [codex, exec, --json, <prompt>]                  // MCP optional
+   *   grok:     [grok, --no-leader, --always-approve, --output-format, streaming-json, --single=<prompt>]
+   *   omp:      [omp, -p, --mode, json, --auto-approve, --, <prompt>]
    *   opencode: [opencode, run, --format, json, <prompt>]
    *   pi:       [pi, -p, --mode, json, <prompt>]
    */
@@ -295,17 +365,17 @@ export interface CliAdapter {
     base: readonly string[],
     ctx: SpawnContext,
     prompt: string,
-    overrides?: HeadlessRunOverrides,
   ): readonly string[];
 
   /**
    * Extract the agent's OWN session id from one line of headless stdout.
-   * All four agent CLIs announce their session id in the first line(s) of
+   * Agent CLIs announce their session id in the first line(s) of
    * their structured headless output (verified 2026-06-11):
    *   claude:   every stream-json event carries `session_id`
    *   codex:    `{"type":"thread.started","thread_id":…}` — equals the rollout
    *             `session_meta.id`, resumable via `codex resume <id>`
    *   opencode: every event carries top-level `sessionID` (`ses_…`)
+   *   omp:      line 1 is `{"type":"session","id":…}` (17.3.4 print JSON)
    *   pi:       line 1 is `{"type":"session","id":…}` (echoes --session-id)
    * The runner calls this per complete line until it returns non-null; the id
    * is recorded on the task so a finished headless run can be REOPENED as a
@@ -349,21 +419,24 @@ export interface CliAdapter {
    * pointing at `<cwd>/.codex`. Merged into the spawn env AFTER
    * `envOverrides` so this takes precedence for overlapping keys.
    *
-   * Intentionally narrow: this is *launcher plumbing* (where to find files),
-   * NOT a back-door for injecting provider config (keys/URLs) — those live
-   * in the workspace's own files (`.claude/settings*.json`,
-   * `.codex/config.toml`) and are read by the CLI directly.
+   * Intentionally narrow: this is launcher plumbing. Managed credential,
+   * model, and effort projection belongs to `sessionRuntime`; native project
+   * files are only a deprecated compatibility export.
    */
   composeEnv?(ctx: SpawnContext): Record<string, string>;
 
   /**
-   * Read/write the workspace's per-CLI AI-provider override. The launcher
-   * dispatches uniformly; each adapter renders the shared `WorkspaceAiCred`
-   * into (and parses it out of) its own native config files. An empty cred
-   * resets only OpenAlice-owned values so the CLI falls back to native/global.
-   * Absent on adapters with no configurable provider (shell).
+   * Read/write a deprecated compatibility export in the CLI's native project
+   * config. Managed OpenAlice Sessions use the persisted Session binding and
+   * per-spawn `sessionRuntime` projection instead. Retained so users may export
+   * configuration for launching the CLI outside OpenAlice and so legacy
+   * Session bindings can still be resumed.
+   *
+   * @deprecated Compatibility export only; do not use as a managed launch
+   * default or readiness gate.
    */
   writeAiConfig?(cwd: string, cred: WorkspaceAiCred): Promise<void>;
+  /** @deprecated Compatibility inspection for legacy Session bindings only. */
   readAiConfig?(cwd: string): Promise<WorkspaceAiCred | null>;
 
   // ── Transcript detection (used only when capabilities.transcriptDiscovery === 'fs-watch')
@@ -403,6 +476,9 @@ export class AdapterRegistry {
   register(adapter: CliAdapter, opts: { default?: boolean } = {}): void {
     if (this.adapters.has(adapter.id)) {
       throw new Error(`adapter already registered: ${adapter.id}`);
+    }
+    if (isAgentRuntime(adapter) && adapter.sessionRuntime === null) {
+      throw new Error(`agent adapter must implement Session runtime projection: ${adapter.id}`);
     }
     this.adapters.set(adapter.id, adapter);
     if (opts.default || this.defaultId === null) this.defaultId = adapter.id;

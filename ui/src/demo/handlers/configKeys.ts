@@ -15,7 +15,7 @@ export const demoCredentialPresets = [
     description: 'Pay per token via Anthropic API',
     category: 'official',
     defaultName: 'Claude (API Key)',
-    hint: 'Opus is the recommended complex-agent default; Sonnet balances capability and cost, while Fable is the highest-capability premium tier.',
+    hint: 'Opus 5 is the recommended complex-agent default; Sonnet balances capability and cost, while Fable is the highest-capability premium tier.',
     setup: {
       apiKeyLabel: 'Anthropic API key',
       apiKeyPlaceholder: 'sk-ant-...',
@@ -24,9 +24,10 @@ export const demoCredentialPresets = [
     },
     models: [
       { id: 'claude-fable-5', label: 'Claude Fable 5 (Highest capability)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'required', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high' } } },
-      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (Complex agents)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
+      { id: 'claude-opus-5', label: 'Claude Opus 5 (Complex agents)', semantics: { contextWindow: 1_000_000, maxOutputTokens: 128_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
       { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (Balanced)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
       { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (Fastest)', semantics: { contextWindow: 200_000, reasoning: { mode: 'optional', interleaved: true } } },
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 (Previous generation)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Previous generation)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'max'], defaultEffort: 'high', interleaved: true } } },
     ],
     schema: {
@@ -35,12 +36,13 @@ export const demoCredentialPresets = [
         apiKey: { type: 'string' },
         model: {
           type: 'string',
-          default: 'claude-opus-4-8',
+          default: 'claude-opus-5',
           oneOf: [
             { const: 'claude-fable-5', title: 'Claude Fable 5 (Highest capability)' },
-            { const: 'claude-opus-4-8', title: 'Claude Opus 4.8 (Complex agents)' },
+            { const: 'claude-opus-5', title: 'Claude Opus 5 (Complex agents)' },
             { const: 'claude-sonnet-5', title: 'Claude Sonnet 5 (Balanced)' },
             { const: 'claude-haiku-4-5', title: 'Claude Haiku 4.5 (Fastest)' },
+            { const: 'claude-opus-4-8', title: 'Claude Opus 4.8 (Previous generation)' },
             { const: 'claude-sonnet-4-6', title: 'Claude Sonnet 4.6 (Previous generation)' },
           ],
         },
@@ -61,9 +63,9 @@ export const demoCredentialPresets = [
       modelHelp: 'Choose a model enabled for this API project, or paste another exact ID.',
     },
     models: [
-      { id: 'gpt-5.6', label: 'GPT 5.6 (Sol alias)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol (Power)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
       { id: 'gpt-5.6-terra', label: 'GPT 5.6 Terra (Balanced)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
-      { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'gpt-5.6-luna', label: 'GPT 5.6 Luna (Cost-efficient)', semantics: { contextWindow: 400_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
       { id: 'gpt-5.5', label: 'GPT 5.5 (Previous generation)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' } } },
       { id: 'gpt-5.4', label: 'GPT 5.4 (Previous generation)', semantics: { contextWindow: 1_050_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh'], defaultEffort: 'none' } } },
     ],
@@ -73,9 +75,9 @@ export const demoCredentialPresets = [
         apiKey: { type: 'string' },
         model: {
           type: 'string',
-          default: 'gpt-5.6',
+          default: 'gpt-5.6-sol',
           oneOf: [
-            { const: 'gpt-5.6', title: 'GPT 5.6 (Sol alias)' },
+            { const: 'gpt-5.6-sol', title: 'GPT 5.6 Sol (Power)' },
             { const: 'gpt-5.6-terra', title: 'GPT 5.6 Terra (Balanced)' },
             { const: 'gpt-5.6-luna', title: 'GPT 5.6 Luna (Cost-efficient)' },
             { const: 'gpt-5.5', title: 'GPT 5.5 (Previous generation)' },
@@ -100,9 +102,11 @@ export const demoCredentialPresets = [
       modelHelp: 'Choose a Gemini model exposed by Google’s native API.',
     },
     models: [
-      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Stable)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['minimal', 'low', 'medium', 'high'], defaultEffort: 'medium' } } },
-      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Preview, paid)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high'], defaultEffort: 'high' } } },
-      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Stable)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['minimal', 'low', 'medium', 'high'], defaultEffort: 'minimal' } } },
+      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Agentic default)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['medium', 'high'], defaultEffort: 'medium' } } },
+      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite (Fastest / economical)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['minimal', 'medium', 'high'], defaultEffort: 'minimal' } } },
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Previous generation)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['minimal', 'low', 'medium', 'high'], defaultEffort: 'medium' } } },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Previous preview, paid)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high'], defaultEffort: 'high' } } },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Previous generation)', semantics: { contextWindow: 1_048_576, maxOutputTokens: 65_536, reasoning: { mode: 'adaptive', efforts: ['minimal', 'low', 'medium', 'high'], defaultEffort: 'minimal' } } },
       { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Previous generation)', semantics: { contextWindow: 1_048_576, reasoning: { mode: 'required' } } },
       { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Previous generation)', semantics: { contextWindow: 1_048_576, reasoning: { mode: 'optional' } } },
       { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (Previous generation)', semantics: { contextWindow: 1_048_576, reasoning: { mode: 'optional' } } },
@@ -113,11 +117,13 @@ export const demoCredentialPresets = [
         apiKey: { type: 'string' },
         model: {
           type: 'string',
-          default: 'gemini-3.1-flash-lite',
+          default: 'gemini-3.6-flash',
           oneOf: [
-            { const: 'gemini-3.5-flash', title: 'Gemini 3.5 Flash (Stable)' },
-            { const: 'gemini-3.1-pro-preview', title: 'Gemini 3.1 Pro (Preview, paid)' },
-            { const: 'gemini-3.1-flash-lite', title: 'Gemini 3.1 Flash-Lite (Stable)' },
+            { const: 'gemini-3.6-flash', title: 'Gemini 3.6 Flash (Agentic default)' },
+            { const: 'gemini-3.5-flash-lite', title: 'Gemini 3.5 Flash-Lite (Fastest / economical)' },
+            { const: 'gemini-3.5-flash', title: 'Gemini 3.5 Flash (Previous generation)' },
+            { const: 'gemini-3.1-pro-preview', title: 'Gemini 3.1 Pro (Previous preview, paid)' },
+            { const: 'gemini-3.1-flash-lite', title: 'Gemini 3.1 Flash-Lite (Previous generation)' },
             { const: 'gemini-2.5-pro', title: 'Gemini 2.5 Pro (Previous generation)' },
             { const: 'gemini-2.5-flash', title: 'Gemini 2.5 Flash (Previous generation)' },
             { const: 'gemini-2.5-flash-lite', title: 'Gemini 2.5 Flash-Lite (Previous generation)' },
@@ -206,7 +212,7 @@ export const configKeysHandlers = [
     HttpResponse.json({
       credentials: [
         { slug: 'anthropic-1', vendor: 'anthropic', label: 'Anthropic', authType: 'api-key', wires: { anthropic: '' }, apiKey: null, hasApiKey: true, lastModel: 'claude-opus-4-8' },
-        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-responses': '', 'openai-chat': '' }, apiKey: null, hasApiKey: true, lastModel: 'gpt-5.6' },
+        { slug: 'openai-1', vendor: 'openai', label: 'OpenAI', authType: 'api-key', wires: { 'openai-responses': '', 'openai-chat': '' }, apiKey: null, hasApiKey: true, lastModel: 'gpt-5.6-sol' },
       ],
     }),
   ),

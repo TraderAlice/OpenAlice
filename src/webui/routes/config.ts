@@ -108,7 +108,8 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   // ==================== Credential Vault ====================
   //
-  // Alice's central api-key credentials — the set injected into workspaces.
+  // Alice's central api-key credentials — resolved into per-process Session
+  // bindings when a Workspace launch explicitly selects one.
   // Subscription logins (claude login / codex login) are NOT stored here; they
   // live in the CLI's own auth. The list never returns the raw key (only
   // whether one is set); Test runs the lightweight probe, not the in-process
@@ -129,6 +130,7 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
         ...(cred.label ? { label: cred.label } : {}),
         authType: cred.authType,
         wires: credentialWires(cred), // derives from legacy {baseUrl,wireShape} too
+        ...(cred.baseUrl ? { baseUrl: cred.baseUrl } : {}),
         apiKey: cred.apiKey ?? null,
         hasApiKey: !!cred.apiKey,
         ...(cred.lastModel ? { lastModel: cred.lastModel } : {}),
@@ -142,19 +144,21 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   /** POST /credentials — add an api-key credential (deduped by key). Returns slug. */
   app.post('/credentials', async (c) => {
     try {
-      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; apiKey?: string; lastModel?: string }>()
+      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; baseUrl?: string; apiKey?: string; lastModel?: string }>()
       const apiKey = body.apiKey?.trim()
       if (!apiKey) return c.json({ error: 'apiKey is required' }, 400)
       const vendorParse = credentialVendorEnum.safeParse(body.vendor)
       const label = body.label?.trim()
       const lastModel = body.lastModel?.trim()
       const wires = parseWires(body.wires)
+      const baseUrl = body.baseUrl?.trim()
       const cred: Credential = {
         vendor: vendorParse.success ? vendorParse.data : 'custom',
         ...(label ? { label } : {}),
         authType: 'api-key',
         apiKey,
         ...(Object.keys(wires).length ? { wires } : {}),
+        ...(baseUrl ? { baseUrl } : {}),
         ...(lastModel ? { lastModel } : {}),
       }
       const slug = await addCredential(cred)
@@ -168,19 +172,22 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
   app.put('/credentials/:slug', async (c) => {
     try {
       const slug = c.req.param('slug')
-      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; apiKey?: string; lastModel?: string }>()
+      const body = await c.req.json<{ vendor?: string; label?: string; wires?: unknown; baseUrl?: string; apiKey?: string; lastModel?: string }>()
       const existing = await resolveCredential(slug)
       const apiKey = body.apiKey?.trim() || existing.apiKey
       const vendorParse = credentialVendorEnum.safeParse(body.vendor)
       const label = body.label?.trim()
       const lastModel = body.lastModel?.trim() || existing.lastModel
       const wires = parseWires(body.wires)
+      const hasBaseUrl = Object.prototype.hasOwnProperty.call(body, 'baseUrl')
+      const baseUrl = hasBaseUrl ? body.baseUrl?.trim() : existing.baseUrl
       const cred: Credential = {
         vendor: vendorParse.success ? vendorParse.data : existing.vendor,
         ...(label || existing.label ? { label: label || existing.label } : {}),
         authType: 'api-key',
         ...(apiKey ? { apiKey } : {}),
         ...(Object.keys(wires).length ? { wires } : { ...(existing.wires ? { wires: existing.wires } : {}) }),
+        ...(baseUrl ? { baseUrl } : {}),
         ...(lastModel ? { lastModel } : {}),
       }
       const defaults = await readWorkspaceCredentialDefaults()
@@ -188,7 +195,12 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
         if (def.credentialSlug !== slug) continue
         const adapter = adapters.get(agentId)
         const capabilities = adapter?.capabilities.aiProvider
-        if (!capabilities || !pickAgentWire(credentialWires(cred), capabilities, def.wireShape)) {
+        const remainsCompatible = capabilities && (
+          def.wireShape
+            ? pickAgentWire(credentialWires(cred), capabilities, def.wireShape) !== null
+            : compatibleCredentials({ [slug]: cred }, adapter).length > 0
+        )
+        if (!remainsCompatible) {
           return c.json({
             error: `This credential is the ${agentId} Workspace default. Choose a compatible default protocol before removing its current wire.`,
           }, 400)
@@ -242,10 +254,9 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
 
   // ============ Default Workspace Credentials (per-agent) ============
   //
-  // The user-level "inject my usual key on every new workspace" setting. A
-  // per-agent map of {credentialSlug, model?} that the workspace creator seeds
-  // into each new workspace's file-based AI config at create time — sparing the
-  // user the per-workspace AI-config modal. References the vault above.
+  // Deprecated installation-level creation seeds. The Workspace creator
+  // translates this per-agent map into secret-free `.alice/settings.json`
+  // preferences; it no longer writes native CLI project configuration.
 
   /**
    * GET /workspace-credential-defaults — the current per-agent defaults plus,
@@ -287,20 +298,21 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
         const registration = capabilities.modelRegistration
         const def = incoming[agent]
         if (def && typeof def.credentialSlug === 'string' && def.credentialSlug) {
+          const credential = credentials[def.credentialSlug]
+          if (!credential || !compatibleCredentials({ [def.credentialSlug]: credential }, adapter).length) {
+            return c.json({ error: `${agent} cannot use ${def.credentialSlug}` }, 400)
+          }
           const parsedWire = credentialWireShapeEnum.safeParse(def.wireShape)
           if (def.wireShape !== undefined && !parsedWire.success) {
             return c.json({ error: `Invalid protocol for ${agent}` }, 400)
           }
           if (parsedWire.success) {
-            const credential = credentials[def.credentialSlug]
             if (
-              credential &&
               !pickAgentWire(credentialWires(credential), capabilities, parsedWire.data)
             ) {
               return c.json({ error: `${agent} cannot use ${parsedWire.data} from ${def.credentialSlug}` }, 400)
             }
           }
-          const credential = credentials[def.credentialSlug]
           const selectedModel = typeof def.model === 'string' && def.model
             ? def.model
             : credential ? resolveInjectionModel(credential) : null

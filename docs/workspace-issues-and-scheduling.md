@@ -9,6 +9,19 @@ Related guides: [[docs/project-structure.md]] and
 live in [[docs/conversation-provenance.md]]. The agent-facing usage manual ships as
 `default/skills/self-scheduling/SKILL.md`.
 
+## Runtime occupancy journal
+
+`workspaces/state/agent-runtime.jsonl` is an append-only projection of desk
+occupancy plus the headless turn assets Office can replay: Session birth,
+process start, spawn failure, stop, declined asks, then `runtime.turn.text` /
+`runtime.turn.tool` / `runtime.turn.error` as the structured translator
+emits them. Completion stays on `runtime.stopped` with clipped assistant
+text and block metrics. Tool input/output and the user prompt stay out —
+they already live in the structured run snapshot and conversation log.
+TUI has no equivalent extractor yet, so headed Sessions still only write
+occupancy. The journal is not a dispatch authority. Office reads this file;
+Automation → Runs remains the current headless-task table.
+
 ## One Object, Two Roles
 
 Each issue is one file:
@@ -33,10 +46,11 @@ workspaces.
 title: Pre-market brief
 status: todo
 priority: high
-assignee: "@workspace"
+assignee: "@new-then-resume"
 when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: codex
-model: gpt-5.6
+credential: openai-primary
+model: gpt-5.6-sol
 effort: high
 ---
 
@@ -50,43 +64,81 @@ The filename stem is the stable issue id. Frontmatter:
 - `status` — `backlog | todo | in_progress | done | canceled`; default `todo`.
 - `priority` — `urgent | high | medium | low | none`; default `none`.
 - `assignee` — the single ownership and dispatch contract:
-  - `@new` means the owning Workspace recruits one new product Session on the
+  - `@new-then-resume` means the owning Workspace recruits one new product Session on the
     first fire, then persists that concrete Session as the future owner;
-  - `@workspace` means the owning Workspace recruits a new product Session for
+  - `@new-each-run` means the owning Workspace recruits a new product Session for
     every scheduled fire;
   - an exact `@resumeId` continues one accountable product Session;
   - `@human` or `@unassigned` is valid only for unscheduled work.
-  When omitted, a scheduled Issue defaults to `@new` so its first run establishes
-  one durable owner; an unscheduled board item defaults to `@workspace`.
+  When omitted, a scheduled Issue defaults to `@new-then-resume` so its first run establishes
+  one durable owner; an unscheduled board item defaults to `@unassigned`.
   Structured creation by an attributable resumable Session still assigns that
-  creating Session. Use `@workspace` explicitly only when every fire should
+  creating Session. Use `@new-each-run` explicitly only when every fire should
   recruit a newcomer.
 - `when` — optional schedule:
   - `{ kind: at, at: <ISO timestamp> }`
   - `{ kind: every, every: <duration> }`
   - `{ kind: cron, cron: <5-field expression>, timezone: local | <IANA zone> }`
-- `agent` — optional CLI adapter id for `@new` / `@workspace` scheduled work;
+- `agent` — optional CLI adapter id for `@new-then-resume` / `@new-each-run` scheduled work;
   otherwise Workspace/default resolution is used. A Session assignee already
   owns its runtime and cannot be overridden here.
+- `credential` — optional secret-free OpenAlice vault slug for the fresh
+  Session. The slug selects provider routing; keys and endpoints never enter
+  the Issue file.
+- `credentialSource: native` — explicitly use the selected Agent runtime's own
+  login. It is mutually exclusive with `credential`. When both fields are
+  omitted, the Issue inherits that Agent's Workspace **headless** preference
+  (fixed, then recent) rather than inspecting deprecated native-project export
+  files.
 - `model` — optional native model id for this Issue's run. Omission inherits the
-  Workspace/native runtime model.
+  selected credential, Workspace, or native runtime model.
 - `effort` — optional one-run reasoning effort:
   `none | minimal | low | medium | high | xhigh | max`. The chosen runtime must
   expose that level; omission inherits its Workspace/native default.
+- `timeout` — optional scheduled-run watchdog: `15m | 30m | 45m | 60m`. Omission
+  means no limit: the headless child runs until the agent exits. This is a run
+  budget, not Session birth, so an exact `@resumeId` owner may still set it.
+- `commentPrompt` — optional template for the Input Prompt sent when a comment
+  needs a reply. Omission keeps the historical wrapper (Issue id, title, author,
+  then the comment, plus the “do not call `issue comment`” instruction). An
+  override replaces that whole structure. Closed tokens: `{comment}`, `{title}`,
+  `{id}`, `{workspaceId}`, `{author}`, `{what}`. The template must include
+  `{comment}`. Chat-style Issues (including the Telegram phone desk) set
+  `{comment}` alone so the inbound text is the prompt. Empty/null write drops
+  the field and restores the default.
+- `telegramConnector: true` — present only on the Alice Project's Telegram
+  phone-desk Issue. Omission is a normal Issue. Any other value is invalid. At
+  most one live desk exists in the Project. Settings → Connectors is the only
+  writer of this flag; generic create/CLI/MCP cannot set it. The board and
+  Tracked list omit the row. What remains the exact scheduled Input Prompt.
+  Comments are the chat transcript. The desk is created with
+  `commentPrompt: '{comment}'` so inbound DMs are the Input Prompt as-is.
+  Owner Telegram DMs become comments. While a desk fire or comment reply is
+  running, later DMs stay in the Connector queue; Alice flushes that stack as
+  one quoted comment when the desk is idle again. Scheduled-fire
+  `assistantText` is stamped as a comment. Connector projects comments that
+  do not contain `[[no-reply]]` and did not arrive from Telegram. While a
+  desk turn is running, it also ships sealed mid-turn `text` blocks — the
+  last consecutive text before a tool or error — and never ships tool I/O.
+  The trailing text stays with the final comment. Projected comments use
+  Telegram MarkdownV2; a parse failure tries `sendRichMessage`, then plain
+  text.
 
-`agent`, `model`, and `effort` are one run-selection tuple. They never carry an
-endpoint, provider, or credential, and the scheduler expresses them as native
-CLI arguments without rewriting Workspace files. All three are forbidden when
-`assignee` is an exact `@resumeId`, because that Session owns its runtime
-conversation. `@new` may use them for its first dispatch; after it becomes an
-exact Session owner, the claim rewrite removes the tuple.
+`agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
+Only the credential slug is persisted; endpoint and key material remain in the
+vault and are resolved just in time. The scheduler freezes the tuple into the
+new Session's durable runtime binding without rewriting Workspace files. All
+fields are forbidden when `assignee` is an exact `@resumeId`, because that
+Session owns its runtime conversation. `@new-then-resume` may use them for its first
+dispatch; after it becomes an exact Session owner, the claim rewrite removes
+the tuple.
 
-Migration `0018_issue_assignee_ownership` removes the retired parallel
-`execution` field. It maps `resume` to the former `session:<resumeId>` shape and
-fresh/omitted scheduled ownership to the former `workspace` shape. That history
-is preserved as explicit `@workspace`; the new omission default is `@new`.
-Migration `0019_issue_session_signatures` then writes those owners as
-`@resumeId` / `@workspace`, the same visible signature language used in reports.
+The 0.89.2-beta baseline has one ownership field and behavior-named scheduling
+tokens. `@workspace` remains a deprecated read alias for `@new-each-run`, and
+`@new` remains a deprecated read alias for `@new-then-resume`; API, CLI, UI,
+documentation, and skills reject or avoid both aliases, and new writes never
+emit them. The retired parallel `execution` contract and `session:<resumeId>`
+storage shape are not supported upgrade inputs after this baseline.
 
 The markdown below frontmatter is the Issue's canonical **What**: the work
 definition humans inspect and edit. For scheduled Issues, Alice sends this exact
@@ -104,7 +156,17 @@ Comments are also the Issue's normal conversation entry. When `assignee` is an
 exact `@resumeId`, a comment from somebody else is delivered asynchronously to
 that Session and its final reply is appended as another structured comment.
 The source comment records `pending`, `replied`, or `failed`, so a durable note
-never masquerades as a delivered message. A human comment without a fixed owner
+never masquerades as a delivered message. While `pending`, the same delivery
+may carry compact **turn progress** from the headless listener: interleaved
+semantic `text` blocks, tool names/status, and errors. That projection is
+transport only — it is not the reply comment, and it never includes tool
+input/output. The snapshot has a fixed UTF-8 byte budget and is removed from
+the task record when the run finishes; terminal delivery state and the
+structured run log remain durable. Inbox inquiries expose the same shape on the inquiry record.
+Issue Activity and Inbox reply threads render that same field as a compact
+live timeline: semantic text, tool name/status, and errors. They do not fetch
+`/output` or show tool payloads. The Telegram phone desk
+already projects sealed `text` blocks from that same field. A human comment without a fixed owner
 uses the same provenance-aware fallback as Inbox: OpenAlice asks the
 attributable creator, or recruits a reconstruction Agent in the Issue
 Workspace when no creator Session exists. The answer is recorded in Activity
@@ -136,6 +198,22 @@ clock explicitly. Cron is not an exchange calendar: holidays, early closes, and
 calendar primitive can add those semantics without making ordinary reminders
 depend on a trading subsystem.
 
+`every` and `cron` share one dispatch channel. They differ only in due math:
+`every` is an interval since the last accepted fire; `cron` is a wall clock.
+By default a missed cron admission (`busy`, full worker pool, or another
+dispatch throw before a run exists) **catches up**: the occurrence stays due
+until a run is accepted, then the next fire is the next calendar slot after
+that success. Set `catchUp: false` to consume every elapsed slot and wait for
+the next future calendar time instead:
+
+```yaml
+when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York, catchUp: false }
+```
+
+Omitted `catchUp` means catch-up. This does not retry a run that was already
+accepted and later failed; that occurrence stays one attempt and uses
+**Retry now**. Creating a cron Issue still does not dump historical slots.
+
 ## Agent and Human Surfaces
 
 Agents normally use:
@@ -143,14 +221,16 @@ Agents normally use:
 ```bash
 alice-workspace issue list
 alice-workspace issue show --id <id-or-title>
-alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @workspace --agent codex --model gpt-5.6 --effort high
-alice-workspace issue update --id <id> --model gpt-5.6 --effort high
+alice-workspace issue create --title "..." --what "..." --when '{"kind":"every","every":"1h"}' --assignee @new-each-run --agent codex --credential openai-primary --model gpt-5.6-sol --effort high --timeout 30m
+alice-workspace issue update --id <id> --credential openai-primary --model gpt-5.6-sol --effort high
+alice-workspace issue update --id <id> --timeout 45m
 alice-workspace issue comment --id <id> --text "..."
 ```
 
 The CLI and MCP tools use the same implementation and write the same files.
 Direct file editing is also valid and is the clearest way to author rich What
-markdown plus `when` / `assignee` / `agent` / `model` / `effort` frontmatter.
+markdown plus `when` / `assignee` / `agent` / `credential` / `model` / `effort` /
+`timeout` frontmatter.
 
 `issue comment` is preferable to a generic `issue ask --owner` for normal
 collaboration because it leaves the question and answer in the Issue Activity
@@ -168,7 +248,7 @@ an attended, human-approved path and a commit in the peer repository.
   -> ScheduleScanner (~60s)
   -> due calculation from `when` + last-fired marker
   -> assignee selects a new Workspace Session or exact resumeId
-  -> optional model/effort become one-run native CLI arguments
+  -> optional credential/model/effort freeze into a fresh Session binding
   -> headless run of the owning Workspace
   -> native agent CLI
   -> normalized reply + message/tool blocks
@@ -180,13 +260,18 @@ The scanner interprets timing only. It hands the visible markdown What to the
 agent unchanged. Conditions belong in that prompt: for “notify only if X,” the
 run checks X and exits silently when false.
 
-The scanner persists only last-fired markers under the launcher state root.
-Schedule semantics remain in the issue file. Markers are written after a
-successful dispatch, meaning a durable run record was accepted. If that worker
+The scanner persists dispatch cursors (the last accepted fire plus any held
+cron occurrence) under the launcher state root. Schedule semantics remain in
+the issue file. The last-fire cursor is written after a successful dispatch,
+meaning a durable run record was accepted. If that worker
 later fails to launch or exits unsuccessfully, the failed run remains the
-single attempt for that occurrence and the operator can use **Retry now**; the
+single attempt for that occurrence and the operator can use **Retry now**.
+**Run now** starts an extra turn without waiting for the next due time and
+without moving that marker, so a missed fire or a prompt test does not steal
+the next scheduled occurrence. The
 scanner does not turn its own tick interval into a retry storm. Capacity or
-another admission rejection that creates no run stays due for retry.
+another admission rejection that creates no run stays due for retry, including
+cron unless the Issue sets `catchUp: false`.
 
 The durable run record keeps the requested model and effort beside the resolved
 agent. This is selection provenance, not a claim that the provider honored an
@@ -200,9 +285,9 @@ the latest scheduled run, and the assignee's resume availability. It is not
 persisted in markdown and does not create another Issue workflow status:
 
 - `not_started`, `due`, `running`, and `healthy` describe normal progress;
-- `interrupted` means the work was cut off by launcher restart, or its 30-minute
-  watchdog itself woke substantially late (usually computer sleep / launcher
-  suspension); this is operational interruption, not an agent-work failure;
+- `interrupted` means the work was cut off by launcher restart, or an optional
+  run-timeout watchdog itself woke substantially late (usually computer sleep /
+  launcher suspension); this is operational interruption, not an agent-work failure;
 - `failed` retains a real timeout, launch error, runtime error, or non-zero
   process exit until a later success;
 - `blocked` means the schedule has no future fire, or an exact Session owner is
@@ -215,9 +300,11 @@ not a health prerequisite.
 
 Failure explanations are read-side projections from the durable run record.
 Old runs therefore gain structured `failure.kind/title/message/retryable`
-diagnostics without migration. A killed run close to 30 minutes is a timeout;
-a killed run whose watchdog closes much later is described conservatively as a
-paused computer/launcher rather than falsely blaming the agent.
+diagnostics without migration. A killed run close to its configured budget is a
+timeout; historical records that omit a stored budget still use the former
+30-minute default. A killed run whose watchdog closes much later is described
+conservatively as a paused computer/launcher rather than falsely blaming the
+agent.
 
 Startup evidence is explicit on new run records. `processStarted` becomes true
 only after the OS child emits `spawn`; `launchErrorCode` distinguishes an
@@ -228,17 +315,23 @@ rather than the misleading `process_exit` used by older `exitCode: -1` records.
 
 The Issue detail offers **Retry now** only for the latest failed or interrupted
 scheduled run. Retry re-reads the live Issue and uses the same markdown What,
-assignee, runtime, resume mapping, and 30-minute budget as a scheduled fire. It
+assignee, runtime, resume mapping, and optional run timeout as a scheduled fire. It
 does not write the last-fired marker, so a recovery attempt never shifts the
 Issue's cadence. The backend rejects duplicate/racing retries and returns the
 authoritative running detail immediately; there is no automatic retry storm.
+
+**Run now** is the operator extra-turn control for any live scheduled Issue that
+is not already running. It uses the same dispatch path and confirmation dialog,
+does not require a failed last run, and also leaves the next-fire marker
+untouched. The two buttons stay separate: retry recovers a failed occurrence,
+run-now starts a specified Issue immediately.
 
 Headless runs may overlap with interactive sessions or other runs in the same
 checkout. Agents must tolerate concurrent edits. The launcher currently admits
 at most eight headless processes globally and serializes registry persistence,
 but there is no per-Workspace exclusive lock. One small dispatch-start guard
-prevents a manual retry and a schedule tick from launching the same Issue at the
-same instant; it is released as soon as the run is registered.
+prevents a Run now / Retry now click and a schedule tick from launching the same
+Issue at the same instant; it is released as soon as the run is registered.
 
 Offboarding is the lifecycle exception: a Workspace with a live headless run
 cannot depart. Once its Catalog row enters `offboarding`, new dispatch is
@@ -337,11 +430,11 @@ manufacture shell sleep loops. Add `--reconstruct` only when an unattributed
 artifact explicitly needs reconstruction guidance.
 
 The Issue detail UI treats scheduling as an intrinsic Work item capability.
-`assignee: "@new"` recruits one fresh Session on the first fire and then
-rewrites itself to that concrete `@resumeId`; `assignee: "@workspace"`
+`assignee: "@new-then-resume"` recruits one fresh Session on the first fire and then
+rewrites itself to that concrete `@resumeId`; `assignee: "@new-each-run"`
 recruits a new Session on every fire; `assignee: "@resumeId"` keeps one already
 known responsible Session. The first and third modes produce a stable owner to
-ask; `@workspace` execution exposes the creator and each concrete run as
+ask; `@new-each-run` execution exposes the creator and each concrete run as
 separate follow-up targets.
 
 Issue mutation has two complementary histories. Activity records attributable
@@ -369,26 +462,27 @@ provenance store.
 | `src/workspaces/issues/automation-health.ts` | Live schedule/run/owner health projection |
 | `src/workspaces/issues/run-failure.ts` | Read-side scheduled-run termination explanation |
 | `src/workspaces/schedule/scanner.ts` | Workspace scan, due calculation, dispatch |
-| `src/workspaces/schedule/marker-store.ts` | Atomic last-fired persistence |
+| `src/workspaces/schedule/marker-store.ts` | Atomic dispatch-cursor persistence |
 | `src/workspaces/service.ts` | Scanner composition, agent resolution, headless registry |
 | `src/workspaces/headless-task.ts` | Process lifecycle, bounded logs, live structured snapshots |
 | `src/workspaces/headless-task-registry.ts` | Durable run records, resume lineage, and capacity projection |
 | `src/workspaces/resume-registry.ts` | Product `resumeId` → backend-native runtime session mapping |
 | `src/workspaces/headless-output.ts` | Vendor-neutral reply/tool block contract and accumulator |
-| `src/workspaces/adapters/{claude,codex,opencode,pi}.ts` | Runtime-specific JSON event translation |
+| `src/workspaces/adapters/{claude,codex,grok,opencode,pi}.ts` | Runtime-specific JSON event translation |
 | `src/webui/routes/headless.ts` | Cross-workspace capacity, task, normalized output, and diagnostic-tail API |
 | `src/webui/routes/inquiries.ts` | Inbox/Issue follow-up dispatch and durable business-object history |
 | `ui/src/pages/AutomationRunsSection.tsx` | Run list, final reply, tool activity, and diagnostics UI |
 | `src/tool/issue-tools.ts` | Workspace-scoped issue CLI/MCP tools |
 | `src/tool/inbox-push.ts` | Headless/interactive delivery to Inbox |
-| `src/workspaces/session-registry.ts` | Durable Session identity and resumeId → Session index |
-| `src/webui/routes/workspaces.ts` | Idempotent resumeId → interactive-Session materialization |
+| `src/workspaces/session-registry.ts` | Durable product Session roster and resumeId → Session index |
+| `src/workspaces/product-session-coordinator.ts` | Paired Resume identity + Session roster birth, transition, and repair |
+| `src/webui/routes/workspaces.ts` | Idempotent resumeId → interactive process attachment |
 | `src/webui/routes/issues.ts` | Issue board/detail HTTP API |
 | `src/webui/routes/schedule.ts` | Scheduled projection API |
 | `default/skills/self-scheduling/SKILL.md` | Agent-facing authoring instructions |
 
-The retired `.alice/issue.json` and `.alice/schedule.json` formats are migrated
-by `src/migrations/0010_workspace_issues_to_markdown/`. Do not add a second
+The retired `.alice/issue.json` and `.alice/schedule.json` formats predate the
+0.89.2-beta baseline and are no longer upgrade inputs. Do not add a second
 central schedule store or revive the legacy cron/AgentWork path.
 
 ## Verification

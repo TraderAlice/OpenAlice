@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createPreferencesRoutes } from './preferences.js'
-import { AdapterRegistry, type CliAdapter } from '../../workspaces/cli-adapter.js'
+import { AdapterRegistry, emptyAgentSessionRuntime, type CliAdapter } from '../../workspaces/cli-adapter.js'
 
 const unusedShellStatus = vi.fn(async () => ({ supported: false as const }))
 const unusedShellSave = vi.fn(async () => ({ supported: false as const }))
@@ -33,7 +33,7 @@ describe('preferences routes', () => {
     expect(read).toHaveBeenCalledOnce()
   })
 
-  it('persists a provider choice for a loginless runtime', async () => {
+  it('persists an explicit provider override for a native-login runtime', async () => {
     const remember = vi.fn(async (agent: string, credentialSlug: string | null) => ({
       lastCredentialByAgent: { [agent]: credentialSlug! },
       recentChatWorkspaceId: null,
@@ -55,10 +55,44 @@ describe('preferences routes', () => {
     expect(remember).toHaveBeenCalledWith('pi', 'minimax-1')
   })
 
+  it('persists the complete recent launch tuple for Quick Start', async () => {
+    const remember = vi.fn(async (launch) => ({
+      lastCredentialByAgent: { pi: launch.credentialSlug! },
+      recentChatWorkspaceId: null,
+      recentLaunch: launch,
+    }))
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: vi.fn(),
+      rememberQuickChatLaunch: remember,
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    })
+    const legacyLaunch = {
+      agent: 'pi',
+      credentialSlug: 'deepseek-1',
+      model: 'deepseek-v4-flash',
+      reasoningEffort: 'high',
+    }
+    const normalizedLaunch = { ...legacyLaunch, accessMode: 'vault' }
+
+    const response = await app.request('/quick-chat/recent-launch', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(legacyLaunch),
+    })
+
+    expect(response.status).toBe(200)
+    expect(remember).toHaveBeenCalledWith(normalizedLaunch)
+    expect(await response.json()).toMatchObject({ recentLaunch: normalizedLaunch })
+  })
+
   it('accepts a future workspace-required adapter without changing the route schema', async () => {
     const futureAdapter: CliAdapter = {
       id: 'future',
       displayName: 'Future Runtime',
+      sessionRuntime: emptyAgentSessionRuntime,
       capabilities: {
         parallelPerCwd: true,
         resumeLast: false,
@@ -95,7 +129,7 @@ describe('preferences routes', () => {
     expect(remember).toHaveBeenCalledWith('future', 'future-1')
   })
 
-  it('rejects unknown runtimes and empty slugs without writing', async () => {
+  it('accepts native-login runtimes but rejects runtimes without provider support and empty slugs', async () => {
     const remember = vi.fn()
     const app = createPreferencesRoutes({
       readQuickChatPreferences: vi.fn(),
@@ -105,8 +139,15 @@ describe('preferences routes', () => {
       saveWorkspaceShellPreference: unusedShellSave,
     })
 
+    const accepted = await app.request('/quick-chat', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agent: 'codex', credentialSlug: 'openai-1' }),
+    })
+    expect(accepted.status).toBe(200)
+
     for (const body of [
-      { agent: 'codex', credentialSlug: 'openai-1' },
+      { agent: 'shell', credentialSlug: 'openai-1' },
       { agent: 'pi', credentialSlug: '' },
     ]) {
       const response = await app.request('/quick-chat', {
@@ -116,7 +157,7 @@ describe('preferences routes', () => {
       })
       expect(response.status).toBe(400)
     }
-    expect(remember).not.toHaveBeenCalled()
+    expect(remember).toHaveBeenCalledOnce()
   })
 
   it('persists and clears the recent chat workspace id', async () => {

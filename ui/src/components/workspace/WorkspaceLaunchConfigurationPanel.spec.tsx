@@ -134,6 +134,7 @@ describe('WorkspaceLaunchConfigurationPanel', () => {
 
     expect(await screen.findByText('无法读取启动计划')).toBeTruthy()
     expect(screen.getByText('workspace_not_found')).toBeTruthy()
-    expect(screen.getByText(/只读预览/)).toBeTruthy()
+    expect(screen.getByText(/仅预览/)).toBeTruthy()
   })
+
 })

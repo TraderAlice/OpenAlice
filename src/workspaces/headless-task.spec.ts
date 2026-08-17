@@ -22,6 +22,18 @@ const noopLogger = {
 const baseEnv = { PATH: process.env['PATH'] ?? '' };
 
 describe('runHeadlessTask', () => {
+  it('runs to natural exit when no watchdog is requested', async () => {
+    const r = await runHeadlessTask({
+      command: ['node', '-e', 'setTimeout(() => process.stdout.write("finished"), 50)'],
+      cwd: process.cwd(),
+      env: baseEnv,
+      logger: noopLogger,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.killed).toBe(false);
+    expect(r.stdoutTail).toBe('finished');
+  });
+
   it('captures clean exit + stdout tail on a one-shot command', async () => {
     const r = await runHeadlessTask({
       command: ['node', '-e', 'process.stdout.write("hello-headless")'],
@@ -145,6 +157,7 @@ describe('runHeadlessTask', () => {
     const script =
       `process.stdout.write(${JSON.stringify(first + '\n')});` +
       `process.stdout.write(${JSON.stringify(second)});`;
+    const snapshots: string[] = [];
     const r = await runHeadlessTask({
       command: ['node', '-e', script],
       cwd: process.cwd(),
@@ -164,10 +177,15 @@ describe('runHeadlessTask', () => {
           return [];
         }
       },
+      onProgress: (snapshot) => {
+        snapshots.push(snapshot.assistantText ?? '');
+      },
     });
     expect(r.assistantText).toBe('Hello 👋');
     expect(r.structured.assistantText).toBe('Hello 👋');
     expect(r.structured.blocks).toHaveLength(2);
+    expect(snapshots).toContain('Hello');
+    expect(snapshots.at(-1)).toBe('Hello 👋');
   });
 
   it('streams stdout/stderr diagnostics beyond the 16KB in-memory tails', async () => {

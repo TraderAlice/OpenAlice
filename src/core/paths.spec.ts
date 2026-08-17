@@ -44,7 +44,7 @@ describe('dataPath', () => {
   it('joins parts under <USER_DATA_HOME>/data/', async () => {
     const { dataPath } = await loadPaths({ OPENALICE_HOME: '/tmp/oa-test' })
     expect(dataPath('config')).toBe(resolve('/tmp/oa-test', 'data', 'config'))
-    expect(dataPath('brain', 'persona.md')).toBe(resolve('/tmp/oa-test', 'data', 'brain', 'persona.md'))
+    expect(dataPath('domain', 'state.json')).toBe(resolve('/tmp/oa-test', 'data', 'domain', 'state.json'))
   })
 
   it('falls back to ~/.openalice when OPENALICE_HOME is unset', async () => {
@@ -68,12 +68,12 @@ describe('runtimePath', () => {
 describe('defaultPath', () => {
   it('joins parts under <APP_RESOURCES_HOME>/default/', async () => {
     const { defaultPath } = await loadPaths({ OPENALICE_APP_HOME: '/Apps/OpenAlice.app/Contents/Resources' })
-    expect(defaultPath('persona.default.md')).toBe(resolve('/Apps/OpenAlice.app/Contents/Resources', 'default', 'persona.default.md'))
+    expect(defaultPath('assets', 'example.txt')).toBe(resolve('/Apps/OpenAlice.app/Contents/Resources', 'default', 'assets', 'example.txt'))
   })
 
   it('falls back to process.cwd() when OPENALICE_APP_HOME is unset', async () => {
     const { defaultPath } = await loadPaths()
-    expect(defaultPath('persona.default.md')).toBe(resolve(process.cwd(), 'default/persona.default.md'))
+    expect(defaultPath('assets', 'example.txt')).toBe(resolve(process.cwd(), 'default/assets/example.txt'))
   })
 })
 
@@ -108,7 +108,7 @@ describe('two homes are independent', () => {
     // upgrade-survives vs upgrade-replaces semantics.
     const { dataPath, defaultPath } = await loadPaths({ OPENALICE_HOME: '/tmp/user' })
     expect(dataPath('config')).toBe(resolve('/tmp/user', 'data', 'config'))
-    expect(defaultPath('persona.default.md')).toBe(resolve(process.cwd(), 'default/persona.default.md'))
+    expect(defaultPath('assets', 'example.txt')).toBe(resolve(process.cwd(), 'default/assets/example.txt'))
   })
 
   it('setting OPENALICE_APP_HOME does not move USER_DATA_HOME', async () => {
@@ -123,7 +123,7 @@ describe('two homes are independent', () => {
       OPENALICE_APP_HOME: '/Applications/OpenAlice.app/Contents/Resources',
     })
     expect(dataPath('config')).toBe(resolve('/Users/x/Library/Application Support/OpenAlice', 'data', 'config'))
-    expect(defaultPath('persona.default.md')).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'default', 'persona.default.md'))
+    expect(defaultPath('assets', 'example.txt')).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'default', 'assets', 'example.txt'))
     expect(uiBundlePath()).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'ui', 'dist'))
     expect(templatesPath()).toBe(resolve('/Applications/OpenAlice.app/Contents/Resources', 'src', 'workspaces', 'templates'))
   })

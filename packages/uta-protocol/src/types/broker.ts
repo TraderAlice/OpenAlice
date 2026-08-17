@@ -271,7 +271,8 @@ export interface AccountInfo {
  * them end-to-end (every broker today except CCXT).
  *
  * The asymmetric case is CCXT separate-wallet venues (Binance: spot /
- * USDⓈ-M / COIN-M live behind distinct endpoints) and, in future, IBKR
+ * USDⓈ-M / COIN-M; Bitget Classic: spot / USDT-M live behind distinct
+ * endpoints) and, in future, IBKR
  * linked / FA accounts under one login. There the SAME connection spans
  * several trading compartments, so a READ can scope to one (or aggregate
  * across all) and a WRITE must name its target — placing an order is
@@ -534,7 +535,7 @@ export interface IBroker<TMeta = unknown> {
    * omits it is treated as having a single implicit 'default' sub-account, and
    * the `subAccountId` selector is ignored for it (every broker today except
    * CCXT separate-wallet venues). Implementations return >1 ONLY for genuinely
-   * separate-wallet venues (CCXT Binance: spot / USDⓈ-M / COIN-M). Trading
+   * separate-wallet venues (CCXT Binance and Bitget Classic). Trading
    * compartments only — funding / earn wallets are never enumerated.
    */
   listSubAccounts?(): Promise<SubAccountRef[]>

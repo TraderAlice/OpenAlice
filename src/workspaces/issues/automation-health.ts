@@ -24,7 +24,7 @@ export interface IssueAutomationHealth {
   latestTaskId?: string
 }
 
-export type IssueAutomationOwnerState = 'workspace' | 'ready' | 'missing' | 'retired' | 'unbound'
+export type IssueAutomationOwnerState = 'workspace' | 'ready' | 'missing' | 'retired' | 'deleted' | 'unbound'
 
 export interface IssueAutomationHealthInput {
   status: IssueStatus
@@ -50,10 +50,13 @@ export function issueAutomationHealth(input: IssueAutomationHealthInput): IssueA
     return { state: 'running', message: 'A scheduled run is in progress.', latestTaskId: latest.taskId }
   }
   if (input.ownerState === 'missing') {
-    return withLatest({ state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @workspace.' })
+    return withLatest({ state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @new-each-run.' })
   }
   if (input.ownerState === 'retired') {
     return withLatest({ state: 'blocked', message: 'Assigned Session is retired. Reassign the Issue before its next run.' })
+  }
+  if (input.ownerState === 'deleted') {
+    return withLatest({ state: 'blocked', message: 'Assigned Session is deleted. Reassign the Issue before its next run.' })
   }
   if (input.ownerState === 'unbound') {
     return withLatest({ state: 'blocked', message: 'Assigned Session has no resumable runtime conversation yet.' })

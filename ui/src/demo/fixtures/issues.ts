@@ -6,6 +6,7 @@ import type {
   IssueSnapshot,
 } from '../../api/issues'
 import { demoInboxEntries } from './inbox'
+import { demoTurnProgress } from './turn-progress'
 
 // GET /api/issues aggregates every workspace's declared issues by SCANNING
 // each workspace's `.alice/issues/<id>.md` dir (one markdown file per issue) —
@@ -45,7 +46,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           title: 'Morning movers scan',
           status: 'in_progress',
           priority: 'high',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
           agent: 'codex',
           when: { kind: 'cron', cron: '30 8 * * 1-5', timezone: 'America/New_York' },
           lastFiredAtMs: now - HOUR,
@@ -92,7 +93,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           title: 'Liquidity risk review',
           status: 'todo',
           priority: 'high',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
           nameCollision: true,
         },
       ],
@@ -108,7 +109,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           title: 'Weekly macro digest',
           status: 'in_progress',
           priority: 'medium',
-          assignee: '@workspace',
+          assignee: '@new-each-run',
           agent: 'codex',
           when: { kind: 'cron', cron: '0 16 * * 5', timezone: 'local' },
           lastFiredAtMs: now - 2 * DAY,
@@ -125,7 +126,7 @@ export const demoIssuesSnapshot: IssueSnapshot = {
           when: { kind: 'at', at: new Date(now + 3 * DAY).toISOString() },
           lastFiredAtMs: null,
           nextDueAtMs: now + 3 * DAY,
-          automationHealth: { state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @workspace.' },
+          automationHealth: { state: 'blocked', message: 'Assigned Session does not exist. Choose an active Session or @new-each-run.' },
         },
         // Completed work item.
         {
@@ -182,6 +183,8 @@ interface IssueDetailExtras {
   what?: string
   /** Scheduling frontmatter `agent` (adapter id), if set. */
   agent?: string
+  /** Comment-reply Input Prompt template, if set. */
+  commentPrompt?: string
   /** This issue's headless runs, newest-first (Activity feed). */
   runs: IssueRunRecord[]
 }
@@ -465,6 +468,7 @@ export function demoIssueDetail(wsId: string, id: string): IssueDetail | null {
       ...boardIssue,
       what,
       ...(extras?.agent ? { agent: extras.agent } : {}),
+      ...(extras?.commentPrompt ? { commentPrompt: extras.commentPrompt } : {}),
     },
     comments,
     runs,
@@ -507,8 +511,10 @@ export function demoIssueUpdate(
     boardIssue.assignee = patch.assignee
     if (patch.assignee.startsWith('@resume-')) {
       delete boardIssue.agent
+      delete boardIssue.credential
       delete boardIssue.model
       delete boardIssue.effort
+      // timeout is a run budget, not Session birth — keep it.
     }
   }
   if (patch.what !== undefined) {
@@ -519,6 +525,16 @@ export function demoIssueUpdate(
       existing.body = ''
     } else {
       demoIssueExtras[key] = { body: '', what: patch.what, runs: [] }
+    }
+  }
+  if (patch.commentPrompt !== undefined) {
+    const key = `${wsId}/${id}`
+    const existing = demoIssueExtras[key]
+    if (existing) {
+      if (patch.commentPrompt === null) delete existing.commentPrompt
+      else existing.commentPrompt = patch.commentPrompt
+    } else if (patch.commentPrompt !== null) {
+      demoIssueExtras[key] = { body: '', commentPrompt: patch.commentPrompt, runs: [] }
     }
   }
   if (patch.agent !== undefined) {
@@ -537,9 +553,27 @@ export function demoIssueUpdate(
     if (patch.model === null) delete boardIssue.model
     else boardIssue.model = patch.model
   }
+  if (patch.credential !== undefined) {
+    if (patch.credential === null) delete boardIssue.credential
+    else {
+      boardIssue.credential = patch.credential
+      delete boardIssue.credentialSource
+    }
+  }
+  if (patch.credentialSource !== undefined) {
+    if (patch.credentialSource === null) delete boardIssue.credentialSource
+    else {
+      boardIssue.credentialSource = patch.credentialSource
+      delete boardIssue.credential
+    }
+  }
   if (patch.effort !== undefined) {
     if (patch.effort === null) delete boardIssue.effort
     else boardIssue.effort = patch.effort
+  }
+  if (patch.timeout !== undefined) {
+    if (patch.timeout === null) delete boardIssue.timeout
+    else boardIssue.timeout = patch.timeout
   }
   return demoIssueDetail(wsId, id)
 }
@@ -565,7 +599,12 @@ export function demoIssueAddComment(
     author,
     at: new Date().toISOString(),
     markdown: text,
-    delivery: { state: 'pending' as const, targetResumeId: ownerResumeId, taskId },
+    delivery: {
+      state: 'pending' as const,
+      targetResumeId: ownerResumeId,
+      taskId,
+      progress: demoTurnProgress(),
+    },
   })
   demoIssueComments[key] = comments
   window.setTimeout(() => {
@@ -586,6 +625,36 @@ export function demoIssueAddComment(
       replyTo: commentId,
     })
   }, 900)
+  return demoIssueDetail(wsId, id)
+}
+
+/** POST-run backing: operator-started dispatch without requiring a failed last run. */
+export function demoIssueRunNow(wsId: string, id: string): IssueDetail | null {
+  const boardIssue = findBoardIssue(wsId, id)
+  const extras = demoIssueExtras[`${wsId}/${id}`]
+  if (!boardIssue?.when || boardIssue.status === 'done' || boardIssue.status === 'canceled') {
+    return null
+  }
+  const latest = extras?.runs[0]
+  if (latest?.status === 'running') return null
+  const run: IssueRunRecord = {
+    taskId: `demo-run-${Date.now()}`,
+    resumeId: `demo-resume-run-${Date.now()}`,
+    resumable: false,
+    wsId,
+    issueId: id,
+    agent: boardIssue.agent ?? extras?.agent ?? latest?.agent ?? 'codex',
+    prompt: extras?.runs[0]?.prompt ?? boardIssue.title,
+    status: 'running',
+    startedAt: Date.now(),
+  }
+  if (!extras) return null
+  extras.runs.unshift(run)
+  boardIssue.automationHealth = {
+    state: 'running',
+    message: 'A scheduled run is in progress.',
+    latestTaskId: run.taskId,
+  }
   return demoIssueDetail(wsId, id)
 }
 

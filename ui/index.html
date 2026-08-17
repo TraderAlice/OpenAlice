@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto" data-palette="paper" data-day-palette="paper" data-night-palette="graphite">
+<html lang="en" data-theme="auto" data-palette="paper" data-day-palette="paper" data-night-palette="graphite" data-ui-style="default" data-style-palette-mode="saved">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -12,16 +12,28 @@
       (function () {
         try {
           var raw = localStorage.getItem('openalice.theme.v1');
-          var state = raw ? (JSON.parse(raw).state || {}) : {};
+          var persisted = raw ? JSON.parse(raw) : {};
+          var state = persisted.state || {};
           var storedTheme = state.theme;
           var t = storedTheme === 'day' || storedTheme === 'night' || storedTheme === 'auto'
             ? storedTheme
             : storedTheme === 'light' ? 'day' : storedTheme === 'dark' ? 'night' : 'auto';
-          var palettes = ['paper', 'porcelain', 'linen', 'graphite', 'midnight', 'moss', 'iris'];
+          var palettes = ['paper', 'porcelain', 'linen', 'windows-classic', 'graphite', 'midnight', 'moss', 'iris'];
           var storedDay = palettes.indexOf(state.dayPalette) >= 0 ? state.dayPalette : state.lightPalette;
           var storedNight = palettes.indexOf(state.nightPalette) >= 0 ? state.nightPalette : state.darkPalette;
           var day = palettes.indexOf(storedDay) >= 0 ? storedDay : 'paper';
           var night = palettes.indexOf(storedNight) >= 0 ? storedNight : 'graphite';
+          var uiStyles = ['default', 'win98', 'broker-classic'];
+          var uiStyle = uiStyles.indexOf(state.uiStyle) >= 0 ? state.uiStyle : 'default';
+          var stylePaletteMode = state.stylePaletteMode === 'recommended' ? 'recommended' : 'saved';
+          if ((persisted.version || 0) < 2 && day === 'windows-classic' && night === 'windows-classic') {
+            day = 'paper';
+            night = 'graphite';
+            stylePaletteMode = 'recommended';
+          }
+          var styleRecommended = stylePaletteMode === 'recommended' && uiStyle === 'win98';
+          var effectiveDay = styleRecommended ? 'windows-classic' : day;
+          var effectiveNight = styleRecommended ? 'windows-classic' : night;
           var effective = t === 'auto'
             ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'day')
             : t;
@@ -29,12 +41,16 @@
           root.dataset.theme = t;
           root.dataset.dayPalette = day;
           root.dataset.nightPalette = night;
-          root.dataset.palette = effective === 'night' ? night : day;
+          root.dataset.uiStyle = uiStyle;
+          root.dataset.stylePaletteMode = stylePaletteMode;
+          root.dataset.palette = effective === 'night' ? effectiveNight : effectiveDay;
         } catch (e) {
           var root = document.documentElement;
           root.dataset.theme = 'auto';
           root.dataset.dayPalette = 'paper';
           root.dataset.nightPalette = 'graphite';
+          root.dataset.uiStyle = 'default';
+          root.dataset.stylePaletteMode = 'saved';
           root.dataset.palette = 'paper';
         }
       })();

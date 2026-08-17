@@ -1,5 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 @import "./theme/palette.css";
+@import "./theme/style-profiles.css";
 
 /* Tailwind aliases for the semantic color card. The core names intentionally
    mirror Orca/shadcn; this does not import or require the shadcn component
@@ -53,6 +56,16 @@
   --color-backdrop: var(--backdrop);
   --color-code-background: var(--code-background);
   --color-report-canvas: var(--report-canvas);
+  --color-office-wall: var(--office-wall);
+  --color-office-wall-grain: var(--office-wall-grain);
+  --color-office-wall-crown: var(--office-wall-crown);
+  --color-office-trim: var(--office-trim);
+  --color-office-trim-shadow: var(--office-trim-shadow);
+  --color-office-floor: var(--office-floor);
+  --color-office-floor-plank: var(--office-floor-plank);
+  --color-office-floor-sheen: var(--office-floor-sheen);
+  --color-office-label: var(--office-label);
+  --color-office-label-foreground: var(--office-label-foreground);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
@@ -214,11 +227,6 @@ body {
   to { opacity: 1; }
 }
 
-@keyframes oa-page-sidebar-enter {
-  from { transform: translateX(-100%); }
-  to { transform: none; }
-}
-
 @keyframes oa-disclosure-enter {
   from {
     opacity: 0;
@@ -241,6 +249,108 @@ body {
   }
 }
 
+@keyframes oa-suggestion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oa-tracked-graph-node-enter {
+  from {
+    opacity: 0;
+    transform: translate(var(--oa-graph-enter-x), var(--oa-graph-enter-y)) scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oa-tracked-graph-edge-enter {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes oa-tracked-graph-preview-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    border-color: var(--border);
+  }
+}
+
+.oa-tracked-graph-node {
+  transition: opacity var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-tracked-graph-preview-enter {
+  animation: oa-tracked-graph-preview-enter var(--motion-slow) var(--motion-ease-out) backwards;
+  transform-origin: bottom right;
+}
+
+.oa-tracked-graph-node-enter {
+  animation: oa-tracked-graph-node-enter var(--motion-slow) var(--motion-ease-out) backwards;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.oa-tracked-graph-edge {
+  stroke-dasharray: 1;
+  animation: oa-tracked-graph-edge-enter var(--motion-slow) var(--motion-ease-out) backwards;
+  transition:
+    opacity var(--motion-standard) var(--motion-ease-standard),
+    stroke-width var(--motion-fast) var(--motion-ease-standard);
+}
+
+.oa-tracked-graph-node-mark {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.oa-tracked-graph-node[data-focus-state="active"] .oa-tracked-graph-node-mark {
+  transform: scale(1.14);
+}
+
+.oa-tracked-graph-node[data-focus-state="related"] .oa-tracked-graph-node-mark {
+  transform: scale(1.035);
+}
+
+.oa-tracked-graph-hover-halo,
+.oa-tracked-graph-label {
+  transition: opacity var(--motion-standard) var(--motion-ease-standard);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="1"],
+.oa-tracked-graph-edge[data-enter-phase="1"] {
+  animation-delay: calc(var(--motion-fast) / 4);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="2"],
+.oa-tracked-graph-edge[data-enter-phase="2"] {
+  animation-delay: calc(var(--motion-fast) / 2);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="3"],
+.oa-tracked-graph-edge[data-enter-phase="3"] {
+  animation-delay: calc(var(--motion-fast) - var(--motion-fast) / 4);
+}
+
+.oa-tracked-graph-node-enter[data-enter-phase="4"],
+.oa-tracked-graph-edge[data-enter-phase="4"] {
+  animation-delay: var(--motion-fast);
+}
+
 .oa-view-enter {
   animation: oa-view-enter var(--motion-standard) var(--motion-ease-out) both;
 }
@@ -253,13 +363,54 @@ body {
   animation: oa-backdrop-enter var(--motion-standard) ease-out both;
 }
 
-.oa-page-sidebar-dialog[open] {
-  animation: oa-page-sidebar-enter var(--motion-standard) var(--motion-ease-out) both;
+/* Keep direct pointer resizing attached to the cursor, then soften only the
+   primitive's discrete 200px -> 44px collapse snap. Panel classes are applied
+   to react-resizable-panels' nested content element, so this rule deliberately
+   targets the direct flex item from the product-owned group seam. */
+.oa-page-sidebar-resizable[data-collapse-motion="armed"]
+  > [data-panel][data-collapse-state] {
+  transition: flex-grow var(--motion-standard) var(--motion-ease-out);
 }
 
-.oa-page-sidebar-dialog::backdrop {
-  background: var(--backdrop);
-  animation: oa-backdrop-enter var(--motion-standard) ease-out both;
+/* The expanded navigator keeps a hard 200px layout floor. Pointer travel past
+   that floor is represented as a damped, clipped overdrag: content retains its
+   layout width, the separator follows the resisted edge, and the working pane
+   shifts only for the duration of the gesture. Releasing before the commit
+   boundary uses a deliberately light spring; a committed gesture blends this
+   offset back into the primitive-owned 200px -> 44px collapse. */
+.oa-page-sidebar-resizable {
+  --oa-page-sidebar-overdrag: 0px;
+}
+
+.oa-page-sidebar-resizable > [data-page-sidebar-panel="navigator"] {
+  clip-path: inset(0 var(--oa-page-sidebar-overdrag) 0 0);
+}
+
+.oa-page-sidebar-resizable > [data-slot="resizable-handle"],
+.oa-page-sidebar-resizable > [data-page-sidebar-panel="content"] {
+  transform: translateX(calc(-1 * var(--oa-page-sidebar-overdrag)));
+}
+
+.oa-page-sidebar-resizable[data-overdrag-motion]
+  > [data-page-sidebar-panel="navigator"] {
+  transition: clip-path 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
+}
+
+.oa-page-sidebar-resizable[data-overdrag-motion]
+  > [data-slot="resizable-handle"],
+.oa-page-sidebar-resizable[data-overdrag-motion]
+  > [data-page-sidebar-panel="content"] {
+  transition: transform 240ms cubic-bezier(0.2, 1.3, 0.35, 1);
+}
+
+.oa-page-sidebar-resizable[data-overdrag-state="resisting"]
+  > [data-slot="resizable-handle"] {
+  background-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+}
+
+.oa-page-sidebar-resizable[data-overdrag-state="armed"]
+  > [data-slot="resizable-handle"] {
+  background-color: color-mix(in srgb, var(--primary) 78%, var(--border));
 }
 
 /* Page-owned navigators become touch surfaces inside the phone drawer.
@@ -297,6 +448,31 @@ body {
 .oa-popover-enter {
   transform-origin: top;
   animation: oa-popover-enter var(--motion-standard) var(--motion-ease-out) both;
+}
+
+.oa-suggestion-enter {
+  animation: oa-suggestion-enter var(--motion-standard) var(--motion-ease-out) backwards;
+}
+
+.oa-sortable-placeholder {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+  outline: 1px dashed color-mix(in srgb, var(--primary) 32%, var(--border));
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+.oa-sortable-placeholder > * {
+  visibility: hidden;
+}
+
+.oa-sortable-overlay {
+  pointer-events: none;
+  z-index: 80;
+  will-change: transform;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: var(--secondary);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 
 /* ==================== Typography scale ====================
@@ -599,10 +775,17 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-view-enter,
   .oa-dialog-surface,
   .oa-dialog-backdrop,
-  .oa-page-sidebar-dialog[open],
-  .oa-page-sidebar-dialog::backdrop,
   .oa-disclosure-enter,
-  .oa-popover-enter {
+  .oa-popover-enter,
+  .oa-suggestion-enter {
+    animation: none;
+  }
+  .oa-sortable-overlay {
+    box-shadow: none;
+  }
+  .oa-tracked-graph-node-enter,
+  .oa-tracked-graph-edge,
+  .oa-tracked-graph-preview-enter {
     animation: none;
   }
   .oa-pressable,
@@ -612,6 +795,13 @@ html[lang="ja"] .oa-onboarding-title {
   .oa-nav-row,
   .oa-nav-icon,
   .oa-status-surface {
+    transition-duration: 0.01ms;
+  }
+  .oa-tracked-graph-node,
+  .oa-tracked-graph-edge,
+  .oa-tracked-graph-node-mark,
+  .oa-tracked-graph-hover-halo,
+  .oa-tracked-graph-label {
     transition-duration: 0.01ms;
   }
   .oa-pressable:hover,
@@ -686,52 +876,100 @@ html[lang="ja"] .oa-onboarding-title {
   display: none;               /* Chromium / WebKit */
 }
 
-/* Markdown content inside assistant messages */
-/* Prose base size — the single knob for all markdown surfaces (chat,
-   inbox comment, doc preview, file viewer). Headings/lists use `em` so
-   they scale off this. Without it, markdown inherits the browser default
-   16px, which reads oversized next to the 12–13px UI chrome. Being
-   tuned empirically; candidate prose tier for the semantic scale. */
+/* ==================== Markdown typography ====================
+   Messages and documents share parsing and element semantics, but not density.
+   The default remains compact enough for chat/runtime surfaces; the reading
+   modifier is used by durable Markdown reports and issue documents. */
 .markdown-content {
-  font-size: 15px;
+  --markdown-font-size: 15px;
+  --markdown-leading: 1.65;
+  color: inherit;
+  font-size: var(--markdown-font-size);
+  line-height: var(--markdown-leading);
   overflow-wrap: break-word;
+  word-break: normal;
 }
-.markdown-content p {
-  margin: 0.5em 0;
-  text-wrap: pretty;
-}
-.markdown-content p:first-child {
+
+.markdown-content > :first-child {
   margin-top: 0;
 }
-.markdown-content p:last-child {
+
+.markdown-content > :last-child {
   margin-bottom: 0;
 }
-.markdown-content pre {
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  margin: 8px 0;
-  font-size: 13px;
+
+.markdown-content p {
+  margin: 0.65em 0;
+  text-wrap: pretty;
 }
+
+.markdown-content strong {
+  color: color-mix(in srgb, var(--foreground) 94%, var(--muted-foreground));
+  font-weight: 650;
+}
+
+.markdown-content del {
+  color: var(--muted-foreground);
+  text-decoration-thickness: 1px;
+}
+
+.markdown-content kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-inline: 0.08em;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--secondary) 76%, var(--card));
+  padding: 0.05em 0.38em;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  line-height: 1.45;
+  vertical-align: 0.08em;
+}
+
+.markdown-content hr {
+  height: 0;
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.markdown-content pre {
+  margin: 0.75em 0;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--background);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
 .markdown-content code {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 0.86em;
 }
+
 .markdown-content :not(pre) > code {
-  background: var(--muted);
-  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 4px;
+  background: var(--code-background);
+  padding: 0.12em 0.38em;
   overflow-wrap: anywhere;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
+
 .markdown-content ul,
 .markdown-content ol {
-  padding-left: 1.5em;
-  margin: 0.5em 0;
+  margin: 0.7em 0;
+  padding-left: 1.4em;
 }
+
 /* Tailwind preflight resets list-style to none — restore markers. */
 .markdown-content ul {
   list-style: disc;
@@ -739,13 +977,30 @@ html[lang="ja"] .oa-onboarding-title {
 .markdown-content ol {
   list-style: decimal;
 }
+
 .markdown-content li {
-  margin: 0.25em 0;
+  margin: 0.3em 0;
+  padding-left: 0.12em;
   text-wrap: pretty;
 }
-.markdown-content li::marker {
-  color: var(--muted-foreground);
+
+.markdown-content li > ul,
+.markdown-content li > ol {
+  margin-block: 0.3em;
 }
+
+.markdown-content li::marker {
+  color: color-mix(in srgb, var(--muted-foreground) 82%, transparent);
+}
+
+.markdown-content input[type="checkbox"] {
+  width: 0.95em;
+  height: 0.95em;
+  margin: 0 0.45em 0 0;
+  accent-color: var(--primary);
+  vertical-align: -0.08em;
+}
+
 /* Obsidian-style [[name]] wikilinks → clickable entity references. */
 .markdown-content a.wikilink {
   display: inline-block;
@@ -774,58 +1029,272 @@ html[lang="ja"] .oa-onboarding-title {
   background: color-mix(in srgb, currentColor 10%, transparent);
   text-decoration: underline;
 }
+
 .markdown-content blockquote {
-  border-left: 3px solid var(--primary);
-  padding-left: 12px;
-  color: var(--muted-foreground);
-  margin: 0.5em 0;
+  margin: 0.9em 0;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 72%, var(--border));
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  padding: 0.65em 0.9em;
+  color: color-mix(in srgb, var(--foreground) 72%, var(--muted-foreground));
 }
+
+.markdown-content blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-table-shell {
+  max-width: 100%;
+  margin: 0.9em 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--card) 52%, transparent);
+  overscroll-behavior-inline: contain;
+}
+
 .markdown-content table {
-  border-collapse: collapse;
-  margin: 8px 0;
   width: 100%;
+  min-width: 34rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+  font-size: 0.9em;
+  line-height: 1.5;
 }
+
 .markdown-content th,
 .markdown-content td {
-  border: 1px solid var(--border);
-  padding: 6px 12px;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  padding: 0.65em 0.8em;
   text-align: left;
+  vertical-align: top;
 }
+
+.markdown-content tr > :last-child {
+  border-right: 0;
+}
+
+.markdown-content tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
 .markdown-content th {
-  background: var(--muted);
+  background: color-mix(in srgb, var(--muted) 58%, var(--card));
+  color: var(--foreground);
+  font-size: 0.9em;
+  font-weight: 650;
+  white-space: nowrap;
 }
+
+.markdown-content tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+}
+
 .markdown-content img {
   max-width: 100%;
+  height: auto;
+  margin: 1em auto;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
   border-radius: 8px;
-  margin: 8px 0;
 }
+
 .markdown-content a {
   color: var(--primary);
-  text-decoration: none;
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 36%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
   overflow-wrap: anywhere;
 }
+
 .markdown-content a:hover {
-  text-decoration: underline;
+  text-decoration-color: currentColor;
 }
+
 .markdown-content h1 {
-  font-size: 1.25em;
-  font-weight: 600;
-  margin: 0.75em 0 0.5em;
+  margin: 1.2em 0 0.55em;
+  color: var(--foreground);
+  font-size: 1.45em;
+  font-weight: 680;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
 }
+
 .markdown-content h2 {
-  font-size: 1.125em;
-  font-weight: 600;
-  margin: 0.75em 0 0.5em;
+  margin: 1.25em 0 0.5em;
+  color: var(--foreground);
+  font-size: 1.22em;
+  font-weight: 670;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }
+
 .markdown-content h3 {
-  font-size: 1em;
-  font-weight: 600;
-  margin: 0.5em 0 0.25em;
+  margin: 1em 0 0.4em;
+  color: var(--foreground);
+  font-size: 1.05em;
+  font-weight: 650;
+  line-height: 1.4;
 }
+
+.markdown-content h4 {
+  margin: 0.95em 0 0.35em;
+  color: var(--foreground);
+  font-size: 1em;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .markdown-content h1:first-child,
 .markdown-content h2:first-child,
-.markdown-content h3:first-child {
+.markdown-content h3:first-child,
+.markdown-content h4:first-child {
   margin-top: 0;
+}
+
+/* Durable reports use a narrower measure, clearer section rhythm, and slightly
+   larger text. This is deliberately not a card: the document remains the one
+   dominant surface inside the existing application shell. */
+.markdown-content--reading {
+  --markdown-font-size: 15px;
+  --markdown-leading: 1.72;
+  color: color-mix(in srgb, var(--foreground) 84%, var(--muted-foreground));
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+
+.markdown-content--reading p {
+  margin-block: 0.82em;
+}
+
+.markdown-content--reading strong {
+  font-weight: 620;
+}
+
+/* Long CJK italics are difficult to scan and commonly appear as report decks.
+   Treat a first-paragraph, all-emphasis block as editorial standfirst text. */
+.markdown-content--reading > p:first-of-type:has(> em:only-child) {
+  max-width: 44rem;
+  margin: 0 0 2.2rem;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 58%, var(--border));
+  padding-left: 1rem;
+  color: color-mix(in srgb, var(--foreground) 70%, var(--muted-foreground));
+  font-size: 0.98em;
+  line-height: 1.78;
+}
+
+.markdown-content--reading > p:first-of-type:has(> em:only-child) em {
+  font-style: normal;
+}
+
+.markdown-content--reading h1 {
+  max-width: 100%;
+  margin-bottom: 1.35rem;
+  font-size: clamp(1.45rem, 2.3vw, 1.75rem);
+  font-weight: 660;
+  line-height: 1.24;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+
+.markdown-content--reading h2 {
+  margin-top: 2.6em;
+  margin-bottom: 0.75em;
+  border-top: 1px solid color-mix(in srgb, var(--border) 64%, transparent);
+  padding-top: 0.85em;
+  font-size: 1.24em;
+  font-weight: 660;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+}
+
+.markdown-content--reading h3 {
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+  font-size: 1.04em;
+  font-weight: 650;
+}
+
+.markdown-content--reading h4 {
+  margin-top: 1.35em;
+}
+
+.markdown-content--reading hr {
+  width: min(100%, 10rem);
+  margin: 2.25em 0;
+  border-top-color: color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.markdown-content--reading blockquote {
+  margin-block: 1.35em;
+  padding: 0.8em 1em;
+  font-size: 0.94em;
+  line-height: 1.65;
+}
+
+.markdown-content--reading ul,
+.markdown-content--reading ol {
+  margin-block: 0.8em;
+  padding-left: 1.35em;
+}
+
+.markdown-content--reading li {
+  margin-block: 0.34em;
+  padding-left: 0.12em;
+}
+
+.markdown-content--reading .markdown-table-shell {
+  margin-block: 1.25em 1.8em;
+  border-color: color-mix(in srgb, var(--border) 72%, transparent);
+  background: transparent;
+}
+
+.markdown-content--reading table {
+  font-size: 0.84em;
+  line-height: 1.42;
+}
+
+.markdown-content--reading th,
+.markdown-content--reading td {
+  padding: 0.58em 0.72em;
+}
+
+.markdown-content--reading th {
+  background: color-mix(in srgb, var(--muted) 38%, var(--card));
+  font-size: 0.88em;
+  font-weight: 620;
+}
+
+.markdown-content--reading .code-block-wrapper {
+  margin-block: 1.35em;
+}
+
+@media (max-width: 639px) {
+  .markdown-content--reading {
+    --markdown-font-size: 14.5px;
+    --markdown-leading: 1.7;
+  }
+
+  .markdown-content--reading h1 {
+    font-size: 1.45rem;
+  }
+
+  .markdown-content--reading h2 {
+    font-size: 1.2em;
+  }
+
+  .markdown-content table {
+    min-width: 30rem;
+  }
 }
 
 /* Issue What visual editor. Tiptap owns the editable DOM, while these rules

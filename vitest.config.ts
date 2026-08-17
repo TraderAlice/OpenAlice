@@ -18,6 +18,11 @@ const workspaceAliases = {
   '@traderalice/uta-protocol': resolve(__dirname, './packages/uta-protocol/src/index.ts'),
 }
 
+const uiAliases = {
+  ...workspaceAliases,
+  '@': resolve(__dirname, './ui/src'),
+}
+
 export default defineConfig({
   resolve: {
     alias: workspaceAliases,
@@ -38,7 +43,7 @@ export default defineConfig({
       },
       {
         resolve: {
-          alias: workspaceAliases,
+          alias: uiAliases,
         },
         test: {
           name: 'ui',

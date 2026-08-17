@@ -23,7 +23,7 @@ vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
     workspaces: mocks.workspaces,
     defaultAgent: 'codex',
-    agents: [{ id: 'codex', kind: 'native' }],
+    agents: [{ id: 'codex', kind: 'agent' }, { id: 'pi', kind: 'agent' }],
     spawn: mocks.spawn,
     openAgentConfig: mocks.openAgentConfig,
     resumeSession: mocks.resumeSession,
@@ -72,6 +72,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('WorkspacePage identity', () => {
+  it('uses the Workspace runtime ahead of the installation fallback for a fresh Session', () => {
+    mocks.workspaces = [workspace({ defaultAgent: 'pi' })]
+    render(
+      <WorkspacePage
+        spec={{ kind: 'workspace', params: { wsId: 'chat-1' } }}
+        visible
+      />,
+    )
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 't', metaKey: true, bubbles: true }))
+    expect(mocks.spawn).toHaveBeenCalledWith('chat-1', { agent: 'pi' }, undefined)
+  })
+
   it('keeps the user-defined Workspace name primary in the header and runtime label', () => {
     render(
       <WorkspacePage
@@ -135,5 +148,39 @@ describe('WorkspacePage identity', () => {
     expect(mocks.workspaceViewProps).toHaveBeenCalledWith(expect.objectContaining({
       terminalHeaderActions: expect.anything(),
     }))
+  })
+
+  it('lets a paused TUI handoff own the pane without removing the page header', () => {
+    mocks.workspaces = [workspace({
+      displayName: 'Optical Networking Follow-up',
+      sessions: [{
+        id: 'paused-session',
+        resumeId: 'resume-paused',
+        wsId: 'chat-1',
+        agent: 'codex',
+        name: 'x4',
+        createdAt: '2026-07-31T00:00:00.000Z',
+        lastActiveAt: '2026-07-31T00:00:00.000Z',
+        state: 'paused',
+        surface: 'terminal',
+        pid: null,
+        startedAt: null,
+        title: null,
+      }],
+    })]
+
+    const { container } = render(
+      <WorkspacePage
+        spec={{ kind: 'workspace', params: { wsId: 'chat-1', sessionId: 'paused-session' } }}
+        visible
+      />,
+    )
+
+    const shell = container.querySelector('.workspace-page-shell')
+    expect(shell?.classList.contains('is-paused-canvas')).toBe(true)
+    expect(shell?.classList.contains('is-terminal-canvas')).toBe(false)
+    expect(screen.getByText('Optical Networking Follow-up').parentElement?.getAttribute('title'))
+      .toBe('Optical Networking Follow-up\nchat-jun30')
+    expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy()
   })
 })

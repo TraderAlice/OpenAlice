@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { SpawnContext } from '../cli-adapter.js';
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { cursorAdapter } from './cursor.js';
+import { grokAdapter } from './grok.js';
+import { ompAdapter } from './omp.js';
 import { opencodeAdapter } from './opencode.js';
 import { piAdapter } from './pi.js';
 import { shellAdapter } from './shell.js';
@@ -14,6 +17,8 @@ import { shellAdapter } from './shell.js';
  *   claude   → … -- <prompt>        (`--` terminator; claude accepts it interactive)
  *   codex    → … -- <prompt>        (`--` terminator; codex accepts it top-level)
  *   opencode → … --prompt <prompt>  (flag value; no terminator needed)
+ *   cursor   → … -- <prompt>        (`--` terminator; cursor-agent accepts it)
+ *   omp      → … -- <prompt>        (`--` terminator; 17.3.4 accepts it)
  *   pi       → … <prompt>           (bare trailing positional; pi REJECTS `--`)
  *   shell    → ignored              (no agent to receive a prompt)
  *
@@ -69,6 +74,27 @@ describe('interactive seed — composeCommand initialPrompt', () => {
       expect(argv).toEqual(['pi', PROMPT]);
       expect(argv).not.toContain('--');
     });
+
+    it('cursor: trailing `-- <prompt>`', () => {
+      const argv = cursorAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
+      expect(argv).toEqual(['cursor-agent', '--', PROMPT]);
+      expect(argv).not.toContain('-p');
+      expect(argv).not.toContain('agent');
+    });
+
+    it('grok: trailing `-- <prompt>` after --no-leader', () => {
+      const argv = grokAdapter.composeCommand(['grok'], ctx({ initialPrompt: PROMPT }));
+      expect(argv.slice(-2)).toEqual(['--', PROMPT]);
+      expect(argv).toContain('--no-leader');
+      expect(argv).not.toContain('-p');
+    });
+
+    it('omp: trailing `-- <prompt>`', () => {
+      const argv = ompAdapter.composeCommand(['claude'], ctx({ initialPrompt: PROMPT }));
+      expect(argv).toEqual(['omp', '--', PROMPT]);
+      expect(argv).not.toContain('-p');
+      expect(argv).not.toContain('--session-id');
+    });
   });
 
   describe('no prompt → no seed argument', () => {
@@ -80,6 +106,12 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     });
     it('pi', () => {
       expect(piAdapter.composeCommand([], ctx())).toEqual(['pi']);
+    });
+    it('cursor', () => {
+      expect(cursorAdapter.composeCommand([], ctx())).toEqual(['cursor-agent']);
+    });
+    it('omp', () => {
+      expect(ompAdapter.composeCommand([], ctx())).toEqual(['omp']);
     });
   });
 
@@ -105,6 +137,21 @@ describe('interactive seed — composeCommand initialPrompt', () => {
     it('opencode resume ignores the prompt', () => {
       const argv = opencodeAdapter.composeCommand([], ctx({ resume: RESUME, initialPrompt: PROMPT }));
       expect(argv).toContain('--session');
+      expect(argv).not.toContain(PROMPT);
+    });
+    it('cursor resume ignores the prompt', () => {
+      const argv = cursorAdapter.composeCommand(['cursor-agent'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
+      expect(argv).toEqual(['cursor-agent', '--resume', 'sess-1234abcd']);
+      expect(argv).not.toContain(PROMPT);
+    });
+    it('grok resume ignores the prompt', () => {
+      const argv = grokAdapter.composeCommand(['grok'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
+      expect(argv).toContain('--resume');
+      expect(argv).not.toContain(PROMPT);
+    });
+    it('omp resume ignores the prompt', () => {
+      const argv = ompAdapter.composeCommand(['omp'], ctx({ resume: RESUME, initialPrompt: PROMPT }));
+      expect(argv).toEqual(['omp', '--resume', 'sess-1234abcd']);
       expect(argv).not.toContain(PROMPT);
     });
   });

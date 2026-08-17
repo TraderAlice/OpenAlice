@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -125,6 +126,28 @@ const customPreset: Preset = {
   },
 }
 
+const cursorPreset: Preset = {
+  id: 'cursor-dashboard',
+  label: 'Cursor Dashboard',
+  description: 'Cursor Agent using a Cursor Dashboard API key',
+  category: 'official',
+  defaultName: 'Cursor Dashboard',
+  directAgentId: 'cursor',
+  hint: 'Consumed directly by Cursor Agent.',
+  setup: {
+    apiKeyLabel: 'Cursor Dashboard API key',
+    apiKeyHelp: 'Create a key in Cursor Dashboard.',
+    modelHelp: 'Choose a Cursor model.',
+  },
+  schema: {
+    type: 'object',
+    properties: {
+      apiKey: { type: 'string' },
+      model: { type: 'string', default: 'auto', oneOf: [{ const: 'auto', title: 'Auto' }] },
+    },
+  },
+}
+
 const agents: AgentInfo[] = [
   {
     id: 'claude',
@@ -153,6 +176,18 @@ const agents: AgentInfo[] = [
       },
     },
   })),
+  {
+    id: 'cursor',
+    displayName: 'Cursor Agent',
+    capabilities: {
+      parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess',
+      aiProvider: {
+        credentialSource: 'runtime-or-workspace',
+        wirePreference: [],
+        directVendors: ['cursor'],
+      },
+    },
+  },
 ]
 
 function setup() {
@@ -182,22 +217,31 @@ afterEach(() => {
 })
 
 describe('CredentialModal', () => {
-  it('uses the shared long-form dialog contract and restores the opener', () => {
+  it('uses the shared long-form dialog contract and restores the opener', async () => {
     const opener = document.createElement('button')
     opener.textContent = 'Open credentials'
     document.body.append(opener)
     opener.focus()
     const onClose = vi.fn()
 
-    const { unmount } = render(
-      <CredentialModal
-        mode="add"
-        presets={[openAiPreset]}
-        agents={agents}
-        onClose={onClose}
-        onSaved={vi.fn()}
-      />,
-    )
+    function Harness() {
+      const [open, setOpen] = useState(true)
+      if (!open) return null
+      return (
+        <CredentialModal
+          mode="add"
+          presets={[openAiPreset]}
+          agents={agents}
+          onClose={() => {
+            onClose()
+            setOpen(false)
+          }}
+          onSaved={vi.fn()}
+        />
+      )
+    }
+
+    render(<Harness />)
 
     const dialog = screen.getByRole('dialog', { name: 'Add credential' })
     const scrollArea = screen.getByTestId('credential-modal-scroll')
@@ -208,9 +252,8 @@ describe('CredentialModal', () => {
     expect(document.activeElement).toBe(screen.getByPlaceholderText('Search providers…'))
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(onClose).toHaveBeenCalledTimes(1)
-    unmount()
-    expect(document.activeElement).toBe(opener)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(document.activeElement).toBe(opener))
     opener.remove()
   })
 
@@ -256,6 +299,69 @@ describe('CredentialModal', () => {
     const testButton = screen.getByRole('button', { name: 'Test connection' }) as HTMLButtonElement
     expect(testButton.disabled).toBe(true)
     expect(testButton.title).toBe('Enter the custom API base URL.')
+  })
+
+  it('saves Cursor as an ordinary provider credential without a wire probe', async () => {
+    vi.mocked(api.config.addCredential).mockResolvedValue({ slug: 'cursor-1', vendor: 'cursor' })
+    const onSaved = vi.fn().mockResolvedValue(undefined)
+    render(
+      <CredentialModal
+        mode="add"
+        presets={[cursorPreset]}
+        agents={agents}
+        initialPresetId={cursorPreset.id}
+        onClose={vi.fn()}
+        onSaved={onSaved}
+      />,
+    )
+
+    expect(screen.getByText('Cursor Agent')).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('Cursor default endpoint'), { target: { value: 'https://api.cursor.example' } })
+    fireEvent.change(screen.getByPlaceholderText('Enter API key'), { target: { value: 'cursor-key' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.config.addCredential).toHaveBeenCalledWith({
+      vendor: 'cursor',
+      wires: {},
+      baseUrl: 'https://api.cursor.example',
+      apiKey: 'cursor-key',
+      lastModel: 'auto',
+    }))
+    expect(api.config.testCredential).not.toHaveBeenCalled()
+    expect(onSaved).toHaveBeenCalled()
+  })
+
+  it('can clear a Cursor endpoint override and return to the runtime default', async () => {
+    vi.mocked(api.config.updateCredential).mockResolvedValue(undefined)
+    render(
+      <CredentialModal
+        mode="edit"
+        cred={{
+          slug: 'cursor-1',
+          vendor: 'cursor',
+          authType: 'api-key',
+          wires: {},
+          baseUrl: 'https://api.cursor.example',
+          apiKey: 'cursor-key',
+          hasApiKey: true,
+          lastModel: 'auto',
+        }}
+        presets={[cursorPreset]}
+        agents={agents}
+        onClose={vi.fn()}
+        onSaved={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Cursor default endpoint'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.config.updateCredential).toHaveBeenCalledWith('cursor-1', expect.objectContaining({
+      vendor: 'cursor',
+      wires: {},
+      baseUrl: '',
+      lastModel: 'auto',
+    })))
   })
 
   it('can open directly on a provided onboarding test preset', async () => {

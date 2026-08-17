@@ -16,8 +16,8 @@ type AutomationItem = (typeof ITEMS)[number]
 
 /**
  * Automation sidebar — one row per supported automation surface. Task
- * declaration and scheduling live on Workspace issues; Runs and API expose the
- * execution side of that contract.
+ * declaration and scheduling live on Workspace issues; Runs and API expose
+ * the execution side of that contract. Occupancy is Office.
  */
 export function AutomationSidebar() {
   const focused = useWorkspace((state) => getFocusedTab(state)?.spec)

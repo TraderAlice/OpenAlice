@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type {
   ConnectorAdapterHealth,
+  ConnectorAttachment,
   InboxNotification,
 } from '@traderalice/connector-protocol'
 
@@ -62,7 +63,7 @@ export class AdapterHealthTracker {
 
 export function formatInboxNotification(notification: InboxNotification): string {
   const workspace = notification.workspaceLabel ?? notification.workspaceId
-  const provenance = formatProvenance(notification)
+  const provenance = formatInboxProvenance(notification)
   const parts = [
     `**${escapeMarkdown(notification.title)}**`,
     `Workspace: ${escapeMarkdown(workspace)}`,
@@ -75,7 +76,7 @@ export function formatInboxNotification(notification: InboxNotification): string
 
 export function formatPlainInboxNotification(notification: InboxNotification): string {
   const workspace = notification.workspaceLabel ?? notification.workspaceId
-  const provenance = formatProvenance(notification)
+  const provenance = formatInboxProvenance(notification)
   const parts = [notification.title, `Workspace: ${workspace}`]
   if (provenance) parts.push(`From: ${provenance}`)
   if (notification.body.trim()) parts.push('', truncate(notification.body.trim(), 1_600))
@@ -92,28 +93,30 @@ export interface DecodedConnectorAttachment {
 /** Decode and verify the Alice-produced attachment before handing bytes to a
  * platform SDK. Size and digest checks keep malformed loopback payloads from
  * becoming opaque Discord/Telegram upload failures. */
-export function decodeInboxAttachments(notification: InboxNotification): DecodedConnectorAttachment[] {
-  return (notification.attachments ?? []).map((attachment) => {
-    if (!isCanonicalBase64(attachment.contentBase64)) {
-      throw new Error(`Connector attachment is not valid base64: ${attachment.filename}`)
-    }
-    const content = Buffer.from(attachment.contentBase64, 'base64')
-    if (content.byteLength !== attachment.sizeBytes) {
-      throw new Error(`Connector attachment size mismatch: ${attachment.filename}`)
-    }
-    const digest = createHash('sha256').update(content).digest('hex')
-    if (digest !== attachment.contentSha256) {
-      throw new Error(`Connector attachment digest mismatch: ${attachment.filename}`)
-    }
-    return {
-      filename: attachment.filename,
-      mediaType: attachment.mediaType,
-      content,
-    }
-  })
+export function decodeConnectorAttachment(attachment: ConnectorAttachment): DecodedConnectorAttachment {
+  if (!isCanonicalBase64(attachment.contentBase64)) {
+    throw new Error(`Connector attachment is not valid base64: ${attachment.filename}`)
+  }
+  const content = Buffer.from(attachment.contentBase64, 'base64')
+  if (content.byteLength !== attachment.sizeBytes) {
+    throw new Error(`Connector attachment size mismatch: ${attachment.filename}`)
+  }
+  const digest = createHash('sha256').update(content).digest('hex')
+  if (digest !== attachment.contentSha256) {
+    throw new Error(`Connector attachment digest mismatch: ${attachment.filename}`)
+  }
+  return {
+    filename: attachment.filename,
+    mediaType: attachment.mediaType,
+    content,
+  }
 }
 
-function formatProvenance(notification: InboxNotification): string | undefined {
+export function decodeInboxAttachments(notification: InboxNotification): DecodedConnectorAttachment[] {
+  return (notification.attachments ?? []).map(decodeConnectorAttachment)
+}
+
+export function formatInboxProvenance(notification: InboxNotification): string | undefined {
   const actor = notification.provenance?.actorLabel?.trim()
   const resumeId = notification.provenance?.resumeId?.trim()
   const signature = resumeId ? `@${resumeId}` : undefined

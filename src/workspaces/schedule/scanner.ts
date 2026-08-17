@@ -19,27 +19,34 @@
  * sight), `cron` from `now - interval` (catches an occurrence that just passed,
  * without firing immediately on creation OR never firing at all — seeding cron
  * from `now` makes `computeNextRun` always strictly future, i.e. never due).
- * Then `computeNextRun(when, base) <= now`. The marker is written only AFTER a
- * successful dispatch, so a capacity-rejected `every`/`at` fire retries next
- * tick; a `cron` fire rejected at its exact occurrence may skip to the next
- * occurrence (rare — needs the pool full at that minute).
+ * Then `computeNextRun(when, base) <= now`. The last-fired marker is written
+ * only AFTER a successful dispatch. Admission skips (`busy`, capacity) leave
+ * `every` due; cron defaults to the same catch-up, or consumes the slot when
+ * `catchUp: false`.
  */
 
-import { computeNextRun, type Schedule } from '../../core/schedule-expr.js'
-import type { CliAdapter, HeadlessRunOverrides } from '../cli-adapter.js'
+import { computeNextRun, scheduleCatchesUp, type Schedule } from '../../core/schedule-expr.js'
+import type { CliAdapter } from '../cli-adapter.js'
+import type { SessionRuntimeSelection } from '../session-runtime-binding.js'
 import type { Logger } from '../logger.js'
 import type { WorkspaceMeta, WorkspaceRegistry } from '../workspace-registry.js'
 import type { HeadlessTaskTrigger } from '../headless-task-registry.js'
+import type { SessionCreatedBy } from '../session-metadata.js'
 
 import {
   isFireable,
+  isTelegramConnectorIssue,
   issueAssigneeClaimsFirstSession,
   issueAssigneeResumeId,
   issueFirePrompt,
+  issueTimeoutMs,
   readWorkspaceIssues,
   type IssueRecord,
 } from '../issues/declaration.js'
-import { SCHEDULED_ISSUE_RUN_TIMEOUT_MS } from '../issues/run-failure.js'
+import {
+  extraTelegramConnectorDeskKeys,
+  findTelegramConnectorDesks,
+} from '../issues/telegram-connector.js'
 
 import {
   fireBase,
@@ -73,7 +80,9 @@ export class ScheduledIssueRunNowError extends Error {
 export interface MarkerStore {
   key(wsId: string, taskId: string): string
   get(wsId: string, taskId: string): number | undefined
+  getHeld(wsId: string, taskId: string): number | undefined
   set(wsId: string, taskId: string, ts: number): Promise<void>
+  hold(wsId: string, taskId: string, ts: number): Promise<void>
   prune(seenKeys: Set<string>): Promise<void>
 }
 
@@ -86,17 +95,20 @@ export interface ScheduleScannerDeps {
     meta: WorkspaceMeta,
     adapter: CliAdapter,
     prompt: string,
-    timeoutMs: number,
+    timeoutMs?: number,
     /** Composite source of the dispatch. Execution may happen elsewhere. */
     trigger?: HeadlessTaskTrigger,
     /** Product Session to continue. Omitted means allocate a fresh Session. */
     resumeId?: string,
     /** Optional reverse-link metadata; scheduler leaves this absent. */
     inquiry?: undefined,
-    /** One-run model/effort selection inherited from Issue frontmatter. */
-    overrides?: HeadlessRunOverrides,
+    /** Fresh-Session credential/model/effort selection inherited from Issue frontmatter. */
+    selection?: SessionRuntimeSelection,
+    conversation?: undefined,
+    /** Birth stamp when this fire allocates a new product Session. */
+    createdBy?: SessionCreatedBy,
   ) => Promise<{ taskId: string; resumeId: string }>
-  /** Persist @new -> exact @resumeId after the first fresh dispatch. */
+  /** Persist @new-then-resume -> exact @resumeId after the first fresh dispatch. */
   claimFreshSession?: (input: {
     issueWorkspace: WorkspaceMeta
     issueId: string
@@ -154,9 +166,9 @@ export class ScheduleScanner {
   }
 
   /** Dispatch one scheduled Issue immediately without touching its firing
-   * marker. This is the authoritative manual-retry path: it re-reads the live
-   * Issue and reuses the exact prompt, owner, runtime, and timeout used by the
-   * scanner, while preserving the next scheduled occurrence. */
+   * marker. This is the authoritative manual-run / retry path: it re-reads the
+   * live Issue and reuses the exact prompt, owner, runtime, and optional timeout used by
+   * the scanner, while preserving the next scheduled occurrence. */
   async runIssueNow(wsId: string, issueId: string): Promise<{ taskId: string }> {
     const ws = this.deps.registry.get(wsId)
     if (!ws) throw new ScheduledIssueRunNowError('not_found', 'Workspace not found.')
@@ -166,13 +178,26 @@ export class ScheduleScanner {
     const issue = res.issues.find((candidate) => candidate.id === issueId)
     if (!issue) throw new ScheduledIssueRunNowError('not_found', 'Issue not found.')
     if (!issue.when) {
-      throw new ScheduledIssueRunNowError('not_scheduled', 'Only scheduled Issues can be retried.')
+      throw new ScheduledIssueRunNowError('not_scheduled', 'Only scheduled Issues can be run now.')
     }
     if (!isFireable(issue)) {
       throw new ScheduledIssueRunNowError(
         'not_fireable',
-        `This Issue is ${issue.status}; reopen it before retrying.`,
+        `This Issue is ${issue.status}; reopen it before running.`,
       )
+    }
+    if (isTelegramConnectorIssue(issue)) {
+      const extras = extraTelegramConnectorDeskKeys(
+        await findTelegramConnectorDesks(
+          this.deps.registry.list().map((item) => ({ id: item.id, dir: item.dir })),
+        ),
+      )
+      if (extras.has(`${ws.id}:${issue.id}`)) {
+        throw new ScheduledIssueRunNowError(
+          'not_fireable',
+          'Only one Telegram phone-desk Issue may fire in this Alice Project.',
+        )
+      }
     }
 
     return this.dispatchIssue(
@@ -183,6 +208,7 @@ export class ScheduleScanner {
       issueRunOverrides(issue),
       issueAssigneeResumeId(issue.assignee) ?? undefined,
       issueAssigneeClaimsFirstSession(issue.assignee),
+      issueTimeoutMs(issue.timeout),
       true,
     )
   }
@@ -216,8 +242,13 @@ export class ScheduleScanner {
     const seen = new Set<string>()
     try {
       // registry.list() order is preserved by Promise.all → stable display order.
+      const extraDesks = extraTelegramConnectorDeskKeys(
+        await findTelegramConnectorDesks(
+          this.deps.registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })),
+        ),
+      )
       const workspaces = await Promise.all(
-        this.deps.registry.list().map((ws) => this.scanWorkspace(ws, nowMs, seen)),
+        this.deps.registry.list().map((ws) => this.scanWorkspace(ws, nowMs, seen, extraDesks)),
       )
       await this.deps.markers.prune(seen)
       this.lastSnapshot = { workspaces }
@@ -235,6 +266,7 @@ export class ScheduleScanner {
     ws: WorkspaceMeta,
     nowMs: number,
     seen: Set<string>,
+    extraDesks: ReadonlySet<string>,
   ): Promise<ScheduleSnapshotWorkspace> {
     let res
     try {
@@ -263,40 +295,47 @@ export class ScheduleScanner {
       // No `when` ⇒ pure board work item; the scanner does not touch it.
       const when = issue.when
       if (!when) continue
+      if (isTelegramConnectorIssue(issue) && extraDesks.has(`${ws.id}:${issue.id}`)) continue
       seen.add(this.deps.markers.key(ws.id, issue.id))
       if (isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)) {
         await this.fire(
           ws,
           issue.id,
+          when,
           issueFirePrompt(issue),
           issue.agent,
           issueRunOverrides(issue),
           issueAssigneeResumeId(issue.assignee) ?? undefined,
           issueAssigneeClaimsFirstSession(issue.assignee),
+          issueTimeoutMs(issue.timeout),
           nowMs,
         )
       }
       // Read the marker AFTER any fire so last/next reflect a just-fired run.
       const last = this.deps.markers.get(ws.id, issue.id) ?? null
-      tasks.push(snapshotScheduledIssue(issue, when, last, nowMs, this.intervalMs))
+      const held = this.deps.markers.getHeld(ws.id, issue.id) ?? null
+      tasks.push(snapshotScheduledIssue(issue, when, last, nowMs, this.intervalMs, held))
     }
     return { wsId: ws.id, tag: ws.tag, status: 'ok', tasks }
   }
 
   private isDue(wsId: string, taskId: string, when: Schedule, nowMs: number): boolean {
     const last = this.deps.markers.get(wsId, taskId) ?? null
-    const next = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs))
+    const held = this.deps.markers.getHeld(wsId, taskId) ?? null
+    const next = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs, held))
     return next !== null && next <= nowMs
   }
 
   private async fire(
     issueWorkspace: WorkspaceMeta,
     taskId: string,
+    when: Schedule,
     what: string,
     agentId: string | undefined,
-    overrides: HeadlessRunOverrides | undefined,
+    selection: SessionRuntimeSelection | undefined,
     resumeId: string | undefined,
     claimFreshSession: boolean,
+    timeoutMs: number | undefined,
     nowMs: number,
   ): Promise<void> {
     try {
@@ -305,9 +344,10 @@ export class ScheduleScanner {
         taskId,
         what,
         agentId,
-        overrides,
+        selection,
         resumeId,
         claimFreshSession,
+        timeoutMs,
       )
       await this.deps.markers.set(issueWorkspace.id, taskId, nowMs)
       this.deps.logger.info('schedule.fired', {
@@ -318,8 +358,9 @@ export class ScheduleScanner {
         ...(resumeId ? { resumeId } : {}),
       })
     } catch (err) {
-      // Capacity full (or transient) - do NOT mark; the task stays due and
-      // retries on the next tick once a headless slot frees.
+      // Capacity / busy: every stays due with no marker. Cron catch-up holds
+      // the occurrence; calendar-only cron consumes it.
+      await this.noteCronMiss(issueWorkspace.id, taskId, when, nowMs)
       this.deps.logger.info('schedule.fire_skipped', {
         wsId: issueWorkspace.id,
         taskId,
@@ -328,14 +369,37 @@ export class ScheduleScanner {
     }
   }
 
+  private async noteCronMiss(
+    wsId: string,
+    taskId: string,
+    when: Schedule,
+    nowMs: number,
+  ): Promise<void> {
+    if (when.kind !== 'cron') return
+    const last = this.deps.markers.get(wsId, taskId) ?? null
+    const held = this.deps.markers.getHeld(wsId, taskId) ?? null
+    const dueAt = computeNextRun(when, fireBase(when, last, nowMs, this.intervalMs, held))
+    if (dueAt === null || dueAt > nowMs) return
+    if (!scheduleCatchesUp(when)) {
+      // Calendar-only means "the next future calendar occurrence", not "walk
+      // every stale slot one scanner tick at a time". Advancing only to dueAt
+      // would replay an entire backlog after sleep/downtime whenever admission
+      // remained blocked. Use the current scan time as the consumed cursor.
+      await this.deps.markers.hold(wsId, taskId, nowMs)
+      return
+    }
+    if (last === null) await this.deps.markers.hold(wsId, taskId, dueAt - 1)
+  }
+
   private async dispatchIssue(
     issueWorkspace: WorkspaceMeta,
     issueId: string,
     what: string,
     agentId?: string,
-    overrides?: HeadlessRunOverrides,
+    selection?: SessionRuntimeSelection,
     resumeId?: string,
     claimFreshSession = false,
+    timeoutMs?: number,
     manual = false,
   ): Promise<{ taskId: string }> {
     const dispatchKey = `${issueWorkspace.id}:${issueId}`
@@ -365,47 +429,64 @@ export class ScheduleScanner {
         workspaceId: issueWorkspace.id,
         issueId,
       }
+      // Fresh recruits only: exact @resumeId continues an existing Session.
+      const createdBy: SessionCreatedBy | undefined = resumeId
+        ? undefined
+        : {
+            kind: 'issue',
+            workspaceId: issueWorkspace.id,
+            issueId,
+            policy: claimFreshSession ? 'new-then-resume' : 'new-each-run',
+            fire: manual ? 'retry' : 'schedule',
+          }
       const result = resumeId
-        ? overrides
+        ? selection
           ? await this.deps.dispatch(
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
               resumeId,
               undefined,
-              overrides,
+              selection,
             )
           : await this.deps.dispatch(
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
               resumeId,
             )
-        : overrides
+        : selection
           ? await this.deps.dispatch(
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
               undefined,
               undefined,
-              overrides,
+              selection,
+              undefined,
+              createdBy,
             )
           : await this.deps.dispatch(
               executionWorkspace,
               adapter,
               what,
-              SCHEDULED_ISSUE_RUN_TIMEOUT_MS,
+              timeoutMs,
               trigger,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              createdBy,
             )
       if (claimFreshSession) {
         if (!this.deps.claimFreshSession) {
-          throw new Error('Issue @new ownership cannot be persisted in this runtime')
+          throw new Error('Issue @new-then-resume ownership cannot be persisted in this runtime')
         }
         try {
           await this.deps.claimFreshSession({
@@ -447,9 +528,11 @@ export class ScheduleScanner {
   }
 }
 
-function issueRunOverrides(issue: IssueRecord): HeadlessRunOverrides | undefined {
-  if (!issue.model && !issue.effort) return undefined
+function issueRunOverrides(issue: IssueRecord): SessionRuntimeSelection | undefined {
+  if (!issue.credential && !issue.credentialSource && !issue.model && !issue.effort) return undefined
   return {
+    ...(issue.credentialSource === 'native' ? { credentialSource: 'native' as const } : {}),
+    ...(issue.credential ? { credentialSlug: issue.credential } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { reasoningEffort: issue.effort } : {}),
   }

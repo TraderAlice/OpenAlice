@@ -5,6 +5,7 @@ and persistent-state layout. Update it when a top-level subsystem moves or a
 new long-lived process, package, or state root is introduced.
 
 Related guides: [[docs/managed-workspace-runtime.md]],
+[[docs/alice-project.md]],
 [[docs/model-semantics-and-runtime-injection.md]],
 [[docs/cli-installer.md]], [[docs/local-runtime.md]], [[docs/broker-packs.md]],
 [[docs/data-locations.md]],
@@ -16,6 +17,13 @@ Related guides: [[docs/managed-workspace-runtime.md]],
 
 ## Runtime Topology
 
+The top-level product unit is an **AliceProject**. One AliceProject owns one
+complete `OPENALICE_HOME`, one Guardian tree, one Alice backend, and one
+logical frontend endpoint. Browser windows attach to that endpoint; they are
+not additional backend instances. Multiple AliceProjects run concurrently by
+using separate complete homes. See [[docs/alice-project.md]] for identity,
+registry, discovery, and lifecycle semantics.
+
 OpenAlice has two principal long-running service processes plus an optional
 Connector Service supervised by Guardian:
 
@@ -24,7 +32,7 @@ Guardian
 ├── built Runtime control    versioned status + self-owned Server stop
 ├── Alice                    Workspace runtime + product/API process
 │   ├── Web UI transport     HTTP/Vite in dev, app:// + IPC in Electron
-│   ├── Workspace PTYs       claude / codex / opencode / pi / shell
+│   ├── Workspace PTYs       claude / codex / cursor-agent / grok / omp / opencode / pi / shell
 │   ├── ToolCenter           market, news, analysis, Inbox, UTA bridges
 │   └── file-backed state    config, sessions, issues, schedules, tool-call log
 ├── UTA                      broker carrier and trading authority
@@ -68,7 +76,7 @@ src/                           Alice process
 ├── tool/                      agent-facing tool definitions and bridges
 ├── workspaces/                launcher, PTYs, templates, adapters, issues,
 │   │                          schedules, CLI shims, file/git operations
-│   ├── adapters/              claude / codex / opencode / pi / shell
+│   ├── adapters/              claude / codex / cursor / grok / omp / opencode / pi / shell
 │   ├── cli/                   alice, alice-uta, alice-workspace, traderhub
 │   └── templates/             built-in Chat and pinned AutoQuant V2 Harnesses
 ├── services/
@@ -101,9 +109,9 @@ docs/                          owner guides and contributor documentation
 
 The model execution loop is not in `src/ai-providers/`. Native coding-agent
 CLIs own their model loops. Alice's provider catalog describes credential and
-wire suggestions plus curated model semantics; Workspace credential injection
+wire suggestions plus curated model semantics; a Workspace Session binding
 combines credential access, model selection, and those semantics before each
-adapter projects the result into the target CLI's native configuration. Follow
+adapter projects the result into one target CLI process. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for that boundary.
 
 ## Workspace Architecture
@@ -124,10 +132,15 @@ Chat uses that boundary deliberately:
 
 - **New conversation** creates a Session inside the recent Chat Workspace.
 - **New Workspace** explicitly creates a new durable context container.
+- A new Alice Project with no Chat Workspace first shows **Initialize Ask
+  Alice**, the same setup chrome as AutoQuant, without a pinned Harness
+  version. Initialize creates the stable starter workspace at the latest Chat
+  Harness, then the composer appears.
 - The global Ask Alice composer stores `quickChat.recentChatWorkspaceId` in
   `data/preferences.json`. A missing or stale pointer falls back to the most
   recently active Chat Workspace; only a user with no Chat Workspace gets a
-  new stable starter workspace.
+  new stable starter workspace (from that setup page, or as a fallback on
+  first send).
 - Chat navigation treats a Workspace as a potentially large conversation
   container. Its sidebar disclosure is a bounded recent/running preview; the
   Workspace page is the searchable, lifecycle-filtered catalog for the full
@@ -136,6 +149,28 @@ Chat uses that boundary deliberately:
 Do not reintroduce date-based automatic Chat Workspaces. A date is not a
 context boundary, and new daily repositories strand files, issues, git history,
 and agent configuration in yesterday's Workspace.
+
+Tracked is a global, file-backed index over those durable Workspaces:
+
+- `EntityStore` persists only deliberately registered asset/topic anchors.
+- `entity-backlinks.ts` scans authored `[[name]]` links in Workspace Markdown
+  and Issue notes; prose is never inferred into an edge.
+- the Tracked sidebar combines those global asset/topic anchors with the live
+  Workspace Issue index. Issues keep their canonical `workspaceId + issueId`
+  identity, render their complete Markdown body without the work-item controls,
+  and open the canonical Issues detail surface through the explicit Details
+  action; they are never copied into `EntityStore`. The active entity or Issue
+  is encoded in `/tracked` query parameters so refresh and browser Back restore
+  the same selection while retaining one Tracked tab.
+- the relationship graph is a read-time projection of those two canonical
+  sources. Shared notes bridge every registered entity they reference, while
+  unlinked entities and Issues remain visible. Selecting either an entity or
+  an Issue preserves the current Detail/Graph mode; in Graph mode both focus
+  their existing graph node and defer navigation to the preview's explicit
+  Details action. The graph has no second persisted index or layout state to
+  migrate.
+- opening a graph material node keeps the same Tracked provenance and return
+  path as opening it from the backlink detail list.
 
 AutoQuant uses the same durable Workspace boundary with a stricter entry rule:
 
@@ -155,6 +190,8 @@ Load-bearing paths:
 - `src/workspaces/service.ts` — Workspace lifecycle and composition.
 - `src/workspaces/session-pool.ts` — PTY process ownership.
 - `src/workspaces/session-registry.ts` — durable session metadata.
+- `src/workspaces/workspace-runtime-settings.ts` — versioned, secret-free
+  `.alice/settings.json` launch preferences.
 - `src/workspaces/scrollback-store.ts` — terminal replay.
 - `src/workspaces/template-registry.ts` — template declarations.
 - `src/workspaces/template-upgrade.ts` — reviewed managed-asset reconciliation
@@ -174,18 +211,20 @@ provenance link:
   identify the same stateful Session by this id.
 - `taskId` identifies one headless execution. Every follow-up turn gets a new
   task id, so run history remains append-only.
-- `SessionRecord.id` is Alice's durable interactive materialization key. Tabs,
-  PTY attachment, and pause/resume routes use it; it is not Session identity.
+- `SessionRecord.id` is Alice's durable launcher-owned roster/attachment key.
+  Every non-purged product Session receives one at the same birth boundary as
+  its `resumeId`; tabs, process attachment, and pause/resume routes use it, but
+  it is not the product Session identity.
 - `agentSessionId` is the backend-only native CLI conversation id. The
   `ResumeRegistry` maps `resumeId` to this adapter-specific value; it must not
   appear in frontend resume requests or Inbox provenance.
-- `sourceRunId` is present when a finished headless run has been materialized
-  as an interactive Session and preserves execution provenance.
+- `sourceRunId` preserves the first associated headless execution provenance.
 
-Do not use a headless task id directly as a PTY/session id, and do not create a
-new interactive materialization every time the same `resumeId` is opened. The
-run is execution provenance; `resumeId` is the product Session; the
-`SessionRecord` is one durable interactive surface.
+Do not use a headless task id directly as a roster or process-attachment id,
+and do not create another `SessionRecord` when the same `resumeId` changes
+between headless, terminal, and WebPi execution. The run is execution
+provenance; `resumeId` is the product identity; `SessionRecord` is its one
+durable launcher-owned roster record.
 
 For the broader “ask the agent who produced this” model — including mutable
 Issues, Inbox deliveries, document revisions, reconstruction fallback, and
@@ -201,18 +240,24 @@ catalog in `template.json`; creation records the chosen immutable source in
 Workspace tools are exposed as CLI shims on `PATH`. The `alice*` and
 `traderhub` skills teach the native agents how to call those shims. Shared
 project skills are copied to `.agents/skills/` and Claude-specific discovery to
-`.claude/skills/`. Pi keeps providers in its normal user agent directory and
-selects a Workspace provider through `.pi/settings.json`; the shared runtime
-lifecycle also gives Workspaces without an explicit Pi theme the native
-`light/dark` automatic pair. OpenAlice never redirects Pi away from its native
-global packages, settings, auth, or sessions and never replaces an explicit Pi
+`.claude/skills/`. Managed Session provider/model/effort selection comes from
+`.alice/settings.json`, is frozen into `.alice/sessions/<resumeId>.json` as
+the `ai` object (a sibling `displayName` may name the coworker), and
+is projected into the child process by the adapter. Pi's deprecated native-config export
+registers an OpenAlice-managed provider through the Workspace-local
+`.pi/extensions/openalice-provider.ts` and selects it through `.pi/settings.json`;
+the sensitive provider definition and rollback state stay in
+`.pi/openalice-provider.json`. The shared runtime lifecycle also gives
+Workspaces without an explicit Pi theme the native `light/dark` automatic pair.
+OpenAlice never writes Pi's global model registry, redirects Pi away from its
+native global packages/settings/auth/sessions, or replaces an explicit Pi
 project theme.
-OpenCode keeps provider configuration in `opencode.json` and TUI configuration
-in its native `tui.json` project layer. The runtime lifecycle selects the
+OpenCode's deprecated provider export stays in `opencode.json`; TUI configuration
+remains in its native `tui.json` project layer. The runtime lifecycle selects the
 native `system` theme only when the project has no explicit OpenCode TUI or
 legacy theme config. Codex needs no project theme setting: it derives its
 palette directly from the terminal's OSC 10/11 replies.
-Claude Code and opencode keep reversible OpenAlice ownership metadata in
+The deprecated Claude Code and opencode exports keep reversible OpenAlice ownership metadata in
 `.claude/openalice-provider.json` and `.opencode/openalice-provider.json` so
 provider reset preserves unrelated native settings. Those files are sensitive
 and excluded from the Workspace repository.
@@ -254,9 +299,10 @@ issue/schedule -> headless Workspace run -> native agent -> inbox_push -> Inbox
 
 Inbox is the durable agent-to-user delivery surface. Agents publish reports or
 status by calling the injected `inbox_push` capability. Alice stamps the
-interactive Session or headless run identity out-of-band. The user can return
-to the exact originating interactive Session; a finished headless run is
-materialized once and then reused as a normal Session for follow-up.
+product Session and exact execution identity out-of-band. The user can return
+to the exact originating Session regardless of whether its first turn was
+headless or interactive; opening TUI/WebPi attaches a process to the existing
+durable Session record.
 
 ## Persistent State
 
@@ -306,9 +352,11 @@ Overrides:
 
 `data/` is the portable backup/migration unit. `sealing.key` deliberately
 lives beside it so a copied data directory does not carry its decryption key.
-Any upgrade-time transformation of persisted state belongs in
+The active migration chain starts after the 0.89.2-beta baseline. A
+transformation for a persisted shape that has shipped belongs in
 `src/migrations/`, must be idempotent, and must declare affected paths for the
-generated `src/migrations/INDEX.md`.
+generated `src/migrations/INDEX.md`. Unreleased development shapes are replaced
+directly and do not become permanent compatibility code.
 
 ## Change Routing
 

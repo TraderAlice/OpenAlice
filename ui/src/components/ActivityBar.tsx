@@ -1,5 +1,5 @@
 import { ChevronDown, Info, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { type Page } from '../App'
 import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
@@ -8,7 +8,11 @@ import { usePendingPushCount } from '../live/trading-push'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
-import { NAV_SECTIONS } from './activity-navigation'
+import { useAliceProject } from '../hooks/useAliceProject'
+import { useBetaFeatures } from '../live/beta-features'
+import { joinNavLayout, NAV_SECTIONS } from './activity-navigation'
+import { useUiLayout } from '../hooks/useUiLayout'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 /**
  * Map ActivityBar page enum (visual layout grouping) to the ActivitySection
@@ -29,6 +33,7 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'portfolio':            return 'portfolio'
     case 'issue':                return 'issue'
     case 'automation':           return 'automation'
+    case 'office':               return 'office'
     case 'news':                 return 'news'
   }
 }
@@ -85,6 +90,13 @@ export function ActivityBar({
   returnFocusRef,
 }: ActivityBarProps) {
   const { t } = useTranslation()
+  const { project } = useAliceProject()
+  const officeNav = useBetaFeatures((s) => s.office)
+  const { layout } = useUiLayout()
+  const navSections = useMemo(
+    () => joinNavLayout(NAV_SECTIONS, layout, { product: project?.product, office: officeNav }),
+    [layout, officeNav, project?.product],
+  )
   const selectedSidebar = useWorkspace((state) => state.selectedSidebar)
   const setSidebar = useWorkspace((state) => state.setSidebar)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
@@ -102,93 +114,10 @@ export function ActivityBar({
   const compactRail = desktopStatic && (forcedCompactRail || railCollapsed)
   const narrowRail = desktopStatic && railMode === 'narrow' && !compactRail
   const denseRail = desktopStatic && shortRailHeight
-  const mobileDrawerClosed = !desktopStatic && !open
-  const drawerRef = useRef<HTMLElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  const mobileDrawerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!open || desktopStatic) return
-    const drawer = drawerRef.current
-    if (!drawer) return
-
-    const previousFocus = returnFocusRef?.current
-      ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
-    const initialFocus = drawer.querySelector<HTMLElement>('[aria-current="page"]')
-      ?? drawerFocusableElements(drawer)[0]
-      ?? drawer
-    initialFocus.focus()
-
-    const handleDrawerKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCloseRef.current()
-        return
-      }
-      if (event.key !== 'Tab') return
-
-      const focusable = drawerFocusableElements(drawer)
-      if (focusable.length === 0) {
-        event.preventDefault()
-        drawer.focus()
-        return
-      }
-
-      const first = focusable[0]!
-      const last = focusable[focusable.length - 1]!
-      const active = document.activeElement
-      if (!drawer.contains(active)) {
-        event.preventDefault()
-        first.focus()
-      } else if (event.shiftKey && active === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', handleDrawerKeyDown)
-    return () => {
-      document.removeEventListener('keydown', handleDrawerKeyDown)
-      if (previousFocus?.isConnected) previousFocus.focus()
-    }
-  }, [desktopStatic, open, returnFocusRef])
-
-  return (
+  const railContent = (
     <>
-      {/* Backdrop — mobile only */}
-      <div
-        aria-hidden
-        className={`fixed inset-0 bg-backdrop z-40 md:hidden transition-opacity duration-200 motion-reduce:transition-none ${
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
-      />
-
-      {/* ActivityBar — Linear-style workspace rail. Mobile: slide-in over
-       *  page with backdrop. Desktop: static column flush left. */}
-      <aside
-        ref={drawerRef}
-        id="activity-bar"
-        data-testid="activity-bar"
-        role={!desktopStatic ? 'dialog' : undefined}
-        aria-modal={!desktopStatic && open ? 'true' : undefined}
-        aria-label={!desktopStatic ? t('nav.primaryNavigation') : undefined}
-        aria-hidden={mobileDrawerClosed}
-        inert={mobileDrawerClosed ? true : undefined}
-        tabIndex={!desktopStatic ? -1 : undefined}
-        className={`
-          w-[280px] ${compactRail ? 'md:w-[60px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
-          bg-muted
-          border-r border-border/80
-          fixed z-50 top-0 left-0 transition-[transform,width] duration-200 motion-reduce:transition-none
-          ${open ? 'translate-x-0' : '-translate-x-full'}
-          md:static md:translate-x-0 md:z-auto
-        `}
-      >
         {/* Branding — h-10 to line up with the Sidebar header and preserve
             the shell's 40px header rhythm. */}
         <div className={`${denseRail ? 'h-10 mb-2 md:h-7 md:mb-0.5' : 'h-10 mb-2'} flex items-center shrink-0 ${compactRail ? 'justify-center px-0' : narrowRail ? 'pl-[18px] pr-3 gap-2' : 'pl-[22px] pr-4 gap-2.5'}`}>
@@ -203,20 +132,20 @@ export function ActivityBar({
 
         {/* Navigation */}
         <nav className={`flex-1 flex flex-col overflow-x-hidden overflow-y-auto ${denseRail ? 'pb-3 md:pb-0.5' : 'pb-3'} ${compactRail ? 'px-2 md:items-center' : narrowRail ? 'px-2.5' : 'px-3'}`}>
-          {NAV_SECTIONS.map((section, si) => {
-            const labeled = section.sectionLabel.length > 0
+          {navSections.map((section, si) => {
+            const labeled = section.id !== 'primary'
             // User toggle wins over default. The collapse store stores
             // user's explicit preference (true/false); absence means
             // "fall back to defaultCollapsed". Once the user touches a
             // section, their preference is sticky.
-            const stored = labeled ? collapsedSections[section.sectionLabel] : undefined
+            const stored = labeled ? collapsedSections[section.id] : undefined
             const isCollapsed = labeled && (
               stored !== undefined ? stored : Boolean(section.defaultCollapsed)
             )
             const showItems = compactRail ? true : !isCollapsed
             return (
               <div
-                key={si}
+                key={section.id}
                 className={
                   compactRail && si > 0
                     ? `${denseRail ? 'mt-3 pt-3 md:mt-0.5 md:pt-0.5 md:w-8' : 'mt-3 pt-3 md:w-11'} border-t border-border/70`
@@ -233,16 +162,16 @@ export function ActivityBar({
                     description={section.descriptionKey ? t(section.descriptionKey) : undefined}
                     isCollapsed={isCollapsed}
                     onToggleCollapse={() => setCollapsed(
-                      section.sectionLabel,
+                      section.id,
                       !isCollapsed,
                       section.defaultCollapsed,
                     )}
-                    controlsId={`activity-section-${si}`}
+                    controlsId={`activity-section-${section.id}`}
                     showItems={showItems}
                   />
                 )}
                 {showItems && (
-                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${si}`}>
+                  <div className={`oa-disclosure-enter flex flex-col ${denseRail ? 'gap-1 md:gap-px' : 'gap-1'}`} id={`activity-section-${section.id}`}>
                     {section.items.map((item) => {
                       const sec = activitySectionFor(item.page)
                       const isActive = selectedSidebar === sec
@@ -333,26 +262,55 @@ export function ActivityBar({
             </button>
           )}
         </div>
-      </aside>
     </>
   )
-}
 
-const DRAWER_FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
+  const railClassName = `
+    w-[280px] ${compactRail ? 'md:w-[60px]' : narrowRail ? 'md:w-[152px]' : 'md:w-[188px]'} h-full flex flex-col shrink-0
+    bg-muted border-r border-border/80
+  `
 
-function drawerFocusableElements(drawer: HTMLElement): HTMLElement[] {
-  return [...drawer.querySelectorAll<HTMLElement>(DRAWER_FOCUSABLE_SELECTOR)]
-    .filter((element) => (
-      element.tabIndex >= 0 &&
-      element.closest('[hidden], [aria-hidden="true"], [inert]') === null
-    ))
+  if (desktopStatic) {
+    return (
+      <aside
+        id="activity-bar"
+        data-testid="activity-bar"
+        className={`${railClassName} static z-auto transition-[width] duration-200 motion-reduce:transition-none`}
+      >
+        {railContent}
+      </aside>
+    )
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose()
+      }}
+    >
+      <SheetContent
+        ref={mobileDrawerRef}
+        id="activity-bar"
+        data-testid="activity-bar"
+        side="left"
+        aria-modal="true"
+        aria-describedby={undefined}
+        showCloseButton={false}
+        className={`${railClassName} max-w-[85vw] gap-0 p-0 shadow-none motion-reduce:animate-none motion-reduce:transition-none data-[side=left]:w-[280px] data-[side=left]:max-w-[85vw] sm:max-w-[85vw]`}
+        initialFocus={() => {
+          const drawer = mobileDrawerRef.current
+          const current = drawer?.querySelector<HTMLElement>('[aria-current="page"]')
+          const firstAction = drawer?.querySelector<HTMLElement>('button:not([disabled])')
+          return current ?? firstAction ?? drawer
+        }}
+        finalFocus={returnFocusRef ?? undefined}
+      >
+        <SheetTitle className="sr-only">{t('nav.primaryNavigation')}</SheetTitle>
+        {railContent}
+      </SheetContent>
+    </Sheet>
+  )
 }
 
 // ==================== SectionHeader ====================

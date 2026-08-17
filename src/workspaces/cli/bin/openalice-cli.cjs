@@ -74,7 +74,9 @@ async function main() {
   }
 
   // `<bin> <group>` / `<bin> <group> --help` -> verb listing
-  if (!verb || (wantsHelp && !m.groups[group][verb])) return printVerbs(group, groupCmds)
+  if (!verb || (wantsHelp && !m.groups[group][verb])) {
+    return printVerbs(group, groupCmds, m.groupDescriptions && m.groupDescriptions[group])
+  }
 
   const cmd = groupCmds[verb]
   if (!cmd) {
@@ -292,18 +294,22 @@ function printGroups(m) {
   if (m.description) out(m.description)
   out('')
   for (const g of groups) {
-    out(`  ${g.padEnd(width)}  ${Object.keys(m.groups[g]).join(', ')}`)
+    const verbs = Object.keys(m.groups[g]).join(', ')
+    const description = m.groupDescriptions && m.groupDescriptions[g]
+    out(`  ${g.padEnd(width)}  ${description ? `${description} (${verbs})` : verbs}`)
   }
   out(`\nRun \`${BIN} <group>\` or \`${BIN} <group> <verb> --help\` for details.`)
-  if (m.unmapped && m.unmapped.length) {
-    out(`\n(${m.unmapped.length} tool(s) reachable via MCP but not this CLI)`)
+  if (process.env.OPENALICE_CLI_DEBUG === '1' && m.unmapped && m.unmapped.length) {
+    out(`\n(${m.unmapped.length} MCP-only tool(s) in this registry scope)`)
   }
 }
 
-function printVerbs(group, cmds) {
+function printVerbs(group, cmds, description) {
   const verbs = Object.keys(cmds)
   const width = Math.max(...verbs.map((v) => v.length), 1)
-  out(`${BIN} ${group} <verb> [--flags]\n`)
+  out(`${BIN} ${group} <verb> [--flags]`)
+  if (description) out(`${description}\n`)
+  else out('')
   for (const v of verbs) {
     out(`  ${v.padEnd(width)}  ${firstLine(cmds[v].description)}`)
   }

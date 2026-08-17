@@ -22,6 +22,7 @@ import {
   issueFirePrompt,
   readWorkspaceIssues,
   type IssueRecord,
+  type IssueTimeout,
 } from '../issues/declaration.js'
 
 export {
@@ -45,12 +46,16 @@ export interface ScheduleSnapshotTask {
   when: Schedule
   /** The prompt this fire hands to the headless run (resolved `what`/title+body). */
   what: string
-  /** Unified owner. `@new` recruits once, `@workspace` recruits every fire,
-   * and an exact `@resumeId` resumes one accountable Session. */
+  /** Unified owner. `@new-then-resume` recruits once,
+   * `@new-each-run` recruits every fire, and an exact `@resumeId` resumes one
+   * accountable Session. */
   assignee: string
   agent?: string
+  credential?: string
+  credentialSource?: 'native'
   model?: string
   effort?: ModelReasoningEffort
+  timeout?: IssueTimeout
   /** False once the owning issue reaches a terminal status (done/canceled). */
   enabled: boolean
   /** When the scanner last fired this issue (epoch ms), null if never. */
@@ -72,20 +77,27 @@ export interface ScheduleSnapshot {
   workspaces: ScheduleSnapshotWorkspace[]
 }
 
-/** The base timestamp for due-ness: the last fire, or a synthetic never-fired
- *  baseline. `every`/`at` seed from epoch (so they're due on first sight).
- *  `cron` looks back one scan interval — seeding a never-fired cron from `now`
- *  would make it NEVER due (computeNextRun is always strictly future), and
- *  seeding from epoch would fire it immediately; the lookback catches an
- *  occurrence that just passed without firing a stale backlog. */
+/** The base timestamp for due-ness: the last fire, a held cron cursor, or a
+ *  synthetic never-fired baseline. `every`/`at` seed from epoch (so they're due
+ *  on first sight). `cron` looks back one scan interval — seeding a never-fired
+ *  cron from `now` would make it NEVER due (computeNextRun is always strictly
+ *  future), and seeding from epoch would fire it immediately; the lookback
+ *  catches an occurrence that just passed without firing a stale backlog.
+ *  A held cursor keeps (catch-up) or consumes (calendar-only) that slot after
+ *  an admission skip. */
 export function fireBase(
   when: Schedule,
   lastFiredAtMs: number | null,
   nowMs: number,
   lookbackMs: number,
+  heldAtMs: number | null = null,
 ): number {
+  if (when.kind !== 'cron') return lastFiredAtMs ?? 0
+  if (heldAtMs !== null && (lastFiredAtMs === null || heldAtMs >= lastFiredAtMs)) {
+    return heldAtMs
+  }
   if (lastFiredAtMs !== null) return lastFiredAtMs
-  return when.kind === 'cron' ? nowMs - lookbackMs : 0
+  return nowMs - lookbackMs
 }
 
 /** Build a dashboard row for a SCHEDULED issue: its `when` + last-fired marker +
@@ -97,8 +109,9 @@ export function snapshotScheduledIssue(
   lastFiredAtMs: number | null,
   nowMs: number,
   lookbackMs: number,
+  heldAtMs: number | null = null,
 ): ScheduleSnapshotTask {
-  const next = computeNextRun(when, fireBase(when, lastFiredAtMs, nowMs, lookbackMs))
+  const next = computeNextRun(when, fireBase(when, lastFiredAtMs, nowMs, lookbackMs, heldAtMs))
   return {
     id: issue.id,
     issue: issue.title,
@@ -106,8 +119,11 @@ export function snapshotScheduledIssue(
     what: issueFirePrompt(issue),
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.credential ? { credential: issue.credential } : {}),
+    ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
+    ...(issue.timeout ? { timeout: issue.timeout } : {}),
     enabled: !isTerminalStatus(issue.status),
     lastFiredAtMs,
     // An overdue computed time clamps to now: a due-now task reads "due now",

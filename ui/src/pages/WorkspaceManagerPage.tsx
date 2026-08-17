@@ -41,7 +41,6 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const {
     agents,
     defaultAgent,
-    setDefaultAgent,
     openAgentConfig,
     workspaceManager: manager,
     workspaceManagerLoaded,
@@ -63,7 +62,6 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
   const launchConfig = useAgentLaunchConfig({
     agents: runtimeAgents,
     defaultAgent,
-    setDefaultAgent,
     preferences: launchPreferences,
     workspaceId: MANAGER_WORKSPACE_ID,
     hasWorkspace: true,
@@ -90,22 +88,20 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
       launchSelectorsRef.current?.openAgentMenu()
       return
     }
+    if (launchConfig.needsProviderSetup) {
+      openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
+      return
+    }
     setLaunching(true)
     setError(null)
     try {
-      const runtimeRow = await launchConfig.checkSelectedRuntime()
-      if (runtimeRow?.ready !== true) {
-        if (runtimeRow?.repairTarget === 'ai-provider' || launchConfig.needsProviderSetup) {
-          openOrFocus({ kind: 'settings', params: { category: 'ai-provider' } })
-          return
-        }
-        setError(runtimeRow?.message ?? t('chatLanding.runtimeNotReady'))
-        return
-      }
       const result = await quickStartWorkspaceManager(
         prompt,
         effectiveAgent,
         launchConfig.launchCredentialSlug,
+        launchConfig.launchModel,
+        launchConfig.launchReasoningEffort,
+        launchConfig.accessMode === 'native' ? 'native' : undefined,
       )
       setDraft('')
       openOrFocus({ kind: 'workspace-manager', params: { sessionId: result.session.id } })
@@ -177,8 +173,8 @@ export function WorkspaceManagerPage({ spec }: { spec: ManagerSpec }) {
           {session.state === 'paused' ? (
             <ResumeCta
               record={session}
-              onResume={() => void resumeSession(MANAGER_WORKSPACE_ID, session.id)}
-              onOpenWebPi={() => void openWebPiSession(MANAGER_WORKSPACE_ID, session.id)}
+              onResume={() => resumeSession(MANAGER_WORKSPACE_ID, session.id)}
+              onOpenWebPi={() => openWebPiSession(MANAGER_WORKSPACE_ID, session.id)}
             />
           ) : session.agent === 'pi' && session.surface === 'webpi' ? (
             <WebPiView

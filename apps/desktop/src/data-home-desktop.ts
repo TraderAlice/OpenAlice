@@ -140,7 +140,7 @@ export async function resolveDesktopDataHome(options: {
       type: 'question',
       title: 'Choose where OpenAlice works',
       message: preferences.askOnStartup
-        ? 'Which data location should this OpenAlice instance use?'
+        ? 'Which data location should this AliceProject use?'
         : 'Choose an OpenAlice data location before the first Workspace opens.',
       detail: `${currentPath}\n\nEach location owns its data, Workspaces, credentials, Broker Packs, and runtime locks. Separate locations can run concurrently.`,
       buttons: [currentLabel, 'Choose another folder', 'Quit'],

@@ -4,26 +4,39 @@ import { resolveAutoUpdateCapability } from './auto-update-policy.js'
 
 const { autoUpdater } = electronUpdater
 
-type UpdaterStatus = {
-  phase: 'available' | 'downloading' | 'downloaded' | 'error'
-  version?: string
-  percent?: number
-  releaseUrl?: string
-  message?: string
-}
+export type UpdaterInstallStage =
+  | 'preparing'
+  | 'stopping-services'
+  | 'releasing-runtime'
+  | 'handing-off'
+
+type UpdaterStatus =
+  | { phase: 'available'; version?: string; releaseUrl?: string }
+  | { phase: 'downloading'; version?: string; percent?: number }
+  | { phase: 'downloaded'; version: string; releaseUrl: string }
+  | { phase: 'installing'; version: string; stage: UpdaterInstallStage }
+  | { phase: 'error'; message: string }
 
 type UpdateCheckResult =
   | { supported: true }
   | { supported: false; reason: 'not-packaged' | 'missing-config' }
 
 export interface AutoUpdateHooks {
-  beforeInstall: () => Promise<void>
+  beforeInstall: (
+    version: string,
+    report: (stage: Exclude<UpdaterInstallStage, 'preparing' | 'handing-off'>) => void,
+  ) => Promise<void>
+  onInstallHandoff?: (version: string) => Promise<void> | void
+  onInstallFailure?: (error: Error) => Promise<void> | void
 }
 
 export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks): void {
   let downloadedVersion: string | null = null
+  let availableVersion: string | null = null
   let latestStatus: UpdaterStatus | null = null
   let activeCheck: Promise<UpdateCheckResult> | null = null
+  let installInProgress = false
+  let installFailureHandled = false
   const capability = resolveAutoUpdateCapability({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -35,7 +48,25 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
   const sendStatus = (status: UpdaterStatus) => {
     latestStatus = status
     if (win.isDestroyed()) return
+    if (status.phase === 'downloading' && typeof status.percent === 'number') {
+      win.setProgressBar?.(Math.max(0, Math.min(1, status.percent / 100)))
+    } else if (status.phase === 'installing') {
+      win.setProgressBar?.(2)
+    } else {
+      win.setProgressBar?.(-1)
+    }
     win.webContents.send('openalice:updater:status', status)
+  }
+
+  const reportInstallFailure = async (error: Error): Promise<void> => {
+    if (installFailureHandled) return
+    installFailureHandled = true
+    sendStatus({ phase: 'error', message: error.message })
+    try {
+      await hooks.onInstallFailure?.(error)
+    } catch (hookError) {
+      console.error('[updater] install failure recovery failed:', hookError)
+    }
   }
 
   const checkForUpdates = (): Promise<UpdateCheckResult> => {
@@ -67,9 +98,30 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
   ipcMain.removeHandler('openalice:updater:install-and-restart')
   ipcMain.handle('openalice:updater:install-and-restart', async () => {
     if (!downloadedVersion) throw new Error('No downloaded update is ready to install.')
-    await hooks.beforeInstall()
-    autoUpdater.quitAndInstall(false, true)
-    return { ok: true }
+    if (installInProgress) return { ok: true }
+    installInProgress = true
+    installFailureHandled = false
+    const version = downloadedVersion
+    try {
+      sendStatus({ phase: 'installing', version, stage: 'preparing' })
+      // Give the renderer one paint before managed services begin shutting
+      // down. Without this yield the last visible frame is still the button.
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await hooks.beforeInstall(version, (stage) => {
+        sendStatus({ phase: 'installing', version, stage })
+      })
+      sendStatus({ phase: 'installing', version, stage: 'handing-off' })
+      await hooks.onInstallHandoff?.(version)
+      // Assisted NSIS updates must be silent or they stop on the installer UI
+      // after Electron exits. Force-run restarts the updated app on success.
+      autoUpdater.quitAndInstall(true, true)
+      return { ok: true }
+    } catch (error) {
+      const normalized = error instanceof Error ? error : new Error(String(error))
+      await reportInstallFailure(normalized)
+      installInProgress = false
+      throw normalized
+    }
   })
 
   ipcMain.removeHandler('openalice:updater:open-release')
@@ -99,12 +151,18 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
   autoUpdater.allowDowngrade = false
 
   autoUpdater.on('error', (err) => {
-    console.error('[updater] update check failed:', err)
-    sendStatus({ phase: 'error', message: err instanceof Error ? err.message : String(err) })
+    console.error(`[updater] ${installInProgress ? 'install handoff' : 'update check'} failed:`, err)
+    const normalized = err instanceof Error ? err : new Error(String(err))
+    if (installInProgress) {
+      void reportInstallFailure(normalized)
+      return
+    }
+    sendStatus({ phase: 'error', message: normalized.message })
   })
 
   autoUpdater.on('update-available', (info) => {
     console.log(`[updater] update available: ${info.version}`)
+    availableVersion = info.version
     sendStatus({ phase: 'available', version: info.version, releaseUrl: releaseUrlFor(info.version) })
   })
 
@@ -114,11 +172,16 @@ export function configureAutoUpdate(win: BrowserWindow, hooks: AutoUpdateHooks):
 
   autoUpdater.on('download-progress', (progress) => {
     console.log(`[updater] downloading ${progress.percent.toFixed(1)}%`)
-    sendStatus({ phase: 'downloading', percent: progress.percent })
+    sendStatus({
+      phase: 'downloading',
+      ...(availableVersion ? { version: availableVersion } : {}),
+      percent: progress.percent,
+    })
   })
 
   autoUpdater.on('update-downloaded', (info) => {
     downloadedVersion = info.version
+    availableVersion = info.version
     sendStatus({ phase: 'downloaded', version: info.version, releaseUrl: releaseUrlFor(info.version) })
   })
 

@@ -20,11 +20,12 @@ const mocks = vi.hoisted(() => ({
   detectWorkspaceCredential: vi.fn(),
   getAgentReadiness: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
+  getPresets: vi.fn(),
   quickStartWorkspaceManager: vi.fn(),
   openWebPiSession: vi.fn(),
   resumeSession: vi.fn(),
   getQuickChat: vi.fn(),
-  rememberQuickChatCredential: vi.fn(),
+  rememberQuickChatLaunch: vi.fn(),
   openAgentConfig: vi.fn(),
   refreshWorkspaceManager: vi.fn(),
 }))
@@ -57,13 +58,14 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
 vi.mock('../api/preferences', () => ({
   preferencesApi: {
     getQuickChat: mocks.getQuickChat,
-    rememberQuickChatCredential: mocks.rememberQuickChatCredential,
+    rememberQuickChatLaunch: mocks.rememberQuickChatLaunch,
   },
 }))
 
 vi.mock('../api/config', () => ({
   configApi: {
     getWorkspaceCredentialDefaults: mocks.getWorkspaceCredentialDefaults,
+    getPresets: mocks.getPresets,
   },
 }))
 
@@ -94,10 +96,13 @@ vi.mock('../components/workspace/WebPiView', () => ({
   WebPiView: () => <div data-testid="webpi-view" />,
 }))
 
-const runtimeIds = ['claude', 'codex', 'opencode', 'pi'] as const
+const runtimeIds = ['claude', 'codex', 'cursor', 'grok', 'omp', 'opencode', 'pi'] as const
 const runtimeAgents: AgentInfo[] = [
   ['claude', 'Claude'],
   ['codex', 'Codex'],
+  ['cursor', 'Cursor Agent'],
+  ['grok', 'Grok Build'],
+  ['omp', 'Oh My Pi'],
   ['opencode', 'OpenCode'],
   ['pi', 'Pi'],
   ['shell', 'Shell'],
@@ -120,8 +125,12 @@ const runtimeAgents: AgentInfo[] = [
           ? ['anthropic' as const]
           : id === 'codex'
             ? ['openai-responses' as const]
-            : ['google-generative-ai' as const, 'openai-chat' as const, 'anthropic' as const, 'openai-responses' as const],
-        ...(id === 'opencode' || id === 'pi'
+            : id === 'cursor'
+              ? ['openai-chat' as const]
+            : id === 'grok'
+              ? ['openai-chat' as const, 'openai-responses' as const]
+              : ['google-generative-ai' as const, 'openai-chat' as const, 'anthropic' as const, 'openai-responses' as const],
+        ...(id === 'omp' || id === 'opencode' || id === 'pi'
           ? { modelRegistration: { contextWindow: true, reasoning: true } }
           : {}),
       },
@@ -168,16 +177,29 @@ function context(
     setDefaultAgent: mocks.setDefaultAgent,
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    initializeChat: vi.fn(async () => { throw new Error('not used') }),
     setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: vi.fn(async () => ''),
     pauseSession: vi.fn(async () => undefined),
     resumeSession: mocks.resumeSession,
     openWebPiSession: mocks.openWebPiSession,
     requestDeleteSession: vi.fn(),
+    setSessionPresence: vi.fn(async () => undefined),
+    setSessionDisplayName: vi.fn(async () => undefined),
+    updateSessionRuntime: vi.fn(async () => undefined),
     openAgentConfig: mocks.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),
   }
+}
+
+async function findModelEditor(model: string): Promise<HTMLInputElement> {
+  const editor = await screen.findByRole('combobox', { name: 'AI model' }) as HTMLInputElement
+  await waitFor(() => {
+    const visibleModel = editor.value || editor.placeholder.replace(/^Default · /, '')
+    expect(visibleModel).toBe(model)
+  })
+  return editor
 }
 
 function readiness() {
@@ -218,8 +240,9 @@ beforeEach(async () => {
     defaults: {},
     compatibleByAgent: {},
   })
+  mocks.getPresets.mockResolvedValue({ presets: [] })
   mocks.getQuickChat.mockResolvedValue({ lastCredentialByAgent: {}, recentChatWorkspaceId: null })
-  mocks.rememberQuickChatCredential.mockResolvedValue(undefined)
+  mocks.rememberQuickChatLaunch.mockResolvedValue(undefined)
   mocks.openWebPiSession.mockResolvedValue(undefined)
   mocks.resumeSession.mockResolvedValue(undefined)
   mocks.refreshWorkspaceManager.mockResolvedValue(undefined)
@@ -261,7 +284,47 @@ describe('WorkspaceManagerPage runtime selection', () => {
       '检查工作区',
       'codex',
       undefined,
+      undefined,
+      undefined,
+      undefined,
     ))
+  })
+
+  it('starts the Manager without synchronously probing diagnostic readiness', async () => {
+    mocks.getAgentRuntimeReadiness.mockResolvedValue({
+      agents: {
+        codex: {
+          agent: 'codex',
+          displayName: 'Codex',
+          installed: true,
+          binPath: '/tmp/codex',
+          status: 'unknown',
+          ready: false,
+          source: 'unknown',
+          checkedAt: null,
+          durationMs: null,
+        },
+      },
+      overallReady: false,
+      checkedAt: null,
+    })
+    mocks.probeAgentRuntimeReadiness.mockRejectedValue(new Error('readiness timed out'))
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    await screen.findByRole('button', { name: 'Select agent' })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Inspect without a preflight.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start manager' }))
+
+    await waitFor(() => expect(mocks.quickStartWorkspaceManager).toHaveBeenCalledWith(
+      'Inspect without a preflight.',
+      'codex',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ))
+    expect(mocks.probeAgentRuntimeReadiness).not.toHaveBeenCalled()
   })
 
   it('offers a retry when the manager snapshot cannot load', async () => {
@@ -302,8 +365,11 @@ describe('WorkspaceManagerPage runtime selection', () => {
       'Inspect the floor.',
       'claude',
       undefined,
+      undefined,
+      undefined,
+      undefined,
     ))
-    expect(mocks.setDefaultAgent).toHaveBeenCalledWith('claude')
+    expect(mocks.setDefaultAgent).not.toHaveBeenCalled()
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace-manager',
       params: { sessionId: 'manager-session' },
@@ -331,7 +397,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect(await screen.findByLabelText('Model MiniMax-M2.5')).toBeTruthy()
+    expect(await findModelEditor('MiniMax-M2.5')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/context$/)).toBeNull()
     expect(screen.getByRole('status').textContent).toContain('Claude Code still needs its own first-run setup')
@@ -391,17 +457,23 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect((await screen.findByRole('button', { name: 'AI provider' })).textContent).toContain('Gemini')
-    expect(screen.getByLabelText('Model gemini-3.1-flash-lite')).toBeTruthy()
-    expect(screen.getByLabelText('256K context')).toBeTruthy()
+    expect((await screen.findByRole('button', { name: 'AI access' })).textContent).toContain('Gemini')
+    const geminiModel = await findModelEditor('gemini-3.1-flash-lite')
+    expect(geminiModel.title).toBe('256K context')
     expect(screen.queryByText('Agent runtime')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Adjust workspace AI' }))
     expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'pi', 'ai')
 
-    fireEvent.click(screen.getByRole('button', { name: 'AI provider' }))
+    fireEvent.click(screen.getByRole('button', { name: 'AI access' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /DeepSeek/ }))
-    expect(screen.getByLabelText('Model deepseek-chat')).toBeTruthy()
-    expect(mocks.rememberQuickChatCredential).toHaveBeenCalledWith('pi', 'deepseek-1')
+    expect(await findModelEditor('deepseek-chat')).toBeTruthy()
+    expect(mocks.rememberQuickChatLaunch).toHaveBeenCalledWith({
+      agent: 'pi',
+      accessMode: 'vault',
+      credentialSlug: 'deepseek-1',
+      model: null,
+      reasoningEffort: null,
+    })
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Audit issues.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start manager' }))
 
@@ -409,6 +481,9 @@ describe('WorkspaceManagerPage runtime selection', () => {
       'Audit issues.',
       'pi',
       'deepseek-1',
+      undefined,
+      undefined,
+      undefined,
     ))
   })
 
@@ -433,14 +508,15 @@ describe('WorkspaceManagerPage runtime selection', () => {
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
     await waitFor(() => expect(mocks.listAgentCredentials).toHaveBeenCalled())
-    expect(screen.getByRole('button', { name: 'AI provider' }).textContent).toContain('AI provider')
+    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Managed by Pi')
     expect(screen.queryByText('Gemini')).toBeNull()
-    expect(screen.queryByLabelText('Model gemini-3.1-flash-lite')).toBeNull()
+    expect((screen.getByRole('combobox', { name: 'AI model' }) as HTMLInputElement).placeholder)
+      .not.toContain('gemini-3.1-flash-lite')
 
     await act(async () => {
       resolvePreferences({ lastCredentialByAgent: { pi: 'google-1' }, recentChatWorkspaceId: null })
     })
-    expect((await screen.findByRole('button', { name: 'AI provider' })).textContent).toContain('Gemini')
+    expect((await screen.findByRole('button', { name: 'AI access' })).textContent).toContain('Gemini')
   })
 
   it('shows model/context for a usable hand-edited Manager config without a vault credential', async () => {
@@ -470,9 +546,9 @@ describe('WorkspaceManagerPage runtime selection', () => {
 
     render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
 
-    expect(await screen.findByLabelText('Model local-manual-model')).toBeTruthy()
-    expect(screen.getByLabelText('128K context')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'AI provider' })).toBeNull()
+    const localModel = await findModelEditor('local-manual-model')
+    expect(localModel.title).toBe('128K context')
+    expect(screen.getByRole('button', { name: 'AI access' }).textContent).toContain('Workspace AI setup')
   })
 
   it('keeps a paused non-Pi Manager Session stopped until the user resumes it', async () => {
@@ -502,7 +578,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(screen.queryByTestId('terminal-view')).toBeNull()
     expect(container.firstElementChild?.classList.contains('workspaces-root')).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue in terminal' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Resume in TUI' }))
 
     expect(mocks.resumeSession).toHaveBeenCalledWith(
       'workspace-manager',
@@ -565,7 +641,7 @@ describe('WorkspaceManagerPage runtime selection', () => {
     }} />)
 
     expect(mocks.openWebPiSession).not.toHaveBeenCalled()
-    const openWebPi = screen.getByText('Open WebPi').closest('button')
+    const openWebPi = screen.getByText('Open in WebPi').closest('button')
     expect(openWebPi).toBeTruthy()
     fireEvent.click(openWebPi as HTMLButtonElement)
 

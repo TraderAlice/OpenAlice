@@ -109,7 +109,9 @@ describe('AgentConversationLog', () => {
         startedAt,
         conversation: {
           source: { kind: 'workspace', workspaceId: 'ws-chat' },
-          requestedTarget: { kind: 'workspace', workspaceId: 'ws-quant' },
+          requestedTarget: taskId === 'run-2'
+            ? { kind: 'harness', harness: 'autoquant' }
+            : { kind: 'workspace', workspaceId: 'ws-quant' },
           originalPrompt: `Prompt ${taskId}`,
           deliveredPrompt: `Prompt ${taskId}`,
           promptMode: 'plain',
@@ -135,6 +137,7 @@ describe('AgentConversationLog', () => {
         taskId: 'run-2',
         status: 'running',
         assistantText: null,
+        requestedTarget: { kind: 'harness', harness: 'autoquant' },
       }],
     })
     await expect(log.query({ page: 2, pageSize: 1 })).resolves.toMatchObject({

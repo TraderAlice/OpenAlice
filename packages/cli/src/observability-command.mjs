@@ -8,7 +8,7 @@ import { resolveStoredLaunchContext } from './supervisor-config.ts'
 export function parseObservabilityArgs(action, argv) {
   if (!['logs', 'doctor'].includes(action)) throw usageError(`Unknown observability command: ${String(action)}`)
   const options = {
-    instance: null,
+    project: null,
     homeRoot: null,
     json: false,
     waitMs: 2_000,
@@ -25,8 +25,8 @@ export function parseObservabilityArgs(action, argv) {
       options.homeRoot = requireValue(argv, ++index, arg)
       continue
     }
-    if (arg === '--instance') {
-      options.instance = requireValue(argv, ++index, arg)
+    if (arg === '--project' || arg === '--instance') {
+      options.project = requireValue(argv, ++index, arg)
       continue
     }
     if (arg === '--wait' && action === 'doctor') {
@@ -57,7 +57,7 @@ export async function runObservabilityCommand(action, options, dependencies = {}
         checkStoredHome: dependencies.checkStoredHome,
       }))
     )({
-      instance: options.instance ?? undefined,
+      project: options.project ?? undefined,
       home: options.homeRoot ?? undefined,
     })
     const resolvedOptions = {
@@ -105,7 +105,7 @@ Prints a bounded, redacted tail of the selected Runtime log. Only regular
 server.log rotation files inside the selected OpenAlice home are read.
 
 Options:
-  --instance <name>  Select a named complete-home instance
+  --project <name>   Select an AliceProject (deprecated alias: --instance)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --lines <count>    Last 1-5000 lines (default: 200)
   --json             Print a versioned machine-readable result
@@ -121,7 +121,7 @@ compatibility, Web readiness, components, provider artifacts, update metadata,
 and safe log discovery.
 
 Options:
-  --instance <name>  Select a named complete-home instance
+  --project <name>   Select an AliceProject (deprecated alias: --instance)
   --home <path>      User-state root (default: OPENALICE_HOME or ~/.openalice)
   --wait <seconds>   Control timeout, 1-600 (default: 2)
   --json             Print a versioned machine-readable result

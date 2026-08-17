@@ -52,7 +52,7 @@ export function AutomationApiSection() {
 title: Pre-market movers scan
 status: todo
 priority: high
-assignee: "@new"
+assignee: "@new-then-resume"
 when: { kind: cron, cron: "30 8 * * 1-5", timezone: America/New_York }
 agent: claude
 ---
@@ -75,8 +75,8 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
           </li>
           <li>
             <code className={CODE}>assignee</code> <em>(optional)</em>: scheduled work defaults to{' '}
-            <code className={CODE}>@new</code>, which recruits one Session on the first run and then
-            keeps that concrete owner for later runs. Use <code className={CODE}>@workspace</code>{' '}
+            <code className={CODE}>@new-then-resume</code>, which recruits one Session on the first run and then
+            keeps that concrete owner for later runs. Use <code className={CODE}>@new-each-run</code>{' '}
             only when every fire should recruit a newcomer; an exact <code className={CODE}>@resumeId</code>{' '}
             continues that Session.
           </li>
@@ -94,7 +94,7 @@ research/premarket.md --comments "Pre-market brief".`}</Block>
           <li>
             <code className={CODE}>agent</code>, <code className={CODE}>model</code>, and{' '}
             <code className={CODE}>effort</code> optionally select the first or per-run native runtime
-            for <code className={CODE}>@new</code>/<code className={CODE}>@workspace</code>. An exact
+            for <code className={CODE}>@new-then-resume</code>/<code className={CODE}>@new-each-run</code>. An exact
             Session owner already owns that runtime tuple.
           </li>
           <li>

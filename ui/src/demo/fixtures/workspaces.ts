@@ -34,6 +34,27 @@ export const demoWorkspace: Workspace = {
   currentVersion: '0.1.0',
   upgradeAvailable: { from: '0.1.0', to: '0.2.0' },
   sessions: [demoSession],
+  runtimeSettings: {
+    version: 3,
+    runtime: {
+      interactive: {
+        agents: {},
+        recent: {
+          agent: 'pi',
+          agents: {
+          pi: {
+            accessMode: 'vault',
+            credentialSlug: 'openai-1',
+            wireShape: 'openai-chat',
+            model: 'gpt-5.6-sol',
+            reasoningEffort: 'high',
+          },
+          },
+        },
+      },
+      headless: { agents: {}, recent: { agent: 'pi', agents: { pi: { accessMode: 'native' } } } },
+    },
+  },
   agentOverride: { claude: false, codex: false, opencode: false, pi: false },
 }
 
@@ -102,6 +123,36 @@ const demoChatSessions: SessionRecord[] = [
     pid: null,
     startedAt: null,
     title: '解释一下美债收益率曲线倒挂意味着什么',
+  },
+  {
+    id: 'demo-chat-headless-codex',
+    resumeId: 'resume-demo-headless-colleague',
+    wsId: DEMO_CHAT_WORKSPACE_ID,
+    agent: 'codex',
+    name: 'x2',
+    createdAt: new Date(Date.now() - 3_600_000).toISOString(),
+    lastActiveAt: new Date(Date.now() - 120_000).toISOString(),
+    state: 'paused',
+    surface: 'headless',
+    pid: null,
+    startedAt: null,
+    title: 'Morning semiconductor scan',
+    sourceRunId: 'demo-headless-colleague-run',
+  },
+  {
+    id: 'demo-chat-headless-claude',
+    resumeId: 'resume-demo-headless-running',
+    wsId: DEMO_CHAT_WORKSPACE_ID,
+    agent: 'claude',
+    name: 'c1',
+    createdAt: new Date(Date.now() - 720_000).toISOString(),
+    lastActiveAt: new Date(Date.now() - 5_000).toISOString(),
+    state: 'running',
+    surface: 'headless',
+    pid: null,
+    startedAt: null,
+    title: 'Open issue scan',
+    sourceRunId: 'demo-headless-running',
   },
 ]
 

@@ -64,7 +64,7 @@ describe('Workspace creation storage failures', () => {
           version: '1.0.0',
           defaultAgents: [],
           injectTools: false,
-          injectPersona: false,
+          injectInstructions: false,
           bundledSkills: [],
         }),
       } as unknown as TemplateRegistry,

@@ -26,9 +26,44 @@ export interface EntityDetail {
   backlinks: Backlink[]
 }
 
+export interface EntityGraphEntityNode {
+  id: string
+  kind: 'entity'
+  label: string
+  entityType: EntityType
+  description: string
+  createdAt: number
+}
+
+export interface EntityGraphArtifactNode {
+  id: string
+  kind: 'artifact'
+  label: string
+  artifactType: 'note' | 'issue'
+  workspaceId: string
+  workspaceTag: string
+  path: string
+}
+
+export type EntityGraphNode = EntityGraphEntityNode | EntityGraphArtifactNode
+
+export interface EntityGraphEdge {
+  id: string
+  source: string
+  target: string
+}
+
+export interface EntityGraph {
+  nodes: EntityGraphNode[]
+  edges: EntityGraphEdge[]
+}
+
 export const entitiesApi = {
   async list(): Promise<{ entities: EntityListItem[] }> {
     return fetchJson('/api/entities')
+  },
+  async graph(): Promise<EntityGraph> {
+    return fetchJson('/api/entities/relationships/graph')
   },
   async get(name: string): Promise<EntityDetail> {
     return fetchJson(`/api/entities/${encodeURIComponent(name)}`)

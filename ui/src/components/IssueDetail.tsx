@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Hash, History, Inbox, ListChecks, MessageSquare, RotateCcw, Settings, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Brain, Check, ChevronRight, Clock, Cpu, Hash, History, Inbox, KeyRound, ListChecks, LoaderCircle, MessageSquare, Play, RotateCcw, Search, Settings, SlidersHorizontal, Timer, TrendingUp, UserRound, X } from 'lucide-react'
+import { inputClass } from './form'
 
-import type { HeadlessTaskStatus } from '../api/headless'
+import type { HeadlessTaskStatus, HeadlessTurnProgress } from '../api/headless'
 import type { InboxEntry } from '../api/inbox'
 import type {
   IssueDetail as IssueDetailData,
@@ -15,24 +16,25 @@ import type {
   IssueProvenanceRecord,
   IssueRunRecord,
   IssueStatus,
+  IssueTimeout,
   WikilinkIssueRef,
   WikilinkResolution,
 } from '../api/issues'
+import { DEFAULT_ISSUE_COMMENT_PROMPT, ISSUE_TIMEOUTS, issuesApi } from '../api/issues'
 import type { ModelReasoningEffort } from '../api/types'
+import type { Preset, PresetModel } from '../api/types'
+import { configApi } from '../api/config'
 import {
-  detectWorkspaceCredential,
   getAgentReadiness,
   getWorkspaceSessionDirectory,
+  listAgentCredentials,
   type AgentCredentialReadiness,
   type AgentId,
-  type WorkspaceCredentialDetection,
+  type SavedCredential,
+  type WorkspaceRuntimeModeSettings,
   type WorkspaceSessionDirectoryEntry,
 } from './workspace/api'
-import { issuesApi } from '../api/issues'
-import {
-  WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
-  type WorkspaceAgentConfigChangedDetail,
-} from '../lib/workspaceAiEvents'
+import { credentialAccessLabel } from './workspace/AgentLaunchControls'
 import { useIssueDetail } from '../hooks/useIssueDetail'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { formatRelativeTime } from '../lib/intl'
@@ -41,12 +43,30 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { previewForEntry } from '../live/inbox-threads'
 import { useWikilinkHandler } from '../live/wikilink'
 import { useWorkspace } from '../tabs/store'
-import { AutomationHealthPill, CadencePill, PriorityIndicator } from './IssuesBoard'
+import { ConfirmDialog } from './ConfirmDialog'
+import { AutomationHealthPill, CadencePill, CadenceSummary, PriorityIndicator } from './IssuesBoard'
 import { IssueSectionNavigation } from './IssueSectionNavigation'
 import { STATUS_META } from './issue-status-meta'
 import { MarkdownContent } from './MarkdownContent'
+import { hasTurnProgress, TurnProgress } from './TurnProgress'
 import { MarkdownWhatEditor } from './MarkdownWhatEditor'
 import { CenteredLoading } from './StateViews'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  issueEffortOptions,
+  issueModelOptions,
+  issueModelSemantics,
+  resolveIssueAiSelection,
+} from './issue-runtime-options'
 
 // Run-status pill tints — mirrors AutomationRunsSection's STATUS_STYLE so the
 // Issue's independent operational history stays consistent with Automation.
@@ -62,23 +82,14 @@ const RUN_STATUS_STYLE: Record<HeadlessTaskStatus, string> = {
 const STATUS_OPTIONS: IssueStatus[] = ['in_progress', 'todo', 'backlog', 'done', 'canceled']
 const PRIORITY_OPTIONS: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
-// Shared compact control styling for the rail's selects / inline input — the
-// settings `inputClass`, trimmed for the narrow rail.
+// Shared control styling for the Inspector and its configuration dialog.
 const railControl =
-  'min-h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0'
+  'h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:shadow-[0_0_0_1px_var(--primary-muted)] disabled:cursor-not-allowed disabled:opacity-50 sm:h-9'
 
-const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'opencode', 'pi']
-const ALL_RUN_EFFORTS: readonly ModelReasoningEffort[] = [
-  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
-]
+const CONFIGURABLE_AGENTS: readonly AgentId[] = ['claude', 'codex', 'cursor', 'grok', 'omp', 'opencode', 'pi']
 
 function isConfigurableAgent(agent: string | null | undefined): agent is AgentId {
   return CONFIGURABLE_AGENTS.includes(agent as AgentId)
-}
-
-function runEffortsForAgent(agent: string | null): readonly ModelReasoningEffort[] {
-  if (agent === 'claude') return ['low', 'medium', 'high', 'max']
-  return ALL_RUN_EFFORTS
 }
 
 function fmtDuration(ms?: number): string {
@@ -91,22 +102,43 @@ function fmtDuration(ms?: number): string {
 
 // ==================== Properties rail ====================
 
-function PropRow({ label, children }: { label: string; children: ReactNode }) {
+function InspectorField({
+  label,
+  icon,
+  children,
+  className = '',
+}: {
+  label: string
+  icon?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:gap-1">
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="min-w-0 text-right text-[13px] text-foreground max-[359px]:w-full max-[359px]:text-left">{children}</div>
+    <div className={`min-w-0 space-y-1.5 ${className}`}>
+      <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+        {icon}
+        {label}
+      </span>
+      <div className="min-w-0 text-sm text-foreground">{children}</div>
     </div>
   )
 }
 
-/** Editable row: label on the left, an interactive control filling the right. */
-function EditRow({ label, children }: { label: string; children: ReactNode }) {
+function InspectorSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2 max-[359px]:flex-col max-[359px]:items-stretch max-[359px]:gap-1">
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 max-[359px]:w-full max-[359px]:justify-start">{children}</div>
-    </div>
+    <section className="border-t border-border/60 px-4 py-4 first:border-t-0">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/75">{title}</h3>
+      {description && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>}
+      <div className="mt-3">{children}</div>
+    </section>
   )
 }
 
@@ -121,53 +153,219 @@ function AssigneeEditor({
   scheduled: boolean
   sessions: readonly WorkspaceSessionDirectoryEntry[]
   disabled?: boolean
-  onChange: (next: string) => void
+  onChange: (next: string) => Promise<boolean>
 }) {
   const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [draftValue, setDraftValue] = useState(value)
+  const [committing, setCommitting] = useState(false)
   const sessionChoices = sessions
-    .filter((session) => session.resumeId && session.agent !== 'shell' && session.resumable)
+    .filter((session) =>
+      session.resumeId
+      && session.agent !== 'shell'
+      && session.resumable
+      && (session.presence ?? 'active') === 'active')
     .toSorted((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
   const selectedResumeId = value.startsWith('@resume-') ? value.slice(1) : null
+  const draftResumeId = draftValue.startsWith('@resume-') ? draftValue.slice(1) : null
   const hasSelected = !selectedResumeId || sessionChoices.some((session) => session.resumeId === selectedResumeId)
-  const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
+  const contextFor = (session: WorkspaceSessionDirectoryEntry) => {
     const rawContext = session.interactive?.title
       || session.interactive?.name
       || session.latestExecution?.assistantPreview
     const normalizedContext = rawContext?.replace(/\s+/g, ' ').trim()
-    const context = normalizedContext && normalizedContext !== session.resumeId
-      ? normalizedContext.length > 28
-        ? `${normalizedContext.slice(0, 27)}…`
-        : normalizedContext
-      : null
+    if (!normalizedContext || normalizedContext === session.resumeId) return null
+    return normalizedContext.length > 120
+      ? `${normalizedContext.slice(0, 117).trimEnd()}…`
+      : normalizedContext
+  }
+  const labelFor = (session: WorkspaceSessionDirectoryEntry) => {
     const activity = session.active ? 'active' : formatRelativeTime(session.updatedAt)
-    return `@${session.resumeId} · ${session.agent} · ${activity}${context ? ` — ${context}` : ''}`
+    return `${session.resumeId} · ${session.agent} · ${activity}`
+  }
+
+  const policyChoices = scheduled
+    ? [
+        { value: '@new-then-resume', label: t('issues.detail.assigneeNew'), description: t('issues.detail.assigneeNewDescription') },
+        { value: '@new-each-run', label: t('issues.detail.assigneeWorkspaceScheduled'), description: t('issues.detail.assigneeEachDescription') },
+      ]
+    : [
+        { value: '@human', label: t('issues.detail.human'), description: t('issues.detail.assigneeHumanDescription') },
+        { value: '@unassigned', label: t('issues.detail.unassigned'), description: t('issues.detail.assigneeUnassignedDescription') },
+      ]
+  const selectedSession = selectedResumeId
+    ? sessionChoices.find((session) => session.resumeId === selectedResumeId)
+    : null
+  const selectedPolicy = policyChoices.find((choice) => choice.value === value)
+  const selectedLabel = selectedSession
+    ? contextFor(selectedSession) ?? selectedSession.resumeId
+    : selectedPolicy?.label ?? (selectedResumeId ? selectedResumeId : value)
+  const selectedDescription = selectedSession
+    ? `${selectedSession.agent} · ${selectedSession.active ? t('issues.detail.activeNow') : formatRelativeTime(selectedSession.updatedAt)}`
+    : selectedPolicy?.description
+  const draftSession = draftResumeId
+    ? sessionChoices.find((session) => session.resumeId === draftResumeId)
+    : null
+  const draftPolicy = policyChoices.find((choice) => choice.value === draftValue)
+  const draftLabel = draftSession
+    ? contextFor(draftSession) ?? draftSession.resumeId
+    : draftPolicy?.label ?? (draftResumeId ? draftResumeId : draftValue)
+  const draftDescription = draftSession
+    ? `${draftSession.resumeId} · ${draftSession.agent} · ${draftSession.active ? t('issues.detail.activeNow') : formatRelativeTime(draftSession.updatedAt)}`
+    : draftPolicy?.description
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredSessions = normalizedQuery
+    ? sessionChoices.filter((session) => [session.resumeId, session.agent, contextFor(session)]
+        .filter(Boolean)
+        .some((candidate) => candidate!.toLocaleLowerCase().includes(normalizedQuery)))
+    : sessionChoices
+  const close = () => {
+    setOpen(false)
+    setQuery('')
+    setDraftValue(value)
+  }
+  const apply = async () => {
+    if (draftValue === value || committing) return
+    setCommitting(true)
+    try {
+      if (await onChange(draftValue)) {
+        setOpen(false)
+        setQuery('')
+      }
+    } finally {
+      setCommitting(false)
+    }
   }
 
   return (
-    <select
-      className={railControl}
-      value={value}
-      disabled={disabled}
-      aria-label={t('issues.detail.assignee')}
-      onChange={(event) => onChange(event.target.value)}
+    <Dialog open={open} onOpenChange={(next) => {
+      if (next) {
+        setDraftValue(value)
+        setOpen(true)
+        return
+      }
+      if (!committing) close()
+    }}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={t('issues.detail.assignee')}
+        onClick={() => {
+          setDraftValue(value)
+          setOpen(true)
+        }}
+        className="oa-pressable flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <UserRound size={15} className="shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-medium text-foreground">{selectedLabel}</span>
+          {selectedDescription && <span className="block truncate text-[11px] text-muted-foreground">{selectedDescription}</span>}
+        </span>
+        <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
+      </button>
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-xl">
+        <DialogHeader className="px-4 pt-4">
+          <DialogTitle>{t('issues.detail.chooseAssignee')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.chooseAssigneeDescription')}</DialogDescription>
+        </DialogHeader>
+        <label className="mx-4 flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-ring/30">
+          <Search size={15} className="text-muted-foreground" aria-hidden />
+          <span className="sr-only">{t('issues.detail.searchSessions')}</span>
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('issues.detail.searchSessions')}
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        <div className="min-h-0 max-w-full overflow-x-hidden overflow-y-auto px-2 pb-4">
+          <p className="px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            {t('issues.detail.assignmentPolicy')}
+          </p>
+          <div className="space-y-0.5">
+            {policyChoices.map((choice) => (
+              <AssigneeChoice
+                key={choice.value}
+                label={choice.label}
+                description={choice.description}
+                selected={draftValue === choice.value}
+                onClick={() => setDraftValue(choice.value)}
+              />
+            ))}
+          </div>
+          <p className="mt-2 border-t border-border/60 px-2 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            {t('issues.detail.workspaceSessions')}
+          </p>
+          <div className="space-y-0.5">
+            {!hasSelected && selectedResumeId && (
+              <AssigneeChoice
+                label={t('issues.detail.signedSession', { resumeId: selectedResumeId })}
+                description={t('issues.detail.sessionUnavailable')}
+                selected={draftValue === value}
+                onClick={() => setDraftValue(value)}
+              />
+            )}
+            {filteredSessions.map((session) => (
+              <AssigneeChoice
+                key={session.resumeId}
+                label={contextFor(session) ?? session.resumeId}
+                description={labelFor(session)}
+                selected={draftResumeId === session.resumeId}
+                onClick={() => setDraftValue(`@${session.resumeId}`)}
+              />
+            ))}
+            {filteredSessions.length === 0 && (
+              <p className="px-3 py-8 text-center text-sm text-muted-foreground">{t('issues.detail.noSessionsFound')}</p>
+            )}
+          </div>
+        </div>
+        <DialogFooter className="mx-0 mb-0 items-center rounded-none px-4 py-3 sm:justify-between">
+          <div className="min-w-0 text-left sm:mr-auto">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+              {t('issues.detail.pendingAssignee')}
+            </span>
+            <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{draftLabel}</span>
+            {draftDescription && <span className="block truncate text-xs text-muted-foreground">{draftDescription}</span>}
+          </div>
+          <div className="flex w-full justify-end gap-2 sm:w-auto">
+            <Button type="button" variant="outline" disabled={committing} onClick={close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" disabled={committing || draftValue === value} onClick={() => void apply()}>
+              {committing ? t('issues.detail.assigning') : t('issues.detail.confirmAssignment')}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function AssigneeChoice({
+  label,
+  description,
+  selected,
+  onClick,
+}: {
+  label: string
+  description?: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-12 w-full min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {scheduled && <option value="@new">{t('issues.detail.assigneeNew')}</option>}
-      <option value="@workspace">
-        {scheduled ? t('issues.detail.assigneeWorkspaceScheduled') : t('issues.detail.assigneeWorkspace')}
-      </option>
-      {!scheduled && <option value="@human">{t('issues.detail.human')}</option>}
-      {!scheduled && <option value="@unassigned">{t('issues.detail.unassigned')}</option>}
-      <optgroup label={t('issues.detail.workspaceSessions')}>
-        {sessionChoices.map((session) => (
-          <option key={session.resumeId} value={`@${session.resumeId}`}>
-            {labelFor(session)}
-          </option>
-        ))}
-        {!hasSelected && selectedResumeId && (
-          <option value={value}>{t('issues.detail.signedSession', { resumeId: selectedResumeId })}</option>
-        )}
-      </optgroup>
-    </select>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-foreground">{label}</span>
+        {description && <span className="mt-0.5 block truncate text-xs text-muted-foreground">{description}</span>}
+      </span>
+      {selected && <Check size={16} className="shrink-0 text-primary" aria-hidden />}
+    </button>
   )
 }
 
@@ -247,7 +445,7 @@ function AgentEditor({
         aria-label={canConfigure
           ? t('issues.detail.configureRuntime', { runtime: effectiveAgent })
           : t('issues.detail.noConfigurableRuntime')}
-        className="min-h-10 min-w-10 shrink-0 rounded-md border border-border bg-background px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:min-w-0"
+        className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:size-9"
       >
         <Settings size={14} aria-hidden />
       </button>
@@ -257,14 +455,16 @@ function AgentEditor({
 
 function ModelEditor({
   value,
-  workspaceModel,
-  loadingWorkspaceDefault,
+  defaultModel,
+  models,
+  loadingDefault,
   disabled,
   onChange,
 }: {
   value?: string
-  workspaceModel: string | null
-  loadingWorkspaceDefault: boolean
+  defaultModel: string | null
+  models: readonly PresetModel[]
+  loadingDefault: boolean
   disabled?: boolean
   onChange: (next: string | null) => void
 }) {
@@ -281,36 +481,46 @@ function ModelEditor({
     if (next !== (value ?? '')) onChange(next || null)
     if (!next) setCustomMode(false)
   }
-  const workspaceLabel = loadingWorkspaceDefault
+  const defaultLabel = loadingDefault
     ? t('issues.detail.defaultLoading')
-    : workspaceModel
-      ? t('issues.detail.defaultValue', { value: workspaceModel })
+    : defaultModel
+      ? t('issues.detail.defaultValue', { value: defaultModel })
       : t('issues.detail.defaultRuntimeDecides')
+  const knownValue = value && models.some((model) => model.id === value)
 
   return (
     <div className="min-w-0 flex-1">
       <select
         className={`${railControl} w-full`}
-        value={customMode ? 'custom' : 'workspace'}
+        value={customMode ? (knownValue ? value : 'custom') : 'default'}
         disabled={disabled}
         aria-label={t('issues.detail.runModel')}
         onChange={(event) => {
-          if (event.target.value === 'workspace') {
+          if (event.target.value === 'default') {
             setCustomMode(false)
             setDraft('')
             if (value) onChange(null)
+            return
+          }
+          if (event.target.value !== 'custom') {
+            setCustomMode(true)
+            setDraft(event.target.value)
+            onChange(event.target.value)
             return
           }
           setCustomMode(true)
           queueMicrotask(() => inputRef.current?.focus())
         }}
       >
-        <option value="workspace">{workspaceLabel}</option>
+        <option value="default">{defaultLabel}</option>
+        {models.map((model) => (
+          <option key={model.id} value={model.id}>{model.label}</option>
+        ))}
         <option value="custom">
           {value ? t('issues.detail.overrideValue', { value }) : t('issues.detail.customModel')}
         </option>
       </select>
-      {customMode && (
+      {customMode && !knownValue && (
         <input
           ref={inputRef}
           className={`${railControl} mt-1 w-full`}
@@ -335,35 +545,260 @@ function ModelEditor({
   )
 }
 
-function workspaceEffortLabel(
-  detected: WorkspaceCredentialDetection | null,
-  loading: boolean,
-  t: TFunction,
-): string {
-  if (loading) return t('issues.detail.defaultLoading')
-  if (detected?.reasoningEffort) return t('issues.detail.defaultValue', { value: detected.reasoningEffort })
-  if (detected?.reasoningMode === 'none') return t('issues.detail.defaultValue', { value: t('issues.detail.none') })
-  if (detected?.reasoningMode === 'required') return t('issues.detail.defaultValue', { value: t('issues.detail.required') })
-  if (detected?.reasoningDefaultEnabled === true) return t('issues.detail.defaultThinkingOn')
-  if (detected?.reasoningDefaultEnabled === false) return t('issues.detail.defaultThinkingOff')
-  return t('issues.detail.defaultRuntimeDecides')
+function credentialLabel(credential: SavedCredential | null | undefined): string {
+  return credential ? credentialAccessLabel(credential) : ''
 }
 
-function PropertySection({
-  title,
-  description,
-  children,
+function IssueAiEditor({
+  issue,
+  agent,
+  mode,
+  credentials,
+  presets,
+  loading,
+  disabled,
+  onApply,
 }: {
-  title: string
-  description?: string
-  children: ReactNode
+  issue: IssueDetailIssue
+  agent: string | null
+  mode: WorkspaceRuntimeModeSettings | null
+  credentials: readonly SavedCredential[]
+  presets: readonly Preset[]
+  loading: boolean
+  disabled: boolean
+  onApply: (patch: IssuePatch) => void
 }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const initialAccess = issue.credentialSource === 'native'
+    ? 'native'
+    : issue.credential
+      ? `vault:${issue.credential}`
+      : 'inherit'
+  const [access, setAccess] = useState(initialAccess)
+  const [model, setModel] = useState<string | null>(issue.model ?? null)
+  const [effort, setEffort] = useState<ModelReasoningEffort | null>(issue.effort ?? null)
+
+  useEffect(() => {
+    if (!open) return
+    setAccess(initialAccess)
+    setModel(issue.model ?? null)
+    setEffort(issue.effort ?? null)
+  }, [initialAccess, issue.effort, issue.model, open])
+
+  const draftIssue = {
+    ...(access === 'native' ? { credentialSource: 'native' as const } : {}),
+    ...(access.startsWith('vault:') ? { credential: access.slice(6) } : {}),
+    ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
+  }
+  const resolved = resolveIssueAiSelection({ mode, agent, issue: draftIssue })
+  const committed = resolveIssueAiSelection({ mode, agent, issue })
+  const selectedCredential = resolved.credentialSlug
+    ? credentials.find((candidate) => candidate.slug === resolved.credentialSlug) ?? null
+    : null
+  const models = issueModelOptions({
+    agent,
+    credential: selectedCredential,
+    defaultModel: resolved.model ?? selectedCredential?.resolvedModel ?? null,
+    presets,
+  })
+  const effectiveModel = model ?? resolved.model ?? selectedCredential?.resolvedModel ?? null
+  const semantics = issueModelSemantics(effectiveModel, models)
+  const efforts = issueEffortOptions({ agent, semantics, modelKnown: semantics !== null })
+  const inheritedEffort = resolved.reasoningEffort ?? selectedCredential?.resolvedReasoningEffort ?? null
+
+  const committedCredential = committed.credentialSlug
+    ? credentials.find((candidate) => candidate.slug === committed.credentialSlug) ?? null
+    : null
+  const summaryAccess = committed.accessMode === 'vault'
+    ? credentialLabel(committedCredential) || committed.credentialSlug || t('issues.detail.savedAccess')
+    : t('issues.detail.agentLogin')
+  const summaryModel = committed.model ?? committedCredential?.resolvedModel ?? t('issues.detail.runtimeDecides')
+  const summaryEffort = committed.reasoningEffort ?? committedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
+  const provenance = committed.accessOrigin === 'workspace-fixed'
+    ? t('issues.detail.workspaceHeadlessFixed')
+    : committed.accessOrigin === 'workspace-recent'
+      ? t('issues.detail.workspaceHeadlessRecent')
+      : committed.accessOrigin === 'runtime'
+        ? t('issues.detail.agentRuntimeDefault')
+        : t('issues.detail.issueOverride')
+
   return (
-    <section className="rounded-lg border border-border bg-background p-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">{title}</h3>
-      {description && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{description}</p>}
-      <div className="mt-2 divide-y divide-border/60">{children}</div>
-    </section>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <button
+        type="button"
+        aria-label={t('issues.detail.aiConfiguration')}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+        className="oa-pressable grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <KeyRound size={15} className="text-muted-foreground" aria-hidden />
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-medium text-foreground">{summaryAccess}</span>
+          <span className="block truncate text-[11px] text-muted-foreground">{summaryModel} · {summaryEffort}</span>
+          <span className="mt-0.5 block text-[10px] text-muted-foreground/75">{provenance}</span>
+        </span>
+        <ChevronRight size={14} className="text-muted-foreground/70" aria-hidden />
+      </button>
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t('issues.detail.aiConfiguration')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.aiConfigurationDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <label className="block space-y-1.5">
+            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><KeyRound size={14} />{t('issues.detail.aiAccess')}</span>
+            <select
+              className={`${railControl} w-full`}
+              aria-label={t('issues.detail.aiAccess')}
+              value={access}
+              disabled={loading}
+              onChange={(event) => {
+                setAccess(event.target.value)
+                setModel(null)
+                setEffort(null)
+              }}
+            >
+              <option value="inherit">{t('issues.detail.followWorkspaceHeadless')}</option>
+              <option value="native">{t('issues.detail.useAgentLogin')}</option>
+              {credentials.map((credential) => (
+                <option key={credential.slug} value={`vault:${credential.slug}`}>
+                  {credentialLabel(credential)} · {credential.vendor}
+                </option>
+              ))}
+              {issue.credential && !credentials.some((credential) => credential.slug === issue.credential) && (
+                <option value={`vault:${issue.credential}`}>{t('issues.detail.missingCredentialValue', { credential: issue.credential })}</option>
+              )}
+            </select>
+            <span className="block text-[11px] leading-relaxed text-muted-foreground">{t('issues.detail.aiAccessDescription')}</span>
+          </label>
+          <div className="space-y-1.5">
+            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><Cpu size={14} />{t('issues.detail.model')}</span>
+            <ModelEditor
+              value={model ?? undefined}
+              defaultModel={resolved.model ?? selectedCredential?.resolvedModel ?? null}
+              models={models}
+              loadingDefault={loading}
+              disabled={disabled}
+              onChange={setModel}
+            />
+          </div>
+          <label className="block space-y-1.5">
+            <span className="flex items-center gap-2 text-xs font-medium text-foreground"><Brain size={14} />{t('issues.detail.effort')}</span>
+            <select
+              className={`${railControl} w-full`}
+              value={effort ?? ''}
+              disabled={disabled}
+              onChange={(event) => setEffort(event.target.value ? event.target.value as ModelReasoningEffort : null)}
+            >
+              <option value="">{inheritedEffort
+                ? t('issues.detail.workspaceValue', { value: inheritedEffort })
+                : t('issues.detail.runtimeDecides')}</option>
+              {efforts.map((candidate) => <option key={candidate} value={candidate}>{candidate}</option>)}
+            </select>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+          <Button
+            onClick={() => {
+              onApply({
+                credential: access.startsWith('vault:') ? access.slice(6) : null,
+                credentialSource: access === 'native' ? 'native' : null,
+                model,
+                effort,
+              })
+              setOpen(false)
+            }}
+          >
+            {t('issues.detail.applyAiConfiguration')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function SchedulePolicyEditor({
+  issue,
+  saving,
+  onPatch,
+}: {
+  issue: IssueDetailIssue
+  saving: boolean
+  onPatch: (patch: IssuePatch) => Promise<boolean>
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+
+  if (!issue.when) return null
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={saving}
+        onClick={() => setOpen(true)}
+        className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <SlidersHorizontal size={13} aria-hidden />
+        {t('issues.detail.editSchedule')}
+      </Button>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('issues.detail.scheduleSettings')}</DialogTitle>
+          <DialogDescription>{t('issues.detail.scheduleSettingsDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {issue.when.kind === 'cron' && (
+            <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+              <input
+                className="mt-1"
+                type="checkbox"
+                checked={issue.when.catchUp !== false}
+                disabled={saving}
+                aria-label={t('issues.detail.catchUp')}
+                onChange={(event) => onPatch({ catchUp: event.target.checked })}
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">{t('issues.detail.catchUp')}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                  {t('issues.detail.catchUpDescription')}
+                </span>
+              </span>
+            </label>
+          )}
+          <label className="block space-y-1.5">
+            <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+              <Timer size={14} aria-hidden />
+              {t('issues.detail.timeout')}
+            </span>
+            <select
+              className={`${railControl} w-full`}
+              aria-label={t('issues.detail.timeout')}
+              value={issue.timeout ?? ''}
+              disabled={saving}
+              onChange={(event) => {
+                const value = event.target.value
+                onPatch({ timeout: value === '' ? null : value as IssueTimeout })
+              }}
+            >
+              <option value="">{t('issues.detail.timeoutNone')}</option>
+              {ISSUE_TIMEOUTS.map((timeout) => (
+                <option key={timeout} value={timeout}>{timeout}</option>
+              ))}
+            </select>
+            <span className="block text-[11px] leading-relaxed text-muted-foreground">{t('issues.detail.timeoutHint')}</span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => setOpen(false)}>{t('common.close')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -373,14 +808,17 @@ function PropertiesRail({
   agentOptions,
   issueDefaultAgent,
   defaultAgent,
+  headlessRuntime,
   agentReadiness,
   sessions,
   saving,
   retrying,
   error,
   canRetry,
+  canRunNow,
   onPatch,
   onRetry,
+  onRunNow,
   onConfigureAgent,
 }: {
   wsId: string
@@ -388,17 +826,21 @@ function PropertiesRail({
   agentOptions: readonly { id: string; displayName: string; installed?: boolean }[]
   issueDefaultAgent: string | null
   defaultAgent: string | null
+  headlessRuntime: WorkspaceRuntimeModeSettings | null
   agentReadiness: Readonly<Record<string, AgentCredentialReadiness>>
   sessions: readonly WorkspaceSessionDirectoryEntry[]
   saving: boolean
   retrying: boolean
   error: string | null
   canRetry: boolean
-  onPatch: (patch: IssuePatch) => void
-  onRetry: () => void
+  canRunNow: boolean
+  onPatch: (patch: IssuePatch) => Promise<boolean>
+  onRetry: () => Promise<void>
+  onRunNow: () => Promise<void>
   onConfigureAgent: (agent: AgentId) => void
 }) {
   const { t } = useTranslation()
+  const [confirmAction, setConfirmAction] = useState<'run' | 'retry' | null>(null)
   const meta = STATUS_META[issue.status]
   const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
   const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
@@ -410,57 +852,60 @@ function PropertiesRail({
     : undefined
   const effectiveAgent = ownerSession?.agent || issue.agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
   const selectedReadiness = effectiveAgent ? agentReadiness[effectiveAgent] : undefined
-  const agentNeedsCredential = selectedReadiness?.requiresCredential === true && !selectedReadiness.ready
-  const effortOptions = runEffortsForAgent(effectiveAgent)
-  const [workspaceDefaults, setWorkspaceDefaults] = useState<{
+  const [credentialOptions, setCredentialOptions] = useState<{
     agent: string
     loading: boolean
-    detected: WorkspaceCredentialDetection | null
+    credentials: SavedCredential[]
   } | null>(null)
-  const [workspaceDefaultsRevision, setWorkspaceDefaultsRevision] = useState(0)
+  const [presets, setPresets] = useState<readonly Preset[]>([])
 
   useEffect(() => {
-    const handleWorkspaceAgentConfigChanged = (event: Event) => {
-      const detail = (event as CustomEvent<WorkspaceAgentConfigChangedDetail>).detail
-      if (detail?.wsId === wsId && detail.agent === effectiveAgent) {
-        setWorkspaceDefaultsRevision((revision) => revision + 1)
-      }
-    }
-    window.addEventListener(
-      WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
-      handleWorkspaceAgentConfigChanged,
-    )
-    return () => {
-      window.removeEventListener(
-        WORKSPACE_AGENT_CONFIG_CHANGED_EVENT,
-        handleWorkspaceAgentConfigChanged,
-      )
-    }
-  }, [effectiveAgent, wsId])
+    let live = true
+    void configApi.getPresets()
+      .then(({ presets: next }) => { if (live) setPresets(next) })
+      .catch(() => { if (live) setPresets([]) })
+    return () => { live = false }
+  }, [])
 
   useEffect(() => {
-    if (!isConfigurableAgent(effectiveAgent)) {
-      setWorkspaceDefaults(null)
+    if (!effectiveAgent) {
+      setCredentialOptions(null)
       return
     }
     let live = true
-    setWorkspaceDefaults({ agent: effectiveAgent, loading: true, detected: null })
-    void detectWorkspaceCredential(wsId, effectiveAgent)
-      .then((detected) => {
-        if (live) setWorkspaceDefaults({ agent: effectiveAgent, loading: false, detected })
-      })
-      .catch(() => {
-        if (live) setWorkspaceDefaults({ agent: effectiveAgent, loading: false, detected: null })
-      })
-    return () => { live = false }
-  }, [effectiveAgent, workspaceDefaultsRevision, wsId])
+    const refresh = () => {
+      setCredentialOptions((current) => current?.agent === effectiveAgent
+        ? { ...current, loading: true }
+        : { agent: effectiveAgent, loading: true, credentials: [] })
+      void listAgentCredentials(effectiveAgent)
+        .then((credentials) => {
+          if (live) setCredentialOptions({ agent: effectiveAgent, loading: false, credentials })
+        })
+        .catch(() => {
+          if (live) setCredentialOptions({ agent: effectiveAgent, loading: false, credentials: [] })
+        })
+    }
+    refresh()
+    window.addEventListener('openalice:credentials-changed', refresh)
+    return () => {
+      live = false
+      window.removeEventListener('openalice:credentials-changed', refresh)
+    }
+  }, [effectiveAgent])
 
-  const selectedWorkspaceDefaults = workspaceDefaults?.agent === effectiveAgent
-    ? workspaceDefaults
-    : null
+  const availableCredentials = credentialOptions?.agent === effectiveAgent
+    ? credentialOptions.credentials
+    : []
+  const credentialsLoading = credentialOptions?.agent === effectiveAgent
+    ? credentialOptions.loading
+    : Boolean(effectiveAgent)
+  const resolvedAi = resolveIssueAiSelection({ mode: headlessRuntime, agent: effectiveAgent, issue })
+  const agentNeedsCredential = selectedReadiness?.requiresCredential === true
+    && !selectedReadiness.ready
+    && resolvedAi.accessMode === 'native'
   const automationHealthMessage = useMemo<string | null>(() => {
     const health = issue.automationHealth
-    if (!health) return null
+    if (!health) return issue.when ? t('issues.detail.healthMessage.not_started') : null
     // Failure/interruption messages may contain authoritative runtime diagnostics.
     // Keep those verbatim; only localize launcher-owned, deterministic states.
     if (health.state === 'failed' || health.state === 'interrupted') return health.message
@@ -470,7 +915,7 @@ function PropertiesRail({
       })
     }
     const blockedMessages = {
-      'Assigned Session does not exist. Choose an active Session or @workspace.': 'missingSession',
+      'Assigned Session does not exist. Choose an active Session or @new-each-run.': 'missingSession',
       'Assigned Session is retired. Reassign the Issue before its next run.': 'retiredSession',
       'Assigned Session has no resumable runtime conversation yet.': 'unboundSession',
       'Schedule has no future fire. Check its expression and timestamp.': 'noFutureRun',
@@ -490,158 +935,219 @@ function PropertiesRail({
   }, [issue.automationHealth, issue.status, t])
 
   return (
-    <aside id="issue-work-item" className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 space-y-3 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0">
-      <PropertySection
-        title={t('issues.detail.workItem')}
-        description={t('issues.detail.workItemDescription')}
-      >
-        <EditRow label={t('issues.detail.status')}>
-          <meta.Icon size={14} className={`shrink-0 ${meta.className}`} />
-          <select
-            className={railControl}
-            value={issue.status}
-            disabled={saving}
-            aria-label={t('issues.detail.status')}
-            onChange={(e) => onPatch({ status: e.target.value as IssueStatus })}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {t(`issues.status.${s}`)}
-              </option>
-            ))}
-          </select>
-        </EditRow>
-        <EditRow label={t('issues.detail.priority')}>
-          <PriorityIndicator priority={issue.priority} />
-          <select
-            className={`${railControl} capitalize`}
-            value={issue.priority}
-            disabled={saving}
-            aria-label={t('issues.detail.priority')}
-            onChange={(e) => onPatch({ priority: e.target.value as IssuePriority })}
-          >
-            {PRIORITY_OPTIONS.map((p) => (
-              <option key={p} value={p}>
-                {t(`issues.priority.${p}`)}
-              </option>
-            ))}
-          </select>
-        </EditRow>
-        <EditRow label={t('issues.detail.assignee')}>
-          <AssigneeEditor
-            value={issue.assignee}
-            scheduled={Boolean(issue.when)}
-            sessions={sessions}
-            disabled={saving}
-            onChange={(assignee) => onPatch({ assignee })}
-          />
-        </EditRow>
+    <aside
+      id="issue-work-item"
+      className="mt-5 min-w-0 w-full shrink-0 scroll-mt-20 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:mt-0 lg:self-start"
+    >
+      <div className="overflow-hidden rounded-xl border border-border bg-background lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto">
+        <h3 className="sr-only">{t('issues.detail.workItem')}</h3>
+
+        {issue.when && (
+          <section className="oa-status-surface px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <AutomationHealthPill
+                health={issue.automationHealth ?? {
+                  state: 'not_started',
+                  message: t('issues.detail.healthMessage.not_started'),
+                }}
+              />
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {t('issues.detail.lastRun')} · {issue.lastFiredAtMs
+                  ? formatRelativeTime(issue.lastFiredAtMs)
+                  : t('issues.detail.never')}
+              </span>
+            </div>
+            {automationHealthMessage && (
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{automationHealthMessage}</p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {issue.lastFiredAtMs && (
+                <a
+                  href="#issue-runs"
+                  className="inline-flex h-8 items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {t('issues.detail.viewLastRun')}
+                </a>
+              )}
+              {canRetry ? (
+                <Button type="button" size="sm" disabled={retrying} onClick={() => setConfirmAction('retry')} className="ml-auto">
+                  <RotateCcw size={12} aria-hidden />
+                  {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
+                </Button>
+              ) : canRunNow ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={retrying}
+                  onClick={() => setConfirmAction('run')}
+                  className="ml-auto"
+                >
+                  <Play size={12} aria-hidden />
+                  {retrying ? t('issues.detail.runningNow') : t('issues.detail.runNow')}
+                </Button>
+              ) : null}
+            </div>
+          </section>
+        )}
+
+        <InspectorSection title={t('issues.detail.ownership')}>
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-2">
+            <InspectorField
+              label={t('issues.detail.status')}
+              icon={<meta.Icon size={13} className={meta.className} aria-hidden />}
+            >
+              <select
+                className={`${railControl} w-full`}
+                value={issue.status}
+                disabled={saving}
+                aria-label={t('issues.detail.status')}
+                onChange={(e) => onPatch({ status: e.target.value as IssueStatus })}
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{t(`issues.status.${s}`)}</option>
+                ))}
+              </select>
+            </InspectorField>
+            <InspectorField
+              label={t('issues.detail.priority')}
+              icon={<PriorityIndicator priority={issue.priority} />}
+            >
+              <select
+                className={`${railControl} w-full capitalize`}
+                value={issue.priority}
+                disabled={saving}
+                aria-label={t('issues.detail.priority')}
+                onChange={(e) => onPatch({ priority: e.target.value as IssuePriority })}
+              >
+                {PRIORITY_OPTIONS.map((p) => (
+                  <option key={p} value={p}>{t(`issues.priority.${p}`)}</option>
+                ))}
+              </select>
+            </InspectorField>
+          </div>
+          <InspectorField label={t('issues.detail.assignee')} className="mt-3">
+            <AssigneeEditor
+              value={issue.assignee}
+              scheduled={Boolean(issue.when)}
+              sessions={sessions}
+              disabled={saving}
+              onChange={(assignee) => onPatch({ assignee })}
+            />
+          </InspectorField>
+        </InspectorSection>
+
         {issue.when && (
           <>
-          <PropRow label={t('issues.detail.cadence')}><CadencePill when={issue.when} /></PropRow>
-          {ownerResumeId ? (
-            <PropRow label={t('issues.detail.runtime')}>
-              <span title={t('issues.detail.sessionDeterminesRuntime')}>
-                {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
-              </span>
-            </PropRow>
-          ) : (
-            <EditRow label={t('issues.detail.runtime')}>
-              <AgentEditor
-                value={issue.agent}
-                issueDefaultAgent={issueDefaultAgent}
-                defaultAgent={defaultAgent}
-                options={agentOptions}
-                readiness={agentReadiness}
-                disabled={saving}
-                onChange={(agent) => {
-                  const nextAgent = agent || issueDefaultInOptions || defaultInOptions || agentOptions[0]?.id || null
-                  onPatch({
-                    agent,
-                    ...(issue.effort && !runEffortsForAgent(nextAgent).includes(issue.effort)
-                      ? { effort: null }
-                      : {}),
-                  })
-                }}
-                onConfigure={onConfigureAgent}
-              />
-            </EditRow>
-          )}
-          {!ownerResumeId && (
-            <>
-              <EditRow label={t('issues.detail.model')}>
-                <ModelEditor
-                  value={issue.model}
-                  workspaceModel={selectedWorkspaceDefaults?.detected?.model ?? null}
-                  loadingWorkspaceDefault={selectedWorkspaceDefaults?.loading ?? false}
-                  disabled={saving}
-                  onChange={(model) => onPatch({ model })}
-                />
-              </EditRow>
-              <EditRow label={t('issues.detail.effort')}>
-                <select
-                  className={railControl}
-                  value={issue.effort ?? ''}
-                  disabled={saving}
-                  aria-label={t('issues.detail.runEffort')}
-                  onChange={(event) => onPatch({
-                    effort: event.target.value
-                      ? event.target.value as ModelReasoningEffort
-                      : null,
-                  })}
-                >
-                  <option value="">
-                    {workspaceEffortLabel(
-                      selectedWorkspaceDefaults?.detected ?? null,
-                      selectedWorkspaceDefaults?.loading ?? false,
-                      t,
-                    )}
-                  </option>
-                  {effortOptions.map((effort) => (
-                    <option key={effort} value={effort}>{effort}</option>
-                  ))}
-                </select>
-              </EditRow>
-            </>
-          )}
-          {agentNeedsCredential && (
-            <p className="py-2 text-right text-[11px] leading-snug text-warning max-[359px]:text-left">
-              {t('issues.detail.aiCredentialMissing')}
-            </p>
-          )}
-          {issue.automationHealth && (
-            <PropRow label={t('issues.detail.health')}>
-              <div className="flex flex-col items-end gap-1 max-[359px]:items-start">
-                <AutomationHealthPill health={issue.automationHealth} />
-                <span className="max-w-44 text-[11px] leading-snug text-muted-foreground max-[359px]:max-w-none">
-                  {automationHealthMessage}
+            <InspectorSection title={t('issues.detail.schedule')}>
+              <CadenceSummary when={issue.when} />
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock size={13} aria-hidden />
+                  {t('issues.detail.nextRun')}
                 </span>
-                {canRetry && (
-                  <button
-                    type="button"
-                    disabled={retrying}
-                    onClick={onRetry}
-                    className="oa-pressable mt-1 inline-flex min-h-10 items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning transition-colors hover:border-warning/60 hover:bg-warning/15 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
-                  >
-                    <RotateCcw size={12} aria-hidden />
-                    {retrying ? t('issues.detail.retrying') : t('issues.detail.retryNow')}
-                  </button>
-                )}
+                <span className="tabular-nums text-foreground">
+                  {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : '—'}
+                </span>
               </div>
-            </PropRow>
-          )}
-          <PropRow label={t('issues.detail.lastRun')}>
-            {issue.lastFiredAtMs
-              ? formatRelativeTime(issue.lastFiredAtMs)
-              : <span className="text-muted-foreground">{t('issues.detail.never')}</span>}
-          </PropRow>
-          <PropRow label={t('issues.detail.nextRun')}>
-            {issue.nextDueAtMs ? formatRelativeTime(issue.nextDueAtMs) : <span className="text-muted-foreground">—</span>}
-          </PropRow>
+              <div className="mt-1 flex justify-end">
+                <SchedulePolicyEditor issue={issue} saving={saving} onPatch={onPatch} />
+              </div>
+            </InspectorSection>
+
+            <InspectorSection title={t('issues.detail.agent')}>
+              <InspectorField label={t('issues.detail.runtime')}>
+                {ownerResumeId ? (
+                  <div className="overflow-hidden rounded-md border border-border bg-muted/20">
+                    <div
+                      className="flex min-h-10 items-center gap-2.5 px-3 py-2"
+                      title={t('issues.detail.sessionDeterminesRuntime')}
+                    >
+                      <Cpu size={14} className="text-muted-foreground" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                        {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{t('issues.detail.sessionBinding')}</span>
+                    </div>
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 border-t border-border/60 px-3 py-2.5">
+                      <KeyRound size={14} className="text-muted-foreground" aria-hidden />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-medium">
+                          {ownerSession?.runtime?.credentialSource === 'vault'
+                            ? credentialLabel(availableCredentials.find((candidate) => candidate.slug === ownerSession.runtime?.credentialSlug))
+                              || ownerSession.runtime?.credentialSlug
+                              || t('issues.detail.savedAccess')
+                            : t('issues.detail.agentLogin')}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {ownerSession?.runtime?.model ?? t('issues.detail.runtimeDecides')} · {ownerSession?.runtime?.reasoningEffort ?? t('issues.detail.runtimeDecides')}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <AgentEditor
+                      value={issue.agent}
+                      issueDefaultAgent={issueDefaultAgent}
+                      defaultAgent={defaultAgent}
+                      options={agentOptions}
+                      readiness={agentReadiness}
+                      disabled={saving}
+                      onChange={(agent) => {
+                        onPatch({
+                          agent,
+                          credential: null,
+                          credentialSource: null,
+                          model: null,
+                          effort: null,
+                        })
+                      }}
+                      onConfigure={onConfigureAgent}
+                    />
+                  </div>
+                )}
+              </InspectorField>
+
+              {!ownerResumeId && (
+                <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
+                  <div className="flex min-w-0">
+                    <IssueAiEditor
+                      issue={issue}
+                      agent={effectiveAgent}
+                      mode={headlessRuntime}
+                      credentials={availableCredentials}
+                      presets={presets}
+                      loading={credentialsLoading}
+                      disabled={saving}
+                      onApply={onPatch}
+                    />
+                  </div>
+                </InspectorField>
+              )}
+              {agentNeedsCredential && (
+                <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
+              )}
+            </InspectorSection>
           </>
         )}
-      </PropertySection>
-      {error && <p className="mt-2 text-[11px] leading-snug text-destructive">{error}</p>}
+      </div>
+      {error && <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error}</p>}
+      {confirmAction && (
+        <ConfirmDialog
+          title={t(confirmAction === 'retry' ? 'issues.detail.retryNowTitle' : 'issues.detail.runNowTitle')}
+          message={t(confirmAction === 'retry' ? 'issues.detail.retryNowMessage' : 'issues.detail.runNowMessage')}
+          confirmLabel={t(confirmAction === 'retry' ? 'issues.detail.retryNow' : 'issues.detail.runNow')}
+          cancelLabel={t('common.cancel')}
+          workingLabel={t(confirmAction === 'retry' ? 'issues.detail.retrying' : 'issues.detail.runningNow')}
+          variant="primary"
+          onConfirm={async () => {
+            if (confirmAction === 'retry') await onRetry()
+            else await onRunNow()
+            setConfirmAction(null)
+          }}
+          onClose={() => { if (!retrying) setConfirmAction(null) }}
+        />
+      )}
     </aside>
   )
 }
@@ -712,7 +1218,7 @@ function CommentComposer({
         <p className="min-w-0 flex-1 basis-full break-words text-[11px] leading-snug text-muted-foreground sm:basis-auto">
           {ownerResumeId
             ? <>{t('issues.detail.assignedSessionPrefix')} <span className="font-mono text-foreground/75">@{ownerResumeId}</span> {t('issues.detail.assignedSessionSuffix')}</>
-            : assignee === '@new'
+            : assignee === '@new-then-resume'
               ? t('issues.detail.replyBeforeFirstRun')
               : t('issues.detail.replyWithoutOwner')}
         </p>
@@ -761,6 +1267,75 @@ function WhatEditor({
         </p>
       </div>
       <MarkdownWhatEditor value={value} onSave={onSave} />
+    </section>
+  )
+}
+
+function CommentPromptEditor({
+  value,
+  onSave,
+}: {
+  value?: string
+  onSave: (commentPrompt: string | null) => Promise<boolean> | void
+}) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  const [saving, setSaving] = useState(false)
+  const stored = value ?? ''
+  const dirty = draft !== (stored || DEFAULT_ISSUE_COMMENT_PROMPT)
+
+  useEffect(() => {
+    setDraft(value ?? DEFAULT_ISSUE_COMMENT_PROMPT)
+  }, [value])
+
+  return (
+    <section id="issue-comment-prompt" className="mt-4 scroll-mt-20 border-t border-border/60 pt-4">
+      <div className="mb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">
+          {t('issues.detail.commentPrompt')}
+        </h2>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/65">
+          {t('issues.detail.commentPromptDescription')}
+        </p>
+        <p className="mt-1 font-mono text-[11px] leading-snug text-muted-foreground">
+          {t('issues.detail.commentPromptTokens')}
+        </p>
+      </div>
+      <textarea
+        className={`${inputClass} min-h-28 font-mono text-[12.5px] leading-5`}
+        value={draft}
+        aria-label={t('issues.detail.commentPrompt')}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="oa-pressable inline-flex min-h-9 items-center rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50"
+          disabled={saving || !dirty}
+          onClick={async () => {
+            setSaving(true)
+            await onSave(draft.trim() === DEFAULT_ISSUE_COMMENT_PROMPT ? null : draft)
+            setSaving(false)
+          }}
+        >
+          {saving ? t('issues.detail.whatSaving') : t('issues.detail.commentPromptSave')}
+        </button>
+        {stored ? (
+          <button
+            type="button"
+            className="oa-pressable inline-flex min-h-9 items-center rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true)
+              const ok = await onSave(null)
+              if (ok !== false) setDraft(DEFAULT_ISSUE_COMMENT_PROMPT)
+              setSaving(false)
+            }}
+          >
+            {t('issues.detail.commentPromptReset')}
+          </button>
+        ) : null}
+      </div>
     </section>
   )
 }
@@ -902,9 +1477,12 @@ function mutationFieldLabel(field: string, t: TFunction): string {
     case 'assignee': return t('issues.detail.mutationField.assignee')
     case 'schedule': return t('issues.detail.mutationField.schedule')
     case 'runtime': return t('issues.detail.mutationField.runtime')
+    case 'credential': return t('issues.detail.mutationField.credential')
     case 'model': return t('issues.detail.mutationField.model')
     case 'effort': return t('issues.detail.mutationField.effort')
+    case 'timeout': return t('issues.detail.mutationField.timeout')
     case 'what': return t('issues.detail.mutationField.what')
+    case 'commentPrompt': return t('issues.detail.mutationField.commentPrompt')
     default: return field
   }
 }
@@ -917,8 +1495,8 @@ function unknownOriginLabel(reason: string, t: TFunction): string {
 
 function mutationValue(field: string, value: string, t: TFunction): string {
   if (field === 'assignee') {
-    if (value === '@new') return t('issues.detail.mutationValue.newSessionKeepOwner')
-    if (value === '@workspace') return t('issues.detail.mutationValue.newSessionEachRun')
+    if (value === '@new-then-resume') return t('issues.detail.mutationValue.newSessionKeepOwner')
+    if (value === '@new-each-run') return t('issues.detail.mutationValue.newSessionEachRun')
     if (value === '@human') return t('issues.detail.human')
     if (value === '@unassigned') return t('issues.detail.unassigned')
   }
@@ -967,6 +1545,29 @@ function mutationSummary(
   })
 }
 
+export function IssuePendingReply({
+  targetResumeId,
+  progress,
+}: {
+  targetResumeId: string
+  progress?: HeadlessTurnProgress
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="mt-3 border-t border-border/60 pt-2">
+      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <LoaderCircle size={11} className="shrink-0 animate-spin text-primary" aria-hidden />
+        <span>
+          {t('issues.detail.waitingForPrefix')}{' '}
+          <span className="font-mono text-foreground/75">@{targetResumeId}</span>{' '}
+          {t('issues.detail.waitingForSuffix')}
+        </span>
+      </p>
+      {hasTurnProgress(progress) && <TurnProgress progress={progress} />}
+    </div>
+  )
+}
+
 export function IssueActivity({
   activity,
   onOpenSession,
@@ -988,25 +1589,6 @@ export function IssueActivity({
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [openError, setOpenError] = useState<string | null>(null)
   const [identityPopoverId, setIdentityPopoverId] = useState<string | null>(null)
-  const identityPopoverRef = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (!identityPopoverId) return
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!identityPopoverRef.current?.contains(event.target as Node)) {
-        setIdentityPopoverId(null)
-      }
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIdentityPopoverId(null)
-    }
-    document.addEventListener('mousedown', closeOnOutsideClick)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [identityPopoverId])
 
   const openSession = async (record: IssueProvenanceRecord) => {
     setIdentityPopoverId(null)
@@ -1056,11 +1638,10 @@ export function IssueActivity({
                     </div>
                     <MarkdownContent text={comment.markdown} />
                     {delivery?.state === 'pending' && (
-                      <p className="mt-3 border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
-                        {t('issues.detail.waitingForPrefix')}{' '}
-                        <span className="font-mono text-foreground/75">@{delivery.targetResumeId}</span>{' '}
-                        {t('issues.detail.waitingForSuffix')}
-                      </p>
+                      <IssuePendingReply
+                        targetResumeId={delivery.targetResumeId}
+                        progress={delivery.progress}
+                      />
                     )}
                     {delivery?.state === 'failed' && (
                       <p className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-2 text-[11px] leading-snug text-warning">
@@ -1089,28 +1670,28 @@ export function IssueActivity({
                 <div className="min-w-0 flex-1">
                   <div className="text-[12px] text-muted-foreground">
                     {isSession ? (
-                      <span
-                        ref={identityPopoverId === record.id ? identityPopoverRef : undefined}
-                        className="relative inline-block"
+                      <Popover
+                        open={identityPopoverId === record.id}
+                        onOpenChange={(open) => setIdentityPopoverId(open ? record.id : null)}
                       >
-                        <button
-                          type="button"
-                          aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
-                          aria-haspopup="dialog"
-                          aria-expanded={identityPopoverId === record.id}
-                          aria-controls={`issue-session-${record.id}`}
-                          onClick={() => setIdentityPopoverId((open) => open === record.id ? null : record.id)}
-                          disabled={openingId !== null}
-                          className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
+                        <PopoverTrigger
+                          render={<button
+                            type="button"
+                            aria-label={t('issues.detail.showSessionDetails', { origin: originLabel })}
+                            disabled={openingId !== null}
+                            className="inline-flex min-h-10 items-center rounded-sm font-medium text-foreground/80 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-50 sm:min-h-0"
+                          />}
                         >
-                          {originLabel}
-                        </button>
-                        {identityPopoverId === record.id && (
-                          <div
+                            {originLabel}
+                        </PopoverTrigger>
+                        <PopoverContent
                             id={`issue-session-${record.id}`}
                             role="dialog"
                             aria-label={t('issues.detail.sessionDialog', { resumeId: origin.resumeId })}
-                            className="oa-popover-enter absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg"
+                            align="start"
+                            sideOffset={8}
+                            initialFocus={false}
+                            className="z-30 w-72 max-w-[calc(100vw-3rem)] gap-0 rounded-xl border border-border/70 bg-secondary p-3 text-left shadow-lg ring-0"
                           >
                             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
                               {t('issues.detail.session')}
@@ -1129,9 +1710,8 @@ export function IssueActivity({
                                 ? t('issues.detail.opening')
                                 : t('issues.detail.openConversation')}
                             </button>
-                          </div>
-                        )}
-                      </span>
+                        </PopoverContent>
+                      </Popover>
                     ) : (
                       <span className="font-medium text-foreground/80">{originLabel}</span>
                     )}{' '}
@@ -1333,7 +1913,7 @@ export function IssueDetail({
 }: IssueDetailProps) {
   const { t } = useTranslation()
   const { data, error, loading, mutate } = useIssueDetail(wsId, id)
-  const { agents, defaultAgent, issueDefaultAgent, openAgentConfig, openHeadlessRun } = useWorkspaces()
+  const { agents, defaultAgent, issueDefaultAgent, workspaces, openAgentConfig, openHeadlessRun } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const setSidebar = useWorkspace((s) => s.setSidebar)
   const selectInboxEntry = useInboxSelection((s) => s.select)
@@ -1350,6 +1930,11 @@ export function IssueDetail({
   const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
+  const workspace = workspaces.find((candidate) => candidate.id === wsId) ?? null
+  const workspaceIssueDefaultAgent = workspace?.runtimeSettings?.runtime.headless.defaultAgent
+    ?? workspace?.runtimeSettings?.runtime.headless.recent.agent
+    ?? issueDefaultAgent
+  const workspaceLegacyDefaultAgent = workspace?.defaultAgent ?? defaultAgent
 
   useEffect(() => {
     let live = true
@@ -1474,6 +2059,19 @@ export function IssueDetail({
     }
   }, [retrying, wsId, id, mutate])
 
+  const onRunNow = useCallback(async () => {
+    if (retrying) return
+    setRetrying(true)
+    setActionError(null)
+    try {
+      mutate(await issuesApi.runNow(wsId, id))
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRetrying(false)
+    }
+  }, [retrying, wsId, id, mutate])
+
   const backToBoard = (
     <button
       type="button"
@@ -1523,6 +2121,12 @@ export function IssueDetail({
     && latestRun?.failure?.retryable
     && (latestRun.status === 'failed' || latestRun.status === 'interrupted'),
   )
+  const canRunNow = Boolean(
+    issue.when
+    && issue.status !== 'done'
+    && issue.status !== 'canceled'
+    && latestRun?.status !== 'running',
+  )
   const comments = data.comments ?? []
   const inboxReports = data.inboxReports ?? []
   const provenance = data.provenance ?? []
@@ -1538,9 +2142,9 @@ export function IssueDetail({
     })),
   ].filter((record) => Number.isFinite(record.at)).sort((a, b) => a.at - b.at)
   return (
-    <div className="mx-auto max-w-4xl px-4 py-5 md:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-5 md:px-6">
       {backToBoard}
-      <main className="grid min-w-0 gap-x-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+      <main className="grid min-w-0 gap-x-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <header className="min-w-0 lg:col-start-1 lg:row-start-1">
           <div className="mb-1 flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
             <span className="max-w-full break-all font-mono text-[11px] leading-snug text-muted-foreground/70">{id}</span>
@@ -1556,16 +2160,19 @@ export function IssueDetail({
           wsId={wsId}
           issue={issue}
           agentOptions={agentOptions}
-          issueDefaultAgent={issueDefaultAgent}
-          defaultAgent={defaultAgent}
+          issueDefaultAgent={workspaceIssueDefaultAgent}
+          defaultAgent={workspaceLegacyDefaultAgent}
+          headlessRuntime={workspace?.runtimeSettings?.runtime.headless ?? null}
           agentReadiness={agentReadiness}
           sessions={sessionDirectory}
           saving={saving}
           retrying={retrying}
           error={actionError}
           canRetry={canRetry}
+          canRunNow={canRunNow}
           onPatch={onPatch}
-          onRetry={() => void onRetry()}
+          onRetry={onRetry}
+          onRunNow={onRunNow}
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">
@@ -1574,6 +2181,11 @@ export function IssueDetail({
             value={issue.what}
             scheduled={Boolean(issue.when)}
             onSave={(what) => onPatch({ what })}
+          />
+          <CommentPromptEditor
+            key={`${wsId}:${id}:comment-prompt`}
+            value={issue.commentPrompt}
+            onSave={(commentPrompt) => onPatch({ commentPrompt })}
           />
           <IssueActivity
             activity={activity}

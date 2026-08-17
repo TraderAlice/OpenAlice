@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -61,25 +61,35 @@ function launchConfig(overrides: Partial<AgentLaunchConfigState> = {}): AgentLau
     runtimeReadiness: null,
     selectedRuntimeReadiness: null,
     needsCredential: true,
+    canSelectCredential: true,
+    accessMode: 'vault',
     credentials,
     effectiveCredential: 'primary',
     credential: credentials[0]!,
     detectedCredential: null,
     workspaceConfigResolved: true,
+    defaultModel: 'gpt-5',
+    modelOptions: [],
+    launchModel: undefined,
+    effortOptions: ['low', 'medium', 'high'],
+    selectedReasoningEffort: undefined,
+    launchReasoningEffort: undefined,
     aiDetails: null,
     selectedRuntimeUsesGlobalConfig: false,
     credentialSelectionReady: true,
     noCredentials: false,
     needsProviderSetup: false,
-    willOverwriteCredential: false,
     selectedMissing: false,
     anyInstalled: true,
     agentsKnown: true,
     launchCredentialSlug: 'primary',
     selectAgent: vi.fn(),
     selectCredential: vi.fn(),
+    selectRuntimeDefault: vi.fn(),
+    selectWorkspaceDefault: vi.fn(),
+    selectModel: vi.fn(),
+    selectReasoningEffort: vi.fn(),
     resetCredentialSelection: vi.fn(),
-    checkSelectedRuntime: vi.fn(async () => null),
     ...overrides,
   }
 }
@@ -91,6 +101,15 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('AgentLaunchSelectors keyboard menus', () => {
+  it('keeps model and effort together above the phone breakpoint', () => {
+    render(<AgentLaunchSelectors config={launchConfig()} onConfigureProvider={vi.fn()} />)
+
+    const group = screen.getByTestId('agent-launch-inference-group')
+    expect(group.className).toContain('contents')
+    expect(group.className).toContain('sm:flex')
+    expect(group.className).toContain('sm:shrink-0')
+  })
+
   it('moves through the agent menu and returns focus on Escape', async () => {
     const user = userEvent.setup()
     render(<AgentLaunchSelectors config={launchConfig()} onConfigureProvider={vi.fn()} />)
@@ -151,15 +170,170 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
     trigger.focus()
     await user.keyboard('{ArrowUp}')
+    expect(screen.getByText(i18n.t('chatLanding.credentialMenuTitle', { runtime: 'OpenCode' }))).toBeTruthy()
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
 
-    await user.keyboard('{ArrowDown}{End}{Enter}')
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Managed by OpenCode/ }))
+    await user.keyboard('{End}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: /Backup/ }))
+    await user.keyboard('{Enter}')
     expect(selectCredential).toHaveBeenCalledWith('backup')
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
+  })
+
+  it('keeps native runtime login as the default and makes a vault override explicit', async () => {
+    const user = userEvent.setup()
+    const selectCredential = vi.fn()
+    const selectRuntimeDefault = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({
+          needsCredential: false,
+          accessMode: 'native',
+          effectiveCredential: null,
+          credential: null,
+          launchCredentialSlug: undefined,
+          selectCredential,
+          selectRuntimeDefault,
+        })}
+        onConfigureProvider={vi.fn()}
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
+    expect(trigger.textContent).toContain(i18n.t('chatLanding.runtimeAccount', { runtime: 'OpenCode' }))
+    await user.click(trigger)
+    await user.click(screen.getByRole('menuitem', { name: /Primary/ }))
+    expect(selectCredential).toHaveBeenCalledWith('primary')
+
+    await user.click(trigger)
+    await user.click(screen.getByRole('menuitem', {
+      name: new RegExp(i18n.t('chatLanding.runtimeAccount', { runtime: 'OpenCode' })),
+    }))
+    expect(selectRuntimeDefault).toHaveBeenCalledOnce()
+  })
+
+  it('shows the provider as the saved access identity instead of exposing only its slug', () => {
+    const deepseek = {
+      ...credentials[0]!,
+      slug: 'deepseek-1',
+      vendor: 'deepseek',
+      label: 'deepseek-1',
+    }
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({
+          accessMode: 'vault',
+          credentials: [deepseek],
+          effectiveCredential: deepseek.slug,
+          credential: deepseek,
+          launchCredentialSlug: deepseek.slug,
+        })}
+        onConfigureProvider={vi.fn()}
+        labeled
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
+    expect(trigger.textContent).toContain('DeepSeek API')
+    expect(trigger.textContent).toContain('deepseek-1')
+  })
+
+  it('renders paused-session settings as two full-width rows', () => {
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig()}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+        toolbar
+        layout="settings"
+      />,
+    )
+
+    const credentialTrigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectCredential') })
+    const inferenceTrigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
+    expect(credentialTrigger.className).toContain('w-full')
+    expect(inferenceTrigger.className).toContain('w-full')
+    expect(inferenceTrigger.textContent).toContain('gpt-5')
+    expect(inferenceTrigger.textContent).toContain('Effort not specified')
+  })
+
+  it('combines model and reasoning into a nested toolbar menu', async () => {
+    const user = userEvent.setup()
+    const selectModel = vi.fn()
+    const selectReasoningEffort = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({
+          defaultModel: 'gpt-5',
+          modelOptions: [
+            { id: 'gpt-5', label: 'GPT-5' },
+            { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+          ],
+          aiDetails: {
+            model: 'gpt-5',
+            contextWindow: null,
+            reasoning: true,
+            reasoningEffort: 'high',
+            reasoningMode: 'adaptive',
+            source: 'new-injection',
+          },
+          launchReasoningEffort: 'high',
+          selectModel,
+          selectReasoningEffort,
+        })}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+        toolbar
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
+    expect(trigger.textContent).toContain('gpt-5')
+    expect(trigger.textContent).toContain('high reasoning')
+
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.click(screen.getByRole('menuitem', { name: /Model/ }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /GPT-5.6/ }))
+    expect(selectModel).toHaveBeenCalledWith('gpt-5.6-sol')
+
+    await user.keyboard('{Escape}{Escape}')
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.click(screen.getByRole('menuitem', { name: /Effort/ }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'low reasoning' }))
+    expect(selectReasoningEffort).toHaveBeenCalledWith('low')
+  })
+
+  it('keeps free-typed custom models available behind the model submenu', async () => {
+    const user = userEvent.setup()
+    const selectModel = vi.fn()
+    render(
+      <AgentLaunchSelectors
+        config={launchConfig({ selectModel })}
+        onConfigureProvider={vi.fn()}
+        showRuntime={false}
+        toolbar
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectModelAndEffort') })
+    trigger.focus()
+    await user.keyboard('{ArrowDown}')
+    await user.click(screen.getByRole('menuitem', { name: /Model/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.customModel') }))
+
+    const input = await screen.findByRole('textbox', { name: i18n.t('chatLanding.customModelId') })
+    await user.clear(input)
+    await user.type(input, 'private-model-1')
+    await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))
+    expect(selectModel).toHaveBeenCalledWith('private-model-1')
   })
 })

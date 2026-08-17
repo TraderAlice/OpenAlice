@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkspacesContext, type WorkspacesContextValue } from '../../contexts/workspaces-context'
@@ -19,9 +20,26 @@ const actions = vi.hoisted(() => ({
   pauseSession: vi.fn(async () => undefined),
   resumeSession: vi.fn(async () => undefined),
   openWebPiSession: vi.fn(async () => undefined),
+  openHeadlessRun: vi.fn(async () => undefined),
   requestDeleteSession: vi.fn(),
+  setSessionPresence: vi.fn(async () => undefined),
+  setSessionDisplayName: vi.fn(async () => undefined),
+  updateSessionRuntime: vi.fn(async () => undefined),
+  openAgentConfig: vi.fn(),
+}))
+const directoryState = vi.hoisted(() => ({
+  directories: new Map(),
 }))
 const { openOrFocus } = actions
+
+vi.mock('../../hooks/useWorkspaceSessionDirectory', () => ({
+  useWorkspaceSessionDirectories: () => ({
+    directories: directoryState.directories,
+    loading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}))
 
 vi.mock('../../tabs/store', () => ({
   useWorkspace: (selector: (state: { openOrFocus: typeof openOrFocus }) => unknown) =>
@@ -91,17 +109,21 @@ function workspaceContext(
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
-    openHeadlessRun: vi.fn(async () => undefined),
+    openHeadlessRun: actions.openHeadlessRun,
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    initializeChat: vi.fn(async () => { throw new Error('not used') }),
     setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: vi.fn(async () => 'session-1'),
     pauseSession: actions.pauseSession,
     resumeSession: actions.resumeSession,
     openWebPiSession: actions.openWebPiSession,
     requestDeleteSession: actions.requestDeleteSession,
-    openAgentConfig: vi.fn(),
+    setSessionPresence: actions.setSessionPresence,
+    setSessionDisplayName: actions.setSessionDisplayName,
+    updateSessionRuntime: actions.updateSessionRuntime,
+    openAgentConfig: actions.openAgentConfig,
     saveWorkspaceMetadata: vi.fn(async () => undefined),
     renameWorkspace: vi.fn(async () => undefined),
   }
@@ -111,29 +133,170 @@ function renderSection(
   workspaces: readonly Workspace[] = [chatWorkspace],
   workspaceManager: ManagerWorkspaceSnapshot | null = null,
   onNavigate?: () => void,
+  displayMode: 'focused' | 'recent' | 'multi' = 'multi',
+  onRequestDisplayMode: (mode: 'focused' | 'recent' | 'multi') => void = () => undefined,
 ) {
   return render(
     <WorkspacesContext.Provider value={workspaceContext(workspaces, workspaceManager)}>
-      <ChatWorkspaceSection onNavigate={onNavigate} />
+      <ChatWorkspaceSection
+        onNavigate={onNavigate}
+        displayMode={displayMode}
+        onRequestDisplayMode={onRequestDisplayMode}
+      />
     </WorkspacesContext.Provider>,
   )
 }
 
 beforeEach(async () => {
   for (const mock of Object.values(actions)) mock.mockClear()
+  directoryState.directories = new Map()
+  window.localStorage.clear()
   await i18n.changeLanguage('en')
 })
 
 afterEach(cleanup)
 
 describe('ChatWorkspaceSection actions', () => {
-  it('keeps conversation creation primary and scopes workspace creation to the workspace list', () => {
+  it('keeps one durable Workspace focused and starts new conversations inside it', () => {
+    const sessions = [chatSession(1), chatSession(2)]
+    const focusedWorkspace = { ...chatWorkspace, sessions }
+    const onNavigate = vi.fn()
+
+    renderSection([focusedWorkspace], null, onNavigate, 'focused')
+
+    expect(screen.getByText('Recent conversations')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Chat context: chat-jul11' })).toBeTruthy()
+    expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'chat-landing',
+      params: { targetWsId: chatWorkspace.id },
+    })
+    expect(onNavigate).toHaveBeenCalledOnce()
+  })
+
+  it('routes the bottom Workspace context menu into the Workspace tree', () => {
+    const onRequestDisplayMode = vi.fn()
+    renderSection([chatWorkspace], null, undefined, 'focused', onRequestDisplayMode)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
+    const menu = screen.getByRole('dialog', { name: 'Chat Workspace options' })
+    expect(menu.className).toContain('w-72')
+    expect(menu.className).not.toContain('absolute bottom-full')
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace tree' }))
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('multi')
+  })
+
+  it('surfaces a template update from the bottom Workspace context', () => {
+    const upgradeWorkspace: Workspace = {
+      ...chatWorkspace,
+      currentVersion: '1.8.2',
+      upgradeAvailable: { from: '1.8.2', to: '1.8.3' },
+    }
+    renderSection([upgradeWorkspace], null, undefined, 'focused')
+
+    const trigger = screen.getByRole('button', {
+      name: 'Chat context: chat-jul11. Template update available to v1.8.3.',
+    })
+    expect(within(trigger).getByText('Update available · v1.8.3')).toBeTruthy()
+
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Review template update to v1.8.3' }))
+
+    expect(actions.openAgentConfig).toHaveBeenCalledWith('chat-1', undefined, 'template')
+  })
+
+  it('keeps Escape scoped to the open Workspace context menu', () => {
+    renderSection([chatWorkspace], null, undefined, 'focused')
+
+    const trigger = screen.getByRole('button', { name: 'Chat context: chat-jul11' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('dialog', { name: 'Chat Workspace options' })).toBeTruthy()
+    trigger.focus()
+
+    const allowed = fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(allowed).toBe(false)
+    expect(screen.queryByRole('dialog', { name: 'Chat Workspace options' })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('offers an explicit recent view and orders sessions across Workspaces with ownership visible', () => {
+    const olderWorkspace = {
+      ...chatWorkspace,
+      sessions: [{ ...chatSession(1), lastActiveAt: '2026-07-01T12:00:00.000Z' }],
+    }
+    const newerWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+      sessions: [{
+        ...chatSession(2),
+        id: 'newest-session',
+        wsId: 'chat-2',
+        lastActiveAt: '2026-08-03T12:00:00.000Z',
+      }],
+    }
+    const onRequestDisplayMode = vi.fn()
+
+    const { unmount } = renderSection(
+      [olderWorkspace, newerWorkspace],
+      null,
+      undefined,
+      'focused',
+      onRequestDisplayMode,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Recent across Workspaces' }))
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('recent')
+    unmount()
+
+    renderSection([olderWorkspace, newerWorkspace], null, undefined, 'recent')
+    const newer = screen.getByRole('button', { name: 'Conversation 2' })
+    const older = screen.getByRole('button', { name: 'Conversation 1' })
+    expect(newer.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('chat-aug3')).toBeTruthy()
+    expect(screen.getByText('chat-jul11')).toBeTruthy()
+    expect(screen.queryByText('Workspaces', { selector: 'span.uppercase' })).toBeNull()
+  })
+
+  it('switches the focused Workspace through a searchable Dialog', () => {
+    const alternative = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+    }
+    const onRequestDisplayMode = vi.fn()
+    renderSection([chatWorkspace, alternative], null, undefined, 'focused', onRequestDisplayMode)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-aug3' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Workspace' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Switch Workspace' })
+    expect(screen.queryByRole('dialog', { name: 'Chat Workspace options' })).toBeNull()
+    const picker = within(dialog)
+    expect(picker.getByRole('searchbox', { name: 'Search Workspaces…' })).toBeTruthy()
+    fireEvent.click(picker.getByRole('button', { name: /chat-jul11/ }))
+
+    expect(openOrFocus).toHaveBeenCalledWith({
+      kind: 'chat-landing',
+      params: { targetWsId: chatWorkspace.id },
+    })
+    expect(onRequestDisplayMode).toHaveBeenCalledWith('focused')
+  })
+
+  it('keeps conversation creation primary and scopes workspace creation to the workspace list', async () => {
+    const user = userEvent.setup()
     const onNavigate = vi.fn()
     renderSection([chatWorkspace], null, onNavigate)
 
     const newChat = screen.getByRole('button', { name: 'New chat' })
-    const newWorkspace = screen.getByRole('button', { name: 'New workspace' })
-    const workspaceHeading = screen.getByText('Workspaces', { selector: 'span' })
+    const workspaceHeading = screen.getByText('Workspaces', { selector: 'span.uppercase' })
     const workspaceButton = screen.getByRole('button', { name: chatWorkspace.tag })
     const newSession = screen.getByRole('button', { name: 'New conversation in chat-jul11' })
     const moreWorkspaceActions = screen.getByRole('button', { name: 'More actions for chat-jul11' })
@@ -141,13 +304,12 @@ describe('ChatWorkspaceSection actions', () => {
     expect(newChat.className).toContain('w-full')
     expect(newChat.textContent).toBe('New chat')
     expect(newChat.querySelector('.lucide-message-square-plus')).toBeTruthy()
-    expect(workspaceHeading.parentElement?.nextElementSibling?.contains(newWorkspace)).toBe(true)
-    expect(newWorkspace.className).toContain('w-full')
-    expect(newWorkspace.textContent).toBe('New workspace')
-    expect(newWorkspace.querySelector('.lucide-panels-top-left')).toBeTruthy()
+    expect(workspaceHeading.parentElement?.nextElementSibling?.tagName).toBe('UL')
+    expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
     expect(newSession.querySelector('.lucide-message-square-plus')).toBeTruthy()
 
-    fireEvent.click(moreWorkspaceActions)
+    moreWorkspaceActions.focus()
+    await user.keyboard('{ArrowDown}')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Configure chat-jul11' }))
     expect(onNavigate).not.toHaveBeenCalled()
 
@@ -168,9 +330,13 @@ describe('ChatWorkspaceSection actions', () => {
       params: { targetWsId: chatWorkspace.id },
     })
     expect(onNavigate).toHaveBeenCalledTimes(3)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    expect(screen.getByRole('button', { name: 'New workspace' })).toBeTruthy()
   })
 
-  it('keeps named Workspace identity compact and scopes every row action to it', () => {
+  it('keeps named Workspace identity compact and scopes every row action to it', async () => {
+    const user = userEvent.setup()
     const namedWorkspace: Workspace = {
       ...chatWorkspace,
       id: 'chat-optical',
@@ -192,7 +358,8 @@ describe('ChatWorkspaceSection actions', () => {
     const more = screen.getByRole('button', {
       name: 'More actions for Optical Networking Follow-up (chat-jun30)',
     })
-    fireEvent.click(more)
+    more.focus()
+    await user.keyboard('{ArrowDown}')
     const configure = screen.getByRole('menuitem', {
       name: 'Configure Optical Networking Follow-up (chat-jun30)',
     })
@@ -214,7 +381,9 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([])
 
     expect(screen.getByText(i18n.t('chat.noChatWorkspacesYet'))).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'New workspace' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'New workspace' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    expect(screen.getByRole('button', { name: 'New workspace' })).toBeTruthy()
   })
 
   it('reports a failed Workspace inventory without pretending the list is empty', () => {
@@ -259,23 +428,77 @@ describe('ChatWorkspaceSection actions', () => {
     expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
-  it('bounds expanded Workspace history and routes the full catalog to the Session library', () => {
+  it('scrolls the full Workspace roster and keeps Browse in the context menu', () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
     const onNavigate = vi.fn()
     renderSection([{ ...chatWorkspace, sessions }], null, onNavigate)
 
-    expect(screen.getAllByRole('button', { name: /^Conversation/ })).toHaveLength(6)
-    expect(screen.queryByRole('button', { name: 'Conversation 3' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
+    expect(screen.getByRole('button', { name: 'Conversation 3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'View all 9 sessions' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'View all 9 sessions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    const browser = within(dialog)
+    expect(browser.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
+    expect(openOrFocus).not.toHaveBeenCalled()
+
+    fireEvent.click(browser.getByRole('button', { name: 'Conversation 3' }))
     expect(openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace',
-      params: { wsId: chatWorkspace.id, source: 'chat' },
+      params: { wsId: chatWorkspace.id, sessionId: 'chat-session-3', source: 'chat' },
     })
     expect(onNavigate).toHaveBeenCalledTimes(1)
   })
 
-  it('owns Manager Session navigation and lifecycle actions under the Manager entry', () => {
+  it('browses current or cross-Workspace conversations without leaving the page first', async () => {
+    const user = userEvent.setup()
+    const olderWorkspace = {
+      ...chatWorkspace,
+      sessions: [{ ...chatSession(1), title: 'Older thesis' }],
+    }
+    const currentWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+      sessions: [{
+        ...chatSession(2),
+        id: 'current-session',
+        wsId: 'chat-2',
+        title: 'Current thesis',
+      }],
+    }
+    renderSection([olderWorkspace, currentWorkspace], null, undefined, 'focused')
+
+    const trigger = screen.getByRole('button', { name: 'Chat context: chat-aug3' })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    const browser = within(dialog)
+    expect(browser.getByRole('button', { name: 'Current thesis' })).toBeTruthy()
+    expect(browser.queryByRole('button', { name: 'Older thesis' })).toBeNull()
+
+    fireEvent.click(browser.getByRole('button', { name: 'All Workspaces' }))
+    expect(browser.getByRole('button', { name: 'Older thesis' })).toBeTruthy()
+
+    fireEvent.change(browser.getByRole('searchbox', { name: 'Search conversations…' }), {
+      target: { value: 'older' },
+    })
+    expect(browser.queryByRole('button', { name: 'Current thesis' })).toBeNull()
+    expect(browser.getByRole('button', { name: 'Older thesis' })).toBeTruthy()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Browse all conversations' })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('owns Manager Session navigation and lifecycle actions under the Manager entry', async () => {
+    const user = userEvent.setup()
     const onNavigate = vi.fn()
     const manager: ManagerWorkspaceSnapshot = {
       id: MANAGER_WORKSPACE_ID,
@@ -343,13 +566,172 @@ describe('ChatWorkspaceSection actions', () => {
 
     const pausedRow = pausedSession.parentElement
     expect(pausedRow).toBeTruthy()
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' }))
-    fireEvent.click(within(pausedRow as HTMLElement).getByRole('menuitem', { name: 'Delete Coordinate owners' }))
+    const managerMore = within(pausedRow as HTMLElement).getByRole('button', { name: 'More actions for Coordinate owners' })
+    managerMore.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Coordinate owners' }))
     expect(actions.requestDeleteSession).toHaveBeenCalledWith(MANAGER_WORKSPACE_ID, 'manager-pi')
     expect(onNavigate).toHaveBeenCalledTimes(2)
 
     fireEvent.click(managerUi.getByRole('button', { name: 'Collapse sessions' }))
     expect(managerUi.queryByRole('button', { name: 'Inspect the floor' })).toBeNull()
     expect(onNavigate).toHaveBeenCalledTimes(2)
+  })
+
+  it('groups running headless Sessions and explains why TUI is temporarily unavailable', async () => {
+    const onNavigate = vi.fn()
+    directoryState.directories = new Map([[chatWorkspace.id, {
+      workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
+      sessions: [
+        {
+          resumeId: 'resume-headless-colleague',
+          agent: 'codex',
+          createdAt: Date.parse('2026-08-01T00:00:00.000Z'),
+          updatedAt: Date.parse('2026-08-02T00:00:00.000Z'),
+          lifecycle: 'active',
+          resumable: true,
+          active: false,
+          latestExecution: {
+            taskId: 'task-done',
+            status: 'done',
+            startedAt: Date.parse('2026-08-02T00:00:00.000Z'),
+            finishedAt: Date.parse('2026-08-02T00:05:00.000Z'),
+            assistantPreview: 'Morning scan complete. Semis still lead.',
+          },
+        },
+        {
+          resumeId: 'resume-headless-running',
+          agent: 'claude',
+          createdAt: Date.parse('2026-08-03T00:00:00.000Z'),
+          updatedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+          lifecycle: 'active',
+          resumable: true,
+          active: true,
+          latestExecution: {
+            taskId: 'task-run',
+            status: 'running',
+            startedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+            issueId: 'scan-open',
+          },
+        },
+      ],
+    }]])
+
+    const headlessWorkspace = {
+      ...chatWorkspace,
+      sessions: [
+        {
+          ...chatSession(20),
+          id: 'session-headless-colleague',
+          resumeId: 'resume-headless-colleague',
+          agent: 'codex',
+          name: 'x1',
+          surface: 'headless' as const,
+          title: null,
+          lastActiveAt: '2026-08-02T00:05:00.000Z',
+        },
+        {
+          ...chatSession(21),
+          id: 'session-headless-running',
+          resumeId: 'resume-headless-running',
+          agent: 'claude',
+          name: 'c1',
+          surface: 'headless' as const,
+          state: 'running' as const,
+          title: null,
+          lastActiveAt: '2026-08-03T01:00:00.000Z',
+        },
+      ],
+    }
+
+    renderSection([headlessWorkspace], null, onNavigate, 'focused')
+
+    const runningSection = screen.getByRole('region', { name: 'Running in background' })
+    expect(within(runningSection).getByText('scan-open')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Morning scan complete. Semis still lead.' })).toBeTruthy()
+    const [runningTitle, runningPlay] = screen.getAllByRole('button', { name: 'Running · scan-open' })
+    fireEvent.click(runningTitle!)
+    expect(screen.getByRole('dialog', { name: 'This Session is running in the background' })).toBeTruthy()
+    expect(screen.getByText('Started by Issue scan-open')).toBeTruthy()
+    expect(openOrFocus).not.toHaveBeenCalled()
+    expect(actions.resumeSession).not.toHaveBeenCalled()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]!)
+
+    fireEvent.click(runningPlay!)
+    expect(screen.getByRole('dialog', { name: 'This Session is running in the background' })).toBeTruthy()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]!)
+
+    fireEvent.click(within(runningSection).getByRole('button', { name: /Running in background/ }))
+    expect(within(runningSection).queryByText('scan-open')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Morning scan complete. Semis still lead.' }))
+    expect(actions.resumeSession).toHaveBeenCalledWith(
+      chatWorkspace.id,
+      'session-headless-colleague',
+      'chat',
+    )
+    expect(onNavigate).toHaveBeenCalledOnce()
+
+    const user = userEvent.setup()
+    const more = screen.getByRole('button', { name: 'More actions for Morning scan complete. Semis still lead.' })
+    more.focus()
+    await user.keyboard('{ArrowDown}')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive Morning scan complete. Semis still lead.' }))
+    expect(actions.setSessionPresence).toHaveBeenCalledWith(
+      chatWorkspace.id,
+      'resume-headless-colleague',
+      'archived',
+    )
+  })
+
+  it('keeps headless occupancy inside Browse Running without a Headless filter', () => {
+    directoryState.directories = new Map([[chatWorkspace.id, {
+      workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
+      sessions: [{
+        resumeId: 'resume-headless-running',
+        agent: 'claude',
+        createdAt: Date.parse('2026-08-03T00:00:00.000Z'),
+        updatedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+        lifecycle: 'active',
+        resumable: true,
+        active: true,
+        latestExecution: {
+          taskId: 'task-run',
+          status: 'running',
+          startedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+          issueId: 'scan-open',
+        },
+      }],
+    }]])
+    const pausedWorkspace = {
+      ...chatWorkspace,
+      sessions: [
+        { ...chatSession(1), title: 'Paused thesis' },
+        {
+          ...chatSession(22),
+          id: 'session-headless-running',
+          resumeId: 'resume-headless-running',
+          agent: 'claude',
+          name: 'c1',
+          surface: 'headless' as const,
+          state: 'running' as const,
+          title: null,
+          lastActiveAt: '2026-08-03T01:00:00.000Z',
+        },
+      ],
+    }
+    renderSection([pausedWorkspace], null, undefined, 'focused')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
+    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    const browser = within(dialog)
+    expect(browser.getByRole('button', { name: 'Paused thesis' })).toBeTruthy()
+    expect(browser.getByRole('button', { name: 'Running · scan-open' })).toBeTruthy()
+
+    fireEvent.click(browser.getByRole('button', { name: /^Running$/ }))
+    expect(browser.queryByRole('button', { name: 'Paused thesis' })).toBeNull()
+    expect(browser.getByRole('button', { name: 'Running · scan-open' })).toBeTruthy()
+    expect(browser.queryByRole('button', { name: 'Headless' })).toBeNull()
   })
 })

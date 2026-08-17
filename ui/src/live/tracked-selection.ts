@@ -11,17 +11,26 @@ reloadOnHotUpdate('live/tracked-selection')
  * Not persisted: ephemeral UI state, no value across reloads.
  */
 
+export interface TrackedIssueSelection {
+  workspaceId: string
+  issueId: string
+}
+
 interface TrackedSelectionState {
   selectedName: string | null
+  selectedIssue: TrackedIssueSelection | null
 }
 
 interface TrackedSelectionActions {
   select: (name: string | null) => void
+  selectIssue: (issue: TrackedIssueSelection) => void
 }
 
 export const useTrackedSelection = create<TrackedSelectionState & TrackedSelectionActions>()(
   (set) => ({
     selectedName: null,
-    select: (name) => set({ selectedName: name }),
+    selectedIssue: null,
+    select: (name) => set({ selectedName: name, selectedIssue: null }),
+    selectIssue: (issue) => set({ selectedName: null, selectedIssue: issue }),
   }),
 )

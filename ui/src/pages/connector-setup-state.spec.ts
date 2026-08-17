@@ -55,4 +55,17 @@ describe('Connector setup lifecycle', () => {
       serviceEnabled: false,
     })).toMatchObject({ stage: 'linked_offline', linked: true })
   })
+
+  it('ignores a stale runtime owner while Settings is clearing learned fields', () => {
+    expect(getConnectorSetupState({
+      definition,
+      adapter: {
+        enabled: true,
+        configuredSecrets: ['botToken'],
+        settings: { ownerUserId: '', chatId: '' },
+      },
+      serviceEnabled: true,
+      runtime: { id: 'telegram', enabled: true, status: 'healthy', owner: 'owner-1' },
+    })).toMatchObject({ stage: 'awaiting_link', linked: false })
+  })
 })

@@ -2,16 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyRuntimeReadinessFailure,
+  failedRuntimeReadinessRow,
   runtimeProbeSucceeded,
   snapshotRuntimeReadiness,
   type AgentRuntimeReadinessRow,
 } from './agent-runtime-readiness.js';
-import type { CliAdapter } from './cli-adapter.js';
+import { emptyAgentSessionRuntime, type CliAdapter } from './cli-adapter.js';
 import type { HeadlessTaskResult } from './headless-task.js';
 
 const piAdapter: CliAdapter = {
   id: 'pi',
   displayName: 'Pi',
+  sessionRuntime: emptyAgentSessionRuntime,
   kind: 'agent',
   binary: 'pi',
   capabilities: {
@@ -20,6 +22,10 @@ const piAdapter: CliAdapter = {
     resumeById: true,
     transcriptDiscovery: 'none',
     headless: true,
+    aiProvider: {
+      credentialSource: 'runtime-or-workspace',
+      wirePreference: ['openai-chat'],
+    },
   },
   composeCommand: () => ['pi'],
   composeHeadlessCommand: () => ['pi', '-p', 'hi'],
@@ -65,6 +71,18 @@ describe('agent runtime readiness helpers', () => {
     expect(classifyRuntimeReadinessFailure(result({ stderrTail: 'boom' }))).toBe('failed');
   });
 
+  it('routes missing native provider state to CLI login for a login-capable runtime', () => {
+    expect(failedRuntimeReadinessRow({
+      adapter: piAdapter,
+      availability: { installed: true, path: '/usr/bin/pi' },
+      result: result({ stderrTail: 'missing API key provider config' }),
+      source: 'global-login',
+    })).toMatchObject({
+      status: 'provider_required',
+      repairTarget: 'cli-login',
+    });
+  });
+
   it('requires a clean exit with a decoded assistant reply to count as ready', () => {
     expect(runtimeProbeSucceeded(result({ exitCode: 0, assistantText: 'Hello!' }))).toBe(true);
     expect(runtimeProbeSucceeded(result({ exitCode: 0, stdoutTail: '{"type":"system"}' }))).toBe(false);
@@ -76,6 +94,36 @@ describe('agent runtime readiness helpers', () => {
       exitCode: 0,
       stdoutTail: '{"type":"future_event","message":"started"}',
     }))).toBe('output_unrecognized');
+  });
+
+  it('preserves an in-band provider error instead of calling it unrecognized output', () => {
+    const providerError = result({
+      exitCode: 0,
+      stdoutTail: '{"type":"message_end","message":{"stopReason":"error"}}',
+      structured: {
+        schemaVersion: 1,
+        assistantText: null,
+        blocks: [{
+          type: 'error',
+          message: '429: 余额不足或无可用资源包，请充值。',
+        }],
+        metrics: { textBlocks: 0, toolCalls: 0, toolFailures: 0 },
+        truncated: false,
+      },
+    });
+
+    expect(classifyRuntimeReadinessFailure(providerError)).toBe('failed');
+    expect(failedRuntimeReadinessRow({
+      adapter: piAdapter,
+      availability: { installed: true, path: '/usr/bin/pi' },
+      result: providerError,
+      source: 'launcher-vault',
+    })).toMatchObject({
+      status: 'failed',
+      ready: false,
+      repairTarget: 'retry',
+      message: 'The runtime reported an error: 429: 余额不足或无可用资源包，请充值。',
+    });
   });
 
   it('GET snapshot uses cached rows without inventing readiness', () => {

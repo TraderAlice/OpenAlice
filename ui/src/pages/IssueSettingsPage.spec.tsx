@@ -37,7 +37,8 @@ describe('IssueSettingsPage', () => {
 
     expect(select.id).not.toBe('')
     expect(document.querySelector(`label[for="${select.id}"]`)?.textContent).toBe('Agent runtime')
-    expect(description?.textContent).toContain('installation session default (opencode)')
+    expect(description?.textContent).toContain("each target Workspace's Session default")
+    expect(description?.textContent).toContain('Alice fallback (opencode)')
     expect(screen.queryByRole('option', { name: 'Shell' })).toBeNull()
   })
 })

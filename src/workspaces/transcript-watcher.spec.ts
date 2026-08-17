@@ -33,9 +33,12 @@ function fakeSession(recordId: string, cwd: string): PersistentSession {
   } as unknown as PersistentSession;
 }
 
-function fakeSubprocessAdapter(list: () => Promise<readonly OnDiskSession[]>): CliAdapter {
+function fakeSubprocessAdapter(
+  list: () => Promise<readonly OnDiskSession[]>,
+  id = 'fake',
+): CliAdapter {
   return {
-    id: 'fake',
+    id,
     displayName: 'Fake',
     capabilities: { parallelPerCwd: true, resumeLast: true, resumeById: true, transcriptDiscovery: 'subprocess' },
     composeCommand: (base: readonly string[]) => base,
@@ -99,5 +102,22 @@ describe('TranscriptWatcher — subprocess poll discovery', () => {
     // oldest pending (a) gets oldest new id; b gets the next; no double-claim.
     expect(a.agentSessionId).toBe('ses_1');
     expect(b.agentSessionId).toBe('ses_2');
+  });
+
+  it('keeps concurrent runtime discovery isolated within the same workspace cwd', async () => {
+    let ompSessions: OnDiskSession[] = [];
+    let codexSessions: OnDiskSession[] = [];
+    const omp = fakeSession('recOmp', '/ws/shared');
+    const codex = fakeSession('recCodex', '/ws/shared');
+
+    await watcher.register(omp, fakeSubprocessAdapter(async () => ompSessions, 'omp'));
+    await watcher.register(codex, fakeSubprocessAdapter(async () => codexSessions, 'codex'));
+
+    codexSessions = [sess('codex_native', '2026-06-05T10:00:00Z')];
+    ompSessions = [sess('omp_native', '2026-06-05T10:00:01Z')];
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(omp.agentSessionId).toBe('omp_native');
+    expect(codex.agentSessionId).toBe('codex_native');
   });
 });

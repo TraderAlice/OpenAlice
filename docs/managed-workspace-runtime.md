@@ -18,8 +18,10 @@ The default packaged path is:
 
 1. OpenAlice supplies a managed Pi runtime.
 2. The user configures an API-key credential in **Settings → AI Provider**.
-3. OpenAlice injects that credential into the Workspace's Pi config.
-4. Pi starts with the OpenAlice CLIs and shared skills already available.
+3. The Workspace records that secret-free credential reference, model, and
+   effort preference in `.alice/settings.json`.
+4. OpenAlice resolves the secret just in time and projects it into each Pi
+   process; Pi starts with the OpenAlice CLIs and shared skills available.
 
 The runtime and the model credential are separate requirements. Bundling Pi
 removes the CLI/toolchain prerequisite; it does not bundle a model account or
@@ -75,34 +77,27 @@ while confirmed gateway endpoints can use `Authorization: Bearer` without also
 emitting a conflicting API-key header. Old Workspace defaults without an
 explicit protocol keep the runtime preference order for backward compatibility.
 
-**Settings → AI Provider → Default Workspace credentials** owns creation-time
-defaults only: per-agent credential, optional protocol, and the opencode/Pi
-context limit. The context default is 256K so users do not cross common
-higher-price tiers implicitly. Changing these settings never rewrites an
-existing Workspace; that Workspace's settings modal remains the explicit
-override surface.
+**Settings → AI Provider → Default Workspace credentials** is a deprecated
+installation-level creation seed. New Workspaces translate it into secret-free
+runtime preferences; changing it never rewrites an existing Workspace. Normal
+users choose native auth or a vault credential on the launch surface, and the
+accepted choice becomes that Workspace's recent preference.
 
 Credential access and model semantics are separate inputs. Known model ids
 resolve reasoning behavior and advertised limits from the offline registry;
-the injector caps the selected context policy at the model maximum and leaves
-effort to the native runtime. Only unknown/free-typed models expose an advanced
+the Session binding resolver caps the selected context policy at the model
+maximum and leaves effort to the native runtime. Only unknown/free-typed models expose an advanced
 reasoning override, and creation defaults bind that assertion to the exact
 model id so it cannot leak across a later model change. Follow
 [[docs/model-semantics-and-runtime-injection.md]] for the full contract.
 
-Quick Chat must summarize the launch configuration behind its credential pill:
-the effective model ID and every context limit actually declared by the native
-project config are visible before Send. For an existing Workspace these values
-come from its CLI-native config; selecting a different Pi/opencode credential
-previews the model that credential will inject and the global context default.
-Claude Code and Codex Workspace overrides show their model but omit context
-because those native project files do not declare one. The adjacent adjustment
-action opens that Workspace's AI injector for all four runtimes, and falls back
-to AI Provider settings before the first Workspace has been created. Saving the
-Workspace modal refreshes this summary without requiring a page reload.
-Their default remains the CLI's own global login and configuration: Alice never
-chooses the first compatible vault credential simply because one exists. Only
-an explicit Workspace binding or creation default opts into injection.
+Quick Chat summarizes the exact pending binding behind its credential/model
+controls. For an existing Workspace these values come from its interactive
+recent preference in `.alice/settings.json`; selecting another credential,
+model, or effort updates the file only after the fresh Session is accepted for
+launch. Native auth is always a valid explicit choice, including for Pi and
+opencode when the user has configured them globally. Native project config
+export remains available only under the deprecated compatibility section.
 
 Claude Code can place global onboarding and per-project trust screens before an
 interactive seeded prompt even after the same Workspace passes a headless
@@ -398,10 +393,10 @@ pinning and upgrading the bundled Pi with the OpenAlice release.
 
 Source development and user-installed Pi update trust in Pi's normal user
 agent directory (or an explicit user-provided `PI_CODING_AGENT_DIR`). Provider
-overrides do not change that directory: OpenAlice adds a namespaced provider to
-its `models.json` and uses the native Workspace `.pi/settings.json` layer to
-select it. This keeps the user's global settings, packages, auth, resources,
-trust, and sessions visible.
+overrides do not change or write that directory: a generic managed extension
+under the Workspace's `.pi/extensions/` registers the local provider, and the
+native Workspace `.pi/settings.json` layer selects it. This keeps the user's
+global models, settings, packages, auth, resources, trust, and sessions visible.
 
 An installer-owned OpenAlice Runtime is a separate managed boundary. A launcher
 carrying `OPENALICE_MANAGED_PI_PATH` causes the selected complete home to set
@@ -458,18 +453,23 @@ OpenAlice copies Workspace skills into two canonical project paths:
 - `.claude/skills/` for Claude Code;
 - `.agents/skills/` for Codex, current Pi, and compatible shared-skill readers.
 
-Pi's provider definition lives in its normal user `models.json`; the Workspace
-stores provider/model selection, the automatic terminal theme default, and
-OpenAlice rollback metadata under `.pi/`. Do not restore a duplicate
+Pi's provider definition and reversible ownership state live in the sensitive
+Workspace-local `.pi/openalice-provider.json`. The generic managed
+`.pi/extensions/openalice-provider.ts` registers it in-process, while project
+settings store provider/model selection and the automatic terminal theme
+default. Both managed files are excluded from git. Do not restore a duplicate
 `.pi/skills/` copy: current Pi discovers the shared `.agents/skills/` tree from
 the Workspace working directory.
 
-Provider injection into shared native JSON config is node-owned, not
-file-owned. Claude Code's `.claude/settings.local.json` and opencode's
+The deprecated provider export into shared native JSON config is node-owned,
+not file-owned. Claude Code's `.claude/settings.local.json` and opencode's
 `opencode.json` preserve unknown/user keys and use their adjacent OpenAlice
 rollback sidecars for conflict-aware reset. Keep all native provider config and
 rollback paths, plus OpenCode's generated `tui.json`, in `_common.mjs`'s local
-git excludes.
+git excludes. Alice never reads this export to resolve a fresh managed binding
+or readiness probe. A native CLI can still discover a retained project file
+through its own config precedence, which is why the compatibility UI is explicit
+and warns before writing it.
 
 ## Packaging Invariants
 
@@ -490,6 +490,27 @@ directory packages may not have updater metadata, so the native check reports
 that it is unsupported and the shared version route remains the non-installing
 fallback. The top-level update banner and downloaded-update prompt remain
 secondary notifications over the same backend and updater state.
+
+The update UI must distinguish determinate download progress from the native
+installer handoff. Before closing, the old app reports `preparing`,
+`stopping-services`, `releasing-runtime`, and `handing-off` stages, releases
+the Guardian runtime lock, and emits a native notification that OpenAlice may
+remain closed for up to a minute. Do not invent an install percentage: the
+platform installer does not expose one to the old Electron process.
+
+Before the handoff, Electron atomically records
+`openalice-update-attempt.json` in its machine-local `userData` directory. The
+new version clears that marker on first launch. If the initiating version is
+still running after the bounded installer window, the marker is archived as
+`.failed` and a native error names the target version and desktop diagnostic
+log. This marker is updater evidence, not user-owned OpenAlice state, and does
+not belong under `OPENALICE_HOME`.
+
+Alice startup stderr is tee'd to the terminal and the bounded `desktop.log`
+under Electron's platform log directory. If Alice exits before the renderer is
+ready—or later exits unexpectedly—the desktop shows a native error with the
+last diagnostic lines and log path before cascading shutdown. A failed local
+backend must never present as an unexplained desktop flash-and-exit.
 
 Keep these true together:
 
@@ -550,6 +571,40 @@ output, tool use, and cleanup failures distinguishable. The Desktop Package
 Smoke matrix preserves these receipts as CI artifacts. Release candidates run
 the same acceptance on all three platform/architecture builds before any tag or
 GitHub Release is created; only accepted installers are then published.
+
+### N-1 desktop upgrade acceptance
+
+Fresh-package startup is not upgrade evidence. Every native Desktop Package
+Smoke job also downloads the newest published desktop release whose product
+version differs from the candidate, runs that real app against an isolated
+home, creates a Chat Workspace plus persisted metadata and browser state, then
+opens the same home with the unpacked candidate. Acceptance requires:
+
+- the candidate reports its expected version;
+- the N-1 Workspace id, display metadata, and renderer sentinel survive;
+- the candidate can create a new Workspace after migrations;
+- a second candidate launch reads both old and new state; and
+- every check is recorded in a versioned JSON receipt.
+
+The runner uses explicit temporary `OPENALICE_HOME`, `AQ_LAUNCHER_ROOT`,
+`OPENALICE_GLOBAL_DIR`, and Electron `userData` roots. It never reads normal
+desktop data, credentials, or preferences. The previous renderer is driven
+through a short-lived loopback DevTools endpoint so the test uses its real API
+and bootstrap code without adding a production smoke route.
+
+Release candidates repeat the journey against publication bytes. macOS expands
+the final signed architecture-specific ZIP; Windows silently installs N-1 and
+then runs the final NSIS installer over the same isolated install directory.
+Before either artifact is accepted, the release job parses the platform update
+YAML and recomputes the referenced file size and SHA-512, requires its blockmap,
+and verifies the candidate version. A failed upgrade receipt or byte mismatch
+blocks `publish-release`, so no tag, GitHub Release, or CDN mirror is created.
+
+This gate proves N-1 state compatibility and the shipped ZIP/NSIS bytes. macOS
+ShipIt replacement and signing/notarization remain native release mechanics;
+the updater status/handoff contract stays covered by desktop unit/UI tests and
+signed release rehearsal. Do not describe an unpacked-package PR smoke as proof
+that ShipIt itself replaced the application.
 
 Do not replace the actual shims with direct tool-function calls in this smoke:
 that would stop covering argv parsing, manifest discovery, managed Node,

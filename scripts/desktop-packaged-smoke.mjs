@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer as createNetServer } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
@@ -14,6 +14,10 @@ import { buildDesktopPackagedSmokePlan } from './desktop-packaged-smoke-plan.mjs
 import { runPnpmSync } from './pnpm-command.mjs'
 import { packagedElectronExecutable } from './smoke-packaged-toolchain.mjs'
 import { startWorkspaceAcceptanceAiMock } from './workspace-acceptance-ai-mock.mjs'
+import {
+  formatWorkspaceAcceptanceFailure,
+  readWorkspaceAcceptanceReceipt,
+} from './workspace-acceptance-receipt.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const plan = buildDesktopPackagedSmokePlan(process.argv.slice(2), process.env)
@@ -271,16 +275,22 @@ async function main() {
     signalToRaise = exit.requestedSignal
     finalCode = exit.timedOut ? 1 : exit.code ?? (exit.signal ? 1 : 0)
 
-    if (!exit.signal && workspaceAcceptance && finalCode === 0) {
-      const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'))
-      const failedChecks = Object.entries(receipt.checks ?? {})
-        .filter(([, ok]) => ok !== true)
-        .map(([name]) => name)
-      if (failedChecks.length > 0) throw new Error(`failed receipt checks: ${failedChecks.join(', ')}`)
-      if (aiMock.stats.acceptanceToolTurns < 1 || aiMock.stats.acceptanceFinalTurns < 1) {
-        throw new Error(`mock did not observe both Pi turns: ${JSON.stringify(aiMock.stats)}`)
+    if (workspaceAcceptance) {
+      if (!existsSync(receiptPath)) {
+        if (finalCode === 0) throw new Error(`workspace acceptance receipt missing: ${receiptPath}`)
+        console.error(`[desktop-smoke] workspace acceptance receipt unavailable: ${receiptPath}`)
+      } else {
+        const summary = readWorkspaceAcceptanceReceipt(receiptPath)
+        console.log(`[desktop-smoke] workspace acceptance receipt: ${JSON.stringify(summary.receipt)}`)
+        if (summary.error || summary.incompleteChecks.length > 0) {
+          throw new Error(`workspace acceptance failed: ${formatWorkspaceAcceptanceFailure(summary)}`)
+        }
+        if (finalCode === 0 && (
+          aiMock.stats.acceptanceToolTurns < 1 || aiMock.stats.acceptanceFinalTurns < 1
+        )) {
+          throw new Error(`mock did not observe both Pi turns: ${JSON.stringify(aiMock.stats)}`)
+        }
       }
-      console.log(`[desktop-smoke] workspace acceptance receipt: ${JSON.stringify(receipt)}`)
     }
   } catch (error) {
     finalCode = 1

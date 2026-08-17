@@ -11,14 +11,14 @@ import {
 describe('observability command presenter', () => {
   it('parses bounded logs and Doctor options', () => {
     expect(parseObservabilityArgs('logs', ['--instance', 'research', '--home', '/tmp/alice', '--lines', '50', '--json'])).toEqual({
-      instance: 'research',
+      project: 'research',
       homeRoot: '/tmp/alice',
       json: true,
       waitMs: 2_000,
       lines: 50,
     })
     expect(parseObservabilityArgs('doctor', ['--wait', '3', '--json'])).toEqual({
-      instance: null,
+      project: null,
       homeRoot: null,
       json: true,
       waitMs: 3_000,
@@ -91,7 +91,7 @@ describe('observability command presenter', () => {
 
     expect(readLogs).toHaveBeenCalledWith(
       expect.objectContaining({
-        instance: 'research',
+        project: 'research',
         homeRoot: resolve('/tmp/research'),
       }),
       expect.any(Object),
@@ -131,7 +131,7 @@ describe('observability command presenter', () => {
 
     expect(readLogs).toHaveBeenCalledWith(
       expect.objectContaining({
-        instance: 'research',
+        project: 'research',
         homeRoot: resolve('/srv/openalice-research'),
       }),
       expect.any(Object),

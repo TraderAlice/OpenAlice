@@ -9,6 +9,7 @@ GitHub navigation.
 
 | Wikilink route | Guide | Owns |
 |---|---|---|
+| [[docs/alice-project.md]] | [AliceProject](alice-project.md) | Top-level local runtime identity, one-project/one-backend topology, concurrency, and display contract |
 | [[docs/project-structure.md]] | [Project structure](project-structure.md) | Process boundaries, source ownership, state roots, architectural entry points |
 | [[docs/development-workflow.md]] | [Development workflow](development-workflow.md) | Branches, delivery modes, PRs, promotions, external review, risk gates |
 | [[docs/managed-workspace-runtime.md]] | [Managed Workspace runtime](managed-workspace-runtime.md) | Electron packaging, managed Pi, PortableGit/Bash, runtime profile, Workspace PATH |

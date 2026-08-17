@@ -4,6 +4,8 @@ import { homedir, hostname, tmpdir } from 'node:os'
 import { createConnection } from 'node:net'
 import { resolve } from 'node:path'
 
+import { resolveAliceProjectIdentity } from './alice-project.ts'
+
 export const GUARDIAN_CONTROL_PROTOCOL = 1
 export const GUARDIAN_CONTROL_API_VERSION = 1
 const MAX_RESPONSE_BYTES = 1024 * 1024
@@ -94,12 +96,17 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
     homeDir: dependencies.homeDir,
   })
   const requestControl = dependencies.requestControl ?? requestRuntimeControl
+  const aliceProject = resolveAliceProjectIdentity({
+    home: homeRoot,
+    appRoot: dependencies.env?.['OPENALICE_PROJECT_APP_ROOT'],
+    env: dependencies.env,
+  })
   try {
     const runtime = await requestControl(homeRoot, 'runtime.status', {
       timeoutMs: options.timeoutMs,
       platform: dependencies.platform,
     })
-    return classifyControlStatus(homeRoot, runtime)
+    return classifyControlStatus(homeRoot, runtime, aliceProject)
   } catch (error) {
     if (!isUnavailableControlError(error)) {
       return emptyRuntimeStatus(
@@ -109,6 +116,7 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
           : 'unhealthy',
         'unknown',
         error instanceof Error ? error.message : String(error),
+        aliceProject,
       )
     }
   }
@@ -125,11 +133,12 @@ export async function readRuntimeStatus(options = {}, dependencies = {}) {
         'owned_elsewhere',
         'running',
         'Guardian ownership is active but no compatible CLI Server control endpoint is available',
+        aliceProject,
       ),
       owner: owner.publicOwner,
     }
   }
-  return emptyRuntimeStatus(homeRoot, 'absent', 'absent', owner?.detail)
+  return emptyRuntimeStatus(homeRoot, 'absent', 'absent', owner?.detail, aliceProject)
 }
 
 export async function stopRuntimeServer(options = {}, dependencies = {}) {
@@ -164,6 +173,9 @@ export async function stopRuntimeServer(options = {}, dependencies = {}) {
 
 export function formatRuntimeStatus(status) {
   const lines = [`OpenAlice Server: ${status.class}`]
+  if (status.aliceProject) {
+    lines.push(`AliceProject: ${status.aliceProject.displayName} (${status.aliceProject.key})`)
+  }
   lines.push(`Home: ${status.home}`)
   if (status.productVersion || status.runtimeVersion) {
     lines.push(`Version: ${status.productVersion ?? status.runtimeVersion}`)
@@ -178,13 +190,16 @@ export function formatRuntimeStatus(status) {
   return `${lines.join('\n')}\n`
 }
 
-function classifyControlStatus(homeRoot, runtime) {
+function classifyControlStatus(homeRoot, runtime, fallbackAliceProject) {
+  // Installed CLI cannot import @traderalice/guardian-runtime. Keep this
+  // classifier aligned with packages/guardian-runtime/src/runtime-discovery.ts.
   if (!runtime || typeof runtime !== 'object') {
     return emptyRuntimeStatus(
       homeRoot,
       'unhealthy',
       'unknown',
       'Guardian returned an invalid runtime.status result',
+      fallbackAliceProject,
     )
   }
   const owner = sanitizeControlOwner(runtime.owner)
@@ -204,6 +219,7 @@ function classifyControlStatus(homeRoot, runtime) {
         'incompatible',
         state,
         `Guardian control API ${control.minClientApiVersion}-${control.apiVersion} is incompatible with CLI API ${GUARDIAN_CONTROL_API_VERSION}`,
+        fallbackAliceProject,
       ),
       owner,
       control,
@@ -227,6 +243,7 @@ function classifyControlStatus(homeRoot, runtime) {
     runtimeVersion: sanitizeVersion(runtime.runtimeVersion) ?? productVersion,
     state,
     home: homeRoot,
+    aliceProject: sanitizeAliceProject(runtime.aliceProject, homeRoot) ?? fallbackAliceProject,
     owner,
     endpoints: sanitizeEndpoints(runtime.endpoints),
     provider: sanitizeProvider(runtime.provider, owner),
@@ -239,7 +256,7 @@ function classifyControlStatus(homeRoot, runtime) {
   }
 }
 
-function emptyRuntimeStatus(homeRoot, statusClass, state, detail) {
+function emptyRuntimeStatus(homeRoot, statusClass, state, detail, aliceProject) {
   return {
     protocol: GUARDIAN_CONTROL_PROTOCOL,
     control: {
@@ -252,6 +269,7 @@ function emptyRuntimeStatus(homeRoot, statusClass, state, detail) {
     runtimeVersion: 'unknown',
     state,
     home: homeRoot,
+    ...(aliceProject ? { aliceProject } : {}),
     owner: null,
     endpoints: {},
     provider: { kind: 'unknown' },
@@ -261,6 +279,22 @@ function emptyRuntimeStatus(homeRoot, statusClass, state, detail) {
     componentDetail: {},
     capabilities: [],
     ...(detail ? { detail: sanitizeDetail(detail) } : {}),
+  }
+}
+
+function sanitizeAliceProject(value, homeRoot) {
+  if (!value || typeof value !== 'object') return null
+  const home = safePath(value.home)
+  if (home !== resolve(homeRoot)) return null
+  if (typeof value.id !== 'string' || !/^alice-project-[a-z0-9_-]{8,96}$/.test(value.id)) return null
+  if (typeof value.key !== 'string' || !/^[a-z][a-z0-9_-]{0,31}$/.test(value.key)) return null
+  if (typeof value.displayName !== 'string' || value.displayName.trim().length < 1 || value.displayName.length > 80) return null
+  return {
+    id: value.id,
+    key: value.key,
+    displayName: value.displayName.trim(),
+    home,
+    appRoot: safePath(value.appRoot),
   }
 }
 

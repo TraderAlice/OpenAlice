@@ -45,9 +45,8 @@ describe('Supervisor TUI screen', () => {
 
     expect(lines).toContain('OpenAlice  0.87.0-beta  dev')
     expect(lines).toContain('Runtime state: absent')
-    expect(lines).toContain(
-      'Enter Start & open · s Background · p Setup · i Instances · m Managed · c Source',
-    )
+    expect(lines.join('\n')).toContain('Enter Start & open · s Background · p Setup')
+    expect(lines.join('\n')).toContain('i AliceProjects')
     expect(lines).toContain('d Doctor · l Logs · u Update · ? Help')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
   })
@@ -291,8 +290,8 @@ describe('Supervisor TUI screen', () => {
           created: true,
         }
       },
-      configureInstance: async () => {
-        calls.push('configure-instance')
+      configureProject: async () => {
+        calls.push('configure-project')
         return preparedContext
       },
       start: async () => {
@@ -316,7 +315,7 @@ describe('Supervisor TUI screen', () => {
     expect(calls).toEqual([
       'inspect-managed',
       'prepare-managed',
-      'configure-instance',
+      'configure-project',
       'start',
       'open',
     ])
@@ -389,15 +388,15 @@ describe('Supervisor TUI screen', () => {
     expect(settingsRequests).toBe(2)
   })
 
-  it('opens instance selection while stopped or running', () => {
-    let instanceRequests = 0
+  it('opens AliceProject selection while stopped or running', () => {
+    let projectRequests = 0
     const screen = new SupervisorScreen({
       version: 'dev',
       channel: 'development',
       runtime: { class: 'absent' },
     }, {
-      onInstances: () => {
-        instanceRequests += 1
+      onProjects: () => {
+        projectRequests += 1
       },
     })
 
@@ -409,7 +408,7 @@ describe('Supervisor TUI screen', () => {
       },
     })
     expect(screen.handleKey('i', matchesKey)).toBe(true)
-    expect(instanceRequests).toBe(2)
+    expect(projectRequests).toBe(2)
   })
 
   it('confirms managed source preparation before dispatch', () => {

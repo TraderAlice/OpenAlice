@@ -3,6 +3,7 @@ import type { ChildProcess, Serializable } from 'node:child_process'
 import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, normalize, resolve, sep } from 'node:path'
+import { resolveAliceProjectIdentity } from '@traderalice/guardian-runtime'
 import { readKeyboardInputSourceId } from './keyboard-input-source.js'
 
 interface WorkspaceMeta {
@@ -183,6 +184,11 @@ export function registerOpenAliceIpc(opts: OpenAliceIpcOptions): void {
     ports: { web: opts.webPort, mcp: opts.mcpPort, uta: opts.utaPort },
     userDataHome: opts.userDataHome,
     appHome: opts.appHome,
+    aliceProject: resolveAliceProjectIdentity({
+      home: opts.userDataHome,
+      appRoot: opts.appHome,
+      env: process.env,
+    }),
   }))
 
   ipcMain.handle('openalice:keyboard:get-input-source-id', () => readKeyboardInputSourceId())

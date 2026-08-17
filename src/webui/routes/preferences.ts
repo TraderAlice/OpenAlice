@@ -4,6 +4,7 @@ import { z } from 'zod'
 import {
   readQuickChatPreferences,
   rememberQuickChatCredential,
+  rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
   type QuickChatPreferences,
 } from '../../core/preferences.js'
@@ -25,6 +26,24 @@ const recentChatWorkspaceUpdateSchema = z.object({
   workspaceId: z.string().trim().min(1).max(128).nullable(),
 })
 
+const modelReasoningEffortSchema = z.enum([
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+])
+
+const recentQuickChatLaunchUpdateSchema = z.object({
+  agent: z.string().trim().min(1).max(128),
+  accessMode: z.enum(['auto', 'native', 'vault']).optional(),
+  credentialSlug: z.string().trim().min(1).max(128).nullable(),
+  model: z.string().trim().min(1).max(256).nullable(),
+  reasoningEffort: modelReasoningEffortSchema.nullable(),
+}).transform((value) => ({
+  ...value,
+  accessMode: value.accessMode ?? (value.credentialSlug === null ? 'auto' as const : 'vault' as const),
+})).refine(
+  (value) => value.accessMode === 'vault' ? value.credentialSlug !== null : value.credentialSlug === null,
+  { message: 'access mode and credential must agree' },
+)
+
 const workspaceShellPreferenceUpdateSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('auto'), customPath: z.null().optional() }),
   z.object({ mode: z.literal('custom'), customPath: z.string().trim().min(1).max(1024) }),
@@ -33,6 +52,7 @@ const workspaceShellPreferenceUpdateSchema = z.discriminatedUnion('mode', [
 interface PreferenceRouteDeps {
   readQuickChatPreferences(): Promise<QuickChatPreferences>
   rememberQuickChatCredential(agent: string, credentialSlug: string | null): Promise<QuickChatPreferences>
+  rememberQuickChatLaunch?(launch: NonNullable<QuickChatPreferences['recentLaunch']>): Promise<QuickChatPreferences>
   rememberRecentChatWorkspace(workspaceId: string | null): Promise<QuickChatPreferences>
   getWorkspaceShellStatus(): Promise<WindowsWorkspaceShellStatus>
   saveWorkspaceShellPreference(input: {
@@ -45,6 +65,7 @@ const defaultDeps: PreferenceRouteDeps = {
   readQuickChatPreferences: () => readQuickChatPreferences(),
   rememberQuickChatCredential: (agent, credentialSlug) =>
     rememberQuickChatCredential(agent, credentialSlug),
+  rememberQuickChatLaunch: (launch) => rememberQuickChatLaunch(launch),
   rememberRecentChatWorkspace: (workspaceId) => rememberRecentChatWorkspace(workspaceId),
   getWorkspaceShellStatus: () => getWindowsWorkspaceShellStatus(),
   saveWorkspaceShellPreference: (input) => saveWindowsWorkspaceShellPreference(input),
@@ -70,7 +91,7 @@ export function createPreferencesRoutes(
       return c.json({ error: 'invalid_quick_chat_preference' }, 400)
     }
     const adapter = adapterRegistry.get(parsed.data.agent)
-    if (adapter?.capabilities.aiProvider?.credentialSource !== 'workspace-required') {
+    if (!adapter?.capabilities.aiProvider) {
       return c.json({ error: 'invalid_quick_chat_preference' }, 400)
     }
     try {
@@ -90,6 +111,18 @@ export function createPreferencesRoutes(
     }
     try {
       return c.json(await deps.rememberRecentChatWorkspace(parsed.data.workspaceId))
+    } catch (error) {
+      return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
+    }
+  })
+
+  app.put('/quick-chat/recent-launch', async (c) => {
+    const parsed = recentQuickChatLaunchUpdateSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success || !adapterRegistry.get(parsed.data?.agent ?? '')?.capabilities.aiProvider) {
+      return c.json({ error: 'invalid_quick_chat_launch_preference' }, 400)
+    }
+    try {
+      return c.json(await (deps.rememberQuickChatLaunch ?? defaultDeps.rememberQuickChatLaunch!)(parsed.data))
     } catch (error) {
       return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
     }

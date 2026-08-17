@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type {
@@ -24,6 +24,11 @@ const mocks = vi.hoisted(() => ({
   openAgentConfig: vi.fn(),
   openHeadlessRun: vi.fn(),
   getWorkspaceSessionDirectory: vi.fn(),
+  listAgentCredentials: vi.fn(),
+  getPresets: vi.fn(),
+  updateIssue: vi.fn(),
+  runNow: vi.fn(),
+  retry: vi.fn(),
 }))
 
 const scheduledIssue: IssueDetailData = {
@@ -33,7 +38,7 @@ const scheduledIssue: IssueDetailData = {
     what: 'Scan the market and publish a brief.',
     status: 'in_progress',
     priority: 'high',
-    assignee: '@workspace',
+    assignee: '@new-each-run',
     agent: 'codex',
     when: {
       kind: 'cron',
@@ -74,7 +79,25 @@ vi.mock('./workspace/api', () => ({
   detectWorkspaceCredential: mocks.detectWorkspaceCredential,
   getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
   getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
+  listAgentCredentials: mocks.listAgentCredentials,
 }))
+
+vi.mock('../api/config', () => ({
+  configApi: { getPresets: mocks.getPresets },
+}))
+
+vi.mock('../api/issues', async (importOriginal) => {
+  const actual = await importOriginal() as typeof import('../api/issues')
+  return {
+    ...actual,
+    issuesApi: {
+      ...actual.issuesApi,
+      update: mocks.updateIssue,
+      runNow: mocks.runNow,
+      retry: mocks.retry,
+    },
+  }
+})
 
 vi.mock('./MarkdownWhatEditor', () => ({
   MarkdownWhatEditor: ({ value }: { value: string }) => <div>{value}</div>,
@@ -83,13 +106,143 @@ vi.mock('./MarkdownWhatEditor', () => ({
 beforeEach(async () => {
   await i18n.changeLanguage('en')
   delete scheduledIssue.issue.automationHealth
+  delete scheduledIssue.issue.credential
+  delete scheduledIssue.issue.model
+  delete scheduledIssue.issue.effort
+  delete scheduledIssue.issue.timeout
+  scheduledIssue.runs = []
+  mocks.updateIssue.mockResolvedValue(scheduledIssue)
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
+  mocks.listAgentCredentials.mockResolvedValue([{
+    slug: 'longcat-1',
+    vendor: 'longcat',
+    label: 'LongCat primary',
+    authType: 'api-key',
+    wires: { 'openai-chat': 'https://example.test' },
+    resolvedModel: 'LongCat-2.0',
+  }, {
+    slug: 'deepseek-1',
+    vendor: 'deepseek',
+    label: 'DeepSeek primary',
+    authType: 'api-key',
+    wires: { 'openai-chat': 'https://example.test' },
+    resolvedModel: 'deepseek-v4-flash',
+  }])
+  mocks.getPresets.mockResolvedValue({ presets: [{
+    id: 'longcat',
+    label: 'LongCat',
+    description: '',
+    category: 'third-party',
+    defaultName: 'LongCat',
+    schema: {},
+    models: [{
+      id: 'LongCat-2.0',
+      label: 'LongCat 2.0',
+      semantics: { reasoning: { mode: 'optional', defaultEnabled: true } },
+    }],
+  }, {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    description: '',
+    category: 'third-party',
+    defaultName: 'DeepSeek',
+    schema: {},
+    models: [{
+      id: 'deepseek-v4-flash',
+      label: 'DeepSeek V4 Flash',
+      semantics: { reasoning: { mode: 'optional', efforts: ['low', 'high', 'max'], defaultEffort: 'high' } },
+    }],
+  }] })
 })
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.clearAllMocks()
+})
+
+describe('IssueDetail manual run', () => {
+  it('confirms before dispatching a scheduled Issue without waiting for failure', async () => {
+    mocks.runNow.mockResolvedValue({
+      ...scheduledIssue,
+      runs: [{
+        taskId: 'run-now-1',
+        resumeId: 'resume-run-now',
+        resumable: false,
+        wsId: 'demo-ws-auto-quant',
+        issueId: 'morning-scan',
+        agent: 'codex',
+        prompt: scheduledIssue.issue.what,
+        status: 'running',
+        startedAt: Date.now(),
+      }],
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Run this Issue now?' })
+    expect(dialog.textContent).toContain('The next scheduled time stays unchanged.')
+    expect(mocks.runNow).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Run now' }))
+    await waitFor(() => expect(mocks.runNow).toHaveBeenCalledWith('demo-ws-auto-quant', 'morning-scan'))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocks.mutate).toHaveBeenCalled()
+  })
+
+  it('does not dispatch when the confirmation is cancelled', async () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Run this Issue now?' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocks.runNow).not.toHaveBeenCalled()
+  })
+
+  it('confirms before retrying a failed run', async () => {
+    scheduledIssue.runs = [{
+      taskId: 'failed-run',
+      resumeId: 'resume-failed-run',
+      resumable: true,
+      wsId: 'demo-ws-auto-quant',
+      issueId: 'morning-scan',
+      agent: 'codex',
+      prompt: scheduledIssue.issue.what,
+      status: 'failed',
+      startedAt: Date.now() - 30_000,
+      finishedAt: Date.now() - 20_000,
+      failure: {
+        kind: 'runtime_error',
+        title: 'Runtime failed',
+        message: 'The runtime exited early.',
+        retryable: true,
+      },
+    }]
+    mocks.retry.mockResolvedValue({ ...scheduledIssue, runs: [] })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry now' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Retry this Issue now?' })
+    expect(dialog.textContent).toContain('The next scheduled time stays unchanged.')
+    expect(mocks.retry).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retry now' }))
+    await waitFor(() => expect(mocks.retry).toHaveBeenCalledWith('demo-ws-auto-quant', 'morning-scan'))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  })
+
+  it('closes the confirmation and exposes a dispatch failure in the inspector', async () => {
+    mocks.runNow.mockRejectedValue(new Error('The Issue is already running.'))
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Run now' }))
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(screen.getByRole('alert').textContent).toContain('The Issue is already running.')
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
 })
 
 describe('IssueActivity provenance identity', () => {
@@ -114,7 +267,7 @@ describe('IssueActivity provenance identity', () => {
         wsId="ws-home"
         issueId="audit"
         ownerResumeId={null}
-        assignee="@workspace"
+        assignee="@new-each-run"
         onPosted={vi.fn()}
       />,
     )
@@ -154,21 +307,87 @@ describe('IssueDetail property controls', () => {
 
     const status = screen.getByRole('combobox', { name: 'Status' })
     expect(status).toBeTruthy()
-    expect(status.className).toContain('min-h-10')
-    expect(screen.getByText('Status').parentElement?.className).toContain('max-[359px]:flex-col')
+    expect(status.className).toContain('h-10')
+    expect(status.className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Priority' })).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Assignee' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Assignee' }).className).toContain('w-full')
     expect(screen.getByRole('combobox', { name: 'Runtime' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('min-h-10')
+    expect(screen.queryByRole('combobox', { name: 'Run timeout' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('size-10')
+    expect(screen.getByRole('heading', { level: 3, name: 'Schedule' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 3, name: 'Agent' })).toBeTruthy()
+    expect(screen.getByText('America/New_York').className).toContain('break-all')
+    expect(screen.getByRole('button', { name: 'AI configuration' }).textContent)
+      .toContain('Runtime managed')
+    fireEvent.click(screen.getByRole('button', { name: 'AI configuration' }))
+    const credential = screen.getByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
     const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
-    const effort = screen.getByRole('combobox', { name: 'Run effort' }) as HTMLSelectElement
+    const effort = screen.getByRole('combobox', { name: 'Effort' }) as HTMLSelectElement
     await waitFor(() => {
-      expect(model.selectedOptions[0]?.textContent).toBe('Default · LongCat-2.0')
-      expect(effort.selectedOptions[0]?.textContent).toBe('Default · thinking on')
+      expect(credential.value).toBe('inherit')
+      expect(model.selectedOptions[0]?.textContent).toBe('Default · runtime managed')
+      expect(effort.selectedOptions[0]?.textContent).toBe('Runtime managed')
     })
 
     fireEvent.change(model, { target: { value: 'custom' } })
     expect(screen.getByRole('textbox', { name: 'Custom run model' })).toBeTruthy()
+  })
+
+  it('patches the optional run timeout from the execution inspector', async () => {
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: { ...scheduledIssue.issue, timeout: '30m' },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule settings' }))
+    const timeout = await screen.findByRole('combobox', { name: 'Run timeout' }) as HTMLSelectElement
+    expect(timeout.value).toBe('')
+    fireEvent.change(timeout, { target: { value: '30m' } })
+    await waitFor(() => {
+      expect(mocks.updateIssue).toHaveBeenCalledWith(
+        'demo-ws-auto-quant',
+        'morning-scan',
+        { timeout: '30m' },
+      )
+    })
+  })
+
+  it('patches cron catch-up from the schedule inspector', async () => {
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: {
+        ...scheduledIssue.issue,
+        when: { ...scheduledIssue.issue.when!, catchUp: false },
+      },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule settings' }))
+    const toggle = await screen.findByRole('checkbox', { name: /Retry a missed fire/ }) as HTMLInputElement
+    expect(toggle.checked).toBe(true)
+    fireEvent.click(toggle)
+    await waitFor(() => {
+      expect(mocks.updateIssue).toHaveBeenCalledWith(
+        'demo-ws-auto-quant',
+        'morning-scan',
+        { catchUp: false },
+      )
+    })
+  })
+
+  it('chooses a credential before narrowing model and effort options', async () => {
+    scheduledIssue.issue.credential = 'deepseek-1'
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'AI configuration' }))
+    const credential = screen.getByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
+    const model = screen.getByRole('combobox', { name: 'Run model' }) as HTMLSelectElement
+    const effort = screen.getByRole('combobox', { name: 'Effort' }) as HTMLSelectElement
+    await waitFor(() => {
+      expect(credential.value).toBe('vault:deepseek-1')
+      expect(Array.from(model.options).map((option) => option.value)).toContain('deepseek-v4-flash')
+      expect(Array.from(model.options).map((option) => option.value)).not.toContain('LongCat-2.0')
+      expect(Array.from(effort.options).map((option) => option.value))
+        .toEqual(['', 'low', 'high', 'max'])
+    })
   })
 
   it('places mobile work-item controls before long-form Issue content', async () => {
@@ -296,11 +515,12 @@ describe('IssueDetail property controls', () => {
 
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
-    expect(screen.getByText('运行状态')).toBeTruthy()
+    expect(screen.getByText('失败')).toBeTruthy()
     expect(screen.getByText('Provider rejected model MODEL_NOT_FOUND.')).toBeTruthy()
   })
 
   it('keeps stable Session identities first in a large assignee picker', async () => {
+    const longPreview = `Updated a very long financial and industrial rotation report. ${'Cross-market context and execution notes. '.repeat(5)}END-OF-PREVIEW`
     mocks.getWorkspaceSessionDirectory.mockResolvedValue({
       sessions: [
         {
@@ -314,7 +534,7 @@ describe('IssueDetail property controls', () => {
             taskId: 'task-1',
             status: 'done',
             startedAt: Date.now() - 90_000,
-            assistantPreview: 'Updated a very long financial and industrial rotation report.',
+            assistantPreview: longPreview,
           },
         },
         {
@@ -336,12 +556,38 @@ describe('IssueDetail property controls', () => {
 
     render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
 
-    const assignee = screen.getByRole('combobox', { name: 'Assignee' }) as HTMLSelectElement
-    await waitFor(() => expect(assignee.options).toHaveLength(4))
-    const labels = Array.from(assignee.options, (option) => option.textContent ?? '')
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Choose responsibility' })
+    expect(dialog.className).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(dialog.className).toContain('grid-rows-[auto_auto_minmax(0,1fr)_auto]')
+    const choices = within(dialog).getAllByRole('button')
+    const activeIndex = choices.findIndex((choice) => choice.textContent?.includes('Current thesis room'))
+    const recentIndex = choices.findIndex((choice) => choice.textContent?.includes('Updated a very long financial'))
 
-    expect(labels[2]).toBe('@resume-active-owner · pi · active — Current thesis room')
-    expect(labels[3]).toMatch(/^@resume-recent-worker · codex · .+ — Updated a very long financi…$/)
-    expect(labels.some((label) => label.startsWith('Updated a very long'))).toBe(false)
+    expect(activeIndex).toBeGreaterThanOrEqual(0)
+    expect(recentIndex).toBeGreaterThan(activeIndex)
+    expect(choices[activeIndex]?.textContent).toContain('resume-active-owner · pi · active')
+    expect(choices[recentIndex]?.textContent).toContain('resume-recent-worker · codex')
+
+    fireEvent.click(choices[activeIndex]!)
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    expect(within(dialog).getByText('Pending assignment')).toBeTruthy()
+    expect(within(dialog).getByText('resume-active-owner · pi · active now')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm assignment' }))
+    await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'morning-scan',
+      { assignee: '@resume-active-owner' },
+    ))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Choose responsibility' })).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }))
+    const reopenedDialog = await screen.findByRole('dialog', { name: 'Choose responsibility' })
+
+    const search = within(reopenedDialog).getByPlaceholderText(/Search Sessions/)
+    fireEvent.change(search, { target: { value: 'financial' } })
+    expect(within(reopenedDialog).queryByText('Current thesis room')).toBeNull()
+    expect(within(reopenedDialog).getByText(/^Updated a very long financial.*…$/)).toBeTruthy()
+    expect(within(reopenedDialog).queryByText(/END-OF-PREVIEW/)).toBeNull()
   })
 })

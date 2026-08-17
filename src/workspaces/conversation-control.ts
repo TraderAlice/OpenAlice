@@ -1,7 +1,13 @@
 import { readFile } from 'node:fs/promises'
 
+import {
+  readAutoQuantPreferences,
+  readQuickChatPreferences,
+  rememberRecentChatWorkspace,
+} from '../core/preferences.js'
 import type {
   WorkspaceConversationAskResult,
+  WorkspaceConversationCaller,
   WorkspaceConversationControl,
   WorkspaceConversationResolution,
   WorkspaceConversationTarget,
@@ -11,9 +17,31 @@ import type { ArtifactRef, ProvenanceAction, SessionOrigin } from '../core/prove
 import type { AgentConversationDispatch } from './agent-conversation-log.js'
 import { isAgentRuntime } from './cli-adapter.js'
 import type { HeadlessStructuredOutput } from './headless-output.js'
-import { headlessLogPaths } from './headless-task-registry.js'
+import {
+  headlessLogPaths,
+  type HeadlessInquirySubject,
+} from './headless-task-registry.js'
+import type {
+  SessionConversationBirthReason,
+  SessionConversationCaller,
+  SessionCreatedBy,
+} from './session-metadata.js'
 import { logger as launcherLogger } from './logger.js'
+import { conversationCause } from './agent-runtime-log.js'
 import type { WorkspaceService } from './service.js'
+import { AUTO_QUANT_WORKSPACE_TEMPLATE } from './chat-workspace-resolver.js'
+
+interface ConversationHarnessDependencies {
+  readQuickChatPreferences(): Promise<{ recentChatWorkspaceId: string | null }>
+  rememberRecentChatWorkspace(workspaceId: string): Promise<unknown>
+  readAutoQuantPreferences(): Promise<{ defaultWorkspaceId: string | null }>
+}
+
+const defaultHarnessDependencies: ConversationHarnessDependencies = {
+  readQuickChatPreferences,
+  rememberRecentChatWorkspace,
+  readAutoQuantPreferences,
+}
 
 interface ArtifactTarget {
   artifact: ArtifactRef
@@ -92,6 +120,9 @@ function exactResolution(
   }
   if (identity.lifecycle === 'retired') {
     return { mode: 'unavailable', reason: 'retired-session', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
+  }
+  if (identity.presence === 'deleted') {
+    return { mode: 'unavailable', reason: 'deleted-session', attributedOrigin: origin, ...(artifact ? { artifact } : {}) }
   }
   if (!svc.registry.get(identity.wsId)) {
     return {
@@ -201,13 +232,50 @@ function reconstructionPrompt(
   ].join('\n')
 }
 
+async function recordConversationReject(
+  svc: WorkspaceService,
+  input: {
+    readonly source?: WorkspaceConversationCaller
+    readonly target: WorkspaceConversationTarget
+  },
+  resolution: Extract<WorkspaceConversationResolution, { mode: 'unavailable' }>,
+): Promise<void> {
+  const attributed = resolution.attributedOrigin
+  const source = input.source
+  await svc.recordAgentRuntime?.('runtime.rejected', {
+    workspaceId: attributed?.workspaceId
+      ?? (source?.kind === 'session' || source?.kind === 'workspace' ? source.workspaceId : ''),
+    resumeId: attributed?.resumeId ?? '',
+    agent: attributed?.agent ?? '',
+    reason: resolution.reason,
+    cause: conversationCause({
+      source: source?.kind === 'session'
+        ? {
+            kind: 'session',
+            resumeId: source.resumeId,
+            workspaceId: source.workspaceId,
+            agent: source.agent,
+          }
+        : source?.kind === 'workspace'
+          ? { kind: 'workspace', workspaceId: source.workspaceId }
+          : { kind: 'human' },
+    }),
+  })
+}
+
 export function createWorkspaceConversationControl(
   svc: WorkspaceService,
+  harnessDependencies: ConversationHarnessDependencies = defaultHarnessDependencies,
 ): WorkspaceConversationControl {
   return {
     async ask(input): Promise<WorkspaceConversationAskResult> {
-      const resolution = resolveWorkspaceConversationTarget(svc, input.target)
-      if (resolution.mode === 'unavailable') return { status: 'unavailable', resolution }
+      const resolution = input.target.kind === 'harness'
+        ? await resolveHarnessConversationTarget(svc, input.target.harness, harnessDependencies)
+        : resolveWorkspaceConversationTarget(svc, input.target)
+      if (resolution.mode === 'unavailable') {
+        await recordConversationReject(svc, input, resolution)
+        return { status: 'unavailable', resolution }
+      }
 
       const continuingOrigin = resolution.origin
       const wsId = continuingOrigin?.workspaceId ?? (
@@ -215,15 +283,17 @@ export function createWorkspaceConversationControl(
       )
       const meta = svc.registry.get(wsId)
       if (!meta) {
-        return {
-          status: 'unavailable',
+        const missing = {
+          status: 'unavailable' as const,
           resolution: {
-            mode: 'unavailable',
+            mode: 'unavailable' as const,
             reason: unavailableWorkspaceReason(svc, wsId),
             ...(resolution.artifact ? { artifact: resolution.artifact } : {}),
             ...(resolution.mode === 'exact' ? { attributedOrigin: resolution.origin } : {}),
           },
         }
+        await recordConversationReject(svc, input, missing.resolution)
+        return missing
       }
 
       if (continuingOrigin && input.agent) {
@@ -264,6 +334,16 @@ export function createWorkspaceConversationControl(
             },
           }
         : undefined
+      // Exact continue reuses resumeId — birth is already fixed. Fresh workers
+      // get a conversation birth stamp from the authoritative ask source.
+      const createdBy = continuingOrigin
+        ? undefined
+        : conversationSessionCreatedBy({
+            source: conversation.source,
+            target: input.target,
+            resolution,
+            subject: input.subject,
+          })
       const dispatched = inquiry
         ? await svc.dispatchHeadlessTask(
             meta,
@@ -275,6 +355,7 @@ export function createWorkspaceConversationControl(
             inquiry,
             undefined,
             conversation,
+            createdBy,
           )
         : await svc.dispatchHeadlessTask(
             meta,
@@ -286,6 +367,7 @@ export function createWorkspaceConversationControl(
             undefined,
             undefined,
             conversation,
+            createdBy,
           )
       let effectiveResolution = resolution
       if (resolution.mode === 'reconstructed' && resolution.artifact && !resolution.origin) {
@@ -341,6 +423,105 @@ export function createWorkspaceConversationControl(
       }
       return result
     },
+  }
+}
+
+function conversationSessionCreatedBy(input: {
+  source: WorkspaceConversationCaller
+  target: WorkspaceConversationTarget
+  resolution: Exclude<WorkspaceConversationResolution, { mode: 'unavailable' }>
+  subject?: HeadlessInquirySubject
+}): SessionCreatedBy {
+  const caller = conversationBirthCaller(input.source)
+  const reason = conversationBirthReason(input.target, input.resolution, input.subject)
+  return {
+    kind: 'conversation',
+    caller,
+    reason,
+    ...(input.subject ? { subject: input.subject } : {}),
+  }
+}
+
+function conversationBirthCaller(source: WorkspaceConversationCaller): SessionConversationCaller {
+  if (source.kind === 'session') {
+    return {
+      kind: 'agent',
+      resumeId: source.resumeId,
+      workspaceId: source.workspaceId,
+    }
+  }
+  // workspace-scoped callers and explicit humans are human/control-plane.
+  return { kind: 'human' }
+}
+
+function conversationBirthReason(
+  target: WorkspaceConversationTarget,
+  resolution: Exclude<WorkspaceConversationResolution, { mode: 'unavailable' }>,
+  subject?: HeadlessInquirySubject,
+): SessionConversationBirthReason {
+  if (subject?.kind === 'issue' && subject.commentId) return 'issue-comment'
+  if (resolution.mode === 'exact') return 'explicit-workspace'
+  if (target.kind === 'harness') {
+    return target.harness === 'autoquant' ? 'harness-autoquant' : 'harness-chat'
+  }
+  switch (resolution.reason) {
+    case 'explicit-workspace':
+    case 'missing-origin':
+    case 'non-session-origin':
+    case 'unavailable-reconstruction':
+    case 'prior-reconstruction':
+      return resolution.reason
+    case 'harness-default':
+      // Harness targets are handled above; keep a safe fallback if resolution
+      // reason is harness-default without a harness target shape.
+      return 'harness-chat'
+    default:
+      return 'missing-origin'
+  }
+}
+
+async function resolveHarnessConversationTarget(
+  svc: WorkspaceService,
+  harness: 'chat' | 'autoquant',
+  dependencies: ConversationHarnessDependencies,
+): Promise<WorkspaceConversationResolution> {
+  if (harness === 'chat') {
+    const preferences = await dependencies.readQuickChatPreferences().catch((err) => {
+      launcherLogger.warn('conversation.harness_chat_preference_read_failed', { err })
+      return { recentChatWorkspaceId: null }
+    })
+    const target = await svc.resolveOrCreateChatWorkspace(preferences.recentChatWorkspaceId)
+    if (!target.ok) {
+      launcherLogger.warn('conversation.harness_chat_workspace_unavailable', {
+        code: target.code,
+        message: target.message,
+      })
+      return { mode: 'unavailable', reason: 'chat-workspace-unavailable' }
+    }
+    await dependencies.rememberRecentChatWorkspace(target.workspace.id).catch((err) => {
+      launcherLogger.warn('conversation.harness_chat_preference_write_failed', { err })
+    })
+    return {
+      mode: 'reconstructed',
+      workspaceId: target.workspace.id,
+      reason: 'harness-default',
+    }
+  }
+
+  const preferences = await dependencies.readAutoQuantPreferences().catch((err) => {
+    launcherLogger.warn('conversation.harness_autoquant_preference_read_failed', { err })
+    return { defaultWorkspaceId: null }
+  })
+  const workspace = preferences.defaultWorkspaceId
+    ? svc.registry.get(preferences.defaultWorkspaceId)
+    : undefined
+  if (!workspace || workspace.template !== AUTO_QUANT_WORKSPACE_TEMPLATE) {
+    return { mode: 'unavailable', reason: 'autoquant-not-initialized' }
+  }
+  return {
+    mode: 'reconstructed',
+    workspaceId: workspace.id,
+    reason: 'harness-default',
   }
 }
 

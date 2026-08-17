@@ -38,6 +38,7 @@ import {
   ISSUES_DIR_REL,
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
+  ISSUE_TIMEOUTS,
   issueAssigneeResumeId,
   issueAssigneeSchema,
   issueWhenSchema,
@@ -56,10 +57,12 @@ import {
   type IssueComment,
 } from '../workspaces/issues/comments.js'
 import { dispatchIssueCommentReply } from '../workspaces/issues/comment-delivery.js'
+import { projectDeskComment } from '../workspaces/issues/telegram-desk-project.js'
 import { issueMutation, issueMutationFingerprint } from '../workspaces/issues/change-tracker.js'
 import {
-  NEW_ASSIGNEE,
-  WORKSPACE_ASSIGNEE,
+  NEW_THEN_RESUME_ASSIGNEE,
+  UNASSIGNED_ASSIGNEE,
+  deprecatedIssueAssigneeReplacement,
   normalizeIssueAssigneeAlias,
   sessionSignature,
 } from '../workspaces/session-signature.js'
@@ -104,8 +107,10 @@ async function remoteIssueWriteHint(ctx: WorkspaceToolContext, id: string): Prom
 }
 
 const issueAssigneeInputSchema = z.string().min(1).refine(
-  (value) => value.toLowerCase() === '@me' || issueAssigneeSchema.safeParse(normalizeIssueAssigneeAlias(value)).success,
-  'assignee must be @me, @new, @workspace, @human, @unassigned, or an exact @resumeId',
+  (value) => value.toLowerCase() === '@me'
+    || deprecatedIssueAssigneeReplacement(value) !== null
+    || issueAssigneeSchema.safeParse(normalizeIssueAssigneeAlias(value)).success,
+  'assignee must be @me, @new-each-run, @new-then-resume, @human, @unassigned, or an exact @resumeId',
 )
 
 function resolveIssueAssignee(
@@ -119,6 +124,10 @@ function resolveIssueAssignee(
     : undefined
   if (isMe && !selfResumeId) {
     return { ok: false, error: '@me needs an attributable product Session' }
+  }
+  const replacement = isMe ? null : deprecatedIssueAssigneeReplacement(requested)
+  if (replacement) {
+    return { ok: false, error: `${requested} is deprecated; use ${replacement}` }
   }
   const assignee = isMe ? sessionSignature(selfResumeId!) : normalizeIssueAssigneeAlias(requested)
   const parsed = issueAssigneeSchema.safeParse(assignee)
@@ -143,15 +152,15 @@ function resolveIssueAssignee(
  * Session that Alice can resume. Shell PTYs also carry an interactive
  * SessionRecord/resumeId for terminal bookkeeping, but they have no native
  * Agent Runtime conversation to continue. Treating those as owners creates an
- * Issue that cannot ever run; an omitted owner therefore falls back to `@new`
- * for scheduled work and the Workspace for a plain board item, while an
+ * Issue that cannot ever run; an omitted owner therefore falls back to
+ * `@new-then-resume` for scheduled work and `@unassigned` for a plain board item, while an
  * explicit `@me` remains a strict validation error.
  *
  * Older/test contexts may not expose the identity resolver. Preserve their
  * attributable-session behavior; production always supplies the resolver.
  */
 function defaultIssueAssignee(ctx: WorkspaceToolContext, scheduled: boolean): string {
-  const fallback = scheduled ? NEW_ASSIGNEE : WORKSPACE_ASSIGNEE
+  const fallback = scheduled ? NEW_THEN_RESUME_ASSIGNEE : UNASSIGNED_ASSIGNEE
   const origin = sessionOriginFromInboxOrigin(ctx.workspaceId, ctx.origin)
   if (!origin) return fallback
   if (!ctx.resolveSessionIdentity) return '@me'
@@ -207,8 +216,12 @@ function rowOf(issue: IssueRecord) {
     priority: issue.priority,
     assignee: issue.assignee,
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.credential ? { credential: issue.credential } : {}),
+    ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
+    ...(issue.timeout ? { timeout: issue.timeout } : {}),
+    ...(issue.commentPrompt ? { commentPrompt: issue.commentPrompt } : {}),
     scheduled: issue.when !== undefined,
   }
 }
@@ -300,12 +313,15 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
       description: [
         "Update one of THIS workspace's issues — its board fields.",
         '',
-        'Patch any subset of `status`, `priority`, `assignee`, `agent`, `model`,',
-        '`effort`, or `what`; omitted fields are',
+        'Patch any subset of `status`, `priority`, `assignee`, `agent`, `credential`, `credentialSource`, `model`,',
+        '`effort`, `timeout`, `what`, or `commentPrompt`; omitted fields are',
         'left untouched. `assignee:"@me"` binds this current product',
-        'Session; `@new` recruits once and assigns that first Session permanently;',
+        'Session; `@new-then-resume` recruits once and assigns that first Session permanently;',
         'pass an exact `@resumeId` to assign another known Session. What is the',
-        'canonical markdown work definition and exact scheduled prompt. Other scheduling',
+        'canonical markdown work definition and exact scheduled prompt. `commentPrompt` is the',
+        'template for the comment-reply Input Prompt (`{comment}` required; null restores the',
+        'default wrapper). `timeout` is an optional',
+        'scheduled-run watchdog (`15m`/`30m`/`45m`/`60m`); omit or null means no limit. Other',
         'schedule timing (`when`) is preserved — edit it by writing the file directly',
         '(`.alice/issues/<id>.md`).',
         '',
@@ -318,13 +334,17 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
         priority: z.enum(ISSUE_PRIORITIES).optional().describe('New priority.'),
         assignee: issueAssigneeInputSchema
           .optional()
-          .describe('@new, @workspace, @human, @unassigned, @me, or an exact @resumeId.'),
-        agent: z.string().min(1).nullable().optional().describe('Runtime id for @new/@workspace; null inherits the Workspace default.'),
+          .describe('@new-each-run, @new-then-resume, @human, @unassigned, @me, or an exact @resumeId.'),
+        agent: z.string().min(1).nullable().optional().describe('Runtime id for @new-each-run/@new-then-resume; null inherits the Workspace default.'),
+        credential: z.string().min(1).nullable().optional().describe('OpenAlice vault slug for the fresh Session; null inherits Workspace/native auth.'),
+        credentialSource: z.literal('native').nullable().optional().describe('Use the Agent runtime login explicitly; null inherits the Workspace headless preference.'),
         model: z.string().min(1).nullable().optional().describe('Native one-run model id; null inherits the Workspace/runtime default.'),
         effort: z.enum(MODEL_REASONING_EFFORTS).nullable().optional().describe('One-run reasoning effort; null inherits the Workspace/runtime default.'),
+        timeout: z.enum(ISSUE_TIMEOUTS).nullable().optional().describe('Optional scheduled-run watchdog; null removes the limit so the agent may run until it exits.'),
         what: z.string().min(1).optional().describe('Canonical markdown work definition; exact scheduled prompt.'),
+        commentPrompt: z.string().nullable().optional().describe('Comment-reply Input Prompt template. Must include {comment}. Null restores the default wrapper.'),
       }),
-      execute: async ({ id, status, priority, assignee, agent, model, effort, what }) => {
+      execute: async ({ id, status, priority, assignee, agent, credential, credentialSource, model, effort, timeout, what, commentPrompt }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         const resolvedAssignee = resolveIssueAssignee(ctx, assignee)
@@ -334,13 +354,17 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           priority === undefined &&
           resolvedAssignee.assignee === undefined &&
           agent === undefined &&
+          credential === undefined &&
+          credentialSource === undefined &&
           model === undefined &&
           effort === undefined &&
-          what === undefined
+          timeout === undefined &&
+          what === undefined &&
+          commentPrompt === undefined
         ) {
           return {
             ok: false as const,
-            error: 'no fields to update (pass status/priority/assignee/agent/model/effort/what)',
+            error: 'no fields to update (pass status/priority/assignee/agent/credential/credentialSource/model/effort/timeout/what/commentPrompt)',
           }
         }
         const res = await updateIssueFields(dir.dir, id, {
@@ -348,9 +372,13 @@ export const issueUpdateFactory: WorkspaceToolFactory = {
           priority,
           assignee: resolvedAssignee.assignee,
           agent,
+          credential,
+          credentialSource,
           model,
           effort,
+          timeout,
           what,
+          commentPrompt,
         })
         if (res.ok) {
           await recordIssueProvenance(ctx, res.issue.id, 'updated', {
@@ -405,6 +433,7 @@ export const issueCommentFactory: WorkspaceToolFactory = {
             ...(origin ? { authorResumeId: origin.resumeId } : {}),
             source: origin ?? { kind: 'workspace', workspaceId: ctx.workspaceId },
           })
+          await projectDeskComment(res.issue, res.comment).catch(() => undefined)
           if (dispatched.status !== 'not_requested') {
             const updated = await updateIssueCommentDelivery(
               dir.dir,
@@ -459,12 +488,12 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         'the scanner sends that exact visible What to the Agent Runtime; without',
         '`when` the same What remains a pure board work item. Assignee is the',
         'only ownership field:',
-        '`@new` recruits once and keeps that first Session as owner. `@workspace`',
+        '`@new-then-resume` recruits once and keeps that first Session as owner. `@new-each-run`',
         'recruits a new Session each fire. `@me` resolves to this',
         'calling Session, while an exact `@resumeId` keeps one accountable',
         'Session (including a deliberately signed Session from another Workspace).',
-        'When ownership is omitted, scheduled work defaults to `@new`; an',
-        'unscheduled board item defaults to `@workspace`. An attributable',
+        'When ownership is omitted, scheduled work defaults to `@new-then-resume`; an',
+        'unscheduled board item defaults to `@unassigned`. An attributable',
         'resumable caller still owns the Issue as `@me`.',
         'A scheduled run is unattended: if its result is meant for the human,',
         'What must explicitly tell it to use `alice-workspace inbox push`.',
@@ -480,16 +509,20 @@ export const issueCreateFactory: WorkspaceToolFactory = {
         priority: z.enum(ISSUE_PRIORITIES).optional().describe('Initial priority (default "none").'),
         assignee: issueAssigneeInputSchema
           .optional()
-          .describe('Initial owner. Omitted scheduled work defaults to @new; an attributable resumable caller defaults to @me. @workspace explicitly recruits a fresh Session each fire.'),
+          .describe('Initial owner. Omitted scheduled work defaults to @new-then-resume; an attributable resumable caller defaults to @me. @new-each-run explicitly recruits a fresh Session each fire.'),
         when: issueWhenSchema
           .optional()
           .describe('Schedule shape — { kind:"at", at } | { kind:"every", every } | { kind:"cron", cron, timezone?:"local"|IANA }. Present iff the issue self-schedules.'),
         what: z.string().min(1).optional().describe('Markdown work definition; exact scheduled prompt. Defaults to title.'),
-        agent: z.string().min(1).optional().describe('Adapter id when assignee is @new or @workspace; an exact Session owns its runtime.'),
-        model: z.string().min(1).optional().describe('Native model id for one scheduled run; provider/auth stay Workspace-owned.'),
+        agent: z.string().min(1).optional().describe('Adapter id when assignee is @new-each-run or @new-then-resume; an exact Session owns its runtime.'),
+        credential: z.string().min(1).optional().describe('OpenAlice vault slug to freeze into the fresh Session binding.'),
+        credentialSource: z.literal('native').optional().describe('Use the Agent runtime login explicitly instead of inheriting Workspace access.'),
+        model: z.string().min(1).optional().describe('Native model id for the selected credential/runtime source.'),
         effort: z.enum(MODEL_REASONING_EFFORTS).optional().describe('Reasoning effort for one scheduled run.'),
+        timeout: z.enum(ISSUE_TIMEOUTS).optional().describe('Optional scheduled-run watchdog (15m/30m/45m/60m). Omit for no limit.'),
+        commentPrompt: z.string().min(1).optional().describe('Comment-reply Input Prompt template. Must include {comment}. Omit for the default wrapper.'),
       }),
-      execute: async ({ title, id, status, priority, assignee, when, what, agent, model, effort }) => {
+      execute: async ({ title, id, status, priority, assignee, when, what, agent, credential, credentialSource, model, effort, timeout, commentPrompt }) => {
         const dir = selfDir(ctx)
         if (!dir.ok) return { ok: false as const, error: dir.error }
         // Structured creation is attributable: "who creates it owns it". A
@@ -507,8 +540,12 @@ export const issueCreateFactory: WorkspaceToolFactory = {
           when,
           what,
           agent,
+          credential,
+          credentialSource,
           model,
           effort,
+          timeout,
+          commentPrompt,
         })
         if (res.ok) {
           await recordIssueProvenance(ctx, res.issue.id, 'created')

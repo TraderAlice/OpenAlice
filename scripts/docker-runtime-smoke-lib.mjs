@@ -31,8 +31,8 @@ export function buildDockerRuntimeSmokePlan(argv, opts = {}) {
   if (aiCredentialSlug && flags.has('--keep')) {
     errors.push('[docker-smoke] --keep is disabled for credentialed smoke runs so the secret volume is always removed')
   }
-  if (aiCredentialSlug && !['claude', 'codex', 'opencode', 'pi'].includes(aiAgent)) {
-    errors.push('[docker-smoke] --ai-agent must be claude, codex, opencode, or pi')
+  if (aiCredentialSlug && !['claude', 'codex', 'cursor', 'grok', 'opencode', 'pi'].includes(aiAgent)) {
+    errors.push('[docker-smoke] --ai-agent must be claude, codex, cursor, grok, opencode, or pi')
   }
   if (!aiCredentialSlug && aiAgent !== 'claude') {
     errors.push('[docker-smoke] --ai-agent requires --ai-credential <slug>')

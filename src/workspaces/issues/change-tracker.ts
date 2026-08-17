@@ -28,8 +28,12 @@ export interface IssueAuditSnapshot {
   assignee: string
   schedule?: string
   agent?: string
+  credential?: string
+  credentialSource?: string
   model?: string
   effort?: string
+  timeout?: string
+  commentPrompt?: string
   whatHash: string
 }
 
@@ -54,8 +58,12 @@ export function issueAuditSnapshot(issue: IssueRecord): IssueAuditSnapshot {
     assignee: issue.assignee,
     ...(issue.when ? { schedule: JSON.stringify(issue.when) } : {}),
     ...(issue.agent ? { agent: issue.agent } : {}),
+    ...(issue.credential ? { credential: issue.credential } : {}),
+    ...(issue.credentialSource ? { credentialSource: issue.credentialSource } : {}),
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
+    ...(issue.timeout ? { timeout: issue.timeout } : {}),
+    ...(issue.commentPrompt ? { commentPrompt: issue.commentPrompt } : {}),
     whatHash: digest(issue.what),
   }
 }
@@ -85,8 +93,12 @@ export function issueMutation(
   valueField('assignee', left.assignee, right.assignee)
   valueField('schedule', left.schedule, right.schedule)
   valueField('runtime', left.agent, right.agent)
+  valueField('credential', left.credential, right.credential)
+  valueField('credential source', left.credentialSource, right.credentialSource)
   valueField('model', left.model, right.model)
   valueField('effort', left.effort, right.effort)
+  valueField('timeout', left.timeout, right.timeout)
+  valueField('commentPrompt', left.commentPrompt, right.commentPrompt)
   if (left.whatHash !== right.whatHash) fields.push({ field: 'what' })
   return fields.length > 0 ? { fields } : null
 }

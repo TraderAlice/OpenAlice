@@ -43,6 +43,10 @@ The public installer distributes the TypeScript CLI application from the stable
 curl -fsSL https://openalice.ai/install | bash
 ```
 
+The installer prints one shell-specific activation command after success. Run
+it to use `openalice` immediately in the current terminal without restarting;
+the managed shell-profile block makes future terminals work automatically.
+
 Development dogfooding can opt into `dev` explicitly with `--branch dev`. The
 installer requires Node.js 22.19.0 or newer and installs the CLI, pinned Pi,
 and matching macOS/Linux headless Runtime inside one immutable release. The two
@@ -72,7 +76,7 @@ openalice open
 `scripts/guardian/prod.mjs` on loopback, and leaves it running after the shell
 exits. `openalice open` verifies and opens the normal Web UI. Bare `openalice`
 enters the Supervisor TUI; `openalice run` is the foreground form. A source
-checkout remains an advanced override through instance configuration,
+checkout remains an advanced override through AliceProject configuration,
 `OPENALICE_APP_HOME`, or `--app-dir`; missing source artifacts may then use the
 locked pnpm preparation path.
 

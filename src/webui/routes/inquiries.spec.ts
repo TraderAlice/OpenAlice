@@ -13,12 +13,13 @@ function build(opts: { assignee?: string } = {}) {
     _meta: unknown,
     _adapter: unknown,
     _prompt: string,
-    _timeout: number,
+    _timeout?: number,
     _issueId?: string,
     _resumeId?: string,
     _inquiry?: HeadlessTaskInquiry,
     _overrides?: unknown,
     _conversation?: unknown,
+    _createdBy?: unknown,
   ) => ({ taskId: 'run-new', resumeId: _resumeId ?? 'resume-new' }))
   const list = vi.fn((_filters: unknown) => [] as HeadlessTaskRecord[])
   const svc = {
@@ -69,7 +70,7 @@ describe('business inquiry routes', () => {
     expect(response.status).toBe(202)
     expect((await json(response)).resolution.mode).toBe('exact')
     expect(dispatchHeadlessTask).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), 'Why?', 300_000, undefined, 'resume-author',
+      expect.anything(), expect.anything(), 'Why?', undefined, undefined, 'resume-author',
       expect.objectContaining({
         subject: { kind: 'inbox', entryId: entry.id },
         question: 'Why?',
@@ -82,7 +83,22 @@ describe('business inquiry routes', () => {
         deliveredPrompt: 'Why?',
         promptMode: 'plain',
       }),
+      undefined,
     )
+  })
+
+  it('stamps conversation birth for an unattributed Inbox reconstruction', async () => {
+    const { app, inboxStore, dispatchHeadlessTask } = build()
+    const entry = await inboxStore.append({ workspaceId: 'ws-1', comments: 'manual note' })
+    await app.request(`/inbox/${entry.id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'Recover context' }),
+    })
+    expect(dispatchHeadlessTask.mock.calls[0]?.[9]).toMatchObject({
+      kind: 'conversation',
+      caller: { kind: 'human' },
+      reason: 'missing-origin',
+      subject: { kind: 'inbox', entryId: entry.id },
+    })
   })
 
   it('keeps reconstruction provenance without changing an unattributed Inbox prompt by default', async () => {
@@ -116,7 +132,7 @@ describe('business inquiry routes', () => {
   })
 
   it('rejects Ask owner for a Workspace-owned Issue', async () => {
-    const { app } = build({ assignee: '@workspace' })
+    const { app } = build({ assignee: '@new-each-run' })
     const response = await app.request('/issues/ws-1/issue-1', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: 'Status?', relation: 'owner' }),
@@ -141,6 +157,37 @@ describe('business inquiry routes', () => {
     expect(dispatchHeadlessTask.mock.calls[0]?.[6]?.subject).toMatchObject({ relation: 'owner' })
     expect(dispatchHeadlessTask.mock.calls[1]?.[5]).toBe('resume-run')
     expect(dispatchHeadlessTask.mock.calls[1]?.[6]?.subject).toMatchObject({ relation: 'run', runId: 'run-old' })
+  })
+
+  it('projects compact turn progress on inquiry history', async () => {
+    const { app, list } = build()
+    const progress = {
+      updatedAt: 2,
+      assistantText: null,
+      blocks: [{ type: 'tool' as const, id: 't1', name: 'Read', status: 'running' as const }],
+      metrics: { textBlocks: 0, toolCalls: 1, toolFailures: 0 },
+    }
+    list.mockReturnValue([{
+      taskId: 'run-ask',
+      resumeId: 'resume-author',
+      wsId: 'ws-1',
+      agent: 'pi',
+      prompt: 'Why?',
+      status: 'running',
+      startedAt: 1,
+      inquiry: {
+        subject: { kind: 'inbox', entryId: 'entry-1' },
+        question: 'Why?',
+        resolution: { mode: 'exact' },
+      },
+      progress,
+    }])
+    const body = await json(await app.request('/inbox/entry-1'))
+    expect(body.inquiries).toEqual([expect.objectContaining({
+      taskId: 'run-ask',
+      assistantText: null,
+      progress,
+    })])
   })
 
   it('lists inquiry history by business object', async () => {

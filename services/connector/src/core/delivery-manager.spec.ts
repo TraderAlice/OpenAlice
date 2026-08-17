@@ -7,7 +7,7 @@ import type {
 } from '@traderalice/connector-protocol'
 import type { ConnectorAdapter, ConnectorAdapterContext } from './adapter.js'
 import { ConnectorRegistry } from './adapter.js'
-import { DeliveryManager } from './delivery-manager.js'
+import { DeliveryManager, MAX_INBOUND_OWNER_MESSAGES } from './delivery-manager.js'
 import { createConnectorIOEvent, type ConnectorIOEvent, type ConnectorIORecorder } from './io-events.js'
 
 class MemoryRecorder implements ConnectorIORecorder {
@@ -33,6 +33,8 @@ class FakeThirdPartyAdapter implements ConnectorAdapter {
   async deliver(notification: InboxNotification): Promise<void> {
     this.delivered.push(notification)
   }
+
+  async sendOwnerText(): Promise<void> {}
 
   health(): ConnectorAdapterHealth {
     return { id: this.id, enabled: true, status: this.status }
@@ -70,6 +72,88 @@ describe('DeliveryManager connector registry', () => {
 
     expect(adapter.delivered).toHaveLength(1)
     expect(manager.health()).toMatchObject({ status: 'healthy' })
+    manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: 'hello' })
+    expect(manager.drainInbound()).toEqual([
+      { connectorId: 'carrier-pigeon', userId: '1', text: 'hello' },
+    ])
+    expect(manager.drainInbound()).toEqual([])
+    manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: '' })
+    expect(manager.drainInbound()).toEqual([])
+    for (let i = 0; i < MAX_INBOUND_OWNER_MESSAGES + 1; i += 1) {
+      manager.acceptInbound({ connectorId: 'carrier-pigeon', userId: '1', text: `m${i}` })
+    }
+    const kept = manager.drainInbound(MAX_INBOUND_OWNER_MESSAGES)
+    expect(kept).toHaveLength(MAX_INBOUND_OWNER_MESSAGES)
+    expect(kept[0]?.text).toBe('m1')
+    expect(kept.at(-1)?.text).toBe(`m${MAX_INBOUND_OWNER_MESSAGES}`)
+    await manager.stop()
+  })
+
+  it('reports starting adapters before external startup finishes', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const adapter: ConnectorAdapter = {
+      id: 'slow',
+      start: async () => { await gate },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({ id: 'slow', enabled: true, status: 'starting' }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'slow', label: 'Slow', description: 'Slow adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { slow: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+    })
+
+    manager.installEnabledAdapters()
+    expect(manager.health()).toMatchObject({
+      status: 'healthy',
+      adapters: [{ id: 'slow', status: 'starting' }],
+    })
+
+    const started = manager.start()
+    release()
+    await started
+    await manager.stop()
+  })
+
+  it('keeps a failed adapter registered so its degraded health remains visible', async () => {
+    const adapter: ConnectorAdapter = {
+      id: 'broken',
+      start: async () => { throw new Error('Telegram API did not become ready') },
+      stop: async () => undefined,
+      deliver: async () => { throw new Error('Telegram is not ready') },
+      sendOwnerText: async () => undefined,
+      health: () => ({
+        id: 'broken',
+        enabled: true,
+        status: 'degraded',
+        lastError: 'Telegram API did not become ready',
+      }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'broken', label: 'Broken', description: 'Broken adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+    })
+
+    await manager.start()
+
+    expect(manager.health()).toMatchObject({
+      status: 'degraded',
+      adapters: [{ id: 'broken', status: 'degraded', lastError: 'Telegram API did not become ready' }],
+    })
     await manager.stop()
   })
 
@@ -82,6 +166,7 @@ describe('DeliveryManager connector registry', () => {
         start: async () => undefined,
         stop: async () => undefined,
         deliver: async () => { throw new Error('external outage') },
+        sendOwnerText: async () => undefined,
         health: () => ({ id: 'broken', enabled: true, status: 'degraded' as const, lastError: 'external outage' }),
       }),
     })
@@ -101,6 +186,67 @@ describe('DeliveryManager connector registry', () => {
     })).resolves.toBeUndefined()
   })
 
+  it('skips Inbox push when the adapter turned it off', async () => {
+    const deliver = vi.fn(async () => undefined)
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'quiet', label: 'Quiet', description: 'Quiet adapter.', fields: [], commands: [] },
+      create: () => ({
+        id: 'quiet',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver,
+        sendOwnerText: async () => undefined,
+        health: () => ({ id: 'quiet', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { quiet: { enabled: true, settings: { inboxPush: false } } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+    await manager.deliver({
+      id: 'inbox-3',
+      createdAt: new Date().toISOString(),
+      workspaceId: 'ws-1',
+      title: 'Stay local',
+      body: '',
+    })
+    expect(deliver).not.toHaveBeenCalled()
+    await manager.stop()
+  })
+
+  it('contains asynchronous owner-chat failures after accepting the projection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'broken', label: 'Broken', description: 'Broken adapter.', fields: [], commands: [] },
+      create: () => ({
+        id: 'broken',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        sendOwnerText: async () => { throw new Error('owner chat offline') },
+        health: () => ({ id: 'broken', enabled: true, status: 'degraded' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+
+    expect(manager.enqueueOwnerChat({ id: 'desk-comment-1', adapterId: 'broken', text: 'hello' }))
+      .toEqual({ accepted: true, deliveryId: 'desk-comment-1' })
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
+      '[connector] broken owner-chat delivery failed:',
+      'owner chat offline',
+    ))
+    warn.mockRestore()
+  })
+
   it('treats an online bot waiting for /link as an intentional setup phase', async () => {
     const registry = new ConnectorRegistry()
     registry.register({
@@ -110,6 +256,7 @@ describe('DeliveryManager connector registry', () => {
         start: async () => undefined,
         stop: async () => undefined,
         deliver: async () => { throw new Error('owner not linked') },
+        sendOwnerText: async () => undefined,
         health: () => ({ id: 'unlinked', enabled: true, status: 'awaiting_link' as const }),
       }),
     })
@@ -206,5 +353,195 @@ describe('DeliveryManager connector registry', () => {
       id: 'inbox-no-log', createdAt: new Date().toISOString(), workspaceId: 'ws-1', title: 'Still send', body: '',
     })
     expect(adapter.delivered).toHaveLength(1)
+  })
+
+  it('keeps artifact requests bounded, TTL-limited, and separate from phone-desk inbound', async () => {
+    const now = Date.parse('2026-08-14T15:02:00.000Z')
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+    const adapter = new FakeThirdPartyAdapter()
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: adapter.id, label: 'Fake', description: 'Fake.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { [adapter.id]: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    try {
+      await manager.start()
+
+      const requestId = manager.enqueueArtifactRequest(adapter.id, { entryId: 'entry-1', docIndex: 0 })
+      expect(requestId.startsWith('art-')).toBe(true)
+      manager.acceptInbound({ connectorId: adapter.id, userId: '1', text: 'desk' })
+      expect(manager.drainInbound()).toEqual([
+        { connectorId: adapter.id, userId: '1', text: 'desk' },
+      ])
+      expect(manager.drainActions()).toEqual([expect.objectContaining({
+        requestId,
+        connectorId: adapter.id,
+        entryId: 'entry-1',
+        docIndex: 0,
+      })])
+      expect(manager.drainActions()).toEqual([])
+
+      manager.enqueueArtifactRequest(adapter.id, { entryId: 'stale', docIndex: 1 })
+      vi.setSystemTime(now + 60_001)
+      expect(manager.drainActions()).toEqual([expect.objectContaining({
+        connectorId: adapter.id,
+        entryId: 'stale',
+        docIndex: 1,
+      })])
+
+      for (let index = 0; index < 20; index += 1) {
+        manager.enqueueArtifactRequest(adapter.id, { entryId: `entry-${index}`, docIndex: 0 })
+      }
+      expect(() => manager.enqueueArtifactRequest(adapter.id, { entryId: 'overflow', docIndex: 0 }))
+        .toThrow('Too many pending file requests')
+    } finally {
+      vi.useRealTimers()
+      await manager.stop()
+    }
+  })
+
+  it('notifies the originating connector when a queued file request expires', async () => {
+    const now = Date.parse('2026-08-14T15:02:00.000Z')
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+    const notices: string[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'telegram', label: 'Telegram', description: 'Telegram.', fields: [], commands: [] },
+      create: () => ({
+        id: 'telegram',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        sendOwnerText: async (text) => { notices.push(text) },
+        health: () => ({ id: 'telegram', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { telegram: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    try {
+      await manager.start()
+      manager.enqueueArtifactRequest('telegram', { entryId: 'stale', docIndex: 0 })
+      vi.setSystemTime(now + 60_001)
+      manager.enqueueArtifactRequest('telegram', { entryId: 'fresh', docIndex: 0 })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(notices).toEqual(['That file request expired. Ask for the file again.'])
+      expect(manager.drainActions()).toEqual([expect.objectContaining({ entryId: 'fresh' })])
+    } finally {
+      vi.useRealTimers()
+      await manager.stop()
+    }
+  })
+
+  it('delivers an artifact only to the requesting connector', async () => {
+    const content = Buffer.from('# Current\n')
+    const telegramDelivered: unknown[] = []
+    const otherDelivered: InboxNotification[] = []
+    const otherArtifacts: unknown[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'telegram', label: 'Telegram', description: 'Telegram.', fields: [], commands: [] },
+      create: () => ({
+        id: 'telegram',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        sendOwnerText: async () => undefined,
+        deliverArtifact: async (delivery) => { telegramDelivered.push(delivery) },
+        health: () => ({ id: 'telegram', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    registry.register({
+      definition: { id: 'discord', label: 'Discord', description: 'Discord.', fields: [], commands: [] },
+      create: () => ({
+        id: 'discord',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async (notification) => { otherDelivered.push(notification) },
+        sendOwnerText: async () => undefined,
+        deliverArtifact: async (delivery) => { otherArtifacts.push(delivery) },
+        health: () => ({ id: 'discord', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: {
+        version: 1,
+        adapters: {
+          telegram: { enabled: true, settings: {} },
+          discord: { enabled: true, settings: {} },
+        },
+      },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+    await manager.deliverArtifact({
+      requestId: 'art-1',
+      connectorId: 'telegram',
+      entryId: 'entry-1',
+      docIndex: 0,
+      attachment: {
+        filename: 'close.md',
+        mediaType: 'text/markdown',
+        sizeBytes: content.byteLength,
+        contentSha256: createHash('sha256').update(content).digest('hex'),
+        contentBase64: content.toString('base64'),
+      },
+    })
+    expect(telegramDelivered).toHaveLength(1)
+    expect(otherArtifacts).toEqual([])
+    expect(otherDelivered).toEqual([])
+    await manager.stop()
+  })
+
+  it('does not treat a directed artifact as an Inbox notification', async () => {
+    const delivered: InboxNotification[] = []
+    const artifacts: unknown[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'telegram', label: 'Telegram', description: 'Telegram.', fields: [], commands: [] },
+      create: () => ({
+        id: 'telegram',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async (notification) => { delivered.push(notification) },
+        sendOwnerText: async () => undefined,
+        deliverArtifact: async (delivery) => { artifacts.push(delivery) },
+        health: () => ({ id: 'telegram', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { telegram: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+    const content = Buffer.from('note')
+    await manager.deliverArtifact({
+      requestId: 'art-2',
+      connectorId: 'telegram',
+      entryId: 'entry-2',
+      docIndex: 1,
+      attachment: {
+        filename: 'note.txt',
+        mediaType: 'application/octet-stream',
+        sizeBytes: content.byteLength,
+        contentSha256: createHash('sha256').update(content).digest('hex'),
+        contentBase64: content.toString('base64'),
+      },
+    })
+    expect(delivered).toEqual([])
+    expect(artifacts).toHaveLength(1)
+    await manager.stop()
   })
 })

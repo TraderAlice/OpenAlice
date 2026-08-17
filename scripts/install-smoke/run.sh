@@ -100,6 +100,12 @@ grep -Fq "Press Enter inside the Supervisor to prepare, start, and open OpenAlic
 grep -Fq "Use c only if you want to select an existing checkout instead." \
   <<<"$first_install_output" \
   || fail "source-only install did not keep manual checkout selection secondary"
+grep -Fq "Activate OpenAlice in this terminal now (no restart required):" \
+  <<<"$first_install_output" \
+  || fail "installer did not offer immediate current-shell activation"
+grep -Fq "export PATH=$HOME/.openalice/bin:\$PATH" \
+  <<<"$first_install_output" \
+  || fail "installer did not print the current-shell PATH command"
 
 bin_dir="$HOME/.openalice/bin"
 versions_dir="$HOME/.openalice/cli-versions"
@@ -109,9 +115,11 @@ node -e '
 const value = JSON.parse(process.argv[1]);
 const expectedVersion = process.argv[2];
 if (value.version !== expectedVersion) process.exit(1);
+if (value.installSource?.schemaVersion !== 2) process.exit(1);
 if (value.installSource?.cliVersion !== expectedVersion) process.exit(1);
 if (value.installSource?.selector?.kind !== "branch" || value.installSource?.selector?.value !== "smoke-v1") process.exit(1);
 if (value.installSource?.installerUrl !== "http://127.0.0.1:18080/install") process.exit(1);
+if (value.installSource?.updateChannel !== "development") process.exit(1);
 ' "$install_source" "$cli_version" || fail "installed CLI did not preserve its install source"
 [[ "$($bin_dir/pi --version)" == "0.83.0" ]] || fail "installed managed Pi version check failed"
 "$bin_dir/openalice" --help | grep -Fq "OpenAlice CLI" || fail "installed CLI help check failed"

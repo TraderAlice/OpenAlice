@@ -36,8 +36,9 @@ export interface Profile {
 // ==================== AI Provider Credentials ====================
 
 export type CredentialVendor =
-  | 'anthropic' | 'openai' | 'google'
+  | 'anthropic' | 'openai' | 'google' | 'xai'
   | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat'
+  | 'cursor'
   | 'custom'
 
 export type CredentialAuthType = 'api-key' | 'subscription'
@@ -86,7 +87,7 @@ export interface CredentialSetupGuide {
 }
 
 export type ModelReasoningMode = 'none' | 'optional' | 'adaptive' | 'required'
-export type ModelReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export type ModelReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
 
 export interface ModelSemantics {
   contextWindow?: number
@@ -120,6 +121,8 @@ export interface Preset {
   /** Regions × their per-shape endpoints — the form picks a region; the
    *  credential captures that region's whole wires map (its capabilities). */
   regions?: SerializedRegion[]
+  /** Runtime that consumes this credential directly rather than through a wire. */
+  directAgentId?: string
   /** Provider-aware guidance for the API-key credential form. */
   setup?: CredentialSetupGuide
 }

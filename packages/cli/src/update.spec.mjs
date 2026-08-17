@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
+import { readFileSync } from 'node:fs'
 
 import { describe, expect, it, vi } from 'vitest'
 
@@ -12,12 +13,19 @@ import {
   runUpdateCommand,
 } from './update.mjs'
 
+const currentCliVersion = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+).version
+const [currentMajor = '0', currentMinor = '0'] = currentCliVersion.split('.')
+const newerCliVersion = `${currentMajor}.${Number(currentMinor) + 1}.0-beta`
+
 const stableSource = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   repository: 'TraderAlice/OpenAlice',
-  cliVersion: '0.87.0-beta',
-  selector: { kind: 'branch', value: 'master' },
-  installerUrl: 'https://openalice.ai/install',
+  cliVersion: currentCliVersion,
+  selector: { kind: 'version', value: `v${currentCliVersion}` },
+  installerUrl: `https://raw.githubusercontent.com/TraderAlice/OpenAlice/v${currentCliVersion}/install`,
+  updateChannel: 'stable',
 }
 
 describe('OpenAlice CLI updates', () => {
@@ -43,13 +51,13 @@ describe('OpenAlice CLI updates', () => {
       currentVersion: '0.87.0-beta',
       installSource: stableSource,
     }, {
-      fetchImpl: manifestFetch('0.88.0-beta'),
+      fetchImpl: manifestFetch(newerCliVersion),
       env: {},
     })
     expect(result).toMatchObject({
       status: 'available',
       currentVersion: '0.87.0-beta',
-      latestVersion: '0.88.0-beta',
+      latestVersion: newerCliVersion,
       channel: 'stable',
     })
   })
@@ -59,20 +67,40 @@ describe('OpenAlice CLI updates', () => {
       installSource: {
         ...stableSource,
         selector: { kind: 'version', value: 'v0.87.0-beta' },
+        updateChannel: 'pinned',
       },
     })).resolves.toMatchObject({ status: 'unsupported', channel: 'pinned' })
     await expect(checkForUpdate({
       installSource: {
         ...stableSource,
         selector: { kind: 'branch', value: 'dev' },
+        updateChannel: 'development',
       },
     })).resolves.toMatchObject({ status: 'unsupported', channel: 'development' })
     await expect(checkForUpdate({
       installSource: {
         ...stableSource,
+        selector: { kind: 'branch', value: 'master' },
         installerUrl: 'https://mirror.example.test/install',
+        updateChannel: 'custom',
       },
     })).resolves.toMatchObject({ status: 'unsupported', channel: 'custom' })
+  })
+
+  it('continues to recognize legacy public-master metadata as stable', async () => {
+    await expect(checkForUpdate({
+      currentVersion: '0.87.0-beta',
+      installSource: {
+        schemaVersion: 1,
+        repository: 'TraderAlice/OpenAlice',
+        cliVersion: '0.87.0-beta',
+        selector: { kind: 'branch', value: 'master' },
+        installerUrl: 'https://openalice.ai/install',
+      },
+    }, {
+      fetchImpl: manifestFetch(newerCliVersion),
+      env: {},
+    })).resolves.toMatchObject({ status: 'available', channel: 'stable' })
   })
 
   it('uses the ordinary installer only after an explicit update command', async () => {
@@ -80,14 +108,14 @@ describe('OpenAlice CLI updates', () => {
     const stdout = { write: vi.fn() }
     await expect(runUpdateCommand(['--yes'], {
       applyUpdate,
-      fetchImpl: manifestFetch('0.88.0-beta'),
+      fetchImpl: manifestFetch(newerCliVersion),
       layout: { installRoot: '/tmp/.openalice' },
       readInstallSourceImpl: async () => stableSource,
       stdout,
       env: {},
     })).resolves.toBe(0)
     expect(applyUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ latestVersion: '0.88.0-beta' }),
+      expect.objectContaining({ latestVersion: newerCliVersion }),
       expect.objectContaining({
         layout: { installRoot: '/tmp/.openalice' },
         yes: true,
@@ -173,7 +201,7 @@ describe('OpenAlice CLI updates', () => {
       },
       writeFileImpl: async (_path, value) => { cache = value },
       readInstallSourceImpl: async () => stableSource,
-      fetchImpl: manifestFetch('0.88.0-beta'),
+      fetchImpl: manifestFetch(newerCliVersion),
       stderr,
       env: {},
       now: () => Date.parse('2026-07-29T00:00:00.000Z'),

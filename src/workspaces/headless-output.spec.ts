@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { claudeAdapter } from './adapters/claude.js'
 import { codexAdapter } from './adapters/codex.js'
+import { cursorAdapter } from './adapters/cursor.js'
+import { grokAdapter } from './adapters/grok.js'
 import { opencodeAdapter } from './adapters/opencode.js'
 import { piAdapter } from './adapters/pi.js'
 import type { CliAdapter } from './cli-adapter.js'
@@ -184,6 +186,148 @@ describe('headless structured output', () => {
     expect(output.blocks).toContainEqual(expect.objectContaining({ id: 'w1', name: 'Web search', status: 'completed' }))
     expect(output.blocks).toContainEqual(expect.objectContaining({ id: 'm1', name: 'lookup', status: 'failed', output: { message: 'offline' } }))
     expect(output.blocks).toContainEqual(expect.objectContaining({ id: 'c1', name: 'Collaboration · spawn agent', status: 'completed' }))
+  })
+
+  it('normalizes Cursor stream-json tools and keeps the terminal result', () => {
+    const output = parse(cursorAdapter, [
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'text', text: "I'll read the README.md file" }] },
+        session_id: 'c6b62c6f-7ead-4fd6-9922-e952131177ff',
+      },
+      {
+        type: 'tool_call',
+        subtype: 'started',
+        call_id: 'toolu_read',
+        tool_call: { readToolCall: { args: { path: 'README.md' } } },
+        session_id: 'c6b62c6f-7ead-4fd6-9922-e952131177ff',
+      },
+      {
+        type: 'tool_call',
+        subtype: 'completed',
+        call_id: 'toolu_read',
+        tool_call: {
+          readToolCall: {
+            args: { path: 'README.md' },
+            result: { success: { content: '# Project\n' } },
+          },
+        },
+        session_id: 'c6b62c6f-7ead-4fd6-9922-e952131177ff',
+      },
+      {
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+        result: "I'll read the README.md fileBased on the README, I'll create a summary",
+        session_id: 'c6b62c6f-7ead-4fd6-9922-e952131177ff',
+      },
+    ])
+    expect(output.assistantText).toBe(
+      "I'll read the README.md fileBased on the README, I'll create a summary",
+    )
+    expect(output.blocks).toEqual([
+      { type: 'text', text: "I'll read the README.md file" },
+      {
+        type: 'tool',
+        id: 'toolu_read',
+        name: 'read',
+        status: 'completed',
+        input: { path: 'README.md' },
+        output: { content: '# Project\n' },
+      },
+    ])
+    expect(output.metrics).toEqual({ textBlocks: 1, toolCalls: 1, toolFailures: 0 })
+  })
+
+  it('normalizes Grok 1.0.4 flattened streaming-json tools and keeps the last reply', () => {
+    const output = parse(grokAdapter, [
+      { type: 'thought', data: 'I should run echo.' },
+      { type: 'text', data: 'I will run ' },
+      { type: 'text', data: '`echo PING`.' },
+      {
+        type: 'tool_call',
+        toolCallId: 'call-echo',
+        title: 'run_terminal_command',
+        kind: 'execute',
+        status: 'pending',
+        toolName: 'run_terminal_command',
+        rawInput: { command: 'echo PING', description: 'Print PING' },
+        content: [],
+      },
+      {
+        type: 'tool_call_update',
+        toolCallId: 'call-echo',
+        status: null,
+        content: [],
+        rawOutput: null,
+      },
+      {
+        type: 'tool_call_update',
+        toolCallId: 'call-echo',
+        status: 'in_progress',
+        content: [{ type: 'content', content: { type: 'text', text: 'PING\n' } }],
+        rawOutput: { type: 'Bash', output: [80, 73, 78, 71, 10], output_for_prompt: 'PING\n' },
+      },
+      {
+        type: 'tool_call_update',
+        toolCallId: 'call-echo',
+        status: 'completed',
+        content: [{ type: 'content', content: { type: 'text', text: 'PING\n' } }],
+        rawOutput: {
+          type: 'Bash',
+          output: [80, 73, 78, 71, 10],
+          output_for_prompt: 'exit: 0\nPING\n',
+          exit_code: 0,
+          command: 'echo PING',
+        },
+      },
+      { type: 'text', data: 'DONE' },
+      { type: 'end', stopReason: 'end_turn', sessionId: '01a009ff-50a1-7550-a80f-f5144d904634' },
+    ])
+    expect(output.assistantText).toBe('DONE')
+    expect(output.blocks).toEqual([
+      { type: 'text', text: 'I will run `echo PING`.' },
+      {
+        type: 'tool',
+        id: 'call-echo',
+        name: 'run_terminal_command',
+        status: 'completed',
+        input: { command: 'echo PING', description: 'Print PING' },
+        output: 'exit: 0\nPING\n',
+      },
+      { type: 'text', text: 'DONE' },
+    ])
+    expect(output.metrics).toEqual({ textBlocks: 2, toolCalls: 1, toolFailures: 0 })
+  })
+
+  it('normalizes Grok failed tools and aborted ends', () => {
+    const output = parse(grokAdapter, [
+      {
+        type: 'tool_call',
+        toolCallId: 'call-fail',
+        toolName: 'run_terminal_command',
+        rawInput: { command: 'false' },
+      },
+      {
+        type: 'tool_call_update',
+        toolCallId: 'call-fail',
+        status: 'failed',
+        rawOutput: { output_for_prompt: 'exit: 1\n' },
+      },
+      { type: 'end', stopReason: 'aborted', sessionId: '01a009ff-50a1-7550-a80f-f5144d904634' },
+    ])
+    expect(output.blocks).toEqual([
+      {
+        type: 'tool',
+        id: 'call-fail',
+        name: 'run_terminal_command',
+        status: 'failed',
+        input: { command: 'false' },
+        output: 'exit: 1\n',
+      },
+      { type: 'error', message: 'Grok stopped: aborted' },
+    ])
+    expect(output.metrics).toEqual({ textBlocks: 0, toolCalls: 1, toolFailures: 1 })
   })
 
   it('normalizes Pi execution events and failed tools', () => {

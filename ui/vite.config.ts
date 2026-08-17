@@ -16,8 +16,10 @@ import { resolve } from 'node:path'
  *      the user manually started backend on a different port than
  *      configured, in which case the standalone workflow is on them.
  *
- * Default 3002 if both sources unusable, with a clear warning.
+ * Default 47331 if both sources unusable, matching Guardian PORT_DEFAULTS.web.
  */
+const DEFAULT_BACKEND_PORT = 47331
+
 function readBackendPort(): number {
   // Env wins — set by the dev orchestrator. No drift with backend.
   const envPort = Number.parseInt(process.env['OPENALICE_BACKEND_PORT'] ?? '', 10)
@@ -30,12 +32,12 @@ function readBackendPort(): number {
     const parsed = JSON.parse(raw) as { web?: number }
     const port = parsed.web
     if (typeof port === 'number' && port > 0 && port <= 65535) return port
-    console.warn(`[vite] ${configPath}: web.port missing or invalid, falling back to 3002`)
+    console.warn(`[vite] ${configPath}: web.port missing or invalid, falling back to ${DEFAULT_BACKEND_PORT}`)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.warn(`[vite] could not read ${configPath} (${msg}), falling back to 3002`)
+    console.warn(`[vite] could not read ${configPath} (${msg}), falling back to ${DEFAULT_BACKEND_PORT}`)
   }
-  return 3002
+  return DEFAULT_BACKEND_PORT
 }
 
 const backendPort = readBackendPort()
@@ -63,6 +65,11 @@ const { port: uiPort, strictPort } = readUiPort()
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
   // Inject the backend port as a compile-time constant so the dev client can
   // open the PTY WebSocket *directly* against the backend, bypassing the Vite
   // dev proxy. node-http-proxy's WS upgrade forwarding chokes under the
@@ -78,6 +85,11 @@ export default defineConfig({
   // Backend port is read from `data/config/ports.json` (web.port) so
   // changing the backend port in one place propagates to Vite automatically.
   server: {
+    // Runtime discovery intentionally advertises an IPv4 loopback URL. Vite's
+    // default `localhost` binding may resolve to IPv6-only on macOS, leaving
+    // the installed CLI unable to open or diagnose an otherwise healthy dev
+    // Runtime through the advertised 127.0.0.1 endpoint.
+    host: '127.0.0.1',
     port: uiPort,
     strictPort,
     proxy: {

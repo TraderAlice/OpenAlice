@@ -50,6 +50,37 @@ describe('file-viewer URL projection', () => {
   })
 })
 
+describe('Tracked selection URL projection', () => {
+  it('projects an Issue selection into a reload-safe query', () => {
+    expect(getView('tracked').toUrl({
+      kind: 'tracked',
+      params: { workspace: 'workspace-1', issue: 'power-watch' },
+    })).toBe('/tracked?workspace=workspace-1&issue=power-watch')
+  })
+})
+
+describe('Office URL projection', () => {
+  it('projects Office onto a single /office route', () => {
+    expect(getView('office').toUrl({ kind: 'office', params: {} })).toBe('/office')
+  })
+})
+
+describe('Settings URL projection', () => {
+  it('projects the Beta category onto /settings/beta', () => {
+    expect(getView('settings').toUrl({
+      kind: 'settings',
+      params: { category: 'beta' },
+    })).toBe('/settings/beta')
+  })
+
+  it('projects the Activity bar category onto /settings/activity-bar', () => {
+    expect(getView('settings').toUrl({
+      kind: 'settings',
+      params: { category: 'activity-bar' },
+    })).toBe('/settings/activity-bar')
+  })
+})
+
 describe('shared product shells', () => {
   it('assigns every Ask Alice surface to the shared chat shell', () => {
     expect(getViewShell({ kind: 'chat-landing', params: {} })).toBe('chat')

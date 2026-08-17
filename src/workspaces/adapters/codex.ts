@@ -6,8 +6,8 @@ import { createInterface } from 'node:readline';
 
 import type {
   CliAdapter,
-  HeadlessRunOverrides,
   OnDiskSession,
+  ResolvedSessionRuntimeBinding,
   SpawnContext,
   WorkspaceAiCred,
 } from '../cli-adapter.js';
@@ -23,7 +23,9 @@ const CODEX_ISOLATED_CONFIG_PATH = `${CODEX_ISOLATED_HOME_PATH}/config.toml`;
 const CODEX_ISOLATED_ENV_PATH = `${CODEX_ISOLATED_HOME_PATH}/env.json`;
 const CODEX_LEGACY_ENV_PATH = '.codex/env.json';
 const CODEX_KEY_ENV_NAME = 'OPENALICE_WORKSPACE_KEY';
+const CODEX_SESSION_KEY_ENV_NAME = 'OPENALICE_SESSION_KEY';
 const CODEX_PROVIDER_NAME = 'workspace';
+const CODEX_SESSION_PROVIDER_NAME = 'openalice_session';
 const CODEX_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const CODEX_INTERACTIVE_PERMISSION_ARGS = [
   '--sandbox',
@@ -39,18 +41,71 @@ function codexHome(cwd: string): string {
 
 const codexTitleIndexInFlight = new Map<string, Promise<ReadonlyMap<string, string>>>();
 
+type NodeSqliteModule = typeof import('node:sqlite');
+
+let nodeSqliteModule: NodeSqliteModule | null | undefined;
+
+/**
+ * Node 22 still labels the built-in SQLite module experimental and emits one
+ * process warning when it is first loaded. OPENALICE requires Node >=22.19,
+ * where the synchronous read-only API we use is present. Load it lazily so
+ * non-Codex users never touch the module; suppress only the module-load warning
+ * in this synchronous section so a background title refresh stays silent.
+ */
+function loadNodeSqlite(): NodeSqliteModule | null {
+  if (nodeSqliteModule !== undefined) return nodeSqliteModule;
+  const originalEmitWarning = process.emitWarning;
+  try {
+    process.emitWarning = (() => undefined) as typeof process.emitWarning;
+    nodeSqliteModule = process.getBuiltinModule('node:sqlite') as NodeSqliteModule;
+  } catch {
+    nodeSqliteModule = null;
+  } finally {
+    process.emitWarning = originalEmitWarning;
+  }
+  return nodeSqliteModule;
+}
+
+function readCodexDesktopTitleCatalog(home: string): ReadonlyMap<string, string> {
+  const sqlite = loadNodeSqlite();
+  if (!sqlite) return new Map<string, string>();
+  const path = join(home, 'sqlite', 'codex-dev.db');
+  if (!existsSync(path)) return new Map<string, string>();
+
+  let database: InstanceType<NodeSqliteModule['DatabaseSync']> | undefined;
+  try {
+    database = new sqlite.DatabaseSync(path, { readOnly: true });
+    const rows = database.prepare(
+      'SELECT thread_id, display_title FROM local_thread_catalog',
+    ).all() as Array<{ thread_id?: unknown; display_title?: unknown }>;
+    const titles = new Map<string, string>();
+    for (const row of rows) {
+      const id = typeof row.thread_id === 'string' ? row.thread_id : null;
+      const title = typeof row.display_title === 'string' ? row.display_title.trim() : '';
+      if (id && title) titles.set(id, title);
+    }
+    return titles;
+  } catch {
+    // Codex owns this private catalog and may migrate or lock it. A title is
+    // presentation metadata only, so fall through to the legacy index/fallback.
+    return new Map<string, string>();
+  } finally {
+    database?.close();
+  }
+}
+
 function readCodexSessionTitleIndex(cwd: string): Promise<ReadonlyMap<string, string>> {
   const home = codexHome(cwd);
   const existing = codexTitleIndexInFlight.get(home);
   if (existing) return existing;
   const read = (async () => {
+    const titles = new Map<string, string>();
     let raw: string;
     try {
       raw = await readFile(join(home, 'session_index.jsonl'), 'utf8');
     } catch {
-      return new Map<string, string>();
+      raw = '';
     }
-    const titles = new Map<string, string>();
     for (const line of raw.split(/\r?\n/)) {
       if (!line.trim()) continue;
       try {
@@ -62,6 +117,10 @@ function readCodexSessionTitleIndex(cwd: string): Promise<ReadonlyMap<string, st
         // A partially-written tail must not hide the rest of the index.
       }
     }
+    // Current Codex Desktop keeps its generated short titles in the local
+    // thread catalog. Prefer that newer projection when both stores know the
+    // same native thread id, while retaining session_index.jsonl compatibility.
+    for (const [id, title] of readCodexDesktopTitleCatalog(home)) titles.set(id, title);
     return titles;
   })().finally(() => codexTitleIndexInFlight.delete(home));
   codexTitleIndexInFlight.set(home, read);
@@ -136,6 +195,30 @@ export const codexAdapter: CliAdapter = {
     },
   },
 
+  sessionRuntime: {
+    project(_ctx, runtime: ResolvedSessionRuntimeBinding) {
+      const ai = runtime.ai;
+      const args = [
+        ...(runtime.binding.model ? ['--model', runtime.binding.model] : []),
+        ...(runtime.binding.reasoningEffort
+          ? ['-c', `model_reasoning_effort=${tomlString(runtime.binding.reasoningEffort)}`]
+          : []),
+      ];
+      const env: Record<string, string> = {};
+      if (ai?.apiKey || ai?.baseUrl) {
+        args.push(
+          '-c', `model_provider=${tomlString(CODEX_SESSION_PROVIDER_NAME)}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.name=${tomlString('OpenAlice Session provider')}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.base_url=${tomlString(ai.baseUrl || CODEX_DEFAULT_BASE_URL)}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.env_key=${tomlString(CODEX_SESSION_KEY_ENV_NAME)}`,
+          '-c', `model_providers.${CODEX_SESSION_PROVIDER_NAME}.wire_api=${tomlString('responses')}`,
+        );
+        if (ai.apiKey) env[CODEX_SESSION_KEY_ENV_NAME] = ai.apiKey;
+      }
+      return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
+    },
+  },
+
   /**
    * Every OpenAlice-owned interactive Codex launch explicitly selects full
    * host access and disables command approvals. Without launch-time flags,
@@ -147,7 +230,8 @@ export const codexAdapter: CliAdapter = {
    * is present.
    */
   composeCommand(_base: readonly string[], ctx: SpawnContext): readonly string[] {
-    const head = codexMcpHead(ctx);
+    const [binary, ...baseArgs] = codexMcpHead(ctx);
+    const head = [binary!, ...(ctx.sessionRuntime?.interactiveArgs ?? []), ...baseArgs];
     if (ctx.resume === undefined) {
       // Quick-chat seed: `codex [-c …] -- <prompt>` opens the interactive TUI on
       // that prompt ("Optional user prompt to start the session" per `codex
@@ -177,13 +261,13 @@ export const codexAdapter: CliAdapter = {
     _base: readonly string[],
     ctx: SpawnContext,
     prompt: string,
-    overrides?: HeadlessRunOverrides,
   ): readonly string[] {
-    const custom = readCustomProviderSelection(ctx.cwd);
-    const model = overrides?.model ?? custom?.model;
-    const reasoningEffort = overrides?.reasoningEffort ?? custom?.reasoningEffort;
+    const custom = ctx.sessionRuntime ? null : readCustomProviderSelection(ctx.cwd);
+    const model = custom?.model;
+    const reasoningEffort = custom?.reasoningEffort;
     const head = [
       'codex',
+      ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...(model ? ['--model', model] : []),
       ...(reasoningEffort
         ? ['-c', `model_reasoning_effort=${tomlString(reasoningEffort)}`]
@@ -332,6 +416,7 @@ export const codexAdapter: CliAdapter = {
     }
   },
 
+  /** @deprecated Native-project compatibility export; managed Sessions use sessionRuntime. */
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
     const hasAny = !!(cred.baseUrl || cred.apiKey || cred.model || cred.reasoningEffort);
     const legacyIsolated = isLegacyIsolatedHome(cwd);
@@ -415,6 +500,7 @@ export const codexAdapter: CliAdapter = {
     }
   },
 
+  /** @deprecated Compatibility inspection for legacy Session bindings only. */
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
     const isolatedHome = isolatedHomePath(cwd);
     const tomlRaw = await readWorkspaceFile(
@@ -570,7 +656,7 @@ export const codexAdapter: CliAdapter = {
  * the injected `alice*` CLI tools.
  */
 function codexMcpHead(ctx: SpawnContext): string[] {
-  const custom = readCustomProviderSelection(ctx.cwd);
+  const custom = ctx.sessionRuntime ? null : readCustomProviderSelection(ctx.cwd);
   const selection = custom
     ? [
         ...(custom.model ? ['--model', custom.model] : []),

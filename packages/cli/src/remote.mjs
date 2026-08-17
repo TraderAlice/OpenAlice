@@ -9,6 +9,7 @@ import {
   DEFAULT_INSTALL_SOURCE,
   formatInstallSelector,
   installedContentIdentity,
+  installSourceUpdateChannel,
   installSourcesMatch,
   managedSourceKey,
   parseInstallSource,
@@ -903,6 +904,7 @@ export function buildRemoteInstallCommand(installSource, installBaseUrl = '', wi
   const selectorValue = shellQuote(source.selector.value)
   const installEnv = [
     `OPENALICE_INSTALL_URL=${url}`,
+    `OPENALICE_INSTALL_UPDATE_CHANNEL=${shellQuote(installSourceUpdateChannel(source))}`,
     'OPENALICE_INSTALL_CONTEXT=remote',
     `OPENALICE_EXPECTED_CLI_VERSION=${shellQuote(source.cliVersion)}`,
     installBaseUrl ? `OPENALICE_INSTALL_BASE_URL=${shellQuote(installBaseUrl)}` : '',

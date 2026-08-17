@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline';
 import type {
   AgentInteractiveSetupStatus,
   CliAdapter,
-  HeadlessRunOverrides,
+  ResolvedSessionRuntimeBinding,
   SpawnContext,
   WorkspaceAiCred,
 } from '../cli-adapter.js';
@@ -195,10 +195,49 @@ export const claudeAdapter: CliAdapter = {
     },
   },
 
+  sessionRuntime: {
+    project(ctx, runtime: ResolvedSessionRuntimeBinding) {
+      const effort = runtime.binding.reasoningEffort;
+      if (effort && !CLAUDE_RUN_EFFORTS.has(effort)) {
+        throw new Error(`Claude Code cannot use Session effort ${effort}`);
+      }
+      // Claude Code applies provider-shaped `env` from user/project/local
+      // settings after inheriting the child process environment. A managed
+      // Vault binding must exclude user and local sources so an unrelated
+      // global login or deprecated `.claude/settings.local.json` export cannot
+      // replace ANTHROPIC_BASE_URL / auth / model after OpenAlice projects the
+      // immutable Session binding. Keep the project source enabled: Claude
+      // owns the native loading semantics for the Workspace's CLAUDE.md and
+      // `.claude/skills`, and treating those files as a synthetic plugin loses
+      // their normal project scope and persona behavior. Explicit `--settings`
+      // supplied by composeCommand still loads, so launcher-owned MCP trust
+      // remains available.
+      //
+      // Native bindings intentionally keep Claude's normal settings chain:
+      // choosing Agent login means the runtime, not OpenAlice, owns provider
+      // discovery and authentication.
+      const managedCredentialArgs = runtime.binding.credential.source === 'vault'
+        ? ['--setting-sources=project']
+        : [];
+      const args = [
+        ...managedCredentialArgs,
+        ...(runtime.binding.model ? ['--model', runtime.binding.model] : []),
+        ...(effort ? ['--effort', effort] : []),
+      ];
+      const ai = runtime.ai;
+      const env: Record<string, string> = {};
+      if (ai?.baseUrl) env['ANTHROPIC_BASE_URL'] = ai.baseUrl;
+      if (ai?.apiKey) {
+        env[ai.authMode === 'bearer' ? 'ANTHROPIC_AUTH_TOKEN' : 'ANTHROPIC_API_KEY'] = ai.apiKey;
+      }
+      return { env, interactiveArgs: args, headlessArgs: args, webArgs: args };
+    },
+  },
+
   readInteractiveSetupStatus: readClaudeInteractiveSetupStatus,
 
   composeCommand(base: readonly string[], ctx: SpawnContext): readonly string[] {
-    const cmd = [...base, '--settings', AUTOTRUST_SETTINGS];
+    const cmd = [...base, '--settings', AUTOTRUST_SETTINGS, ...(ctx.sessionRuntime?.interactiveArgs ?? [])];
     if (ctx.resume === undefined) {
       // Quick-chat seed: `claude [flags] -- <prompt>` opens the interactive TUI
       // and auto-submits the prompt. The `--` end-of-options terminator (same as
@@ -230,20 +269,15 @@ export const claudeAdapter: CliAdapter = {
     base: readonly string[],
     ctx: SpawnContext,
     prompt: string,
-    overrides?: HeadlessRunOverrides,
   ): readonly string[] {
     if (ctx.resume === 'last') {
       throw new Error('claude headless: resume requires a concrete resumeId mapping')
-    }
-    if (overrides?.reasoningEffort && !CLAUDE_RUN_EFFORTS.has(overrides.reasoningEffort)) {
-      throw new Error(`Claude Code cannot use one-run effort ${overrides.reasoningEffort}`)
     }
     return [
       ...base,
       '--settings', AUTOTRUST_SETTINGS,
       '--allowedTools', HEADLESS_ALLOWED_TOOLS,
-      ...(overrides?.model ? ['--model', overrides.model] : []),
-      ...(overrides?.reasoningEffort ? ['--effort', overrides.reasoningEffort] : []),
+      ...(ctx.sessionRuntime?.headlessArgs ?? []),
       ...(ctx.resume ? ['--resume', ctx.resume.sessionId] : []),
       '-p', '--output-format', 'stream-json', '--verbose',
       '--', prompt,
@@ -340,6 +374,7 @@ export const claudeAdapter: CliAdapter = {
     }
   },
 
+  /** @deprecated Native-project compatibility export; managed Sessions use sessionRuntime. */
   async writeAiConfig(cwd: string, cred: WorkspaceAiCred): Promise<void> {
     const hasAny = cred.baseUrl || cred.apiKey || cred.model || cred.reasoningEffort;
     if (!hasAny) {
@@ -384,6 +419,7 @@ export const claudeAdapter: CliAdapter = {
     });
   },
 
+  /** @deprecated Compatibility inspection for legacy Session bindings only. */
   async readAiConfig(cwd: string): Promise<WorkspaceAiCred | null> {
     const raw = await readWorkspaceFile(cwd, CLAUDE_SETTINGS_PATH);
     if (raw === null) return null;

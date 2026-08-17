@@ -19,6 +19,7 @@ interface Props {
   readonly wsId: string
   readonly agents: readonly string[]
   readonly initialAgent?: string
+  readonly onOpenCompatibilityConfig?: () => void
 }
 
 const RUNTIME_LABELS: Readonly<Record<string, string>> = {
@@ -68,12 +69,11 @@ export function WorkspaceLaunchConfigurationPanel({
   wsId,
   agents,
   initialAgent,
+  onOpenCompatibilityConfig,
 }: Props) {
   const { t } = useTranslation()
   const runtimeIds = useMemo(() => [...new Set([...agents, 'shell'])], [agents])
-  const preferred = initialAgent && runtimeIds.includes(initialAgent)
-    ? initialAgent
-    : runtimeIds[0] ?? ''
+  const preferred = initialAgent && runtimeIds.includes(initialAgent) ? initialAgent : runtimeIds[0] ?? ''
   const [selectedAgent, setSelectedAgent] = useState(preferred)
   const [plan, setPlan] = useState<WorkspaceLaunchPlan | null>(null)
   const [loading, setLoading] = useState(false)
@@ -131,33 +131,41 @@ export function WorkspaceLaunchConfigurationPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-secondary/50 p-2">
-        {runtimeIds.map((id) => (
-          <button
-            type="button"
-            key={id}
-            onClick={() => setSelectedAgent(id)}
-            className={`oa-pressable shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium ${
-              selectedAgent === id
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            }`}
-          >
-            {RUNTIME_LABELS[id] ?? id}
-          </button>
-        ))}
-      </div>
-
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto max-w-2xl space-y-4">
-          <div>
+          <section>
             <h3 className="text-sm font-semibold text-foreground">
               {t('workspaceSettings.launch.title')}
             </h3>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               {t('workspaceSettings.launch.description')}
             </p>
-          </div>
+          </section>
+
+          <section className="border-t border-border pt-4">
+            <h3 className="text-sm font-semibold text-foreground">
+              {t('workspaceSettings.launch.previewTitle')}
+            </h3>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              {t('workspaceSettings.launch.previewDescription')}
+            </p>
+            <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-border bg-secondary/40 p-1.5">
+              {runtimeIds.map((id) => (
+                <button
+                  type="button"
+                  key={id}
+                  onClick={() => setSelectedAgent(id)}
+                  className={`oa-pressable shrink-0 rounded-md px-3 py-1.5 text-[12px] font-medium ${
+                    selectedAgent === id
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  {RUNTIME_LABELS[id] ?? id}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {loading && (
             <div className="oa-status-surface rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
@@ -308,12 +316,37 @@ export function WorkspaceLaunchConfigurationPanel({
               )}
             </>
           )}
+
+          {onOpenCompatibilityConfig && (
+            <section className="border-t border-border pt-4">
+              <div className="rounded-lg border border-warning/25 bg-warning/5 p-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[12px] font-semibold text-foreground">
+                      {t('workspaceSettings.launch.compatibilityTitle')}
+                    </h3>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      {t('workspaceSettings.launch.compatibilityDescription')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onOpenCompatibilityConfig}
+                      className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-[11px] font-medium text-foreground hover:bg-muted"
+                    >
+                      {t('workspaceSettings.launch.openCompatibility')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/30 p-3">
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          {t('workspaceSettings.launch.readOnly')}
+          {t('workspaceSettings.launch.previewReadOnly')}
         </p>
         <button
           type="button"

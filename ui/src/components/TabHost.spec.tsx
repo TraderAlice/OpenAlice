@@ -47,10 +47,6 @@ vi.mock('../pages/ChatPageShell', async () => {
   }
 })
 
-vi.mock('../pages/AutoQuantPageShell', () => ({
-  AutoQuantPageShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}))
-
 vi.mock('./EmptyEditor', () => ({ EmptyEditor: () => <div>empty</div> }))
 
 const workspaceTab: Tab = {

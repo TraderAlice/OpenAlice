@@ -59,7 +59,7 @@ describe('issue_create', () => {
   it('creates an issue, stamps the workspace assignee, and is reachable via the reader', async () => {
     const res = await run(issueCreateFactory.build(ctx()), { title: 'Fix the thing' })
     expect(res.ok).toBe(true)
-    expect(res.issue).toMatchObject({ id: 'fix-the-thing', title: 'Fix the thing', assignee: '@workspace' })
+    expect(res.issue).toMatchObject({ id: 'fix-the-thing', title: 'Fix the thing', assignee: '@unassigned' })
     const issue = await readBack('fix-the-thing')
     expect(issue?.title).toBe('Fix the thing')
   })
@@ -69,7 +69,7 @@ describe('issue_create', () => {
       id: 'tuned',
       title: 'Tuned run',
       when: { kind: 'every', every: '30m' },
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       agent: 'codex',
       model: 'gpt-5.6',
       effort: 'high',
@@ -80,6 +80,18 @@ describe('issue_create', () => {
       model: 'gpt-5.6',
       effort: 'high',
     })
+  })
+
+  it('creates and returns an optional run timeout', async () => {
+    const res = await run(issueCreateFactory.build(ctx()), {
+      id: 'budgeted',
+      title: 'Budgeted run',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@new-each-run',
+      timeout: '45m',
+    })
+    expect(res.issue).toMatchObject({ timeout: '45m' })
+    expect(await readBack('budgeted')).toMatchObject({ timeout: '45m' })
   })
 
   it('records the creating product Session without accepting identity args', async () => {
@@ -121,19 +133,30 @@ describe('issue_create', () => {
       when: { kind: 'every', every: '30m' },
     })
     expect(created.ok).toBe(true)
-    expect((await readBack('fresh-owner'))?.assignee).toBe('@new')
+    expect((await readBack('fresh-owner'))?.assignee).toBe('@new-then-resume')
   })
 
-  it('accepts @new as an explicit recruit-once ownership policy', async () => {
+  it('accepts @new-then-resume as an explicit recruit-once ownership policy', async () => {
     const created = await run(issueCreateFactory.build(ctx()), {
       id: 'sticky-owner',
       title: 'Sticky owner',
       when: { kind: 'every', every: '30m' },
-      assignee: '@new',
+      assignee: '@new-then-resume',
       agent: 'pi',
     })
     expect(created.ok).toBe(true)
-    expect(await readBack('sticky-owner')).toMatchObject({ assignee: '@new', agent: 'pi' })
+    expect(await readBack('sticky-owner')).toMatchObject({ assignee: '@new-then-resume', agent: 'pi' })
+  })
+
+  it('rejects deprecated assignee aliases with a replacement hint', async () => {
+    const created = await run(issueCreateFactory.build(ctx()), {
+      id: 'deprecated-owner',
+      title: 'Deprecated owner',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@workspace',
+    })
+    expect(created.ok).toBe(false)
+    expect(created.error).toBe('@workspace is deprecated; use @new-each-run')
   })
 
   it('defaults creation to the server-attributed current Session', async () => {
@@ -177,7 +200,7 @@ describe('issue_create', () => {
       id: 'shell-created', title: 'Shell-created issue',
     })
     expect(implicit.ok).toBe(true)
-    expect((await readBack('shell-created'))?.assignee).toBe('@workspace')
+    expect((await readBack('shell-created'))?.assignee).toBe('@unassigned')
 
     const scheduled = await run(issueCreateFactory.build(context), {
       id: 'shell-scheduled',
@@ -185,7 +208,7 @@ describe('issue_create', () => {
       when: { kind: 'every', every: '30m' },
     })
     expect(scheduled.ok).toBe(true)
-    expect((await readBack('shell-scheduled'))?.assignee).toBe('@new')
+    expect((await readBack('shell-scheduled'))?.assignee).toBe('@new-then-resume')
 
     const explicit = await run(issueCreateFactory.build(context), {
       id: 'shell-owned', title: 'Invalid shell owner', assignee: '@me',
@@ -228,7 +251,7 @@ describe('issue_update', () => {
       id: 'sched',
       title: 'scheduled work',
       when: { kind: 'every', every: '30m' },
-      assignee: '@workspace',
+      assignee: '@new-each-run',
       what: 'keep me',
     })
     const res = await run(issueUpdateFactory.build(ctx()), {
@@ -246,7 +269,7 @@ describe('issue_update', () => {
       id: 'runtime-fields',
       title: 'Runtime fields',
       when: { kind: 'every', every: '30m' },
-      assignee: '@workspace',
+      assignee: '@new-each-run',
     })
     await run(issueUpdateFactory.build(ctx()), {
       id: 'runtime-fields',
@@ -267,6 +290,19 @@ describe('issue_update', () => {
     const cleared = await readBack('runtime-fields')
     expect(cleared?.model).toBeUndefined()
     expect(cleared?.effort).toBeUndefined()
+  })
+
+  it('updates and clears an optional run timeout', async () => {
+    await run(issueCreateFactory.build(ctx()), {
+      id: 'budget-fields',
+      title: 'Budget fields',
+      when: { kind: 'every', every: '30m' },
+      assignee: '@new-each-run',
+    })
+    await run(issueUpdateFactory.build(ctx()), { id: 'budget-fields', timeout: '15m' })
+    expect(await readBack('budget-fields')).toMatchObject({ timeout: '15m' })
+    await run(issueUpdateFactory.build(ctx()), { id: 'budget-fields', timeout: null })
+    expect((await readBack('budget-fields'))?.timeout).toBeUndefined()
   })
 
   it('records successful mutations but not rejected ones', async () => {
@@ -393,7 +429,7 @@ describe('global board (ctx.board present)', () => {
             title: 'Shared',
             status: 'in_progress',
             priority: 'none',
-            assignee: '@workspace',
+            assignee: '@new-each-run',
             when: { kind: 'every', every: '30m' },
             nameCollision: true,
           },

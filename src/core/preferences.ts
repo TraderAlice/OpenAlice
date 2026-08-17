@@ -13,10 +13,31 @@ import { z } from 'zod'
 
 import { dataPath } from './paths.js'
 
+const modelReasoningEffortSchema = z.enum([
+  'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra',
+])
+
+const quickChatLaunchSchema = z.object({
+  agent: z.string().min(1),
+  /** How Quick Start resolves authentication before optional model/effort overrides. */
+  accessMode: z.enum(['auto', 'native', 'vault']).optional(),
+  credentialSlug: z.string().min(1).nullable(),
+  model: z.string().min(1).nullable(),
+  reasoningEffort: modelReasoningEffortSchema.nullable(),
+}).transform((value) => ({
+  ...value,
+  accessMode: value.accessMode ?? (value.credentialSlug === null ? 'auto' as const : 'vault' as const),
+})).refine(
+  (value) => value.accessMode === 'vault' ? value.credentialSlug !== null : value.credentialSlug === null,
+  { message: 'access mode and credential must agree' },
+)
+
 const quickChatPreferencesSchema = z.object({
   lastCredentialByAgent: z.record(z.string(), z.string()).default({}),
   /** Stable workspace id used by the global Ask Alice composer. */
   recentChatWorkspaceId: z.string().nullable().default(null),
+  /** The most recently chosen Session launch tuple. It is never a Workspace default. */
+  recentLaunch: quickChatLaunchSchema.nullable().default(null),
 })
 
 const autoQuantPreferencesSchema = z.object({
@@ -32,13 +53,18 @@ const preferencesSchema = z.object({
   quickChat: quickChatPreferencesSchema.default({
     lastCredentialByAgent: {},
     recentChatWorkspaceId: null,
+    recentLaunch: null,
   }),
   autoQuant: autoQuantPreferencesSchema.default({
     defaultWorkspaceId: null,
   }),
 })
 
-export type QuickChatPreferences = z.infer<typeof quickChatPreferencesSchema>
+type ParsedQuickChatPreferences = z.infer<typeof quickChatPreferencesSchema>
+export type QuickChatPreferences = Omit<ParsedQuickChatPreferences, 'recentLaunch'> & {
+  /** Optional on the wire while older test doubles and rolling upgrades coexist. */
+  recentLaunch?: ParsedQuickChatPreferences['recentLaunch']
+}
 export type AutoQuantPreferences = z.infer<typeof autoQuantPreferencesSchema>
 export type Preferences = z.infer<typeof preferencesSchema>
 
@@ -64,6 +90,9 @@ export async function readQuickChatPreferences(path = preferencesPath()): Promis
   return {
     lastCredentialByAgent: { ...preferences.quickChat.lastCredentialByAgent },
     recentChatWorkspaceId: preferences.quickChat.recentChatWorkspaceId,
+    ...(preferences.quickChat.recentLaunch
+      ? { recentLaunch: { ...preferences.quickChat.recentLaunch } }
+      : {}),
   }
 }
 
@@ -93,7 +122,32 @@ function copyQuickChatPreferences(preferences: QuickChatPreferences): QuickChatP
   return {
     lastCredentialByAgent: { ...preferences.lastCredentialByAgent },
     recentChatWorkspaceId: preferences.recentChatWorkspaceId,
+    ...(preferences.recentLaunch ? { recentLaunch: { ...preferences.recentLaunch } } : {}),
   }
+}
+
+export async function rememberQuickChatLaunch(
+  launch: NonNullable<ParsedQuickChatPreferences['recentLaunch']>,
+  path = preferencesPath(),
+): Promise<QuickChatPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const lastCredentialByAgent = { ...preferences.quickChat.lastCredentialByAgent }
+    if (launch.credentialSlug === null) delete lastCredentialByAgent[launch.agent]
+    else lastCredentialByAgent[launch.agent] = launch.credentialSlug
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      quickChat: {
+        ...preferences.quickChat,
+        lastCredentialByAgent,
+        recentLaunch: launch,
+      },
+    })
+    await writePreferences(updated, path)
+    return copyQuickChatPreferences(updated.quickChat)
+  })
+  mutationQueue = operation
+  return operation
 }
 
 export async function rememberQuickChatCredential(

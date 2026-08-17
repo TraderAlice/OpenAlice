@@ -23,7 +23,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
       '--json',
     ])).toEqual(expect.objectContaining({
       appDir: '/tmp/OpenAlice',
-      instance: 'research',
+      project: 'research',
       homeRoot: '/tmp/alice-home',
       port: 41000,
       logFile: '/tmp/openalice.log',
@@ -49,13 +49,13 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
   it('uses explicit control timeouts and exit-code-2 usage errors', () => {
     expect(parseLifecycleArgs('status', ['--home', '/tmp/alice-home', '--wait', '3', '--json'])).toEqual({
-      instance: null,
+      project: null,
       homeRoot: '/tmp/alice-home',
       json: true,
       waitMs: 3_000,
     })
     expect(parseLifecycleArgs('down', [])).toEqual({
-      instance: null,
+      project: null,
       homeRoot: null,
       json: false,
       waitMs: 15_000,
@@ -140,7 +140,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
     expect(startRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
-        instance: 'research',
+        project: 'research',
         homeRoot: resolve('/tmp/research-home'),
       }),
       expect.objectContaining({
@@ -178,7 +178,7 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
     expect(inspectRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
-        instance: 'research',
+        project: 'research',
         homeRoot: resolve('/srv/openalice-research'),
       }),
       expect.any(Object),
@@ -274,12 +274,13 @@ describe('OpenAlice top-level lifecycle commands', () => {
 
   it('generates root help and four shell completions from one command registry', () => {
     const help = formatRootHelp()
-    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'completion']) {
+    for (const command of ['up', 'run', 'down', 'status', 'logs', 'doctor', 'open', 'create', 'project', 'completion']) {
       expect(help).toContain(command)
     }
     expect(formatLifecycleHelp('up')).toContain('installed OpenAlice Runtime in the background')
     expect(formatLifecycleHelp('run')).toContain('foreground')
     expect(formatShellCompletion('bash')).toContain('complete -F _openalice_completion openalice')
+    expect(formatShellCompletion('bash')).toContain('copy-ai-creds')
     expect(formatShellCompletion('zsh')).toContain('#compdef openalice')
     expect(formatShellCompletion('fish')).toContain('complete -c openalice')
     expect(formatShellCompletion('powershell')).toContain('Register-ArgumentCompleter')

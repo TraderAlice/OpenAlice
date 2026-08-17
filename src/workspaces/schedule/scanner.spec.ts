@@ -26,6 +26,7 @@ const noopLogger = {
 
 class FakeMarkers implements MarkerStore {
   private m = new Map<string, number>()
+  private held = new Map<string, number>()
   pruned: Set<string> | null = null
   key(w: string, t: string): string {
     return `${w} ${t}`
@@ -33,12 +34,20 @@ class FakeMarkers implements MarkerStore {
   get(w: string, t: string): number | undefined {
     return this.m.get(this.key(w, t))
   }
+  getHeld(w: string, t: string): number | undefined {
+    return this.held.get(this.key(w, t))
+  }
   async set(w: string, t: string, ts: number): Promise<void> {
     this.m.set(this.key(w, t), ts)
+    this.held.delete(this.key(w, t))
+  }
+  async hold(w: string, t: string, ts: number): Promise<void> {
+    this.held.set(this.key(w, t), ts)
   }
   async prune(seen: Set<string>): Promise<void> {
     this.pruned = seen
     for (const k of [...this.m.keys()]) if (!seen.has(k)) this.m.delete(k)
+    for (const k of [...this.held.keys()]) if (!seen.has(k)) this.held.delete(k)
   }
 }
 
@@ -69,8 +78,11 @@ interface IssueSpec {
   status?: string
   priority?: string
   agent?: string
+  credential?: string
+  credentialSource?: 'native'
   model?: string
   effort?: string
+  timeout?: string
   assignee?: string
   body?: string
 }
@@ -82,12 +94,15 @@ function issueMd(spec: IssueSpec): string {
   if (spec.priority) lines.push(`priority: ${spec.priority}`)
   if (spec.what) lines.push(`what: ${spec.what}`)
   if (spec.agent) lines.push(`agent: ${spec.agent}`)
+  if (spec.credential) lines.push(`credential: ${spec.credential}`)
+  if (spec.credentialSource) lines.push(`credentialSource: ${spec.credentialSource}`)
   if (spec.model) lines.push(`model: ${spec.model}`)
   if (spec.effort) lines.push(`effort: ${spec.effort}`)
+  if (spec.timeout) lines.push(`timeout: ${spec.timeout}`)
   // Scanner tests exercise dispatch policy, not declaration defaults. Keep the
   // historical fresh-every-fire fixture explicit now that omitted scheduled
-  // ownership means recruit once (`@new`).
-  const assignee = spec.assignee ?? (spec.when ? '@workspace' : undefined)
+  // ownership means recruit once (`@new-then-resume`).
+  const assignee = spec.assignee ?? (spec.when ? '@new-each-run' : undefined)
   if (assignee) lines.push(`assignee: ${JSON.stringify(assignee)}`)
   if (spec.when) {
     const w = spec.when
@@ -96,7 +111,7 @@ function issueMd(spec: IssueSpec): string {
         ? `kind: at, at: "${w.at}"`
         : w.kind === 'every'
           ? `kind: every, every: "${w.every}"`
-          : `kind: cron, cron: "${w.cron}"`
+          : `kind: cron, cron: "${w.cron}"${w.catchUp === false ? ', catchUp: false' : ''}`
     lines.push(`when: { ${inner} }`)
   }
   return `---\n${lines.join('\n')}\n---\n${spec.body ?? ''}`
@@ -119,7 +134,7 @@ function scannerFor(
       m: WorkspaceMeta,
       a: CliAdapter,
       p: string,
-      t: number,
+      t?: number,
       trigger?: import('../headless-task-registry.js').HeadlessTaskTrigger,
       resumeId?: string,
     ) => Promise<{ taskId: string; resumeId: string }>
@@ -167,10 +182,98 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'same exact prompt',
-      30 * 60_000,
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'retry-me' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'retry-me',
+        policy: 'new-each-run',
+        fire: 'retry',
+      },
     )
     expect(markers.get('w1', 'retry-me')).toBeUndefined()
+  })
+
+  it('passes an Issue timeout as the dispatch watchdog and omits it by default', async () => {
+    const limited = await makeWs('w1', [{
+      id: 'limited',
+      title: 'Limited',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+      timeout: '45m',
+    }])
+    const unlimited = await makeWs('w2', [{
+      id: 'open',
+      title: 'Open',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+    }])
+    const { scanner: limitedScanner, dispatch: limitedDispatch } = scannerFor([limited])
+    const { scanner: unlimitedScanner, dispatch: unlimitedDispatch } = scannerFor([unlimited])
+    await limitedScanner.scan()
+    await unlimitedScanner.scan()
+    expect(limitedDispatch).toHaveBeenCalledWith(
+      limited,
+      headlessAdapter,
+      'go',
+      45 * 60_000,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'limited',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
+    expect(unlimitedDispatch).toHaveBeenCalledWith(
+      unlimited,
+      headlessAdapter,
+      'go',
+      undefined,
+      { kind: 'issue', workspaceId: 'w2', issueId: 'open' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w2',
+        issueId: 'open',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
+
+    const { scanner: retryScanner, dispatch: retryDispatch } = scannerFor([limited])
+    await retryScanner.runIssueNow('w1', 'limited')
+    expect(retryDispatch).toHaveBeenCalledWith(
+      limited,
+      headlessAdapter,
+      'go',
+      45 * 60_000,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'limited' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'limited',
+        policy: 'new-each-run',
+        fire: 'retry',
+      },
+    )
   })
 
   it('refuses manual retry for an unscheduled or terminal Issue', async () => {
@@ -189,9 +292,24 @@ describe('ScheduleScanner', () => {
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
     // 5th arg = the firing issue's id, threaded so the run records its origin.
-    expect(dispatch).toHaveBeenCalledWith(ws, headlessAdapter, 'go', expect.any(Number), {
-      kind: 'issue', workspaceId: 'w1', issueId: 't1',
-    })
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'go',
+      undefined,
+      { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 't1',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
     expect(markers.get('w1', 't1')).toBe(NOW)
   })
 
@@ -216,13 +334,14 @@ describe('ScheduleScanner', () => {
     expect(markers.get('w1', 't1')).toBe(NOW)
   })
 
-  it('passes Issue model and effort as one-run dispatch overrides', async () => {
+  it('passes Issue credential, model, and effort as one fresh-Session selection', async () => {
     const ws = await makeWs('w1', [{
       id: 'tuned',
       title: 'tuned run',
       when: { kind: 'every', every: '30m' },
       what: 'go',
       agent: 'claude',
+      credential: 'anthropic-primary',
       model: 'claude-opus-4-8',
       effort: 'high',
     }])
@@ -232,11 +351,52 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'go',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'tuned' },
       undefined,
       undefined,
-      { model: 'claude-opus-4-8', reasoningEffort: 'high' },
+      { credentialSlug: 'anthropic-primary', model: 'claude-opus-4-8', reasoningEffort: 'high' },
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'tuned',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
+  })
+
+  it('passes explicit native Agent login without mistaking it for Workspace inheritance', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'native',
+      title: 'native run',
+      when: { kind: 'every', every: '30m' },
+      what: 'go',
+      agent: 'codex',
+      credentialSource: 'native',
+      model: 'gpt-5.6-sol',
+      effort: 'low',
+    }])
+    const { scanner, dispatch } = scannerFor([ws])
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'go',
+      undefined,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'native' },
+      undefined,
+      undefined,
+      { credentialSource: 'native', model: 'gpt-5.6-sol', reasoningEffort: 'low' },
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'native',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
     )
   })
 
@@ -257,7 +417,7 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'continue',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'owned' },
       'resume-kind-owl-abc123',
     )
@@ -265,13 +425,13 @@ describe('ScheduleScanner', () => {
       .toBe('@resume-kind-owl-abc123')
   })
 
-  it('assigns @new to the first fresh Session before advancing the marker', async () => {
+  it('assigns @new-then-resume to the first fresh Session before advancing the marker', async () => {
     const ws = await makeWs('w1', [{
       id: 'sticky',
       title: 'sticky worker',
       when: { kind: 'every', every: '30m' },
       what: 'own this work from now on',
-      assignee: '@new',
+      assignee: '@new-then-resume',
     }])
     const claimFreshSession = vi.fn(async () => undefined)
     const { scanner, dispatch, markers } = scannerFor([ws], { claimFreshSession })
@@ -282,8 +442,19 @@ describe('ScheduleScanner', () => {
       ws,
       headlessAdapter,
       'own this work from now on',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'w1', issueId: 'sticky' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'sticky',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
     )
     expect(claimFreshSession).toHaveBeenCalledWith({
       issueWorkspace: ws,
@@ -298,7 +469,7 @@ describe('ScheduleScanner', () => {
   it('advances the dispatched occurrence when the Session claim write fails', async () => {
     const ws = await makeWs('w1', [{
       id: 'sticky', title: 'sticky worker', when: { kind: 'every', every: '30m' },
-      what: 'own this work', assignee: '@new',
+      what: 'own this work', assignee: '@new-then-resume',
     }])
     const claimFreshSession = vi.fn(async () => { throw new Error('claim write failed') })
     const { scanner, markers } = scannerFor([ws], { claimFreshSession })
@@ -327,7 +498,7 @@ describe('ScheduleScanner', () => {
       execution,
       headlessAdapter,
       'revisit your report',
-      expect.any(Number),
+      undefined,
       { kind: 'issue', workspaceId: 'home', issueId: 'review-report' },
       'resume-peer-author',
     )
@@ -351,9 +522,24 @@ describe('ScheduleScanner', () => {
     const { scanner, dispatch } = scannerFor([ws])
     await scanner.scan()
     expect(dispatch).toHaveBeenCalledTimes(1)
-    expect(dispatch).toHaveBeenCalledWith(ws, headlessAdapter, 'go', expect.any(Number), {
-      kind: 'issue', workspaceId: 'w1', issueId: 'sched',
-    })
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'go',
+      undefined,
+      { kind: 'issue', workspaceId: 'w1', issueId: 'sched' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 'sched',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
     expect(scanner.snapshot()!.workspaces[0].tasks.map((t) => t.id)).toEqual(['sched'])
   })
 
@@ -363,9 +549,24 @@ describe('ScheduleScanner', () => {
     ])
     const { scanner, dispatch } = scannerFor([ws])
     await scanner.scan()
-    expect(dispatch).toHaveBeenCalledWith(ws, headlessAdapter, 'scan movers', expect.any(Number), {
-      kind: 'issue', workspaceId: 'w1', issueId: 't1',
-    })
+    expect(dispatch).toHaveBeenCalledWith(
+      ws,
+      headlessAdapter,
+      'scan movers',
+      undefined,
+      { kind: 'issue', workspaceId: 'w1', issueId: 't1' },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        kind: 'issue',
+        workspaceId: 'w1',
+        issueId: 't1',
+        policy: 'new-each-run',
+        fire: 'schedule',
+      },
+    )
   })
 
   it('fires a never-fired cron issue whose occurrence is within the last tick (not never)', async () => {
@@ -410,6 +611,48 @@ describe('ScheduleScanner', () => {
     await scanner.scan()
     expect(dispatch).not.toHaveBeenCalled()
     expect((markers as FakeMarkers).pruned?.has(markers.key('w1', 't1'))).toBe(true)
+  })
+
+  it('keeps a never-fired cron due after an admission skip', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'c1',
+      title: 'i-cron',
+      when: { kind: 'cron', cron: '* * * * *' },
+      what: 'tick',
+    }])
+    const dispatch = vi.fn(async () => {
+      throw new Error('this conversation already has a running turn')
+    })
+    const { scanner, markers } = scannerFor([ws], { dispatch })
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(markers.get('w1', 'c1')).toBeUndefined()
+    expect(markers.getHeld('w1', 'c1')).toBeTypeOf('number')
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(2)
+  })
+
+  it('consumes every elapsed cron slot when catchUp is false', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'c1',
+      title: 'i-cron',
+      when: { kind: 'cron', cron: '* * * * *', catchUp: false },
+      what: 'tick',
+    }])
+    const dispatch = vi.fn(async () => {
+      throw new Error('this conversation already has a running turn')
+    })
+    const markers = new FakeMarkers()
+    // Simulate a previously successful fire followed by a long sleep. There
+    // are several stale minute slots behind the current wall clock.
+    await markers.set('w1', 'c1', NOW - 10 * 60_000)
+    const { scanner } = scannerFor([ws], { dispatch, markers })
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(markers.getHeld('w1', 'c1')).toBe(NOW)
+    expect(scanner.snapshot()?.workspaces[0]?.tasks[0]?.nextDueAtMs).toBeGreaterThan(NOW)
+    await scanner.scan()
+    expect(dispatch).toHaveBeenCalledTimes(1)
   })
 
   it('does not mark when dispatch hits capacity (so it retries next tick)', async () => {

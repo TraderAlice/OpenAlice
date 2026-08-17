@@ -12,11 +12,11 @@ import { Hono } from 'hono'
 import type { IInboxStore } from '../../core/inbox-store.js'
 import { makeInboxEntryOriginResolver } from '../../core/workspace-tool-center.js'
 import { createWorkspaceConversationControl } from '../../workspaces/conversation-control.js'
+import { projectTurnProgress } from '../../workspaces/headless-progress.js'
 import type { HeadlessInquiryScope, HeadlessInquirySubject, HeadlessTaskRecord } from '../../workspaces/headless-task-registry.js'
 import { issueAssigneeResumeId } from '../../workspaces/issues/declaration.js'
 import { HeadlessCapacityError, HeadlessResumeError, type WorkspaceService } from '../../workspaces/service.js'
 
-const DEFAULT_TIMEOUT_MS = 300_000
 const MAX_PROMPT_CHARS = 16_000
 const LIST_LIMIT = 50
 
@@ -59,6 +59,8 @@ async function inquiryProjection(
   task: HeadlessTaskRecord,
 ) {
   const current = await conversation.read(task.taskId)
+  const progress = task.progress
+    ?? (current?.structured ? projectTurnProgress(current.structured) : null)
   return {
     taskId: task.taskId,
     resumeId: task.resumeId,
@@ -70,7 +72,8 @@ async function inquiryProjection(
     ...(task.durationMs !== undefined ? { durationMs: task.durationMs } : {}),
     ...(task.error ? { error: task.error } : {}),
     inquiry: task.inquiry!,
-    assistantText: current?.structured?.assistantText ?? null,
+    assistantText: current?.structured?.assistantText ?? task.progress?.assistantText ?? null,
+    ...(progress ? { progress } : {}),
   }
 }
 
@@ -105,7 +108,6 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
       const result = await conversation.ask({
         prompt: request.prompt,
         target,
-        timeoutMs: DEFAULT_TIMEOUT_MS,
         source: { kind: 'human' },
         ...(request.reconstruct ? { reconstruct: true } : {}),
         subject: { kind: 'inbox', entryId: entry.id },
@@ -176,7 +178,6 @@ export function createInquiryRoutes(deps: InquiryRoutesDeps): Hono {
       const result = await conversation.ask({
         prompt,
         target,
-        timeoutMs: DEFAULT_TIMEOUT_MS,
         source: { kind: 'human' },
         ...(body.reconstruct === true ? { reconstruct: true } : {}),
         subject,

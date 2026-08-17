@@ -41,6 +41,7 @@ const workspace: Workspace = {
       pid: 42,
       startedAt: 1,
       title: 'Investigate the market',
+      displayName: 'AAPL desk',
     },
   ],
 }
@@ -49,7 +50,6 @@ describe('OverviewCard', () => {
   it('exposes native controls for the workspace and its sessions', () => {
     const onOpen = vi.fn()
     const onOpenSession = vi.fn()
-    const onConfigure = vi.fn()
     const onUpgrade = vi.fn()
     render(
       <OverviewCard
@@ -57,13 +57,12 @@ describe('OverviewCard', () => {
         lastCommit={null}
         onOpen={onOpen}
         onOpenSession={onOpenSession}
-        onConfigure={onConfigure}
         onUpgrade={onUpgrade}
       />,
     )
 
     const workspaceButton = screen.getByRole('button', { name: 'Research desk' })
-    const sessionButton = screen.getByRole('button', { name: 'x1 running' })
+    const sessionButton = screen.getByRole('button', { name: 'AAPL desk running' })
     expect(workspaceButton.tagName).toBe('BUTTON')
     expect(sessionButton.tagName).toBe('BUTTON')
     workspaceButton.focus()
@@ -72,9 +71,7 @@ describe('OverviewCard', () => {
     expect(document.activeElement).toBe(sessionButton)
 
     fireEvent.click(screen.getByRole('button', { name: 'v0.2.0' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Workspace override · codex' }))
     expect(onUpgrade).toHaveBeenCalledTimes(1)
-    expect(onConfigure).toHaveBeenCalledTimes(1)
     expect(onOpen).not.toHaveBeenCalled()
 
     fireEvent.click(workspaceButton)
@@ -93,6 +90,8 @@ describe('OverviewCard', () => {
         id: `session-${index + 1}`,
         resumeId: `resume-${index + 1}`,
         name: `x${index + 1}`,
+        title: null,
+        displayName: undefined,
         state: index === 0 ? 'running' : 'paused',
         lastActiveAt: `2026-07-28T00:${String(59 - index).padStart(2, '0')}:00.000Z`,
       })),
@@ -131,6 +130,8 @@ describe('OverviewCard', () => {
         id: `session-${index + 1}`,
         resumeId: `resume-${index + 1}`,
         name: `x${index + 1}`,
+        title: null,
+        displayName: undefined,
       })),
     }
 

@@ -19,7 +19,7 @@ describe('demo Issue handlers', () => {
       {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'gpt-5.5', effort: 'high' }),
+        body: JSON.stringify({ credential: 'openai-primary', model: 'gpt-5.5', effort: 'high' }),
       },
     )
     const body = await response.json()
@@ -27,8 +27,27 @@ describe('demo Issue handlers', () => {
     expect(response.status).toBe(200)
     expect(body.issue).toMatchObject({
       id: 'morning-scan',
+      credential: 'openai-primary',
       model: 'gpt-5.5',
       effort: 'high',
+    })
+  })
+
+  it('round-trips an optional timeout patch through the detail contract', async () => {
+    const response = await fetch(
+      `${baseUrl}/api/issues/demo-ws-auto-quant/morning-scan`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ timeout: '45m' }),
+      },
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.issue).toMatchObject({
+      id: 'morning-scan',
+      timeout: '45m',
     })
   })
 })

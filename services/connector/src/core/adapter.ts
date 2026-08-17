@@ -1,6 +1,7 @@
 import type {
   ConnectorAdapterConfig,
   ConnectorAdapterHealth,
+  ConnectorArtifactDelivery,
   ConnectorDefinition,
   InboxNotification,
 } from '@traderalice/connector-protocol'
@@ -27,6 +28,8 @@ export interface ConnectorAdapterContext {
   updateSettings(patch: Record<string, string | number | boolean>): Promise<void>
   getServiceStatus(): string
   sendTest(connectorId: string): Promise<string>
+  forwardOwnerText(input: { text: string; userId: string; chatId?: string }): Promise<void>
+  enqueueArtifactRequest(input: { entryId: string; docIndex: number }): string
 }
 
 export interface ConnectorAdapter {
@@ -34,6 +37,9 @@ export interface ConnectorAdapter {
   start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void>
   stop(): Promise<void>
   deliver(notification: InboxNotification): Promise<void>
+  sendOwnerText(text: string): Promise<void>
+  /** Directed current-file delivery. Must not send an Inbox summary. */
+  deliverArtifact?(delivery: ConnectorArtifactDelivery): Promise<void>
   health(): ConnectorAdapterHealth
 }
 

@@ -15,6 +15,8 @@ const CONNECTORS_FILE = dataPath('config', 'connectors.json')
 const SERVICE_FILE = dataPath('config', 'connector-service.json')
 const RESTART_FILE = dataPath('control', 'restart-connector.flag')
 const serviceConfigSchema = z.object({ enabled: z.boolean().default(false) })
+/** Bot tokens are long opaque strings. A 5-character draft must not replace a sealed secret. */
+const MIN_CONNECTOR_SECRET_LENGTH = 20
 
 export async function readConnectorConfig(): Promise<ConnectorConfig> {
   try {
@@ -99,8 +101,12 @@ export async function writePublicConnectorConfig(input: PublicConnectorConfig): 
     for (const [key, value] of Object.entries(incoming.settings)) {
       const field = allowedFields.get(key)
       if (!field) continue
-      if (field.kind === 'secret' && value === '') {
-        if (!incoming.configuredSecrets.includes(key)) delete settings[key]
+      if (field.kind === 'secret') {
+        applyConnectorSecret(settings, key, value, incoming.configuredSecrets.includes(key))
+        continue
+      }
+      if (field.learnedBy && typeof value === 'string' && value.trim() === '') {
+        delete settings[key]
         continue
       }
       settings[key] = value
@@ -114,6 +120,30 @@ export async function writePublicConnectorConfig(input: PublicConnectorConfig): 
   ])
   await triggerConnectorRestart()
   return readPublicConnectorConfig()
+}
+
+function applyConnectorSecret(
+  settings: Record<string, string | number | boolean>,
+  key: string,
+  value: string | number | boolean,
+  configured: boolean,
+): void {
+  if (value === '') {
+    if (!configured) delete settings[key]
+    return
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`Connector secret ${key} must be a string.`)
+  }
+  const next = value.trim()
+  if (!isPlausibleConnectorSecret(next)) {
+    throw new Error(`Connector secret ${key} is too short or malformed to store.`)
+  }
+  settings[key] = next
+}
+
+export function isPlausibleConnectorSecret(value: string): boolean {
+  return value.length >= MIN_CONNECTOR_SECRET_LENGTH && !/\s/.test(value)
 }
 
 async function writePrivateJson(path: string, value: unknown): Promise<void> {

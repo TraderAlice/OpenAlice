@@ -15,6 +15,22 @@ describe('buildWorkspaceSessionDirectory', () => {
         createdAt: 1,
         updatedAt: 2,
         lifecycle: 'active',
+        metadata: {
+          createdBy: {
+            kind: 'issue',
+            workspaceId: 'ws-1',
+            issueId: 'daily-market-close',
+            policy: 'new-then-resume',
+            fire: 'schedule',
+          },
+        },
+        displayName: 'AAPL desk',
+        runtimeBinding: {
+          version: 1,
+          credential: { source: 'vault', credentialSlug: 'secret-slug', wireShape: 'openai-responses' },
+          model: 'gpt-5.6-terra',
+          reasoningEffort: 'high',
+        },
       }],
       interactiveFor: () => ({
         id: 'launcher-secret',
@@ -44,11 +60,66 @@ describe('buildWorkspaceSessionDirectory', () => {
     expect(result.sessions[0]).toMatchObject({
       resumeId: 'resume-kind-owl-abc123',
       resumable: true,
+      createdBy: {
+        kind: 'issue',
+        workspaceId: 'ws-1',
+        issueId: 'daily-market-close',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
+      displayName: 'AAPL desk',
+      runtime: { credentialSource: 'vault', credentialSlug: 'secret-slug', model: 'gpt-5.6-terra', reasoningEffort: 'high' },
       interactive: { name: 'c1', title: 'Investigate provenance' },
       latestExecution: { taskId: 'task-1', assistantPreview: 'done' },
     })
     expect(JSON.stringify(result)).not.toContain('native-secret')
     expect(JSON.stringify(result)).not.toContain('launcher-secret')
     expect(JSON.stringify(result)).not.toContain('private repeated prompt')
+  })
+
+  it('projects archived presence and keeps a deleted Session non-resumable', () => {
+    const archived = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [{
+        resumeId: 'resume-archived',
+        wsId: 'ws-1',
+        agent: 'pi',
+        agentSessionId: 'native-1',
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: 'active',
+        presence: 'archived',
+      }],
+      interactiveFor: () => undefined,
+      latestExecutionFor: () => null,
+      isActive: () => false,
+    })
+    expect(archived.sessions[0]).toMatchObject({
+      resumeId: 'resume-archived',
+      presence: 'archived',
+      resumable: true,
+    })
+
+    const deleted = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [{
+        resumeId: 'resume-deleted',
+        wsId: 'ws-1',
+        agent: 'pi',
+        agentSessionId: 'native-1',
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: 'active',
+        presence: 'deleted',
+      }],
+      interactiveFor: () => undefined,
+      latestExecutionFor: () => null,
+      isActive: () => false,
+    })
+    expect(deleted.sessions[0]).toMatchObject({
+      resumeId: 'resume-deleted',
+      presence: 'deleted',
+      resumable: false,
+    })
   })
 })

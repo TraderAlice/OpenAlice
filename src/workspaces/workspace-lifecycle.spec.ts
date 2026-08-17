@@ -11,6 +11,7 @@ import { ResumeRegistry } from './resume-registry.js'
 import { ScrollbackStore } from './scrollback-store.js'
 import type { SessionPool } from './session-pool.js'
 import { SessionRegistry } from './session-registry.js'
+import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js'
 import { WorkspaceCatalog, type WorkspaceCatalogRecord } from './workspace-catalog.js'
 import { WorkspaceLifecycleManager } from './workspace-lifecycle.js'
 import { WorkspaceOperationGuard } from './workspace-operation-guard.js'
@@ -39,7 +40,7 @@ beforeEach(async () => {
     '---',
     'title: Handoff me',
     'status: todo',
-    'assignee: "@workspace"',
+    'assignee: "@new-each-run"',
     'when: { kind: every, every: "1h" }',
     '---',
     '',
@@ -55,12 +56,23 @@ beforeEach(async () => {
   registry = await WorkspaceRegistry.load(join(root, 'workspaces.json'), noopLogger)
   await registry.add(workspace)
   catalog = await WorkspaceCatalog.load(join(root, 'state', 'workspace-catalog.json'), [workspace], noopLogger)
-  resumes = await ResumeRegistry.load(join(root, 'state', 'resume-identities.json'), noopLogger)
+  resumes = await ResumeRegistry.load(
+    join(root, 'state', 'resume-identities.json'),
+    noopLogger,
+    new WorkspaceSessionRuntimeStore((wsId) => {
+      const active = registry.get(wsId)
+      const historical = catalog.get(wsId)
+      return [active?.dir, historical?.departedDir, historical?.activeDir]
+        .filter((value): value is string => Boolean(value))
+        .map((directory) => join(directory, '.alice', 'sessions'))
+    }),
+  )
   await resumes.ensure({
     resumeId: 'resume-calm-owner',
     wsId: workspace.id,
     agent: 'pi',
     agentSessionId: 'native-session',
+    runtimeBinding: { version: 1, credential: { source: 'native' }, model: 'test-model' },
     now: 1,
   })
   sessions = await SessionRegistry.load(join(root, 'state'), noopLogger)
@@ -113,6 +125,10 @@ describe('WorkspaceLifecycleManager', () => {
     expect(sessions.get(workspace.id, 'pi-calm-seat')?.state).toBe('paused')
     expect(await readFile(join(departedDir, '.alice', 'HANDOFF.md'), 'utf8')).toContain('Review open work.')
     expect(await readFile(join(departedDir, '.alice', 'offboarding.json'), 'utf8')).toContain('handoff-me')
+    expect(await readFile(
+      join(departedDir, '.alice', 'sessions', 'resume-calm-owner.json'),
+      'utf8',
+    )).toContain('test-model')
 
     const restored = await lifecycle.restore(workspace.id)
     expect(restored.ok).toBe(true)
@@ -121,6 +137,10 @@ describe('WorkspaceLifecycleManager', () => {
     expect(catalog.get(workspace.id)?.lifecycle).toBe('active')
     expect(resumes.get('resume-calm-owner')?.lifecycle).toBe('active')
     expect(sessions.get(workspace.id, 'pi-calm-seat')).toBeTruthy()
+    expect(await readFile(
+      join(workspace.dir, '.alice', 'sessions', 'resume-calm-owner.json'),
+      'utf8',
+    )).toContain('test-model')
   })
 
   it('blocks departure while a headless coworker is still working', async () => {
