@@ -9,6 +9,20 @@ export interface PublicSessionRuntime {
   readonly reasoningEffort?: ModelReasoningEffort;
 }
 
+/** Secret-free credential/model/effort projection of a persisted Session binding. */
+export function projectPublicSessionRuntime(
+  binding: SessionRuntimeBinding,
+): PublicSessionRuntime {
+  return {
+    credentialSource: binding.credential.source,
+    ...(binding.credential.source === 'vault'
+      ? { credentialSlug: binding.credential.credentialSlug }
+      : {}),
+    ...(binding.model ? { model: binding.model } : {}),
+    ...(binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
+  };
+}
+
 export interface PublicSession {
   readonly id: string;
   readonly wsId: string;
@@ -75,17 +89,6 @@ export function projectPublicSession(
     ...(context.displayName ? { displayName: context.displayName } : {}),
     sourceRunId: record.sourceRunId ?? null,
     ...(context.presence ? { presence: context.presence } : {}),
-    ...(binding
-      ? {
-          runtime: {
-            credentialSource: binding.credential.source,
-            ...(binding.credential.source === 'vault'
-              ? { credentialSlug: binding.credential.credentialSlug }
-              : {}),
-            ...(binding.model ? { model: binding.model } : {}),
-            ...(binding.reasoningEffort ? { reasoningEffort: binding.reasoningEffort } : {}),
-          },
-        }
-      : {}),
+    ...(binding ? { runtime: projectPublicSessionRuntime(binding) } : {}),
   };
 }

@@ -187,6 +187,16 @@ export const en = {
       sessionBinding: 'Session binding',
       workspaceValue: 'Workspace · {{value}}',
       applyAiConfiguration: 'Apply configuration',
+      sessionAiConfigurationDescription:
+        'Change the credential, model, or effort this Session will use on the next scheduled or comment-reply turn. The Agent runtime stays locked.',
+      sessionAiAccessDescription:
+        'Runtime managed leaves credentials and provider configuration to the Agent runtime; saved access injects an OpenAlice vault credential. The next turn replays this binding.',
+      sessionTurnInProgress: 'Wait for the current turn to finish before changing credential, model, or effort.',
+      changeAssigneeCapabilitiesTitle: 'Change planned assignee capabilities?',
+      changeAssigneeCapabilitiesMessage:
+        'This will change the planned assignee\'s capabilities from {{from}} to {{to}}.',
+      changeAssigneeCapabilitiesConfirm: 'Change capabilities',
+      changingAssigneeCapabilities: 'Updating…',
       retryNow: 'Retry now',
       retrying: 'Retrying…',
       retryNowTitle: 'Retry this Issue now?',

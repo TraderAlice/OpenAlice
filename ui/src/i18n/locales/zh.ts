@@ -175,6 +175,16 @@ export const zh: Resources = {
       sessionBinding: '会话固定配置',
       workspaceValue: '工作区 · {{value}}',
       applyAiConfiguration: '应用配置',
+      sessionAiConfigurationDescription:
+        '更改这个会话在下一次计划运行或评论回复时使用的凭据、模型和推理强度。Agent 运行时保持锁定。',
+      sessionAiAccessDescription:
+        '由运行时管理时，凭据与提供方配置交给 Agent Runtime 自行解析；已保存凭据会注入 OpenAlice 凭据库中的配置。下一轮会回放这次绑定。',
+      sessionTurnInProgress: '请等当前轮次结束后再更换凭据、模型或推理强度。',
+      changeAssigneeCapabilitiesTitle: '更改计划中的负责人能力？',
+      changeAssigneeCapabilitiesMessage:
+        '这样会改变已经在计划中的负责人能力，从 {{from}} 变为 {{to}}。',
+      changeAssigneeCapabilitiesConfirm: '更改能力',
+      changingAssigneeCapabilities: '正在更新…',
       retryNow: '立即重试',
       retrying: '正在重试…',
       retryNowTitle: '现在重试这个议题？',

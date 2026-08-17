@@ -1151,6 +1151,41 @@ export async function updatePausedSessionRuntime(
   return body.session;
 }
 
+export interface ResumeRuntimeUpdateResult {
+  readonly resumeId: string;
+  readonly agent: string;
+  readonly runtime: NonNullable<WorkspaceSessionDirectoryEntry['runtime']>;
+}
+
+/** Replace credential/model/effort on an idle product Session by resumeId.
+ * Agent runtime stays frozen. Used by the Issue page after a Session owner
+ * has already been materialized. */
+export async function updateResumeRuntime(
+  wsId: string,
+  resumeId: string,
+  update: PausedSessionRuntimeUpdate,
+): Promise<ResumeRuntimeUpdateResult> {
+  const res = await fetch(
+    `/api/workspaces/${encodeURIComponent(wsId)}/resumes/${encodeURIComponent(resumeId)}/runtime`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(update),
+    },
+  );
+  const body = (await res.json().catch(() => null)) as {
+    resumeId?: string;
+    agent?: string;
+    runtime?: ResumeRuntimeUpdateResult['runtime'];
+    error?: string;
+    message?: string;
+  } | null;
+  if (!res.ok || !body?.resumeId || !body.agent || !body.runtime) {
+    throw new Error(body?.message ?? body?.error ?? `Session AI configuration update failed: ${res.status}`);
+  }
+  return { resumeId: body.resumeId, agent: body.agent, runtime: body.runtime };
+}
+
 export async function openWebPiSession(wsId: string, sessionId: string): Promise<WebPiSnapshot> {
   const res = await fetch(
     `/api/workspaces/${encodeURIComponent(wsId)}/sessions/${encodeURIComponent(sessionId)}/webpi/open`,

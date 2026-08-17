@@ -238,8 +238,10 @@ Session binding when its owner is `@new-then-resume` or `@new-each-run`.
 `credential` is
 only an OpenAlice-vault slug. Omitting both inherits the Workspace headless
 tuple. Neither form ever contains a key or endpoint. Once an exact
-`@resumeId` exists, those fields cannot replace its credential source, model, or
-effort. Follow-up turns replay the stored binding instead of consulting newly
+`@resumeId` exists, Issue frontmatter cannot replace its credential source,
+model, or effort. The Issue page and paused Session settings may still replace
+those three dimensions on the stored binding; the Agent runtime stays frozen.
+Follow-up turns replay the stored binding instead of consulting newly
 changed Workspace defaults.
 
 The persisted credential component records only an ownership reference:

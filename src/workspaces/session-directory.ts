@@ -6,7 +6,10 @@ import {
 } from './resume-registry.js'
 import { sessionPreferredTitle, type SessionRecord } from './session-registry.js'
 import type { SessionCreatedBy } from './session-metadata.js'
-import type { ModelReasoningEffort } from '@/ai-providers/model-semantics.js'
+import {
+  projectPublicSessionRuntime,
+  type PublicSessionRuntime,
+} from './public-session.js'
 
 export interface WorkspaceSessionDirectoryEntry {
   resumeId: string
@@ -23,12 +26,7 @@ export interface WorkspaceSessionDirectoryEntry {
   active: boolean
   /** Secret-free birth stamp when this product Session was first allocated. */
   createdBy?: SessionCreatedBy
-  runtime?: {
-    credentialSource: 'native' | 'vault' | 'workspace'
-    credentialSlug?: string
-    model?: string
-    reasoningEffort?: ModelReasoningEffort
-  }
+  runtime?: PublicSessionRuntime
   latestExecution?: {
     taskId: string
     status: HeadlessTaskStatus
@@ -82,18 +80,7 @@ export function buildWorkspaceSessionDirectory(input: {
         active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
         ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
         ...(identity.runtimeBinding
-          ? {
-              runtime: {
-                credentialSource: identity.runtimeBinding.credential.source,
-                ...(identity.runtimeBinding.credential.source === 'vault'
-                  ? { credentialSlug: identity.runtimeBinding.credential.credentialSlug }
-                  : {}),
-                ...(identity.runtimeBinding.model ? { model: identity.runtimeBinding.model } : {}),
-                ...(identity.runtimeBinding.reasoningEffort
-                  ? { reasoningEffort: identity.runtimeBinding.reasoningEffort }
-                  : {}),
-              },
-            }
+          ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
           : {}),
         ...(execution
           ? {

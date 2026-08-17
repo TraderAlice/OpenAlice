@@ -36,7 +36,7 @@ import {
   sessionPreferredTitle,
   type SessionRecord,
 } from '../../workspaces/session-registry.js';
-import { projectPublicSession, type PublicSession } from '../../workspaces/public-session.js';
+import { projectPublicSession, projectPublicSessionRuntime, type PublicSession } from '../../workspaces/public-session.js';
 import type { WorkspaceMeta } from '../../workspaces/workspace-registry.js';
 import { HeadlessCapacityError, HeadlessResumeError, resumeFromRecord, type SessionFactoryContext, type WorkspaceService } from '../../workspaces/service.js';
 import {
@@ -1586,6 +1586,104 @@ export function createWorkspaceRoutes(
         return c.json({ error, message: err.message }, err.code === 'not_found' ? 404 : 409);
       }
       throw err;
+    }
+  });
+
+  // Replace credential/model/effort on a product Session. Agent runtime stays
+  // frozen. The Issue page and other resumeId surfaces use this because the
+  // Session directory never exposes launcher record ids.
+  app.put('/:id/resumes/:resumeId/runtime', async (c) => {
+    const id = c.req.param('id');
+    const resumeId = c.req.param('resumeId');
+    if (!validId(id) || !validId(resumeId)) return c.json({ error: 'not_found' }, 404);
+    const meta = svc.resolveRuntimeWorkspace?.(id) ?? svc.registry.get(id);
+    if (!meta) return c.json({ error: 'workspace_not_found' }, 404);
+    const identity = svc.resumeRegistry.get(resumeId);
+    if (!identity || identity.wsId !== id) {
+      return c.json({ error: 'resume_not_found', message: 'Assigned Session does not exist' }, 404);
+    }
+    if (identity.lifecycle === 'retired') {
+      return c.json({ error: 'resume_retired', message: 'this Session retired with its Workspace' }, 409);
+    }
+    if (sessionPresence(identity) === 'deleted') {
+      return c.json({
+        error: 'resume_deleted',
+        message: 'This Session is no longer available',
+      }, 409);
+    }
+    const interactive = svc.sessionRegistry.findByResumeId(id, resumeId);
+    if (
+      interactive
+      && (
+        interactive.state === 'running'
+        || svc.pool.get(interactive.id)
+        || svc.webPi?.has(interactive.id)
+      )
+    ) {
+      return c.json({
+        error: 'session_busy',
+        message: 'Wait for the current turn to finish before changing credential, model, or effort',
+      }, 409);
+    }
+    const latest = svc.headlessTasks?.latestForResumeId(resumeId);
+    if (latest?.status === 'running') {
+      return c.json({
+        error: 'session_busy',
+        message: 'Wait for the current turn to finish before changing credential, model, or effort',
+      }, 409);
+    }
+    const adapter = svc.adapters.get(identity.agent);
+    if (!adapter || !isAgentRuntime(adapter)) {
+      return c.json({
+        error: 'runtime_selection_unsupported',
+        message: `Session runtime "${identity.agent}" does not support managed AI configuration`,
+      }, 400);
+    }
+    const parsed = pausedSessionRuntimeRequestSchema.safeParse(
+      await safeJson(c).catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json({
+        error: 'bad_request',
+        message: parsed.error.issues[0]?.message ?? 'invalid Session AI configuration',
+      }, 400);
+    }
+    try {
+      const resolved = await createSessionRuntimeBinding({
+        adapter,
+        cwd: meta.dir,
+        selection: {
+          ...(parsed.data.credentialSource === 'native'
+            ? { credentialSource: 'native' as const }
+            : { credentialSlug: parsed.data.credentialSlug! }),
+          ...(parsed.data.model ? { model: parsed.data.model } : {}),
+          ...(parsed.data.reasoningEffort
+            ? { reasoningEffort: parsed.data.reasoningEffort }
+            : {}),
+        },
+      });
+      await svc.resumeRegistry.replaceRuntimeBinding({
+        resumeId: identity.resumeId,
+        wsId: identity.wsId,
+        agent: identity.agent,
+        runtimeBinding: resolved.binding,
+      });
+      return c.json({
+        resumeId: identity.resumeId,
+        agent: identity.agent,
+        runtime: projectPublicSessionRuntime(resolved.binding),
+      });
+    } catch (err) {
+      if (err instanceof SessionRuntimeBindingError) {
+        return c.json({ error: err.code, message: err.message }, 400);
+      }
+      launcherLogger.warn('resume_runtime.replace_failed', {
+        id, resumeId, agent: identity.agent, err,
+      });
+      return c.json({
+        error: 'session_runtime_update_failed',
+        message: (err as Error).message,
+      }, 500);
     }
   });
 

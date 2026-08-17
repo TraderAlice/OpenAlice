@@ -28,8 +28,10 @@ import {
   getAgentReadiness,
   getWorkspaceSessionDirectory,
   listAgentCredentials,
+  updateResumeRuntime,
   type AgentCredentialReadiness,
   type AgentId,
+  type PausedSessionRuntimeUpdate,
   type SavedCredential,
   type WorkspaceRuntimeModeSettings,
   type WorkspaceSessionDirectoryEntry,
@@ -549,6 +551,28 @@ function credentialLabel(credential: SavedCredential | null | undefined): string
   return credential ? credentialAccessLabel(credential) : ''
 }
 
+function formatAiCapability(parts: { access: string; model: string; effort: string }): string {
+  return `${parts.access} · ${parts.model} · ${parts.effort}`
+}
+
+function issuePatchToRuntimeUpdate(patch: IssuePatch): PausedSessionRuntimeUpdate {
+  const vault = Boolean(patch.credential)
+  return {
+    credentialSource: vault ? 'vault' : 'native',
+    ...(vault ? { credentialSlug: patch.credential } : {}),
+    model: patch.model ?? null,
+    reasoningEffort: patch.effort ?? null,
+  }
+}
+
+function ownerSessionBusy(session: WorkspaceSessionDirectoryEntry | undefined): boolean {
+  return Boolean(
+    session?.active
+    || session?.interactive?.state === 'running'
+    || session?.latestExecution?.status === 'running',
+  )
+}
+
 function IssueAiEditor({
   issue,
   agent,
@@ -557,6 +581,8 @@ function IssueAiEditor({
   presets,
   loading,
   disabled,
+  bound,
+  boundRuntime,
   onApply,
 }: {
   issue: IssueDetailIssue
@@ -566,25 +592,33 @@ function IssueAiEditor({
   presets: readonly Preset[]
   loading: boolean
   disabled: boolean
-  onApply: (patch: IssuePatch) => void
+  bound?: boolean
+  boundRuntime?: WorkspaceSessionDirectoryEntry['runtime']
+  onApply: (patch: IssuePatch, capability: { from: string; to: string }) => void
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const initialAccess = issue.credentialSource === 'native'
-    ? 'native'
-    : issue.credential
-      ? `vault:${issue.credential}`
-      : 'inherit'
+  const initialAccess = bound
+    ? (boundRuntime?.credentialSource === 'vault' && boundRuntime.credentialSlug
+      ? `vault:${boundRuntime.credentialSlug}`
+      : 'native')
+    : issue.credentialSource === 'native'
+      ? 'native'
+      : issue.credential
+        ? `vault:${issue.credential}`
+        : 'inherit'
+  const initialModel = bound ? boundRuntime?.model ?? null : issue.model ?? null
+  const initialEffort = bound ? boundRuntime?.reasoningEffort ?? null : issue.effort ?? null
   const [access, setAccess] = useState(initialAccess)
-  const [model, setModel] = useState<string | null>(issue.model ?? null)
-  const [effort, setEffort] = useState<ModelReasoningEffort | null>(issue.effort ?? null)
+  const [model, setModel] = useState<string | null>(initialModel)
+  const [effort, setEffort] = useState<ModelReasoningEffort | null>(initialEffort)
 
   useEffect(() => {
     if (!open) return
     setAccess(initialAccess)
-    setModel(issue.model ?? null)
-    setEffort(issue.effort ?? null)
-  }, [initialAccess, issue.effort, issue.model, open])
+    setModel(initialModel)
+    setEffort(initialEffort)
+  }, [initialAccess, initialEffort, initialModel, open])
 
   const draftIssue = {
     ...(access === 'native' ? { credentialSource: 'native' as const } : {}),
@@ -593,36 +627,72 @@ function IssueAiEditor({
     ...(effort ? { effort } : {}),
   }
   const resolved = resolveIssueAiSelection({ mode, agent, issue: draftIssue })
-  const committed = resolveIssueAiSelection({ mode, agent, issue })
+  const committed = bound
+    ? {
+        accessMode: (boundRuntime?.credentialSource === 'vault' ? 'vault' : 'native') as 'vault' | 'native',
+        credentialSlug: boundRuntime?.credentialSource === 'vault' ? boundRuntime.credentialSlug : undefined,
+        model: boundRuntime?.model,
+        reasoningEffort: boundRuntime?.reasoningEffort,
+        accessOrigin: 'issue' as const,
+      }
+    : resolveIssueAiSelection({ mode, agent, issue })
   const selectedCredential = resolved.credentialSlug
     ? credentials.find((candidate) => candidate.slug === resolved.credentialSlug) ?? null
     : null
   const models = issueModelOptions({
     agent,
     credential: selectedCredential,
-    defaultModel: resolved.model ?? selectedCredential?.resolvedModel ?? null,
+    defaultModel: bound
+      ? model ?? selectedCredential?.resolvedModel ?? null
+      : resolved.model ?? selectedCredential?.resolvedModel ?? null,
     presets,
   })
-  const effectiveModel = model ?? resolved.model ?? selectedCredential?.resolvedModel ?? null
+  const effectiveModel = model
+    ?? (bound ? null : resolved.model ?? selectedCredential?.resolvedModel ?? null)
   const semantics = issueModelSemantics(effectiveModel, models)
   const efforts = issueEffortOptions({ agent, semantics, modelKnown: semantics !== null })
-  const inheritedEffort = resolved.reasoningEffort ?? selectedCredential?.resolvedReasoningEffort ?? null
+  const inheritedEffort = bound
+    ? null
+    : resolved.reasoningEffort ?? selectedCredential?.resolvedReasoningEffort ?? null
 
+  const accessLabel = (modeValue: string, slug: string | undefined, fallbackCredential: SavedCredential | null) => (
+    modeValue === 'vault' || modeValue.startsWith('vault:')
+      ? credentialLabel(fallbackCredential)
+        || slug
+        || (modeValue.startsWith('vault:') ? modeValue.slice(6) : undefined)
+        || t('issues.detail.savedAccess')
+      : t('issues.detail.agentLogin')
+  )
   const committedCredential = committed.credentialSlug
     ? credentials.find((candidate) => candidate.slug === committed.credentialSlug) ?? null
     : null
-  const summaryAccess = committed.accessMode === 'vault'
-    ? credentialLabel(committedCredential) || committed.credentialSlug || t('issues.detail.savedAccess')
-    : t('issues.detail.agentLogin')
-  const summaryModel = committed.model ?? committedCredential?.resolvedModel ?? t('issues.detail.runtimeDecides')
-  const summaryEffort = committed.reasoningEffort ?? committedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
-  const provenance = committed.accessOrigin === 'workspace-fixed'
-    ? t('issues.detail.workspaceHeadlessFixed')
-    : committed.accessOrigin === 'workspace-recent'
-      ? t('issues.detail.workspaceHeadlessRecent')
-      : committed.accessOrigin === 'runtime'
-        ? t('issues.detail.agentRuntimeDefault')
-        : t('issues.detail.issueOverride')
+  const summaryAccess = accessLabel(committed.accessMode, committed.credentialSlug, committedCredential)
+  const summaryModel = bound
+    ? committed.model ?? t('issues.detail.runtimeDecides')
+    : committed.model ?? committedCredential?.resolvedModel ?? t('issues.detail.runtimeDecides')
+  const summaryEffort = bound
+    ? committed.reasoningEffort ?? t('issues.detail.runtimeDecides')
+    : committed.reasoningEffort ?? committedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
+  const draftAccess = accessLabel(
+    resolved.accessMode,
+    resolved.credentialSlug,
+    selectedCredential,
+  )
+  const draftModel = bound
+    ? model ?? t('issues.detail.runtimeDecides')
+    : model ?? resolved.model ?? selectedCredential?.resolvedModel ?? t('issues.detail.runtimeDecides')
+  const draftEffort = bound
+    ? effort ?? t('issues.detail.runtimeDecides')
+    : effort ?? resolved.reasoningEffort ?? selectedCredential?.resolvedReasoningEffort ?? t('issues.detail.runtimeDecides')
+  const provenance = bound
+    ? t('issues.detail.sessionBinding')
+    : committed.accessOrigin === 'workspace-fixed'
+      ? t('issues.detail.workspaceHeadlessFixed')
+      : committed.accessOrigin === 'workspace-recent'
+        ? t('issues.detail.workspaceHeadlessRecent')
+        : committed.accessOrigin === 'runtime'
+          ? t('issues.detail.agentRuntimeDefault')
+          : t('issues.detail.issueOverride')
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -644,7 +714,11 @@ function IssueAiEditor({
       <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('issues.detail.aiConfiguration')}</DialogTitle>
-          <DialogDescription>{t('issues.detail.aiConfigurationDescription')}</DialogDescription>
+          <DialogDescription>
+            {t(bound
+              ? 'issues.detail.sessionAiConfigurationDescription'
+              : 'issues.detail.aiConfigurationDescription')}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <label className="block space-y-1.5">
@@ -660,7 +734,9 @@ function IssueAiEditor({
                 setEffort(null)
               }}
             >
-              <option value="inherit">{t('issues.detail.followWorkspaceHeadless')}</option>
+              {!bound && (
+                <option value="inherit">{t('issues.detail.followWorkspaceHeadless')}</option>
+              )}
               <option value="native">{t('issues.detail.useAgentLogin')}</option>
               {credentials.map((credential) => (
                 <option key={credential.slug} value={`vault:${credential.slug}`}>
@@ -670,14 +746,23 @@ function IssueAiEditor({
               {issue.credential && !credentials.some((credential) => credential.slug === issue.credential) && (
                 <option value={`vault:${issue.credential}`}>{t('issues.detail.missingCredentialValue', { credential: issue.credential })}</option>
               )}
+              {bound && boundRuntime?.credentialSlug
+                && !credentials.some((credential) => credential.slug === boundRuntime.credentialSlug)
+                && (
+                  <option value={`vault:${boundRuntime.credentialSlug}`}>
+                    {t('issues.detail.missingCredentialValue', { credential: boundRuntime.credentialSlug })}
+                  </option>
+                )}
             </select>
-            <span className="block text-[11px] leading-relaxed text-muted-foreground">{t('issues.detail.aiAccessDescription')}</span>
+            <span className="block text-[11px] leading-relaxed text-muted-foreground">
+              {t(bound ? 'issues.detail.sessionAiAccessDescription' : 'issues.detail.aiAccessDescription')}
+            </span>
           </label>
           <div className="space-y-1.5">
             <span className="flex items-center gap-2 text-xs font-medium text-foreground"><Cpu size={14} />{t('issues.detail.model')}</span>
             <ModelEditor
               value={model ?? undefined}
-              defaultModel={resolved.model ?? selectedCredential?.resolvedModel ?? null}
+              defaultModel={bound ? null : resolved.model ?? selectedCredential?.resolvedModel ?? null}
               models={models}
               loadingDefault={loading}
               disabled={disabled}
@@ -708,6 +793,17 @@ function IssueAiEditor({
                 credentialSource: access === 'native' ? 'native' : null,
                 model,
                 effort,
+              }, {
+                from: formatAiCapability({
+                  access: summaryAccess,
+                  model: summaryModel,
+                  effort: summaryEffort,
+                }),
+                to: formatAiCapability({
+                  access: draftAccess,
+                  model: draftModel,
+                  effort: draftEffort,
+                }),
               })
               setOpen(false)
             }}
@@ -820,6 +916,8 @@ function PropertiesRail({
   onRetry,
   onRunNow,
   onConfigureAgent,
+  onRefreshSessions,
+  sessionsLoaded,
 }: {
   wsId: string
   issue: IssueDetailIssue
@@ -838,9 +936,17 @@ function PropertiesRail({
   onRetry: () => Promise<void>
   onRunNow: () => Promise<void>
   onConfigureAgent: (agent: AgentId) => void
+  onRefreshSessions: () => Promise<void>
+  sessionsLoaded: boolean
 }) {
   const { t } = useTranslation()
   const [confirmAction, setConfirmAction] = useState<'run' | 'retry' | null>(null)
+  const [pendingCapability, setPendingCapability] = useState<{
+    from: string
+    to: string
+    update: PausedSessionRuntimeUpdate
+  } | null>(null)
+  const [runtimeError, setRuntimeError] = useState<string | null>(null)
   const meta = STATUS_META[issue.status]
   const issueDefaultInOptions = issueDefaultAgent && agentOptions.some((a) => a.id === issueDefaultAgent) ? issueDefaultAgent : null
   const defaultInOptions = defaultAgent && agentOptions.some((a) => a.id === defaultAgent) ? defaultAgent : null
@@ -1057,32 +1163,15 @@ function PropertiesRail({
             <InspectorSection title={t('issues.detail.agent')}>
               <InspectorField label={t('issues.detail.runtime')}>
                 {ownerResumeId ? (
-                  <div className="overflow-hidden rounded-md border border-border bg-muted/20">
-                    <div
-                      className="flex min-h-10 items-center gap-2.5 px-3 py-2"
-                      title={t('issues.detail.sessionDeterminesRuntime')}
-                    >
-                      <Cpu size={14} className="text-muted-foreground" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-                        {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">{t('issues.detail.sessionBinding')}</span>
-                    </div>
-                    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 border-t border-border/60 px-3 py-2.5">
-                      <KeyRound size={14} className="text-muted-foreground" aria-hidden />
-                      <span className="min-w-0">
-                        <span className="block truncate text-[13px] font-medium">
-                          {ownerSession?.runtime?.credentialSource === 'vault'
-                            ? credentialLabel(availableCredentials.find((candidate) => candidate.slug === ownerSession.runtime?.credentialSlug))
-                              || ownerSession.runtime?.credentialSlug
-                              || t('issues.detail.savedAccess')
-                            : t('issues.detail.agentLogin')}
-                        </span>
-                        <span className="block truncate text-[11px] text-muted-foreground">
-                          {ownerSession?.runtime?.model ?? t('issues.detail.runtimeDecides')} · {ownerSession?.runtime?.reasoningEffort ?? t('issues.detail.runtimeDecides')}
-                        </span>
-                      </span>
-                    </div>
+                  <div
+                    className="flex min-h-10 items-center gap-2.5 rounded-md border border-border bg-muted/20 px-3 py-2"
+                    title={t('issues.detail.sessionDeterminesRuntime')}
+                  >
+                    <Cpu size={14} className="text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                      {ownerSession?.agent ?? t('issues.detail.sessionOwned')}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{t('issues.detail.sessionBinding')}</span>
                   </div>
                 ) : (
                   <div className="flex min-w-0 items-center gap-2">
@@ -1108,21 +1197,39 @@ function PropertiesRail({
                 )}
               </InspectorField>
 
-              {!ownerResumeId && (
-                <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
-                  <div className="flex min-w-0">
-                    <IssueAiEditor
-                      issue={issue}
-                      agent={effectiveAgent}
-                      mode={headlessRuntime}
-                      credentials={availableCredentials}
-                      presets={presets}
-                      loading={credentialsLoading}
-                      disabled={saving}
-                      onApply={onPatch}
-                    />
-                  </div>
-                </InspectorField>
+              <InspectorField label={t('issues.detail.aiConfiguration')} className="mt-3">
+                <div className="flex min-w-0">
+                  <IssueAiEditor
+                    issue={issue}
+                    agent={effectiveAgent}
+                    mode={headlessRuntime}
+                    credentials={availableCredentials}
+                    presets={presets}
+                    loading={credentialsLoading}
+                    disabled={saving || Boolean(ownerResumeId && (ownerSessionBusy(ownerSession) || (sessionsLoaded && !ownerSession)))}
+                    bound={Boolean(ownerResumeId)}
+                    boundRuntime={ownerSession?.runtime}
+                    onApply={(patch, capability) => {
+                      if (!ownerResumeId) {
+                        void onPatch(patch)
+                        return
+                      }
+                      if (capability.from === capability.to) return
+                      setRuntimeError(null)
+                      setPendingCapability({
+                        from: capability.from,
+                        to: capability.to,
+                        update: issuePatchToRuntimeUpdate(patch),
+                      })
+                    }}
+                  />
+                </div>
+              </InspectorField>
+              {ownerResumeId && ownerSessionBusy(ownerSession) && (
+                <p className="mt-2 text-xs leading-snug text-muted-foreground">{t('issues.detail.sessionTurnInProgress')}</p>
+              )}
+              {ownerResumeId && sessionsLoaded && !ownerSession && (
+                <p className="mt-2 text-xs leading-snug text-muted-foreground">{t('issues.detail.sessionUnavailable')}</p>
               )}
               {agentNeedsCredential && (
                 <p className="mt-2 text-xs leading-snug text-warning">{t('issues.detail.aiCredentialMissing')}</p>
@@ -1131,7 +1238,34 @@ function PropertiesRail({
           </>
         )}
       </div>
-      {error && <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error}</p>}
+      {(error || runtimeError) && (
+        <p role="alert" className="mt-2 text-xs leading-snug text-destructive">{error || runtimeError}</p>
+      )}
+      {pendingCapability && ownerResumeId && (
+        <ConfirmDialog
+          title={t('issues.detail.changeAssigneeCapabilitiesTitle')}
+          message={t('issues.detail.changeAssigneeCapabilitiesMessage', {
+            from: pendingCapability.from,
+            to: pendingCapability.to,
+          })}
+          confirmLabel={t('issues.detail.changeAssigneeCapabilitiesConfirm')}
+          cancelLabel={t('common.cancel')}
+          workingLabel={t('issues.detail.changingAssigneeCapabilities')}
+          variant="primary"
+          onConfirm={async () => {
+            try {
+              await updateResumeRuntime(wsId, ownerResumeId, pendingCapability.update)
+              await onRefreshSessions()
+              setPendingCapability(null)
+              setRuntimeError(null)
+            } catch (cause) {
+              setRuntimeError(cause instanceof Error ? cause.message : String(cause))
+              throw cause
+            }
+          }}
+          onClose={() => setPendingCapability(null)}
+        />
+      )}
       {confirmAction && (
         <ConfirmDialog
           title={t(confirmAction === 'retry' ? 'issues.detail.retryNowTitle' : 'issues.detail.runNowTitle')}
@@ -1928,6 +2062,7 @@ export function IssueDetail({
   const [actionError, setActionError] = useState<string | null>(null)
   const [agentReadiness, setAgentReadiness] = useState<Record<string, AgentCredentialReadiness>>({})
   const [sessionDirectory, setSessionDirectory] = useState<readonly WorkspaceSessionDirectoryEntry[]>([])
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
   // Set when a clicked `[[name]]` resolves to >1 target — drives the picker.
   const [picker, setPicker] = useState<WikilinkResolution | null>(null)
   const workspace = workspaces.find((candidate) => candidate.id === wsId) ?? null
@@ -1948,17 +2083,21 @@ export function IssueDetail({
     return () => { live = false }
   }, [wsId])
 
-  useEffect(() => {
-    let live = true
-    getWorkspaceSessionDirectory(wsId)
-      .then((directory) => {
-        if (live) setSessionDirectory(Array.isArray(directory.sessions) ? directory.sessions : [])
-      })
-      .catch(() => {
-        if (live) setSessionDirectory([])
-      })
-    return () => { live = false }
+  const refreshSessions = useCallback(async () => {
+    try {
+      const directory = await getWorkspaceSessionDirectory(wsId)
+      setSessionDirectory(Array.isArray(directory.sessions) ? directory.sessions : [])
+    } catch {
+      setSessionDirectory([])
+    } finally {
+      setSessionsLoaded(true)
+    }
   }, [wsId])
+
+  useEffect(() => {
+    setSessionsLoaded(false)
+    void refreshSessions()
+  }, [refreshSessions])
 
   const gotoIssue = useCallback(
     (ref: WikilinkIssueRef) => {
@@ -2174,6 +2313,8 @@ export function IssueDetail({
           onRetry={onRetry}
           onRunNow={onRunNow}
           onConfigureAgent={(agent) => openAgentConfig(wsId, agent)}
+          onRefreshSessions={refreshSessions}
+          sessionsLoaded={sessionsLoaded}
         />
         <div className="min-w-0 lg:col-start-1 lg:row-start-2">
           <WhatEditor
