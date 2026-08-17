@@ -38,13 +38,18 @@ describe('demo credential catalog', () => {
     ])
     expect(modelIds('openrouter')).toEqual([
       'anthropic/claude-sonnet-5',
+      'deepseek/deepseek-v4-flash-0731',
+      'tencent/hy3',
+      'openai/gpt-5.6-luna',
+      'z-ai/glm-5.2',
+      'xiaomi/mimo-v2.5',
       'anthropic/claude-opus-5',
       'anthropic/claude-fable-5',
       'openai/gpt-5.6-sol',
       'openai/gpt-5.6-terra',
-      'openai/gpt-5.6-luna',
       'x-ai/grok-4.6',
       'google/gemini-3.7-flash',
+      'minimax/minimax-m3',
       'moonshotai/kimi-k3',
       'deepseek/deepseek-v4-pro',
     ])

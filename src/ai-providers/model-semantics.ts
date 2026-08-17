@@ -374,6 +374,34 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
       maxOutputTokens: 128_000,
       reasoning: OPENAI_56_REASONING,
     },
+    'deepseek/deepseek-v4-flash-0731': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 384_000,
+      reasoning: {
+        mode: 'optional',
+        efforts: ['low', 'high', 'max'],
+        defaultEffort: 'high',
+        interleaved: true,
+      },
+    },
+    'tencent/hy3': {
+      contextWindow: 262_144,
+      reasoning: {
+        mode: 'optional',
+        efforts: ['none', 'low', 'high'],
+        defaultEffort: 'none',
+      },
+    },
+    'z-ai/glm-5.2': {
+      reasoning: { mode: 'adaptive', efforts: ['high', 'max'] },
+    },
+    'xiaomi/mimo-v2.5': {
+      contextWindow: 1_048_576,
+    },
+    'minimax/minimax-m3': {
+      contextWindow: 1_000_000,
+      reasoning: { mode: 'adaptive', interleaved: true },
+    },
     'x-ai/grok-4.6': {
       contextWindow: 500_000,
       reasoning: {

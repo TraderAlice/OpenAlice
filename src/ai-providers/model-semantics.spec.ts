@@ -116,6 +116,19 @@ describe('model semantics registry', () => {
       contextWindow: 1_048_576,
       reasoning: { mode: 'adaptive', defaultEffort: 'medium' },
     })
+    expect(resolveModelSemantics('openrouter', 'deepseek/deepseek-v4-flash-0731')).toEqual(
+      resolveModelSemantics('deepseek', 'deepseek-v4-flash'),
+    )
+    expect(resolveModelSemantics('openrouter', 'tencent/hy3')).toMatchObject({
+      contextWindow: 262_144,
+      reasoning: { mode: 'optional', defaultEffort: 'none' },
+    })
+    expect(resolveModelSemantics('openrouter', 'z-ai/glm-5.2')).toEqual(
+      resolveModelSemantics('glm', 'glm-5.2'),
+    )
+    expect(resolveModelSemantics('openrouter', 'minimax/minimax-m3')).toEqual(
+      resolveModelSemantics('minimax', 'MiniMax-M3'),
+    )
     expect(resolveModelSemantics('openrouter', 'openai/gpt-5.6-sol')).toMatchObject({
       contextWindow: 1_050_000,
       reasoning: { mode: 'optional', defaultEffort: 'medium' },
