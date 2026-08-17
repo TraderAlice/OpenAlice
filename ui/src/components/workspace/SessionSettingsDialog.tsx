@@ -141,9 +141,9 @@ export function SessionSettingsDialog({
   const launchDirty = supportsAi && !launchEquals({
     agent: record.agent,
     accessMode: config.accessMode,
-    credentialSlug: config.launchCredentialSlug,
-    model: config.launchModel,
-    reasoningEffort: config.launchReasoningEffort,
+    credentialSlug: config.launchCredentialSlug ?? null,
+    model: config.launchModel ?? null,
+    reasoningEffort: config.launchReasoningEffort ?? null,
   }, initialLaunch)
   const canSaveAi = aiEditable && launchDirty && config.credentialSelectionReady && Boolean(config.effectiveAgent)
   const canSave = !saving && (displayNameDirty || canSaveAi)
