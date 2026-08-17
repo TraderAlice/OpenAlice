@@ -37,7 +37,7 @@ export interface Profile {
 
 export type CredentialVendor =
   | 'anthropic' | 'openai' | 'google' | 'xai'
-  | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat'
+  | 'minimax' | 'glm' | 'kimi' | 'deepseek' | 'longcat' | 'openrouter'
   | 'cursor'
   | 'custom'
 

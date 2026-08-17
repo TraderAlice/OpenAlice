@@ -182,8 +182,8 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
     const label = isCustom
       ? customLabel
       : vendor === 'custom'
-        ? preset.label
-        : undefined
+        ? (customLabel || preset.label)
+        : customLabel
     setSaving(true)
     setError('')
     try {
@@ -194,7 +194,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
           // Direct-provider endpoints are optional, but an explicit empty value
           // must still reach the API so editing can restore the runtime default.
           ...(isDirect ? { baseUrl: directUrl.trim() } : {}),
-          ...(label ? { label } : {}),
+          label,
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
           ...(model.trim() ? { lastModel: model.trim() } : {}),
         })
@@ -297,7 +297,7 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                   </button>
                 ))}
                 {visiblePresets.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
+                  <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
                     {t('aiProvider.credentialModal.noMatches', { query: presetQuery })}
                   </p>
                 )}
@@ -317,6 +317,21 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
 
               {preset.hint && (
                 <p className="text-[11px] text-muted-foreground bg-muted rounded-lg px-3 py-2.5 leading-relaxed">{preset.hint}</p>
+              )}
+
+              {!isCustom && (
+                <Field
+                  label={t('aiProvider.credentialModal.displayName')}
+                  description={t('aiProvider.credentialModal.displayNameHelp')}
+                >
+                  <input
+                    className={inputClass}
+                    value={customName}
+                    onChange={(event) => setCustomName(event.target.value)}
+                    placeholder={t('aiProvider.credentialModal.displayNamePlaceholder')}
+                    maxLength={80}
+                  />
+                </Field>
               )}
 
               {isDirect ? (

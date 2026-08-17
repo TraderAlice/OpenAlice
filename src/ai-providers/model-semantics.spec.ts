@@ -105,6 +105,37 @@ describe('model semantics registry', () => {
     })
   })
 
+  it('registers curated OpenRouter slugs with origin-equivalent facts', () => {
+    expect(resolveModelSemantics('openrouter', 'anthropic/claude-sonnet-5')).toEqual(
+      resolveModelSemantics('anthropic', 'claude-sonnet-5'),
+    )
+    expect(resolveModelSemantics('openrouter', 'x-ai/grok-4.6')).toEqual(
+      resolveModelSemantics('xai', 'grok-4.6'),
+    )
+    expect(resolveModelSemantics('openrouter', 'google/gemini-3.7-flash')).toMatchObject({
+      contextWindow: 1_048_576,
+      reasoning: { mode: 'adaptive', defaultEffort: 'medium' },
+    })
+    expect(resolveModelSemantics('openrouter', 'deepseek/deepseek-v4-flash-0731')).toEqual(
+      resolveModelSemantics('deepseek', 'deepseek-v4-flash'),
+    )
+    expect(resolveModelSemantics('openrouter', 'tencent/hy3')).toMatchObject({
+      contextWindow: 262_144,
+      reasoning: { mode: 'optional', defaultEffort: 'none' },
+    })
+    expect(resolveModelSemantics('openrouter', 'z-ai/glm-5.2')).toEqual(
+      resolveModelSemantics('glm', 'glm-5.2'),
+    )
+    expect(resolveModelSemantics('openrouter', 'minimax/minimax-m3')).toEqual(
+      resolveModelSemantics('minimax', 'MiniMax-M3'),
+    )
+    expect(resolveModelSemantics('openrouter', 'openai/gpt-5.6-sol')).toMatchObject({
+      contextWindow: 1_050_000,
+      reasoning: { mode: 'optional', defaultEffort: 'medium' },
+    })
+    expect(resolveModelSemantics('openrouter', 'some-vendor/unknown-model')).toBeNull()
+  })
+
   it('keeps LongCat\'s documented thinking default separate from effort tiers', () => {
     const semantics = resolveModelSemantics('longcat', 'LongCat-2.0')
     expect(semantics?.reasoning).toEqual({ mode: 'optional', defaultEnabled: true })

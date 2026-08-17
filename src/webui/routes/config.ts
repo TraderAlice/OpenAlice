@@ -176,14 +176,17 @@ export function createConfigRoutes(opts?: ConfigRouteOpts) {
       const existing = await resolveCredential(slug)
       const apiKey = body.apiKey?.trim() || existing.apiKey
       const vendorParse = credentialVendorEnum.safeParse(body.vendor)
-      const label = body.label?.trim()
+      const hasLabel = Object.prototype.hasOwnProperty.call(body, 'label')
+      const label = typeof body.label === 'string' ? body.label.trim() : undefined
       const lastModel = body.lastModel?.trim() || existing.lastModel
       const wires = parseWires(body.wires)
       const hasBaseUrl = Object.prototype.hasOwnProperty.call(body, 'baseUrl')
       const baseUrl = hasBaseUrl ? body.baseUrl?.trim() : existing.baseUrl
       const cred: Credential = {
         vendor: vendorParse.success ? vendorParse.data : existing.vendor,
-        ...(label || existing.label ? { label: label || existing.label } : {}),
+        ...(hasLabel
+          ? (label ? { label } : {})
+          : (existing.label ? { label: existing.label } : {})),
         authType: 'api-key',
         ...(apiKey ? { apiKey } : {}),
         ...(Object.keys(wires).length ? { wires } : { ...(existing.wires ? { wires: existing.wires } : {}) }),

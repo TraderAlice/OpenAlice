@@ -109,6 +109,43 @@ describe('AIProviderPage', () => {
 
     expect(await screen.findByRole('button', { name: '编辑 Gemini' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
+    expect(screen.getByText('Google Gemini')).toBeTruthy()
+  })
+
+  it('filters the vault list without removing unmatched saved credentials', async () => {
+    mocks.getCredentials.mockResolvedValue({
+      credentials: [
+        {
+          slug: 'google-1',
+          vendor: 'google',
+          label: 'Gemini',
+          authType: 'api-key',
+          wires: { 'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta' },
+          apiKey: null,
+          hasApiKey: true,
+          lastModel: 'gemini-3.1-pro-preview',
+        },
+        {
+          slug: 'openrouter-1',
+          vendor: 'openrouter',
+          label: 'Work gateway',
+          authType: 'api-key',
+          wires: { 'openai-chat': 'https://openrouter.ai/api/v1' },
+          apiKey: null,
+          hasApiKey: true,
+          lastModel: 'anthropic/claude-sonnet-5',
+        },
+      ],
+    })
+    render(<AIProviderPage />)
+
+    expect(await screen.findByRole('button', { name: '编辑 Gemini' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '编辑 Work gateway' })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('搜索凭证…'), { target: { value: 'openrouter' } })
+    expect(screen.queryByRole('button', { name: '编辑 Gemini' })).toBeNull()
+    expect(screen.getByRole('button', { name: '编辑 Work gateway' })).toBeTruthy()
+    expect(screen.getByText('OpenRouter')).toBeTruthy()
   })
 
   it('confirms credential deletion and explains the default cleanup', async () => {

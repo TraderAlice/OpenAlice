@@ -27,6 +27,14 @@ const longcatKey: Credential = {
   vendor: 'longcat', authType: 'api-key', apiKey: 'lc-key',
   wires: { 'openai-chat': 'https://api.longcat.chat/openai' },
 }
+const openrouterKey: Credential = {
+  vendor: 'openrouter', authType: 'api-key', apiKey: 'sk-or',
+  wires: {
+    'openai-chat': 'https://openrouter.ai/api/v1',
+    'openai-responses': 'https://openrouter.ai/api/v1',
+    anthropic: 'https://openrouter.ai/api',
+  },
+}
 
 const builtinAdapters = createBuiltinAdapterRegistry()
 
@@ -253,6 +261,35 @@ describe('credentialToWorkspaceAiCred', () => {
     expect(credentialToWorkspaceAiCred(longcatKey, 'pi', {
       model: 'LongCat-2.0',
     })).not.toHaveProperty('reasoningEffort')
+  })
+
+  it('routes an OpenRouter key by each runtime\'s preferred compatible wire', () => {
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'claude', {
+      model: 'anthropic/claude-sonnet-5',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api',
+      wireShape: 'anthropic',
+      authMode: 'bearer',
+      model: 'anthropic/claude-sonnet-5',
+    })
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'codex', {
+      model: 'openai/gpt-5.6-sol',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      wireShape: 'openai-responses',
+    })
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'pi', {
+      model: 'anthropic/claude-sonnet-5',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      wireShape: 'openai-chat',
+    })
+    expect(credentialToWorkspaceAiCred(openrouterKey, 'grok', {
+      model: 'openai/gpt-5.6-sol',
+    })).toMatchObject({
+      baseUrl: 'https://openrouter.ai/api/v1',
+      wireShape: 'openai-chat',
+    })
   })
 
   it('injects Google through the native wire for opencode and Pi only', () => {
@@ -505,6 +542,7 @@ describe('resolveInjectionModel', () => {
     expect(resolveInjectionModel({ vendor: 'google' })).toBe('gemini-3.6-flash')
     expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.2')
     expect(resolveInjectionModel({ vendor: 'longcat' })).toBe('LongCat-2.0')
+    expect(resolveInjectionModel({ vendor: 'openrouter' })).toBe('openai/gpt-5.6-luna')
   })
 
   it('returns null for a vendor with no catalog default (custom)', () => {
