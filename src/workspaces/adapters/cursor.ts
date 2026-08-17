@@ -26,7 +26,11 @@ export function cursorDataDir(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env['CURSOR_DATA_DIR']?.trim();
   const home = env['HOME']?.trim() || homedir();
   if (configured) return expandHome(configured, home);
-  return join(home, '.cursor');
+  // `HOME` can come from an isolated Unix-shaped test/runtime environment on
+  // Windows. `resolve` makes that path absolute for the current platform;
+  // `join` would leave it drive-relative (`\tmp\...`) and make Cursor session
+  // discovery depend on the process's current drive.
+  return resolve(home, '.cursor');
 }
 
 /**
