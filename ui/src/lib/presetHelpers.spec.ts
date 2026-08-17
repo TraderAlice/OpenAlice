@@ -6,7 +6,6 @@ import {
   baseUrlToVendor,
   credentialMatchesQuery,
   describeModelSemantics,
-  groupPresetsByCategory,
   pickAgentWire,
   presetModel,
   savedCredentialModel,
@@ -138,19 +137,6 @@ describe('provider inference', () => {
 })
 
 describe('vault catalog helpers', () => {
-  it('groups presets by catalog category and hides empty groups', () => {
-    expect(groupPresetsByCategory([
-      { category: 'custom' },
-      { category: 'official' },
-      { category: 'official' },
-      { category: 'third-party' },
-    ])).toEqual([
-      { category: 'official', items: [{ category: 'official' }, { category: 'official' }] },
-      { category: 'third-party', items: [{ category: 'third-party' }] },
-      { category: 'custom', items: [{ category: 'custom' }] },
-    ])
-  })
-
   it('matches vault rows by nickname, vendor label, slug, or remembered model', () => {
     const cred = {
       slug: 'openrouter-1',

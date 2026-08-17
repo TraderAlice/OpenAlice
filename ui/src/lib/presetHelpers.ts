@@ -284,21 +284,6 @@ export function vendorLabel(vendor: string): string {
   return VENDOR_LABELS[vendor] ?? vendor
 }
 
-export const PRESET_CATEGORY_ORDER = ['official', 'third-party', 'custom'] as const
-
-export type PresetCategory = (typeof PRESET_CATEGORY_ORDER)[number]
-
-export function groupPresetsByCategory<T extends { category: PresetCategory }>(
-  presets: readonly T[],
-): Array<{ category: PresetCategory; items: T[] }> {
-  return PRESET_CATEGORY_ORDER
-    .map((category) => ({
-      category,
-      items: presets.filter((preset) => preset.category === category),
-    }))
-    .filter((group) => group.items.length > 0)
-}
-
 export function credentialSearchHaystack(cred: {
   slug: string
   vendor: string

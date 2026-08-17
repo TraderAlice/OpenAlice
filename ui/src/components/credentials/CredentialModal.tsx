@@ -10,7 +10,6 @@ import {
   AGENT_LABELS,
   WIRE_SHAPE_GUIDANCE,
   compatibleAgentIds,
-  groupPresetsByCategory,
   presetCompatibleAgentIds,
   presetDefaultModel,
   presetModels,
@@ -126,18 +125,10 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
     const query = presetQuery.trim().toLowerCase()
     return query
       ? presets.filter((item) =>
-          [item.label, item.description, item.id, item.category].some((text) => text.toLowerCase().includes(query)),
+          [item.label, item.description, item.id].some((text) => text.toLowerCase().includes(query)),
         )
       : presets
   }, [presetQuery, presets])
-  const groupedPresets = useMemo(() => groupPresetsByCategory(visiblePresets), [visiblePresets])
-  const categoryLabel = (category: 'official' | 'third-party' | 'custom') => (
-    category === 'official'
-      ? t('aiProvider.credentialModal.categoryOfficial')
-      : category === 'third-party'
-        ? t('aiProvider.credentialModal.categoryThirdParty')
-        : t('aiProvider.credentialModal.categoryCustom')
-  )
 
   // The fields the test covers. Editing any of them re-locks Save.
   const testKey = `${JSON.stringify(wires)}|${directUrl.trim()}|${apiKey.trim()}|${model.trim()}`
@@ -280,44 +271,37 @@ export function CredentialModal({ mode, cred, presets, agents, initialPresetId, 
                 placeholder={t('aiProvider.credentialModal.search')}
                 autoFocus
               />
-              {groupedPresets.map((group) => (
-                <div key={group.category} className="space-y-1.5">
-                  <h3 className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {categoryLabel(group.category)}
-                  </h3>
-                  <div className="overflow-hidden rounded-lg border border-border bg-background">
-                    {group.items.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => pickPreset(item)}
-                        className="flex min-h-[46px] w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/60"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[12.5px] font-medium text-foreground">{item.label}</span>
-                          <span className="block truncate text-[10.5px] text-muted-foreground">{item.description}</span>
-                          <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/75">
-                            {item.category === 'custom'
-                              ? t('aiProvider.credentialModal.chooseMode')
-                              : t('aiProvider.credentialModal.worksWith', {
-                                  agents: agentNames(presetCompatibleAgentIds(item, agents)),
-                                })}
-                          </span>
-                        </span>
-                        {item.category === 'custom' && (
-                          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                            {t('aiProvider.credentialModal.freeForm')}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {visiblePresets.length === 0 && (
-                <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
-                  {t('aiProvider.credentialModal.noMatches', { query: presetQuery })}
-                </p>
-              )}
+              <div className="overflow-hidden rounded-lg border border-border bg-background">
+                {visiblePresets.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => pickPreset(item)}
+                    className="flex min-h-[46px] w-full items-center gap-3 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/60"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium text-foreground">{item.label}</span>
+                      <span className="block truncate text-[10.5px] text-muted-foreground">{item.description}</span>
+                      <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/75">
+                        {item.category === 'custom'
+                          ? t('aiProvider.credentialModal.chooseMode')
+                          : t('aiProvider.credentialModal.worksWith', {
+                              agents: agentNames(presetCompatibleAgentIds(item, agents)),
+                            })}
+                      </span>
+                    </span>
+                    {item.category === 'custom' && (
+                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {t('aiProvider.credentialModal.freeForm')}
+                      </span>
+                    )}
+                  </button>
+                ))}
+                {visiblePresets.length === 0 && (
+                  <p className="px-4 py-6 text-center text-[12px] text-muted-foreground">
+                    {t('aiProvider.credentialModal.noMatches', { query: presetQuery })}
+                  </p>
+                )}
+              </div>
           </div>
         ) : (
           <>

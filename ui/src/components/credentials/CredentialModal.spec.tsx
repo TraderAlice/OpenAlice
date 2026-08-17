@@ -257,7 +257,7 @@ describe('CredentialModal', () => {
     opener.remove()
   })
 
-  it('groups the provider picker by official, third-party, and custom', () => {
+  it('lists providers in one catalog without official or third-party headings', () => {
     render(
       <CredentialModal
         mode="add"
@@ -268,9 +268,8 @@ describe('CredentialModal', () => {
       />,
     )
 
-    expect(screen.getByRole('heading', { name: 'Official' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Third-party' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Custom' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Official' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Third-party' })).toBeNull()
     expect(screen.getByText('OpenAI')).toBeTruthy()
     expect(screen.getByText('Google Gemini')).toBeTruthy()
     expect(screen.getByText('free-form')).toBeTruthy()
