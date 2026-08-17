@@ -1,5 +1,5 @@
 ---
-version: 1.1.4
+version: 1.1.5
 ---
 
 # AutoQuant
@@ -20,8 +20,8 @@ conversation, Inbox, market-data tools, and optional UTA access around the
 desk. It does not reproduce AutoQuant's Project, Study, Session, Run, Report,
 or Dossier lifecycle.
 
-The default supported source is AutoQuant V2 `v0.8.31` at commit
-`426d815b18450172fbcf4c6b6af77c6ae05a4967`. The exact upstream source is
+The default supported source is AutoQuant V2 `v0.9.31` at commit
+`adc6363a7af5a9105811735973d4d5cfac58cf36`. The exact upstream source is
 recorded in `.alice/harness-source.json`; the Workspace itself starts a fresh
 research branch at that commit while retaining AutoQuant's upstream history and
 `origin` remote for later Coding Agent-managed fetches and merges.

@@ -225,12 +225,16 @@ export const autoQuantTemplate: TemplateInfo = {
   description: 'Agent-native quantitative research desk pinned to an approved AutoQuant V2 release.',
   groupOrder: 20,
   defaultAgents: ['codex', 'claude'],
-  version: '1.0.0',
+  version: '1.1.5',
   hasReadme: true,
   source: {
     repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-    defaultVersion: 'v0.8.31',
+    defaultVersion: 'v0.9.31',
     versions: [
+      {
+        version: 'v0.9.31',
+        commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36',
+      },
       {
         version: 'v0.8.31',
         commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
