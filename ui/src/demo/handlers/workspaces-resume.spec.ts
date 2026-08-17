@@ -95,4 +95,41 @@ describe('demo Workspace resume handlers', () => {
       expect.arrayContaining(['resume-demo-headless-colleague', 'resume-demo-headless-running']),
     )
   })
+
+  it('replaces an idle Issue owner Session binding by resumeId', async () => {
+    const list = await fetch(`${baseUrl}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/resumes`)
+    const before = await list.json() as {
+      sessions: Array<{ resumeId: string; runtime?: { model?: string; reasoningEffort?: string } }>
+    }
+    expect(before.sessions.find((session) => session.resumeId === 'resume-demo-thesis-owner')?.runtime)
+      .toMatchObject({ credentialSource: 'native', model: 'claude-opus-4-6', reasoningEffort: 'high' })
+
+    const response = await fetch(
+      `${baseUrl}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/resumes/resume-demo-thesis-owner/runtime`,
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          credentialSource: 'native',
+          model: 'claude-sonnet-4-6',
+          reasoningEffort: 'low',
+        }),
+      },
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      resumeId: 'resume-demo-thesis-owner',
+      agent: 'claude',
+      runtime: {
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-6',
+        reasoningEffort: 'low',
+      },
+    })
+
+    const after = await fetch(`${baseUrl}/api/workspaces/${DEMO_AUTO_QUANT_WORKSPACE_ID}/resumes`)
+      .then((next) => next.json()) as typeof before
+    expect(after.sessions.find((session) => session.resumeId === 'resume-demo-thesis-owner')?.runtime)
+      .toMatchObject({ model: 'claude-sonnet-4-6', reasoningEffort: 'low' })
+  })
 })

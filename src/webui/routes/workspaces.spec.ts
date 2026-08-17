@@ -49,6 +49,7 @@ function build(
     sessionRecord?: any;
     runtimeBinding?: any;
     poolLive?: any;
+    runningHeadless?: any;
     recordAgentRuntime?: any;
   } = {},
 ) {
@@ -168,7 +169,13 @@ function build(
     },
     sessionRegistry: {
       get: vi.fn(() => opts.sessionRecord),
+      findByResumeId: vi.fn((_wsId: string, resumeId: string) => (
+        opts.sessionRecord?.resumeId === resumeId ? opts.sessionRecord : undefined
+      )),
       update: vi.fn(async () => undefined),
+    },
+    headlessTasks: {
+      latestForResumeId: vi.fn(() => opts.runningHeadless ?? null),
     },
     pool: {
       get: vi.fn(() => opts.poolLive),
@@ -1198,6 +1205,112 @@ describe('POST /:id/headless/:taskId/session', () => {
     expect(opened.status).toBe(409);
     expect(opened.body.error).toBe('run_still_running');
     expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /:id/resumes/:resumeId/runtime', () => {
+  const resumeIdentity = {
+    resumeId: 'resume-issue-owner',
+    wsId: 'ws-1',
+    agent: 'claude',
+    lifecycle: 'active' as const,
+  };
+  const adapter = {
+    id: 'claude',
+    displayName: 'Claude Code',
+    capabilities: {
+      aiProvider: {
+        credentialSource: 'runtime-or-workspace',
+        wirePreference: ['anthropic'],
+      },
+    },
+    sessionRuntime: emptyAgentSessionRuntime,
+  };
+
+  it('replaces credential, model, and effort on an idle headless Session', async () => {
+    const { app, replaceRuntimeBinding } = build({
+      resumeIdentity,
+      adapters: { claude: adapter },
+    });
+
+    const result = await put(app, '/ws-1/resumes/resume-issue-owner/runtime', {
+      credentialSource: 'native',
+      model: 'claude-sonnet-4-5',
+      reasoningEffort: 'low',
+    });
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        resumeId: 'resume-issue-owner',
+        agent: 'claude',
+        runtime: {
+          credentialSource: 'native',
+          model: 'claude-sonnet-4-5',
+          reasoningEffort: 'low',
+        },
+      },
+    });
+    expect(replaceRuntimeBinding).toHaveBeenCalledWith(expect.objectContaining({
+      resumeId: 'resume-issue-owner',
+      agent: 'claude',
+      runtimeBinding: {
+        version: 1,
+        credential: { source: 'native' },
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'low',
+      },
+    }));
+  });
+
+  it('rejects edits while a headless turn is running', async () => {
+    const { app, replaceRuntimeBinding } = build({
+      resumeIdentity,
+      adapters: { claude: adapter },
+      runningHeadless: { taskId: 'task-1', status: 'running', resumeId: 'resume-issue-owner' },
+    });
+
+    const result = await put(app, '/ws-1/resumes/resume-issue-owner/runtime', {
+      credentialSource: 'native',
+    });
+
+    expect(result).toMatchObject({ status: 409, body: { error: 'session_busy' } });
+    expect(replaceRuntimeBinding).not.toHaveBeenCalled();
+  });
+
+  it('rejects edits while the interactive Session is running', async () => {
+    const { app, replaceRuntimeBinding } = build({
+      resumeIdentity,
+      adapters: { claude: adapter },
+      sessionRecord: {
+        id: 'claude-sunny-amber-spring',
+        resumeId: 'resume-issue-owner',
+        wsId: 'ws-1',
+        agent: 'claude',
+        state: 'running',
+      },
+      poolLive: { pid: 42 },
+    });
+
+    const result = await put(app, '/ws-1/resumes/resume-issue-owner/runtime', {
+      credentialSource: 'native',
+    });
+
+    expect(result).toMatchObject({ status: 409, body: { error: 'session_busy' } });
+    expect(replaceRuntimeBinding).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing resume identity', async () => {
+    const { app, replaceRuntimeBinding } = build({
+      adapters: { claude: adapter },
+    });
+
+    const result = await put(app, '/ws-1/resumes/resume-missing/runtime', {
+      credentialSource: 'native',
+    });
+
+    expect(result).toMatchObject({ status: 404, body: { error: 'resume_not_found' } });
+    expect(replaceRuntimeBinding).not.toHaveBeenCalled();
   });
 });
 

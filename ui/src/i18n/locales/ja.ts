@@ -176,6 +176,16 @@ export const ja: Resources = {
       sessionBinding: 'セッション固定設定',
       workspaceValue: 'Workspace · {{value}}',
       applyAiConfiguration: '設定を適用',
+      sessionAiConfigurationDescription:
+        '次のスケジュール実行またはコメント返信でこのセッションが使う認証情報・モデル・推論強度を変更します。Agent ランタイムは固定されたままです。',
+      sessionAiAccessDescription:
+        'ランタイム管理では認証とプロバイダ設定を Agent ランタイムに任せ、保存済みアクセスは OpenAlice の保管資格情報を注入します。次のターンはこのバインディングを再生します。',
+      sessionTurnInProgress: '認証情報、モデル、推論強度を変更する前に、現在のターンが終わるのを待ってください。',
+      changeAssigneeCapabilitiesTitle: '予定中の担当能力を変更しますか？',
+      changeAssigneeCapabilitiesMessage:
+        '予定中の担当の能力が {{from}} から {{to}} に変わります。',
+      changeAssigneeCapabilitiesConfirm: '能力を変更',
+      changingAssigneeCapabilities: '更新中…',
       retryNow: '今すぐ再試行',
       retrying: '再試行中…',
       retryNowTitle: 'この Issue を今すぐ再試行しますか？',

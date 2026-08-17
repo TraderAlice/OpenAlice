@@ -183,6 +183,16 @@ export const zhHant: Resources = {
       sessionBinding: '工作階段固定設定',
       workspaceValue: 'Workspace · {{value}}',
       applyAiConfiguration: '套用設定',
+      sessionAiConfigurationDescription:
+        '變更這個工作階段在下一次排程或評論回覆時使用的憑證、模型與推理強度。Agent 執行環境保持鎖定。',
+      sessionAiAccessDescription:
+        '由執行環境管理時，憑證與提供方設定交給 Agent Runtime 自行解析；已儲存存取會注入 OpenAlice 憑證庫設定。下一輪會回放這次綁定。',
+      sessionTurnInProgress: '請等目前輪次結束後再更換憑證、模型或推理強度。',
+      changeAssigneeCapabilitiesTitle: '變更計畫中的負責人能力？',
+      changeAssigneeCapabilitiesMessage:
+        '這樣會改變已經在計畫中的負責人能力，從 {{from}} 變為 {{to}}。',
+      changeAssigneeCapabilitiesConfirm: '變更能力',
+      changingAssigneeCapabilities: '正在更新…',
       retryNow: '立即重試',
       retrying: '正在重試…',
       retryNowTitle: '現在重試這個議題？',

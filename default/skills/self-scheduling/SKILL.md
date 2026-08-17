@@ -208,7 +208,9 @@ plain tracked item; add a `when` and it starts firing.
 
 `agent`, `credential`/`credentialSource`, `model`, and `effort` are one Session-creation tuple.
 They are valid only for `@new-then-resume` / `@new-each-run`; an exact `@resumeId` Session owns
-the complete tuple. The scheduler freezes explicit values into the fresh Session runtime
+the complete tuple, so do not write those fields back onto the Issue file. Humans may still
+change that Session's credential, model, and effort from the Issue page; the Agent runtime
+stays locked. The scheduler freezes explicit values into the fresh Session runtime
 binding and does not rewrite persistent Workspace configuration.
 
 > **Deprecated assignee aliases:** never write `@workspace` or `@new` in a new

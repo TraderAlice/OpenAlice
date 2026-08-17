@@ -81,7 +81,9 @@ The filename stem is the stable issue id. Frontmatter:
   - `{ kind: cron, cron: <5-field expression>, timezone: local | <IANA zone> }`
 - `agent` — optional CLI adapter id for `@new-then-resume` / `@new-each-run` scheduled work;
   otherwise Workspace/default resolution is used. A Session assignee already
-  owns its runtime and cannot be overridden here.
+  owns its Agent runtime and cannot be overridden here. After the first
+  successful run, the Issue page may still replace that Session's credential,
+  model, and effort.
 - `credential` — optional secret-free OpenAlice vault slug for the fresh
   Session. The slug selects provider routing; keys and endpoints never enter
   the Issue file.
@@ -128,10 +130,12 @@ The filename stem is the stable issue id. Frontmatter:
 Only the credential slug is persisted; endpoint and key material remain in the
 vault and are resolved just in time. The scheduler freezes the tuple into the
 new Session's durable runtime binding without rewriting Workspace files. All
-fields are forbidden when `assignee` is an exact `@resumeId`, because that
-Session owns its runtime conversation. `@new-then-resume` may use them for its first
-dispatch; after it becomes an exact Session owner, the claim rewrite removes
-the tuple.
+fields are forbidden on the Issue file when `assignee` is an exact `@resumeId`,
+because that Session owns its runtime conversation. `@new-then-resume` may use
+them for its first dispatch; after it becomes an exact Session owner, the claim
+rewrite removes the tuple. The Issue page may still replace the Session's
+credential, model, and effort (not the Agent runtime) after a successful first
+run; the next scheduled or comment-reply turn replays the updated binding.
 
 The 0.89.2-beta baseline has one ownership field and behavior-named scheduling
 tokens. `@workspace` remains a deprecated read alias for `@new-each-run`, and

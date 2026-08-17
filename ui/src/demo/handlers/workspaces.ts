@@ -27,6 +27,13 @@ import type {
 } from '../../components/workspace/api'
 
 const demoSessionPresence = new Map<string, 'active' | 'archived' | 'deleted'>()
+const demoResumeRuntimes = new Map<string, NonNullable<SessionRecord['runtime']>>([
+  ['resume-demo-thesis-owner', {
+    credentialSource: 'native',
+    model: 'claude-opus-4-6',
+    reasoningEffort: 'high',
+  }],
+])
 
 const demoManagerSession = {
   id: 'demo-manager-session',
@@ -77,6 +84,12 @@ export function resetDemoWorkspaceWebPiState(): void {
   demoManagerMessages = []
   demoQuickChatSequence = 0
   demoWebPiSessions = createSeededWebPiSessions()
+  demoResumeRuntimes.clear()
+  demoResumeRuntimes.set('resume-demo-thesis-owner', {
+    credentialSource: 'native',
+    model: 'claude-opus-4-6',
+    reasoningEffort: 'high',
+  })
   for (let index = 0; index < demoWorkspaces.length; index += 1) {
     const workspace = demoWorkspaces[index]!
     demoWorkspaces[index] = {
@@ -950,6 +963,28 @@ export const workspacesHandlers = [
       ...(displayName ? { displayName } : {}),
     })
   }),
+  http.put('/api/workspaces/:id/resumes/:resumeId/runtime', async ({ params, request }) => {
+    const resumeId = String(params.resumeId)
+    const body = await request.json().catch(() => ({})) as Partial<PausedSessionRuntimeUpdate>
+    if (
+      (body.credentialSource !== 'native' && body.credentialSource !== 'vault')
+      || (body.credentialSource === 'vault' && !body.credentialSlug)
+    ) {
+      return HttpResponse.json({ error: 'bad_request' }, { status: 400 })
+    }
+    const runtime = {
+      credentialSource: body.credentialSource,
+      ...(body.credentialSource === 'vault' ? { credentialSlug: body.credentialSlug! } : {}),
+      ...(body.model ? { model: body.model } : {}),
+      ...(body.reasoningEffort ? { reasoningEffort: body.reasoningEffort } : {}),
+    }
+    demoResumeRuntimes.set(resumeId, runtime)
+    return HttpResponse.json({
+      resumeId,
+      agent: resumeId === 'resume-demo-thesis-owner' ? 'claude' : 'pi',
+      runtime,
+    })
+  }),
   http.patch('/api/workspaces/:id/resumes/:resumeId', async ({ params, request }) => {
     const resumeId = String(params.resumeId)
     const body = await request.json().catch(() => ({})) as { presence?: unknown }
@@ -969,6 +1004,7 @@ export const workspacesHandlers = [
           resumeId: 'resume-demo-thesis-owner', agent: 'claude',
           createdAt: Date.now() - 86_400_000, updatedAt: Date.now() - 60_000,
           lifecycle: 'active', resumable: true, active: false,
+          runtime: demoResumeRuntimes.get('resume-demo-thesis-owner'),
           latestExecution: {
             taskId: 'demo-thesis-owner-run', status: 'done',
             startedAt: Date.now() - 180_000,
@@ -988,6 +1024,7 @@ export const workspacesHandlers = [
       presence?: 'active' | 'archived' | 'deleted'
       resumable: boolean
       active: boolean
+      runtime?: SessionRecord['runtime']
       interactive?: {
         name: string
         title?: string
@@ -1010,6 +1047,7 @@ export const workspacesHandlers = [
       lifecycle: 'active',
       resumable: session.agent !== 'shell',
       active: session.state === 'running',
+      runtime: demoResumeRuntimes.get(session.resumeId) ?? session.runtime,
       interactive: {
         name: session.name,
         ...(session.title ? { title: session.title } : {}),

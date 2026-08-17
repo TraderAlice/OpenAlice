@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   openHeadlessRun: vi.fn(),
   getWorkspaceSessionDirectory: vi.fn(),
   listAgentCredentials: vi.fn(),
+  updateResumeRuntime: vi.fn(),
   getPresets: vi.fn(),
   updateIssue: vi.fn(),
   runNow: vi.fn(),
@@ -80,6 +81,7 @@ vi.mock('./workspace/api', () => ({
   getAgentReadiness: vi.fn().mockResolvedValue({ agents: {} }),
   getWorkspaceSessionDirectory: mocks.getWorkspaceSessionDirectory,
   listAgentCredentials: mocks.listAgentCredentials,
+  updateResumeRuntime: mocks.updateResumeRuntime,
 }))
 
 vi.mock('../api/config', () => ({
@@ -111,7 +113,15 @@ beforeEach(async () => {
   delete scheduledIssue.issue.effort
   delete scheduledIssue.issue.timeout
   scheduledIssue.runs = []
+  scheduledIssue.issue.assignee = '@new-each-run'
+  scheduledIssue.issue.agent = 'codex'
   mocks.updateIssue.mockResolvedValue(scheduledIssue)
+  mocks.updateResumeRuntime.mockClear()
+  mocks.updateResumeRuntime.mockResolvedValue({
+    resumeId: 'resume-kind-owl-abc123',
+    agent: 'codex',
+    runtime: { credentialSource: 'vault', credentialSlug: 'longcat-1', model: 'LongCat-2.0', reasoningEffort: 'high' },
+  })
   mocks.getWorkspaceSessionDirectory.mockResolvedValue({ sessions: [] })
   mocks.listAgentCredentials.mockResolvedValue([{
     slug: 'longcat-1',
@@ -388,6 +398,92 @@ describe('IssueDetail property controls', () => {
       expect(Array.from(effort.options).map((option) => option.value))
         .toEqual(['', 'low', 'high', 'max'])
     })
+  })
+
+  it('confirms a bound Session capability change without rewriting Issue frontmatter', async () => {
+    scheduledIssue.issue.assignee = '@resume-kind-owl-abc123'
+    delete scheduledIssue.issue.agent
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [{
+        resumeId: 'resume-kind-owl-abc123',
+        agent: 'codex',
+        createdAt: Date.now() - 86_400_000,
+        updatedAt: Date.now() - 60_000,
+        resumable: true,
+        active: false,
+        runtime: {
+          credentialSource: 'native',
+          model: 'claude-sonnet-4-5',
+          reasoningEffort: 'high',
+        },
+      }],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = await screen.findByRole('button', { name: 'AI configuration' })
+    await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false))
+    expect(trigger.textContent).toContain('Runtime managed')
+    expect(trigger.textContent).toContain('claude-sonnet-4-5 · high')
+    expect(screen.queryByRole('combobox', { name: 'Runtime' })).toBeNull()
+    expect(screen.getByText('codex')).toBeTruthy()
+
+    fireEvent.click(trigger)
+    const access = await screen.findByRole('combobox', { name: 'AI access' }) as HTMLSelectElement
+    expect(Array.from(access.options).map((option) => option.value)).not.toContain('inherit')
+    expect(access.value).toBe('native')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Effort' }), { target: { value: 'low' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply configuration' }))
+
+    const confirm = await screen.findByRole('alertdialog')
+    expect(confirm.textContent).toContain(
+      'This will change the planned assignee\'s capabilities from Runtime managed · claude-sonnet-4-5 · high to Runtime managed · claude-sonnet-4-5 · low.',
+    )
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Change capabilities' }))
+
+    await waitFor(() => expect(mocks.updateResumeRuntime).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'resume-kind-owl-abc123',
+      {
+        credentialSource: 'native',
+        model: 'claude-sonnet-4-5',
+        reasoningEffort: 'low',
+      },
+    ))
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  })
+
+  it('locks bound Session AI configuration while a turn is running', async () => {
+    scheduledIssue.issue.assignee = '@resume-kind-owl-abc123'
+    delete scheduledIssue.issue.agent
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [{
+        resumeId: 'resume-kind-owl-abc123',
+        agent: 'codex',
+        createdAt: Date.now() - 86_400_000,
+        updatedAt: Date.now() - 60_000,
+        resumable: true,
+        active: true,
+        runtime: {
+          credentialSource: 'native',
+          model: 'claude-sonnet-4-5',
+          reasoningEffort: 'high',
+        },
+        latestExecution: {
+          taskId: 'task-running',
+          status: 'running',
+          startedAt: Date.now() - 10_000,
+        },
+      }],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = await screen.findByRole('button', { name: 'AI configuration' })
+    await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(true))
+    expect(screen.getByText('Wait for the current turn to finish before changing credential, model, or effort.')).toBeTruthy()
+    expect(mocks.updateResumeRuntime).not.toHaveBeenCalled()
   })
 
   it('places mobile work-item controls before long-form Issue content', async () => {
