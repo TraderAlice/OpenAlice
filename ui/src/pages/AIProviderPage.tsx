@@ -55,9 +55,9 @@ function credentialLabel(cred: Pick<CredentialSummary, 'slug' | 'vendor' | 'labe
 interface RuntimeInfo {
   id: string
   name: string
-  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.cursor.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.omp.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
-  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.cursor.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.omp.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
-  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.cursor.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.omp.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
+  blurbKey: 'aiProvider.runtime.claude.blurb' | 'aiProvider.runtime.codex.blurb' | 'aiProvider.runtime.cursor.blurb' | 'aiProvider.runtime.agy.blurb' | 'aiProvider.runtime.grok.blurb' | 'aiProvider.runtime.omp.blurb' | 'aiProvider.runtime.opencode.blurb' | 'aiProvider.runtime.pi.blurb'
+  modelsKey: 'aiProvider.runtime.claude.models' | 'aiProvider.runtime.codex.models' | 'aiProvider.runtime.cursor.models' | 'aiProvider.runtime.agy.models' | 'aiProvider.runtime.grok.models' | 'aiProvider.runtime.omp.models' | 'aiProvider.runtime.opencode.models' | 'aiProvider.runtime.pi.models'
+  authKey: 'aiProvider.runtime.claude.auth' | 'aiProvider.runtime.codex.auth' | 'aiProvider.runtime.cursor.auth' | 'aiProvider.runtime.agy.auth' | 'aiProvider.runtime.grok.auth' | 'aiProvider.runtime.omp.auth' | 'aiProvider.runtime.opencode.auth' | 'aiProvider.runtime.pi.auth'
 }
 
 const AGENT_RUNTIMES: RuntimeInfo[] = [
@@ -81,6 +81,13 @@ const AGENT_RUNTIMES: RuntimeInfo[] = [
     blurbKey: 'aiProvider.runtime.cursor.blurb',
     modelsKey: 'aiProvider.runtime.cursor.models',
     authKey: 'aiProvider.runtime.cursor.auth',
+  },
+  {
+    id: 'agy',
+    name: 'Antigravity',
+    blurbKey: 'aiProvider.runtime.agy.blurb',
+    modelsKey: 'aiProvider.runtime.agy.models',
+    authKey: 'aiProvider.runtime.agy.auth',
   },
   {
     id: 'grok',

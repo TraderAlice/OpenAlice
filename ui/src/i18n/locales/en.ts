@@ -636,6 +636,11 @@ export const en = {
         models: 'First-party Cursor Models pool after login: Auto, Composer 2.5, Grok 4.6 / 4.5. Effort and Fast are part of the CLI id. Third-party ids stay free-typed.',
         auth: '`cursor-agent login` or a Cursor Dashboard API key in `CURSOR_API_KEY`.',
       },
+      agy: {
+        blurb: "Google's coding-agent CLI. Alice launches PATH `agy` only — never `antigravity` or `gemini`.",
+        models: 'First-party Gemini slugs after login (3.7 / 3.6 Flash, 3.1 Pro). Native `--effort` is low / medium / high. Third-party ids stay free-typed.',
+        auth: 'Native `agy` browser / keyring login. A vault Gemini key needs `GEMINI_API_KEY` plus `modelProvider: "gemini"` in the CLI settings file — Alice does not write that file.',
+      },
       grok: {
         blurb: "xAI's coding-agent CLI.",
         models: 'Grok models on the xAI API, plus OpenAI-compatible endpoints through a custom base URL.',
