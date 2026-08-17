@@ -625,6 +625,11 @@ export const ja: Resources = {
         models: 'ログイン後のファーストパーティ Cursor Models：Auto、Composer 2.5、Grok 4.6 / 4.5。effort と Fast は CLI id に含まれます。サードパーティ id は手入力のままです。',
         auth: '`cursor-agent login`、または Cursor Dashboard の API キーを `CURSOR_API_KEY` に設定。',
       },
+      agy: {
+        blurb: 'Google の coding-agent CLI。Alice は PATH 上の `agy` だけを起動し、`antigravity` や `gemini` は使いません。',
+        models: 'ログイン後のファーストパーティ Gemini slug（3.7 / 3.6 Flash、3.1 Pro）。ネイティブ `--effort` は low / medium / high。サードパーティ id は手入力のままです。',
+        auth: '`agy` のブラウザ / キーリングログイン。Vault の Gemini キーは CLI settings に `modelProvider: "gemini"` が必要で、Alice はそのファイルを書きません。',
+      },
       grok: {
         blurb: 'xAI の coding-agent CLI。',
         models: 'xAI API の Grok モデル。カスタム Base URL で OpenAI 互換エンドポイントにも接続できます。',

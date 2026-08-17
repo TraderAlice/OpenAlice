@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Preset } from '../api'
 import type { SavedCredential } from './workspace/api'
+import { AGY_FIRST_PARTY_MODEL_IDS } from '../lib/agy-models'
 import { CURSOR_FIRST_PARTY_MODEL_IDS } from '../lib/cursor-models'
 import {
   issueEffortOptions,
@@ -94,6 +95,10 @@ describe('Issue runtime options', () => {
       .toEqual(['low', 'medium', 'high', 'max'])
     expect(issueEffortOptions({ agent: 'cursor', semantics: null, modelKnown: false }))
       .toEqual([])
+    expect(issueEffortOptions({ agent: 'agy', semantics: null, modelKnown: false }))
+      .toEqual(['low', 'medium', 'high'])
+    expect(issueEffortOptions({ agent: 'agy', semantics: null, modelKnown: true }))
+      .toEqual([])
     expect(issueEffortOptions({
       agent: 'cursor',
       semantics: { reasoning: { mode: 'optional', efforts: ['low', 'high'] } },
@@ -103,6 +108,21 @@ describe('Issue runtime options', () => {
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(issueEffortOptions({ agent: 'omp', semantics: null, modelKnown: false }))
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  it('suggests Antigravity first-party Gemini slugs even when a vault catalog is bound', () => {
+    expect(issueModelOptions({
+      agent: 'agy',
+      credential: null,
+      defaultModel: null,
+      presets,
+    }).map((model) => model.id)).toEqual([...AGY_FIRST_PARTY_MODEL_IDS])
+    expect(issueModelOptions({
+      agent: 'agy',
+      credential: deepSeek,
+      defaultModel: 'gemini-3.5-flash',
+      presets,
+    }).map((model) => model.id)).toEqual([...AGY_FIRST_PARTY_MODEL_IDS])
   })
 
   it('suggests Cursor first-party CLI ids even when a vault catalog is bound', () => {

@@ -20,6 +20,7 @@ const DEFAULT_WIRE_BY_AGENT: Record<string, WireShape> = {
   claude: 'anthropic',
   codex: 'openai-responses',
   cursor: 'openai-chat',
+  agy: 'google-generative-ai',
   grok: 'openai-chat',
   omp: 'openai-chat',
   opencode: 'openai-chat',

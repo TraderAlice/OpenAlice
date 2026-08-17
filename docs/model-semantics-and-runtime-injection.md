@@ -74,6 +74,12 @@ runtime's native launch interface:
   as `CURSOR_API_KEY`, plus `--model` only (live CLI rejects
   `id[effort=…]`; catalog ids already
   encode effort as suffixes such as `gpt-5.2-low`);
+- Antigravity native authentication or an optional Gemini key projected as
+  `GEMINI_API_KEY` (and `GOOGLE_GEMINI_BASE_URL` only for a custom host), plus
+  `--model` and `--effort low|medium|high`. `GEMINI_API_KEY` alone has no
+  effect unless the user already set `modelProvider: "gemini"` in
+  `~/.gemini/antigravity-cli/settings.json`; Alice does not write that file.
+  Alice launches PATH `agy` only — never `antigravity` or `gemini`;
 - Grok Build `XAI_API_KEY` / optional `GROK_MODELS_BASE_URL` plus `--model`
   and `--effort`;
 - Oh My Pi provider env plus `--model` and `--thinking`;
@@ -146,6 +152,16 @@ resolved value:
   (`src/workspaces/adapters/cursor-models.ts`); third-party ids stay
   free-typed. Effort and Fast are suffixes on the CLI id
   (`cursor-grok-4.6-high-fast`), not a separate picker;
+- Antigravity: `--model <slug>` plus `--effort low|medium|high`. `agy models`
+  is filtered by auth type and billing tier — a free Gemini API key returns
+  raw API ids; an Antigravity account returns effort-suffixed slugs. Do not
+  invent a suffix mapper. Issue / launch suggestions are the union of those
+  Gemini pools (`src/workspaces/adapters/agy-models.ts`); Claude and other
+  third-party ids stay free-typed. `ultra` / `xhigh` / `max` / `none` /
+  `minimal` are rejected. Headless stdout is documented `stream-json`
+  (`init` carries `conversation_id`). Resume is `--conversation` /
+  `--continue`, not `--resume`. Bind the prompt with `-p <prompt>`; do not
+  use a `--` terminator;
 - Grok Build: `--effort` (`none` through `max` / `xhigh`; `ultra` is rejected);
 - Codex: project `model_reasoning_effort`.
 

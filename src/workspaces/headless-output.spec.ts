@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { claudeAdapter } from './adapters/claude.js'
 import { codexAdapter } from './adapters/codex.js'
+import { agyAdapter } from './adapters/agy.js'
 import { cursorAdapter } from './adapters/cursor.js'
 import { grokAdapter } from './adapters/grok.js'
 import { opencodeAdapter } from './adapters/opencode.js'
@@ -234,6 +235,73 @@ describe('headless structured output', () => {
         status: 'completed',
         input: { path: 'README.md' },
         output: { content: '# Project\n' },
+      },
+    ])
+    expect(output.metrics).toEqual({ textBlocks: 1, toolCalls: 1, toolFailures: 0 })
+  })
+
+  it('normalizes Antigravity stream-json tools and keeps the terminal result', () => {
+    const output = parse(agyAdapter, [
+      {
+        event: 'init',
+        conversation_id: 'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
+        init: { cwd: '/home/user/project', tools: ['run_command'] },
+      },
+      {
+        event: 'step_update',
+        step_update: {
+          conversation_id: 'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
+          step_index: 3,
+          state: 'DONE',
+          step_type: 'agent_response',
+          text_delta: 'Git rebase rewrites history.\n',
+        },
+      },
+      {
+        event: 'step_update',
+        step_update: {
+          conversation_id: 'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
+          step_index: 4,
+          state: 'ACTIVE',
+          step_type: 'tool',
+          tool_name: 'run_command',
+          tool_info: { name: 'run_command', parameters: { CommandLine: 'echo hello' } },
+        },
+      },
+      {
+        event: 'step_update',
+        step_update: {
+          conversation_id: 'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
+          step_index: 4,
+          state: 'DONE',
+          step_type: 'tool',
+          tool_name: 'run_command',
+          tool_info: {
+            name: 'run_command',
+            parameters: { CommandLine: 'echo hello' },
+            output: 'hello\r\n',
+          },
+        },
+      },
+      {
+        event: 'result',
+        result: {
+          conversation_id: 'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
+          status: 'SUCCESS',
+          response: 'Git rebase rewrites history.\n',
+        },
+      },
+    ])
+    expect(output.assistantText).toBe('Git rebase rewrites history.')
+    expect(output.blocks).toEqual([
+      { type: 'text', text: 'Git rebase rewrites history.' },
+      {
+        type: 'tool',
+        id: 'step-4',
+        name: 'run_command',
+        status: 'completed',
+        input: { CommandLine: 'echo hello' },
+        output: 'hello\r\n',
       },
     ])
     expect(output.metrics).toEqual({ textBlocks: 1, toolCalls: 1, toolFailures: 0 })

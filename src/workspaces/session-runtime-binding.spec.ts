@@ -10,6 +10,7 @@ import {
   type ResolvedSessionRuntimeBinding,
   type WorkspaceAiCred,
 } from './cli-adapter.js'
+import { agyAdapter } from './adapters/agy.js'
 import { claudeAdapter } from './adapters/claude.js'
 import { codexAdapter } from './adapters/codex.js'
 import { cursorAdapter } from './adapters/cursor.js'
@@ -276,7 +277,7 @@ describe('built-in Agent Session runtime projection', () => {
     env: { AQ_LAUNCHER_REPO_ROOT: '/openalice' },
   }
 
-  it.each([claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
+  it.each([claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
     '$id implements a secret-free argv projection',
     (adapter) => {
       const projected = adapter.sessionRuntime!.project(ctx, runtime)
@@ -303,7 +304,7 @@ describe('built-in Agent Session runtime projection', () => {
     },
   )
 
-  it.each([claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
+  it.each([claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter])(
     '$id accepts a credentialless native binding and still projects model/effort',
     (adapter) => {
       const native = createNativeSessionRuntimeBinding({
@@ -341,6 +342,8 @@ describe('built-in Agent Session runtime projection', () => {
       .toContain('--extension')
     expect(ompAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
       .toEqual(['--model', 'session-model', '--thinking', 'high'])
+    expect(agyAdapter.sessionRuntime!.project(ctx, runtime).interactiveArgs)
+      .toEqual(['--model', 'session-model', '--effort', 'high'])
   })
 
   it.each([
