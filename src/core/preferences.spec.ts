@@ -5,12 +5,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   readAutoQuantPreferences,
+  readHarnessPreferences,
   readPreferences,
   readQuickChatPreferences,
   rememberAutoQuantDefaultWorkspace,
   rememberQuickChatCredential,
   rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
+  saveHarnessPreferences,
 } from './preferences.js'
 
 const roots: string[] = []
@@ -32,6 +34,7 @@ describe('preferences', () => {
       version: 1,
       quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null, recentLaunch: null },
       autoQuant: { defaultWorkspaceId: null },
+      harness: { showHeadlessBornSessions: false },
     })
 
     await writeFile(path, '{not-json', 'utf-8')
@@ -140,6 +143,22 @@ describe('preferences', () => {
     expect(await readQuickChatPreferences(path)).toEqual({
       lastCredentialByAgent: {},
       recentChatWorkspaceId: 'chat-calm-river',
+    })
+  })
+
+  it('defaults harness roster visibility off and persists an explicit opt-in', async () => {
+    const path = await preferenceFile()
+    expect(await readHarnessPreferences(path)).toEqual({
+      showHeadlessBornSessions: false,
+    })
+
+    await saveHarnessPreferences({ showHeadlessBornSessions: true }, path)
+    expect(await readHarnessPreferences(path)).toEqual({
+      showHeadlessBornSessions: true,
+    })
+    expect(await readQuickChatPreferences(path)).toEqual({
+      lastCredentialByAgent: {},
+      recentChatWorkspaceId: null,
     })
   })
 })

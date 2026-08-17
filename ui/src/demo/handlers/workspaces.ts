@@ -1048,12 +1048,16 @@ export const workspacesHandlers = [
       resumable: session.agent !== 'shell',
       active: session.state === 'running',
       runtime: demoResumeRuntimes.get(session.resumeId) ?? session.runtime,
-      interactive: {
-        name: session.name,
-        ...(session.title ? { title: session.title } : {}),
-        state: session.state,
-        lastActiveAt: session.lastActiveAt,
-      },
+      ...(session.surface === 'headless'
+        ? {}
+        : {
+            interactive: {
+              name: session.name,
+              ...(session.title ? { title: session.title } : {}),
+              state: session.state,
+              lastActiveAt: session.lastActiveAt,
+            },
+          }),
     }))
     if (wsId === DEMO_CHAT_WORKSPACE_ID) {
       const completedHeadless = sessions.find(

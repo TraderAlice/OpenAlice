@@ -97,6 +97,22 @@ describe('UrlAdopter file provenance', () => {
   })
 })
 
+describe('UrlAdopter Settings Harness', () => {
+  it('adopts the Harness settings category from /settings/harness', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/harness']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'settings',
+      params: { category: 'harness' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
 describe('UrlAdopter Settings Beta', () => {
   it('adopts the Beta settings category from /settings/beta', async () => {
     render(

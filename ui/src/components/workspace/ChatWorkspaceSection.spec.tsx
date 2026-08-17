@@ -50,6 +50,19 @@ vi.mock('../../tabs/types', () => ({
   getFocusedTab: () => null,
 }))
 
+const harnessPreference = vi.hoisted(() => ({
+  showHeadlessBornSessions: true,
+}))
+
+vi.mock('../../hooks/useHarnessPreferences', () => ({
+  useHarnessPreferences: () => ({
+    preferences: harnessPreference,
+    loading: false,
+    error: null,
+    save: vi.fn(),
+  }),
+}))
+
 const chatTemplate: TemplateInfo = {
   name: 'chat',
   defaultAgents: ['pi'],
@@ -150,6 +163,7 @@ function renderSection(
 beforeEach(async () => {
   for (const mock of Object.values(actions)) mock.mockClear()
   directoryState.directories = new Map()
+  harnessPreference.showHeadlessBornSessions = true
   window.localStorage.clear()
   await i18n.changeLanguage('en')
 })
@@ -682,6 +696,28 @@ describe('ChatWorkspaceSection actions', () => {
       'resume-headless-colleague',
       'archived',
     )
+  })
+
+  it('hides headless-born Sessions that never opened a TUI unless the harness preference is on', () => {
+    harnessPreference.showHeadlessBornSessions = false
+    const hiddenWorkspace = {
+      ...chatWorkspace,
+      sessions: [
+        { ...chatSession(1), title: 'Interactive thesis' },
+        {
+          ...chatSession(20),
+          id: 'session-headless-colleague',
+          resumeId: 'resume-headless-colleague',
+          agent: 'codex',
+          name: 'x1',
+          surface: 'headless' as const,
+          title: null,
+        },
+      ],
+    }
+    renderSection([hiddenWorkspace], null, undefined, 'focused')
+    expect(screen.getByRole('button', { name: 'Interactive thesis' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'x1' })).toBeNull()
   })
 
   it('keeps headless occupancy inside Browse Running without a Headless filter', () => {

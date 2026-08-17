@@ -4,6 +4,7 @@ import type { SessionRecord, Workspace, WorkspaceSessionDirectoryEntry } from '.
 import {
   flattenHarnessSessions,
   harnessSessionTitle,
+  isHeadlessBornWithoutInteractive,
   joinWorkspaceHarnessSessions,
   orderHarnessSessions,
   shortResumeId,
@@ -126,7 +127,7 @@ describe('joinWorkspaceHarnessSessions', () => {
         entry(),
         entry({ resumeId: 'resume-directory-only' }),
       ],
-    })
+    }, { includeHeadlessBornSessions: true })
 
     expect(rows.map((row) => row.resumeId)).toEqual([
       'resume-headless-only',
@@ -176,7 +177,7 @@ describe('joinWorkspaceHarnessSessions', () => {
         runningHeadless,
         failed,
       ],
-    })
+    }, { includeHeadlessBornSessions: true })
 
     expect(rows.map((row) => row.resumeId)).toEqual([
       'resume-running',
@@ -238,6 +239,44 @@ describe('joinWorkspaceHarnessSessions', () => {
     expect(row.occupancyRunning).toBe(true)
     expect(row.headlessOccupying).toBe(false)
   })
+
+  it('hides headless-born Sessions that have never opened a TUI', () => {
+    const bornHeadless = headlessSession({ sourceRunId: 'run-1' })
+    const openedLater = headlessSession({
+      id: 'session-opened',
+      resumeId: 'resume-opened',
+      sourceRunId: 'run-2',
+    })
+    expect(isHeadlessBornWithoutInteractive(bornHeadless, entry())).toBe(true)
+    expect(isHeadlessBornWithoutInteractive(openedLater, entry({
+      resumeId: 'resume-opened',
+      interactive: {
+        name: 'x2',
+        state: 'paused',
+        lastActiveAt: '2026-08-03T00:00:00.000Z',
+      },
+    }))).toBe(false)
+
+    const rows = joinWorkspaceHarnessSessions(workspace([session(), bornHeadless, openedLater]), {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry(),
+        entry({
+          resumeId: 'resume-opened',
+          interactive: {
+            name: 'x2',
+            state: 'paused',
+            lastActiveAt: '2026-08-03T00:00:00.000Z',
+          },
+        }),
+      ],
+    })
+    expect(rows.map((row) => row.resumeId)).toEqual([
+      'resume-opened',
+      'resume-interactive',
+    ])
+  })
 })
 
 describe('orderHarnessSessions', () => {
@@ -265,6 +304,7 @@ describe('orderHarnessSessions', () => {
           })],
         }],
       ]),
+      { includeHeadlessBornSessions: true },
     )
     expect(rows.map((row) => `${row.workspaceId}:${row.resumeId}`)).toEqual([
       'ws-2:resume-headless-only',

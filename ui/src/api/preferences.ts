@@ -16,6 +16,14 @@ export interface QuickChatPreferences {
   recentLaunch?: QuickChatLaunchPreference | null
 }
 
+export interface HarnessPreferences {
+  readonly showHeadlessBornSessions: boolean
+}
+
+export const DEFAULT_HARNESS_PREFERENCES: HarnessPreferences = {
+  showHeadlessBornSessions: false,
+}
+
 export type WorkspaceShellStatus =
   | { supported: false }
   | {
@@ -72,6 +80,18 @@ export const preferencesApi = {
       method: 'PUT',
       headers,
       body: JSON.stringify(input),
+    })
+  },
+
+  getHarness(): Promise<HarnessPreferences> {
+    return fetchJson('/api/preferences/harness')
+  },
+
+  saveHarness(next: HarnessPreferences): Promise<HarnessPreferences> {
+    return fetchJson('/api/preferences/harness', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(next),
     })
   },
 }
