@@ -37,10 +37,10 @@ describe('demo credential catalog', () => {
       'claude-sonnet-4-6',
     ])
     expect(modelIds('openrouter')).toEqual([
+      'openai/gpt-5.6-luna',
       'anthropic/claude-sonnet-5',
       'deepseek/deepseek-v4-flash-0731',
       'tencent/hy3',
-      'openai/gpt-5.6-luna',
       'z-ai/glm-5.2',
       'xiaomi/mimo-v2.5',
       'anthropic/claude-opus-5',

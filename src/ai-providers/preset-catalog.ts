@@ -275,7 +275,7 @@ export const OPENROUTER: PresetDef = {
     backend: z.literal('vercel-ai-sdk'),
     provider: z.literal('openai-compatible'),
     baseUrl: z.string().default('https://openrouter.ai/api/v1').describe('API endpoint'),
-    model: z.string().default('anthropic/claude-sonnet-5').describe('Model'),
+    model: z.string().default('openai/gpt-5.6-luna').describe('Model'),
     apiKey: z.string().min(1).describe('OpenRouter API key'),
   }),
   regions: [{
@@ -291,10 +291,10 @@ export const OPENROUTER: PresetDef = {
     },
   }],
   models: withModelSemantics('openrouter', [
-    { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5 (Suggested default)' },
+    { id: 'openai/gpt-5.6-luna', label: 'GPT 5.6 Luna (Suggested default)' },
+    { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5' },
     { id: 'deepseek/deepseek-v4-flash-0731', label: 'DeepSeek V4 Flash 0731 (Top weekly)' },
     { id: 'tencent/hy3', label: 'Tencent Hy3 (Top weekly)' },
-    { id: 'openai/gpt-5.6-luna', label: 'GPT 5.6 Luna (Top weekly / cost-efficient)' },
     { id: 'z-ai/glm-5.2', label: 'GLM 5.2 (Top weekly)' },
     { id: 'xiaomi/mimo-v2.5', label: 'Xiaomi MiMo-V2.5 (Top weekly)' },
     { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5 (Complex agents)' },
@@ -311,7 +311,7 @@ export const OPENROUTER: PresetDef = {
     apiKeyLabel: 'OpenRouter API key',
     apiKeyPlaceholder: 'sk-or-...',
     apiKeyHelp: 'Use a key from openrouter.ai. This is not a first-party Anthropic, OpenAI, or Google key.',
-    modelHelp: 'Use the exact OpenRouter model ID (`provider/model`), or paste another ID from the OpenRouter catalog. Sonnet 5 is the suggested coding default. The next suggestions are this week\'s highest-volume text models on OpenRouter.',
+    modelHelp: 'Use the exact OpenRouter model ID (`provider/model`), or paste another ID from the OpenRouter catalog. GPT 5.6 Luna is the suggested default. The next suggestions mix current Anthropic tiers with this week\'s highest-volume text models.',
   },
   writeOnlyFields: ['apiKey'],
 }
@@ -639,6 +639,6 @@ export const DEFAULT_MODEL_BY_VENDOR: Record<string, string> = {
   kimi: 'kimi-k3',
   deepseek: 'deepseek-v4-pro',
   longcat: 'LongCat-2.0',
-  openrouter: 'anthropic/claude-sonnet-5',
+  openrouter: 'openai/gpt-5.6-luna',
   cursor: 'auto',
 }

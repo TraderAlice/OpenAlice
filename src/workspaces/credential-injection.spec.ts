@@ -538,7 +538,7 @@ describe('resolveInjectionModel', () => {
     expect(resolveInjectionModel({ vendor: 'google' })).toBe('gemini-3.6-flash')
     expect(resolveInjectionModel({ vendor: 'glm' })).toBe('glm-5.2')
     expect(resolveInjectionModel({ vendor: 'longcat' })).toBe('LongCat-2.0')
-    expect(resolveInjectionModel({ vendor: 'openrouter' })).toBe('anthropic/claude-sonnet-5')
+    expect(resolveInjectionModel({ vendor: 'openrouter' })).toBe('openai/gpt-5.6-luna')
   })
 
   it('returns null for a vendor with no catalog default (custom)', () => {

@@ -102,10 +102,10 @@ export const demoCredentialPresets = [
       modelHelp: 'Use the exact OpenRouter model ID, or paste another catalog ID.',
     },
     models: [
-      { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5 (Suggested default)', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
+      { id: 'openai/gpt-5.6-luna', label: 'GPT 5.6 Luna (Suggested default)', semantics: { contextWindow: 400_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
+      { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', semantics: { contextWindow: 1_000_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
       { id: 'deepseek/deepseek-v4-flash-0731', label: 'DeepSeek V4 Flash 0731 (Top weekly)', semantics: { contextWindow: 1_000_000, maxOutputTokens: 384_000, reasoning: { mode: 'optional', efforts: ['low', 'high', 'max'], defaultEffort: 'high', interleaved: true } } },
       { id: 'tencent/hy3', label: 'Tencent Hy3 (Top weekly)', semantics: { contextWindow: 262_144, reasoning: { mode: 'optional', efforts: ['none', 'low', 'high'], defaultEffort: 'none' } } },
-      { id: 'openai/gpt-5.6-luna', label: 'GPT 5.6 Luna (Top weekly / cost-efficient)', semantics: { contextWindow: 400_000, maxOutputTokens: 128_000, reasoning: { mode: 'optional', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' } } },
       { id: 'z-ai/glm-5.2', label: 'GLM 5.2 (Top weekly)', semantics: { reasoning: { mode: 'adaptive', efforts: ['high', 'max'] } } },
       { id: 'xiaomi/mimo-v2.5', label: 'Xiaomi MiMo-V2.5 (Top weekly)', semantics: { contextWindow: 1_048_576 } },
       { id: 'anthropic/claude-opus-5', label: 'Claude Opus 5 (Complex agents)', semantics: { contextWindow: 1_000_000, maxOutputTokens: 128_000, reasoning: { mode: 'adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high', interleaved: true } } },
@@ -124,12 +124,12 @@ export const demoCredentialPresets = [
         apiKey: { type: 'string' },
         model: {
           type: 'string',
-          default: 'anthropic/claude-sonnet-5',
+          default: 'openai/gpt-5.6-luna',
           oneOf: [
-            { const: 'anthropic/claude-sonnet-5', title: 'Claude Sonnet 5 (Suggested default)' },
+            { const: 'openai/gpt-5.6-luna', title: 'GPT 5.6 Luna (Suggested default)' },
+            { const: 'anthropic/claude-sonnet-5', title: 'Claude Sonnet 5' },
             { const: 'deepseek/deepseek-v4-flash-0731', title: 'DeepSeek V4 Flash 0731 (Top weekly)' },
             { const: 'tencent/hy3', title: 'Tencent Hy3 (Top weekly)' },
-            { const: 'openai/gpt-5.6-luna', title: 'GPT 5.6 Luna (Top weekly / cost-efficient)' },
             { const: 'z-ai/glm-5.2', title: 'GLM 5.2 (Top weekly)' },
             { const: 'xiaomi/mimo-v2.5', title: 'Xiaomi MiMo-V2.5 (Top weekly)' },
             { const: 'anthropic/claude-opus-5', title: 'Claude Opus 5 (Complex agents)' },

@@ -30,12 +30,12 @@ describe('OPENROUTER preset', () => {
       apiKey: 'sk-or-test',
     }) as { baseUrl?: string; model?: string };
     expect(parsed.baseUrl).toBe('https://openrouter.ai/api/v1');
-    expect(parsed.model).toBe('anthropic/claude-sonnet-5');
+    expect(parsed.model).toBe('openai/gpt-5.6-luna');
     expect(OPENROUTER.models?.map((model) => model.id)).toEqual([
+      'openai/gpt-5.6-luna',
       'anthropic/claude-sonnet-5',
       'deepseek/deepseek-v4-flash-0731',
       'tencent/hy3',
-      'openai/gpt-5.6-luna',
       'z-ai/glm-5.2',
       'xiaomi/mimo-v2.5',
       'anthropic/claude-opus-5',
@@ -195,7 +195,7 @@ describe('credential form catalog', () => {
       kimi: 'kimi-k3',
       deepseek: 'deepseek-v4-pro',
       longcat: 'LongCat-2.0',
-      openrouter: 'anthropic/claude-sonnet-5',
+      openrouter: 'openai/gpt-5.6-luna',
       // Runtime-direct provider: `auto` is Cursor routing, not a model API id.
       cursor: 'auto',
     });
