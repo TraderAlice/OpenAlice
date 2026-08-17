@@ -120,6 +120,53 @@ describe('AlpacaBroker — placeOrder()', () => {
     expect(result.orderId).toBe('ord-1')
   })
 
+  it('clamps time_in_force to "gtc" for crypto symbols (Alpaca rejects "day" for crypto)', async () => {
+    // Regression: staging a crypto rebalance order with the IBKR-derived
+    // default tif "DAY" got a live 422 from Alpaca — "invalid crypto
+    // time_in_force". Alpaca crypto only accepts gtc/ioc.
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-crypto', status: 'new' })
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    ;(acc as any).client = { createOrder }
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-c047371e|BTC/USD'
+    contract.symbol = 'BTC/USD'
+    contract.secType = 'STK'
+    contract.exchange = 'SMART'
+    contract.currency = 'USD'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.cashQty = new Decimal(20000)
+    order.tif = 'DAY'
+
+    const result = await acc.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+    expect(createOrder.mock.calls[0][0].time_in_force).toBe('gtc')
+  })
+
+  it('leaves time_in_force alone for non-crypto (equity) symbols', async () => {
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-eq', status: 'new' })
+    const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
+    ;(acc as any).client = { createOrder }
+    const contract = new Contract()
+    contract.aliceId = 'alpaca-paper|AAPL'
+    contract.symbol = 'AAPL'
+    contract.secType = 'STK'
+    contract.exchange = 'NASDAQ'
+    contract.currency = 'USD'
+
+    const order = new Order()
+    order.action = 'BUY'
+    order.orderType = 'MKT'
+    order.totalQuantity = new Decimal(10)
+    order.tif = 'DAY'
+
+    const result = await acc.placeOrder(contract, order)
+    expect(result.success).toBe(true)
+    expect(createOrder.mock.calls[0][0].time_in_force).toBe('day')
+  })
+
   it('surfaces bracket leg ids with kinds (ledger tracks legs from birth)', async () => {
     const acc = new AlpacaBroker({ apiKey: 'k', secretKey: 's', paper: true })
     ;(acc as any).client = {

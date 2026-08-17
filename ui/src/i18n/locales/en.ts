@@ -1746,7 +1746,12 @@ export const en = {
     rejecting: 'Rejecting…',
     reject: 'Reject',
     operationDiff: 'Operation diff',
-    stagedWarning: 'These operations are staged but do not have a commit message yet. The agent still needs to commit before this can be pushed.',
+    commitMessagePlaceholder: 'Describe this batch of orders…',
+    commit: 'Commit',
+    committing: 'Committing…',
+    commitFailed: 'Commit failed',
+    commitMessageRequired: 'A commit message is required.',
+    stagedWarning: 'These operations are staged but do not have a commit message yet. Add a commit message and commit before this can be pushed.',
     approvalWarning: 'Approval pushes these operations to the broker account. Check account, side, quantity, and order type before confirming.',
     result: '{{submitted}} submitted, {{rejected}} rejected',
     queue: {

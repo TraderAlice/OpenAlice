@@ -1735,7 +1735,12 @@ export const ja: Resources = {
     rejecting: '却下中…',
     reject: '却下',
     operationDiff: '操作の差分',
-    stagedWarning: 'これらの操作はステージ済みですが、まだコミットメッセージがありません。プッシュするには、エージェントが先にコミットする必要があります。',
+    commitMessagePlaceholder: 'この注文バッチの説明を入力…',
+    commit: 'コミット',
+    committing: 'コミット中…',
+    commitFailed: 'コミットに失敗しました',
+    commitMessageRequired: 'コミットメッセージが必要です。',
+    stagedWarning: 'これらの操作はステージ済みですが、まだコミットメッセージがありません。プッシュする前にコミットメッセージを入力してコミットしてください。',
     approvalWarning: '承認すると、これらの操作がブローカー口座へプッシュされます。確定前に口座、売買方向、数量、注文タイプを確認してください。',
     result: '{{submitted}} 件を送信、{{rejected}} 件を却下',
     queue: {

@@ -75,6 +75,18 @@ function ibkrTifToAlpaca(tif: string): string {
   }
 }
 
+/** Alpaca crypto pair symbols always carry the quote-currency slash (e.g.
+ *  "BTC/USD"); equities never do. Alpaca's crypto order book only accepts
+ *  time_in_force 'gtc' or 'ioc' -- 'day' (our IBKR-derived default) is
+ *  rejected with a 422 ("invalid crypto time_in_force"), so crypto orders
+ *  need it clamped regardless of what the caller asked for. */
+function alpacaTimeInForce(symbol: string, tif: string): string {
+  const mapped = ibkrTifToAlpaca(tif)
+  const isCrypto = symbol.includes('/')
+  if (isCrypto && mapped !== 'gtc' && mapped !== 'ioc') return 'gtc'
+  return mapped
+}
+
 /**
  * Surface Alpaca's response body in failures. The SDK throws axios-shaped
  * errors whose message is just "Request failed with status code 422" — the
@@ -281,7 +293,7 @@ export class AlpacaBroker implements IBroker {
         symbol,
         side: order.action.toLowerCase(), // BUY → buy, SELL → sell
         type: ibkrOrderTypeToAlpaca(order.orderType),
-        time_in_force: ibkrTifToAlpaca(order.tif),
+        time_in_force: alpacaTimeInForce(symbol, order.tif),
       }
 
       // Quantity: totalQuantity or cashQty (notional)

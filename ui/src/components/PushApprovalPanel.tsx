@@ -233,6 +233,10 @@ function itemTitle(item: ReviewItem, t: TFunction): string {
   return item.commit.message
 }
 
+function itemAccountId(item: ReviewItem): string {
+  return item.kind === 'history' ? item.accountId : item.account.id
+}
+
 function itemAccountLabel(item: ReviewItem): string {
   if (item.kind === 'history') return item.label
   return accountLabel(item.account)
@@ -270,6 +274,8 @@ export function PushApprovalPanel() {
   const [history, setHistory] = useState<AccountHistory[]>([])
   const [pushing, setPushing] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<string | null>(null)
+  const [committing, setCommitting] = useState<string | null>(null)
+  const [commitMessages, setCommitMessages] = useState<Record<string, string>>({})
   const [confirmingPush, setConfirmingPush] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<{ accountId: string; data: WalletPushResult } | null>(null)
@@ -388,6 +394,33 @@ export function PushApprovalPanel() {
       setPushing(null)
     }
   }, [poll, t])
+
+  const setCommitMessage = useCallback((accountId: string, message: string) => {
+    setCommitMessages((previous) => ({ ...previous, [accountId]: message }))
+  }, [])
+
+  const handleCommit = useCallback(async (accountId: string) => {
+    const message = (commitMessages[accountId] || '').trim()
+    if (!message) {
+      setError(t('tradingReview.commitMessageRequired'))
+      return
+    }
+    setCommitting(accountId)
+    setError(null)
+    try {
+      await api.trading.walletCommit(accountId, message)
+      setCommitMessages((previous) => {
+        const next = { ...previous }
+        delete next[accountId]
+        return next
+      })
+      await poll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('tradingReview.commitFailed'))
+    } finally {
+      setCommitting(null)
+    }
+  }, [commitMessages, poll, t])
 
   const handleReject = useCallback(async (accountId: string) => {
     setRejecting(accountId)
@@ -615,6 +648,10 @@ export function PushApprovalPanel() {
             confirmingPush={confirmingPush}
             pushing={pushing}
             rejecting={rejecting}
+            committing={committing}
+            commitMessage={selected ? commitMessages[itemAccountId(selected)] || '' : ''}
+            onCommitMessageChange={setCommitMessage}
+            onCommit={handleCommit}
             onConfirmPush={setConfirmingPush}
             onPush={handlePush}
             onReject={handleReject}
@@ -788,6 +825,10 @@ function ReviewDetail({
   confirmingPush,
   pushing,
   rejecting,
+  committing,
+  commitMessage,
+  onCommitMessageChange,
+  onCommit,
   onConfirmPush,
   onPush,
   onReject,
@@ -800,6 +841,10 @@ function ReviewDetail({
   error: string | null
   confirmingPush: string | null
   pushing: string | null
+  committing: string | null
+  commitMessage: string
+  onCommitMessageChange: (accountId: string, message: string) => void
+  onCommit: (accountId: string) => void
   rejecting: string | null
   onConfirmPush: (accountId: string | null) => void
   onPush: (accountId: string) => void
@@ -930,8 +975,26 @@ function ReviewDetail({
             <section className="space-y-3">
               <ReviewSummary item={item} operations={ops} />
               {isStaged && (
-                <div className="rounded-md border border-warning/25 bg-warning/5 px-3 py-2 text-[12px] leading-relaxed text-warning/80">
-                  {t('tradingReview.stagedWarning')}
+                <div className="space-y-2 rounded-md border border-warning/25 bg-warning/5 px-3 py-2">
+                  <p className="text-[12px] leading-relaxed text-warning/80">
+                    {t('tradingReview.stagedWarning')}
+                  </p>
+                  <textarea
+                    value={commitMessage}
+                    onChange={(e) => onCommitMessageChange(accountId, e.target.value)}
+                    placeholder={t('tradingReview.commitMessagePlaceholder')}
+                    rows={2}
+                    disabled={committing === accountId}
+                    className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onCommit(accountId)}
+                    disabled={committing !== null || !commitMessage.trim()}
+                    className="btn-primary-sm"
+                  >
+                    {committing === accountId ? t('tradingReview.committing') : t('tradingReview.commit')}
+                  </button>
                 </div>
               )}
               {isPending && (

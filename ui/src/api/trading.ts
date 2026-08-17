@@ -133,6 +133,19 @@ export const tradingApi = {
     return fetchJson(`/api/trading/uta/${utaId}/wallet/status`)
   },
 
+  async walletCommit(utaId: string, message: string): Promise<WalletStatus> {
+    const res = await fetch(`/api/trading/uta/${utaId}/wallet/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || `Commit failed (${res.status})`)
+    }
+    return res.json()
+  },
+
   async walletReject(utaId: string, reason?: string): Promise<WalletRejectResult> {
     const res = await fetch(`/api/trading/uta/${utaId}/wallet/reject`, {
       method: 'POST',

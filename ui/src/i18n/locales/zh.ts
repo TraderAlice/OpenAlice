@@ -1734,7 +1734,12 @@ export const zh: Resources = {
     rejecting: '拒绝中…',
     reject: '拒绝',
     operationDiff: '操作差异',
-    stagedWarning: '这些操作已经暂存，但还没有提交信息。智能体仍需完成提交后才能推送。',
+    commitMessagePlaceholder: '描述这批订单…',
+    commit: '提交',
+    committing: '提交中…',
+    commitFailed: '提交失败',
+    commitMessageRequired: '需要填写提交信息。',
+    stagedWarning: '这些操作已经暂存，但还没有提交信息。请填写提交信息并提交后才能推送。',
     approvalWarning: '批准后，这些操作会被推送到券商账户。确认前请核对账户、方向、数量和订单类型。',
     result: '已提交 {{submitted}} 项，已拒绝 {{rejected}} 项',
     queue: {

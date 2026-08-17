@@ -1742,7 +1742,12 @@ export const zhHant: Resources = {
     rejecting: '拒絕中…',
     reject: '拒絕',
     operationDiff: '操作差異',
-    stagedWarning: '這些操作已經暫存，但還沒有提交訊息。Agent 仍需完成提交後才能推送。',
+    commitMessagePlaceholder: '描述這批訂單…',
+    commit: '提交',
+    committing: '提交中…',
+    commitFailed: '提交失敗',
+    commitMessageRequired: '需要填寫提交訊息。',
+    stagedWarning: '這些操作已經暫存，但還沒有提交訊息。請填寫提交訊息並提交後才能推送。',
     approvalWarning: '批准後，這些操作會被推送到券商帳戶。確認前請核對帳戶、方向、數量和訂單類型。',
     result: '已提交 {{submitted}} 項，已拒絕 {{rejected}} 項',
     queue: {
