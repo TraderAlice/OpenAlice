@@ -2,10 +2,13 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 
 import {
+  readHarnessPreferences,
   readQuickChatPreferences,
   rememberQuickChatCredential,
   rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
+  saveHarnessPreferences,
+  type HarnessPreferences,
   type QuickChatPreferences,
 } from '../../core/preferences.js'
 import {
@@ -44,6 +47,10 @@ const recentQuickChatLaunchUpdateSchema = z.object({
   { message: 'access mode and credential must agree' },
 )
 
+const harnessPreferenceUpdateSchema = z.object({
+  showHeadlessBornSessions: z.boolean(),
+})
+
 const workspaceShellPreferenceUpdateSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('auto'), customPath: z.null().optional() }),
   z.object({ mode: z.literal('custom'), customPath: z.string().trim().min(1).max(1024) }),
@@ -54,6 +61,8 @@ interface PreferenceRouteDeps {
   rememberQuickChatCredential(agent: string, credentialSlug: string | null): Promise<QuickChatPreferences>
   rememberQuickChatLaunch?(launch: NonNullable<QuickChatPreferences['recentLaunch']>): Promise<QuickChatPreferences>
   rememberRecentChatWorkspace(workspaceId: string | null): Promise<QuickChatPreferences>
+  readHarnessPreferences?(): Promise<HarnessPreferences>
+  saveHarnessPreferences?(next: HarnessPreferences): Promise<HarnessPreferences>
   getWorkspaceShellStatus(): Promise<WindowsWorkspaceShellStatus>
   saveWorkspaceShellPreference(input: {
     mode: 'auto' | 'custom'
@@ -67,6 +76,8 @@ const defaultDeps: PreferenceRouteDeps = {
     rememberQuickChatCredential(agent, credentialSlug),
   rememberQuickChatLaunch: (launch) => rememberQuickChatLaunch(launch),
   rememberRecentChatWorkspace: (workspaceId) => rememberRecentChatWorkspace(workspaceId),
+  readHarnessPreferences: () => readHarnessPreferences(),
+  saveHarnessPreferences: (next) => saveHarnessPreferences(next),
   getWorkspaceShellStatus: () => getWindowsWorkspaceShellStatus(),
   saveWorkspaceShellPreference: (input) => saveWindowsWorkspaceShellPreference(input),
 }
@@ -123,6 +134,24 @@ export function createPreferencesRoutes(
     }
     try {
       return c.json(await (deps.rememberQuickChatLaunch ?? defaultDeps.rememberQuickChatLaunch!)(parsed.data))
+    } catch (error) {
+      return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
+    }
+  })
+
+  app.get('/harness', async (c) => {
+    try {
+      return c.json(await (deps.readHarnessPreferences ?? defaultDeps.readHarnessPreferences!)())
+    } catch (error) {
+      return c.json({ error: 'preferences_read_failed', message: String(error) }, 500)
+    }
+  })
+
+  app.put('/harness', async (c) => {
+    const parsed = harnessPreferenceUpdateSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: 'invalid_harness_preference' }, 400)
+    try {
+      return c.json(await (deps.saveHarnessPreferences ?? defaultDeps.saveHarnessPreferences!)(parsed.data))
     } catch (error) {
       return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
     }

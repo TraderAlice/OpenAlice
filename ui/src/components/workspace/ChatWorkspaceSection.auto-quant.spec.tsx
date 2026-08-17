@@ -34,6 +34,15 @@ vi.mock('../../tabs/types', () => ({
   }),
 }))
 
+vi.mock('../../hooks/useHarnessPreferences', () => ({
+  useHarnessPreferences: () => ({
+    preferences: { showHeadlessBornSessions: true },
+    loading: false,
+    error: null,
+    save: vi.fn(),
+  }),
+}))
+
 vi.mock('../../hooks/useWorkspaceSessionDirectory', () => ({
   useWorkspaceSessionDirectories: () => ({
     directories: new Map(),

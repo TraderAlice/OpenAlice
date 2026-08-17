@@ -55,6 +55,7 @@ import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-or
 import { useWorkspaceSessionDirectories } from '../../hooks/useWorkspaceSessionDirectory'
 import { useReorderMotion } from './useReorderMotion'
 import { preferencesApi } from '../../api/preferences'
+import { useHarnessPreferences } from '../../hooks/useHarnessPreferences'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Dialog,
@@ -120,6 +121,10 @@ export function ChatWorkspaceSection({
     () => chatWorkspaces.map((workspace) => workspace.id),
     [chatWorkspaces],
   )
+  const { preferences: harnessPreferences } = useHarnessPreferences()
+  const rosterJoin = useMemo(() => ({
+    includeHeadlessBornSessions: harnessPreferences.showHeadlessBornSessions,
+  }), [harnessPreferences.showHeadlessBornSessions])
   const sessionDirectories = useWorkspaceSessionDirectories(chatWorkspaceIds)
   const rosterByWorkspace = useMemo(() => {
     const next = new Map<string, HarnessSession[]>()
@@ -129,14 +134,15 @@ export function ChatWorkspaceSection({
         joinWorkspaceHarnessSessions(
           workspace,
           sessionDirectories.directories.get(workspace.id) ?? null,
+          rosterJoin,
         ),
       )
     }
     return next
-  }, [chatWorkspaces, sessionDirectories.directories])
+  }, [chatWorkspaces, rosterJoin, sessionDirectories.directories])
   const recentRoster = useMemo(
-    () => flattenHarnessSessions(chatWorkspaces, sessionDirectories.directories),
-    [chatWorkspaces, sessionDirectories.directories],
+    () => flattenHarnessSessions(chatWorkspaces, sessionDirectories.directories, rosterJoin),
+    [chatWorkspaces, rosterJoin, sessionDirectories.directories],
   )
   const workspaceListRef = useReorderMotion<HTMLUListElement>(
     chatWorkspaces.map((workspace) => workspace.id),
@@ -497,6 +503,7 @@ export function ChatWorkspaceSection({
         open={conversationBrowserOpen}
         workspaces={chatWorkspaces}
         directories={sessionDirectories.directories}
+        includeHeadlessBornSessions={harnessPreferences.showHeadlessBornSessions}
         currentWorkspaceId={conversationWorkspaceId}
         isRowActive={isRosterRowActive}
         restoreFocusRef={dialogRestoreFocusRef}

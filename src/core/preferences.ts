@@ -48,6 +48,14 @@ const autoQuantPreferencesSchema = z.object({
   defaultWorkspaceId: z.string().nullable().default(null),
 })
 
+const harnessPreferencesSchema = z.object({
+  /**
+   * Ask Alice and Auto Quant share one roster. Headless-born Sessions that
+   * have never opened a TUI/WebPi stay off that roster unless this is true.
+   */
+  showHeadlessBornSessions: z.boolean().default(false),
+})
+
 const preferencesSchema = z.object({
   version: z.literal(1).default(1),
   quickChat: quickChatPreferencesSchema.default({
@@ -58,6 +66,9 @@ const preferencesSchema = z.object({
   autoQuant: autoQuantPreferencesSchema.default({
     defaultWorkspaceId: null,
   }),
+  harness: harnessPreferencesSchema.default({
+    showHeadlessBornSessions: false,
+  }),
 })
 
 type ParsedQuickChatPreferences = z.infer<typeof quickChatPreferencesSchema>
@@ -66,6 +77,7 @@ export type QuickChatPreferences = Omit<ParsedQuickChatPreferences, 'recentLaunc
   recentLaunch?: ParsedQuickChatPreferences['recentLaunch']
 }
 export type AutoQuantPreferences = z.infer<typeof autoQuantPreferencesSchema>
+export type HarnessPreferences = z.infer<typeof harnessPreferencesSchema>
 export type Preferences = z.infer<typeof preferencesSchema>
 
 function emptyPreferences(): Preferences {
@@ -99,6 +111,11 @@ export async function readQuickChatPreferences(path = preferencesPath()): Promis
 export async function readAutoQuantPreferences(path = preferencesPath()): Promise<AutoQuantPreferences> {
   const preferences = await readPreferences(path)
   return { defaultWorkspaceId: preferences.autoQuant.defaultWorkspaceId }
+}
+
+export async function readHarnessPreferences(path = preferencesPath()): Promise<HarnessPreferences> {
+  const preferences = await readPreferences(path)
+  return { showHeadlessBornSessions: preferences.harness.showHeadlessBornSessions }
 }
 
 // Alice is single-writer at the process level, but two UI requests can still
@@ -210,6 +227,23 @@ export async function rememberAutoQuantDefaultWorkspace(
     })
     await writePreferences(updated, path)
     return { defaultWorkspaceId: updated.autoQuant.defaultWorkspaceId }
+  })
+  mutationQueue = operation
+  return operation
+}
+
+export async function saveHarnessPreferences(
+  next: HarnessPreferences,
+  path = preferencesPath(),
+): Promise<HarnessPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      harness: next,
+    })
+    await writePreferences(updated, path)
+    return { showHeadlessBornSessions: updated.harness.showHeadlessBornSessions }
   })
   mutationQueue = operation
   return operation

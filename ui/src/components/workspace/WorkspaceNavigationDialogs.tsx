@@ -156,6 +156,7 @@ export interface ConversationBrowserDialogProps extends DialogFocusProps {
   open: boolean
   workspaces: readonly Workspace[]
   directories?: ReadonlyMap<string, WorkspaceSessionDirectory>
+  includeHeadlessBornSessions?: boolean
   currentWorkspaceId: string | null
   isRowActive?: (row: HarnessSession) => boolean
   activeSessionId?: string | null
@@ -185,7 +186,10 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
       const rows = joinWorkspaceHarnessSessions(
         workspace,
         props.directories?.get(workspace.id) ?? null,
-        { presence: stateFilter === 'archived' ? 'archived' : 'active' },
+        {
+          presence: stateFilter === 'archived' ? 'archived' : 'active',
+          includeHeadlessBornSessions: props.includeHeadlessBornSessions,
+        },
       )
       return rows.map((row) => ({ workspace, row }))
     })
@@ -195,7 +199,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
       const occupancy = right.row.occupancyAt - left.row.occupancyAt
       if (occupancy !== 0) return occupancy
       return left.row.resumeId.localeCompare(right.row.resumeId)
-    }), [props.currentWorkspaceId, props.directories, props.workspaces, scope, stateFilter])
+    }), [props.currentWorkspaceId, props.directories, props.includeHeadlessBornSessions, props.workspaces, scope, stateFilter])
 
   const visibleSessions = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()

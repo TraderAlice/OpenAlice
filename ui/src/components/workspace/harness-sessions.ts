@@ -114,6 +114,30 @@ export function toHarnessSession(
   }
 }
 
+/**
+ * A Session that was born on a headless turn and has never opened a TUI or
+ * WebPi. Ask Alice / Auto Quant hide these by default; the Issue page still
+ * owns them.
+ */
+export function isHeadlessBornWithoutInteractive(
+  session: SessionRecord,
+  entry: WorkspaceSessionDirectoryEntry | null,
+): boolean {
+  if (entry?.interactive) return false
+  if (session.surface === 'terminal' || session.surface === 'webpi') return false
+  const createdBy = entry?.createdBy?.kind
+  if (createdBy === 'interactive') return false
+  if (createdBy === 'issue' || createdBy === 'headless') return true
+  if (session.surface === 'headless') return true
+  return Boolean(session.sourceRunId)
+}
+
+export interface HarnessSessionJoinOptions {
+  readonly presence?: SessionPresence
+  /** When false (Ask Alice / Auto Quant default), hide headless-born never-TUI rows. */
+  readonly includeHeadlessBornSessions?: boolean
+}
+
 /** Running occupancy first (TUI or headless), then latest occupancy. */
 export function orderHarnessSessions<T extends {
   occupancyRunning: boolean
@@ -137,14 +161,16 @@ export function orderHarnessSessions<T extends {
 export function joinWorkspaceHarnessSessions(
   workspace: Workspace,
   directory: WorkspaceSessionDirectory | null,
-  opts: { presence?: SessionPresence } = {},
+  opts: HarnessSessionJoinOptions = {},
 ): HarnessSession[] {
   const wanted = opts.presence ?? 'active'
+  const includeHeadlessBorn = opts.includeHeadlessBornSessions === true
   if (!directory) {
     if (wanted !== 'active') return []
     return orderHarnessSessions(
       workspace.sessions
         .filter((session) => (session.presence ?? 'active') === 'active')
+        .filter((session) => includeHeadlessBorn || !isHeadlessBornWithoutInteractive(session, null))
         .map((session) => toHarnessSession(workspace.id, session, null)),
     )
   }
@@ -158,6 +184,7 @@ export function joinWorkspaceHarnessSessions(
     const entry = directoryByResume.get(session.resumeId) ?? null
     const presence = entryPresence(entry, session.presence ?? 'active')
     if (presence !== wanted) return []
+    if (!includeHeadlessBorn && isHeadlessBornWithoutInteractive(session, entry)) return []
     return [toHarnessSession(workspace.id, session, entry)]
   })
   return orderHarnessSessions(rows)
@@ -166,7 +193,8 @@ export function joinWorkspaceHarnessSessions(
 export function flattenHarnessSessions(
   workspaces: readonly Workspace[],
   directories: ReadonlyMap<string, WorkspaceSessionDirectory>,
+  opts: HarnessSessionJoinOptions = {},
 ): HarnessSession[] {
   return orderHarnessSessions(workspaces.flatMap((workspace) =>
-    joinWorkspaceHarnessSessions(workspace, directories.get(workspace.id) ?? null)))
+    joinWorkspaceHarnessSessions(workspace, directories.get(workspace.id) ?? null, opts)))
 }
