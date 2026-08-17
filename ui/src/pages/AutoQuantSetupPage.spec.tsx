@@ -32,8 +32,12 @@ const template: TemplateInfo = {
   hasReadme: true,
   source: {
     repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-    defaultVersion: 'v0.8.31',
+    defaultVersion: 'v0.9.31',
     versions: [
+      {
+        version: 'v0.9.31',
+        commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36',
+      },
       {
         version: 'v0.8.31',
         commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
@@ -121,7 +125,7 @@ describe('AutoQuant setup', () => {
     render(<AutoQuantSetupPage />)
 
     expect(screen.queryByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…')).toBeNull()
-    expect(screen.getByText('v0.8.31')).toBeTruthy()
+    expect(screen.getByText('v0.9.31')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Initialize AutoQuant' }))
     await waitFor(() => expect(mocks.initializeAutoQuant).toHaveBeenCalledOnce())
   })

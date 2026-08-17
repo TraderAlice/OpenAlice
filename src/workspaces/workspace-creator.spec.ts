@@ -95,8 +95,9 @@ describe('resolveTemplateSource', () => {
     bundledSkills: [],
     source: {
       repository: 'https://github.com/TraderAlice/Auto-Quant-V2.git',
-      defaultVersion: 'v0.8.31',
+      defaultVersion: 'v0.9.31',
       versions: [
+        { version: 'v0.9.31', commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36' },
         { version: 'v0.8.31', commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967' },
         { version: 'v0.8.30', commit: 'cba95f8718e8396a3147a9cc5f5275cd44feae5f' },
         { version: 'v0.8.27', commit: '4bf9eb45763776ab5fc2e02829b804594fc377a3' },
@@ -106,8 +107,8 @@ describe('resolveTemplateSource', () => {
 
   it('uses the catalog default when the caller omits a version', () => {
     expect(resolveTemplateSource(template)).toEqual({
-      version: 'v0.8.31',
-      commit: '426d815b18450172fbcf4c6b6af77c6ae05a4967',
+      version: 'v0.9.31',
+      commit: 'adc6363a7af5a9105811735973d4d5cfac58cf36',
     });
   });
 
