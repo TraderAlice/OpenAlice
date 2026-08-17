@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { claudeAdapter } from './claude.js';
 import { codexAdapter } from './codex.js';
+import { agyAdapter } from './agy.js';
 import { cursorAdapter } from './cursor.js';
 import { grokAdapter } from './grok.js';
 import { ompAdapter } from './omp.js';
@@ -42,6 +43,15 @@ describe('extractHeadlessSessionId', () => {
       '"sessionID":"ses_148a17c1bffezxX6W1AJye0ohW","type":"step-start"}}';
     expect(opencodeAdapter.extractHeadlessSessionId?.(line)).toBe(
       'ses_148a17c1bffezxX6W1AJye0ohW',
+    );
+  });
+
+  it('agy: documented stream-json init carries conversation_id', () => {
+    const line =
+      '{"event":"init","conversation_id":"c3b66b04-872b-4fbe-a3a4-058a026ef20a",' +
+      '"init":{"cwd":"/home/user/project","tools":["ask_permission"],"permission_mode":"request-review"}}';
+    expect(agyAdapter.extractHeadlessSessionId?.(line)).toBe(
+      'c3b66b04-872b-4fbe-a3a4-058a026ef20a',
     );
   });
 
@@ -88,14 +98,14 @@ describe('extractHeadlessSessionId', () => {
   });
 
   it('non-JSON and irrelevant lines return null everywhere', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.extractHeadlessSessionId?.('plain text noise')).toBeNull();
       expect(adapter.extractHeadlessSessionId?.('{"type":"other"}')).toBeNull();
     }
   });
 
   it('every headless-capable adapter declares an extractor', () => {
-    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
+    for (const adapter of [claudeAdapter, codexAdapter, cursorAdapter, agyAdapter, grokAdapter, ompAdapter, opencodeAdapter, piAdapter]) {
       expect(adapter.capabilities.headless).toBe(true);
       expect(typeof adapter.extractHeadlessSessionId).toBe('function');
     }

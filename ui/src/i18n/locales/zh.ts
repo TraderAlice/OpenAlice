@@ -628,6 +628,11 @@ export const zh: Resources = {
         models: '登录后的本家 Cursor Models：Auto、Composer 2.5、Grok 4.6 / 4.5。effort 和 Fast 写在 CLI id 里。第三方模型可手输。',
         auth: '`cursor-agent login`，或把 Cursor Dashboard API key 放进 `CURSOR_API_KEY`。',
       },
+      agy: {
+        blurb: 'Google 的 coding-agent CLI。Alice 只启动 PATH 上的 `agy`，不会使用 `antigravity` 或 `gemini`。',
+        models: '登录后的本家 Gemini slug（3.7 / 3.6 Flash、3.1 Pro）。原生 `--effort` 只有 low / medium / high。第三方模型可手输。',
+        auth: '用 `agy` 浏览器 / 钥匙串登录。保险库里的 Gemini key 还要自己在 CLI settings 里写 `modelProvider: "gemini"`——Alice 不会改那个文件。',
+      },
       grok: {
         blurb: 'xAI 的 coding-agent CLI。',
         models: 'xAI API 上的 Grok 模型，也可通过自定义 Base URL 接入兼容 OpenAI 的端点。',

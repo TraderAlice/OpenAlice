@@ -29,7 +29,7 @@ const VENDORS_BY_BASEURL: Array<[RegExp, CredentialVendor]> = [
  *
  * A recognized baseUrl wins (GLM/MiniMax/Kimi/DeepSeek/LongCat/OpenRouter
  * gateways); otherwise the agent decides: claude → anthropic, codex → openai,
- * grok → xai. cursor/opencode/omp/pi are OpenAI-compatible against arbitrary
+ * grok → xai. agy/cursor/opencode/omp/pi are OpenAI-compatible against arbitrary
  * endpoints, so an unrecognized baseUrl falls back to 'custom' rather than
  * guessing a first-party vendor.
  */

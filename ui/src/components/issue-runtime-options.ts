@@ -4,6 +4,7 @@ import type {
   Preset,
   PresetModel,
 } from '../api'
+import { AGY_FIRST_PARTY_MODELS } from '../lib/agy-models'
 import { CURSOR_FIRST_PARTY_MODELS } from '../lib/cursor-models'
 import type {
   SavedCredential,
@@ -91,6 +92,10 @@ const OMP_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
   'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
 ]
 
+const AGY_RUNTIME_EFFORTS: readonly ModelReasoningEffort[] = [
+  'low', 'medium', 'high',
+]
+
 const PROVIDER_PRESET_BY_VENDOR: Readonly<Record<string, string>> = {
   anthropic: 'claude-api',
   openai: 'codex-api',
@@ -122,6 +127,7 @@ function vendorCatalog(input: {
   // protocol catalog. Its CLI model ids therefore come from the Cursor catalog;
   // binding some other provider key must not make those ids valid `--model` values.
   if (input.agent === 'cursor') return CURSOR_FIRST_PARTY_MODELS
+  if (input.agent === 'agy') return AGY_FIRST_PARTY_MODELS
   const presetId = input.credential
     ? PROVIDER_PRESET_BY_VENDOR[input.credential.vendor] ?? input.credential.vendor
     : input.agent ? NATIVE_PRESET_BY_AGENT[input.agent] : undefined
@@ -167,6 +173,7 @@ export function runtimeEffortOptions(input: {
   // fabricated scale. Unknown/private ids preserve the runtime's native knobs.
   if (input.modelKnown) return []
   if (input.agent === 'claude') return CLAUDE_RUNTIME_EFFORTS
+  if (input.agent === 'agy') return AGY_RUNTIME_EFFORTS
   if (input.agent === 'grok') return GROK_RUNTIME_EFFORTS
   if (input.agent === 'omp') return OMP_RUNTIME_EFFORTS
   return ALL_RUNTIME_EFFORTS
