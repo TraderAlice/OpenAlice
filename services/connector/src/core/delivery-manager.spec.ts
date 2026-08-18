@@ -9,7 +9,6 @@ import type { ConnectorAdapter, ConnectorAdapterContext } from './adapter.js'
 import { ConnectorRegistry } from './adapter.js'
 import {
   DeliveryManager,
-  isTransientConnectorStartError,
   MAX_INBOUND_OWNER_MESSAGES,
 } from './delivery-manager.js'
 import { createConnectorIOEvent, type ConnectorIOEvent, type ConnectorIORecorder } from './io-events.js'
@@ -167,6 +166,7 @@ describe('DeliveryManager connector registry', () => {
     let status: ConnectorAdapterHealth['status'] = 'degraded'
     const adapter: ConnectorAdapter = {
       id: 'flaky',
+      classifyStartFailure: () => 'retry',
       start: async () => {
         attempts += 1
         if (attempts === 1) throw new Error('Telegram polling did not become ready within 15000ms')
@@ -240,6 +240,7 @@ describe('DeliveryManager connector registry', () => {
     let attempts = 0
     const adapter: ConnectorAdapter = {
       id: 'slow-fail',
+      classifyStartFailure: () => 'retry',
       start: async () => {
         attempts += 1
         throw new Error('Network request for \'getMe\' failed!')
@@ -266,13 +267,6 @@ describe('DeliveryManager connector registry', () => {
     await manager.stop()
     await new Promise((resolve) => setTimeout(resolve, 80))
     expect(attempts).toBe(1)
-  })
-
-  it('classifies Telegram polling timeouts as transient', () => {
-    expect(isTransientConnectorStartError(new Error('Telegram polling did not become ready within 15000ms'))).toBe(true)
-    expect(isTransientConnectorStartError(new Error("Network request for 'setMyCommands' failed!"))).toBe(true)
-    expect(isTransientConnectorStartError(new Error('Telegram Bot API is unreachable: Telegram Bot API did not answer getMe within 15000ms'))).toBe(true)
-    expect(isTransientConnectorStartError(new Error('Telegram setting botToken is required'))).toBe(false)
   })
 
   it('contains adapter delivery failures', async () => {

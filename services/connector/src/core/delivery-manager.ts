@@ -52,11 +52,6 @@ export const MAX_INBOUND_OWNER_MESSAGES = 100
 export const DEFAULT_ADAPTER_START_RETRY_DELAY_MS = 5_000
 const MAX_ADAPTER_START_RETRY_DELAY_MS = 60_000
 
-export function isTransientConnectorStartError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  return /did not become ready|did not answer getme|bot api is unreachable|network request|fetch failed|econn|etimedout|enotfound|enetunreach|ehostunreach|socket disconnected|aborted delay|certificate|eai_again|socket hang up|tls connection/i.test(message)
-}
-
 export class DeliveryManager {
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
@@ -364,7 +359,8 @@ export class DeliveryManager {
     attempt: number,
   ): void {
     console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
-    if (!isTransientConnectorStartError(error)) return
+    const adapter = this.adapters.get(id)
+    if (adapter?.classifyStartFailure?.(error) !== 'retry') return
     this.scheduleAdapterStartRetry(id, config, attempt)
   }
 

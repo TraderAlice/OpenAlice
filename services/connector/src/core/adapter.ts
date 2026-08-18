@@ -23,6 +23,8 @@ export interface ConnectorCommandContext {
 
 export type ConnectorCommandHandler = (context: ConnectorCommandContext) => Promise<void>
 
+export type ConnectorStartFailureDisposition = 'fatal' | 'retry'
+
 export interface ConnectorAdapterContext {
   commands: CommandRegistry
   updateSettings(patch: Record<string, string | number | boolean>): Promise<void>
@@ -35,6 +37,11 @@ export interface ConnectorAdapterContext {
 export interface ConnectorAdapter {
   readonly id: string
   start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void>
+  /**
+   * Classify failures that escape start(). Core owns retry scheduling, while
+   * each adapter owns the meaning of its SDK errors. The default is fatal.
+   */
+  classifyStartFailure?(error: unknown): ConnectorStartFailureDisposition
   stop(): Promise<void>
   deliver(notification: InboxNotification): Promise<void>
   sendOwnerText(text: string): Promise<void>

@@ -4,6 +4,19 @@ import type {
   ConnectorAttachment,
   InboxNotification,
 } from '@traderalice/connector-protocol'
+import type { ConnectorStartFailureDisposition } from '../core/adapter.js'
+
+/**
+ * Shared default for adapters whose SDK exposes transport failures only as
+ * errors. Keep this at the adapter boundary: DeliveryManager must never infer
+ * platform lifecycle semantics from third-party error text.
+ */
+export function classifyNetworkStartFailure(error: unknown): ConnectorStartFailureDisposition {
+  const message = formatAdapterError(error)
+  return /did not become ready|did not answer getme|api is unreachable|network request|fetch failed|econn|etimedout|enotfound|enetunreach|ehostunreach|socket disconnected|aborted delay|certificate|eai_again|socket hang up|tls connection/i.test(message)
+    ? 'retry'
+    : 'fatal'
+}
 
 export class AdapterHealthTracker {
   private value: ConnectorAdapterHealth

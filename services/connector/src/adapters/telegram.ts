@@ -220,7 +220,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     } finally {
       if (attemptTimer) clearTimeout(attemptTimer)
     }
-    await Promise.race([polling, this.whenAborted()])
+    await this.awaitPollingOrAbort(polling)
   }
 
   private async disconnectSession(): Promise<void> {
@@ -289,25 +289,36 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     })
   }
 
-  private whenAborted(): Promise<void> {
+  private async awaitPollingOrAbort(polling: Promise<void>): Promise<void> {
     const signal = this.abort?.signal
-    if (!signal || signal.aborted) return Promise.resolve()
-    return new Promise((resolve) => {
-      signal.addEventListener('abort', () => resolve(), { once: true })
+    if (!signal || signal.aborted) return
+    let onAbort: (() => void) | undefined
+    const aborted = new Promise<void>((resolve) => {
+      onAbort = resolve
+      signal.addEventListener('abort', onAbort, { once: true })
     })
+    try {
+      await Promise.race([polling, aborted])
+    } finally {
+      if (onAbort) signal.removeEventListener('abort', onAbort)
+    }
   }
 
   private async delay(ms: number): Promise<void> {
     const signal = this.abort?.signal
     if (signal?.aborted) return
     await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, ms)
-      timer.unref?.()
-      const onAbort = () => {
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
         clearTimeout(timer)
+        signal?.removeEventListener('abort', finish)
         resolve()
       }
-      signal?.addEventListener('abort', onAbort, { once: true })
+      const timer = setTimeout(finish, ms)
+      timer.unref?.()
+      signal?.addEventListener('abort', finish, { once: true })
     })
   }
 
