@@ -15,9 +15,13 @@ import type {
 } from '../core/adapter.js'
 import {
   AdapterHealthTracker,
+  DEFAULT_CONNECTION_ATTEMPT_TIMEOUT_MS,
+  DEFAULT_CONNECTION_RETRY_DELAY_MS,
   decodeConnectorAttachment,
+  formatAdapterError,
   formatInboxNotification,
   formatPlainInboxNotification,
+  superviseLongConnection,
 } from './shared.js'
 import { formatTelegramInboxMarkdownV2 } from './telegram-markdown-v2.js'
 import {
@@ -35,117 +39,80 @@ import { sendTelegramRichText } from './telegram-rich-text.js'
 export class TelegramConnectorAdapter implements ConnectorAdapter {
   readonly id = 'telegram'
   private readonly tracker = new AdapterHealthTracker(this.id)
-  private readonly startupTimeoutMs: number
+  private readonly attemptTimeoutMs: number
+  private readonly reconnectDelayMs: number
   private bot?: Bot
+  private sessionReady = false
   private ownerUserId?: string
   private chatId?: string
   private inboxPush = true
   private inboxStore?: IInboxStore
   private readonly inboxSessions = new Map<string, TelegramInboxSession>()
+  private stopped = true
+  private loop?: Promise<void>
+  private abort?: AbortController
+  private token?: string
+  private adapterContext?: ConnectorAdapterContext
 
-  constructor(options: { startupTimeoutMs?: number; inboxStore?: IInboxStore } = {}) {
-    this.startupTimeoutMs = options.startupTimeoutMs ?? 15_000
+  constructor(options: {
+    attemptTimeoutMs?: number
+    reconnectDelayMs?: number
+    startupTimeoutMs?: number
+    inboxStore?: IInboxStore
+  } = {}) {
+    this.attemptTimeoutMs = options.attemptTimeoutMs ?? options.startupTimeoutMs ?? DEFAULT_CONNECTION_ATTEMPT_TIMEOUT_MS
+    this.reconnectDelayMs = options.reconnectDelayMs ?? DEFAULT_CONNECTION_RETRY_DELAY_MS
     this.inboxStore = options.inboxStore
   }
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
+    let token: string
     try {
-      const token = requiredString(config, 'botToken')
-      this.ownerUserId = optionalString(config, 'ownerUserId')
-      this.chatId = optionalString(config, 'chatId')
-      this.inboxPush = isInboxPushEnabled(config.settings)
-      const bot = new Bot(token)
-      this.bot = bot
-
-      bot.command('inbox', async (ctx) => {
-        if (ctx.chat.type !== 'private' || !ctx.from) return
-        await this.presentInbox(ctx, context, { stack: [], scope: 'unread' }).catch(async (error) => {
-          this.tracker.degraded(error)
-          await ctx.reply('Could not load Inbox. Check OpenAlice logs.').catch(() => undefined)
-        })
-      })
-      bot.command('settings', async (ctx) => {
-        if (ctx.chat.type !== 'private' || !ctx.from) return
-        await this.presentSettings(ctx, context).catch(async (error) => {
-          this.tracker.degraded(error)
-          await ctx.reply('Could not open settings. Check OpenAlice logs.').catch(() => undefined)
-        })
-      })
-      bot.on('callback_query:data', async (ctx) => {
-        await this.handleControl(ctx, context).catch(async (error) => {
-          this.tracker.degraded(error)
-          await ctx.answerCallbackQuery({ text: 'That control failed.' }).catch(() => undefined)
-        })
-      })
-
-      for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
-        if (command.name === 'inbox' || command.name === 'settings') continue
-        bot.command(command.name, async (ctx) => {
-          if (ctx.chat.type !== 'private' || !ctx.from) return
-          const handled = await context.commands.execute({
-            connectorId: this.id,
-            command: command.name,
-            userId: String(ctx.from.id),
-            chatId: String(ctx.chat.id),
-            reply: async (message) => { await ctx.reply(message) },
-          }).catch(async (error) => {
-            this.tracker.degraded(error)
-            await ctx.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
-            return true
-          })
-          if (!handled) await ctx.reply('Unknown connector command.')
-        })
-      }
-      this.registerCommands(context)
-      bot.on('message:text', async (ctx) => {
-        if (ctx.chat.type !== 'private' || !ctx.from) return
-        const text = ctx.message.text.trim()
-        if (!text || text.startsWith('/')) return
-        if (!this.isOwner(String(ctx.from.id))) return
-        try {
-          await context.forwardOwnerText({
-            text,
-            userId: String(ctx.from.id),
-            chatId: String(ctx.chat.id),
-          })
-        } catch (error) {
-          this.tracker.degraded(error)
-          await ctx.reply('OpenAlice could not accept this message. Check Connector Settings and logs.')
-            .catch(() => undefined)
-        }
-      })
-      // The slash-command menu is convenience. A 404/transformer failure here
-      // must not block long polling, owner chat, or Inbox delivery — users can
-      // still type the commands directly.
-      await publishTelegramCommands(bot).catch((error) => {
-        console.warn('[connector] Telegram command menu was not published:', error instanceof Error ? error.message : error)
-      })
-      await withTimeout(
-        () => waitForTelegramPolling(bot, (error) => this.tracker.degraded(error)),
-        this.startupTimeoutMs,
-        `Telegram polling did not become ready within ${this.startupTimeoutMs}ms`,
-      )
-      // Keep the optional startup menu call untransformed; install retries only
-      // after polling is live for subsequent Telegram API traffic.
-      bot.api.config.use(autoRetry())
-      if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
-      else this.tracker.awaitingLink()
+      token = requiredString(config, 'botToken')
     } catch (error) {
       this.tracker.degraded(error)
-      await this.bot?.stop().catch(() => undefined)
-      this.bot = undefined
       throw error
     }
+    this.ownerUserId = optionalString(config, 'ownerUserId')
+    this.chatId = optionalString(config, 'chatId')
+    this.inboxPush = isInboxPushEnabled(config.settings)
+    this.token = token
+    this.adapterContext = context
+    this.registerCommands(context)
+    this.stopped = false
+    this.abort = new AbortController()
+    this.tracker.connecting('Connecting to Telegram.')
+    this.loop = superviseLongConnection({
+      label: 'telegram',
+      isStopped: () => this.stopped,
+      runSession: () => this.runSession(),
+      disconnect: () => this.disconnectSession(),
+      onFailure: (error) => {
+        this.sessionReady = false
+        this.tracker.degraded(error)
+        console.warn('[connector] Telegram session failed:', formatAdapterError(error))
+      },
+      delay: (ms) => this.delay(ms),
+      reconnectDelayMs: this.reconnectDelayMs,
+    }).catch((error) => {
+      if (!this.stopped) {
+        this.tracker.degraded(error)
+        console.warn('[connector] Telegram supervisor stopped:', formatAdapterError(error))
+      }
+    })
   }
 
   async stop(): Promise<void> {
-    await this.bot?.stop().catch(() => undefined)
-    this.bot = undefined
+    this.stopped = true
+    this.abort?.abort()
+    await this.disconnectSession()
+    await this.loop?.catch(() => undefined)
+    this.loop = undefined
     this.tracker.stopped()
   }
 
   async deliver(notification: InboxNotification): Promise<void> {
-    if (!this.bot) throw new Error('Telegram bot is not ready')
+    if (!this.bot || !this.sessionReady) throw new Error('Telegram bot is not ready')
     if (!this.chatId) throw new Error('Telegram private chat is not linked')
     this.tracker.attempt()
     try {
@@ -164,7 +131,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   }
 
   async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
-    if (!this.bot) throw new Error('Telegram bot is not ready')
+    if (!this.bot || !this.sessionReady) throw new Error('Telegram bot is not ready')
     if (!this.chatId) throw new Error('Telegram private chat is not linked')
     this.tracker.attempt()
     try {
@@ -182,7 +149,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   }
 
   async sendOwnerText(text: string): Promise<void> {
-    if (!this.bot) throw new Error('Telegram bot is not ready')
+    if (!this.bot || !this.sessionReady) throw new Error('Telegram bot is not ready')
     if (!this.chatId) throw new Error('Telegram private chat is not linked')
     this.tracker.attempt()
     try {
@@ -196,6 +163,152 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
 
   health(): ConnectorAdapterHealth {
     return this.tracker.get()
+  }
+
+  private async runSession(): Promise<void> {
+    const token = this.token
+    const context = this.adapterContext
+    if (!token || !context) throw new Error('Telegram adapter is not armed')
+    if (this.tracker.get().status === 'degraded') this.tracker.connecting('Reconnecting to Telegram.')
+    const bot = new Bot(token)
+    this.bot = bot
+    this.sessionReady = false
+    this.attachBot(bot, context)
+
+    let ready = false
+    let resolveReady!: () => void
+    const becameReady = new Promise<void>((resolve) => { resolveReady = resolve })
+    const polling = bot.start({
+      drop_pending_updates: true,
+      onStart: () => {
+        ready = true
+        resolveReady()
+        this.sessionReady = true
+        if (this.ownerUserId && this.chatId) this.tracker.healthy(this.ownerUserId)
+        else this.tracker.awaitingLink()
+        // Menu publish is convenience only. Never put it on the session
+        // critical path: a hang or 400 must not delay getUpdates.
+        void withTimeout(
+          () => publishTelegramCommands(bot),
+          this.attemptTimeoutMs,
+          `Telegram command menu publish exceeded ${this.attemptTimeoutMs}ms`,
+        ).catch((error) => {
+          console.warn('[connector] Telegram command menu was not published:', formatAdapterError(error))
+        })
+        bot.api.config.use(autoRetry())
+      },
+    })
+
+    let attemptTimer: ReturnType<typeof setTimeout> | undefined
+    const attemptExpired = new Promise<never>((_resolve, reject) => {
+      attemptTimer = setTimeout(() => {
+        reject(new Error(`Telegram polling session did not become ready within ${this.attemptTimeoutMs}ms`))
+      }, this.attemptTimeoutMs)
+      attemptTimer.unref?.()
+    })
+    try {
+      await Promise.race([
+        becameReady,
+        polling.then(() => {
+          if (!ready) throw new Error('Telegram polling ended before it became ready')
+        }),
+        attemptExpired,
+      ])
+    } catch (error) {
+      await Promise.resolve(bot.stop()).catch(() => undefined)
+      throw error
+    } finally {
+      if (attemptTimer) clearTimeout(attemptTimer)
+    }
+    await Promise.race([polling, this.whenAborted()])
+  }
+
+  private async disconnectSession(): Promise<void> {
+    this.sessionReady = false
+    const bot = this.bot
+    this.bot = undefined
+    await Promise.resolve(bot?.stop()).catch(() => undefined)
+  }
+
+  private attachBot(bot: Bot, context: ConnectorAdapterContext): void {
+    bot.command('inbox', async (ctx) => {
+      if (ctx.chat.type !== 'private' || !ctx.from) return
+      await this.presentInbox(ctx, context, { stack: [], scope: 'unread' }).catch(async (error) => {
+        this.tracker.degraded(error)
+        await ctx.reply('Could not load Inbox. Check OpenAlice logs.').catch(() => undefined)
+      })
+    })
+    bot.command('settings', async (ctx) => {
+      if (ctx.chat.type !== 'private' || !ctx.from) return
+      await this.presentSettings(ctx, context).catch(async (error) => {
+        this.tracker.degraded(error)
+        await ctx.reply('Could not open settings. Check OpenAlice logs.').catch(() => undefined)
+      })
+    })
+    bot.on('callback_query:data', async (ctx) => {
+      await this.handleControl(ctx, context).catch(async (error) => {
+        this.tracker.degraded(error)
+        await ctx.answerCallbackQuery({ text: 'That control failed.' }).catch(() => undefined)
+      })
+    })
+
+    for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
+      if (command.name === 'inbox' || command.name === 'settings') continue
+      bot.command(command.name, async (ctx) => {
+        if (ctx.chat.type !== 'private' || !ctx.from) return
+        const handled = await context.commands.execute({
+          connectorId: this.id,
+          command: command.name,
+          userId: String(ctx.from.id),
+          chatId: String(ctx.chat.id),
+          reply: async (message) => { await ctx.reply(message) },
+        }).catch(async (error) => {
+          this.tracker.degraded(error)
+          await ctx.reply('Connector command failed. Check OpenAlice logs.').catch(() => undefined)
+          return true
+        })
+        if (!handled) await ctx.reply('Unknown connector command.')
+      })
+    }
+    bot.on('message:text', async (ctx) => {
+      if (ctx.chat.type !== 'private' || !ctx.from) return
+      const text = ctx.message.text.trim()
+      if (!text || text.startsWith('/')) return
+      if (!this.isOwner(String(ctx.from.id))) return
+      try {
+        await context.forwardOwnerText({
+          text,
+          userId: String(ctx.from.id),
+          chatId: String(ctx.chat.id),
+        })
+      } catch (error) {
+        this.tracker.degraded(error)
+        await ctx.reply('OpenAlice could not accept this message. Check Connector Settings and logs.')
+          .catch(() => undefined)
+      }
+    })
+  }
+
+  private whenAborted(): Promise<void> {
+    const signal = this.abort?.signal
+    if (!signal || signal.aborted) return Promise.resolve()
+    return new Promise((resolve) => {
+      signal.addEventListener('abort', () => resolve(), { once: true })
+    })
+  }
+
+  private async delay(ms: number): Promise<void> {
+    const signal = this.abort?.signal
+    if (signal?.aborted) return
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, ms)
+      timer.unref?.()
+      const onAbort = () => {
+        clearTimeout(timer)
+        resolve()
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+    })
   }
 
   private registerCommands(context: ConnectorAdapterContext): void {
@@ -366,23 +479,6 @@ async function publishTelegramCommands(bot: Bot): Promise<void> {
     command: name,
     description,
   })))
-}
-
-function waitForTelegramPolling(bot: Bot, onFailure: (error: unknown) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let ready = false
-    void bot.start({
-      drop_pending_updates: true,
-      onStart: () => {
-        ready = true
-        resolve()
-      },
-    }).catch((error) => {
-      console.warn('[connector] Telegram polling stopped:', error instanceof Error ? error.message : error)
-      onFailure(error)
-      if (!ready) reject(error)
-    })
-  })
 }
 
 export async function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number, message: string): Promise<T> {

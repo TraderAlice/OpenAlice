@@ -7,7 +7,11 @@ import type {
 } from '@traderalice/connector-protocol'
 import type { ConnectorAdapter, ConnectorAdapterContext } from './adapter.js'
 import { ConnectorRegistry } from './adapter.js'
-import { DeliveryManager, MAX_INBOUND_OWNER_MESSAGES } from './delivery-manager.js'
+import {
+  DeliveryManager,
+  isTransientConnectorStartError,
+  MAX_INBOUND_OWNER_MESSAGES,
+} from './delivery-manager.js'
 import { createConnectorIOEvent, type ConnectorIOEvent, type ConnectorIORecorder } from './io-events.js'
 
 class MemoryRecorder implements ConnectorIORecorder {
@@ -146,6 +150,7 @@ describe('DeliveryManager connector registry', () => {
       registry,
       config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
       updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 60_000,
     })
 
     await manager.start()
@@ -155,6 +160,119 @@ describe('DeliveryManager connector registry', () => {
       adapters: [{ id: 'broken', status: 'degraded', lastError: 'Telegram API did not become ready' }],
     })
     await manager.stop()
+  })
+
+  it('retries a transient adapter start failure without dropping the registration', async () => {
+    let attempts = 0
+    let status: ConnectorAdapterHealth['status'] = 'degraded'
+    const adapter: ConnectorAdapter = {
+      id: 'flaky',
+      start: async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('Telegram polling did not become ready within 15000ms')
+        status = 'healthy'
+      },
+      stop: async () => { status = 'stopped' },
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({ id: 'flaky', enabled: true, status }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'flaky', label: 'Flaky', description: 'Flaky adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { flaky: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 5,
+    })
+
+    await manager.start()
+    expect(attempts).toBe(1)
+    expect(manager.health().adapters[0]?.status).toBe('degraded')
+
+    await vi.waitFor(() => {
+      expect(attempts).toBe(2)
+      expect(manager.health().adapters[0]?.status).toBe('healthy')
+    })
+    await manager.stop()
+  })
+
+  it('does not retry a configuration error', async () => {
+    let attempts = 0
+    const adapter: ConnectorAdapter = {
+      id: 'invalid',
+      start: async () => {
+        attempts += 1
+        throw new Error('Telegram setting botToken is required')
+      },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({
+        id: 'invalid',
+        enabled: true,
+        status: 'degraded',
+        lastError: 'Telegram setting botToken is required',
+      }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'invalid', label: 'Invalid', description: 'Invalid adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { invalid: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 5,
+    })
+
+    await manager.start()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(attempts).toBe(1)
+    await manager.stop()
+  })
+
+  it('cancels a pending start retry on stop', async () => {
+    let attempts = 0
+    const adapter: ConnectorAdapter = {
+      id: 'slow-fail',
+      start: async () => {
+        attempts += 1
+        throw new Error('Network request for \'getMe\' failed!')
+      },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({ id: 'slow-fail', enabled: true, status: 'degraded' }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'slow-fail', label: 'Slow fail', description: 'Fails.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { 'slow-fail': { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 50,
+    })
+
+    await manager.start()
+    expect(attempts).toBe(1)
+    await manager.stop()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(attempts).toBe(1)
+  })
+
+  it('classifies Telegram polling timeouts as transient', () => {
+    expect(isTransientConnectorStartError(new Error('Telegram polling did not become ready within 15000ms'))).toBe(true)
+    expect(isTransientConnectorStartError(new Error("Network request for 'setMyCommands' failed!"))).toBe(true)
+    expect(isTransientConnectorStartError(new Error('Telegram Bot API is unreachable: Telegram Bot API did not answer getMe within 15000ms'))).toBe(true)
+    expect(isTransientConnectorStartError(new Error('Telegram setting botToken is required'))).toBe(false)
   })
 
   it('contains adapter delivery failures', async () => {
