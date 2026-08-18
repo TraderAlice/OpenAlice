@@ -1062,6 +1062,7 @@ export const zhHant: Resources = {
       offboard: '辦理 {{workspace}} 離職',
     },
     viewAllSessions: '查看全部 {{count}} 個工作階段',
+    viewAllConversations: '查看全部 {{count}} 個對話',
     deleteWorkspace: '辦理工作區離職',
     deleteWorkspaceTitle: '辦理對話工作區離職',
     deleteWorkspaceMessage: '讓對話工作區 {{tag}} 離職？它的工作台會移出活動目錄，Session 會退休，並保留交接記錄以便日後恢復。',

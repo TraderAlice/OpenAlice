@@ -364,6 +364,7 @@ export function ChatWorkspaceSection({
           onDeleteSession={deleteRosterSession}
           onArchiveSession={archiveRosterSession}
           onSettingsSession={openSessionSettings}
+          onBrowseSessions={(restoreFocus) => openConversationBrowser(focusedWorkspace.id, restoreFocus)}
           onCreateWorkspace={() => setShowCreate(true)}
         />
       ) : displayMode === 'recent' ? (
@@ -380,6 +381,7 @@ export function ChatWorkspaceSection({
           onDeleteSession={deleteRosterSession}
           onArchiveSession={archiveRosterSession}
           onSettingsSession={openSessionSettings}
+          onBrowseSessions={(restoreFocus) => openConversationBrowser(null, restoreFocus)}
           onCreateWorkspace={() => setShowCreate(true)}
         />
       ) : (
@@ -775,6 +777,7 @@ interface FocusedChatWorkspaceProps {
   onDeleteSession: (row: HarnessSession) => void
   onArchiveSession: (row: HarnessSession) => void
   onSettingsSession: (row: HarnessSession) => void
+  onBrowseSessions: (restoreFocus: HTMLElement) => void
   onCreateWorkspace: () => void
 }
 
@@ -791,6 +794,7 @@ interface AllWorkspaceRecentSessionsProps {
   onDeleteSession: (row: HarnessSession) => void
   onArchiveSession: (row: HarnessSession) => void
   onSettingsSession: (row: HarnessSession) => void
+  onBrowseSessions: (restoreFocus: HTMLElement) => void
   onCreateWorkspace: () => void
 }
 
@@ -807,6 +811,7 @@ interface HarnessSessionRosterProps {
   onDeleteSession: (row: HarnessSession) => void
   onArchiveSession: (row: HarnessSession) => void
   onSettingsSession: (row: HarnessSession) => void
+  onBrowseSessions: (restoreFocus: HTMLElement) => void
 }
 
 function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
@@ -882,6 +887,26 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
           </p>
         ) : visibleRecent.map(renderRow)}
       </div>
+
+      {recent.length > visibleRecent.length && (
+        <button
+          type="button"
+          className="oa-nav-row group flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-primary/5"
+          onClick={(event) => props.onBrowseSessions(event.currentTarget)}
+        >
+          <span className="min-w-0 flex-1 truncate">
+            {props.harness === 'auto-quant'
+              ? t('autoQuant.viewAllResearch', { count: recent.length })
+              : t('chat.viewAllConversations', { count: recent.length })}
+          </span>
+          <ChevronRight
+            size={13}
+            strokeWidth={2.2}
+            className="shrink-0 text-primary/65 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+            aria-hidden
+          />
+        </button>
+      )}
     </div>
   )
 }
@@ -928,6 +953,7 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
         onDeleteSession={props.onDeleteSession}
         onArchiveSession={props.onArchiveSession}
         onSettingsSession={props.onSettingsSession}
+        onBrowseSessions={props.onBrowseSessions}
       />
 
       {props.workspaces.length === 0 && (
@@ -998,6 +1024,7 @@ function FocusedChatWorkspace(props: FocusedChatWorkspaceProps): ReactElement {
         onDeleteSession={props.onDeleteSession}
         onArchiveSession={props.onArchiveSession}
         onSettingsSession={props.onSettingsSession}
+        onBrowseSessions={props.onBrowseSessions}
       />
     </div>
   )
