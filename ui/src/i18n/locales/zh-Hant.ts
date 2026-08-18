@@ -2233,6 +2233,11 @@ export const zhHant: Resources = {
     restoreSession: '恢復「{{title}}」',
     restoreSessionAction: '放回名冊',
     sessionPresenceFailed: '無法更新這個 Session。',
+    sessionSource: {
+      issue: '議題',
+      headless: '背景',
+      conversation: '對話',
+    },
     sessionSettings: {
       action: '設定',
       openFor: '「{{title}}」的設定',

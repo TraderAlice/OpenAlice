@@ -5,14 +5,20 @@ import type {
   WorkspaceSessionDirectory,
   WorkspaceSessionDirectoryEntry,
 } from './api'
+import {
+  projectHarnessSessionPresentation,
+  type HarnessSessionSourceKind,
+} from './harness-session-presentation'
 
-const PREVIEW_TITLE_LIMIT = 48
+export { shortResumeId } from './harness-session-presentation'
 
 export interface HarnessSession {
   readonly workspaceId: string
   readonly resumeId: string
   readonly agent: string
   readonly title: string
+  readonly sourceKind?: HarnessSessionSourceKind
+  readonly issueId?: string
   readonly occupancyAt: number
   readonly occupancyRunning: boolean
   readonly headlessOccupying: boolean
@@ -37,33 +43,11 @@ function timestamp(value: string | number | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-export function shortResumeId(resumeId: string): string {
-  const trimmed = resumeId.replace(/^resume-/, '')
-  return trimmed.length <= 12 ? trimmed : trimmed.slice(0, 12)
-}
-
 export function harnessSessionTitle(
   session: SessionRecord | null,
   entry: WorkspaceSessionDirectoryEntry | null,
 ): string {
-  const coworkerName = session?.displayName?.trim() || entry?.displayName?.trim()
-  if (coworkerName) return coworkerName
-
-  const interactiveTitle = session?.title?.trim() || entry?.interactive?.title?.trim()
-  if (interactiveTitle) return interactiveTitle
-
-  const preview = entry?.latestExecution?.assistantPreview?.replace(/\s+/g, ' ').trim()
-  if (preview) {
-    return preview.length > PREVIEW_TITLE_LIMIT
-      ? `${preview.slice(0, PREVIEW_TITLE_LIMIT - 1)}…`
-      : preview
-  }
-
-  const issueId = entry?.latestExecution?.issueId?.trim()
-  if (issueId) return issueId
-
-  if (session?.name.trim()) return session.name.trim()
-  return shortResumeId(session?.resumeId ?? entry?.resumeId ?? 'session')
+  return projectHarnessSessionPresentation(session, entry).title
 }
 
 export function harnessOccupancyAt(
@@ -98,11 +82,14 @@ export function toHarnessSession(
   const resumeId = session.resumeId
   const interactiveRunning = session.state === 'running'
   const headlessOccupying = isHeadlessOccupying(session, entry)
+  const presentation = projectHarnessSessionPresentation(session, entry)
   return {
     workspaceId,
     resumeId,
     agent: session.agent,
-    title: harnessSessionTitle(session, entry),
+    title: presentation.title,
+    ...(presentation.sourceKind ? { sourceKind: presentation.sourceKind } : {}),
+    ...(presentation.issueId ? { issueId: presentation.issueId } : {}),
     occupancyAt: harnessOccupancyAt(session, entry),
     occupancyRunning: interactiveRunning || headlessOccupying,
     headlessOccupying,

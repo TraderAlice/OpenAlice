@@ -2225,6 +2225,11 @@ export const zh: Resources = {
     restoreSession: '恢复“{{title}}”',
     restoreSessionAction: '放回名册',
     sessionPresenceFailed: '无法更新这个 Session。',
+    sessionSource: {
+      issue: '议题',
+      headless: '后台',
+      conversation: '对话',
+    },
     sessionSettings: {
       action: '设置',
       openFor: '“{{title}}”的设置',

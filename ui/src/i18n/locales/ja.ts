@@ -2226,6 +2226,11 @@ export const ja: Resources = {
     restoreSession: '「{{title}}」を復元',
     restoreSessionAction: '名簿に戻す',
     sessionPresenceFailed: 'この Session を更新できませんでした。',
+    sessionSource: {
+      issue: 'Issue',
+      headless: 'バックグラウンド',
+      conversation: '会話',
+    },
     sessionSettings: {
       action: '設定',
       openFor: '「{{title}}」の設定',

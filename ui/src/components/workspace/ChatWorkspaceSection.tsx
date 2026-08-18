@@ -51,6 +51,7 @@ import {
   joinWorkspaceHarnessSessions,
   type HarnessSession,
 } from './harness-sessions'
+import { harnessSessionRosterSubtitle } from './harness-session-presentation'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
 import { useWorkspaceSessionDirectories } from '../../hooks/useWorkspaceSessionDirectory'
 import { useReorderMotion } from './useReorderMotion'
@@ -797,7 +798,7 @@ interface HarnessSessionRosterProps {
   sessions: readonly HarnessSession[]
   emptyCopy: string
   keyFor: (row: HarnessSession) => string
-  subtitleFor?: (row: HarnessSession) => string | undefined
+  workspaceLabelFor?: (row: HarnessSession) => string | undefined
   isRowActive: (row: HarnessSession) => boolean
   onOpenSession: (row: HarnessSession) => void
   onPauseSession: (row: HarnessSession) => void
@@ -818,7 +819,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
     <HarnessSessionRow
       key={props.keyFor(row)}
       row={row}
-      subtitle={props.subtitleFor?.(row)}
+      workspaceLabel={props.workspaceLabelFor?.(row)}
       isActive={props.isRowActive(row)}
       onSelect={() => props.onOpenSession(row)}
       onPause={() => props.onPauseSession(row)}
@@ -917,7 +918,7 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
         sessions={sessions}
         emptyCopy={props.harness === 'auto-quant' ? t('autoQuant.noResearchYet') : t('chat.noRecentConversations')}
         keyFor={(row) => `${row.workspaceId}:${row.resumeId}`}
-        subtitleFor={(row) => workspaceName.get(row.workspaceId)}
+        workspaceLabelFor={(row) => workspaceName.get(row.workspaceId)}
         isRowActive={props.isRowActive}
         onOpenSession={props.onOpenSession}
         onPauseSession={props.onPauseSession}
@@ -1114,7 +1115,7 @@ interface ChatWorkspaceRowProps {
 
 function HarnessSessionRow(props: {
   row: HarnessSession
-  subtitle?: string
+  workspaceLabel?: string
   isActive: boolean
   onSelect: () => void
   onPause: () => void
@@ -1124,13 +1125,14 @@ function HarnessSessionRow(props: {
   onRestore?: () => void
   onSettings?: () => void
 }): ReactElement {
+  const { t } = useTranslation()
   const row = props.row
   return (
     <SessionRow
       reorderId={`${row.workspaceId}:${row.resumeId}`}
       session={row.session.title === row.title ? row.session : { ...row.session, title: row.title }}
       displayTitle={row.title}
-      subtitle={props.subtitle}
+      subtitle={harnessSessionRosterSubtitle(row.sourceKind, t, props.workspaceLabel)}
       isActive={props.isActive}
       headlessOccupying={row.headlessOccupying}
       resumable={row.resumable}
@@ -1154,7 +1156,7 @@ function HeadlessSessionBusyDialog(props: {
   onOpenChange: (open: boolean) => void
 }): ReactElement {
   const { t } = useTranslation()
-  const issueId = props.row?.directory?.latestExecution?.issueId?.trim()
+  const issueId = props.row?.issueId
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>

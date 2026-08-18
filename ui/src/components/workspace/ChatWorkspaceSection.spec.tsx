@@ -661,9 +661,9 @@ describe('ChatWorkspaceSection actions', () => {
     renderSection([headlessWorkspace], null, onNavigate, 'focused')
 
     const runningSection = screen.getByRole('region', { name: 'Running in background' })
-    expect(within(runningSection).getByText('scan-open')).toBeTruthy()
+    expect(within(runningSection).getByText('Scan Open')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Morning scan complete. Semis still lead.' })).toBeTruthy()
-    const [runningTitle, runningPlay] = screen.getAllByRole('button', { name: 'Running · scan-open' })
+    const [runningTitle, runningPlay] = screen.getAllByRole('button', { name: 'Running · Scan Open' })
     fireEvent.click(runningTitle!)
     expect(screen.getByRole('dialog', { name: 'This Session is running in the background' })).toBeTruthy()
     expect(screen.getByText('Started by Issue scan-open')).toBeTruthy()
@@ -676,7 +676,7 @@ describe('ChatWorkspaceSection actions', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]!)
 
     fireEvent.click(within(runningSection).getByRole('button', { name: /Running in background/ }))
-    expect(within(runningSection).queryByText('scan-open')).toBeNull()
+    expect(within(runningSection).queryByText('Scan Open')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume Morning scan complete. Semis still lead.' }))
     expect(actions.resumeSession).toHaveBeenCalledWith(
@@ -763,11 +763,191 @@ describe('ChatWorkspaceSection actions', () => {
     const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
     const browser = within(dialog)
     expect(browser.getByRole('button', { name: 'Paused thesis' })).toBeTruthy()
-    expect(browser.getByRole('button', { name: 'Running · scan-open' })).toBeTruthy()
+    expect(browser.getByRole('button', { name: 'Running · Scan Open' })).toBeTruthy()
 
     fireEvent.click(browser.getByRole('button', { name: /^Running$/ }))
     expect(browser.queryByRole('button', { name: 'Paused thesis' })).toBeNull()
-    expect(browser.getByRole('button', { name: 'Running · scan-open' })).toBeTruthy()
+    expect(browser.getByRole('button', { name: 'Running · Scan Open' })).toBeTruthy()
     expect(browser.queryByRole('button', { name: 'Headless' })).toBeNull()
+  })
+
+  it('projects Issue identity across focused, recent, multi, and browse rosters', () => {
+    const launchPrompt = [
+      '# Daily market close',
+      '',
+      'You are the close-desk analyst. Review semiconductors, rates, and open risk.',
+    ].join('\n')
+    const longEnglish = 'Review the overnight cross-asset tape and summarize every open risk before the cash open'
+    const longCjk = '请在开盘前复查隔夜跨资产波动并整理所有未平仓风险'
+    directoryState.directories = new Map([
+      [chatWorkspace.id, {
+        workspace: { id: chatWorkspace.id, tag: chatWorkspace.tag },
+        sessions: [
+          {
+            resumeId: 'resume-issue',
+            agent: 'codex',
+            createdAt: Date.parse('2026-08-04T00:00:00.000Z'),
+            updatedAt: Date.parse('2026-08-04T01:00:00.000Z'),
+            lifecycle: 'active' as const,
+            resumable: true,
+            active: false,
+            createdBy: {
+              kind: 'issue' as const,
+              workspaceId: chatWorkspace.id,
+              issueId: 'daily-market-close',
+              policy: 'new-then-resume' as const,
+              fire: 'schedule' as const,
+            },
+            latestExecution: {
+              taskId: 'task-issue',
+              status: 'done' as const,
+              startedAt: Date.parse('2026-08-04T00:50:00.000Z'),
+              finishedAt: Date.parse('2026-08-04T01:00:00.000Z'),
+              issueId: 'daily-market-close',
+              assistantPreview: 'Close scan finished. Semis still lead.',
+            },
+          },
+          {
+            resumeId: 'resume-named',
+            agent: 'pi',
+            createdAt: Date.parse('2026-08-03T00:00:00.000Z'),
+            updatedAt: Date.parse('2026-08-03T01:00:00.000Z'),
+            lifecycle: 'active' as const,
+            resumable: true,
+            active: false,
+            displayName: 'AAPL desk',
+            createdBy: {
+              kind: 'issue' as const,
+              workspaceId: chatWorkspace.id,
+              issueId: 'aapl-earnings',
+              policy: 'new-each-run' as const,
+              fire: 'retry' as const,
+            },
+          },
+          {
+            resumeId: 'chat-resume-1',
+            agent: 'pi',
+            createdAt: Date.parse('2026-07-01T00:00:00.000Z'),
+            updatedAt: Date.parse('2026-07-01T12:00:00.000Z'),
+            lifecycle: 'active' as const,
+            resumable: true,
+            active: false,
+            createdBy: { kind: 'interactive' as const, surface: 'quick-chat' as const },
+            interactive: {
+              name: 'p1',
+              title: longEnglish,
+              state: 'paused' as const,
+              lastActiveAt: '2026-07-01T12:00:00.000Z',
+            },
+          },
+        ],
+      }],
+      ['chat-2', {
+        workspace: { id: 'chat-2', tag: 'chat-aug3' },
+        sessions: [{
+          resumeId: 'resume-conversation',
+          agent: 'pi',
+          createdAt: Date.parse('2026-08-05T00:00:00.000Z'),
+          updatedAt: Date.parse('2026-08-05T02:00:00.000Z'),
+          lifecycle: 'active' as const,
+          resumable: true,
+          active: false,
+          createdBy: {
+            kind: 'conversation' as const,
+            caller: { kind: 'human' as const },
+            reason: 'explicit-workspace',
+          },
+        }],
+      }],
+    ])
+
+    const focusedWorkspace: Workspace = {
+      ...chatWorkspace,
+      sessions: [
+        {
+          ...chatSession(30),
+          id: 'session-issue',
+          resumeId: 'resume-issue',
+          agent: 'codex',
+          name: 'x1',
+          surface: 'headless',
+          title: launchPrompt,
+          lastActiveAt: '2026-08-06T01:00:00.000Z',
+        },
+        {
+          ...chatSession(31),
+          id: 'session-named',
+          resumeId: 'resume-named',
+          displayName: 'AAPL desk',
+          title: launchPrompt,
+          lastActiveAt: '2026-08-03T01:00:00.000Z',
+        },
+        { ...chatSession(1), title: longEnglish },
+      ],
+    }
+    const otherWorkspace: Workspace = {
+      ...chatWorkspace,
+      id: 'chat-2',
+      tag: 'chat-aug3',
+      dir: '/tmp/chat-aug3',
+      createdAt: '2026-08-03T00:00:00.000Z',
+      sessions: [{
+        ...chatSession(2),
+        id: 'session-conversation',
+        resumeId: 'resume-conversation',
+        wsId: 'chat-2',
+        title: longCjk,
+        lastActiveAt: '2026-08-05T02:00:00.000Z',
+      }],
+    }
+
+    const expectSharedTitles = (scope: HTMLElement | Document = document) => {
+      const view = scope === document ? screen : within(scope as HTMLElement)
+      expect(view.getByRole('button', { name: 'Daily Market Close' })).toBeTruthy()
+      expect(view.getByRole('button', { name: 'AAPL desk' })).toBeTruthy()
+      expect(view.getByRole('button', { name: longEnglish })).toBeTruthy()
+      expect(view.queryByRole('button', { name: launchPrompt })).toBeNull()
+      expect(view.queryByText(launchPrompt)).toBeNull()
+    }
+
+    const { unmount: unmountFocused } = renderSection(
+      [focusedWorkspace, otherWorkspace],
+      null,
+      undefined,
+      'focused',
+    )
+    expectSharedTitles()
+    expect(screen.getAllByText('Issue')).toHaveLength(2)
+    expect(screen.queryByText(longCjk)).toBeNull()
+    unmountFocused()
+
+    const { unmount: unmountRecent } = renderSection(
+      [focusedWorkspace, otherWorkspace],
+      null,
+      undefined,
+      'recent',
+    )
+    expectSharedTitles()
+    expect(screen.getByRole('button', { name: longCjk })).toBeTruthy()
+    expect(screen.getAllByText('Issue · chat-jul11')).toHaveLength(2)
+    expect(screen.getByText('Conversation · chat-aug3')).toBeTruthy()
+    unmountRecent()
+
+    renderSection([focusedWorkspace, otherWorkspace], null, undefined, 'multi')
+    expectSharedTitles()
+    expect(screen.getByRole('button', { name: longCjk })).toBeTruthy()
+    expect(screen.getAllByText('Issue')).toHaveLength(2)
+    expect(screen.getByText('Conversation')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat context: Workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
+    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    const browser = within(dialog)
+    expectSharedTitles(dialog)
+    fireEvent.click(browser.getByRole('button', { name: 'All Workspaces' }))
+    expectSharedTitles(dialog)
+    expect(browser.getByRole('button', { name: longCjk })).toBeTruthy()
+    expect(browser.getAllByText('Issue')).toHaveLength(2)
+    expect(browser.getByText('Conversation')).toBeTruthy()
   })
 })
