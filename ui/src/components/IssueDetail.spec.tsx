@@ -3,9 +3,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type {
-  IssueDetail as IssueDetailData,
-  IssueProvenanceRecord,
+import {
+  DEFAULT_ISSUE_COMMENT_PROMPT,
+  type IssueDetail as IssueDetailData,
+  type IssueProvenanceRecord,
 } from '../api/issues'
 import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
@@ -151,6 +152,7 @@ beforeEach(async () => {
   scheduledIssue.runs = []
   scheduledIssue.issue.assignee = '@new-each-run'
   scheduledIssue.issue.agent = 'codex'
+  delete scheduledIssue.issue.commentPrompt
   mocks.updateIssue.mockResolvedValue(scheduledIssue)
   mocks.updateResumeRuntime.mockClear()
   mocks.updateResumeRuntime.mockResolvedValue({
@@ -381,6 +383,10 @@ describe('IssueDetail property controls', () => {
     expect(screen.getByRole('button', { name: 'Configure codex' }).className).toContain('size-10')
     expect(screen.getByRole('heading', { level: 3, name: 'Schedule' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Agent' })).toBeTruthy()
+    const commentBehavior = screen.getByRole('button', { name: 'Comment behavior' })
+    expect(commentBehavior.className).toContain('w-full')
+    expect(commentBehavior.textContent).toContain('Default')
+    expect(commentBehavior.textContent).toContain('Standard reply wrapper')
     expect(screen.getByText('America/New_York').className).toContain('break-all')
     expect(screen.getByRole('button', { name: 'AI configuration' }).textContent)
       .toContain('Runtime managed')
@@ -594,7 +600,10 @@ describe('IssueDetail property controls', () => {
     const sectionNavigation = screen.getByRole('navigation', { name: 'Issue sections' })
 
     expect(workItem.compareDocumentPosition(what) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(workItem.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(what.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.getElementById('issue-comment-prompt')).toBeNull()
+    expect(screen.queryByRole('heading', { level: 2, name: 'Comment prompt' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Comment prompt' })).toBeNull()
     expect(sectionNavigation.className).toContain('sticky')
     expect(sectionNavigation.className).toContain('overflow-x-auto')
     expect(sectionNavigation.className).toContain('flex-nowrap')
@@ -836,5 +845,139 @@ describe('IssueDetail property controls', () => {
     expect(footer?.className).toContain('sm:flex-row')
     expect(pending.parentElement?.className).toContain('min-w-0')
     expect(pending.parentElement?.className).toContain('max-w-full')
+  })
+})
+
+describe('IssueDetail comment behavior', () => {
+  it('summarizes Default in the Agent inspector and keeps the reading column as What then Activity', () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = screen.getByRole('button', { name: 'Comment behavior' })
+    expect(trigger.textContent).toContain('Default')
+    expect(trigger.textContent).toContain('Standard reply wrapper')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Comment prompt' })).toBeNull()
+    expect(document.getElementById('issue-comment-prompt')).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Comment prompt' })).toBeNull()
+
+    const what = screen.getByRole('heading', { level: 2, name: 'What' })
+    const activity = screen.getByRole('heading', { level: 2, name: 'Activity' })
+    expect(what.compareDocumentPosition(activity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('summarizes a stored custom template without opening the editor', () => {
+    scheduledIssue.issue.commentPrompt = '{comment}'
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    const trigger = screen.getByRole('button', { name: 'Comment behavior' })
+    expect(trigger.textContent).toContain('Custom')
+    expect(trigger.textContent).toContain('{comment}')
+    expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Comment prompt' })).toBeNull()
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+  })
+
+  it('opens the shared dialog on the default template without persisting', async () => {
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comment behavior' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Comment behavior' })
+    expect(dialog.className).toContain('max-h-[min(42rem,calc(100dvh-2rem))]')
+    expect(dialog.className).toContain('min-w-0')
+    expect(dialog.className).toContain('overflow-hidden')
+    expect(dialog.className).toContain('grid-rows-[auto_minmax(0,1fr)_auto]')
+    expect(within(dialog).getByText('Supported tokens')).toBeTruthy()
+    expect(within(dialog).getByText('{comment} {title} {id} {workspaceId} {author} {what}')).toBeTruthy()
+
+    const editor = within(dialog).getByRole('textbox', { name: 'Comment prompt' }) as HTMLTextAreaElement
+    expect(editor.value).toBe(DEFAULT_ISSUE_COMMENT_PROMPT)
+    expect(editor.className).toContain('resize-y')
+    expect(editor.className).toContain('overflow-y-auto')
+    expect(within(dialog).getByRole('button', { name: 'Save comment prompt' })).toHaveProperty('disabled', true)
+    expect(within(dialog).queryByRole('button', { name: 'Use default wrapper' })).toBeNull()
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull())
+    expect(mocks.updateIssue).not.toHaveBeenCalled()
+  })
+
+  it('saves a custom template through the existing commentPrompt patch', async () => {
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: { ...scheduledIssue.issue, commentPrompt: '{comment}' },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comment behavior' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Comment behavior' })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Comment prompt' }), {
+      target: { value: '{comment}' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save comment prompt' }))
+
+    await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'morning-scan',
+      { commentPrompt: '{comment}' },
+    ))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull())
+  })
+
+  it('resets a custom template to the omitted default without writing the canonical wrapper', async () => {
+    scheduledIssue.issue.commentPrompt = '{comment}'
+    mocks.updateIssue.mockResolvedValue({
+      ...scheduledIssue,
+      issue: { ...scheduledIssue.issue, commentPrompt: undefined },
+    })
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comment behavior' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Comment behavior' })
+    expect((within(dialog).getByRole('textbox', { name: 'Comment prompt' }) as HTMLTextAreaElement).value)
+      .toBe('{comment}')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Use default wrapper' }))
+
+    await waitFor(() => expect(mocks.updateIssue).toHaveBeenCalledWith(
+      'demo-ws-auto-quant',
+      'morning-scan',
+      { commentPrompt: null },
+    ))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Comment behavior' })).toBeNull())
+  })
+
+  it('keeps comment behavior in the Agent inspector when the Issue is unscheduled', () => {
+    const when = scheduledIssue.issue.when
+    delete scheduledIssue.issue.when
+    try {
+      render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+      expect(screen.getByRole('heading', { level: 3, name: 'Agent' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Comment behavior' }).textContent).toContain('Default')
+      expect(screen.queryByRole('heading', { level: 3, name: 'Schedule' })).toBeNull()
+      expect(document.getElementById('issue-comment-prompt')).toBeNull()
+    } finally {
+      scheduledIssue.issue.when = when
+    }
+  })
+
+  it.each([
+    ['en', 'Comment behavior', 'Default', 'Custom'],
+    ['zh', '评论行为', '默认', '自定义'],
+    ['zh-Hant', '留言行為', '預設', '自訂'],
+    ['ja', 'コメントの動作', 'デフォルト', 'カスタム'],
+  ] as const)('localizes the Default versus Custom inspector summary in %s', async (
+    locale,
+    commentBehavior,
+    defaultLabel,
+    customLabel,
+  ) => {
+    await i18n.changeLanguage(locale)
+    const { unmount } = render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    expect(screen.getByRole('button', { name: commentBehavior }).textContent).toContain(defaultLabel)
+    unmount()
+
+    scheduledIssue.issue.commentPrompt = '{comment}'
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+    expect(screen.getByRole('button', { name: commentBehavior }).textContent).toContain(customLabel)
   })
 })
