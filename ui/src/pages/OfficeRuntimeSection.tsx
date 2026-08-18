@@ -15,12 +15,14 @@ const STATUS_STYLE: Record<AgentRuntimeEventType, string> = {
   'runtime.turn.text': 'bg-primary/10 text-foreground',
   'runtime.turn.tool': 'bg-info/10 text-info',
   'runtime.turn.error': 'bg-destructive/15 text-destructive',
+  'dev.sonner_test': 'bg-secondary text-muted-foreground',
 }
 
 function eventLabel(type: AgentRuntimeEventType): string {
   if (type === 'runtime.turn.text') return 'text'
   if (type === 'runtime.turn.tool') return 'tool'
   if (type === 'runtime.turn.error') return 'error'
+  if (type === 'dev.sonner_test') return 'Sonner test'
   return type.replace('runtime.', '').replace('session.', '')
 }
 
@@ -31,6 +33,7 @@ function eventDetail(event: AgentRuntimeEvent): string | null {
     return [payload.toolName, payload.toolStatus].filter(Boolean).join(' · ') || null
   }
   if (event.type === 'runtime.turn.error') return payload.message ?? payload.error ?? null
+  if (event.type === 'dev.sonner_test') return payload.message ?? null
   if (event.type === 'runtime.stopped' && payload.assistantText) return payload.assistantText
   return null
 }

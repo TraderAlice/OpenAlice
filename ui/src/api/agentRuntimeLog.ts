@@ -1,4 +1,4 @@
-import { fetchJson } from './client'
+import { fetchJson, headers } from './client'
 
 export type AgentRuntimeEventType =
   | 'session.born'
@@ -9,6 +9,7 @@ export type AgentRuntimeEventType =
   | 'runtime.turn.text'
   | 'runtime.turn.tool'
   | 'runtime.turn.error'
+  | 'dev.sonner_test'
 
 export type AgentRuntimeSurface = 'terminal' | 'webpi' | 'headless'
 
@@ -52,6 +53,7 @@ export interface AgentRuntimePayload {
     toolFailures: number
   }
   truncated?: boolean
+  testState?: 'running' | 'success' | 'error'
 }
 
 export interface AgentRuntimeEvent {
@@ -87,5 +89,12 @@ export const agentRuntimeLogApi = {
     if (opts.type) params.set('type', opts.type)
     const qs = params.toString()
     return fetchJson<AgentRuntimePage>(`/api/agent-runtime${qs ? `?${qs}` : ''}`)
+  },
+  async triggerSonnerTest(state: 'running' | 'success' | 'error'): Promise<void> {
+    await fetchJson('/api/agent-runtime/sonner-test', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ state }),
+    })
   },
 }

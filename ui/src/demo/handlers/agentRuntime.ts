@@ -1,15 +1,18 @@
 import { http, HttpResponse } from 'msw'
 
 const now = Date.now()
+let demoSonnerSeq = 6
+const demoSonnerEvents: Array<Record<string, unknown>> = []
 
 export const agentRuntimeHandlers = [
   http.get('/api/agent-runtime', () => HttpResponse.json({
-    lastSeq: 6,
+    lastSeq: demoSonnerSeq,
     page: 1,
     pageSize: 50,
-    total: 6,
+    total: 6 + demoSonnerEvents.length,
     totalPages: 1,
     entries: [
+      ...demoSonnerEvents,
       {
         seq: 6,
         ts: now - 12_000,
@@ -99,4 +102,26 @@ export const agentRuntimeHandlers = [
       },
     ],
   })),
+  http.post('/api/agent-runtime/sonner-test', async ({ request }) => {
+    const body = await request.json() as { state?: 'running' | 'success' | 'error' }
+    const state = body.state
+    if (!state || !['running', 'success', 'error'].includes(state)) {
+      return HttpResponse.json({ error: 'invalid state' }, { status: 400 })
+    }
+    demoSonnerSeq += 1
+    const entry = {
+      seq: demoSonnerSeq,
+      ts: Date.now(),
+      type: 'dev.sonner_test',
+      payload: {
+        workspaceId: '__dev__',
+        resumeId: `sonner-test-${demoSonnerSeq}`,
+        agent: 'Dev Panel',
+        testState: state,
+        message: `Sonner ${state} test`,
+      },
+    }
+    demoSonnerEvents.unshift(entry)
+    return HttpResponse.json({ entry }, { status: 201 })
+  }),
 ]

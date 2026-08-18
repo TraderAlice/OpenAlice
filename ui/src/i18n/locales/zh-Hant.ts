@@ -1593,6 +1593,7 @@ export const zhHant: Resources = {
   dev: {
     onboarding: '新手引導',
     snapshots: '快照',
+    frontend: '前端',
     filterTools: '篩選工具…',
     selectTool: '請從左側面板選擇一個工具。',
     toolDetailsLoadError: '工具詳細資料載入失敗。',
@@ -1743,6 +1744,12 @@ export const zhHant: Resources = {
     runsDescription: '查看跨工作區的無頭 Agent 運行與工作進度。',
     api: 'API',
     apiDescription: '從外部觸發工作區自動化，並查看排程檔案格式。',
+  },
+  activityToast: {
+    agent: 'Agent',
+    conversationRunning: '{{agent}} 正在處理另一個 Agent 的請求',
+    conversationFailed: '{{agent}} 未能完成 Agent 請求',
+    inboxDelivered: '{{agent}} 已傳送一則 Inbox 訊息',
   },
   office: {
     description: '多個 Harness 辦公室共處一個平層。Workspace 是小組，每個 Session 都有自己的工位。',

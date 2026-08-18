@@ -3,6 +3,7 @@
  * Occupancy history for Automation; never a spawn or replay-control surface.
  */
 import { Hono } from 'hono'
+import { z } from 'zod'
 
 import { isAgentRuntimeEventType } from '../../workspaces/agent-runtime-log.js'
 import type { WorkspaceService } from '../../workspaces/service.js'
@@ -14,6 +15,23 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 
 export function createAgentRuntimeLogRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
+
+  app.post('/sonner-test', async (c) => {
+    const parsed = z.object({
+      state: z.enum(['running', 'success', 'error']),
+    }).safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: 'state must be running, success, or error' }, 400)
+
+    const now = Date.now()
+    const entry = await svc.agentRuntimeLog.record('dev.sonner_test', {
+      workspaceId: '__dev__',
+      resumeId: `sonner-test-${now}`,
+      agent: 'Dev Panel',
+      testState: parsed.data.state,
+      message: `Sonner ${parsed.data.state} test`,
+    })
+    return c.json({ entry }, 201)
+  })
 
   app.get('/', async (c) => {
     const afterSeqRaw = c.req.query('afterSeq')

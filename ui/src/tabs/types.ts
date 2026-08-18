@@ -17,7 +17,7 @@ export type WorkspaceSource = 'chat' | 'auto-quant'
 export type FileViewerSource = WorkspaceSource | 'tracked'
 
 /** One source of truth for the Dev sidebar and `/dev/:tab` URL contract. */
-export const DEV_TABS = ['tools', 'onboarding', 'snapshots', 'logs', 'simulator'] as const
+export const DEV_TABS = ['frontend', 'tools', 'onboarding', 'snapshots', 'logs', 'simulator'] as const
 export type DevTab = typeof DEV_TABS[number]
 
 export function isDevTab(value: string): value is DevTab {

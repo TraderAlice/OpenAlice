@@ -46,4 +46,23 @@ describe('GET /api/agent-runtime', () => {
     const body = await res.json() as { lastSeq: number }
     expect(body.lastSeq).toBe(3)
   })
+
+  it('records a Sonner probe through the same runtime journal', async () => {
+    const record = vi.fn(async (type, payload) => ({ seq: 7, ts: 1, type, payload }))
+    const app = new Hono().route('/', createAgentRuntimeLogRoutes({
+      agentRuntimeLog: { record },
+    } as never))
+
+    const res = await app.request('/sonner-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'success' }),
+    })
+
+    expect(res.status).toBe(201)
+    expect(record).toHaveBeenCalledWith('dev.sonner_test', expect.objectContaining({
+      agent: 'Dev Panel',
+      testState: 'success',
+    }))
+  })
 })

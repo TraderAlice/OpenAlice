@@ -1597,6 +1597,7 @@ export const en = {
   dev: {
     onboarding: 'Onboarding',
     snapshots: 'Snapshots',
+    frontend: 'Frontend',
     filterTools: 'Filter tools…',
     selectTool: 'Select a tool from the left panel.',
     toolDetailsLoadError: 'Failed to load tool details.',
@@ -1747,6 +1748,12 @@ export const en = {
     runsDescription: 'Headless agent runs across workspaces — what the workers are doing.',
     api: 'API',
     apiDescription: 'Trigger workspace automation from outside, and review the schedule-file format.',
+  },
+  activityToast: {
+    agent: 'Agent',
+    conversationRunning: '{{agent}} is handling another Agent request',
+    conversationFailed: '{{agent}} could not complete an Agent request',
+    inboxDelivered: '{{agent}} sent an Inbox update',
   },
   office: {
     description: 'Harness offices share one floor. Each Workspace forms a group; every Session has its own desk.',
