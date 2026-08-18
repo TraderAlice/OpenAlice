@@ -1206,6 +1206,14 @@ html[lang="ja"] .oa-onboarding-title {
   text-wrap: pretty;
 }
 
+/* Inbox supplies a stable document title above provenance. When the stored
+ * report opens with that exact Markdown heading, keep the source untouched but
+ * avoid rendering the same title twice. The outer h1 preserves the document
+ * outline for assistive technology. */
+.inbox-report-body--repeats-heading .markdown-content--reading > h1:first-child {
+  display: none;
+}
+
 .markdown-content--reading h2 {
   margin-top: 2.6em;
   margin-bottom: 0.75em;

@@ -2086,6 +2086,8 @@ export const zhHant: Resources = {
     noMessages: '收件匣是空的。',
     emptyHint: '工作區會將狀態更新推送到這裡。',
     untitledUpdate: '沒有摘要的更新',
+    unread: '未讀',
+    moreAttachments: '另有 {{count}} 個',
     dateToday: '今天',
     dateYesterday: '昨天',
     dateThisWeek: '本週',
