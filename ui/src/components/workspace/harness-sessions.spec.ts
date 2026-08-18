@@ -82,12 +82,22 @@ describe('harness session titles', () => {
     expect(harnessSessionTitle(null, entry({ displayName: 'AAPL desk' }))).toBe('AAPL desk')
   })
 
-  it('prefers the interactive title, then preview, issue, then a short resume id', () => {
+  it('prefers the interactive title, then preview, a readable Issue id, then a short resume id', () => {
     expect(harnessSessionTitle(session(), entry({ resumeId: 'resume-interactive' }))).toBe('Interactive thesis')
     expect(harnessSessionTitle(null, entry())).toBe('Morning scan complete. Semis still lead.')
     expect(harnessSessionTitle(null, entry({
       latestExecution: { taskId: 'task-1', status: 'done', startedAt: 1, issueId: 'scan-open' },
-    }))).toBe('scan-open')
+    }))).toBe('Scan Open')
+    expect(harnessSessionTitle(session({ title: '# Launch prompt\n\nWrite the close brief.' }), entry({
+      resumeId: 'resume-interactive',
+      createdBy: {
+        kind: 'issue',
+        workspaceId: 'ws-1',
+        issueId: 'daily-market-close',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
+    }))).toBe('Daily Market Close')
     expect(harnessSessionTitle(null, entry({
       resumeId: 'resume-calm-amber-river-a1b2c3',
       latestExecution: undefined,

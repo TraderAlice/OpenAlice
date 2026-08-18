@@ -271,6 +271,30 @@ describe('SessionRow actions', () => {
     expect(onArchive).toHaveBeenCalledOnce()
   })
 
+  it('ellipsizes long English and CJK titles without moving row actions', () => {
+    const title = `${'市场扫描'.repeat(12)} and a very long English conversation title about overnight risk`
+    render(
+      <SessionRow
+        session={{ ...session, state: 'paused', pid: null, startedAt: null, title }}
+        displayTitle={title}
+        subtitle="Issue"
+        isActive={false}
+        canDelete={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const main = screen.getByRole('button', { name: title })
+    expect(main.querySelector('.truncate')?.textContent).toBe(title)
+    expect(screen.getByText('Issue').className).toContain('truncate')
+    const resume = screen.getByRole('button', { name: `Resume ${title}` })
+    expect(resume.className).toContain('oa-icon-action')
+    expect(main.compareDocumentPosition(resume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('does not offer Archive while an interactive Session is running', async () => {
     const user = userEvent.setup()
     const onArchive = vi.fn()

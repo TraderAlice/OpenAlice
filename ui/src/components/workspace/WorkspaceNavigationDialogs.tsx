@@ -24,6 +24,7 @@ import {
   joinWorkspaceHarnessSessions,
   type HarnessSession,
 } from './harness-sessions'
+import { harnessSessionSourceLabel } from './harness-session-presentation'
 import { orderSessionsForSidebar } from './sidebar-order'
 
 interface DialogFocusProps {
@@ -211,6 +212,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
         row.title,
         row.resumeId,
         row.agent,
+        row.issueId,
         row.directory?.latestExecution?.issueId,
         row.directory?.latestExecution?.assistantPreview,
         row.session?.name,
@@ -313,6 +315,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                 const title = row.headlessOccupying
                   ? t('workspace.sessionRunning', { title: row.title })
                   : row.title
+                const sourceLabel = harnessSessionSourceLabel(row.sourceKind, t)
                 const active = props.isRowActive?.(row)
                   ?? (workspace.id === props.currentWorkspaceId && row.session?.id === props.activeSessionId)
                 const occupancyIso = row.occupancyAt > 0
@@ -342,6 +345,7 @@ export function ConversationBrowserDialog(props: ConversationBrowserDialogProps)
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-sm font-medium ${row.failed ? 'text-muted-foreground/70' : ''}`} title={row.title}>{row.title}</span>
                         <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                          {sourceLabel && <span className="truncate">{sourceLabel}</span>}
                           <span className="truncate">{workspaceDisplayName(workspace)}</span>
                           <span className="font-mono">{row.agent}</span>
                           {occupancyIso && <span>{formatRelativeTime(occupancyIso)}</span>}

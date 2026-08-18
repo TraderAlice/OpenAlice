@@ -2237,6 +2237,11 @@ export const en = {
     restoreSession: 'Restore {{title}}',
     restoreSessionAction: 'Restore to roster',
     sessionPresenceFailed: 'Could not update this Session.',
+    sessionSource: {
+      issue: 'Issue',
+      headless: 'Background',
+      conversation: 'Conversation',
+    },
     sessionSettings: {
       action: 'Settings',
       openFor: 'Settings for {{title}}',
