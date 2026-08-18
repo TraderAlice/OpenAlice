@@ -42,7 +42,6 @@ import {
   getAutoQuantDefaultWorkspace,
   getWorkspaceManager,
   getWorkspaceDefaultAgent,
-  listAgents,
   listTemplates,
   listWorkspaces,
   initializeAutoQuantWorkspace as apiInitializeAutoQuantWorkspace,
@@ -62,7 +61,6 @@ import {
   spawnSession,
   updatePausedSessionRuntime as apiUpdatePausedSessionRuntime,
   updateWorkspaceMetadata,
-  type AgentInfo,
   type PausedSessionRuntimeUpdate,
   MANAGER_WORKSPACE_ID,
   type ManagerQuickStartResult,
@@ -81,6 +79,7 @@ import {
 import { WorkspaceActionsContext } from './workspace-actions-context'
 import { reconcileWorkspaceList } from './workspace-list-reconcile'
 import { reconcileJsonSnapshot } from '../lib/reconcile-json-state'
+import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 
 function deprecatedExportTab(agent: AgentId | undefined): Tab | undefined {
   if (agent === 'claude' || agent === 'codex' || agent === 'opencode' || agent === 'pi') return agent
@@ -97,7 +96,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [autoQuantDefaultWorkspaceId, setAutoQuantDefaultWorkspaceId] = useState<string | null>(null)
   const [autoQuantPreferenceLoaded, setAutoQuantPreferenceLoaded] = useState(false)
   const [autoQuantPreferenceError, setAutoQuantPreferenceError] = useState<string | null>(null)
-  const [agents, setAgents] = useState<AgentInfo[]>([])
+  const { agents } = useAgentRuntimes()
   const [defaultAgent, setDefaultAgentState] = useState<string | null>(null)
   const [issueDefaultAgent, setIssueDefaultAgentState] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
@@ -201,7 +200,6 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshTemplates()
-    void listAgents().then(setAgents).catch(() => setAgents([]))
     void getWorkspaceDefaultAgent().then(setDefaultAgentState).catch(() => setDefaultAgentState(null))
     void getIssueDefaultAgent().then(setIssueDefaultAgentState).catch(() => setIssueDefaultAgentState(null))
     void refreshAutoQuantPreference()

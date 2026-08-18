@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { AIProviderPage } from './AIProviderPage'
 
@@ -32,8 +33,14 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
   return { ...actual, listAgents: mocks.listAgents }
 })
 
+vi.mock('../tabs/store', () => ({
+  useWorkspace: (selector: (state: { openOrFocus: () => void }) => unknown) =>
+    selector({ openOrFocus: vi.fn() }),
+}))
+
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('zh')
   mocks.getCredentials.mockResolvedValue({
     credentials: [{
@@ -78,18 +85,17 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('AIProviderPage', () => {
-  it('puts creation defaults before collapsed runtime reference and localizes the primary UI', async () => {
+  it('puts creation defaults before the Agent runtimes link and localizes the primary UI', async () => {
     render(<AIProviderPage />)
 
     const credentials = await screen.findByRole('heading', { name: '凭证库' })
     const defaults = await screen.findByRole('heading', { name: '新工作区默认值' })
-    const runtimeReference = screen.getByText('Agent 运行时参考')
-    const details = runtimeReference.closest('details')
+    const runtimesLink = screen.getByRole('button', { name: '打开 Agent 运行时' })
 
     expect(screen.getByRole('heading', { name: 'AI 提供方' })).toBeTruthy()
-    expect(details?.open).toBe(false)
-    expect(credentials.compareDocumentPosition(runtimeReference) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(defaults.compareDocumentPosition(runtimeReference) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText('Agent 运行时参考')).toBeNull()
+    expect(credentials.compareDocumentPosition(runtimesLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(defaults.compareDocumentPosition(runtimesLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('persists a Pi creation default and acknowledges the save', async () => {

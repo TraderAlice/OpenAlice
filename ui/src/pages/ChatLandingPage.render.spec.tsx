@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
 import { i18n } from '../i18n'
 import type { AgentInfo, Workspace } from '../components/workspace/api'
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { AutoQuantLandingPage, ChatLandingPage } from './ChatLandingPage'
 
 const mocks = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getAgentReadiness: vi.fn(),
   getAgentRuntimeReadiness: vi.fn(),
   probeAgentRuntimeReadiness: vi.fn(),
+  listAgents: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
   getPresets: vi.fn(),
   getQuickChat: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     getAgentReadiness: mocks.getAgentReadiness,
     getAgentRuntimeReadiness: mocks.getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness: mocks.probeAgentRuntimeReadiness,
+    listAgents: mocks.listAgents,
   }
 })
 
@@ -195,6 +198,7 @@ let workspaces: Workspace[]
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   workspaces = [chatWorkspace()]
   mocks.useWorkspaces.mockImplementation(() => context(workspaces))
@@ -250,6 +254,7 @@ beforeEach(async () => {
     overallReady: true,
     checkedAt: '2026-07-16T00:00:00.000Z',
   })
+  mocks.listAgents.mockResolvedValue([piAgent, opencodeAgent])
   mocks.probeAgentRuntimeReadiness.mockImplementation(() => mocks.getAgentRuntimeReadiness())
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
     defaults: {},

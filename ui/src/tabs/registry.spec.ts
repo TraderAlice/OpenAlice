@@ -85,6 +85,13 @@ describe('Settings URL projection', () => {
       params: { category: 'activity-bar' },
     })).toBe('/settings/activity-bar')
   })
+
+  it('projects the Agent runtimes category onto /settings/agent-runtimes', () => {
+    expect(getView('settings').toUrl({
+      kind: 'settings',
+      params: { category: 'agent-runtimes' },
+    })).toBe('/settings/agent-runtimes')
+  })
 })
 
 describe('shared product shells', () => {

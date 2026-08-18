@@ -9,6 +9,7 @@ import {
   type SessionRecord,
   type Workspace,
 } from '../components/workspace/api'
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { ToastProvider } from '../components/Toast'
 import { useWorkspaces } from './workspaces-context'
@@ -186,6 +187,7 @@ function QuickChatProbe() {
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   mocks.listWorkspaces.mockResolvedValue([workspace()])
   mocks.listTemplates.mockResolvedValue([])

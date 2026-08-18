@@ -9,6 +9,25 @@ import { i18n } from '../../i18n'
 import type { AgentInfo, SavedCredential } from './api'
 import { AgentLaunchSelectors } from './AgentLaunchControls'
 
+vi.mock('../../hooks/useAgentRuntimes', () => ({
+  useAgentRuntimes: () => ({
+    agents: [],
+    catalog: [],
+    primary: [],
+    others: [],
+    installed: [],
+    notInstalled: [],
+    readiness: null,
+    quickAccessIds: [],
+    recentAgentId: null,
+    loading: false,
+    refreshing: false,
+    error: null,
+    refresh: vi.fn(),
+    saveQuickAccess: vi.fn(),
+  }),
+}))
+
 const agents: AgentInfo[] = [
   {
     id: 'opencode',
@@ -118,8 +137,9 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     trigger.focus()
     await user.keyboard('{ArrowDown}')
 
-    const openCode = screen.getByRole('menuitem', { name: 'OpenCode' })
-    const pi = screen.getByRole('menuitem', { name: 'Pi' })
+    const openCode = screen.getByRole('menuitem', { name: /OpenCode/ })
+    const pi = screen.getByRole('menuitem', { name: /^Pi/ })
+    const others = screen.getByRole('menuitem', { name: i18n.t('chatLanding.otherRuntimes') })
     expect(document.activeElement).toBe(openCode)
 
     await user.keyboard('{ArrowDown}')
@@ -127,10 +147,10 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     await user.keyboard('{Home}')
     expect(document.activeElement).toBe(openCode)
     await user.keyboard('{End}')
-    expect(document.activeElement).toBe(pi)
-    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(others)
+    await user.keyboard('{Home}')
     expect(document.activeElement).toBe(openCode)
-    await user.keyboard('{ArrowUp}')
+    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(pi)
 
     await user.keyboard('{Escape}')
@@ -150,7 +170,10 @@ describe('AgentLaunchSelectors keyboard menus', () => {
 
     const trigger = screen.getByRole('button', { name: i18n.t('chatLanding.selectAgent') })
     trigger.focus()
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+    await user.keyboard('{ArrowDown}')
+    const pi = await screen.findByRole('menuitem', { name: /^Pi/ })
+    pi.focus()
+    await user.keyboard('{Enter}')
 
     expect(selectAgent).toHaveBeenCalledWith('pi')
     expect(screen.queryByRole('menu')).toBeNull()

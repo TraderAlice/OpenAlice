@@ -7,6 +7,7 @@ import type {
   IssueDetail as IssueDetailData,
   IssueProvenanceRecord,
 } from '../api/issues'
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
 import { i18n } from '../i18n'
 import { IssueActivity, IssueDetail } from './IssueDetail'
 
@@ -140,6 +141,7 @@ vi.mock('./MarkdownWhatEditor', () => ({
 }))
 
 beforeEach(async () => {
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   delete scheduledIssue.issue.automationHealth
   delete scheduledIssue.issue.credential

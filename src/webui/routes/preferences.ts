@@ -2,15 +2,21 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 
 import {
+  AGENT_RUNTIME_QUICK_ACCESS_LIMIT,
+  normalizeAgentRuntimeQuickAccessIds,
+  readAgentRuntimesPreferences,
   readHarnessPreferences,
   readQuickChatPreferences,
   rememberQuickChatCredential,
   rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
+  saveAgentRuntimesPreferences,
   saveHarnessPreferences,
+  type AgentRuntimesPreferences,
   type HarnessPreferences,
   type QuickChatPreferences,
 } from '../../core/preferences.js'
+import { isAgentRuntime } from '../../workspaces/cli-adapter.js'
 import {
   getWindowsWorkspaceShellStatus,
   InvalidWindowsWorkspaceShellPathError,
@@ -51,6 +57,10 @@ const harnessPreferenceUpdateSchema = z.object({
   showHeadlessBornSessions: z.boolean(),
 })
 
+const agentRuntimesPreferenceUpdateSchema = z.object({
+  quickAccessIds: z.array(z.string().trim().min(1).max(128)).max(AGENT_RUNTIME_QUICK_ACCESS_LIMIT),
+})
+
 const workspaceShellPreferenceUpdateSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('auto'), customPath: z.null().optional() }),
   z.object({ mode: z.literal('custom'), customPath: z.string().trim().min(1).max(1024) }),
@@ -63,6 +73,8 @@ interface PreferenceRouteDeps {
   rememberRecentChatWorkspace(workspaceId: string | null): Promise<QuickChatPreferences>
   readHarnessPreferences?(): Promise<HarnessPreferences>
   saveHarnessPreferences?(next: HarnessPreferences): Promise<HarnessPreferences>
+  readAgentRuntimesPreferences?(): Promise<AgentRuntimesPreferences>
+  saveAgentRuntimesPreferences?(next: AgentRuntimesPreferences): Promise<AgentRuntimesPreferences>
   getWorkspaceShellStatus(): Promise<WindowsWorkspaceShellStatus>
   saveWorkspaceShellPreference(input: {
     mode: 'auto' | 'custom'
@@ -78,6 +90,8 @@ const defaultDeps: PreferenceRouteDeps = {
   rememberRecentChatWorkspace: (workspaceId) => rememberRecentChatWorkspace(workspaceId),
   readHarnessPreferences: () => readHarnessPreferences(),
   saveHarnessPreferences: (next) => saveHarnessPreferences(next),
+  readAgentRuntimesPreferences: () => readAgentRuntimesPreferences(),
+  saveAgentRuntimesPreferences: (next) => saveAgentRuntimesPreferences(next),
   getWorkspaceShellStatus: () => getWindowsWorkspaceShellStatus(),
   saveWorkspaceShellPreference: (input) => saveWindowsWorkspaceShellPreference(input),
 }
@@ -152,6 +166,36 @@ export function createPreferencesRoutes(
     if (!parsed.success) return c.json({ error: 'invalid_harness_preference' }, 400)
     try {
       return c.json(await (deps.saveHarnessPreferences ?? defaultDeps.saveHarnessPreferences!)(parsed.data))
+    } catch (error) {
+      return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
+    }
+  })
+
+  app.get('/agent-runtimes', async (c) => {
+    try {
+      return c.json(await (deps.readAgentRuntimesPreferences ?? defaultDeps.readAgentRuntimesPreferences!)())
+    } catch (error) {
+      return c.json({ error: 'preferences_read_failed', message: String(error) }, 500)
+    }
+  })
+
+  app.put('/agent-runtimes', async (c) => {
+    const parsed = agentRuntimesPreferenceUpdateSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: 'invalid_agent_runtime_preference' }, 400)
+    const quickAccessIds = normalizeAgentRuntimeQuickAccessIds(parsed.data.quickAccessIds)
+    if (quickAccessIds.length !== parsed.data.quickAccessIds.length) {
+      return c.json({ error: 'invalid_agent_runtime_preference' }, 400)
+    }
+    for (const agentId of quickAccessIds) {
+      const adapter = adapterRegistry.get(agentId)
+      if (!adapter || !isAgentRuntime(adapter)) {
+        return c.json({ error: 'invalid_agent_runtime_preference' }, 400)
+      }
+    }
+    try {
+      return c.json(await (deps.saveAgentRuntimesPreferences ?? defaultDeps.saveAgentRuntimesPreferences!)({
+        quickAccessIds,
+      }))
     } catch (error) {
       return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
     }
