@@ -12,6 +12,7 @@ import type { AgentInfo, AgentRuntimeReadinessRow } from '../components/workspac
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import { canAddAgentRuntimeQuickAccess } from '../lib/agentRuntimeQuickAccess'
 import { agentRuntimeIcon } from '../lib/agentRuntimeIcon'
+import { agentRuntimeSettingsStatusKey } from '../lib/agentRuntimeReadiness'
 
 const RUNTIME_COPY = {
   claude: {
@@ -46,18 +47,6 @@ const RUNTIME_COPY = {
     models: 'aiProvider.runtime.pi.models',
     auth: 'aiProvider.runtime.pi.auth',
   },
-} as const
-
-const STATUS_KEYS = {
-  unknown: 'settings.agentRuntimes.status.unknown',
-  checking: 'settings.agentRuntimes.status.checking',
-  ready: 'settings.agentRuntimes.status.ready',
-  not_installed: 'settings.agentRuntimes.status.notInstalled',
-  auth_required: 'settings.agentRuntimes.status.authRequired',
-  provider_required: 'settings.agentRuntimes.status.providerRequired',
-  output_unrecognized: 'settings.agentRuntimes.status.outputUnrecognized',
-  timeout: 'settings.agentRuntimes.status.timeout',
-  failed: 'settings.agentRuntimes.status.failed',
 } as const
 
 const REPAIR_KEYS = {
@@ -301,7 +290,7 @@ function RuntimeSettingsCard({
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               {installed ? t('settings.agentRuntimes.installed') : t('settings.agentRuntimes.notInstalled')}
               <span className="px-1.5 text-muted-foreground/50">·</span>
-              {t(STATUS_KEYS[row?.status ?? 'unknown'])}
+              {t(agentRuntimeSettingsStatusKey(row))}
             </p>
             <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={binPath ?? undefined}>
               {binPath ?? t('settings.agentRuntimes.unknownPath')}

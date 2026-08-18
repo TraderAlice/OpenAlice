@@ -175,6 +175,55 @@ describe('AgentRuntimePicker', () => {
     expect(screen.queryByRole('heading', { name: i18n.t('chatLanding.allRuntimesTitle') })).toBeNull()
   })
 
+  it('does not treat an unprobed installed runtime as a problem in Others', async () => {
+    const user = userEvent.setup()
+    render(
+      <AgentRuntimePicker
+        agents={agents}
+        primary={primary}
+        selectedId="pi"
+        readiness={{
+          overallReady: false,
+          checkedAt: null,
+          agents: {
+            claude: {
+              agent: 'claude',
+              displayName: 'Claude',
+              installed: true,
+              binPath: '/usr/bin/claude',
+              status: 'unknown',
+              ready: false,
+              source: 'unknown',
+              checkedAt: null,
+              durationMs: null,
+            },
+            cursor: {
+              agent: 'cursor',
+              displayName: 'Cursor Agent',
+              installed: true,
+              binPath: '/usr/bin/cursor-agent',
+              status: 'auth_required',
+              ready: false,
+              source: 'unknown',
+              checkedAt: '2026-08-18T00:00:00.000Z',
+              durationMs: 8,
+            },
+          },
+        }}
+        onSelect={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: i18n.t('chatLanding.selectAgent') }))
+    await user.click(await screen.findByRole('menuitem', { name: i18n.t('chatLanding.otherRuntimes') }))
+
+    expect(screen.getByRole('button', { name: 'Claude' }).textContent).toBe('Claude')
+    expect(screen.queryByText(i18n.t('chatLanding.pickerRuntimeChecking'))).toBeNull()
+    expect(screen.getByRole('button', { name: /Cursor Agent/ }).textContent).toContain(
+      i18n.t('chatLanding.pickerRuntimeAuthRequired'),
+    )
+  })
+
   it('restores focus to the trigger on Escape', async () => {
     const user = userEvent.setup()
     render(
