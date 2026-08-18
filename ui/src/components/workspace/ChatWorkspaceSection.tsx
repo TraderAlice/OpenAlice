@@ -51,6 +51,7 @@ import {
   joinWorkspaceHarnessSessions,
   type HarnessSession,
 } from './harness-sessions'
+import { selectRecentSidebarWorkset } from './harness-session-workset'
 import { harnessSessionRosterSubtitle } from './harness-session-presentation'
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order'
 import { useWorkspaceSessionDirectories } from '../../hooks/useWorkspaceSessionDirectory'
@@ -813,8 +814,9 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
   const [runningExpanded, setRunningExpanded] = useState(true)
   const running = props.sessions.filter((row) => row.headlessOccupying)
   const recent = props.sessions.filter((row) => !row.headlessOccupying)
+  const visibleRecent = selectRecentSidebarWorkset(recent, props.isRowActive)
   const runningRef = useReorderMotion<HTMLDivElement>(running.map(props.keyFor))
-  const recentRef = useReorderMotion<HTMLDivElement>(recent.map(props.keyFor))
+  const recentRef = useReorderMotion<HTMLDivElement>(visibleRecent.map(props.keyFor))
   const renderRow = (row: HarnessSession) => (
     <HarnessSessionRow
       key={props.keyFor(row)}
@@ -878,7 +880,7 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
           <p className="px-3 py-2 text-[11px] leading-relaxed text-muted-foreground/55">
             {t('chat.allConversationsRunning')}
           </p>
-        ) : recent.map(renderRow)}
+        ) : visibleRecent.map(renderRow)}
       </div>
     </div>
   )
