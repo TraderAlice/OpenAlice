@@ -8,7 +8,6 @@ import {
   ListChecks,
   MessageSquare,
   Microscope,
-  Newspaper,
   Plug,
   Settings,
   Telescope,
@@ -30,7 +29,7 @@ import {
 
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.workspaces'
-  | 'nav.item.market' | 'nav.item.news' | 'nav.item.office' | 'nav.item.tradingAsGit' | 'nav.item.issue'
+  | 'nav.item.market' | 'nav.item.office' | 'nav.item.tradingAsGit' | 'nav.item.issue'
   | 'nav.item.portfolio' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
 interface NavLeaf {
@@ -89,8 +88,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { page: 'issue',      labelKey: 'nav.item.issue',      icon: ListChecks, defaultTab: { kind: 'issue', params: {} } },
       { page: 'auto-quant', labelKey: 'nav.item.autoQuant',  icon: Microscope, defaultTab: { kind: 'auto-quant-landing', params: {} } },
       { page: 'tracked',    labelKey: 'nav.item.tracked',    icon: Telescope, defaultTab: { kind: 'tracked', params: {} } },
+      // News is a Market navigator leaf, not a rail item.
       { page: 'market',     labelKey: 'nav.item.market',     icon: BarChart3, defaultTab: { kind: 'market-list', params: {} } },
-      { page: 'news',       labelKey: 'nav.item.news',       icon: Newspaper, defaultTab: { kind: 'news', params: {} } },
     ],
   },
   {

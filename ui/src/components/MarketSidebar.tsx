@@ -114,7 +114,12 @@ export function MarketSidebar() {
           active={isFocused('market-rotation')}
           onClick={() => openOrFocus({ kind: 'market-rotation', params: {} })}
         />
-        {/* Boards — a distinct cluster from the two nav rows above, on the
+        <SidebarRow
+          label={t('nav.item.news')}
+          active={isFocused('news')}
+          onClick={() => openOrFocus({ kind: 'news', params: {} })}
+        />
+        {/* Boards — a distinct cluster from the three browse rows above, on the
             same kinship rail the Inbox uses for grouped sub-rows. */}
         <div className="ml-[18px] border-l border-border/50">
           <SidebarRow

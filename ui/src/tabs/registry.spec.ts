@@ -65,6 +65,12 @@ describe('Office URL projection', () => {
   })
 })
 
+describe('Market News URL projection', () => {
+  it('projects News onto the Market navigator route', () => {
+    expect(getView('news').toUrl({ kind: 'news', params: {} })).toBe('/market/news')
+  })
+})
+
 describe('Settings URL projection', () => {
   it('projects the Beta category onto /settings/beta', () => {
     expect(getView('settings').toUrl({

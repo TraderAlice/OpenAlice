@@ -33,6 +33,15 @@ vi.mock('./registry', () => ({
   getView: vi.fn(),
 }))
 
+vi.mock('../hooks/useAliceProject', () => ({
+  useAliceProject: () => ({
+    project: { product: 'trader' },
+    loading: false,
+    error: null,
+    refresh: async () => undefined,
+  }),
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -174,5 +183,35 @@ describe('UrlAdopter Tracked selection', () => {
       params: { workspace: 'workspace-1', issue: 'power-watch' },
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+  })
+})
+
+describe('UrlAdopter Market News', () => {
+  it('adopts News under Market from /market/news', async () => {
+    render(
+      <MemoryRouter initialEntries={['/market/news']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'news',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('market')
+  })
+
+  it('redirects the retired /news rail route into Market', async () => {
+    render(
+      <MemoryRouter initialEntries={['/news']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'news',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('market')
   })
 })
