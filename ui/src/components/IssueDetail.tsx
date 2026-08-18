@@ -265,7 +265,7 @@ function AssigneeEditor({
         </span>
         <ChevronRight size={14} className="shrink-0 text-muted-foreground/70" aria-hidden />
       </button>
-      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-xl">
+      <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="px-4 pt-4">
           <DialogTitle>{t('issues.detail.chooseAssignee')}</DialogTitle>
           <DialogDescription>{t('issues.detail.chooseAssigneeDescription')}</DialogDescription>
@@ -322,15 +322,15 @@ function AssigneeEditor({
             )}
           </div>
         </div>
-        <DialogFooter className="mx-0 mb-0 items-center rounded-none px-4 py-3 sm:justify-between">
-          <div className="min-w-0 text-left sm:mr-auto">
+        <DialogFooter className="mx-0 mb-0 min-w-0 flex-col items-stretch rounded-none px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 w-full max-w-full overflow-hidden text-left sm:mr-auto sm:flex-1">
             <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
               {t('issues.detail.pendingAssignee')}
             </span>
             <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{draftLabel}</span>
             {draftDescription && <span className="block truncate text-xs text-muted-foreground">{draftDescription}</span>}
           </div>
-          <div className="flex w-full justify-end gap-2 sm:w-auto">
+          <div className="flex w-full shrink-0 justify-end gap-2 sm:w-auto">
             <Button type="button" variant="outline" disabled={committing} onClick={close}>
               {t('common.cancel')}
             </Button>

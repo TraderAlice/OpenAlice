@@ -785,4 +785,56 @@ describe('IssueDetail property controls', () => {
     expect(within(reopenedDialog).getByText(/^Updated a very long financial.*…$/)).toBeTruthy()
     expect(within(reopenedDialog).queryByText(/END-OF-PREVIEW/)).toBeNull()
   })
+
+  it('stacks the pending assignment above confirmation actions and keeps a long Session label inside the footer', async () => {
+    const longTitle = `Overnight rotation desk for cross-market financials and industrials ${'with execution notes across regions '.repeat(4)}END-OF-TITLE`
+    mocks.getWorkspaceSessionDirectory.mockResolvedValue({
+      sessions: [{
+        resumeId: 'resume-long-label-owner',
+        agent: 'pi',
+        createdAt: Date.now() - 86_400_000,
+        updatedAt: Date.now() - 3_600_000,
+        resumable: true,
+        active: true,
+        interactive: {
+          name: 'p1',
+          title: longTitle,
+          state: 'running',
+          lastActiveAt: new Date().toISOString(),
+        },
+      }],
+    })
+
+    render(<IssueDetail wsId="demo-ws-auto-quant" id="morning-scan" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Assignee' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Choose responsibility' })
+    const choice = within(dialog).getByRole('button', { name: /Overnight rotation desk/ })
+    fireEvent.click(choice)
+
+    const footer = dialog.querySelector('[data-slot="dialog-footer"]')
+    expect(footer).toBeTruthy()
+    const pending = within(footer as HTMLElement).getByText('Pending assignment')
+    const cancel = within(footer as HTMLElement).getByRole('button', { name: 'Cancel' })
+    const confirm = within(footer as HTMLElement).getByRole('button', { name: 'Confirm assignment' })
+    expect(pending.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(cancel.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const results = within(dialog).getByText('Assignment policy').parentElement
+    expect(results?.contains(choice)).toBe(true)
+    expect(results?.contains(footer)).toBe(false)
+    expect(footer?.previousElementSibling).toBe(results)
+
+    const normalizedTitle = longTitle.replace(/\s+/g, ' ').trim()
+    const truncatedTitle = `${normalizedTitle.slice(0, 117).trimEnd()}…`
+    expect(within(footer as HTMLElement).getByText(truncatedTitle)).toBeTruthy()
+    expect(within(footer as HTMLElement).queryByText(normalizedTitle)).toBeNull()
+    expect(within(footer as HTMLElement).queryByText(/END-OF-TITLE/)).toBeNull()
+
+    expect(footer?.className).toContain('flex-col')
+    expect(footer?.className).not.toContain('flex-col-reverse')
+    expect(footer?.className).toContain('sm:flex-row')
+    expect(pending.parentElement?.className).toContain('min-w-0')
+    expect(pending.parentElement?.className).toContain('max-w-full')
+  })
 })
