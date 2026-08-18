@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { inputClass } from '@/components/form'
 import { agentRuntimeIcon } from '../../lib/agentRuntimeIcon'
+import { agentRuntimePickerStatusKey } from '../../lib/agentRuntimeReadiness'
 import { installHintFor } from './agentInstall'
 import type { AgentInfo, AgentRuntimeReadinessSnapshot } from './api'
 
@@ -62,14 +63,8 @@ function AgentRuntimeRow({
 }) {
   const { t } = useTranslation()
   const Icon = agentRuntimeIcon(agent.id)
-  const row = readiness?.agents[agent.id]
-  const status = row?.ready === true
-    ? t('chatLanding.pickerRuntimeReady')
-    : row?.status === 'checking'
-      ? t('chatLanding.pickerRuntimeChecking')
-      : row
-        ? t('chatLanding.pickerRuntimeNeedsAttention')
-        : undefined
+  const statusKey = agentRuntimePickerStatusKey(readiness?.agents[agent.id])
+  const status = statusKey ? t(statusKey) : undefined
 
   return (
     <button
@@ -84,7 +79,9 @@ function AgentRuntimeRow({
         <span className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 truncate font-medium">{agent.displayName}</span>
           {status && (
-            <span className="shrink-0 text-[10px] font-normal text-muted-foreground">{status}</span>
+            <span className="max-w-[7.5rem] shrink-0 truncate text-[10px] font-normal text-muted-foreground" title={status}>
+              {status}
+            </span>
           )}
         </span>
       </span>
