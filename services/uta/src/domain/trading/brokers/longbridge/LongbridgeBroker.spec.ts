@@ -230,6 +230,17 @@ describe('mapLbOrderStatus', () => {
   it('Canceled → Cancelled', () => expect(mapLbOrderStatus(15)).toBe('Cancelled'))
   it('PartialFilled → Submitted (still active)', () => expect(mapLbOrderStatus(11)).toBe('Submitted'))
   it('New → Submitted', () => expect(mapLbOrderStatus(7)).toBe('Submitted'))
+  // Expired(16) is ambiguous: broker marks US-equity GTC/GTD orders Expired
+  // between trading sessions (transient), while Day orders really expire at
+  // close. The timeInForce argument keeps GTC/GTD alive for re-observation.
+  it('Expired without TIF → Submitted (conservative, avoids false rejection)',
+    () => expect(mapLbOrderStatus(16)).toBe('Submitted'))
+  it('Expired + Day TIF → Inactive (real close-time expiry)',
+    () => expect(mapLbOrderStatus(16, 1 /* Day */)).toBe('Inactive'))
+  it('Expired + GTC TIF → Submitted (transient between sessions)',
+    () => expect(mapLbOrderStatus(16, 2 /* GoodTilCanceled */)).toBe('Submitted'))
+  it('Expired + GTD TIF → Submitted (transient between sessions)',
+    () => expect(mapLbOrderStatus(16, 3 /* GoodTilDate */)).toBe('Submitted'))
 })
 
 // ==================== init() ====================

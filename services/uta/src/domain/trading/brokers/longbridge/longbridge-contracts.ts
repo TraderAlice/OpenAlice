@@ -109,14 +109,28 @@ export function marketToSuffix(market: number): string {
 /**
  * Map Longbridge's `OrderStatus` enum (numeric) to IBKR-style status string.
  * IBKR statuses we emit: Submitted, Filled, Cancelled, Inactive.
+ *
+ * `timeInForce` disambiguates Expired(16): US equities outside trading hours
+ * are briefly marked Expired by the broker for GTC/GTD orders — a transient
+ * state that reverts to New once the market reopens. Treating it as terminal
+ * ("Inactive") makes the UTA state machine declare the order rejected and stop
+ * tracking it, while the order is still alive at the broker (observed against
+ * longbridge-main live account: NVDA GTC limit filled later and NET GTC limit
+ * remained open, both misreported as rejected). Only Day orders reach a true
+ * terminal Expired (unfilled at close); GTC/GTD Expired stays a candidate for
+ * re-observation until the next sync pass.
  */
-export function mapLbOrderStatus(status: number): string {
+export function mapLbOrderStatus(status: number, timeInForce?: number): string {
   switch (status) {
     case 5:                         // Filled
       return 'Filled'
     case 14:                        // Rejected
-    case 16:                        // Expired
       return 'Inactive'
+    case 16:                        // Expired
+      // Longbridge TimeInForceType: Unknown=0, Day=1, GoodTilCanceled=2, GoodTilDate=3.
+      // Day orders expire for real at close; GTC/GTD Expired between sessions is
+      // a transient broker-venue state, not a termination.
+      return timeInForce === 1 ? 'Inactive' : 'Submitted'
     case 15:                        // Canceled
     case 17:                        // PartialWithdrawal
       return 'Cancelled'
@@ -136,9 +150,9 @@ export function mapLbOrderStatus(status: number): string {
 }
 
 /** Make an OrderState from an LB status enum + optional reject message. */
-export function makeOrderState(status: number, msg?: string): OrderState {
+export function makeOrderState(status: number, msg?: string, timeInForce?: number): OrderState {
   const s = new OrderState()
-  s.status = mapLbOrderStatus(status)
+  s.status = mapLbOrderStatus(status, timeInForce)
   if (msg && (status === 14 /* Rejected */)) s.rejectReason = msg
   return s
 }
