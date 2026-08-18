@@ -13,6 +13,7 @@ import type {
 } from '../core/adapter.js'
 import {
   AdapterHealthTracker,
+  classifyNetworkStartFailure,
   decodeInboxAttachments,
   formatInboxNotification,
 } from './shared.js'
@@ -24,6 +25,8 @@ export class SlackConnectorAdapter implements ConnectorAdapter {
   private web?: WebClient
   private socket?: SocketModeClient
   private ownerUserId?: string
+
+  classifyStartFailure = classifyNetworkStartFailure
 
   constructor(options: { startupTimeoutMs?: number } = {}) {
     this.startupTimeoutMs = options.startupTimeoutMs ?? 15_000

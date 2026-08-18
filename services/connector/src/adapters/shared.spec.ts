@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { InboxNotification } from '@traderalice/connector-protocol'
 import {
   AdapterHealthTracker,
+  classifyNetworkStartFailure,
   decodeInboxAttachments,
   formatAdapterError,
   formatInboxNotification,
@@ -99,6 +100,13 @@ describe('adapter error formatting', () => {
     const tracker = new AdapterHealthTracker('telegram')
     tracker.degraded(error)
     expect(tracker.get().lastError).toContain('ECONNREFUSED')
+  })
+})
+
+describe('adapter-owned start failure classification', () => {
+  it('retries transport failures without teaching core platform error strings', () => {
+    expect(classifyNetworkStartFailure(new Error('connect ECONNREFUSED 198.18.0.130:443'))).toBe('retry')
+    expect(classifyNetworkStartFailure(new Error('Slack setting botToken is required'))).toBe('fatal')
   })
 })
 

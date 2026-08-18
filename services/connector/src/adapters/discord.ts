@@ -12,6 +12,7 @@ import type {
 } from '../core/adapter.js'
 import {
   AdapterHealthTracker,
+  classifyNetworkStartFailure,
   decodeInboxAttachments,
   formatInboxNotification,
 } from './shared.js'
@@ -21,6 +22,8 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
   private readonly tracker = new AdapterHealthTracker(this.id)
   private client?: Client
   private ownerUserId?: string
+
+  classifyStartFailure = classifyNetworkStartFailure
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
     try {

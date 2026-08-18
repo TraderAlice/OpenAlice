@@ -175,6 +175,16 @@ Core dispatch must not branch on platform IDs. Adding a connector means:
 3. register its factory at service composition;
 4. add adapter-specific tests and packaging dependencies.
 
+`ConnectorAdapter` is also the lifecycle boundary. `start()` validates durable
+configuration and arms the adapter; `stop()` is idempotent and releases every
+SDK resource. A long-lived adapter must recover transient disconnects either
+through its SDK or the shared connection supervisor. If a legacy synchronous
+`start()` still lets a transport failure escape, the adapter classifies that
+failure as `retry` or `fatal`; DeliveryManager schedules retries but never
+parses third-party or platform-specific error text itself. Health must move
+through `starting`, `awaiting_link`, `healthy`, `degraded`, and `stopped` as the
+external session changes rather than treating process startup as connectivity.
+
 The Settings renderer consumes definitions as data. The DeliveryManager test
 registers a fake third adapter to prevent a future Discord/Telegram union or
 `if (id === ...)` dispatch from becoming the architecture.
