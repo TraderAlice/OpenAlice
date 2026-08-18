@@ -97,7 +97,6 @@ export type ActivitySection =
   | 'issue'
   | 'automation'
   | 'office'
-  | 'news'
 
 export interface Tab {
   id: string

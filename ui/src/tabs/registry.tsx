@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import type { Workspace } from '../components/workspace/api'
 import type { ViewKind, ViewSpec } from './types'
 
@@ -195,11 +195,28 @@ const officeModule: ViewModule<'office'> = {
   Component: () => <OfficePage />,
 }
 
+function MarketArea({ children }: { children: ReactNode }) {
+  return (
+    <PageSidebarShell
+      storageKey="market"
+      titleKey="nav.item.market"
+      defaultWidth={300}
+      sidebar={<MarketSidebar />}
+    >
+      {children}
+    </PageSidebarShell>
+  )
+}
+
 const newsModule: ViewModule<'news'> = {
   kind: 'news',
   title: () => 'News',
-  toUrl: () => '/news',
-  Component: () => <NewsPage />,
+  toUrl: () => '/market/news',
+  Component: () => (
+    <MarketArea>
+      <NewsPage />
+    </MarketArea>
+  ),
 }
 
 const marketListModule: ViewModule<'market-list'> = {
@@ -207,14 +224,9 @@ const marketListModule: ViewModule<'market-list'> = {
   title: () => 'Market',
   toUrl: () => '/market',
   Component: () => (
-    <PageSidebarShell
-      storageKey="market"
-      titleKey="nav.item.market"
-      defaultWidth={300}
-      sidebar={<MarketSidebar />}
-    >
+    <MarketArea>
       <MarketPage />
-    </PageSidebarShell>
+    </MarketArea>
   ),
 }
 
@@ -223,14 +235,9 @@ const marketRotationModule: ViewModule<'market-rotation'> = {
   title: () => 'Sector Rotation',
   toUrl: () => '/market/rotation',
   Component: () => (
-    <PageSidebarShell
-      storageKey="market"
-      titleKey="nav.item.market"
-      defaultWidth={300}
-      sidebar={<MarketSidebar />}
-    >
+    <MarketArea>
       <MarketRotationPage />
-    </PageSidebarShell>
+    </MarketArea>
   ),
 }
 
@@ -239,14 +246,9 @@ const marketBoardModule: ViewModule<'market-board'> = {
   title: (spec) => MARKET_BOARD_TITLES[spec.params.board],
   toUrl: (spec) => `/market/boards/${spec.params.board}`,
   Component: (props) => (
-    <PageSidebarShell
-      storageKey="market"
-      titleKey="nav.item.market"
-      defaultWidth={300}
-      sidebar={<MarketSidebar />}
-    >
+    <MarketArea>
       <MarketBoardPage {...props} />
-    </PageSidebarShell>
+    </MarketArea>
   ),
 }
 
@@ -257,14 +259,9 @@ const marketDetailModule: ViewModule<'market-detail'> = {
     `/market/${spec.params.assetClass}/${encodeURIComponent(spec.params.symbol)}` +
     (spec.params.source ? `?source=${encodeURIComponent(spec.params.source)}` : ''),
   Component: (props) => (
-    <PageSidebarShell
-      storageKey="market"
-      titleKey="nav.item.market"
-      defaultWidth={300}
-      sidebar={<MarketSidebar />}
-    >
+    <MarketArea>
       <MarketDetailPage {...props} />
-    </PageSidebarShell>
+    </MarketArea>
   ),
 }
 

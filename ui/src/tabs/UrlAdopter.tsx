@@ -57,9 +57,10 @@ export function UrlAdopter() {
         <Route path="/automation/runtime" element={<Navigate to="/office" replace />} />
         <Route path="/automation/:section" element={<AdoptAutomation />} />
         <Route path="/office" element={<AdoptStatic spec={{ kind: 'office', params: {} }} />} />
-        <Route path="/news" element={<AdoptTraderStatic spec={{ kind: 'news', params: {} }} />} />
+        <Route path="/news" element={<Navigate to="/market/news" replace />} />
         <Route path="/market" element={<AdoptTraderStatic spec={{ kind: 'market-list', params: {} }} />} />
         <Route path="/market/rotation" element={<AdoptTraderStatic spec={{ kind: 'market-rotation', params: {} }} />} />
+        <Route path="/market/news" element={<AdoptTraderStatic spec={{ kind: 'news', params: {} }} />} />
         {/* Static `boards` segment outranks /market/:assetClass/:symbol in
             react-router's specificity scoring, so order here doesn't matter —
             but keep it above the dynamic route for readability. */}
@@ -449,7 +450,7 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'issue-detail':       return 'issue'
     case 'automation':         return 'automation'
     case 'office':             return 'office'
-    case 'news':               return 'news'
+    case 'news':
     case 'market-list':
     case 'market-rotation':
     case 'market-board':

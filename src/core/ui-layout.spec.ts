@@ -34,6 +34,17 @@ describe('ui-layout', () => {
     expect(layout.hidden).not.toContain('settings')
   })
 
+  it('drops a retired news rail entry from persisted layouts', () => {
+    const layout = normalizeUiLayout({
+      version: 1,
+      groups: [{ id: 'primary', items: ['chat', 'market', 'news'] }],
+      hidden: ['news', 'dev'],
+    })
+    expect(layout.groups.find((group) => group.id === 'primary')?.items).not.toContain('news')
+    expect(layout.hidden).not.toContain('news')
+    expect(layout.hidden).toEqual(['dev'])
+  })
+
   it('treats a missing or malformed file as the default document', async () => {
     const path = await layoutFile()
     expect(await readUiLayout(path)).toEqual(defaultUiLayout())
