@@ -20,12 +20,13 @@ export interface AgentRuntimesState extends AgentRuntimeQuickAccessProjection {
   readonly agents: readonly AgentInfo[]
   readonly readiness: AgentRuntimeReadinessSnapshot | null
   readonly quickAccessIds: readonly string[]
-  readonly recentAgentId: string | null
+  readonly recentAgentIds: readonly string[]
   readonly loading: boolean
   readonly refreshing: boolean
   readonly error: string | null
   refresh(agent?: string): Promise<void>
   saveQuickAccess(ids: readonly string[]): Promise<void>
+  recordSuccessfulUse(agentId: string): Promise<void>
 }
 
 interface AgentRuntimesStore {
@@ -33,7 +34,8 @@ interface AgentRuntimesStore {
   readiness: AgentRuntimeReadinessSnapshot | null
   quickAccessIds: readonly string[]
   confirmedQuickAccessIds: readonly string[]
-  recentAgentId: string | null
+  recentAgentIds: readonly string[]
+  confirmedRecentAgentIds: readonly string[]
   loading: boolean
   refreshing: boolean
   error: string | null
@@ -42,11 +44,12 @@ interface AgentRuntimesStore {
   loadGeneration: number
   saveGeneration: number
   saveQueue: Promise<unknown>
-  recentAgentTouched: boolean
+  recentGeneration: number
+  recentQueue: Promise<unknown>
   ensureLoaded(): Promise<void>
   refresh(agent?: string): Promise<void>
   saveQuickAccess(ids: readonly string[]): Promise<void>
-  adoptRecentAgent(agentId: string | null): void
+  recordSuccessfulUse(agentId: string): Promise<void>
 }
 
 function errorMessage(cause: unknown): string {
@@ -67,13 +70,13 @@ const emptyStoreSlice = {
   readiness: null as AgentRuntimeReadinessSnapshot | null,
   quickAccessIds: [] as readonly string[],
   confirmedQuickAccessIds: [] as readonly string[],
-  recentAgentId: null as string | null,
+  recentAgentIds: [] as readonly string[],
+  confirmedRecentAgentIds: [] as readonly string[],
   loading: true,
   refreshing: false,
   error: null as string | null,
   loaded: false,
   inflight: null as Promise<void> | null,
-  recentAgentTouched: false,
 }
 
 export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
@@ -81,6 +84,8 @@ export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
   loadGeneration: 0,
   saveGeneration: 0,
   saveQueue: Promise.resolve(),
+  recentGeneration: 0,
+  recentQueue: Promise.resolve(),
 
   async ensureLoaded() {
     if (get().loaded) return
@@ -89,30 +94,29 @@ export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
     const generation = get().loadGeneration
     const request = (async () => {
       set({ loading: true })
-      const [listed, snapshot, pins, recents] = await Promise.all([
+      const [listed, snapshot, preferences] = await Promise.all([
         asSettled(() => listAgents()),
         asSettled(() => getAgentRuntimeReadiness()),
         asSettled(() => preferencesApi.getAgentRuntimes()),
-        asSettled(() => preferencesApi.getQuickChat()),
       ])
       if (get().loadGeneration !== generation) return
       const agents = listed.status === 'fulfilled'
         ? listed.value ?? []
         : get().agents
-      const quickAccessIds = pins.status === 'fulfilled'
-        ? normalizeAgentRuntimeQuickAccessIds(pins.value?.quickAccessIds ?? [])
+      const quickAccessIds = preferences.status === 'fulfilled'
+        ? normalizeAgentRuntimeQuickAccessIds(preferences.value?.quickAccessIds ?? [])
         : get().quickAccessIds
+      const recentAgentIds = preferences.status === 'fulfilled'
+        ? normalizeAgentRuntimeQuickAccessIds(preferences.value?.recentAgentIds ?? [])
+        : get().recentAgentIds
       const failed = [listed, snapshot].find((result) => result.status === 'rejected')
       set({
         agents,
         readiness: snapshot.status === 'fulfilled' ? snapshot.value ?? null : get().readiness,
         quickAccessIds,
         confirmedQuickAccessIds: quickAccessIds,
-        recentAgentId: get().recentAgentTouched
-          ? get().recentAgentId
-          : recents.status === 'fulfilled'
-            ? recents.value?.recentLaunch?.agent ?? null
-            : get().recentAgentId,
+        recentAgentIds,
+        confirmedRecentAgentIds: recentAgentIds,
         error: failed && failed.status === 'rejected' ? errorMessage(failed.reason) : null,
         loading: false,
         loaded: true,
@@ -185,8 +189,32 @@ export const useAgentRuntimesStore = create<AgentRuntimesStore>((set, get) => ({
     return operation
   },
 
-  adoptRecentAgent(agentId: string | null) {
-    set({ recentAgentId: agentId, recentAgentTouched: true })
+  async recordSuccessfulUse(agentId: string) {
+    const normalizedAgentId = agentId.trim()
+    if (!normalizedAgentId) return
+    const nextIds = normalizeAgentRuntimeQuickAccessIds([
+      normalizedAgentId,
+      ...get().recentAgentIds.filter((id) => id !== normalizedAgentId),
+    ])
+    const generation = get().recentGeneration + 1
+    set({ recentGeneration: generation, recentAgentIds: nextIds, error: null })
+    const operation = get().recentQueue.catch(() => undefined).then(async () => {
+      try {
+        const saved = await preferencesApi.rememberAgentRuntimeUse(normalizedAgentId)
+        const confirmed = normalizeAgentRuntimeQuickAccessIds(saved.recentAgentIds ?? [])
+        const latest = get().recentGeneration === generation
+        set({
+          confirmedRecentAgentIds: confirmed,
+          ...(latest ? { recentAgentIds: confirmed, error: null } : {}),
+        })
+      } catch (cause) {
+        if (get().recentGeneration !== generation) return
+        set({ recentAgentIds: get().confirmedRecentAgentIds, error: errorMessage(cause) })
+        throw cause
+      }
+    })
+    set({ recentQueue: operation })
+    return operation
   },
 }))
 
@@ -197,6 +225,8 @@ export function resetAgentRuntimesStore(): void {
     loadGeneration: useAgentRuntimesStore.getState().loadGeneration + 1,
     saveGeneration: useAgentRuntimesStore.getState().saveGeneration + 1,
     saveQueue: Promise.resolve(),
+    recentGeneration: useAgentRuntimesStore.getState().recentGeneration + 1,
+    recentQueue: Promise.resolve(),
   })
 }
 
@@ -209,21 +239,22 @@ export function useAgentRuntimes(): AgentRuntimesState {
   const agents = useAgentRuntimesStore((state) => state.agents)
   const readiness = useAgentRuntimesStore((state) => state.readiness)
   const quickAccessIds = useAgentRuntimesStore((state) => state.quickAccessIds)
-  const recentAgentId = useAgentRuntimesStore((state) => state.recentAgentId)
+  const recentAgentIds = useAgentRuntimesStore((state) => state.recentAgentIds)
   const loading = useAgentRuntimesStore((state) => state.loading)
   const refreshing = useAgentRuntimesStore((state) => state.refreshing)
   const error = useAgentRuntimesStore((state) => state.error)
   const ensureLoaded = useAgentRuntimesStore((state) => state.ensureLoaded)
   const refreshStore = useAgentRuntimesStore((state) => state.refresh)
   const saveStore = useAgentRuntimesStore((state) => state.saveQuickAccess)
+  const recordSuccessfulUseStore = useAgentRuntimesStore((state) => state.recordSuccessfulUse)
 
   useEffect(() => {
     void ensureLoaded()
   }, [ensureLoaded])
 
   const projection = useMemo(
-    () => projectAgentRuntimeQuickAccess(agents, quickAccessIds, recentAgentId),
-    [agents, quickAccessIds, recentAgentId],
+    () => projectAgentRuntimeQuickAccess(agents, quickAccessIds, recentAgentIds),
+    [agents, quickAccessIds, recentAgentIds],
   )
 
   return {
@@ -231,7 +262,7 @@ export function useAgentRuntimes(): AgentRuntimesState {
     agents,
     readiness,
     quickAccessIds,
-    recentAgentId,
+    recentAgentIds,
     loading,
     refreshing,
     error,
@@ -239,6 +270,10 @@ export function useAgentRuntimes(): AgentRuntimesState {
     saveQuickAccess: useCallback(
       (ids: readonly string[]) => saveStore(ids),
       [saveStore],
+    ),
+    recordSuccessfulUse: useCallback(
+      (agentId: string) => recordSuccessfulUseStore(agentId),
+      [recordSuccessfulUseStore],
     ),
   }
 }

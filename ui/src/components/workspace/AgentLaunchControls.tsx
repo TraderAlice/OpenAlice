@@ -436,9 +436,9 @@ export const AgentLaunchSelectors = forwardRef<AgentLaunchSelectorsHandle, Agent
     return projectAgentRuntimeQuickAccess(
       pickerAgents,
       discovery.quickAccessIds,
-      discovery.recentAgentId,
+      discovery.recentAgentIds,
     ).primary
-  }, [discovery.catalog.length, discovery.primary, discovery.quickAccessIds, discovery.recentAgentId, pickerAgents])
+  }, [discovery.catalog.length, discovery.primary, discovery.quickAccessIds, discovery.recentAgentIds, pickerAgents])
   const workspaceAccess = config.accessMode === 'auto' && config.detectedCredential?.configured === true
   const nativeAccess = config.accessMode === 'native' || (
     config.accessMode === 'auto' && !workspaceAccess && config.effectiveCredential === null

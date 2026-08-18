@@ -76,6 +76,8 @@ export function normalizeAgentRuntimeQuickAccessIds(ids: unknown): string[] {
 
 const agentRuntimesPreferencesSchema = z.object({
   quickAccessIds: z.unknown().default([]).transform(normalizeAgentRuntimeQuickAccessIds),
+  /** Successful Session launches, newest first. This is presentation history, not runtime config. */
+  recentAgentIds: z.unknown().default([]).transform(normalizeAgentRuntimeQuickAccessIds),
 })
 
 const preferencesSchema = z.object({
@@ -93,6 +95,7 @@ const preferencesSchema = z.object({
   }),
   agentRuntimes: agentRuntimesPreferencesSchema.default({
     quickAccessIds: [],
+    recentAgentIds: [],
   }),
 })
 
@@ -105,6 +108,7 @@ export type AutoQuantPreferences = z.infer<typeof autoQuantPreferencesSchema>
 export type HarnessPreferences = z.infer<typeof harnessPreferencesSchema>
 export type AgentRuntimesPreferences = {
   readonly quickAccessIds: readonly string[]
+  readonly recentAgentIds: readonly string[]
 }
 export type Preferences = z.infer<typeof preferencesSchema>
 
@@ -150,7 +154,10 @@ export async function readAgentRuntimesPreferences(
   path = preferencesPath(),
 ): Promise<AgentRuntimesPreferences> {
   const preferences = await readPreferences(path)
-  return { quickAccessIds: [...preferences.agentRuntimes.quickAccessIds] }
+  return {
+    quickAccessIds: [...preferences.agentRuntimes.quickAccessIds],
+    recentAgentIds: [...preferences.agentRuntimes.recentAgentIds],
+  }
 }
 
 // Alice is single-writer at the process level, but two UI requests can still
@@ -285,7 +292,7 @@ export async function saveHarnessPreferences(
 }
 
 export async function saveAgentRuntimesPreferences(
-  next: AgentRuntimesPreferences,
+  next: Pick<AgentRuntimesPreferences, 'quickAccessIds'>,
   path = preferencesPath(),
 ): Promise<AgentRuntimesPreferences> {
   const operation = mutationQueue.catch(() => undefined).then(async () => {
@@ -293,11 +300,43 @@ export async function saveAgentRuntimesPreferences(
     const updated = preferencesSchema.parse({
       ...preferences,
       agentRuntimes: {
+        ...preferences.agentRuntimes,
         quickAccessIds: normalizeAgentRuntimeQuickAccessIds(next.quickAccessIds),
       },
     })
     await writePreferences(updated, path)
-    return { quickAccessIds: [...updated.agentRuntimes.quickAccessIds] }
+    return {
+      quickAccessIds: [...updated.agentRuntimes.quickAccessIds],
+      recentAgentIds: [...updated.agentRuntimes.recentAgentIds],
+    }
+  })
+  mutationQueue = operation
+  return operation
+}
+
+/** Promote a runtime only after a Session was created successfully. */
+export async function rememberAgentRuntimeUse(
+  agentId: string,
+  path = preferencesPath(),
+): Promise<AgentRuntimesPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const recentAgentIds = normalizeAgentRuntimeQuickAccessIds([
+      agentId,
+      ...preferences.agentRuntimes.recentAgentIds.filter((id) => id !== agentId),
+    ])
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      agentRuntimes: {
+        ...preferences.agentRuntimes,
+        recentAgentIds,
+      },
+    })
+    await writePreferences(updated, path)
+    return {
+      quickAccessIds: [...updated.agentRuntimes.quickAccessIds],
+      recentAgentIds: [...updated.agentRuntimes.recentAgentIds],
+    }
   })
   mutationQueue = operation
   return operation

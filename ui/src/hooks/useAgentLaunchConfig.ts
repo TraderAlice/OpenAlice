@@ -19,7 +19,7 @@ import {
   type Workspace,
   type WorkspaceCredentialDetection,
 } from '../components/workspace/api'
-import { useAgentRuntimes, useAgentRuntimesStore } from './useAgentRuntimes'
+import { useAgentRuntimes } from './useAgentRuntimes'
 import { requiresWorkspaceCredential, resolveAgentRuntime } from '../lib/agentRuntime'
 import {
   runtimeEffortOptions,
@@ -279,12 +279,10 @@ export function useAgentLaunchPreferences(): AgentLaunchPreferencesState {
         : { ...current.lastCredentialByAgent, [launch.agent]: launch.credentialSlug },
       recentLaunch: launch,
     }))
-    useAgentRuntimesStore.getState().adoptRecentAgent(launch.agent)
     try {
       const saved = await preferencesApi.rememberQuickChatLaunch(launch)
       if (saved) {
         setPreferences(saved)
-        useAgentRuntimesStore.getState().adoptRecentAgent(saved.recentLaunch?.agent ?? launch.agent)
         window.dispatchEvent(new CustomEvent(AGENT_LAUNCH_PREFERENCES_CHANGED_EVENT, { detail: saved }))
       }
     } catch {

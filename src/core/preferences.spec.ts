@@ -11,6 +11,7 @@ import {
   readPreferences,
   readQuickChatPreferences,
   rememberAutoQuantDefaultWorkspace,
+  rememberAgentRuntimeUse,
   rememberQuickChatCredential,
   rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
@@ -38,7 +39,7 @@ describe('preferences', () => {
       quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null, recentLaunch: null },
       autoQuant: { defaultWorkspaceId: null },
       harness: { showHeadlessBornSessions: false },
-      agentRuntimes: { quickAccessIds: [] },
+      agentRuntimes: { quickAccessIds: [], recentAgentIds: [] },
     })
 
     await writeFile(path, '{not-json', 'utf-8')
@@ -171,14 +172,21 @@ describe('preferences', () => {
     expect(normalizeAgentRuntimeQuickAccessIds(['pi', 'pi', '', 'codex', '  grok  ', 'omp', 'claude'])).toEqual([
       'pi', 'codex', 'grok', 'omp',
     ])
-    expect(await readAgentRuntimesPreferences(path)).toEqual({ quickAccessIds: [] })
+    expect(await readAgentRuntimesPreferences(path)).toEqual({
+      quickAccessIds: [],
+      recentAgentIds: [],
+    })
 
     const saved = await saveAgentRuntimesPreferences({
       quickAccessIds: ['pi', 'codex', 'pi', 'grok', 'omp', 'claude'],
     }, path)
-    expect(saved).toEqual({ quickAccessIds: ['pi', 'codex', 'grok', 'omp'] })
+    expect(saved).toEqual({
+      quickAccessIds: ['pi', 'codex', 'grok', 'omp'],
+      recentAgentIds: [],
+    })
     expect(await readAgentRuntimesPreferences(path)).toEqual({
       quickAccessIds: ['pi', 'codex', 'grok', 'omp'],
+      recentAgentIds: [],
     })
     expect(await readFile(path, 'utf-8')).not.toContain('installed')
     expect(await readFile(path, 'utf-8')).not.toContain('binPath')
@@ -186,10 +194,27 @@ describe('preferences', () => {
     await rememberQuickChatCredential('pi', 'minimax-1', path)
     expect(await readAgentRuntimesPreferences(path)).toEqual({
       quickAccessIds: ['pi', 'codex', 'grok', 'omp'],
+      recentAgentIds: [],
     })
     expect(await readQuickChatPreferences(path)).toEqual({
       lastCredentialByAgent: { pi: 'minimax-1' },
       recentChatWorkspaceId: null,
+    })
+  })
+
+  it('stores successful runtime use as a bounded MRU without changing the fallback baseline', async () => {
+    const path = await preferenceFile()
+    await saveAgentRuntimesPreferences({ quickAccessIds: ['pi', 'codex'] }, path)
+    await rememberAgentRuntimeUse('claude', path)
+    await rememberAgentRuntimeUse('grok', path)
+    await rememberAgentRuntimeUse('claude', path)
+    await rememberAgentRuntimeUse('opencode', path)
+    await rememberAgentRuntimeUse('cursor', path)
+    const saved = await rememberAgentRuntimeUse('omp', path)
+
+    expect(saved).toEqual({
+      quickAccessIds: ['pi', 'codex'],
+      recentAgentIds: ['omp', 'cursor', 'opencode', 'claude'],
     })
   })
 })

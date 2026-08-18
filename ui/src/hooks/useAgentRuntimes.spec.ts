@@ -10,15 +10,13 @@ import {
   probeAgentRuntimeReadiness,
   type AgentInfo,
 } from '../components/workspace/api'
-import { useAgentLaunchPreferences } from './useAgentLaunchConfig'
 import { resetAgentRuntimesStore, useAgentRuntimes } from './useAgentRuntimes'
 
 vi.mock('../api/preferences', () => ({
   preferencesApi: {
     getAgentRuntimes: vi.fn(),
     saveAgentRuntimes: vi.fn(),
-    getQuickChat: vi.fn(),
-    rememberQuickChatLaunch: vi.fn(),
+    rememberAgentRuntimeUse: vi.fn(),
   },
 }))
 
@@ -77,35 +75,29 @@ describe('useAgentRuntimes', () => {
     vi.mocked(probeAgentRuntimeReadiness).mockReset()
     vi.mocked(preferencesApi.getAgentRuntimes).mockReset()
     vi.mocked(preferencesApi.saveAgentRuntimes).mockReset()
-    vi.mocked(preferencesApi.getQuickChat).mockReset()
-    vi.mocked(preferencesApi.rememberQuickChatLaunch).mockReset()
+    vi.mocked(preferencesApi.rememberAgentRuntimeUse).mockReset()
     vi.mocked(listAgents).mockResolvedValue(agents)
     vi.mocked(getAgentRuntimeReadiness).mockResolvedValue(readiness)
     vi.mocked(probeAgentRuntimeReadiness).mockResolvedValue(readiness)
-    vi.mocked(preferencesApi.getAgentRuntimes).mockResolvedValue({ quickAccessIds: ['pi', 'grok'] })
-    vi.mocked(preferencesApi.saveAgentRuntimes).mockImplementation(async (next) => next)
-    vi.mocked(preferencesApi.rememberQuickChatLaunch).mockImplementation(async (launch) => ({
-      lastCredentialByAgent: {},
-      recentChatWorkspaceId: null,
-      recentLaunch: launch,
-    }))
-    vi.mocked(preferencesApi.getQuickChat).mockResolvedValue({
-      lastCredentialByAgent: {},
-      recentChatWorkspaceId: null,
-      recentLaunch: {
-        agent: 'opencode',
-        credentialSlug: null,
-        model: null,
-        reasoningEffort: null,
-      },
+    vi.mocked(preferencesApi.getAgentRuntimes).mockResolvedValue({
+      quickAccessIds: ['pi', 'grok'],
+      recentAgentIds: ['opencode'],
     })
+    vi.mocked(preferencesApi.saveAgentRuntimes).mockImplementation(async (next) => ({
+      ...next,
+      recentAgentIds: ['opencode'],
+    }))
+    vi.mocked(preferencesApi.rememberAgentRuntimeUse).mockImplementation(async (agentId) => ({
+      quickAccessIds: ['pi', 'grok'],
+      recentAgentIds: [agentId, 'opencode'].filter((id, index, all) => all.indexOf(id) === index),
+    }))
   })
 
   afterEach(() => {
     resetAgentRuntimesStore()
   })
 
-  it('starts loading and projects pinned ids before recent and registry fallbacks', async () => {
+  it('starts loading and projects recent ids before pins and baseline fallbacks', async () => {
     const { result } = renderHook(() => useAgentRuntimes())
     expect(result.current.loading).toBe(true)
     expect(result.current.primary).toEqual([])
@@ -114,11 +106,11 @@ describe('useAgentRuntimes', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.catalog.map((item) => item.id)).not.toContain('shell')
     expect(result.current.agents.map((item) => item.id)).toContain('shell')
-    expect(result.current.primary.map((item) => item.id)).toEqual(['pi', 'grok', 'opencode', 'claude'])
+    expect(result.current.primary.map((item) => item.id)).toEqual(['opencode', 'pi', 'grok', 'claude'])
     expect(result.current.notInstalled.map((item) => item.id)).toEqual(['codex'])
     expect(result.current.readiness).toEqual(readiness)
     expect(result.current.quickAccessIds).toEqual(['pi', 'grok'])
-    expect(result.current.recentAgentId).toBe('opencode')
+    expect(result.current.recentAgentIds).toEqual(['opencode'])
   })
 
   it('reports a load error without leaving the hook unusable', async () => {
@@ -138,7 +130,6 @@ describe('useAgentRuntimes', () => {
     expect(listAgents).toHaveBeenCalledOnce()
     expect(getAgentRuntimeReadiness).toHaveBeenCalledOnce()
     expect(preferencesApi.getAgentRuntimes).toHaveBeenCalledOnce()
-    expect(preferencesApi.getQuickChat).toHaveBeenCalledOnce()
     expect(second.result.current.quickAccessIds).toEqual(first.result.current.quickAccessIds)
     expect(second.result.current.readiness).toBe(first.result.current.readiness)
 
@@ -148,7 +139,7 @@ describe('useAgentRuntimes', () => {
     expect(preferencesApi.saveAgentRuntimes).toHaveBeenCalledOnce()
     expect(first.result.current.quickAccessIds).toEqual(['cursor', 'pi', 'omp'])
     expect(second.result.current.quickAccessIds).toEqual(['cursor', 'pi', 'omp'])
-    expect(second.result.current.primary.map((item) => item.id)).toEqual(['cursor', 'pi', 'omp', 'opencode'])
+    expect(second.result.current.primary.map((item) => item.id)).toEqual(['opencode', 'cursor', 'pi', 'omp'])
 
     await act(async () => {
       await second.result.current.refresh('pi')
@@ -169,19 +160,20 @@ describe('useAgentRuntimes', () => {
     })
     expect(result.current.quickAccessIds).toEqual(['pi', 'grok'])
     expect(result.current.error).toBe('write failed')
-    expect(result.current.primary.map((item) => item.id)).toEqual(['pi', 'grok', 'opencode', 'claude'])
+    expect(result.current.primary.map((item) => item.id)).toEqual(['opencode', 'pi', 'grok', 'claude'])
   })
 
   it('keeps a successful stale save as confirmed when the later intent fails', async () => {
     const { result } = renderHook(() => useAgentRuntimes())
     await waitFor(() => expect(result.current.loading).toBe(false))
 
-    let finishA: (value: { quickAccessIds: readonly string[] }) => void = () => undefined
-    const pendingA = new Promise<{ quickAccessIds: readonly string[] }>((resolve) => {
+    type RuntimePreferences = { quickAccessIds: readonly string[]; recentAgentIds: readonly string[] }
+    let finishA: (value: RuntimePreferences) => void = () => undefined
+    const pendingA = new Promise<RuntimePreferences>((resolve) => {
       finishA = resolve
     })
     let failB: () => void = () => undefined
-    const pendingB = new Promise<{ quickAccessIds: readonly string[] }>((_resolve, reject) => {
+    const pendingB = new Promise<RuntimePreferences>((_resolve, reject) => {
       failB = () => reject(new Error('write failed'))
     })
     vi.mocked(preferencesApi.saveAgentRuntimes)
@@ -202,7 +194,7 @@ describe('useAgentRuntimes', () => {
     expect(result.current.quickAccessIds).toEqual(['claude'])
 
     await act(async () => {
-      finishA({ quickAccessIds: ['cursor'] })
+      finishA({ quickAccessIds: ['cursor'], recentAgentIds: ['opencode'] })
       await saveA
     })
     await waitFor(() => expect(preferencesApi.saveAgentRuntimes).toHaveBeenCalledTimes(2))
@@ -214,28 +206,36 @@ describe('useAgentRuntimes', () => {
     })
     expect(result.current.quickAccessIds).toEqual(['cursor'])
     expect(result.current.error).toBe('write failed')
-    expect(result.current.primary.map((item) => item.id)[0]).toBe('cursor')
+    expect(result.current.primary.map((item) => item.id)[0]).toBe('opencode')
   })
 
-  it('updates quick-access fallback after an installation-level recent launch is remembered', async () => {
+  it('promotes only successful launches and persists the complete MRU order', async () => {
     const runtimes = renderHook(() => useAgentRuntimes())
-    const preferences = renderHook(() => useAgentLaunchPreferences())
     await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
-    expect(runtimes.result.current.recentAgentId).toBe('opencode')
-    expect(runtimes.result.current.primary.map((item) => item.id)).toEqual(['pi', 'grok', 'opencode', 'claude'])
+    expect(runtimes.result.current.recentAgentIds).toEqual(['opencode'])
+    expect(runtimes.result.current.primary.map((item) => item.id)).toEqual(['opencode', 'pi', 'grok', 'claude'])
 
     await act(async () => {
-      await preferences.result.current.rememberLaunch({
-        agent: 'cursor',
-        accessMode: 'auto',
-        credentialSlug: null,
-        model: null,
-        reasoningEffort: null,
-      })
+      await runtimes.result.current.recordSuccessfulUse('cursor')
     })
-    expect(preferencesApi.rememberQuickChatLaunch).toHaveBeenCalledOnce()
-    expect(runtimes.result.current.recentAgentId).toBe('cursor')
-    expect(runtimes.result.current.primary.map((item) => item.id)).toEqual(['pi', 'grok', 'cursor', 'claude'])
+    expect(preferencesApi.rememberAgentRuntimeUse).toHaveBeenCalledWith('cursor')
+    expect(runtimes.result.current.recentAgentIds).toEqual(['cursor', 'opencode'])
+    expect(runtimes.result.current.primary.map((item) => item.id)).toEqual(['cursor', 'opencode', 'pi', 'grok'])
     expect(runtimes.result.current.quickAccessIds).toEqual(['pi', 'grok'])
+  })
+
+  it('records every successful launch when promotions arrive back-to-back', async () => {
+    const runtimes = renderHook(() => useAgentRuntimes())
+    await waitFor(() => expect(runtimes.result.current.loading).toBe(false))
+
+    await act(async () => {
+      await Promise.all([
+        runtimes.result.current.recordSuccessfulUse('cursor'),
+        runtimes.result.current.recordSuccessfulUse('claude'),
+      ])
+    })
+
+    expect(preferencesApi.rememberAgentRuntimeUse).toHaveBeenNthCalledWith(1, 'cursor')
+    expect(preferencesApi.rememberAgentRuntimeUse).toHaveBeenNthCalledWith(2, 'claude')
   })
 })

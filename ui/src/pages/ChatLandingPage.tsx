@@ -26,6 +26,7 @@ import { RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
 import { useAliceProject } from '../hooks/useAliceProject'
+import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
@@ -64,6 +65,7 @@ function HarnessLandingPage({
 }) {
   const { t } = useTranslation()
   const { project } = useAliceProject()
+  const { recordSuccessfulUse } = useAgentRuntimes()
   const {
     quickChat,
     agents,
@@ -204,6 +206,7 @@ function HarnessLandingPage({
         launchConfig.launchReasoningEffort,
         launchConfig.accessMode === 'native' ? 'native' : undefined,
       )
+      void recordSuccessfulUse(effectiveAgent).catch(() => undefined)
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')
     } catch (err) {

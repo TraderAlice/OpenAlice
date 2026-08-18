@@ -7,6 +7,7 @@ import {
   readAgentRuntimesPreferences,
   readHarnessPreferences,
   readQuickChatPreferences,
+  rememberAgentRuntimeUse,
   rememberQuickChatCredential,
   rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
@@ -74,7 +75,8 @@ interface PreferenceRouteDeps {
   readHarnessPreferences?(): Promise<HarnessPreferences>
   saveHarnessPreferences?(next: HarnessPreferences): Promise<HarnessPreferences>
   readAgentRuntimesPreferences?(): Promise<AgentRuntimesPreferences>
-  saveAgentRuntimesPreferences?(next: AgentRuntimesPreferences): Promise<AgentRuntimesPreferences>
+  saveAgentRuntimesPreferences?(next: Pick<AgentRuntimesPreferences, 'quickAccessIds'>): Promise<AgentRuntimesPreferences>
+  rememberAgentRuntimeUse?(agentId: string): Promise<AgentRuntimesPreferences>
   getWorkspaceShellStatus(): Promise<WindowsWorkspaceShellStatus>
   saveWorkspaceShellPreference(input: {
     mode: 'auto' | 'custom'
@@ -92,6 +94,7 @@ const defaultDeps: PreferenceRouteDeps = {
   saveHarnessPreferences: (next) => saveHarnessPreferences(next),
   readAgentRuntimesPreferences: () => readAgentRuntimesPreferences(),
   saveAgentRuntimesPreferences: (next) => saveAgentRuntimesPreferences(next),
+  rememberAgentRuntimeUse: (agentId) => rememberAgentRuntimeUse(agentId),
   getWorkspaceShellStatus: () => getWindowsWorkspaceShellStatus(),
   saveWorkspaceShellPreference: (input) => saveWindowsWorkspaceShellPreference(input),
 }
@@ -196,6 +199,23 @@ export function createPreferencesRoutes(
       return c.json(await (deps.saveAgentRuntimesPreferences ?? defaultDeps.saveAgentRuntimesPreferences!)({
         quickAccessIds,
       }))
+    } catch (error) {
+      return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
+    }
+  })
+
+  app.put('/agent-runtimes/recent', async (c) => {
+    const parsed = z.object({
+      agentId: z.string().trim().min(1).max(128),
+    }).safeParse(await c.req.json().catch(() => null))
+    const adapter = parsed.success ? adapterRegistry.get(parsed.data.agentId) : null
+    if (!parsed.success || !adapter || !isAgentRuntime(adapter)) {
+      return c.json({ error: 'invalid_agent_runtime_preference' }, 400)
+    }
+    try {
+      return c.json(await (deps.rememberAgentRuntimeUse ?? defaultDeps.rememberAgentRuntimeUse!)(
+        parsed.data.agentId,
+      ))
     } catch (error) {
       return c.json({ error: 'preferences_write_failed', message: String(error) }, 500)
     }

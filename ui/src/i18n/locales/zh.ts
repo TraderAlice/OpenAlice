@@ -531,7 +531,7 @@ export const zh: Resources = {
       title: 'Agent 运行时',
       description: '查看这个 AliceProject 可以启动的原生 CLI，修复缺失安装，并选择最多四个快捷运行时。',
       quickAccess: '快捷入口',
-      quickAccessDescription: '这些运行时会出现在启动选择器最前面。空位会先用最近使用且已安装的运行时补齐，再按注册表中其余已安装顺序补齐。未安装的运行时不会自动填入。',
+      quickAccessDescription: '成功创建 Session 后，对应运行时会自动移到最前面。这里的顺序作为最近使用记录之后的候补基线；未安装的运行时不会自动填入。',
       quickAccessEmpty: '还没有置顶运行时。可从下方目录最多添加四个。',
       catalog: '已发现的运行时',
       catalogDescription: '安装状态由本机探测，不会作为偏好保存。',

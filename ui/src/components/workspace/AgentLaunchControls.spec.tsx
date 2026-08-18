@@ -19,12 +19,13 @@ vi.mock('../../hooks/useAgentRuntimes', () => ({
     notInstalled: [],
     readiness: null,
     quickAccessIds: [],
-    recentAgentId: null,
+    recentAgentIds: [],
     loading: false,
     refreshing: false,
     error: null,
     refresh: vi.fn(),
     saveQuickAccess: vi.fn(),
+    recordSuccessfulUse: vi.fn(),
   }),
 }))
 
@@ -140,18 +141,18 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     const openCode = screen.getByRole('menuitem', { name: /OpenCode/ })
     const pi = screen.getByRole('menuitem', { name: /^Pi/ })
     const others = screen.getByRole('menuitem', { name: i18n.t('chatLanding.otherRuntimes') })
-    expect(document.activeElement).toBe(openCode)
+    expect(document.activeElement).toBe(pi)
 
     await user.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(pi)
-    await user.keyboard('{Home}')
     expect(document.activeElement).toBe(openCode)
+    await user.keyboard('{Home}')
+    expect(document.activeElement).toBe(pi)
     await user.keyboard('{End}')
     expect(document.activeElement).toBe(others)
     await user.keyboard('{Home}')
-    expect(document.activeElement).toBe(openCode)
-    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(pi)
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(openCode)
 
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('menu')).toBeNull()
