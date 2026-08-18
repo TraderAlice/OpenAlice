@@ -5,7 +5,6 @@ import {
   Bot,
   Check,
   ChevronDown,
-  ChevronRight,
   Copy,
   Download,
   FileCode2,
@@ -32,6 +31,7 @@ import { useWorkspace } from '../tabs/store'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { readWorkspaceFile, type ReadFileResult } from '../components/workspace/api'
 import { workspaceDisplayName, workspaceDisplayTitle } from '../components/workspace/display'
+import { presentInboxEntry } from '../lib/inbox-presentation'
 import type { InboxEntry, InboxDoc } from '../api/inbox'
 
 interface InboxPageProps {
@@ -329,32 +329,41 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
     (prompt: string) => api.inquiries.askInbox(entry.id, prompt),
     [entry.id],
   )
+  const relativeTime = formatRelativeTime(entry.ts)
+  const { documentTitle, repeatsLeadingHeading } = presentInboxEntry(entry, {
+    source: displayLabel,
+    unread: false,
+    time: relativeTime,
+    untitled: t('inbox.untitledUpdate'),
+    unreadLabel: t('inbox.unread'),
+    moreAttachments: (count) => t('inbox.moreAttachments', { count }),
+  })
 
   return (
-    <div className="mx-auto max-w-[920px] px-4 py-6 md:px-8 md:py-8">
-      {/* Provenance is identity, not a third way to open the same Session. */}
-      <header className="mb-5 border-b border-border/70 pb-3">
+    <article className="mx-auto w-full max-w-[46rem] px-4 py-6 md:px-6 md:py-9">
+      <header className="mb-7">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="text-pretty break-words text-[1.35rem] font-semibold leading-snug tracking-[-0.02em] text-foreground md:text-[1.5rem]">
+              {documentTitle}
+            </h1>
+            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
               <span
-                className={`text-[14px] font-semibold ${
-                  wsAlive ? 'text-foreground' : 'text-muted-foreground/70 line-through'
-                }`}
+                className={wsAlive ? 'min-w-0 break-words' : 'min-w-0 break-words text-muted-foreground/70 line-through'}
                 title={wsAlive ? displayTitle : t('inbox.workspaceNotExists')}
               >
                 {displayLabel}
               </span>
               {senderLabel && senderDisplay && (
                 <span className="inline-flex min-w-0 items-center">
-                  <ChevronRight size={11} className="mr-1 shrink-0 text-muted-foreground/35" aria-hidden />
+                  <span className="mr-2 text-muted-foreground/35" aria-hidden>·</span>
                   <Popover open={senderPopoverOpen} onOpenChange={setSenderPopoverOpen}>
                     <PopoverTrigger
                       render={<button
                         ref={senderTriggerRef}
                         type="button"
                         aria-label={t('inbox.showSenderDetails', { sender: senderDisplay })}
-                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[11px] font-medium text-muted-foreground/75 underline decoration-border underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-0"
+                        className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-sm text-[12px] text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:min-h-0"
                       />}
                     >
                         {origin?.kind === 'interactive'
@@ -402,23 +411,26 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
                 </span>
               )}
               {issueId && (
-                <button
-                  type="button"
-                  onClick={openIssue}
-                  title={t('inbox.fromIssueTitle', { issue: issueId })}
-                  className="oa-pressable inline-flex min-h-10 min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-left text-[11px] text-muted-foreground/75 hover:bg-primary/10 hover:text-primary sm:min-h-0 sm:py-0.5"
-                >
-                  <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
-                  <span className="min-w-0 break-words sm:max-w-[220px] sm:truncate">
-                    {t('inbox.fromIssue', { issue: issueTitle ?? issueId })}
-                  </span>
-                </button>
+                <span className="inline-flex min-w-0 items-center">
+                  <span className="mr-2 text-muted-foreground/35" aria-hidden>·</span>
+                  <button
+                    type="button"
+                    onClick={openIssue}
+                    title={t('inbox.fromIssueTitle', { issue: issueId })}
+                    className="oa-pressable inline-flex min-h-10 min-w-0 items-center gap-1 rounded-sm py-1 text-left text-[12px] text-muted-foreground hover:text-primary sm:min-h-0 sm:py-0"
+                  >
+                    <ListChecks size={12} strokeWidth={1.75} className="shrink-0" />
+                    <span className="min-w-0 break-words sm:max-w-[220px] sm:truncate">
+                      {t('inbox.fromIssue', { issue: issueTitle ?? issueId })}
+                    </span>
+                  </button>
+                </span>
               )}
             </div>
             <div className="mt-1.5 text-[11px] tabular-nums text-muted-foreground/55">
               {formatAbsolute(entry.ts)}
               <span className="mx-1.5 text-muted-foreground/30">·</span>
-              {formatRelativeTime(entry.ts)}
+              {relativeTime}
             </div>
           </div>
           <div className="-mr-1 flex shrink-0 items-center gap-1">
@@ -458,27 +470,33 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           </div>
         </div>
       </header>
-      {continueError && <div className="-mt-3 mb-5 text-[12px] text-destructive">{continueError}</div>}
+      {continueError && <div className="-mt-4 mb-6 text-[12px] text-destructive">{continueError}</div>}
 
-      {/* The sender's message is the Inbox asset's primary content. */}
       {hasComments && (
-        <div className="text-[15px] leading-relaxed text-foreground/90">
+        <div className="min-w-0">
           <MarkdownContent
             text={entry.comments!}
+            className={repeatsLeadingHeading ? 'inbox-report-body--repeats-heading' : undefined}
+            variant="reading"
             strikethrough={false}
             codeSpanWikilinks
-            className="leading-relaxed text-foreground/90"
           />
         </div>
       )}
 
       {hasDocs && (
-        <section className={hasComments ? 'mt-7' : ''}>
-          <div className="mb-2.5 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/55">
+        <section
+          className={hasComments ? 'mt-10 border-t border-border/60 pt-7' : ''}
+          aria-labelledby={`inbox-attachments-${entry.id}`}
+        >
+          <h2
+            id={`inbox-attachments-${entry.id}`}
+            className="mb-3 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/60"
+          >
             <Paperclip size={12} aria-hidden />
             {t('inbox.documentsSection')}
             <span className="font-normal tabular-nums text-muted-foreground/40">{entry.docs!.length}</span>
-          </div>
+          </h2>
           <div className="space-y-2">
             {entry.docs!.map((doc) => (
               <InboxAttachment
@@ -500,11 +518,11 @@ function Detail({ entry, onDelete }: { entry: InboxEntry; onDelete: () => void }
           ask={askInbox}
         />
       ) : (
-        <div className="mt-8 border-t border-border/50 pt-4 text-[12px] italic text-muted-foreground/60">
+        <div className="mt-10 border-t border-border/60 pt-6 text-[12px] italic text-muted-foreground/60">
           {t('inbox.cannotReplyWorkspaceGone')}
         </div>
       )}
-    </div>
+    </article>
   )
 }
 

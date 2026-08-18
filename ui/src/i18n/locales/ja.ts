@@ -2079,6 +2079,8 @@ export const ja: Resources = {
     noMessages: '受信トレイにメッセージがありません。',
     emptyHint: 'ワークスペースがステータス更新をここに送ります。',
     untitledUpdate: '要約のない更新',
+    unread: '未読',
+    moreAttachments: 'ほか {{count}} 件',
     dateToday: '今日',
     dateYesterday: '昨日',
     dateThisWeek: '今週',

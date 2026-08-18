@@ -103,7 +103,7 @@ describe('InboxSidebar Workspace labels', () => {
 
     render(<InboxSidebar />)
 
-    const update = screen.getByText('Research is ready.')
+    const update = screen.getByText('Research is ready')
     const workspace = screen.getByText('Research desk')
     expect(update.compareDocumentPosition(workspace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(update.className).toMatch(/font-(medium|semibold)/)
@@ -117,6 +117,52 @@ describe('InboxSidebar Workspace labels', () => {
     render(<InboxSidebar />)
 
     expect(screen.getByText('Update without a summary')).toBeTruthy()
+  })
+
+  it('gives a long report a concise accessible name and an optional excerpt', () => {
+    const omittedTail = 'TAIL_MARKER_THAT_MUST_NOT_BE_THE_ROW_NAME'
+    mocks.mode = 'time'
+    mocks.entries = [{
+      ...mocks.entries[0]!,
+      comments: [
+        'Morning scan is in.',
+        '',
+        `VST led on datacenter-power flow, and the rest of the tape stayed quiet. ${omittedTail}`,
+      ].join('\n'),
+    }]
+
+    render(<InboxSidebar />)
+
+    const row = screen.getByRole('button', { name: /Morning scan is in/ })
+    const accessibleName = row.getAttribute('aria-label') ?? ''
+    expect(accessibleName).toContain('Morning scan is in')
+    expect(accessibleName).toContain('Research desk')
+    expect(accessibleName).toContain('Unread')
+    expect(accessibleName).not.toContain(omittedTail)
+    expect(accessibleName.length).toBeLessThan(160)
+    expect(screen.getByText(/VST led on datacenter-power flow/)).toBeTruthy()
+    expect(screen.queryByText(omittedTail)).toBeNull()
+  })
+
+  it('names attachment-only and empty pushes without using a body as the title', () => {
+    mocks.mode = 'time'
+    mocks.entries = [
+      {
+        id: 'inbox-docs',
+        ts: Date.now(),
+        workspaceId: 'workspace-1',
+        comments: '',
+        docs: [{ path: 'reports/close-report.md' }, { path: 'notes/context.txt' }],
+      },
+    ]
+
+    render(<InboxSidebar />)
+
+    const row = screen.getByRole('button', { name: /close-report\.md/ })
+    expect(row.getAttribute('aria-label')).toContain('close-report.md')
+    expect(row.getAttribute('aria-label')).toContain('+1 more')
+    expect(screen.getByText('close-report.md · +1 more')).toBeTruthy()
+    expect(screen.queryByText(/reports\/close-report/)).toBeNull()
   })
 })
 
@@ -151,8 +197,8 @@ describe('InboxSidebar search', () => {
     const search = screen.getByRole('searchbox', { name: 'Search Inbox…' })
     await user.type(search, 'opencode')
 
-    expect(screen.getByText('Macro alert published.')).toBeTruthy()
-    expect(screen.queryByText('Research is ready.')).toBeNull()
+    expect(screen.getByText('Macro alert published')).toBeTruthy()
+    expect(screen.queryByText('Research is ready')).toBeNull()
     expect(screen.getByText('1 of 2 updates')).toBeTruthy()
 
     search.blur()
@@ -165,8 +211,8 @@ describe('InboxSidebar search', () => {
     expect(screen.getByText('No updates match “nothing-here”.')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Clear Inbox search' }))
-    expect(screen.getByText('Research is ready.')).toBeTruthy()
-    expect(screen.getByText('Macro alert published.')).toBeTruthy()
+    expect(screen.getByText('Research is ready')).toBeTruthy()
+    expect(screen.getByText('Macro alert published')).toBeTruthy()
     expect(screen.queryByText(/updates match/)).toBeNull()
   })
 })

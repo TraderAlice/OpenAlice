@@ -2090,6 +2090,8 @@ export const en = {
     noMessages: 'No inbox messages.',
     emptyHint: 'Workspaces will push status updates here.',
     untitledUpdate: 'Update without a summary',
+    unread: 'Unread',
+    moreAttachments: '+{{count}} more',
     dateToday: 'Today',
     dateYesterday: 'Yesterday',
     dateThisWeek: 'This week',
