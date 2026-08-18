@@ -266,9 +266,14 @@ describe('preferences routes', () => {
   })
 
   it('reads and persists an ordered agent-runtime quick-access list', async () => {
-    const read = vi.fn(async () => ({ quickAccessIds: ['pi', 'codex'] }))
+    const read = vi.fn(async () => ({ quickAccessIds: ['pi', 'codex'], recentAgentIds: ['grok'] }))
     const save = vi.fn(async (next: { quickAccessIds: readonly string[] }) => ({
       quickAccessIds: [...next.quickAccessIds],
+      recentAgentIds: ['grok'],
+    }))
+    const rememberUse = vi.fn(async (agentId: string) => ({
+      quickAccessIds: ['grok', 'opencode', 'pi'],
+      recentAgentIds: [agentId, 'grok'],
     }))
     const app = createPreferencesRoutes({
       readQuickChatPreferences: vi.fn(),
@@ -276,12 +281,14 @@ describe('preferences routes', () => {
       rememberRecentChatWorkspace: unusedRecentWorkspace,
       readAgentRuntimesPreferences: read,
       saveAgentRuntimesPreferences: save,
+      rememberAgentRuntimeUse: rememberUse,
       getWorkspaceShellStatus: unusedShellStatus,
       saveWorkspaceShellPreference: unusedShellSave,
     })
 
     expect(await (await app.request('/agent-runtimes')).json()).toEqual({
       quickAccessIds: ['pi', 'codex'],
+      recentAgentIds: ['grok'],
     })
     const response = await app.request('/agent-runtimes', {
       method: 'PUT',
@@ -289,8 +296,23 @@ describe('preferences routes', () => {
       body: JSON.stringify({ quickAccessIds: ['grok', 'opencode', 'pi'] }),
     })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ quickAccessIds: ['grok', 'opencode', 'pi'] })
+    expect(await response.json()).toEqual({
+      quickAccessIds: ['grok', 'opencode', 'pi'],
+      recentAgentIds: ['grok'],
+    })
     expect(save).toHaveBeenCalledWith({ quickAccessIds: ['grok', 'opencode', 'pi'] })
+
+    const recentResponse = await app.request('/agent-runtimes/recent', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agentId: 'claude' }),
+    })
+    expect(recentResponse.status).toBe(200)
+    expect(await recentResponse.json()).toEqual({
+      quickAccessIds: ['grok', 'opencode', 'pi'],
+      recentAgentIds: ['claude', 'grok'],
+    })
+    expect(rememberUse).toHaveBeenCalledWith('claude')
   })
 
   it('rejects unknown, utility, duplicate, or oversized runtime quick-access lists', async () => {

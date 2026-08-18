@@ -539,7 +539,7 @@ export const zhHant: Resources = {
       title: 'Agent 執行環境',
       description: '查看這個 AliceProject 可以啟動的原生 CLI，修復缺失安裝，並選擇最多四個快捷執行環境。',
       quickAccess: '快捷入口',
-      quickAccessDescription: '這些執行環境會出現在啟動選擇器最前面。空位會先用最近使用且已安裝的執行環境補齊，再按登錄表中其餘已安裝順序補齊。未安裝的執行環境不會自動填入。',
+      quickAccessDescription: '成功建立 Session 後，對應執行環境會自動移到最前面。這裡的順序作為最近使用記錄之後的候補基線；未安裝的執行環境不會自動填入。',
       quickAccessEmpty: '還沒有釘選執行環境。可從下方目錄最多新增四個。',
       catalog: '已發現的執行環境',
       catalogDescription: '安裝狀態由本機探測，不會作為偏好儲存。',

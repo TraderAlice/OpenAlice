@@ -90,12 +90,13 @@ vi.mock('../hooks/useAgentRuntimes', () => ({
       },
     },
     quickAccessIds: mocks.quickAccessIds,
-    recentAgentId: null,
+    recentAgentIds: [],
     loading: false,
     refreshing: false,
     error: null,
     refresh: mocks.refresh,
     saveQuickAccess: mocks.saveQuickAccess,
+    recordSuccessfulUse: vi.fn(),
   }),
 }))
 

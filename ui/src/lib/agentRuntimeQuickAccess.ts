@@ -1,6 +1,12 @@
 import type { AgentInfo } from '../components/workspace/api'
 
 export const AGENT_RUNTIME_QUICK_ACCESS_LIMIT = 4
+export const DEFAULT_AGENT_RUNTIME_QUICK_ACCESS_IDS = [
+  'pi',
+  'codex',
+  'claude',
+  'grok',
+] as const
 
 export function normalizeAgentRuntimeQuickAccessIds(ids: readonly unknown[]): string[] {
   const seen = new Set<string>()
@@ -43,15 +49,15 @@ export interface AgentRuntimeQuickAccessProjection {
 }
 
 /**
- * Pinned ids first (when they are known and installed), then the recently used
- * installed runtime, then remaining installed registry order. Uninstalled
- * runtimes never occupy a fallback slot. The full catalog stays in `others`
- * plus the complete installed / not-installed partitions.
+ * Successful launches form an MRU queue. Manually selected quick-access ids
+ * then provide an installation-level baseline, followed by the product's cold
+ * start order and finally registry order. Uninstalled runtimes never occupy a
+ * primary slot.
  */
 export function projectAgentRuntimeQuickAccess(
   agents: readonly AgentInfo[],
   pinnedIds: readonly string[],
-  recentAgentId: string | null,
+  recentAgentIds: readonly string[],
 ): AgentRuntimeQuickAccessProjection {
   const catalog = agentRuntimeCatalog(agents)
   const byId = new Map(catalog.map((agent) => [agent.id, agent]))
@@ -66,8 +72,9 @@ export function projectAgentRuntimeQuickAccess(
     primary.push(agent)
   }
 
+  for (const id of recentAgentIds) pushInstalled(id)
   for (const id of pinnedIds) pushInstalled(id)
-  pushInstalled(recentAgentId)
+  for (const id of DEFAULT_AGENT_RUNTIME_QUICK_ACCESS_IDS) pushInstalled(id)
   for (const agent of catalog) pushInstalled(agent.id)
 
   return {

@@ -10,6 +10,7 @@ let recentLaunch = {
 }
 let showHeadlessBornSessions = false
 let agentRuntimeQuickAccessIds: string[] = []
+let recentAgentRuntimeIds: string[] = []
 
 export const preferencesHandlers = [
   http.get('/api/preferences/quick-chat', () =>
@@ -84,7 +85,10 @@ export const preferencesHandlers = [
     return HttpResponse.json({ showHeadlessBornSessions })
   }),
   http.get('/api/preferences/agent-runtimes', () =>
-    HttpResponse.json({ quickAccessIds: [...agentRuntimeQuickAccessIds] }),
+    HttpResponse.json({
+      quickAccessIds: [...agentRuntimeQuickAccessIds],
+      recentAgentIds: [...recentAgentRuntimeIds],
+    }),
   ),
   http.put('/api/preferences/agent-runtimes', async ({ request }) => {
     const body = (await request.json().catch(() => null)) as {
@@ -101,6 +105,23 @@ export const preferencesHandlers = [
       ids.push(id)
     }
     agentRuntimeQuickAccessIds = ids
-    return HttpResponse.json({ quickAccessIds: [...agentRuntimeQuickAccessIds] })
+    return HttpResponse.json({
+      quickAccessIds: [...agentRuntimeQuickAccessIds],
+      recentAgentIds: [...recentAgentRuntimeIds],
+    })
+  }),
+  http.put('/api/preferences/agent-runtimes/recent', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as { agentId?: unknown } | null
+    if (!body || typeof body.agentId !== 'string' || body.agentId.trim().length === 0) {
+      return HttpResponse.json({ error: 'invalid_agent_runtime_preference' }, { status: 400 })
+    }
+    recentAgentRuntimeIds = [
+      body.agentId,
+      ...recentAgentRuntimeIds.filter((id) => id !== body.agentId),
+    ].slice(0, 4)
+    return HttpResponse.json({
+      quickAccessIds: [...agentRuntimeQuickAccessIds],
+      recentAgentIds: [...recentAgentRuntimeIds],
+    })
   }),
 ]
