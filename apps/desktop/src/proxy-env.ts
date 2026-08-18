@@ -15,9 +15,14 @@ export function proxyEnvFromRules(
   rules: string,
   env: EnvLike = process.env,
 ): Record<string, string> {
-  const explicit = PROXY_KEYS.some((key) => !!env[key]?.trim())
+  const explicitValues = Object.fromEntries(PROXY_KEYS.flatMap((key) => {
+    const value = env[key]?.trim() || env[key.toLowerCase()]?.trim()
+    return value ? [[key, value]] : []
+  }))
+  const explicit = Object.keys(explicitValues).length > 0
   if (explicit) {
     return {
+      ...explicitValues,
       ...(!env['NODE_USE_ENV_PROXY'] ? { NODE_USE_ENV_PROXY: '1' } : {}),
       ...localBypassEnv(env),
     }

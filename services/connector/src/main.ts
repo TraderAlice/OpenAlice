@@ -22,6 +22,7 @@ import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
+import { installConnectorProxyTransport } from './core/proxy.js'
 
 const CONNECTOR_PORT = Number(process.env['OPENALICE_CONNECTOR_PORT'] ?? 47334)
 
@@ -31,10 +32,12 @@ async function main(): Promise<void> {
 
   const configStore = new ConnectorConfigStore()
   const config = await configStore.read()
+  const proxy = installConnectorProxyTransport()
+  if (proxy.active) console.log('[connector] shared HTTP proxy transport enabled')
   const registry = new ConnectorRegistry()
-  registry.register(discordConnectorRegistration())
-  registry.register(telegramConnectorRegistration())
-  registry.register(slackConnectorRegistration())
+  registry.register(discordConnectorRegistration(proxy))
+  registry.register(telegramConnectorRegistration(proxy))
+  registry.register(slackConnectorRegistration(proxy))
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -99,6 +102,7 @@ async function main(): Promise<void> {
     server.close()
     await manager.stop()
     await journal.flush()
+    await proxy.close()
     process.exit(0)
   }
   process.on('SIGINT', () => { void shutdown('SIGINT') })

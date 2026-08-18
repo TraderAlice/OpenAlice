@@ -20,6 +20,9 @@
     "discord.js": "14.26.5",
     "grammy": "^1.45.1",
     "hono": "^4.12.32",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "undici": "^6.27.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

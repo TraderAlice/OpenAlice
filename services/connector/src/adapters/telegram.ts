@@ -14,6 +14,10 @@ import type {
   ConnectorAdapterRegistration,
 } from '../core/adapter.js'
 import {
+  DIRECT_CONNECTOR_PROXY_TRANSPORT,
+  type ConnectorProxyTransport,
+} from '../core/proxy.js'
+import {
   AdapterHealthTracker,
   DEFAULT_CONNECTION_ATTEMPT_TIMEOUT_MS,
   DEFAULT_CONNECTION_RETRY_DELAY_MS,
@@ -53,16 +57,19 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private abort?: AbortController
   private token?: string
   private adapterContext?: ConnectorAdapterContext
+  private readonly proxy: ConnectorProxyTransport
 
   constructor(options: {
     attemptTimeoutMs?: number
     reconnectDelayMs?: number
     startupTimeoutMs?: number
     inboxStore?: IInboxStore
+    proxy?: ConnectorProxyTransport
   } = {}) {
     this.attemptTimeoutMs = options.attemptTimeoutMs ?? options.startupTimeoutMs ?? DEFAULT_CONNECTION_ATTEMPT_TIMEOUT_MS
     this.reconnectDelayMs = options.reconnectDelayMs ?? DEFAULT_CONNECTION_RETRY_DELAY_MS
     this.inboxStore = options.inboxStore
+    this.proxy = options.proxy ?? DIRECT_CONNECTOR_PROXY_TRANSPORT
   }
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
@@ -170,7 +177,11 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     const context = this.adapterContext
     if (!token || !context) throw new Error('Telegram adapter is not armed')
     if (this.tracker.get().status === 'degraded') this.tracker.connecting('Reconnecting to Telegram.')
-    const bot = new Bot(token)
+    const bot = new Bot(token, {
+      client: this.proxy.nodeFetchAgent
+        ? { baseFetchConfig: { agent: this.proxy.nodeFetchAgent } }
+        : undefined,
+    })
     this.bot = bot
     this.sessionReady = false
     this.attachBot(bot, context)
@@ -481,8 +492,10 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   }
 }
 
-export function telegramConnectorRegistration(): ConnectorAdapterRegistration {
-  return { definition: TELEGRAM_CONNECTOR_DEFINITION, create: () => new TelegramConnectorAdapter() }
+export function telegramConnectorRegistration(
+  proxy: ConnectorProxyTransport = DIRECT_CONNECTOR_PROXY_TRANSPORT,
+): ConnectorAdapterRegistration {
+  return { definition: TELEGRAM_CONNECTOR_DEFINITION, create: () => new TelegramConnectorAdapter({ proxy }) }
 }
 
 async function publishTelegramCommands(bot: Bot): Promise<void> {
