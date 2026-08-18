@@ -39,6 +39,8 @@ export interface DeliveryManagerOptions {
   updateAdapterSettings(id: string, patch: Record<string, string | number | boolean>): Promise<void>
   startedAt?: string
   recorder?: ConnectorIORecorder
+  /** First retry delay after a transient adapter start failure. Doubles each attempt up to 60s. */
+  adapterStartRetryDelayMs?: number
 }
 
 /**
@@ -47,12 +49,20 @@ export interface DeliveryManagerOptions {
  * durable notification and performs external delivery after returning.
  */
 export const MAX_INBOUND_OWNER_MESSAGES = 100
+export const DEFAULT_ADAPTER_START_RETRY_DELAY_MS = 5_000
+const MAX_ADAPTER_START_RETRY_DELAY_MS = 60_000
+
+export function isTransientConnectorStartError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /did not become ready|did not answer getme|bot api is unreachable|network request|fetch failed|econn|etimedout|enotfound|enetunreach|ehostunreach|socket disconnected|aborted delay|certificate|eai_again|socket hang up|tls connection/i.test(message)
+}
 
 export class DeliveryManager {
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
   private readonly inbound: InboundOwnerMessage[] = []
   private readonly actions: ConnectorArtifactRequest[] = []
+  private readonly bootRetries = new Map<string, ReturnType<typeof setTimeout>>()
   private readonly startedAt: string
   private stopped = false
 
@@ -77,7 +87,7 @@ export class DeliveryManager {
     for (const [id, config] of Object.entries(this.options.config.adapters)) {
       if (!config.enabled || !this.adapters.has(id)) continue
       await this.bootAdapter(id, config).catch((error) => {
-        console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
+        this.handleAdapterStartFailure(id, config, error, 0)
       })
     }
   }
@@ -304,6 +314,7 @@ export class DeliveryManager {
 
   async stop(): Promise<void> {
     this.stopped = true
+    for (const id of [...this.bootRetries.keys()]) this.clearAdapterStartRetry(id)
     await Promise.allSettled([...this.adapters.values()].map((adapter) => adapter.stop()))
     this.adapters.clear()
     this.commands.clear()
@@ -344,6 +355,42 @@ export class DeliveryManager {
     // Keep a failed adapter registered. start() may record a useful degraded
     // reason; dropping it here reduced Settings to "configured but not running".
     await adapter.start(config, context)
+  }
+
+  private handleAdapterStartFailure(
+    id: string,
+    config: ConnectorAdapterConfig,
+    error: unknown,
+    attempt: number,
+  ): void {
+    console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
+    if (!isTransientConnectorStartError(error)) return
+    this.scheduleAdapterStartRetry(id, config, attempt)
+  }
+
+  private scheduleAdapterStartRetry(id: string, config: ConnectorAdapterConfig, attempt: number): void {
+    if (this.stopped) return
+    this.clearAdapterStartRetry(id)
+    const base = this.options.adapterStartRetryDelayMs ?? DEFAULT_ADAPTER_START_RETRY_DELAY_MS
+    const delayMs = Math.min(base * 2 ** attempt, MAX_ADAPTER_START_RETRY_DELAY_MS)
+    console.warn(`[connector] ${id} will retry start in ${delayMs}ms`)
+    const timer = setTimeout(() => {
+      this.bootRetries.delete(id)
+      if (this.stopped) return
+      const current = this.options.config.adapters[id]
+      if (!current?.enabled) return
+      void this.bootAdapter(id, current).catch((error) => {
+        this.handleAdapterStartFailure(id, current, error, attempt + 1)
+      })
+    }, delayMs)
+    timer.unref?.()
+    this.bootRetries.set(id, timer)
+  }
+
+  private clearAdapterStartRetry(id: string): void {
+    const timer = this.bootRetries.get(id)
+    if (timer) clearTimeout(timer)
+    this.bootRetries.delete(id)
   }
 
   private get recorder(): ConnectorIORecorder {

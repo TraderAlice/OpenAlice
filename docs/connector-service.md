@@ -209,11 +209,17 @@ run `/link`. Removing the token is a different action.
 `awaiting_link` means the adapter can already receive `/link`. Telegram does
 not report that until long polling has started (`onStart`); Discord waits for
 the gateway to become ready. Publishing Telegram's slash-command menu is
-best-effort: a failed `setMyCommands` must not block polling or Inbox delivery.
-The Connector HTTP health endpoint binds before those external calls so
-Guardian can probe a `starting` adapter instead of treating the whole service
-as missing. A failed adapter stays registered with its `lastError` rather than
-collapsing to "configured but not running."
+best-effort and happens only after polling is live: a hung or failed
+`setMyCommands` must not block `start()`, long polling, owner chat, or Inbox
+delivery. `start()` arms the adapter and returns; the Bot API session is a
+supervised loop. A hung handshake is abandoned after one attempt budget
+(default 30s) and the same adapter reconnects with backoff. That budget is
+not a process-level deadline and does not stop Connector Service. The
+Connector HTTP health endpoint binds before those external calls so Guardian
+can probe a `starting` adapter instead of treating the whole service as
+missing. A failed adapter stays registered with its `lastError` rather than
+collapsing to "configured but not running." Configuration errors such as a
+missing bot token still fail `start()` and do not reconnect.
 
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
@@ -282,7 +288,10 @@ Each probe also records a stable reason code, check timestamp, and latency. A
 failed optional-service probe must never change Alice or Inbox availability.
 An adapter in `starting` or `awaiting_link` is online and intentionally
 incomplete, so it does not degrade the service; external notification delivery
-becomes healthy only after the owner runs `/link`.
+becomes healthy only after the owner runs `/link`. A Telegram adapter that
+cannot reach the Bot API stays `starting` or `degraded` and reconnects
+inside the Connector process; Alice reports `degraded` only while the
+adapter is `degraded`.
 The contract matrix lives in `src/services/optional-carrier/health.spec.ts`;
 `integrations.spec.ts` applies it to the real UTA and Connector response shapes.
 Guardian/process smoke tests remain responsible for proving that an enabled
