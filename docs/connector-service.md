@@ -151,6 +151,23 @@ credentials. `data/config/connectors.json` is an AES-256-GCM sealed envelope;
 the machine key remains at `<OPENALICE_HOME>/sealing.key` outside portable
 `data/`.
 
+### Network proxy
+
+Guardian passes explicit `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and
+`NO_PROXY` values to Connector Service. The desktop Guardian also resolves the
+host system proxy through Chromium when no explicit environment value exists,
+on every supported desktop platform. Lower-case environment names are accepted
+and normalized for child processes.
+
+Connector Service owns one shared proxy transport. It installs an Undici
+dispatcher for fetch/WebSocket SDKs and gives adapters an explicit Node agent
+selector for libraries such as grammY that create their own `node-fetch`
+transport. New adapters must consume this shared context instead of reading
+environment variables or changing `http.globalAgent` / `https.globalAgent`
+themselves. Only HTTP(S) proxy URLs are currently supported; SOCKS-only rules
+remain untouched rather than being silently misrouted. Proxy URLs and
+credentials must never be logged.
+
 The Settings API never returns a bot token. It returns field definitions,
 non-secret values, and `configuredSecrets` presence markers. The Settings
 draft field is masked by default to keep tokens out of screenshots and

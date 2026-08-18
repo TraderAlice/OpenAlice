@@ -443,7 +443,7 @@ importers:
         version: 2.0.12(hono@4.12.32)
       '@slack/socket-mode':
         specifier: ^3.0.0
-        version: 3.0.0(undici@7.28.0)
+        version: 3.0.0(undici@6.27.0)
       '@slack/web-api':
         specifier: ^8.0.0
         version: 8.0.0
@@ -459,6 +459,15 @@ importers:
       hono:
         specifier: ^4.12.32
         version: 4.12.32
+      http-proxy-agent:
+        specifier: ^7.0.2
+        version: 7.0.2
+      https-proxy-agent:
+        specifier: ^7.0.6
+        version: 7.0.6
+      undici:
+        specifier: ^6.27.0
+        version: 6.27.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -6473,13 +6482,13 @@ snapshots:
     dependencies:
       '@types/node': 25.2.3
 
-  '@slack/socket-mode@3.0.0(undici@7.28.0)':
+  '@slack/socket-mode@3.0.0(undici@6.27.0)':
     dependencies:
       '@slack/logger': 5.0.0
       '@slack/web-api': 8.0.0
       '@types/node': 25.2.3
       eventemitter3: 5.0.4
-      undici: 7.28.0
+      undici: 6.27.0
 
   '@slack/types@3.0.0': {}
 
