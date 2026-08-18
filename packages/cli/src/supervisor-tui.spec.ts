@@ -454,4 +454,292 @@ describe('Supervisor TUI screen', () => {
     expect(screen.snapshot.panel).toBe('help')
     expect(screen.render(100).join('\n')).toContain('Supervisor controls')
   })
+
+  it('renders a machine-level recovery shell and gates project actions', () => {
+    const actions: SupervisorAction[] = []
+    let settingsRequests = 0
+    let projectRequests = 0
+    let sourceRequests = 0
+    const screen = new SupervisorScreen({
+      version: '0.89.4-beta',
+      channel: 'stable',
+      runtime: null,
+      mode: 'config-recovery',
+      recoveryReason: 'newer-schema',
+      diagnostic: 'Supervisor configuration schemaVersion 3 is newer than this OpenAlice',
+    }, {
+      onAction: (action) => actions.push(action),
+      onSettings: () => {
+        settingsRequests += 1
+      },
+      onProjects: () => {
+        projectRequests += 1
+      },
+      onConfigureSource: () => {
+        sourceRequests += 1
+      },
+      onRequestManagedSource: () => {
+        sourceRequests += 1
+      },
+    })
+
+    const output = screen.render(100).join('\n')
+    expect(output).toContain('AliceProject configuration cannot be read.')
+    expect(output).toContain('requires a newer OpenAlice')
+    expect(output).toContain('will not inspect, start, open, stop, restart, or configure a project')
+    expect(output).toContain('u Update · ? Help')
+    expect(output).not.toContain('Enter Start & open')
+    expect(output).not.toContain('i AliceProjects')
+    expect(output).not.toContain('Default AliceProject')
+
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(screen.handleKey('s', matchesKey)).toBe(true)
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(screen.handleKey('x', matchesKey)).toBe(true)
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    expect(screen.handleKey('l', matchesKey)).toBe(true)
+    expect(screen.handleKey('d', matchesKey)).toBe(true)
+    expect(screen.handleKey('p', matchesKey)).toBe(true)
+    expect(screen.handleKey('i', matchesKey)).toBe(true)
+    expect(screen.handleKey('m', matchesKey)).toBe(true)
+    expect(screen.handleKey('c', matchesKey)).toBe(true)
+    expect(actions).toEqual([])
+    expect(settingsRequests).toBe(0)
+    expect(projectRequests).toBe(0)
+    expect(sourceRequests).toBe(0)
+    expect(screen.snapshot.notice).toContain('will not inspect, start, open, stop, restart, or configure')
+
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.snapshot.panel).toBe('help')
+    expect(screen.render(100).join('\n')).toContain('Supervisor recovery controls')
+    expect(screen.render(100).join('\n')).not.toContain('i  Select or create')
+
+    expect(screen.handleKey('u', matchesKey)).toBe(true)
+    expect(actions).toEqual(['update'])
+  })
+
+  it('confirms an available update before dispatching the installer', () => {
+    const actions: SupervisorAction[] = []
+    const screen = new SupervisorScreen({
+      version: '0.89.4-beta',
+      channel: 'stable',
+      runtime: { class: 'absent' },
+    }, {
+      onAction: (action) => actions.push(action),
+    })
+
+    expect(screen.handleKey('u', matchesKey)).toBe(true)
+    expect(actions).toEqual(['update'])
+
+    screen.update({
+      update: {
+        status: 'available',
+        currentVersion: '0.89.4-beta',
+        latestVersion: '0.90.0',
+      },
+      confirmation: 'update',
+    })
+    const confirmation = screen.render(100).join('\n')
+    expect(confirmation).toContain('Install OpenAlice 0.90.0 now?')
+    expect(confirmation).toContain('will not reload')
+    expect(confirmation).toContain('run openalice again')
+
+    expect(screen.handleKey('n', matchesKey)).toBe(true)
+    expect(actions).toEqual(['update'])
+    expect(screen.snapshot.confirmation).toBeUndefined()
+
+    screen.update({ confirmation: 'update' })
+    expect(screen.handleKey('enter', matchesKey)).toBe(true)
+    expect(actions).toEqual(['update', 'apply-update'])
+  })
+
+  it('opens a recovery TUI when AliceProject config is unreadable', async () => {
+    const calls: string[] = []
+    let inputListener: ((data: string) => unknown) | undefined
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => inputListener?.('s'))
+        setTimeout(() => inputListener?.('q'), 5)
+      }
+      stop(): void {}
+    }
+    const inspect = async () => {
+      calls.push('inspect')
+      return { class: 'absent' }
+    }
+    const start = async () => {
+      calls.push('start')
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      env: {},
+      resolveContext: async () => {
+        throw Object.assign(
+          new Error('Supervisor configuration schemaVersion 3 is newer than this OpenAlice (supports 2).'),
+          { code: 'ESUPERVISORSCHEMA', exitCode: 2 },
+        )
+      },
+      inspect,
+      start,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+      version: '0.89.4-beta',
+      channel: 'stable',
+    })).resolves.toBe(0)
+
+    expect(calls).toEqual([])
+  })
+
+  it('opens recovery even when OPENALICE_HOME is set in the environment', async () => {
+    const inspect = async () => {
+      throw new Error('must not inspect a guessed project')
+    }
+    let inputListener: ((data: string) => unknown) | undefined
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => inputListener?.('q'))
+      }
+      stop(): void {}
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      env: { OPENALICE_HOME: '/tmp/explicit-home' },
+      resolveContext: async () => {
+        throw Object.assign(
+          new Error('Invalid Supervisor configuration'),
+          { code: 'ESUPERVISORCONFIG', exitCode: 2 },
+        )
+      },
+      inspect,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+      version: '0.89.4-beta',
+      channel: 'stable',
+    })).resolves.toBe(0)
+  })
+
+  it('still fails explicit --project/--home instead of opening recovery', async () => {
+    const loadTui = async () => {
+      throw new Error('TUI should not start')
+    }
+    await expect(runSupervisorTui({ home: '/tmp/research' }, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      env: {},
+      resolveContext: async () => {
+        throw Object.assign(
+          new Error('Invalid Supervisor configuration'),
+          { code: 'ESUPERVISORCONFIG', exitCode: 2 },
+        )
+      },
+      loadTui,
+    })).rejects.toMatchObject({
+      code: 'ESUPERVISORCONFIG',
+      exitCode: 2,
+    })
+
+    await expect(runSupervisorTui({ project: 'research' }, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: async () => {
+        throw Object.assign(
+          new Error('Supervisor configuration schemaVersion 3 is newer than this OpenAlice (supports 2).'),
+          { code: 'ESUPERVISORSCHEMA', exitCode: 2 },
+        )
+      },
+      loadTui,
+    })).rejects.toMatchObject({
+      code: 'ESUPERVISORSCHEMA',
+      exitCode: 2,
+    })
+  })
+
+  it('installs an available update from the TUI after confirmation', async () => {
+    const calls: string[] = []
+    let inputListener: ((data: string) => unknown) | undefined
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => inputListener?.('u'))
+      }
+      stop(): void {}
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({
+        cwd: '/tmp',
+        homeDir: '/home/alice',
+        env: {
+          OPENALICE_MANAGED_RUNTIME_PATH: '/opt/openalice/runtime',
+          OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY: '1234567890abcdef',
+        },
+      }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      start: async () => {
+        calls.push('start')
+      },
+      checkUpdate: async () => {
+        calls.push('check')
+        setTimeout(() => inputListener?.('enter'), 0)
+        return {
+          status: 'available',
+          currentVersion: '0.89.4-beta',
+          latestVersion: '0.90.0',
+          installer: {
+            versionedUrl: 'https://download.openalice.ai/OpenAlice-0.90.0-install',
+            sha256: 'a'.repeat(64),
+          },
+        }
+      },
+      applyUpdate: async (result) => {
+        calls.push(`apply:${result.latestVersion}`)
+        queueMicrotask(() => inputListener?.('q'))
+        return 0
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+      version: '0.89.4-beta',
+      channel: 'stable',
+    })).resolves.toBe(0)
+
+    expect(calls).toEqual(['check', 'apply:0.90.0'])
+  })
 })

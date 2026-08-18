@@ -496,12 +496,7 @@ export function parseSupervisorConfig(
   if (root['schemaVersion'] === 1) {
     return parseLegacySupervisorConfig(root)
   }
-  rejectUnknownKeys(root, CONFIG_KEYS, 'Supervisor configuration')
-  if (root['schemaVersion'] !== CONFIG_SCHEMA_VERSION) {
-    throw configError(
-      `Supervisor configuration schemaVersion must be ${CONFIG_SCHEMA_VERSION}.`,
-    )
-  }
+  assertCurrentSupervisorSchemaVersion(root['schemaVersion'])
 
   const defaultProject = optionalProjectKey(
     root['defaultProject'],
@@ -509,7 +504,7 @@ export function parseSupervisorConfig(
   )
   const defaults = root['defaults'] === undefined
     ? undefined
-    : parseLaunchValues(root['defaults'], 'defaults', false)
+    : parseLaunchValues(root['defaults'], 'defaults', false, true)
   let projects: Record<string, AliceProjectLaunchConfig> | undefined
   if (root['projects'] !== undefined) {
     const rawProjects = requireRecord(root['projects'], 'projects')
@@ -519,6 +514,7 @@ export function parseSupervisorConfig(
       const parsed = parseLaunchValues(
         entry,
         `projects.${name}`,
+        true,
         true,
       ) as AliceProjectLaunchConfig
       if (parsed.name !== undefined && parsed.name !== name) {
@@ -539,12 +535,12 @@ export function parseSupervisorConfig(
     )
   }
 
-  return {
+  return retainUnknownFields({
     schemaVersion: CONFIG_SCHEMA_VERSION,
     ...(defaultProject === undefined ? {} : { defaultProject }),
     ...(defaults === undefined ? {} : { defaults }),
     ...(projects === undefined ? {} : { projects }),
-  }
+  }, root, CONFIG_KEYS)
 }
 
 function parseLegacySupervisorConfig(
@@ -801,15 +797,15 @@ function parseLaunchValues(
   value: unknown,
   label: string,
   allowName: boolean,
+  preserveUnknown = false,
 ): LaunchConfigValues | AliceProjectLaunchConfig {
   const record = requireRecord(value, label)
-  rejectUnknownKeys(
-    record,
-    allowName
-      ? LAUNCH_VALUE_KEYS
-      : new Set([...LAUNCH_VALUE_KEYS].filter((key) => key !== 'name' && key !== 'product')),
-    label,
-  )
+  const allowed = allowName
+    ? LAUNCH_VALUE_KEYS
+    : new Set([...LAUNCH_VALUE_KEYS].filter((key) => key !== 'name' && key !== 'product'))
+  if (!preserveUnknown) {
+    rejectUnknownKeys(record, allowed, label)
+  }
   const result: AliceProjectLaunchConfig = {}
   if (allowName && record['name'] !== undefined) {
     result.name = requireProjectKey(record['name'], `${label}.name`)
@@ -845,7 +841,52 @@ function parseLaunchValues(
     }
     result.updateChecks = record['updateChecks']
   }
-  return result
+  return preserveUnknown
+    ? retainUnknownFields(result, record, allowed)
+    : result
+}
+
+function assertCurrentSupervisorSchemaVersion(value: unknown): asserts value is 2 {
+  if (isNewerSupervisorSchemaVersion(value)) {
+    throw configError(
+      `Supervisor configuration schemaVersion ${value} is newer than this OpenAlice (supports ${CONFIG_SCHEMA_VERSION}). Update OpenAlice to read this AliceProject configuration.`,
+      'ESUPERVISORSCHEMA',
+    )
+  }
+  if (value !== CONFIG_SCHEMA_VERSION) {
+    throw configError(
+      `Supervisor configuration schemaVersion must be ${CONFIG_SCHEMA_VERSION}.`,
+    )
+  }
+}
+
+export function isNewerSupervisorSchemaVersion(value: unknown): value is number {
+  return typeof value === 'number'
+    && Number.isInteger(value)
+    && value > CONFIG_SCHEMA_VERSION
+}
+
+export function isNewerSupervisorSchemaError(error: unknown): boolean {
+  return isTaggedError(error, 'ESUPERVISORSCHEMA')
+}
+
+export function isSupervisorConfigError(error: unknown): boolean {
+  return isTaggedError(error, 'ESUPERVISORCONFIG')
+    || isNewerSupervisorSchemaError(error)
+}
+
+function retainUnknownFields<T extends object>(
+  parsed: T,
+  source: Record<string, unknown>,
+  known: Set<string>,
+): T {
+  const extras: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(source)) {
+    if (!known.has(key)) extras[key] = value
+  }
+  return Object.keys(extras).length === 0
+    ? parsed
+    : { ...parsed, ...extras }
 }
 
 function optionalProjectKey(
@@ -924,9 +965,13 @@ function configError(
 }
 
 function isConfigError(error: unknown): boolean {
+  return isSupervisorConfigError(error)
+}
+
+function isTaggedError(error: unknown, code: string): boolean {
   return error instanceof Error
     && 'code' in error
-    && error.code === 'ESUPERVISORCONFIG'
+    && error.code === code
 }
 
 function isNodeError(error: unknown, code: string): boolean {
