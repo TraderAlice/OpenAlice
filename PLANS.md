@@ -29,9 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/chat-session-roster-legibility.md]] — Give Ask Alice's unified
-  first-class Session roster semantic, provenance-aware titles without
-  changing identity, presence, occupancy, or ordering behavior.
 - [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
   PATH `agy` only; never spawn `antigravity` / `gemini`.
   Serial PR from `feat/agy-adapter`; do not merge until Ame says so.
