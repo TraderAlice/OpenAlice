@@ -29,7 +29,6 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
-- [[plans/inbox-editorial-hierarchy.md]] — Make the Inbox scan-first and long-report readable without fragmenting it into cards.
 - [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
   PATH `agy` only; never spawn `antigravity` / `gemini`.
   Serial PR from `feat/agy-adapter`; do not merge until Ame says so.
