@@ -1066,6 +1066,7 @@ export const en = {
       offboard: 'Offboard {{workspace}}',
     },
     viewAllSessions: 'View all {{count}} sessions',
+    viewAllConversations: 'View all {{count}} conversations',
     deleteWorkspace: 'Offboard workspace',
     deleteWorkspaceTitle: 'Offboard chat workspace',
     deleteWorkspaceMessage: 'Offboard chat workspace {{tag}}? Its desk moves out of the active directory, Sessions retire, and a handoff record is kept for later restore.',

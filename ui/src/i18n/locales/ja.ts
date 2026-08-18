@@ -1055,6 +1055,7 @@ export const ja: Resources = {
       offboard: '{{workspace}} を退役',
     },
     viewAllSessions: '{{count}} 件のセッションをすべて表示',
+    viewAllConversations: '{{count}} 件の会話をすべて表示',
     deleteWorkspace: 'ワークスペースを退役',
     deleteWorkspaceTitle: 'チャットワークスペースを退役',
     deleteWorkspaceMessage: 'チャットワークスペース {{tag}} を退役させますか？作業台はアクティブディレクトリから移動し、Session は退役します。復元用の引き継ぎ記録は保持されます。',

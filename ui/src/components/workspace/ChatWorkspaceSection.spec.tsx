@@ -446,10 +446,11 @@ describe('ChatWorkspaceSection actions', () => {
     expect(retryTemplates).toHaveBeenCalledOnce()
   })
 
-  it('caps focused and recent sidebars to a recent work set and keeps Browse complete', () => {
+  it('caps focused and recent sidebars to a recent work set and keeps Browse complete', async () => {
     const sessions = Array.from({ length: 9 }, (_, index) => chatSession(index + 1))
     const workspace = { ...chatWorkspace, sessions }
     const onNavigate = vi.fn()
+    const user = userEvent.setup()
 
     const expectCappedSidebar = () => {
       expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
@@ -464,18 +465,26 @@ describe('ChatWorkspaceSection actions', () => {
 
     const { unmount: unmountFocused } = renderSection([workspace], null, onNavigate, 'focused')
     expectCappedSidebar()
-    expect(screen.queryByRole('button', { name: 'View all 9 sessions' })).toBeNull()
+    const inlineBrowse = screen.getByRole('button', { name: 'View all 9 conversations' })
+    inlineBrowse.focus()
+    await user.click(inlineBrowse)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chat context: chat-jul11' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Browse all conversations' }))
-
-    const dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
-    const browser = within(dialog)
+    let dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    let browser = within(dialog)
     expect(browser.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(9)
     expect(browser.getByRole('button', { name: 'Conversation 1' })).toBeTruthy()
+    expect(browser.getByRole('button', { name: 'Current Workspace' }).getAttribute('aria-pressed')).toBe('true')
     expect(openOrFocus).not.toHaveBeenCalled()
 
-    fireEvent.click(browser.getByRole('button', { name: 'Conversation 3' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Browse all conversations' })).toBeNull()
+    expect(document.activeElement).toBe(inlineBrowse)
+
+    await user.click(inlineBrowse)
+    dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    browser = within(dialog)
+
+    await user.click(browser.getByRole('button', { name: 'Conversation 3' }))
     expect(openOrFocus).toHaveBeenCalledWith({
       kind: 'workspace',
       params: { wsId: chatWorkspace.id, sessionId: 'chat-session-3', source: 'chat' },
@@ -485,6 +494,9 @@ describe('ChatWorkspaceSection actions', () => {
 
     const { unmount: unmountRecent } = renderSection([workspace], null, undefined, 'recent')
     expectCappedSidebar()
+    await user.click(screen.getByRole('button', { name: 'View all 9 conversations' }))
+    dialog = screen.getByRole('dialog', { name: 'Browse all conversations' })
+    expect(within(dialog).getByRole('button', { name: 'All Workspaces' }).getAttribute('aria-pressed')).toBe('true')
     unmountRecent()
 
     focusedTabState.tab = {
@@ -506,6 +518,19 @@ describe('ChatWorkspaceSection actions', () => {
         screen.getByRole('button', { name: 'Conversation 1' }),
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'View all 9 conversations' })).toBeTruthy()
+  })
+
+  it('does not show an inline Browse action when every recent conversation fits', () => {
+    const workspace = {
+      ...chatWorkspace,
+      sessions: Array.from({ length: 8 }, (_, index) => chatSession(index + 1)),
+    }
+
+    renderSection([workspace], null, undefined, 'focused')
+
+    expect(screen.getAllByRole('button', { name: /^Conversation \d+$/ })).toHaveLength(8)
+    expect(screen.queryByRole('button', { name: /View all \d+ conversations/ })).toBeNull()
   })
 
   it('keeps every running headless row while still capping the recent work set', () => {

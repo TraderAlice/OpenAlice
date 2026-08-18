@@ -1054,6 +1054,7 @@ export const zh: Resources = {
       offboard: '办理 {{workspace}} 离职',
     },
     viewAllSessions: '查看全部 {{count}} 个会话',
+    viewAllConversations: '查看全部 {{count}} 个对话',
     deleteWorkspace: '办理工作区离职',
     deleteWorkspaceTitle: '办理对话工作区离职',
     deleteWorkspaceMessage: '让对话工作区 {{tag}} 离职？它的工作台会移出活动目录，Session 会退休，并保留交接记录以便日后恢复。',
