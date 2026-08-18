@@ -122,6 +122,22 @@ describe('UrlAdopter Settings Harness', () => {
   })
 })
 
+describe('UrlAdopter Settings Agent runtimes', () => {
+  it('adopts the Agent runtimes settings category from /settings/agent-runtimes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/agent-runtimes']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'settings',
+      params: { category: 'agent-runtimes' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
 describe('UrlAdopter Settings Beta', () => {
   it('adopts the Beta settings category from /settings/beta', async () => {
     render(

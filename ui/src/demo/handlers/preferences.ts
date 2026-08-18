@@ -9,6 +9,7 @@ let recentLaunch = {
   reasoningEffort: null as string | null,
 }
 let showHeadlessBornSessions = false
+let agentRuntimeQuickAccessIds: string[] = []
 
 export const preferencesHandlers = [
   http.get('/api/preferences/quick-chat', () =>
@@ -81,5 +82,25 @@ export const preferencesHandlers = [
     }
     showHeadlessBornSessions = body.showHeadlessBornSessions
     return HttpResponse.json({ showHeadlessBornSessions })
+  }),
+  http.get('/api/preferences/agent-runtimes', () =>
+    HttpResponse.json({ quickAccessIds: [...agentRuntimeQuickAccessIds] }),
+  ),
+  http.put('/api/preferences/agent-runtimes', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as {
+      quickAccessIds?: unknown
+    } | null
+    if (!body || !Array.isArray(body.quickAccessIds) || body.quickAccessIds.length > 4) {
+      return HttpResponse.json({ error: 'invalid_agent_runtime_preference' }, { status: 400 })
+    }
+    const ids: string[] = []
+    for (const id of body.quickAccessIds) {
+      if (typeof id !== 'string' || id.trim().length === 0 || ids.includes(id)) {
+        return HttpResponse.json({ error: 'invalid_agent_runtime_preference' }, { status: 400 })
+      }
+      ids.push(id)
+    }
+    agentRuntimeQuickAccessIds = ids
+    return HttpResponse.json({ quickAccessIds: [...agentRuntimeQuickAccessIds] })
   }),
 ]

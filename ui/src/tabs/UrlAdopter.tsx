@@ -74,6 +74,7 @@ export function UrlAdopter() {
         <Route path="/settings/appearance" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'appearance' } }} />} />
         <Route path="/settings/activity-bar" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'activity-bar' } }} />} />
         <Route path="/settings/ai-provider" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'ai-provider' } }} />} />
+        <Route path="/settings/agent-runtimes" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'agent-runtimes' } }} />} />
         <Route path="/settings/agent-permissions" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'agent-permissions' } }} />} />
         <Route path="/settings/tools" element={<AdoptStatic spec={{ kind: 'settings', params: { category: 'tools' } }} />} />
         <Route path="/settings/trading" element={<AdoptTraderSettings category="trading" />} />

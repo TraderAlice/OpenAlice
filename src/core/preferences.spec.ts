@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
+  normalizeAgentRuntimeQuickAccessIds,
+  readAgentRuntimesPreferences,
   readAutoQuantPreferences,
   readHarnessPreferences,
   readPreferences,
@@ -12,6 +14,7 @@ import {
   rememberQuickChatCredential,
   rememberQuickChatLaunch,
   rememberRecentChatWorkspace,
+  saveAgentRuntimesPreferences,
   saveHarnessPreferences,
 } from './preferences.js'
 
@@ -35,6 +38,7 @@ describe('preferences', () => {
       quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null, recentLaunch: null },
       autoQuant: { defaultWorkspaceId: null },
       harness: { showHeadlessBornSessions: false },
+      agentRuntimes: { quickAccessIds: [] },
     })
 
     await writeFile(path, '{not-json', 'utf-8')
@@ -158,6 +162,33 @@ describe('preferences', () => {
     })
     expect(await readQuickChatPreferences(path)).toEqual({
       lastCredentialByAgent: {},
+      recentChatWorkspaceId: null,
+    })
+  })
+
+  it('stores an ordered secret-free runtime quick-access list of at most four ids', async () => {
+    const path = await preferenceFile()
+    expect(normalizeAgentRuntimeQuickAccessIds(['pi', 'pi', '', 'codex', '  grok  ', 'omp', 'claude'])).toEqual([
+      'pi', 'codex', 'grok', 'omp',
+    ])
+    expect(await readAgentRuntimesPreferences(path)).toEqual({ quickAccessIds: [] })
+
+    const saved = await saveAgentRuntimesPreferences({
+      quickAccessIds: ['pi', 'codex', 'pi', 'grok', 'omp', 'claude'],
+    }, path)
+    expect(saved).toEqual({ quickAccessIds: ['pi', 'codex', 'grok', 'omp'] })
+    expect(await readAgentRuntimesPreferences(path)).toEqual({
+      quickAccessIds: ['pi', 'codex', 'grok', 'omp'],
+    })
+    expect(await readFile(path, 'utf-8')).not.toContain('installed')
+    expect(await readFile(path, 'utf-8')).not.toContain('binPath')
+
+    await rememberQuickChatCredential('pi', 'minimax-1', path)
+    expect(await readAgentRuntimesPreferences(path)).toEqual({
+      quickAccessIds: ['pi', 'codex', 'grok', 'omp'],
+    })
+    expect(await readQuickChatPreferences(path)).toEqual({
+      lastCredentialByAgent: { pi: 'minimax-1' },
       recentChatWorkspaceId: null,
     })
   })

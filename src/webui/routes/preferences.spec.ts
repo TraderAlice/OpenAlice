@@ -264,4 +264,60 @@ describe('preferences routes', () => {
     expect(await response.json()).toEqual({ showHeadlessBornSessions: true })
     expect(save).toHaveBeenCalledWith({ showHeadlessBornSessions: true })
   })
+
+  it('reads and persists an ordered agent-runtime quick-access list', async () => {
+    const read = vi.fn(async () => ({ quickAccessIds: ['pi', 'codex'] }))
+    const save = vi.fn(async (next: { quickAccessIds: readonly string[] }) => ({
+      quickAccessIds: [...next.quickAccessIds],
+    }))
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: vi.fn(),
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      readAgentRuntimesPreferences: read,
+      saveAgentRuntimesPreferences: save,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    })
+
+    expect(await (await app.request('/agent-runtimes')).json()).toEqual({
+      quickAccessIds: ['pi', 'codex'],
+    })
+    const response = await app.request('/agent-runtimes', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ quickAccessIds: ['grok', 'opencode', 'pi'] }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ quickAccessIds: ['grok', 'opencode', 'pi'] })
+    expect(save).toHaveBeenCalledWith({ quickAccessIds: ['grok', 'opencode', 'pi'] })
+  })
+
+  it('rejects unknown, utility, duplicate, or oversized runtime quick-access lists', async () => {
+    const save = vi.fn()
+    const app = createPreferencesRoutes({
+      readQuickChatPreferences: vi.fn(),
+      rememberQuickChatCredential: vi.fn(),
+      rememberRecentChatWorkspace: unusedRecentWorkspace,
+      saveAgentRuntimesPreferences: save,
+      getWorkspaceShellStatus: unusedShellStatus,
+      saveWorkspaceShellPreference: unusedShellSave,
+    })
+
+    for (const quickAccessIds of [
+      ['shell'],
+      ['ghost'],
+      ['pi', 'pi'],
+      ['pi', 'codex', 'opencode', 'grok', 'claude'],
+      [''],
+    ]) {
+      const response = await app.request('/agent-runtimes', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ quickAccessIds }),
+      })
+      expect(response.status).toBe(400)
+    }
+    expect(save).not.toHaveBeenCalled()
+  })
 })

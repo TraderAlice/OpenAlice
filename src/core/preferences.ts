@@ -56,6 +56,28 @@ const harnessPreferencesSchema = z.object({
   showHeadlessBornSessions: z.boolean().default(false),
 })
 
+/** Installation-level launcher pins. Persist ids only — never install state. */
+export const AGENT_RUNTIME_QUICK_ACCESS_LIMIT = 4
+
+export function normalizeAgentRuntimeQuickAccessIds(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const id of ids) {
+    if (typeof id !== 'string') continue
+    const trimmed = id.trim()
+    if (!trimmed || trimmed.length > 128 || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    result.push(trimmed)
+    if (result.length >= AGENT_RUNTIME_QUICK_ACCESS_LIMIT) break
+  }
+  return result
+}
+
+const agentRuntimesPreferencesSchema = z.object({
+  quickAccessIds: z.unknown().default([]).transform(normalizeAgentRuntimeQuickAccessIds),
+})
+
 const preferencesSchema = z.object({
   version: z.literal(1).default(1),
   quickChat: quickChatPreferencesSchema.default({
@@ -69,6 +91,9 @@ const preferencesSchema = z.object({
   harness: harnessPreferencesSchema.default({
     showHeadlessBornSessions: false,
   }),
+  agentRuntimes: agentRuntimesPreferencesSchema.default({
+    quickAccessIds: [],
+  }),
 })
 
 type ParsedQuickChatPreferences = z.infer<typeof quickChatPreferencesSchema>
@@ -78,6 +103,9 @@ export type QuickChatPreferences = Omit<ParsedQuickChatPreferences, 'recentLaunc
 }
 export type AutoQuantPreferences = z.infer<typeof autoQuantPreferencesSchema>
 export type HarnessPreferences = z.infer<typeof harnessPreferencesSchema>
+export type AgentRuntimesPreferences = {
+  readonly quickAccessIds: readonly string[]
+}
 export type Preferences = z.infer<typeof preferencesSchema>
 
 function emptyPreferences(): Preferences {
@@ -116,6 +144,13 @@ export async function readAutoQuantPreferences(path = preferencesPath()): Promis
 export async function readHarnessPreferences(path = preferencesPath()): Promise<HarnessPreferences> {
   const preferences = await readPreferences(path)
   return { showHeadlessBornSessions: preferences.harness.showHeadlessBornSessions }
+}
+
+export async function readAgentRuntimesPreferences(
+  path = preferencesPath(),
+): Promise<AgentRuntimesPreferences> {
+  const preferences = await readPreferences(path)
+  return { quickAccessIds: [...preferences.agentRuntimes.quickAccessIds] }
 }
 
 // Alice is single-writer at the process level, but two UI requests can still
@@ -244,6 +279,25 @@ export async function saveHarnessPreferences(
     })
     await writePreferences(updated, path)
     return { showHeadlessBornSessions: updated.harness.showHeadlessBornSessions }
+  })
+  mutationQueue = operation
+  return operation
+}
+
+export async function saveAgentRuntimesPreferences(
+  next: AgentRuntimesPreferences,
+  path = preferencesPath(),
+): Promise<AgentRuntimesPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      agentRuntimes: {
+        quickAccessIds: normalizeAgentRuntimeQuickAccessIds(next.quickAccessIds),
+      },
+    })
+    await writePreferences(updated, path)
+    return { quickAccessIds: [...updated.agentRuntimes.quickAccessIds] }
   })
   mutationQueue = operation
   return operation

@@ -24,6 +24,14 @@ export const DEFAULT_HARNESS_PREFERENCES: HarnessPreferences = {
   showHeadlessBornSessions: false,
 }
 
+export interface AgentRuntimesPreferences {
+  readonly quickAccessIds: readonly string[]
+}
+
+export const DEFAULT_AGENT_RUNTIMES_PREFERENCES: AgentRuntimesPreferences = {
+  quickAccessIds: [],
+}
+
 export type WorkspaceShellStatus =
   | { supported: false }
   | {
@@ -89,6 +97,18 @@ export const preferencesApi = {
 
   saveHarness(next: HarnessPreferences): Promise<HarnessPreferences> {
     return fetchJson('/api/preferences/harness', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(next),
+    })
+  },
+
+  getAgentRuntimes(): Promise<AgentRuntimesPreferences> {
+    return fetchJson('/api/preferences/agent-runtimes')
+  },
+
+  saveAgentRuntimes(next: AgentRuntimesPreferences): Promise<AgentRuntimesPreferences> {
+    return fetchJson('/api/preferences/agent-runtimes', {
       method: 'PUT',
       headers,
       body: JSON.stringify(next),
