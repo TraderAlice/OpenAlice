@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
+import { ActivityToasts } from './components/ActivityToasts'
 import { MobileContextBar } from './components/MobileContextBar'
 import { TabHost } from './components/TabHost'
 import { DesktopUpdatePrompt } from './components/DesktopUpdatePrompt'
@@ -131,6 +132,7 @@ function AppShellContent() {
           {mainContent}
         </div>
         <UrlAdopter />
+        <ActivityToasts />
         {showFirstRunGuide && (
           <Suspense fallback={null}>
             <FirstRunGuide />

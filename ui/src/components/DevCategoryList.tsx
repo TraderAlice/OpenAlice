@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { Wrench, Camera, ScrollText, FlaskConical, Compass } from 'lucide-react'
+import { Wrench, Camera, ScrollText, FlaskConical, Compass, PanelsTopLeft } from 'lucide-react'
 import { useWorkspace } from '../tabs/store'
 import { getFocusedTab } from '../tabs/types'
 import { SidebarRow } from './SidebarRow'
 
 const CATEGORIES = [
+  { labelKey: 'dev.frontend', tab: 'frontend', Icon: PanelsTopLeft },
   { labelKey: 'common.tools', tab: 'tools', Icon: Wrench },
   { labelKey: 'dev.onboarding', tab: 'onboarding', Icon: Compass },
   { labelKey: 'dev.snapshots', tab: 'snapshots', Icon: Camera },

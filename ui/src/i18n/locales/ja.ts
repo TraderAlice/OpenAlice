@@ -1586,6 +1586,7 @@ export const ja: Resources = {
   dev: {
     onboarding: 'オンボーディング',
     snapshots: 'スナップショット',
+    frontend: 'フロントエンド',
     filterTools: 'ツールを絞り込む…',
     selectTool: '左側のパネルからツールを選択してください。',
     toolDetailsLoadError: 'ツールの詳細を読み込めませんでした。',
@@ -1736,6 +1737,12 @@ export const ja: Resources = {
     runsDescription: 'ワークスペースをまたぐヘッドレス Agent の実行状況を確認します。',
     api: 'API',
     apiDescription: '外部からワークスペース自動化を起動し、スケジュールファイル形式を確認します。',
+  },
+  activityToast: {
+    agent: 'Agent',
+    conversationRunning: '{{agent}} が別の Agent からの依頼を処理中です',
+    conversationFailed: '{{agent}} が Agent からの依頼を完了できませんでした',
+    inboxDelivered: '{{agent}} が Inbox にメッセージを送信しました',
   },
   office: {
     description: '複数の Harness オフィスが同じフロアを共有する。Workspace はグループとなり、Session が各自の机に座る。',

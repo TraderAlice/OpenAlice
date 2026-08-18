@@ -1585,6 +1585,7 @@ export const zh: Resources = {
   dev: {
     onboarding: '新手引导',
     snapshots: '快照',
+    frontend: '前端',
     filterTools: '筛选工具…',
     selectTool: '请从左侧面板选择一个工具。',
     toolDetailsLoadError: '工具详情加载失败。',
@@ -1735,6 +1736,12 @@ export const zh: Resources = {
     runsDescription: '查看跨工作区的无头 Agent 运行及工作进度。',
     api: 'API',
     apiDescription: '从外部触发工作区自动化，并查看调度文件格式。',
+  },
+  activityToast: {
+    agent: 'Agent',
+    conversationRunning: '{{agent}} 正在处理另一个 Agent 的请求',
+    conversationFailed: '{{agent}} 未能完成 Agent 请求',
+    inboxDelivered: '{{agent}} 已发送一条 Inbox 消息',
   },
   office: {
     description: '多个 Harness 办公室共处一个平层。Workspace 是小组，每个 Session 都有自己的工位。',
