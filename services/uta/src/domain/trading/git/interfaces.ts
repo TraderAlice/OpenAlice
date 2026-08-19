@@ -30,8 +30,8 @@ export interface ITradingGit {
 
   add(operation: Operation): AddResult
   commit(message: string): CommitPrepareResult
-  push(expectedPendingHash?: string): Promise<PushResult>
-  reject(reason?: string, expectedPendingHash?: string): Promise<RejectResult>
+  push(expectedPendingHash: string): Promise<PushResult>
+  reject(reason: string | undefined, expectedPendingHash: string): Promise<RejectResult>
 
   // ---- wallet reconciliation (synthesized commits) ----
 

@@ -133,13 +133,17 @@ export const tradingApi = {
     return fetchJson(`/api/trading/uta/${utaId}/wallet/status`)
   },
 
-  async walletReject(utaId: string, reason?: string, expectedPendingHash?: string): Promise<WalletRejectResult> {
+  async walletReject(
+    utaId: string,
+    reason: string | undefined,
+    expectedPendingHash: string,
+  ): Promise<WalletRejectResult> {
     const res = await fetch(`/api/trading/uta/${utaId}/wallet/reject`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...(reason ? { reason } : {}),
-        ...(expectedPendingHash ? { expectedPendingHash } : {}),
+        expectedPendingHash,
       }),
     })
     if (!res.ok) {

@@ -48,7 +48,7 @@ describe('executeOneShotOrder', () => {
     expect(push).not.toHaveBeenCalled()
   })
 
-  it('returns commit error AND triggers a rollback reject', async () => {
+  it('returns commit error without attempting an unauthenticated reject', async () => {
     const stage = vi.fn()
     const reject = vi.fn(async () => {})
     const { uta, push } = makeFakeUta({
@@ -59,11 +59,11 @@ describe('executeOneShotOrder', () => {
     const r = await executeOneShotOrder(uta, 'msg', stage)
 
     expect(r).toEqual({ ok: false, phase: 'commit', error: 'nothing staged' })
-    expect(reject).toHaveBeenCalledTimes(1)
+    expect(reject).not.toHaveBeenCalled()
     expect(push).not.toHaveBeenCalled()
   })
 
-  it('swallows reject errors during commit-failure rollback', async () => {
+  it('does not let an unused reject error replace the commit error', async () => {
     const stage = vi.fn()
     const { uta } = makeFakeUta({
       commit: vi.fn(() => { throw new Error('commit broke') }),

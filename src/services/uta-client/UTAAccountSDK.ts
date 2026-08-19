@@ -279,12 +279,12 @@ export class UTAAccountSDK {
     )
   }
 
-  reject(reason?: string, expectedPendingHash?: string): Promise<RejectResult> {
+  reject(reason: string | undefined, expectedPendingHash: string): Promise<RejectResult> {
     return this.client.post<RejectResult>(
       `/api/trading/uta/${encodeURIComponent(this.id)}/wallet/reject`,
       {
         ...(reason !== undefined ? { reason } : {}),
-        ...(expectedPendingHash ? { expectedPendingHash } : {}),
+        expectedPendingHash,
       },
     )
   }

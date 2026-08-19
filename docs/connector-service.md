@@ -131,11 +131,13 @@ Telegram /inbox detail -> "view files" confirm
   -> Connector directed artifact delivery to the requesting adapter only
 
 Telegram /uta (or an Approve/Reject button)
-  -> Connector UTA action queue (review | push | reject, optional utaId + pendingHash)
+  -> Connector UTA action queue (review, or push/reject with required utaId + pendingHash)
   -> Alice connector action bridge drain
   -> Alice UTAManagerSDK list/status/push/reject (lite/readonly honored here)
   -> UTA push/reject require expectedPendingHash and validate it in the same
      request before mutation; mismatch or absence is 409 and does not write
+  -> A pending commit is immutable: UTA refuses further staging until that
+     commit is pushed or rejected, and refuses staging/recommit during a write
   -> Connector directed UTA presentation back to the requesting adapter only
      Commits with more operations than the Telegram page can show are not
      remotely actionable — Approve/Reject stay off and the owner uses

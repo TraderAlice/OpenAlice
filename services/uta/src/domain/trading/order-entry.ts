@@ -58,8 +58,8 @@ export async function executeOneShotOrder(
   try {
     preparedHash = uta.commit(message).hash
   } catch (err) {
-    // Roll back so the next attempt starts from an empty staging area.
-    try { await uta.reject('auto-rollback after commit error') } catch { /* best effort */ }
+    // commit is synchronous and publishes its pending hash only on success.
+    // Without that token there is no safe reject authorization to send.
     return { ok: false, phase: 'commit', error: errorMessage(err) }
   }
 
