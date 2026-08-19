@@ -82,11 +82,15 @@ export function feishuPostContent(markdown: string): string {
   })
 }
 
-export function createFeishuAxios(proxy: ConnectorProxyTransport): AxiosInstance | undefined {
+export function createFeishuAxios(
+  proxy: ConnectorProxyTransport,
+  domain: FeishuOpenDomain = 'feishu',
+): AxiosInstance | undefined {
   if (!proxy.nodeFetchAgent) return undefined
+  const hostname = domain === 'lark' ? 'open.larksuite.com' : 'open.feishu.cn'
   return axios.create({
-    httpAgent: proxy.nodeFetchAgent(new URL('http://open.feishu.cn')),
-    httpsAgent: proxy.nodeFetchAgent(new URL('https://open.feishu.cn')),
+    httpAgent: proxy.nodeFetchAgent(new URL(`http://${hostname}`)),
+    httpsAgent: proxy.nodeFetchAgent(new URL(`https://${hostname}`)),
     proxy: false,
   })
 }
@@ -156,7 +160,7 @@ export class FeishuConnectorAdapter implements ConnectorAdapter {
       this.registerCommands(context)
 
       const lark = await import('@larksuiteoapi/node-sdk')
-      const httpInstance = createFeishuAxios(this.proxy) as ConstructorParameters<typeof lark.Client>[0]['httpInstance']
+      const httpInstance = createFeishuAxios(this.proxy, domain) as ConstructorParameters<typeof lark.Client>[0]['httpInstance']
       const sdkDomain = domain === 'lark' ? lark.Domain.Lark : lark.Domain.Feishu
       const client = new lark.Client({
         appId,

@@ -1,7 +1,9 @@
 # Connector desk specimen + per-adapter Issue
 
-**Status:** active — increment 2  
-**Owner guides:** [[docs/connector-service.md]], [[docs/workspace-issues-and-scheduling.md]], [[docs/conversation-provenance.md]]  
+**Status:** active — increment 2
+
+**Owner guides:** [[docs/connector-service.md]], [[docs/workspace-issues-and-scheduling.md]], [[docs/conversation-provenance.md]]
+
 **Delivery:** serial PRs to `dev` (`area:collaboration`, `area:settings`). `review:deep` for the persisted flag.
 
 ## Goal

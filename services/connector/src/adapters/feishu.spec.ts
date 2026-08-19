@@ -167,7 +167,7 @@ describe('Feishu long connection', () => {
   })
 
   it('passes the shared proxy agent into both HTTP and WebSocket clients', async () => {
-    const nodeFetchAgent = vi.fn(() => ({ proxy: true }))
+    const nodeFetchAgent = vi.fn((_url: URL) => ({ proxy: true }))
     const proxy = {
       active: true,
       nodeFetchAgent,
@@ -179,6 +179,11 @@ describe('Feishu long connection', () => {
       settings: { appId: APP_ID, appSecret: APP_SECRET, domain: 'lark' },
     }, context())
     expect(nodeFetchAgent).toHaveBeenCalled()
+    expect(nodeFetchAgent.mock.calls.map(([url]) => (url as URL).hostname)).toEqual([
+      'open.larksuite.com',
+      'open.larksuite.com',
+      'open.larksuite.com',
+    ])
     expect(wsCtor.mock.calls[0]?.[0]).toMatchObject({ agent: { proxy: true } })
     expect(clientCtor.mock.calls[0]?.[0].httpInstance).toBeTruthy()
     expect(clientCtor.mock.calls[0]?.[0].domain).toBe(1)

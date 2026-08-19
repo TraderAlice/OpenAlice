@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
@@ -27,8 +27,14 @@ async function rewriteWorkspaceIssues(wsDir: string): Promise<void> {
     const path = join(wsDir, ISSUES_REL, file)
     const raw = await readFile(path, 'utf8')
     const next = rewriteIssueDocument(raw)
-    if (next !== raw) await writeFile(path, next, 'utf8')
+    if (next !== raw) await atomicWrite(path, next)
   }
+}
+
+async function atomicWrite(path: string, value: string): Promise<void> {
+  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`
+  await writeFile(temporary, value, 'utf8')
+  await rename(temporary, path)
 }
 
 export function rewriteIssueDocument(raw: string): string {
