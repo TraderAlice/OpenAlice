@@ -47,6 +47,9 @@ the durable truth after it changes. Git history is the archive.
   Telegram phone desk: What is the heartbeat prompt, comments are the chat,
   Connector only transports. Increment 1 bound the desk in Settings.
   Increment 2 projects comments unless `[[no-reply]]`.
+- [[plans/connector-desk.md]] — Desk specimen is shared; each `desk` adapter
+  owns its own Issue. Increment 1 generalizes `telegramConnector` →
+  `connectorDesk: <id>`. Feishu adapter is a later increment.
 - [[plans/connector-inbox-commands.md]] — Connectors declare `inbox` and
   `settings` capabilities and implement their own slash-command forms.
   Telegram uses a bounded `/inbox` summary plus on-demand file pull;

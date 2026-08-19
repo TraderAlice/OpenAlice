@@ -29,8 +29,8 @@ export interface IssueComment {
   replyTo?: string
   /** Delivery is optional for agent-authored notes and owner self-comments. */
   delivery?: IssueCommentDelivery
-  /** Present when the comment arrived through a Connector owner chat. */
-  via?: 'telegram'
+  /** Connector id when the comment arrived through that adapter's owner chat. */
+  via?: string
 }
 
 const headlessTurnProgressSchema = z.object({
@@ -102,7 +102,7 @@ const issueCommentSchema = z.object({
   markdown: z.string().min(1),
   replyTo: z.string().min(1).optional(),
   delivery: issueCommentDeliverySchema.optional(),
-  via: z.literal('telegram').optional(),
+  via: z.string().min(1).max(64).optional(),
 })
 
 const issueCommentsFileSchema = z.object({
@@ -146,7 +146,7 @@ export interface AppendIssueCommentOptions {
   at?: string
   replyTo?: string
   delivery?: IssueCommentDelivery
-  via?: 'telegram'
+  via?: string
 }
 
 async function writeIssueComments(wsDir: string, id: string, comments: IssueComment[]): Promise<void> {

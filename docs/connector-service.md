@@ -9,7 +9,7 @@ It complements [[docs/workspace-issues-and-scheduling.md]] and
 
 Connector Service projects durable OpenAlice Inbox entries into optional
 external chats. It is not another agent runtime, chat input loop, or source of
-truth. Telegram, Discord, and Slack are the first adapters, not hard-coded product
+truth. Telegram, Discord, Slack, and Feishu are the first adapters, not hard-coded product
 categories.
 
 - Local Inbox append completes before any external request begins.
@@ -53,15 +53,18 @@ categories.
   by the current trading mode. Callback data carries only page-local
   indexes; account ids and pending hashes stay in the Connector session
   and the Alice-validated action request.
-- Connector Service never interprets chat. Alice owns the phone-desk Issue.
-  Connector queues owner text and Alice drains that stack only while a live
-  phone-desk Issue exists and no desk generation is running. Several stacked
-  DMs become one quoted comment. Alice projects desk comments that do not
-  contain the literal tag `[[no-reply]]`. Inbound Telegram comments are not
-  echoed back. While a desk turn is running, Alice also ships sealed mid-turn
-  `text` blocks (a tool or error followed them) so the phone chat does not
-  wait for the final reply. Tool names, status, and payloads stay off Telegram.
-  The trailing text still becomes today's reply comment.
+- Connector Service never interprets chat. Alice owns one phone-desk Issue
+  per `desk`-capable connector. Connector queues owner text keyed by
+  `connectorId`; Alice drains that stack only while that connector's live
+  desk exists and no generation is running on it. Several stacked DMs become
+  one quoted comment on that Issue. Alice projects desk comments that do not
+  contain the literal tag `[[no-reply]]`. Inbound owner comments are not
+  echoed back to that connector. While a desk turn is running, Alice also
+  ships sealed mid-turn `text` blocks (a tool or error followed them) so the
+  phone chat does not wait for the final reply. Tool names, status, and
+  payloads stay off the owner chat. The trailing text still becomes today's
+  reply comment. Telegram is the first `desk` adapter; Discord and Slack do
+  not advertise `desk` until they ingest private owner chat.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are externalized as
@@ -112,6 +115,7 @@ Workspace agent
           -> Discord Connector
           -> Telegram Connector
           -> Slack Connector
+          -> Feishu Connector
           -> future adapter
 
 Telegram owner DM
@@ -243,6 +247,18 @@ path expects Slack to host the app. Socket Mode plus the Web API is the
 current local-app shape after the 2026 Node SDK majors (`@slack/web-api` 8,
 `@slack/socket-mode` 3).
 
+Feishu/Lark is an enterprise self-built app with bot capability. OpenAlice is
+local, so Feishu uses long connection (`WSClient`) instead of a public Request
+URL. Store apps cannot use long connection. The owner pastes App ID and App
+secret, chooses `feishu` (`open.feishu.cn`) or `lark` (`open.larksuite.com`),
+starts the bot, DMs it, and runs `/link` as plain text — Feishu has no runtime
+slash-command menu. Subscribe to `im.message.receive_v1`, keep availability
+limited to the owner, and leave IP allowlists empty unless the Connector
+egress IP is listed. Group custom-bot webhooks are send-only and are not this
+connector. `/inbox`, `/settings`, and `/uta` currently reply with placeholders;
+owner-chat desk and Inbox push are implemented. Each Feishu desk is its own
+Issue (`feishu-phone-desk`), not the Telegram phone desk.
+
 Saving valid bot credentials does not mean the connector is linked. Settings
 must present the lifecycle explicitly: credentials ready, bot online and
 `awaiting_link`, then linked/healthy. Starting the linking step enables the
@@ -296,20 +312,21 @@ The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
   unlink, linking instructions, and explicit test sends. The Telegram card also
-  binds the Project's one phone-desk Issue: the Workspace picker defaults to
-  the Ask Alice Chat workspace. The operator can edit What and heartbeat
-  cadence, then open the ordinary Issue detail for comments. Generic
-  Issue create/update cannot set `telegramConnector`.
-- The phone-desk Issue is hidden from the Issue board and Tracked list. It still
-  fires on `when`. Extra `telegramConnector: true` files in other Workspaces do
-  not fire. Owner DMs become comments; the desk is seeded with
-  `commentPrompt: '{comment}'` so those comments are the reply Input Prompt
-  as-is. Scheduled-fire `assistantText` is stamped as a comment. Connector
-  projects those comments unless they contain the literal tag `[[no-reply]]`
-  or arrived from Telegram. Pending comment replies also carry compact turn
-  progress. The phone desk ships sealed mid-turn `text` blocks (the last
-  consecutive text before a tool or error) and skips tool/error blocks. A
-  text already sent this way is not sent again as the final comment.
+  binds that connector's phone-desk Issue when the adapter advertises `desk`:
+  the Workspace picker defaults to the Ask Alice Chat workspace. The operator
+  can edit What and heartbeat cadence, then open the ordinary Issue detail
+  for comments. Generic Issue create/update cannot set `connectorDesk`.
+- Each phone-desk Issue is hidden from the Issue board and Tracked list. It
+  still fires on `when`. Extra desks for the same connector in other
+  Workspaces do not fire. Owner DMs become comments on that connector's
+  Issue; the desk is seeded with `commentPrompt: '{comment}'` so those
+  comments are the reply Input Prompt as-is. Scheduled-fire `assistantText`
+  is stamped as a comment. Connector projects those comments unless they
+  contain the literal tag `[[no-reply]]` or arrived from that connector.
+  Pending comment replies also carry compact turn progress. The phone desk
+  ships sealed mid-turn `text` blocks (the last consecutive text before a
+  tool or error) and skips tool/error blocks. A text already sent this way
+  is not sent again as the final comment.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product

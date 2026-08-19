@@ -49,7 +49,7 @@ function host(overrides: Partial<TelegramDeskChatHost> = {}): TelegramDeskChatHo
 
 describe('telegram desk chat filter', () => {
   it('projects agent comments and skips inbound telegram or [[no-reply]]', () => {
-    const issue = { telegramConnector: true as const }
+    const issue = { connectorDesk: 'telegram' }
     expect(shouldProjectDeskComment(issue, {
       id: 'c1', author: '@resume-a', at: 'now', markdown: 'Hello from the desk.',
     })).toBe(true)
@@ -96,7 +96,7 @@ describe('telegram desk ingest and stamp', () => {
     expect(result.comment.author).toBe('human')
     expect(result.comment.via).toBe('telegram')
     expect(result.comment.markdown).toBe('What is the overnight risk?')
-    expect(shouldProjectDeskComment(created.ok ? created.issue : { telegramConnector: true }, result.comment)).toBe(false)
+    expect(shouldProjectDeskComment(created.ok ? created.issue : { connectorDesk: 'telegram' }, result.comment)).toBe(false)
   })
 
   it('stamps a scheduled fire as a comment', async () => {
@@ -200,46 +200,48 @@ describe('telegram desk ingest and stamp', () => {
     expect(comments.ok && comments.comments).toHaveLength(1)
   })
 
-  it('does not drain Connector inbound until a live desk exists', async () => {
-    let drained = 0
+  it('returns inbound when no live desk exists yet', async () => {
+    const returned: unknown[] = []
     const client = {
-      drainInbound: async () => {
-        drained += 1
-        return [{ connectorId: 'telegram', userId: '42', text: 'queued' }]
+      drainInbound: async () => [{ connectorId: 'telegram', userId: '42', text: 'queued' }],
+      returnInbound: async (messages: unknown[]) => {
+        returned.push(...messages)
       },
     } as unknown as ConnectorClient
 
     await pullTelegramDeskInbound(host(), client)
-    expect(drained).toBe(0)
+    expect(returned).toEqual([{ connectorId: 'telegram', userId: '42', text: 'queued' }])
 
     const created = await createTelegramConnectorDesk(
       { id: 'ws-a', dir: wsDir },
       [{ id: 'ws-a', dir: wsDir }],
     )
     expect(created.ok).toBe(true)
+    returned.length = 0
     await pullTelegramDeskInbound(host(), client)
-    expect(drained).toBe(1)
+    expect(returned).toEqual([])
   })
 
-  it('leaves Connector inbound stacked while the desk is generating', async () => {
+  it('returns inbound for a generating desk so another connector can still flush', async () => {
     const created = await createTelegramConnectorDesk(
       { id: 'ws-a', dir: wsDir },
       [{ id: 'ws-a', dir: wsDir }],
     )
     expect(created.ok).toBe(true)
-    let drained = 0
+    const returned: unknown[] = []
     const client = {
-      drainInbound: async () => {
-        drained += 1
-        return [{ connectorId: 'telegram', userId: '42', text: 'later' }]
+      drainInbound: async () => [{ connectorId: 'telegram', userId: '42', text: 'later' }],
+      returnInbound: async (messages: unknown[]) => {
+        returned.push(...messages)
       },
     } as unknown as ConnectorClient
 
     await pullTelegramDeskInbound(host({ deskGenerating: () => true }), client)
-    expect(drained).toBe(0)
+    expect(returned).toEqual([{ connectorId: 'telegram', userId: '42', text: 'later' }])
 
+    returned.length = 0
     await pullTelegramDeskInbound(host({ deskGenerating: () => false }), client)
-    expect(drained).toBe(1)
+    expect(returned).toEqual([])
   })
 
   it('does not overlap inbound drains when one poll is still running', async () => {

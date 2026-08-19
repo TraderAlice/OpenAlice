@@ -132,7 +132,7 @@ describe('deskProgressScope', () => {
 })
 
 describe('projectDeskTurnProgress', () => {
-  const desk = { telegramConnector: true as const, status: 'todo' as const }
+  const desk = { connectorDesk: 'telegram', status: 'todo' as const }
 
   it('sends sealed texts once and skips tools', async () => {
     const { client, sent } = mockClient()
@@ -173,7 +173,7 @@ describe('projectDeskTurnProgress', () => {
       client,
     })
     await projectDeskTurnProgress({
-      issue: { telegramConnector: true, status: 'canceled' },
+      issue: { connectorDesk: 'telegram', status: 'canceled' },
       scopeId: 'c1',
       progress: snapshot,
       client,
@@ -205,7 +205,7 @@ describe('projectDeskTurnProgress', () => {
 describe('final comment dedup', () => {
   it('skips a final comment whose markdown was already shipped as progress', async () => {
     const { client, sent } = mockClient()
-    const issue = { telegramConnector: true as const }
+    const issue = { connectorDesk: 'telegram' }
     await projectDeskTurnProgress({
       issue: { ...issue, status: 'todo' },
       scopeId: 'telegram-1',
@@ -231,7 +231,7 @@ describe('final comment dedup', () => {
 
   it('still ships a different final reply', async () => {
     const { client, sent } = mockClient()
-    const issue = { telegramConnector: true as const }
+    const issue = { connectorDesk: 'telegram' }
     await projectDeskTurnProgress({
       issue: { ...issue, status: 'todo' },
       scopeId: 'run-1',

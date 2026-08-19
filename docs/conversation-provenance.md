@@ -367,11 +367,11 @@ Issue-file edits that bypass UI/CLI mutation routes. Such edits are attributed
 to a Session only when exactly one Session could have made them; concurrent
 edits remain explicitly unknown rather than crediting the wrong coworker.
 
-The Alice Project's Telegram phone-desk Issue uses this same comment sidecar as
-its chat transcript. Owner private-chat text arrives as a human comment with
-`via: telegram` and `origin.kind: external`. Scheduled-fire replies and Alice
-comments are projected back unless they contain `[[no-reply]]`. Connector does
-not create a second conversation object.
+Each connector phone-desk Issue uses this same comment sidecar as that
+channel's chat transcript. Owner private-chat text arrives as a human comment
+with `via: <connectorId>` and `origin.kind: external`. Scheduled-fire replies
+and Alice comments are projected back unless they contain `[[no-reply]]`.
+Connector does not create a second conversation object.
 
 When an Issue has a fixed `@resumeId` owner, a comment from somebody else is
 delivered to that exact Session. The Input Prompt is `commentPrompt` when set,

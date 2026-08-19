@@ -60,6 +60,20 @@ export class ConnectorClient {
     })
   }
 
+  /** Put unread owner DMs back after a per-desk generation block. */
+  async returnInbound(messages: InboundOwnerMessage[], signal?: AbortSignal): Promise<void> {
+    if (messages.length === 0) return
+    const response = await this.fetchImpl(new URL('/v1/inbound/return', this.baseUrl), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        messages: messages.map((message) => inboundOwnerMessageSchema.parse(message)),
+      }),
+      signal,
+    })
+    if (!response.ok) throw new Error(`Connector Service inbound return failed: ${response.status}`)
+  }
+
   async sendOwnerMessage(message: OwnerChatMessage, signal?: AbortSignal): Promise<ConnectorDeliveryReceipt> {
     const response = await this.fetchImpl(new URL('/v1/notifications/owner-chat', this.baseUrl), {
       method: 'POST',

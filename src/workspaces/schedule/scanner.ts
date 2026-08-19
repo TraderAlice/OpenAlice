@@ -35,7 +35,7 @@ import type { SessionCreatedBy } from '../session-metadata.js'
 
 import {
   isFireable,
-  isTelegramConnectorIssue,
+  isConnectorDeskIssue,
   issueAssigneeClaimsFirstSession,
   issueAssigneeResumeId,
   issueFirePrompt,
@@ -44,9 +44,9 @@ import {
   type IssueRecord,
 } from '../issues/declaration.js'
 import {
-  extraTelegramConnectorDeskKeys,
-  findTelegramConnectorDesks,
-} from '../issues/telegram-connector.js'
+  extraConnectorDeskKeys,
+  findConnectorDesks,
+} from '../issues/connector-desk.js'
 
 import {
   fireBase,
@@ -186,16 +186,16 @@ export class ScheduleScanner {
         `This Issue is ${issue.status}; reopen it before running.`,
       )
     }
-    if (isTelegramConnectorIssue(issue)) {
-      const extras = extraTelegramConnectorDeskKeys(
-        await findTelegramConnectorDesks(
+    if (isConnectorDeskIssue(issue)) {
+      const extras = extraConnectorDeskKeys(
+        await findConnectorDesks(
           this.deps.registry.list().map((item) => ({ id: item.id, dir: item.dir })),
         ),
       )
       if (extras.has(`${ws.id}:${issue.id}`)) {
         throw new ScheduledIssueRunNowError(
           'not_fireable',
-          'Only one Telegram phone-desk Issue may fire in this Alice Project.',
+          `Only one ${issue.connectorDesk} phone-desk Issue may fire in this Alice Project.`,
         )
       }
     }
@@ -242,8 +242,8 @@ export class ScheduleScanner {
     const seen = new Set<string>()
     try {
       // registry.list() order is preserved by Promise.all → stable display order.
-      const extraDesks = extraTelegramConnectorDeskKeys(
-        await findTelegramConnectorDesks(
+      const extraDesks = extraConnectorDeskKeys(
+        await findConnectorDesks(
           this.deps.registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })),
         ),
       )
@@ -295,7 +295,7 @@ export class ScheduleScanner {
       // No `when` ⇒ pure board work item; the scanner does not touch it.
       const when = issue.when
       if (!when) continue
-      if (isTelegramConnectorIssue(issue) && extraDesks.has(`${ws.id}:${issue.id}`)) continue
+      if (isConnectorDeskIssue(issue) && extraDesks.has(`${ws.id}:${issue.id}`)) continue
       seen.add(this.deps.markers.key(ws.id, issue.id))
       if (isFireable(issue) && this.isDue(ws.id, issue.id, when, nowMs)) {
         await this.fire(

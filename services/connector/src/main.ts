@@ -22,6 +22,7 @@ import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
 import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
+import { feishuConnectorRegistration } from './adapters/feishu.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
 import { installConnectorProxyTransport } from './core/proxy.js'
@@ -40,6 +41,7 @@ async function main(): Promise<void> {
   registry.register(discordConnectorRegistration(proxy))
   registry.register(telegramConnectorRegistration(proxy))
   registry.register(slackConnectorRegistration(proxy))
+  registry.register(feishuConnectorRegistration(proxy))
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -70,6 +72,11 @@ async function main(): Promise<void> {
   })
   app.post('/v1/inbound/drain', async (c) => {
     return c.json({ messages: manager.drainInbound() })
+  })
+  app.post('/v1/inbound/return', async (c) => {
+    const body = await c.req.json().catch(() => null) as { messages?: unknown } | null
+    manager.returnInbound(Array.isArray(body?.messages) ? body.messages : [])
+    return c.json({ ok: true })
   })
   app.post('/v1/actions/drain', (c) => {
     return c.json({ requests: manager.drainActions() })
