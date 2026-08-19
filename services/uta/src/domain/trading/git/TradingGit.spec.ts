@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import Decimal from 'decimal.js'
 import { Contract, Order, OrderState } from '@traderalice/ibkr'
-import { TradingGit } from './TradingGit.js'
+import { PendingHashConflictError, TradingGit } from './TradingGit.js'
 import type { TradingGitConfig } from './interfaces.js'
 import type { Operation, GitState } from './types.js'
 import '../contract-ext.js'
@@ -89,6 +89,21 @@ describe('TradingGit', () => {
       expect(status.staged).toHaveLength(1)
       expect(status.pendingMessage).toBeNull()
     })
+
+    it('does not allow the reviewed payload to change while a commit awaits approval', async () => {
+      git.add(buyOp('AAPL'))
+      const { hash } = git.commit('Buy AAPL')
+
+      expect(() => git.add(buyOp('MSFT'))).toThrow(PendingHashConflictError)
+      expect(git.status()).toMatchObject({
+        pendingHash: hash,
+        pendingMessage: 'Buy AAPL',
+        staged: [expect.objectContaining({ action: 'placeOrder' })],
+      })
+
+      await git.push(hash)
+      expect(config.executeOperation).toHaveBeenCalledOnce()
+    })
   })
 
   // ==================== commit ====================
@@ -121,7 +136,7 @@ describe('TradingGit', () => {
     it('executes operations and returns PushResult', async () => {
       git.add(buyOp())
       git.commit('Buy AAPL')
-      const result = await git.push()
+      const result = await git.push(git.status().pendingHash!)
 
       expect(result.hash).toHaveLength(8)
       expect(result.message).toBe('Buy AAPL')
@@ -134,7 +149,7 @@ describe('TradingGit', () => {
       git.add(buyOp('AAPL'))
       git.add(buyOp('GOOG'))
       git.commit('Two buys')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       expect(config.executeOperation).toHaveBeenCalledTimes(2)
     })
@@ -142,7 +157,7 @@ describe('TradingGit', () => {
     it('calls getGitState after execution', async () => {
       git.add(buyOp())
       git.commit('msg')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       expect(config.getGitState).toHaveBeenCalled()
     })
@@ -150,7 +165,7 @@ describe('TradingGit', () => {
     it('clears staging area after push', async () => {
       git.add(buyOp())
       git.commit('msg')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const status = git.status()
       expect(status.staged).toHaveLength(0)
@@ -158,12 +173,77 @@ describe('TradingGit', () => {
     })
 
     it('throws when staging area is empty', async () => {
-      await expect(git.push()).rejects.toThrow('Nothing to push')
+      await expect(git.push(git.status().pendingHash!)).rejects.toThrow('Nothing to push')
     })
 
     it('throws when not committed', async () => {
       git.add(buyOp())
-      await expect(git.push()).rejects.toThrow('please commit first')
+      await expect(git.push(git.status().pendingHash!)).rejects.toThrow('please commit first')
+    })
+
+    it('refuses a mismatched expected hash without executing', async () => {
+      git.add(buyOp())
+      git.commit('Buy AAPL')
+      await expect(git.push('stalehash')).rejects.toBeInstanceOf(PendingHashConflictError)
+      expect(config.executeOperation).not.toHaveBeenCalled()
+      expect(git.status().pendingMessage).toBe('Buy AAPL')
+    })
+
+    it('refuses a missing expected hash at the domain boundary', async () => {
+      git.add(buyOp())
+      git.commit('Buy AAPL')
+      const pushWithoutHash = git.push as unknown as () => Promise<unknown>
+
+      await expect(pushWithoutHash.call(git)).rejects.toBeInstanceOf(PendingHashConflictError)
+      expect(config.executeOperation).not.toHaveBeenCalled()
+      expect(git.status().pendingMessage).toBe('Buy AAPL')
+    })
+
+    it('pushes when the expected hash still matches', async () => {
+      git.add(buyOp())
+      const { hash } = git.commit('Buy AAPL')
+      const result = await git.push(hash)
+      expect(result.hash).toBe(hash)
+      expect(config.executeOperation).toHaveBeenCalledOnce()
+    })
+
+    it('rejects a second write while one is in flight', async () => {
+      let release!: () => void
+      const blocked = new Promise<void>((resolve) => { release = resolve })
+      const slow = makeConfig({
+        executeOperation: vi.fn(async () => {
+          await blocked
+          return { success: true, orderId: 'order-1' }
+        }),
+      })
+      const slowGit = new TradingGit(slow)
+      slowGit.add(buyOp())
+      const { hash } = slowGit.commit('Buy AAPL')
+      const first = slowGit.push(hash)
+      await expect(slowGit.push(hash)).rejects.toBeInstanceOf(PendingHashConflictError)
+      release()
+      await first
+    })
+
+    it('rejects staging and recommit while a write is in flight', async () => {
+      let release!: () => void
+      const blocked = new Promise<void>((resolve) => { release = resolve })
+      const slow = makeConfig({
+        executeOperation: vi.fn(async () => {
+          await blocked
+          return { success: true, orderId: 'order-1' }
+        }),
+      })
+      const slowGit = new TradingGit(slow)
+      slowGit.add(buyOp())
+      const { hash } = slowGit.commit('Buy AAPL')
+      const first = slowGit.push(hash)
+
+      expect(() => slowGit.add(buyOp('MSFT'))).toThrow(PendingHashConflictError)
+      expect(() => slowGit.commit('changed')).toThrow(PendingHashConflictError)
+
+      release()
+      await first
     })
 
     it('calls onCommit callback with exported state', async () => {
@@ -172,7 +252,7 @@ describe('TradingGit', () => {
 
       gitWithCb.add(buyOp())
       gitWithCb.commit('msg')
-      await gitWithCb.push()
+      await gitWithCb.push(gitWithCb.status().pendingHash!)
 
       expect(onCommit).toHaveBeenCalledTimes(1)
       const exported = onCommit.mock.calls[0][0]
@@ -188,7 +268,7 @@ describe('TradingGit', () => {
 
       gitFail.add(buyOp())
       gitFail.commit('msg')
-      const result = await gitFail.push()
+      const result = await gitFail.push(gitFail.status().pendingHash!)
 
       expect(result.rejected).toHaveLength(1)
       expect(result.submitted).toHaveLength(0)
@@ -202,7 +282,7 @@ describe('TradingGit', () => {
 
       gitFail.add(buyOp())
       gitFail.commit('msg')
-      const result = await gitFail.push()
+      const result = await gitFail.push(gitFail.status().pendingHash!)
 
       expect(result.rejected).toHaveLength(1)
       expect(result.rejected[0].error).toBe('Network error')
@@ -219,7 +299,7 @@ describe('TradingGit', () => {
 
       gitPending.add(buyOp())
       gitPending.commit('limit order')
-      const result = await gitPending.push()
+      const result = await gitPending.push(gitPending.status().pendingHash!)
 
       expect(result.submitted).toHaveLength(1)
       expect(result.rejected).toHaveLength(0)
@@ -239,7 +319,7 @@ describe('TradingGit', () => {
 
       gitFilled.add(buyOp())
       gitFilled.commit('market buy')
-      const result = await gitFilled.push()
+      const result = await gitFilled.push(gitFilled.status().pendingHash!)
 
       expect(result.submitted).toHaveLength(1)
       expect(result.submitted[0].status).toBe('filled')
@@ -260,7 +340,7 @@ describe('TradingGit', () => {
 
       gitCancel.add({ action: 'cancelOrder', orderId: 'order-cancel' })
       gitCancel.commit('cancel order')
-      const result = await gitCancel.push()
+      const result = await gitCancel.push(gitCancel.status().pendingHash!)
 
       expect(result.submitted).toHaveLength(1)
       expect(result.submitted[0].status).toBe('cancelled')
@@ -278,7 +358,7 @@ describe('TradingGit', () => {
 
       gitAsync.add(buyOp())
       gitAsync.commit('async limit')
-      const result = await gitAsync.push()
+      const result = await gitAsync.push(gitAsync.status().pendingHash!)
 
       expect(result.submitted).toHaveLength(1)
       expect(result.submitted[0].status).toBe('submitted')
@@ -298,7 +378,7 @@ describe('TradingGit', () => {
 
       gitInactive.add(buyOp())
       gitInactive.commit('rejected by exchange')
-      const result = await gitInactive.push()
+      const result = await gitInactive.push(gitInactive.status().pendingHash!)
 
       // Inactive maps to rejected — but success is still true from broker
       // so it lands in submitted (success-based), with status 'rejected'
@@ -317,7 +397,7 @@ describe('TradingGit', () => {
 
       gitFail.add({ action: 'cancelOrder', orderId: 'nonexistent' })
       gitFail.commit('cancel unknown')
-      const result = await gitFail.push()
+      const result = await gitFail.push(gitFail.status().pendingHash!)
 
       expect(result.rejected).toHaveLength(1)
       expect(result.rejected[0].error).toBe('Order not found')
@@ -335,11 +415,11 @@ describe('TradingGit', () => {
     it('returns commits in reverse chronological order', async () => {
       git.add(buyOp('AAPL'))
       git.commit('First')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       git.add(buyOp('GOOG'))
       git.commit('Second')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const entries = git.log()
       expect(entries).toHaveLength(2)
@@ -350,11 +430,11 @@ describe('TradingGit', () => {
     it('filters by symbol', async () => {
       git.add(buyOp('AAPL'))
       git.commit('Buy AAPL')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       git.add(buyOp('GOOG'))
       git.commit('Buy GOOG')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const entries = git.log({ symbol: 'AAPL' })
       expect(entries).toHaveLength(1)
@@ -365,7 +445,7 @@ describe('TradingGit', () => {
       for (let i = 0; i < 5; i++) {
         git.add(buyOp('AAPL'))
         git.commit(`Commit ${i}`)
-        await git.push()
+        await git.push(git.status().pendingHash!)
       }
 
       const entries = git.log({ limit: 2 })
@@ -375,7 +455,7 @@ describe('TradingGit', () => {
     it('includes operation summaries', async () => {
       git.add(buyOp('AAPL'))
       git.commit('Buy')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const entries = git.log()
       expect(entries[0].operations).toHaveLength(1)
@@ -391,7 +471,7 @@ describe('TradingGit', () => {
       operation.order.tif = 'GTC'
       git.add(operation)
       git.commit('MU entry')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const [entry] = git.log()
       expect(entry.operations[0].change).toBe('BUY 10 LMT @971 GTC (submitted)')
@@ -407,6 +487,34 @@ describe('TradingGit', () => {
     })
   })
 
+  describe('reject expected hash', () => {
+    it('refuses a mismatched expected hash without recording a reject commit', async () => {
+      git.add(buyOp())
+      git.commit('Buy AAPL')
+      await expect(git.reject('nope', 'stalehash')).rejects.toBeInstanceOf(PendingHashConflictError)
+      expect(git.status().pendingMessage).toBe('Buy AAPL')
+      expect(git.status().commitCount).toBe(0)
+    })
+
+    it('rejects when the expected hash still matches', async () => {
+      git.add(buyOp())
+      const { hash } = git.commit('Buy AAPL')
+      const result = await git.reject('changed mind', hash)
+      expect(result.hash).toBe(hash)
+      expect(git.status().pendingMessage).toBeNull()
+    })
+
+    it('refuses reject without an expected hash', async () => {
+      git.add(buyOp())
+      git.commit('Buy AAPL')
+      const rejectWithoutHash = git.reject as unknown as (reason?: string) => Promise<unknown>
+
+      await expect(rejectWithoutHash.call(git, 'nope')).rejects.toBeInstanceOf(PendingHashConflictError)
+      expect(git.status().pendingMessage).toBe('Buy AAPL')
+      expect(git.status().commitCount).toBe(0)
+    })
+  })
+
   // ==================== show ====================
 
   describe('show', () => {
@@ -417,7 +525,7 @@ describe('TradingGit', () => {
     it('returns the full commit for a known hash', async () => {
       git.add(buyOp())
       const { hash } = git.commit('msg')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const commit = git.show(hash)
       expect(commit).not.toBeNull()
@@ -442,7 +550,7 @@ describe('TradingGit', () => {
     it('tracks head and commitCount after push', async () => {
       git.add(buyOp())
       git.commit('msg')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const s = git.status()
       expect(s.head).toHaveLength(8)
@@ -481,7 +589,7 @@ describe('TradingGit', () => {
     it('show()/exportState()/status() JSON output contains no sentinel literal', async () => {
       git.add(buyOp())
       git.commit('mkt buy')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const head = git.status().head!
       for (const blob of [git.status(), git.show(head), git.exportState()]) {
@@ -514,7 +622,7 @@ describe('TradingGit', () => {
       order.lmtPrice = new Decimal('3500.25')
       git.add({ action: 'placeOrder', contract, order })
       git.commit('lmt buy')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const exported = git.exportState()
       const op = exported.commits[0].operations[0] as Extract<Operation, { action: 'placeOrder' }>
@@ -544,7 +652,7 @@ describe('TradingGit', () => {
     it('round-trips state', async () => {
       git.add(buyOp('AAPL'))
       git.commit('Buy AAPL')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const exported = git.exportState()
       expect(exported.commits).toHaveLength(1)
@@ -572,7 +680,7 @@ describe('TradingGit', () => {
       order.cashQty = new Decimal('1000')
       git.add({ action: 'placeOrder', contract, order })
       git.commit('precise eth order')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       // Simulate persist → reload by going through JSON.
       const exported = JSON.parse(JSON.stringify(git.exportState()))
@@ -599,7 +707,7 @@ describe('TradingGit', () => {
       order.lmtPrice = new Decimal(145.25)
       git.add({ action: 'placeOrder', contract, order })
       git.commit('legacy order')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const exported = git.exportState()
       // Tamper: rewrite lmtPrice as a bare number in the serialised form.
@@ -652,7 +760,7 @@ describe('TradingGit', () => {
       git.setCurrentRound(42)
       git.add(buyOp())
       git.commit('msg')
-      await git.push()
+      await git.push(git.status().pendingHash!)
 
       const commit = git.show(git.status().head!)
       expect(commit!.round).toBe(42)
@@ -707,7 +815,7 @@ describe('TradingGit', () => {
 
       gitP.add(buyOp('AAPL'))
       gitP.commit('limit buy')
-      await gitP.push()
+      await gitP.push(gitP.status().pendingHash!)
 
       const pending = gitP.getPendingOrderIds()
       expect(pending).toHaveLength(1)
@@ -727,7 +835,7 @@ describe('TradingGit', () => {
 
       gitP.add(buyOp('AAPL'))
       gitP.commit('limit buy')
-      await gitP.push()
+      await gitP.push(gitP.status().pendingHash!)
 
       // Sync to filled
       await gitP.sync(
@@ -763,7 +871,7 @@ describe('TradingGit', () => {
 
       gitP.add(buyOp('AAPL'))
       gitP.commit('bracket buy')
-      await gitP.push()
+      await gitP.push(gitP.status().pendingHash!)
 
       const pending = gitP.getPendingOrderIds()
       expect(pending.map((p) => p.orderId).sort()).toEqual(['leg-sl', 'leg-tp', 'parent-1'])
@@ -794,7 +902,7 @@ describe('TradingGit', () => {
       }))
       gitP.add(buyOp('AAPL'))
       gitP.commit('buy')
-      await gitP.push()
+      await gitP.push(gitP.status().pendingHash!)
 
       // One sync commit carrying TWO updates → operations[1] is undefined;
       // the pending scan crashed the whole UTA process on every boot once
@@ -825,7 +933,7 @@ describe('TradingGit', () => {
 
       gitP.add(buyOp('AAPL'))
       gitP.commit('market buy')
-      await gitP.push()
+      await gitP.push(gitP.status().pendingHash!)
 
       // Filled at push time → should NOT appear as pending
       expect(gitP.getPendingOrderIds()).toHaveLength(0)
@@ -839,7 +947,7 @@ describe('TradingGit', () => {
       }))
       gitS.add(buyOp('AAPL'))
       gitS.commit('buy')
-      await gitS.push()
+      await gitS.push(gitS.status().pendingHash!)
 
       await gitS.sync(
         [

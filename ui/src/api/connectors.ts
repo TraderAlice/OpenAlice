@@ -20,7 +20,7 @@ export interface ConnectorDefinition {
     defaultValue?: string | number | boolean
   }>
   commands: Array<{ name: string; description: string }>
-  capabilities?: Array<'inbox' | 'settings'>
+  capabilities?: Array<'inbox' | 'settings' | 'uta'>
 }
 
 export interface PublicConnectorConfig {
@@ -152,7 +152,9 @@ function isConnectorDefinition(value: unknown): boolean {
       && typeof command.description === 'string')
     && (value.capabilities === undefined
       || (Array.isArray(value.capabilities)
-        && value.capabilities.every((capability) => capability === 'inbox' || capability === 'settings')))
+        && value.capabilities.every((capability) => (
+          capability === 'inbox' || capability === 'settings' || capability === 'uta'
+        ))))
 }
 
 function isPublicConnectorConfig(value: unknown): boolean {

@@ -29,6 +29,34 @@ describe('ConnectorClient artifact control plane', () => {
     expect(requests[0]).not.toHaveProperty('path')
   })
 
+  it('drains only schema-valid UTA requests and ignores extra fields', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      requests: [
+        {
+          requestId: 'uta-1',
+          connectorId: 'telegram',
+          createdAt: '2026-08-14T15:02:00.000Z',
+          action: 'push',
+          utaId: 'alpaca-paper',
+          pendingHash: 'abc12345',
+          reason: 'should-not-round-trip',
+        },
+        { requestId: 'uta-bad', connectorId: 'telegram', createdAt: '2026-08-14T15:02:00.000Z', action: 'explode' },
+      ],
+    }), { status: 200 }))
+    const client = new ConnectorClient('http://127.0.0.1:47334', fetchImpl)
+    const requests = await client.drainUtaActions()
+    expect(requests).toEqual([{
+      requestId: 'uta-1',
+      connectorId: 'telegram',
+      createdAt: '2026-08-14T15:02:00.000Z',
+      action: 'push',
+      utaId: 'alpaca-paper',
+      pendingHash: 'abc12345',
+    }])
+    expect(requests[0]).not.toHaveProperty('reason')
+  })
+
   it('posts a directed artifact delivery without an Inbox notification body', async () => {
     const content = Buffer.from('# Close\n')
     const fetchImpl = vi.fn(async (_url: URL, init?: RequestInit) => {

@@ -271,15 +271,21 @@ export class UTAAccountSDK {
 
   // ==================== Write / lifecycle (existing routes) ====================
 
-  async push(): Promise<PushResult> {
+  async push(expectedPendingHash: string): Promise<PushResult> {
     this.assertVenueWritable()
-    return this.client.post<PushResult>(`/api/trading/uta/${encodeURIComponent(this.id)}/wallet/push`)
+    return this.client.post<PushResult>(
+      `/api/trading/uta/${encodeURIComponent(this.id)}/wallet/push`,
+      { expectedPendingHash },
+    )
   }
 
-  reject(reason?: string): Promise<RejectResult> {
+  reject(reason: string | undefined, expectedPendingHash: string): Promise<RejectResult> {
     return this.client.post<RejectResult>(
       `/api/trading/uta/${encodeURIComponent(this.id)}/wallet/reject`,
-      reason !== undefined ? { reason } : undefined,
+      {
+        ...(reason !== undefined ? { reason } : {}),
+        expectedPendingHash,
+      },
     )
   }
 

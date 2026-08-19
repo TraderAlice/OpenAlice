@@ -42,6 +42,7 @@ function context() {
     sendTest: async () => 'probe',
     forwardOwnerText: async () => undefined,
     enqueueArtifactRequest: () => 'art-test',
+    enqueueUtaRequest: () => 'uta-test',
   }
 }
 

@@ -5,10 +5,14 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorArtifactRequestSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
+  connectorUtaRequestSchema,
   artifactFailureMessage,
   inboundOwnerMessageSchema,
   isConnectorActionExpired,
   isInboxPushEnabled,
+  utaFailureMessage,
   type ConnectorAdapterConfig,
   type ConnectorAdapterHealth,
   type ConnectorArtifactDelivery,
@@ -17,6 +21,9 @@ import {
   type ConnectorConfig,
   type ConnectorDeliveryReceipt,
   type ConnectorServiceHealth,
+  type ConnectorUtaFailure,
+  type ConnectorUtaPresentation,
+  type ConnectorUtaRequest,
   type InboxNotification,
   type InboundOwnerMessage,
   type OwnerChatMessage,
@@ -57,6 +64,7 @@ export class DeliveryManager {
   private readonly commands = new Map<string, CommandRegistry>()
   private readonly inbound: InboundOwnerMessage[] = []
   private readonly actions: ConnectorArtifactRequest[] = []
+  private readonly utaActions: ConnectorUtaRequest[] = []
   private readonly bootRetries = new Map<string, ReturnType<typeof setTimeout>>()
   private readonly startedAt: string
   private stopped = false
@@ -191,6 +199,116 @@ export class DeliveryManager {
 
   drainActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorArtifactRequest[] {
     return this.actions.splice(0, Math.max(0, limit))
+  }
+
+  enqueueUtaRequest(connectorId: string, input: {
+    action: 'review' | 'push' | 'reject'
+    utaId?: string
+    pendingHash?: string
+  }): string {
+    const expired = this.expireUtaActions()
+    for (const request of expired) {
+      void this.failUta({
+        requestId: request.requestId,
+        connectorId: request.connectorId,
+        reason: 'expired',
+        message: utaFailureMessage('expired'),
+      }).catch((error) => {
+        console.warn(
+          `[connector] ${request.connectorId} expired UTA-request notify failed:`,
+          error instanceof Error ? error.message : error,
+        )
+      })
+    }
+    if (this.utaActions.length >= MAX_CONNECTOR_ACTION_REQUESTS) {
+      throw new Error('Too many pending UTA requests. Try again in a moment.')
+    }
+    const request = connectorUtaRequestSchema.parse({
+      requestId: `uta-${randomUUID()}`,
+      connectorId,
+      createdAt: new Date().toISOString(),
+      action: input.action,
+      ...(input.utaId ? { utaId: input.utaId } : {}),
+      ...(input.pendingHash ? { pendingHash: input.pendingHash } : {}),
+    })
+    this.utaActions.push(request)
+    void this.record({
+      correlationId: request.requestId,
+      direction: 'inbound',
+      stage: 'action.enqueued',
+      connectorId,
+      payload: {
+        kind: 'uta',
+        requestId: request.requestId,
+        action: request.action,
+        utaId: request.utaId,
+        ttlMs: CONNECTOR_ACTION_TTL_MS,
+      },
+    })
+    return request.requestId
+  }
+
+  drainUtaActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorUtaRequest[] {
+    return this.utaActions.splice(0, Math.max(0, limit))
+  }
+
+  async presentUta(presentation: ConnectorUtaPresentation): Promise<void> {
+    const parsed = connectorUtaPresentationSchema.parse(presentation)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    await this.record({
+      correlationId: parsed.requestId,
+      direction: 'outbound',
+      stage: 'delivery.attempted',
+      connectorId: adapter.id,
+      payload: {
+        kind: 'uta',
+        requestId: parsed.requestId,
+        accountCount: parsed.review.accounts.length,
+        result: parsed.result?.kind,
+      },
+    })
+    try {
+      if (adapter.presentUta) await adapter.presentUta(parsed)
+      else {
+        const waiting = parsed.review.accounts.filter((account) => account.pendingMessage).length
+        await adapter.sendOwnerText(
+          parsed.result?.message
+          ?? parsed.review.unavailable
+          ?? (waiting > 0
+            ? `UTA: ${waiting} account${waiting === 1 ? '' : 's'} waiting for approval. Open /uta in Telegram or Trading as Git in OpenAlice.`
+            : 'UTA: nothing waiting for approval.'),
+        )
+      }
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.succeeded',
+        connectorId: adapter.id,
+        payload: { kind: 'uta', requestId: parsed.requestId },
+      })
+    } catch (error) {
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.failed',
+        connectorId: adapter.id,
+        payload: {
+          kind: 'uta',
+          requestId: parsed.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
+  }
+
+  async failUta(failure: ConnectorUtaFailure): Promise<void> {
+    const parsed = connectorUtaFailureSchema.parse(failure)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    if (adapter.failUta) await adapter.failUta(parsed)
+    else await adapter.sendOwnerText(parsed.message)
   }
 
   async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
@@ -346,6 +464,7 @@ export class DeliveryManager {
         })
       },
       enqueueArtifactRequest: (input) => this.enqueueArtifactRequest(id, input),
+      enqueueUtaRequest: (input) => this.enqueueUtaRequest(id, input),
     }
     // Keep a failed adapter registered. start() may record a useful degraded
     // reason; dropping it here reduced Settings to "configured but not running".
@@ -433,6 +552,18 @@ export class DeliveryManager {
       if (!request || isConnectorActionExpired(request.createdAt, now)) {
         if (request) expired.push(request)
         this.actions.splice(index, 1)
+      }
+    }
+    return expired
+  }
+
+  private expireUtaActions(now = Date.now()): ConnectorUtaRequest[] {
+    const expired: ConnectorUtaRequest[] = []
+    for (let index = this.utaActions.length - 1; index >= 0; index -= 1) {
+      const request = this.utaActions[index]
+      if (!request || isConnectorActionExpired(request.createdAt, now)) {
+        if (request) expired.push(request)
+        this.utaActions.splice(index, 1)
       }
     }
     return expired

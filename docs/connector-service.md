@@ -21,10 +21,11 @@ categories.
 - The service is optional in every trading mode, including lite.
 - Guardian may start, stop, or restart it without restarting Alice or UTA.
 - Inbox delivery remains outbound by default. Each adapter may advertise
-  `inbox` and `settings` capabilities and implement those slash commands
+  `inbox`, `settings`, and `uta` capabilities and implement those slash commands
   itself. Telegram uses an inline-button form: `/inbox` defaults to unread
-  items, can switch to the full Inbox history, and `/settings` toggles Inbox
-  push. Discord and Slack register the same
+  items, can switch to the full Inbox history, `/settings` toggles Inbox
+  push, and `/uta` reviews pending Trading-as-Git commits with Approve /
+  Reject. Discord and Slack register the same
   commands and currently reply with a placeholder. `inboxPush: false` skips Inbox
   `deliver` for that adapter and does not affect phone-desk owner chat.
   `/link`, `/status`, and `/test` stay the generic control plane. Discord
@@ -46,7 +47,12 @@ categories.
   artifact delivery back to that Connector only. Cancel does not enqueue.
   First-version pull does not change Inbox read state. Discord and Slack
   keep `/inbox` as a placeholder and reject artifact delivery as
-  unimplemented.
+  unimplemented. `/uta` is the same shape: Telegram renders the review
+  panel; Discord and Slack reply with a placeholder. Connector never
+  talks to UTA. Push and reject stay Alice-owned wallet writes, gated
+  by the current trading mode. Callback data carries only page-local
+  indexes; account ids and pending hashes stay in the Connector session
+  and the Alice-validated action request.
 - Connector Service never interprets chat. Alice owns the phone-desk Issue.
   Connector queues owner text and Alice drains that stack only while a live
   phone-desk Issue exists and no desk generation is running. Several stacked
@@ -123,6 +129,19 @@ Telegram /inbox detail -> "view files" confirm
   -> Alice connector action bridge drain (not the phone-desk inbound drain)
   -> Alice re-reads Inbox entry and materializes one Workspace file
   -> Connector directed artifact delivery to the requesting adapter only
+
+Telegram /uta (or an Approve/Reject button)
+  -> Connector UTA action queue (review, or push/reject with required utaId + pendingHash)
+  -> Alice connector action bridge drain
+  -> Alice UTAManagerSDK list/status/push/reject (lite/readonly honored here)
+  -> UTA push/reject require expectedPendingHash and validate it in the same
+     request before mutation; mismatch or absence is 409 and does not write
+  -> A pending commit is immutable: UTA refuses further staging until that
+     commit is pushed or rejected, and refuses staging/recommit during a write
+  -> Connector directed UTA presentation back to the requesting adapter only
+     Commits with more operations than the Telegram page can show are not
+     remotely actionable — Approve/Reject stay off and the owner uses
+     Trading as Git.
 ```
 
 Load-bearing paths:
@@ -250,10 +269,12 @@ missing bot token still fail `start()` and do not reconnect.
 
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
-`/test` still sends when Inbox push is off. `/inbox` and `/settings` are
+`/test` still sends when Inbox push is off. `/inbox`, `/settings`, and `/uta` are
 capability commands: the catalog only declares them; Telegram renders
 buttons, and a connector that has not implemented the form yet must still
-answer the slash command.
+answer the slash command. `/uta` does not interpret free-text chat as
+orders; only the owner-linked slash command and its buttons may enqueue
+review, push, or reject.
 
 ### Setup lifecycle and UI ownership
 

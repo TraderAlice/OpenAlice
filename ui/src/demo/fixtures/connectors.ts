@@ -46,8 +46,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'test', description: 'Send a test notification.' },
         { name: 'inbox', description: 'Browse recent Inbox items.' },
         { name: 'settings', description: 'Change Inbox push for this chat.' },
+        { name: 'uta', description: 'Review and approve pending trades.' },
       ],
-      capabilities: ['inbox', 'settings'],
+      capabilities: ['inbox', 'settings', 'uta'],
     },
     {
       id: 'telegram',
@@ -95,8 +96,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'test', description: 'Send a test notification.' },
         { name: 'inbox', description: 'Browse recent Inbox items.' },
         { name: 'settings', description: 'Change Inbox push for this chat.' },
+        { name: 'uta', description: 'Review and approve pending trades.' },
       ],
-      capabilities: ['inbox', 'settings'],
+      capabilities: ['inbox', 'settings', 'uta'],
     },
     {
       id: 'slack',
@@ -142,8 +144,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'test', description: 'Send a test notification.' },
         { name: 'inbox', description: 'Browse recent Inbox items.' },
         { name: 'settings', description: 'Change Inbox push for this chat.' },
+        { name: 'uta', description: 'Review and approve pending trades.' },
       ],
-      capabilities: ['inbox', 'settings'],
+      capabilities: ['inbox', 'settings', 'uta'],
     },
   ],
   config: {

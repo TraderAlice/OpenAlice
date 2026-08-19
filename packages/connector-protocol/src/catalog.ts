@@ -49,8 +49,9 @@ export const DISCORD_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'test', description: 'Send a test notification.' },
       { name: 'inbox', description: 'Browse recent Inbox items.' },
       { name: 'settings', description: 'Change Inbox push for this chat.' },
+      { name: 'uta', description: 'Review and approve pending trades.' },
     ],
-    capabilities: ['inbox', 'settings'],
+    capabilities: ['inbox', 'settings', 'uta'],
   }
 
 export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
@@ -99,8 +100,9 @@ export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'test', description: 'Send a test notification.' },
       { name: 'inbox', description: 'Browse recent Inbox items.' },
       { name: 'settings', description: 'Change Inbox push for this chat.' },
+      { name: 'uta', description: 'Review and approve pending trades.' },
     ],
-    capabilities: ['inbox', 'settings'],
+    capabilities: ['inbox', 'settings', 'uta'],
   }
 
 export const SLACK_CONNECTOR_DEFINITION: ConnectorDefinition = {
@@ -147,8 +149,9 @@ export const SLACK_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'test', description: 'Send a test notification.' },
       { name: 'inbox', description: 'Browse recent Inbox items.' },
       { name: 'settings', description: 'Change Inbox push for this chat.' },
+      { name: 'uta', description: 'Review and approve pending trades.' },
     ],
-    capabilities: ['inbox', 'settings'],
+    capabilities: ['inbox', 'settings', 'uta'],
   }
 
 export const BUILTIN_CONNECTOR_DEFINITIONS: ConnectorDefinition[] = [

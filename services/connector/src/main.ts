@@ -11,6 +11,8 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorDeliveryReceiptSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
   inboxNotificationSchema,
   ownerChatMessageSchema,
 } from '@traderalice/connector-protocol'
@@ -80,6 +82,19 @@ async function main(): Promise<void> {
   app.post('/v1/artifacts/fail', async (c) => {
     const failure = connectorArtifactFailureSchema.parse(await c.req.json())
     await manager.failArtifact(failure)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
+  })
+  app.post('/v1/actions/uta/drain', (c) => {
+    return c.json({ requests: manager.drainUtaActions() })
+  })
+  app.post('/v1/uta/present', async (c) => {
+    const presentation = connectorUtaPresentationSchema.parse(await c.req.json())
+    await manager.presentUta(presentation)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: presentation.requestId }))
+  })
+  app.post('/v1/uta/fail', async (c) => {
+    const failure = connectorUtaFailureSchema.parse(await c.req.json())
+    await manager.failUta(failure)
     return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
   })
   app.post('/v1/connectors/:id/test', async (c) => {

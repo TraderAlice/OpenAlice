@@ -409,12 +409,17 @@ export function PushApprovalPanel() {
   }, [poll])
 
   const handlePush = useCallback(async (accountId: string) => {
+    const expectedPendingHash = pending.find((item) => item.account.id === accountId)?.status.pendingHash
+    if (!expectedPendingHash) {
+      setError(t('tradingReview.pushFailed'))
+      return
+    }
     setPushing(accountId)
     setConfirmingPush(null)
     setError(null)
     setLastResult(null)
     try {
-      const data = await api.trading.walletPush(accountId)
+      const data = await api.trading.walletPush(accountId, expectedPendingHash)
       setLastResult({ accountId, data })
       await poll()
     } catch (err) {
@@ -422,20 +427,26 @@ export function PushApprovalPanel() {
     } finally {
       setPushing(null)
     }
-  }, [poll, t])
+  }, [pending, poll, t])
 
   const handleReject = useCallback(async (accountId: string) => {
+    const expectedPendingHash = pending.find((item) => item.account.id === accountId)?.status.pendingHash
+      ?? staged.find((item) => item.account.id === accountId)?.status.pendingHash
+    if (!expectedPendingHash) {
+      setError(t('tradingReview.rejectFailed'))
+      return
+    }
     setRejecting(accountId)
     setError(null)
     try {
-      await api.trading.walletReject(accountId)
+      await api.trading.walletReject(accountId, undefined, expectedPendingHash)
       await poll()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('tradingReview.rejectFailed'))
     } finally {
       setRejecting(null)
     }
-  }, [poll, t])
+  }, [pending, poll, staged, t])
 
   const historyAccounts = useMemo(
     () => history.map((h) => ({ id: h.accountId, label: h.label })),

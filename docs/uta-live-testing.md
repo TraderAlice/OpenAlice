@@ -157,7 +157,9 @@ export AQ_WS_ID=<any live workspace id>     # from ~/.openalice/workspaces/works
 BIN=src/workspaces/cli/bin/alice-uta
 node $BIN                                    # discover groups/verbs
 node $BIN order place --help                 # flags come from the manifest
-# "user approves": curl -s -X POST http://127.0.0.1:47333/api/trading/uta/<id>/wallet/push
+# "user approves": curl -s -X POST http://127.0.0.1:47333/api/trading/uta/<id>/wallet/push \
+#   -H 'content-type: application/json' \
+#   -d '{"expectedPendingHash":"<pendingHash from wallet/status>"}'
 ```
 
 Running inside a real OpenAlice Workspace is preferred: the launcher injects
