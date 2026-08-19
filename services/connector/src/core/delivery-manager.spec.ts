@@ -595,6 +595,7 @@ describe('DeliveryManager connector registry', () => {
           pendingMessage: 'long AAPL',
           pendingHash: 'abc12345',
           stagedCount: 1,
+          hiddenOperationCount: 0,
           operations: [{ action: 'placeOrder', summary: 'BUY AAPL MKT × 10' }],
         }],
       },

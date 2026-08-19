@@ -10,7 +10,7 @@ import type { HeadlessTurnProgress } from '../headless-progress.js'
 import type { IssueComment } from './comments.js'
 import {
   ISSUES_DIR_REL,
-  isTelegramConnectorIssue,
+  isConnectorDeskIssue,
   parseIssueContent,
   type IssueRecord,
 } from './declaration.js'
@@ -107,11 +107,11 @@ function markProjectedDeskText(scopeId: string, text: string): void {
 }
 
 export function shouldProjectDeskComment(
-  issue: { telegramConnector?: true },
+  issue: { connectorDesk?: string },
   comment: IssueComment,
   opts?: { progressScopeId?: string },
 ): boolean {
-  if (!isTelegramConnectorIssue(issue) || comment.via === 'telegram') return false
+  if (!isConnectorDeskIssue(issue) || comment.via) return false
   if (containsTelegramNoReply(comment.markdown)) return false
   const scope = opts?.progressScopeId ?? comment.replyTo
   if (scope && alreadyProjectedDeskText(scope, comment.markdown)) return false
@@ -119,17 +119,17 @@ export function shouldProjectDeskComment(
 }
 
 export async function projectDeskComment(
-  issue: { telegramConnector?: true },
+  issue: { connectorDesk?: string },
   comment: IssueComment,
   client: ConnectorClient = new ConnectorClient(resolveConnectorUrl()),
   opts?: { progressScopeId?: string },
 ): Promise<void> {
   const scope = opts?.progressScopeId ?? comment.replyTo
   try {
-    if (!shouldProjectDeskComment(issue, comment, { progressScopeId: scope })) return
+    if (!shouldProjectDeskComment(issue, comment, { progressScopeId: scope }) || !issue.connectorDesk) return
     await client.sendOwnerMessage({
       id: `desk-${comment.id}`,
-      adapterId: 'telegram',
+      adapterId: issue.connectorDesk,
       text: normalizeDeskText(comment.markdown),
     }, AbortSignal.timeout(5_000))
   } finally {
@@ -138,19 +138,19 @@ export async function projectDeskComment(
 }
 
 export async function projectDeskTurnProgress(input: {
-  issue: Pick<IssueRecord, 'telegramConnector' | 'status'>
+  issue: Pick<IssueRecord, 'connectorDesk' | 'status'>
   scopeId: string
   progress: HeadlessTurnProgress
   client?: ConnectorClient
 }): Promise<string[]> {
-  if (!isTelegramConnectorIssue(input.issue) || input.issue.status === 'canceled') return []
+  if (!isConnectorDeskIssue(input.issue) || input.issue.status === 'canceled') return []
   const client = input.client ?? new ConnectorClient(resolveConnectorUrl())
   const sent: string[] = []
   for (const text of sealedProgressTexts(input.progress)) {
     if (alreadyProjectedDeskText(input.scopeId, text)) continue
     await client.sendOwnerMessage({
       id: deskProgressMessageId(input.scopeId, text),
-      adapterId: 'telegram',
+      adapterId: input.issue.connectorDesk,
       text,
     }, AbortSignal.timeout(5_000))
     markProjectedDeskText(input.scopeId, text)

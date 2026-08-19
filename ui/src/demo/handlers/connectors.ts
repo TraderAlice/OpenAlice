@@ -35,9 +35,9 @@ export const connectorsHandlers = [
     return HttpResponse.json({ config: snapshot.config })
   }),
 
-  http.get('/api/connectors/telegram/desk', () => HttpResponse.json({ desk })),
+  http.get('/api/connectors/:id/desk', () => HttpResponse.json({ desk })),
 
-  http.post('/api/connectors/telegram/desk', async ({ request }) => {
+  http.post('/api/connectors/:id/desk', async ({ request }) => {
     const body = await request.json().catch(() => null)
     const wsId = isRecord(body) && typeof body.wsId === 'string' ? body.wsId.trim() : ''
     if (!wsId) return HttpResponse.json({ error: 'invalid', message: 'wsId is required' }, { status: 400 })
@@ -46,7 +46,7 @@ export const connectorsHandlers = [
     return HttpResponse.json({ desk }, { status: 201 })
   }),
 
-  http.patch('/api/connectors/telegram/desk', async ({ request }) => {
+  http.patch('/api/connectors/:id/desk', async ({ request }) => {
     if (!desk) return HttpResponse.json({ error: 'not_found' }, { status: 404 })
     const body = await request.json().catch(() => null)
     if (!isRecord(body)) return HttpResponse.json({ error: 'invalid' }, { status: 400 })
@@ -62,14 +62,14 @@ export const connectorsHandlers = [
     return HttpResponse.json({ desk })
   }),
 
-  http.delete('/api/connectors/telegram/desk', () => {
+  http.delete('/api/connectors/:id/desk', () => {
     const previous = desk
     desk = null
     return HttpResponse.json({
       desk: previous
         ? {
             ...previous,
-            issue: { ...previous.issue, status: 'canceled', telegramConnector: undefined },
+            issue: { ...previous.issue, status: 'canceled', connectorDesk: undefined, telegramConnector: undefined },
           }
         : null,
     })
@@ -152,6 +152,7 @@ function demoDesk(wsId: string): TelegramConnectorDesk {
       priority: 'none',
       assignee: '@new-then-resume',
       when: { kind: 'every', every: '4h' },
+      connectorDesk: 'telegram',
       telegramConnector: true,
     },
   }

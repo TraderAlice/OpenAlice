@@ -20,7 +20,7 @@ export interface ConnectorDefinition {
     defaultValue?: string | number | boolean
   }>
   commands: Array<{ name: string; description: string }>
-  capabilities?: Array<'inbox' | 'settings' | 'uta'>
+  capabilities?: Array<'inbox' | 'settings' | 'uta' | 'desk'>
 }
 
 export interface PublicConnectorConfig {
@@ -63,17 +63,25 @@ export interface ConnectorSettingsSnapshot {
   health: ConnectorHealth
 }
 
-export interface TelegramConnectorDesk {
+export interface ConnectorDesk {
   wsId: string
   issue: IssueDetailIssue
 }
 
-export interface TelegramConnectorDeskSnapshot {
-  desk: TelegramConnectorDesk | null
+/** @deprecated Use {@link ConnectorDesk}. */
+export type TelegramConnectorDesk = ConnectorDesk
+
+export interface ConnectorDeskSnapshot {
+  desk: ConnectorDesk | null
 }
 
-export const TELEGRAM_DESK_CADENCES = ['1h', '2h', '4h', '8h', '12h', '24h'] as const
-export type TelegramDeskCadence = (typeof TELEGRAM_DESK_CADENCES)[number]
+/** @deprecated Use {@link ConnectorDeskSnapshot}. */
+export type TelegramConnectorDeskSnapshot = ConnectorDeskSnapshot
+
+export const CONNECTOR_DESK_CADENCES = ['1h', '2h', '4h', '8h', '12h', '24h'] as const
+export type ConnectorDeskCadence = (typeof CONNECTOR_DESK_CADENCES)[number]
+export const TELEGRAM_DESK_CADENCES = CONNECTOR_DESK_CADENCES
+export type TelegramDeskCadence = ConnectorDeskCadence
 
 export const connectorsApi = {
   async load(): Promise<ConnectorSettingsSnapshot> {
@@ -90,28 +98,31 @@ export const connectorsApi = {
     return fetchJson(`/api/connectors/${encodeURIComponent(id)}/test`, { method: 'POST' })
   },
   desk: {
-    async load(): Promise<TelegramConnectorDeskSnapshot> {
-      return decodeTelegramConnectorDeskSnapshot(await fetchJson<unknown>('/api/connectors/telegram/desk'))
+    async load(connectorId = 'telegram'): Promise<ConnectorDeskSnapshot> {
+      return decodeConnectorDeskSnapshot(await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`))
     },
-    async create(wsId: string): Promise<TelegramConnectorDesk> {
-      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', {
+    async create(wsId: string, connectorId = 'telegram'): Promise<ConnectorDesk> {
+      const body = await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ wsId }),
       })
-      return decodeTelegramConnectorDeskResponse(body)
+      return decodeConnectorDeskResponse(body)
     },
-    async update(patch: { what?: string; when?: Extract<ScheduleWhen, { kind: 'every' }> }): Promise<TelegramConnectorDesk> {
-      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', {
+    async update(
+      patch: { what?: string; when?: Extract<ScheduleWhen, { kind: 'every' }> },
+      connectorId = 'telegram',
+    ): Promise<ConnectorDesk> {
+      const body = await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify(patch),
       })
-      return decodeTelegramConnectorDeskResponse(body)
+      return decodeConnectorDeskResponse(body)
     },
-    async disable(): Promise<TelegramConnectorDesk | null> {
-      const body = await fetchJson<unknown>('/api/connectors/telegram/desk', { method: 'DELETE' })
-      return decodeTelegramConnectorDeskSnapshot(body).desk
+    async disable(connectorId = 'telegram'): Promise<ConnectorDesk | null> {
+      const body = await fetchJson<unknown>(`/api/connectors/${encodeURIComponent(connectorId)}/desk`, { method: 'DELETE' })
+      return decodeConnectorDeskSnapshot(body).desk
     },
   },
 }
@@ -153,7 +164,7 @@ function isConnectorDefinition(value: unknown): boolean {
     && (value.capabilities === undefined
       || (Array.isArray(value.capabilities)
         && value.capabilities.every((capability) => (
-          capability === 'inbox' || capability === 'settings' || capability === 'uta'
+          capability === 'inbox' || capability === 'settings' || capability === 'uta' || capability === 'desk'
         ))))
 }
 
@@ -215,26 +226,26 @@ function isOneOf(value: unknown, options: readonly string[]): value is string {
   return typeof value === 'string' && options.includes(value)
 }
 
-function decodeTelegramConnectorDeskSnapshot(value: unknown): TelegramConnectorDeskSnapshot {
+function decodeConnectorDeskSnapshot(value: unknown): ConnectorDeskSnapshot {
   if (!isRecord(value) || !('desk' in value)) {
-    throw new Error('Invalid Telegram phone-desk response.')
+    throw new Error('Invalid phone-desk response.')
   }
   if (value.desk === null) return { desk: null }
-  return { desk: decodeTelegramConnectorDesk(value.desk) }
+  return { desk: decodeConnectorDesk(value.desk) }
 }
 
-function decodeTelegramConnectorDeskResponse(value: unknown): TelegramConnectorDesk {
-  if (!isRecord(value)) throw new Error('Invalid Telegram phone-desk response.')
-  return decodeTelegramConnectorDesk(value.desk)
+function decodeConnectorDeskResponse(value: unknown): ConnectorDesk {
+  if (!isRecord(value)) throw new Error('Invalid phone-desk response.')
+  return decodeConnectorDesk(value.desk)
 }
 
-function decodeTelegramConnectorDesk(value: unknown): TelegramConnectorDesk {
+function decodeConnectorDesk(value: unknown): ConnectorDesk {
   if (!isRecord(value) || typeof value.wsId !== 'string' || !isRecord(value.issue)) {
-    throw new Error('Invalid Telegram phone-desk response.')
+    throw new Error('Invalid phone-desk response.')
   }
   const issue = value.issue
   if (typeof issue.id !== 'string' || typeof issue.title !== 'string' || typeof issue.what !== 'string') {
-    throw new Error('Invalid Telegram phone-desk response.')
+    throw new Error('Invalid phone-desk response.')
   }
   return {
     wsId: value.wsId,

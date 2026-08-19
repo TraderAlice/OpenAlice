@@ -20,8 +20,9 @@ export const connectorFieldDefinitionSchema = z.object({
 export type ConnectorFieldDefinition = z.infer<typeof connectorFieldDefinitionSchema>
 
 /** Capabilities a connector may advertise. Each adapter implements its own
- *  interaction; the catalog only says the command exists. */
-export const connectorCapabilitySchema = z.enum(['inbox', 'settings', 'uta'])
+ *  interaction; the catalog only says the command exists.
+ *  `desk` means this adapter owns one phone-desk Issue and owner-chat ingest. */
+export const connectorCapabilitySchema = z.enum(['inbox', 'settings', 'uta', 'desk'])
 export type ConnectorCapability = z.infer<typeof connectorCapabilitySchema>
 
 export const connectorDefinitionSchema = z.object({

@@ -125,17 +125,22 @@ import {
 import {
   issueAssigneeClaimsFirstSession,
   issueAssigneeResumeId,
-  isTelegramConnectorIssue,
+  isConnectorDeskIssue,
   type IssueRecord,
 } from './issues/declaration.js';
 import {
-  createTelegramConnectorDesk as createTelegramConnectorDeskFile,
-  disableTelegramConnectorDesk as disableTelegramConnectorDeskFile,
-  findTelegramConnectorDesks,
-  updateTelegramConnectorDesk as updateTelegramConnectorDeskFile,
-  type TelegramConnectorCadence,
-  type TelegramConnectorDesk,
-} from './issues/telegram-connector.js';
+  createConnectorDesk as createConnectorDeskFile,
+  disableConnectorDesk as disableConnectorDeskFile,
+  findConnectorDesks,
+  isConnectorDeskCadence,
+  updateConnectorDesk as updateConnectorDeskFile,
+  type ConnectorDesk,
+  type ConnectorDeskCadence,
+} from './issues/connector-desk.js';
+import {
+  BUILTIN_CONNECTOR_DEFINITIONS,
+  connectorDefinitionHasCapability,
+} from '@traderalice/connector-protocol';
 import { sessionSignature } from './session-signature.js';
 import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
@@ -555,13 +560,20 @@ export interface WorkspaceService {
   /** Dispatch a scheduled Issue immediately without requiring a failed last
    * run and without advancing its next-fire marker. */
   runIssueNow(wsId: string, id: string): Promise<IssueDetail>;
-  telegramConnectorDesk(): Promise<TelegramConnectorDesk | null>;
-  createTelegramConnectorDesk(wsId: string): Promise<TelegramConnectorDesk>;
+  connectorDesk(connectorId: string): Promise<ConnectorDesk | null>;
+  createConnectorDesk(connectorId: string, wsId: string): Promise<ConnectorDesk>;
+  updateConnectorDesk(connectorId: string, patch: {
+    what?: string;
+    when?: { kind: 'every'; every: ConnectorDeskCadence };
+  }): Promise<ConnectorDesk>;
+  disableConnectorDesk(connectorId: string): Promise<ConnectorDesk | null>;
+  telegramConnectorDesk(): Promise<ConnectorDesk | null>;
+  createTelegramConnectorDesk(wsId: string): Promise<ConnectorDesk>;
   updateTelegramConnectorDesk(patch: {
     what?: string;
-    when?: { kind: 'every'; every: TelegramConnectorCadence };
-  }): Promise<TelegramConnectorDesk>;
-  disableTelegramConnectorDesk(): Promise<TelegramConnectorDesk | null>;
+    when?: { kind: 'every'; every: ConnectorDeskCadence };
+  }): Promise<ConnectorDesk>;
+  disableTelegramConnectorDesk(): Promise<ConnectorDesk | null>;
   /** Safe Workspace Session index. resumeId is the only public conversation handle. */
   sessionDirectory(wsId: string, limit?: number): Promise<WorkspaceSessionDirectory | null>;
   /** Change in-desk floor presence. Does not retire or delete the coworker. */
@@ -2276,7 +2288,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           return { wsId: ws.id, tag: ws.tag, status: 'invalid', error: res.error, issues: [] };
         }
         await observeIssueRecords(ws, res.issues);
-        const issues: IssuesSnapshotIssue[] = res.issues.filter((issue) => !isTelegramConnectorIssue(issue)).map((issue) => {
+        const issues: IssuesSnapshotIssue[] = res.issues.filter((issue) => !isConnectorDeskIssue(issue)).map((issue) => {
           // Unscheduled ⇒ pure board work item, no firing markers.
           if (!issue.when) return snapshotBoardIssue(issue, null);
           // Scheduled ⇒ reuse the schedule snapshot's math so the board's
@@ -2938,6 +2950,83 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     transcriptWatcher.disposeAll();
   };
 
+  const connectorDeskOp = async (connectorId: string): Promise<ConnectorDesk | null> => {
+    const desks = await findConnectorDesks(registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })), connectorId);
+    return desks[0] ?? null;
+  };
+  const createConnectorDeskOp = async (connectorId: string, wsId: string): Promise<ConnectorDesk> => (
+    serializeTelegramDeskMutation(async () => {
+      const definition = BUILTIN_CONNECTOR_DEFINITIONS.find((item) => item.id === connectorId);
+      if (!definition || !connectorDefinitionHasCapability(definition, 'desk')) {
+        const err = new Error(`Connector ${connectorId} does not advertise a phone desk`);
+        err.name = 'ConnectorDeskUnsupported';
+        throw err;
+      }
+      const workspace = registry.get(wsId);
+      if (!workspace) {
+        throw new Error(`workspace not found: ${wsId}`);
+      }
+      const workspaces = registry.list().map((ws) => ({ id: ws.id, dir: ws.dir }));
+      const created = await createConnectorDeskFile(
+        connectorId,
+        definition.label,
+        { id: workspace.id, dir: workspace.dir },
+        workspaces,
+      );
+      if (!created.ok) {
+        if (created.reason === 'conflict') {
+          const err = new Error(`${definition.label} phone desk already exists as ${created.wsId}/${created.id}`);
+          err.name = 'ConnectorDeskConflict';
+          throw err;
+        }
+        throw new Error(created.error);
+      }
+      return { wsId: workspace.id, connectorId, issue: created.issue };
+    })
+  );
+  const updateConnectorDeskOp = async (
+    connectorId: string,
+    patch: { what?: string; when?: { kind: 'every'; every: ConnectorDeskCadence } },
+  ): Promise<ConnectorDesk> => serializeTelegramDeskMutation(async () => {
+    if (patch.when && !isConnectorDeskCadence(patch.when.every)) {
+      const err = new Error(`Unsupported phone-desk cadence: ${patch.when.every}`);
+      err.name = 'ConnectorDeskInvalid';
+      throw err;
+    }
+    const desk = await connectorDeskOp(connectorId);
+    if (!desk) {
+      const err = new Error('Phone desk not found');
+      err.name = 'ConnectorDeskNotFound';
+      throw err;
+    }
+    const workspace = registry.get(desk.wsId);
+    if (!workspace) {
+      const err = new Error(`workspace not found: ${desk.wsId}`);
+      err.name = 'ConnectorDeskNotFound';
+      throw err;
+    }
+    const updated = await updateConnectorDeskFile(workspace.dir, desk.issue.id, patch);
+    if (!updated.ok) {
+      const err = new Error(updated.reason === 'invalid' ? updated.error : 'Phone desk not found');
+      err.name = updated.reason === 'not_found' ? 'ConnectorDeskNotFound' : 'ConnectorDeskInvalid';
+      throw err;
+    }
+    return { ...desk, issue: updated.issue };
+  });
+  const disableConnectorDeskOp = async (connectorId: string): Promise<ConnectorDesk | null> => (
+    serializeTelegramDeskMutation(async () => {
+      const desk = await connectorDeskOp(connectorId);
+      if (!desk) return null;
+      const workspace = registry.get(desk.wsId);
+      if (!workspace) return null;
+      const disabled = await disableConnectorDeskFile(workspace.dir, desk.issue.id);
+      if (!disabled.ok) {
+        throw new Error(disabled.reason === 'invalid' ? disabled.error : 'Phone desk could not be disabled');
+      }
+      return { ...desk, issue: disabled.issue };
+    })
+  );
+
   return {
     config,
     registry,
@@ -2976,61 +3065,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     scheduleSnapshot,
     issuesSnapshot,
     issueDetail,
-    telegramConnectorDesk: async () => {
-      const desks = await findTelegramConnectorDesks(registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })));
-      return desks[0] ?? null;
-    },
-    createTelegramConnectorDesk: async (wsId: string) => serializeTelegramDeskMutation(async () => {
-      const workspace = registry.get(wsId);
-      if (!workspace) {
-        throw new Error(`workspace not found: ${wsId}`);
-      }
-      const workspaces = registry.list().map((ws) => ({ id: ws.id, dir: ws.dir }));
-      const created = await createTelegramConnectorDeskFile({ id: workspace.id, dir: workspace.dir }, workspaces);
-      if (!created.ok) {
-        if (created.reason === 'conflict') {
-          const err = new Error(`Telegram phone desk already exists as ${created.wsId}/${created.id}`);
-          err.name = 'TelegramConnectorDeskConflict';
-          throw err;
-        }
-        throw new Error(created.error);
-      }
-      return { wsId: workspace.id, issue: created.issue };
-    }),
-    updateTelegramConnectorDesk: async (patch) => serializeTelegramDeskMutation(async () => {
-      const current = await findTelegramConnectorDesks(registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })));
-      const desk = current[0];
-      if (!desk) {
-        const err = new Error('Telegram phone desk not found');
-        err.name = 'TelegramConnectorDeskNotFound';
-        throw err;
-      }
-      const workspace = registry.get(desk.wsId);
-      if (!workspace) {
-        const err = new Error(`workspace not found: ${desk.wsId}`);
-        err.name = 'TelegramConnectorDeskNotFound';
-        throw err;
-      }
-      const updated = await updateTelegramConnectorDeskFile(workspace.dir, desk.issue.id, patch);
-      if (!updated.ok) {
-        const err = new Error(updated.reason === 'invalid' ? updated.error : 'Telegram phone desk not found');
-        err.name = updated.reason === 'not_found' ? 'TelegramConnectorDeskNotFound' : 'TelegramConnectorDeskInvalid';
-        throw err;
-      }
-      return { wsId: desk.wsId, issue: updated.issue };
-    }),
-    disableTelegramConnectorDesk: async () => serializeTelegramDeskMutation(async () => {
-      const current = await findTelegramConnectorDesks(registry.list().map((ws) => ({ id: ws.id, dir: ws.dir })));
-      const desk = current[0];
-      if (!desk) return null;
-      const workspace = registry.get(desk.wsId);
-      if (!workspace) return null;
-      const disabled = await disableTelegramConnectorDeskFile(workspace.dir, desk.issue.id);
-      if (!disabled.ok) {
-        throw new Error(disabled.reason === 'invalid' ? disabled.error : 'Telegram phone desk could not be disabled');
-      }
-      return { wsId: desk.wsId, issue: disabled.issue };
-    }),
+    connectorDesk: connectorDeskOp,
+    createConnectorDesk: createConnectorDeskOp,
+    updateConnectorDesk: updateConnectorDeskOp,
+    disableConnectorDesk: disableConnectorDeskOp,
+    telegramConnectorDesk: async () => connectorDeskOp('telegram'),
+    createTelegramConnectorDesk: async (wsId: string) => createConnectorDeskOp('telegram', wsId),
+    updateTelegramConnectorDesk: async (patch) => updateConnectorDeskOp('telegram', patch),
+    disableTelegramConnectorDesk: async () => disableConnectorDeskOp('telegram'),
     retryIssue,
     runIssueNow,
     sessionDirectory,

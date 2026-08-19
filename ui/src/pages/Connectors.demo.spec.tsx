@@ -79,7 +79,7 @@ describe('Connector demo routes', () => {
     expect(screen.getByRole('heading', { name: '连接器服务' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '投递连接器' })).toBeTruthy()
     expect(screen.getByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeTruthy()
-    expect(screen.getAllByText('需要设置')).toHaveLength(3)
+    expect(screen.getAllByText('需要设置')).toHaveLength(4)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
   })
 
@@ -90,6 +90,7 @@ describe('Connector demo routes', () => {
     expect(screen.getByText('Discord')).toBeTruthy()
     expect(screen.getByText('Telegram')).toBeTruthy()
     expect(screen.getByText('Slack')).toBeTruthy()
+    expect(screen.getByText('Feishu')).toBeTruthy()
     expect(screen.getByText('Application ID')).toBeTruthy()
     expect(screen.getAllByText('Bot token')).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Send test' })).toBeNull()
@@ -104,7 +105,7 @@ describe('Connector demo routes', () => {
 
     expect(await screen.findByRole('heading', { name: '连接器' })).toBeTruthy()
     expect(screen.getByText('运行外部通知连接器')).toBeTruthy()
-    expect(screen.getAllByText('需要凭据')).toHaveLength(2)
+    expect(screen.getAllByText('需要凭据')).toHaveLength(3)
     expect(screen.getByRole('textbox', { name: 'Discord 应用 ID' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '管理 Telegram 连接信息' })).toBeTruthy()
     expect(screen.queryByText('Connection details')).toBeNull()

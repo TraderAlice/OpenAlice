@@ -154,6 +154,17 @@ export class DeliveryManager {
     return this.inbound.splice(0, Math.max(0, limit))
   }
 
+  returnInbound(messages: readonly unknown[]): void {
+    const restored = messages.flatMap((message) => {
+      const parsed = inboundOwnerMessageSchema.safeParse(message)
+      return parsed.success ? [parsed.data] : []
+    })
+    if (restored.length === 0) return
+    this.inbound.unshift(...restored)
+    const overflow = this.inbound.length - MAX_INBOUND_OWNER_MESSAGES
+    if (overflow > 0) this.inbound.splice(this.inbound.length - overflow, overflow)
+  }
+
   enqueueArtifactRequest(connectorId: string, input: { entryId: string; docIndex: number }): string {
     const expired = this.expireActions()
     for (const request of expired) {
