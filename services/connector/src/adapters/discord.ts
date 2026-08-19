@@ -175,6 +175,10 @@ export class DiscordConnectorAdapter implements ConnectorAdapter {
       if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
       await reply('Discord settings buttons are not implemented yet. Change Inbox push in OpenAlice → Settings → Connectors.')
     })
+    context.commands.register('uta', async ({ userId, reply }) => {
+      if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
+      await reply('UTA review buttons are not implemented for Discord yet. Approve pending trades in OpenAlice → Trading as Git.')
+    })
   }
 
   private isOwner(userId: string): boolean {

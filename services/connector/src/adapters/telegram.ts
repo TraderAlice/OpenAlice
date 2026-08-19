@@ -4,6 +4,8 @@ import type {
   ConnectorAdapterConfig,
   ConnectorAdapterHealth,
   ConnectorArtifactDelivery,
+  ConnectorUtaFailure,
+  ConnectorUtaPresentation,
   InboxNotification,
 } from '@traderalice/connector-protocol'
 import { isInboxPushEnabled, TELEGRAM_CONNECTOR_DEFINITION } from '@traderalice/connector-protocol'
@@ -38,6 +40,14 @@ import {
   transitionTelegramInbox,
   type TelegramInboxSession,
 } from './telegram-controls.js'
+import {
+  formatTelegramUtaListPage,
+  formatTelegramUtaLoadingPage,
+  parseTelegramUtaControl,
+  transitionTelegramUta,
+  type TelegramUtaControl,
+  type TelegramUtaSession,
+} from './telegram-uta.js'
 import { sendTelegramRichText } from './telegram-rich-text.js'
 
 export class TelegramConnectorAdapter implements ConnectorAdapter {
@@ -52,6 +62,8 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private inboxPush = true
   private inboxStore?: IInboxStore
   private readonly inboxSessions = new Map<string, TelegramInboxSession>()
+  private readonly utaSessions = new Map<string, TelegramUtaSession>()
+  private readonly utaPending = new Map<string, { chatId: number; messageId: number; session: TelegramUtaSession }>()
   private stopped = true
   private loop?: Promise<void>
   private abort?: AbortController
@@ -172,6 +184,38 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     return this.tracker.get()
   }
 
+  async presentUta(presentation: ConnectorUtaPresentation): Promise<void> {
+    const pending = this.utaPending.get(presentation.requestId)
+    const form = formatTelegramUtaListPage(presentation.review, presentation.result)
+    const session: TelegramUtaSession = {
+      accountIds: presentation.review.accounts.map((account) => account.id),
+      review: presentation.review,
+      result: presentation.result,
+      view: { kind: 'list' },
+    }
+    if (!pending) {
+      if (!this.chatId) throw new Error('Telegram private chat is not linked')
+      await this.sendOwnerText(form.text)
+      return
+    }
+    this.utaPending.delete(presentation.requestId)
+    const sent = await this.editForm(pending.chatId, pending.messageId, form)
+    if (sent) this.utaSessions.set(sessionKey(pending.chatId, sent), session)
+  }
+
+  async failUta(failure: ConnectorUtaFailure): Promise<void> {
+    const pending = this.utaPending.get(failure.requestId)
+    if (!pending) {
+      await this.sendOwnerText(failure.message)
+      return
+    }
+    this.utaPending.delete(failure.requestId)
+    await this.editForm(pending.chatId, pending.messageId, {
+      text: failure.message,
+      actions: [],
+    })
+  }
+
   private async runSession(): Promise<void> {
     const token = this.token
     const context = this.adapterContext
@@ -256,6 +300,13 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         await ctx.reply('Could not open settings. Check OpenAlice logs.').catch(() => undefined)
       })
     })
+    bot.command('uta', async (ctx) => {
+      if (ctx.chat.type !== 'private' || !ctx.from) return
+      await this.presentUtaCommand(ctx, context).catch(async (error) => {
+        this.tracker.degraded(error)
+        await ctx.reply('Could not open UTA. Check OpenAlice logs.').catch(() => undefined)
+      })
+    })
     bot.on('callback_query:data', async (ctx) => {
       await this.handleControl(ctx, context).catch(async (error) => {
         this.tracker.degraded(error)
@@ -264,7 +315,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     })
 
     for (const command of TELEGRAM_CONNECTOR_DEFINITION.commands) {
-      if (command.name === 'inbox' || command.name === 'settings') continue
+      if (command.name === 'inbox' || command.name === 'settings' || command.name === 'uta') continue
       bot.command(command.name, async (ctx) => {
         if (ctx.chat.type !== 'private' || !ctx.from) return
         const handled = await context.commands.execute({
@@ -390,6 +441,31 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), nextSession)
   }
 
+  private async presentUtaCommand(ctx: Context, context: ConnectorAdapterContext): Promise<void> {
+    if (!this.isOwner(String(ctx.from?.id ?? ''))) {
+      await ctx.reply('This command is only available to the linked owner.')
+      return
+    }
+    const session: TelegramUtaSession = {
+      accountIds: [],
+      view: { kind: 'loading', reason: 'Asking OpenAlice for the current UTA review…' },
+    }
+    const form = formatTelegramUtaLoadingPage()
+    const sent = await this.presentForm(ctx, form, 'reply')
+    if (!sent || !ctx.chat) return
+    try {
+      const requestId = context.enqueueUtaRequest({ action: 'review' })
+      session.requestId = requestId
+      this.utaSessions.set(sessionKey(ctx.chat.id, sent), session)
+      this.utaPending.set(requestId, { chatId: ctx.chat.id, messageId: sent, session })
+    } catch (error) {
+      await this.editForm(ctx.chat.id, sent, {
+        text: error instanceof Error ? error.message : 'Could not request the UTA review. Try again.',
+        actions: [],
+      })
+    }
+  }
+
   private async presentSettings(ctx: Context, _context: ConnectorAdapterContext, mode: 'reply' | 'edit' = 'reply'): Promise<void> {
     if (!this.isOwner(String(ctx.from?.id ?? ''))) {
       if (mode === 'edit') await ctx.answerCallbackQuery({ text: 'Only the linked owner can use this.' })
@@ -402,6 +478,11 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private async handleControl(ctx: Context, context: ConnectorAdapterContext): Promise<void> {
     const data = ctx.callbackQuery?.data
     if (!data) return
+    const utaControl = parseTelegramUtaControl(data)
+    if (utaControl) {
+      await this.handleUtaControl(ctx, context, utaControl)
+      return
+    }
     const control = parseTelegramControl(data)
     if (!control) {
       await ctx.answerCallbackQuery()
@@ -469,6 +550,51 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     if (sent && ctx.chat) this.inboxSessions.set(sessionKey(ctx.chat.id, sent), resolution.session)
   }
 
+  private async handleUtaControl(
+    ctx: Context,
+    context: ConnectorAdapterContext,
+    control: TelegramUtaControl,
+  ): Promise<void> {
+    const messageId = ctx.callbackQuery?.message?.message_id
+    const key = ctx.chat && messageId ? sessionKey(ctx.chat.id, messageId) : undefined
+    const current = key ? this.utaSessions.get(key) : undefined
+    const resolution = transitionTelegramUta(current, control, {
+      isOwner: this.isOwner(String(ctx.from?.id ?? '')),
+    })
+    if (resolution.kind === 'forbidden') {
+      await ctx.answerCallbackQuery({ text: 'Only the linked owner can use this.' })
+      return
+    }
+    await ctx.answerCallbackQuery()
+    if (resolution.kind === 'ignored') return
+    if (resolution.kind === 'expired') {
+      await ctx.editMessageText('This UTA page expired. Send /uta again.')
+      return
+    }
+    if (resolution.kind === 'enqueue') {
+      try {
+        const requestId = context.enqueueUtaRequest({
+          action: resolution.action,
+          ...(resolution.utaId ? { utaId: resolution.utaId } : {}),
+          ...(resolution.pendingHash ? { pendingHash: resolution.pendingHash } : {}),
+        })
+        const next = { ...resolution.session, requestId }
+        const sent = await this.presentForm(ctx, resolution.form, 'edit')
+        if (sent && ctx.chat) {
+          this.utaSessions.set(sessionKey(ctx.chat.id, sent), next)
+          this.utaPending.set(requestId, { chatId: ctx.chat.id, messageId: sent, session: next })
+        }
+      } catch (error) {
+        await ctx.editMessageText(
+          error instanceof Error ? error.message : 'Could not send that UTA request. Try again.',
+        )
+      }
+      return
+    }
+    const sent = await this.presentForm(ctx, resolution.form, 'edit')
+    if (sent && ctx.chat) this.utaSessions.set(sessionKey(ctx.chat.id, sent), resolution.session)
+  }
+
   private async presentForm(
     ctx: Context,
     form: { text: string; actions: Array<Array<{ text: string; data: string }>> },
@@ -481,6 +607,17 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     }
     const sent = await ctx.reply(form.text, markup ? { reply_markup: markup } : {})
     return sent.message_id
+  }
+
+  private async editForm(
+    chatId: number,
+    messageId: number,
+    form: { text: string; actions: Array<Array<{ text: string; data: string }>> },
+  ): Promise<number | undefined> {
+    if (!this.bot) throw new Error('Telegram bot is not ready')
+    const markup = toInlineKeyboard(form.actions)
+    await this.bot.api.editMessageText(chatId, messageId, form.text, markup ? { reply_markup: markup } : {})
+    return messageId
   }
 
   private resolveInboxStore(): IInboxStore {

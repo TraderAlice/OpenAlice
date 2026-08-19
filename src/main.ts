@@ -292,7 +292,10 @@ async function main() {
   // skip (see cron listener). Created here so cron dispatch can hold it.
   const workspaceServiceRef = createWorkspaceServiceRef()
   startInboxConnectorBridge(inboxStore, () => workspaceServiceRef.current)
-  startConnectorActionBridge(inboxStore, () => workspaceServiceRef.current)
+  startConnectorActionBridge(inboxStore, () => workspaceServiceRef.current, {
+    utaManager,
+    tradingModePolicy: currentTradingModePolicy,
+  })
   startTelegramDeskInboundPoll({
     listWorkspaces: () => workspaceServiceRef.current?.registry.list() ?? [],
     getWorkspace: (id) => workspaceServiceRef.current?.registry.get(id),
