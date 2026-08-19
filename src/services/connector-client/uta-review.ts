@@ -11,7 +11,7 @@ import {
   type ConnectorUtaResult,
   type ConnectorUtaReview,
 } from '@traderalice/connector-protocol'
-import type { PushResult, UTASummary } from '@traderalice/uta-protocol'
+import { UTAHttpError, type PushResult, type UTASummary } from '@traderalice/uta-protocol'
 import type { TradingModePolicy } from '../trading-mode.js'
 import { describeTradingMode } from '../trading-mode.js'
 import type { UTAAccountSDK, UTAManagerSDK } from '../uta-client/index.js'
@@ -98,6 +98,7 @@ export async function buildConnectorUtaReview(
         pendingMessage: null,
         pendingHash: null,
         stagedCount: 0,
+        hiddenOperationCount: 0,
         operations: [{
           action: 'unavailable',
           summary: truncate(error instanceof Error ? error.message : 'Could not read wallet status', 120),
@@ -155,6 +156,10 @@ async function fulfillUtaRequest(
       await fail('not_found')
       return
     }
+    if (!request.pendingHash) {
+      await fail('conflict')
+      return
+    }
 
     const uta = await deps.utaManager.get(request.utaId)
     if (!uta) {
@@ -170,8 +175,12 @@ async function fulfillUtaRequest(
       })
       return
     }
-    if (request.pendingHash && status.pendingHash && request.pendingHash !== status.pendingHash) {
-      await fail('conflict')
+    if (status.staged.length > MAX_CONNECTOR_UTA_OPERATIONS) {
+      await present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
+        kind: 'error',
+        utaId: request.utaId,
+        message: `This commit has ${status.staged.length} operations. Approve it in OpenAlice → Trading as Git.`,
+      })
       return
     }
 
@@ -180,7 +189,7 @@ async function fulfillUtaRequest(
         await fail('readonly')
         return
       }
-      const pushed = await uta.push()
+      const pushed = await uta.push(request.pendingHash)
       await present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
         kind: 'pushed',
         utaId: request.utaId,
@@ -189,7 +198,7 @@ async function fulfillUtaRequest(
       return
     }
 
-    const rejected = await uta.reject()
+    const rejected = await uta.reject(undefined, request.pendingHash)
     await present(deps, request, await buildConnectorUtaReview(deps.utaManager, policy), {
       kind: 'rejected',
       utaId: request.utaId,
@@ -197,6 +206,10 @@ async function fulfillUtaRequest(
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    if (isHashConflict(error)) {
+      await fail('conflict')
+      return
+    }
     if (/readonly/i.test(message)) {
       await fail('readonly', message)
       return
@@ -240,8 +253,15 @@ async function accountReview(uta: UTAAccountSDK, summary: UTASummary): Promise<C
     pendingMessage: status.pendingMessage ? truncate(status.pendingMessage, 200) : null,
     pendingHash: status.pendingHash ? truncate(status.pendingHash, 16) : null,
     stagedCount: status.staged.length,
+    hiddenOperationCount: Math.max(0, status.staged.length - MAX_CONNECTOR_UTA_OPERATIONS),
     operations: status.staged.slice(0, MAX_CONNECTOR_UTA_OPERATIONS).map((operation) => compactUtaOperation(operation)),
   }
+}
+
+function isHashConflict(error: unknown): boolean {
+  if (error instanceof UTAHttpError && error.status === 409) return true
+  const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
+  return code === 'PENDING_HASH_CONFLICT' || code === 'PENDING_HASH_REQUIRED'
 }
 
 function formatPushResult(label: string, result: PushResult): string {

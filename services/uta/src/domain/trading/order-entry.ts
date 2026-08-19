@@ -54,8 +54,9 @@ export async function executeOneShotOrder(
   }
 
   // Phase 2: commit
+  let preparedHash: string | undefined
   try {
-    uta.commit(message)
+    preparedHash = uta.commit(message).hash
   } catch (err) {
     // Roll back so the next attempt starts from an empty staging area.
     try { await uta.reject('auto-rollback after commit error') } catch { /* best effort */ }
@@ -64,7 +65,7 @@ export async function executeOneShotOrder(
 
   // Phase 3: push
   try {
-    const result = await uta.push()
+    const result = await uta.push(preparedHash)
     return { ok: true, result }
   } catch (err) {
     return { ok: false, phase: 'push', error: errorMessage(err) }

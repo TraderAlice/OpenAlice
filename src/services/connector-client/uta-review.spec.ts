@@ -13,8 +13,8 @@ function account(over: {
   label?: string
   tier?: 'trading' | 'data'
   status?: { staged: unknown[]; pendingMessage: string | null; pendingHash: string | null }
-  push?: () => Promise<{ hash: string; submitted: unknown[]; rejected: unknown[] }>
-  reject?: () => Promise<{ hash: string }>
+  push?: (expectedPendingHash?: string) => Promise<{ hash: string; submitted: unknown[]; rejected: unknown[] }>
+  reject?: (reason?: string, expectedPendingHash?: string) => Promise<{ hash: string }>
 } = {}) {
   const id = over.id ?? 'alpaca-paper'
   return {
@@ -124,28 +124,8 @@ describe('processConnectorUtaRequests', () => {
     expect(presented?.review.accounts[0]?.operations[0]?.summary).toBe('BUY AAPL MKT × 10')
   })
 
-  it('refuses a stale pending hash', async () => {
-    const push = vi.fn(async () => ({ hash: 'pushhash', submitted: [], rejected: [] }))
-    const failUta = vi.fn(async () => undefined)
-    await processConnectorUtaRequests({
-      isEnabled: async () => true,
-      drainUtaActions: async () => [request({
-        action: 'push',
-        utaId: 'alpaca-paper',
-        pendingHash: 'oldhash1',
-      })],
-      presentUta: async () => undefined,
-      failUta,
-      warn: vi.fn(),
-      utaManager: manager([account({ push })]),
-      tradingModePolicy: () => PRO,
-    })
-    expect(push).not.toHaveBeenCalled()
-    expect(failUta).toHaveBeenCalledWith(expect.objectContaining({ reason: 'conflict' }))
-  })
-
   it('pushes a matching pending commit', async () => {
-    const push = vi.fn(async () => ({ hash: 'pushhash', submitted: [{}], rejected: [] }))
+    const push = vi.fn(async (_expected?: string) => ({ hash: 'pushhash', submitted: [{}], rejected: [] }))
     const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
     const uta = account({ push })
     let pushed = false
@@ -156,9 +136,9 @@ describe('processConnectorUtaRequests', () => {
         pendingMessage: 'long AAPL',
         pendingHash: 'abc12345',
       }
-    uta.push = async () => {
+    uta.push = async (expected?: string) => {
       pushed = true
-      return push()
+      return push(expected)
     }
     await processConnectorUtaRequests({
       isEnabled: async () => true,
@@ -173,7 +153,7 @@ describe('processConnectorUtaRequests', () => {
       utaManager: manager([uta]),
       tradingModePolicy: () => PRO,
     })
-    expect(push).toHaveBeenCalledOnce()
+    expect(push).toHaveBeenCalledWith('abc12345')
     expect(presentUta.mock.calls[0]?.[0]?.result).toMatchObject({
       kind: 'pushed',
       message: expect.stringContaining('Pushed alpaca-paper'),
@@ -238,5 +218,98 @@ describe('processConnectorUtaRequests', () => {
     })
     expect(push).not.toHaveBeenCalled()
     expect(failUta).toHaveBeenCalledWith(expect.objectContaining({ reason: 'expired' }))
+  })
+
+  it('does not push when the reviewed hash is missing', async () => {
+    const push = vi.fn()
+    const failUta = vi.fn(async () => undefined)
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [request({
+        action: 'push',
+        utaId: 'alpaca-paper',
+      })],
+      presentUta: async () => undefined,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([account({ push })]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(push).not.toHaveBeenCalled()
+    expect(failUta).toHaveBeenCalledWith(expect.objectContaining({ reason: 'conflict' }))
+  })
+
+  it('does not approve a commit larger than the Telegram presentation', async () => {
+    const push = vi.fn()
+    const presentUta = vi.fn(async (_presentation: ConnectorUtaPresentation) => undefined)
+    const uta = account({
+      push,
+      status: {
+        staged: Array.from({ length: 9 }, (_, index) => ({
+          action: 'placeOrder',
+          contract: { symbol: `S${index}` },
+          order: { action: 'BUY', orderType: 'MKT', totalQuantity: '1' },
+        })),
+        pendingMessage: 'basket',
+        pendingHash: 'abc12345',
+      },
+    })
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [request({
+        action: 'push',
+        utaId: 'alpaca-paper',
+        pendingHash: 'abc12345',
+      })],
+      presentUta,
+      failUta: async () => undefined,
+      warn: vi.fn(),
+      utaManager: manager([uta]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(push).not.toHaveBeenCalled()
+    expect(presentUta.mock.calls[0]?.[0]?.result).toMatchObject({
+      kind: 'error',
+      message: expect.stringContaining('Trading as Git'),
+    })
+  })
+
+  it('turns a UTA hash conflict into a no-write failure for push and reject', async () => {
+    const conflict = Object.assign(new Error('Pending commit changed'), { code: 'PENDING_HASH_CONFLICT' })
+    const push = vi.fn(async () => { throw conflict })
+    const reject = vi.fn(async () => { throw conflict })
+    const failUta = vi.fn(async () => undefined)
+    const uta = account({ push, reject })
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [request({
+        action: 'push',
+        utaId: 'alpaca-paper',
+        pendingHash: 'stalehash',
+      })],
+      presentUta: async () => undefined,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([uta]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(push).toHaveBeenCalledWith('stalehash')
+    expect(failUta).toHaveBeenCalledWith(expect.objectContaining({ reason: 'conflict' }))
+
+    await processConnectorUtaRequests({
+      isEnabled: async () => true,
+      drainUtaActions: async () => [request({
+        action: 'reject',
+        utaId: 'alpaca-paper',
+        pendingHash: 'stalehash',
+      })],
+      presentUta: async () => undefined,
+      failUta,
+      warn: vi.fn(),
+      utaManager: manager([uta]),
+      tradingModePolicy: () => PRO,
+    })
+    expect(reject).toHaveBeenCalled()
+    expect(failUta).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'conflict' }))
   })
 })

@@ -790,7 +790,7 @@ export class UnifiedTradingAccount {
     return ids.length ? `${message} [sub:${ids.join(',')}]` : message
   }
 
-  async push(): Promise<PushResult> {
+  async push(expectedPendingHash?: string): Promise<PushResult> {
     this._assertCanMutateAccount('push')
     if (this._disabled) {
       throw new BrokerError('CONFIG', `Account "${this.label}" is disabled due to configuration error.`)
@@ -798,13 +798,13 @@ export class UnifiedTradingAccount {
     if (this.health === 'offline') {
       throw new Error(`Account "${this.label}" is offline. Cannot execute trades.`)
     }
-    const result = await this.git.push()
+    const result = await this.git.push(expectedPendingHash)
     Promise.resolve(this._onPostPush?.(this.id)).catch(() => {})
     return result
   }
 
-  async reject(reason?: string): Promise<RejectResult> {
-    const result = await this.git.reject(reason)
+  async reject(reason?: string, expectedPendingHash?: string): Promise<RejectResult> {
+    const result = await this.git.reject(reason, expectedPendingHash)
     this._stagedSubAccountIds = []
     Promise.resolve(this._onPostReject?.(this.id)).catch(() => {})
     return result

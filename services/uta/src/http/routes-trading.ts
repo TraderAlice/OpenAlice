@@ -7,6 +7,7 @@ import type { UnifiedTradingAccount } from '../domain/trading/UnifiedTradingAcco
 import { searchTradeableContracts } from '../domain/trading/contract-search.js'
 import type { AssetClassHint } from '@traderalice/uta-protocol'
 import { executeOneShotOrder, type OrderEntryPhase } from '../domain/trading/order-entry.js'
+import { isPendingHashConflict } from '../domain/trading/git/TradingGit.js'
 import { projectOrderHistory, projectTradeHistory } from '../domain/trading/order-history.js'
 
 // ==================== Order entry schemas ====================
@@ -79,6 +80,12 @@ async function runOneShot(
 const ALLOWED_ASSET_CLASSES: ReadonlySet<AssetClassHint> = new Set([
   'equity', 'crypto', 'currency', 'commodity', 'unknown',
 ])
+
+function readExpectedPendingHash(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined
+  const value = (body as { expectedPendingHash?: unknown }).expectedPendingHash
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
 
 /** Resolve account by :id param, return 404 if not found. */
 function resolveAccount(ctx: UTAEngineContext, c: Context): UnifiedTradingAccount | null {
@@ -440,10 +447,23 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to reject' }, 400)
     try {
       const body = await c.req.json().catch(() => ({}))
+      const expectedPendingHash = readExpectedPendingHash(body)
+      if (!expectedPendingHash) {
+        return c.json({
+          error: 'expectedPendingHash is required',
+          code: 'PENDING_HASH_REQUIRED',
+        }, 409)
+      }
       const reason = typeof body.reason === 'string' ? body.reason : undefined
-      const result = await uta.reject(reason)
+      const result = await uta.reject(reason, expectedPendingHash)
       return c.json(result)
     } catch (err) {
+      if (isPendingHashConflict(err)) {
+        return c.json({
+          error: err instanceof Error ? err.message : 'Pending commit changed',
+          code: 'PENDING_HASH_CONFLICT',
+        }, 409)
+      }
       return c.json({ error: String(err) }, 500)
     }
   })
@@ -454,9 +474,23 @@ export function createTradingRoutes(ctx: UTAEngineContext) {
     if (!uta) return c.json({ error: 'Account not found' }, 404)
     if (!uta.status().pendingMessage) return c.json({ error: 'Nothing to push' }, 400)
     try {
-      const result = await uta.push()
+      const body = await c.req.json().catch(() => ({}))
+      const expectedPendingHash = readExpectedPendingHash(body)
+      if (!expectedPendingHash) {
+        return c.json({
+          error: 'expectedPendingHash is required',
+          code: 'PENDING_HASH_REQUIRED',
+        }, 409)
+      }
+      const result = await uta.push(expectedPendingHash)
       return c.json(result)
     } catch (err) {
+      if (isPendingHashConflict(err)) {
+        return c.json({
+          error: err instanceof Error ? err.message : 'Pending commit changed',
+          code: 'PENDING_HASH_CONFLICT',
+        }, 409)
+      }
       return c.json({ error: String(err) }, 500)
     }
   })

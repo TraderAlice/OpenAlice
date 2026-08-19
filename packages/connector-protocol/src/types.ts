@@ -222,6 +222,14 @@ export const connectorUtaRequestSchema = z.object({
   action: connectorUtaActionSchema,
   utaId: z.string().min(1).max(64).optional(),
   pendingHash: z.string().min(1).max(16).optional(),
+}).superRefine((value, ctx) => {
+  if (value.action === 'review') return
+  if (!value.utaId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'utaId is required', path: ['utaId'] })
+  }
+  if (!value.pendingHash) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'pendingHash is required', path: ['pendingHash'] })
+  }
 })
 export type ConnectorUtaRequest = z.infer<typeof connectorUtaRequestSchema>
 
@@ -248,6 +256,7 @@ export const connectorUtaAccountReviewSchema = z.object({
   pendingMessage: z.string().max(200).nullable(),
   pendingHash: z.string().max(16).nullable(),
   stagedCount: z.number().int().min(0).max(100),
+  hiddenOperationCount: z.number().int().min(0).max(100).default(0),
   operations: z.array(connectorUtaOperationSchema).max(MAX_CONNECTOR_UTA_OPERATIONS),
 })
 export type ConnectorUtaAccountReview = z.infer<typeof connectorUtaAccountReviewSchema>

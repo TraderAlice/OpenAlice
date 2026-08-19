@@ -134,7 +134,12 @@ Telegram /uta (or an Approve/Reject button)
   -> Connector UTA action queue (review | push | reject, optional utaId + pendingHash)
   -> Alice connector action bridge drain
   -> Alice UTAManagerSDK list/status/push/reject (lite/readonly honored here)
+  -> UTA push/reject require expectedPendingHash and validate it in the same
+     request before mutation; mismatch or absence is 409 and does not write
   -> Connector directed UTA presentation back to the requesting adapter only
+     Commits with more operations than the Telegram page can show are not
+     remotely actionable — Approve/Reject stay off and the owner uses
+     Trading as Git.
 ```
 
 Load-bearing paths:

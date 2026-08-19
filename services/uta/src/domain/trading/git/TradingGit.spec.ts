@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import Decimal from 'decimal.js'
 import { Contract, Order, OrderState } from '@traderalice/ibkr'
-import { TradingGit } from './TradingGit.js'
+import { PendingHashConflictError, TradingGit } from './TradingGit.js'
 import type { TradingGitConfig } from './interfaces.js'
 import type { Operation, GitState } from './types.js'
 import '../contract-ext.js'
@@ -164,6 +164,40 @@ describe('TradingGit', () => {
     it('throws when not committed', async () => {
       git.add(buyOp())
       await expect(git.push()).rejects.toThrow('please commit first')
+    })
+
+    it('refuses a mismatched expected hash without executing', async () => {
+      git.add(buyOp())
+      git.commit('Buy AAPL')
+      await expect(git.push('stalehash')).rejects.toBeInstanceOf(PendingHashConflictError)
+      expect(config.executeOperation).not.toHaveBeenCalled()
+      expect(git.status().pendingMessage).toBe('Buy AAPL')
+    })
+
+    it('pushes when the expected hash still matches', async () => {
+      git.add(buyOp())
+      const { hash } = git.commit('Buy AAPL')
+      const result = await git.push(hash)
+      expect(result.hash).toBe(hash)
+      expect(config.executeOperation).toHaveBeenCalledOnce()
+    })
+
+    it('rejects a second write while one is in flight', async () => {
+      let release!: () => void
+      const blocked = new Promise<void>((resolve) => { release = resolve })
+      const slow = makeConfig({
+        executeOperation: vi.fn(async () => {
+          await blocked
+          return { success: true, orderId: 'order-1' }
+        }),
+      })
+      const slowGit = new TradingGit(slow)
+      slowGit.add(buyOp())
+      const { hash } = slowGit.commit('Buy AAPL')
+      const first = slowGit.push(hash)
+      await expect(slowGit.push(hash)).rejects.toBeInstanceOf(PendingHashConflictError)
+      release()
+      await first
     })
 
     it('calls onCommit callback with exported state', async () => {
@@ -404,6 +438,24 @@ describe('TradingGit', () => {
         auxPrice: undefined,
         timeInForce: 'GTC',
       })
+    })
+  })
+
+  describe('reject expected hash', () => {
+    it('refuses a mismatched expected hash without recording a reject commit', async () => {
+      git.add(buyOp())
+      git.commit('Buy AAPL')
+      await expect(git.reject('nope', 'stalehash')).rejects.toBeInstanceOf(PendingHashConflictError)
+      expect(git.status().pendingMessage).toBe('Buy AAPL')
+      expect(git.status().commitCount).toBe(0)
+    })
+
+    it('rejects when the expected hash still matches', async () => {
+      git.add(buyOp())
+      const { hash } = git.commit('Buy AAPL')
+      const result = await git.reject('changed mind', hash)
+      expect(result.hash).toBe(hash)
+      expect(git.status().pendingMessage).toBeNull()
     })
   })
 

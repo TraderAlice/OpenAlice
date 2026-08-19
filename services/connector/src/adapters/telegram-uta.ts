@@ -26,6 +26,7 @@ export interface TelegramUtaSession {
   review?: ConnectorUtaReview
   result?: ConnectorUtaResult
   requestId?: string
+  consumed?: boolean
   view?:
     | { kind: 'list' }
     | { kind: 'detail'; index: number }
@@ -100,6 +101,9 @@ export function formatTelegramUtaListPage(
   for (const [index, account] of review.accounts.entries()) {
     lines.push(`${index + 1}. ${account.label}`)
     lines.push(accountStatusLine(account))
+    if ((account.hiddenOperationCount ?? 0) > 0) {
+      lines.push(`   ${account.stagedCount} operations · ${account.hiddenOperationCount} not shown`)
+    }
     const preview = account.operations[0]?.summary
     if (preview) lines.push(`   ${preview}`)
     lines.push('')
@@ -124,13 +128,19 @@ export function formatTelegramUtaDetailPage(
     ...(account.pendingMessage ? [`Commit: ${account.pendingMessage}`] : []),
     '',
     ...operationLines(account),
+    ...((account.hiddenOperationCount ?? 0) > 0
+      ? [
+        '',
+        `${account.stagedCount} operations · ${account.hiddenOperationCount} not shown.`,
+        'Approve from OpenAlice → Trading as Git.',
+      ]
+      : []),
   ]
   const actions: TelegramFormAction[][] = []
-  if (account.pendingMessage) {
-    const row: TelegramFormAction[] = []
-    if (!options.readonly) row.push(button('Approve', 'u:p'))
-    row.push(button('Reject', 'u:x'))
-    actions.push(row)
+  if (isRemoteActionable(account) && !options.readonly) {
+    actions.push([button('Approve', 'u:p'), button('Reject', 'u:x')])
+  } else if (isRemoteActionable(account) && options.readonly) {
+    actions.push([button('Reject', 'u:x')])
   }
   actions.push([button('Back', 'u:b')])
   return { text: fitPageText(lines.join('\n')), actions }
@@ -185,6 +195,9 @@ export function transitionTelegramUta(
   }
   if (!session?.review) return { kind: 'expired' }
   if (session.view?.kind === 'loading') return { kind: 'ignored' }
+  if (session.consumed && (control.kind === 'push' || control.kind === 'reject' || control.kind === 'confirm')) {
+    return { kind: 'expired' }
+  }
 
   if (control.kind === 'account') {
     const account = session.review.accounts[control.index]
@@ -212,11 +225,10 @@ export function transitionTelegramUta(
   if (!account) return { kind: 'expired' }
 
   if (control.kind === 'push') {
-    if (!account.pendingMessage) return { kind: 'expired' }
-    if (session.review.readonly) {
+    if (!isRemoteActionable(account) || session.review.readonly) {
       return {
         kind: 'show',
-        form: formatTelegramUtaDetailPage(account, { readonly: true }),
+        form: formatTelegramUtaDetailPage(account, { readonly: session.review.readonly }),
         session: { ...session, view: { kind: 'detail', index: selectedIndex } },
       }
     }
@@ -225,7 +237,13 @@ export function transitionTelegramUta(
   }
 
   if (control.kind === 'reject') {
-    if (!account.pendingMessage) return { kind: 'expired' }
+    if (!isRemoteActionable(account)) {
+      return {
+        kind: 'show',
+        form: formatTelegramUtaDetailPage(account, { readonly: session.review.readonly }),
+        session: { ...session, view: { kind: 'detail', index: selectedIndex } },
+      }
+    }
     const next: TelegramUtaSession = { ...session, view: { kind: 'confirm-reject', index: selectedIndex } }
     return { kind: 'show', form: formatTelegramUtaConfirmPage(account, 'reject'), session: next }
   }
@@ -243,16 +261,18 @@ export function transitionTelegramUta(
     const view = session.view
     if (view?.kind !== 'confirm-push' && view?.kind !== 'confirm-reject') return { kind: 'expired' }
     const action = view.kind === 'confirm-push' ? 'push' : 'reject'
+    if (!isRemoteActionable(account) || !account.pendingHash) return { kind: 'expired' }
     const reason = action === 'push' ? 'Pushing to the broker…' : 'Rejecting the pending commit…'
     const next: TelegramUtaSession = {
       ...session,
+      consumed: true,
       view: { kind: 'loading', reason },
     }
     return {
       kind: 'enqueue',
       action,
       utaId: account.id,
-      ...(account.pendingHash ? { pendingHash: account.pendingHash } : {}),
+      pendingHash: account.pendingHash,
       form: formatTelegramUtaLoadingPage(reason),
       session: next,
     }
@@ -271,7 +291,18 @@ function selectedAccountIndex(session: TelegramUtaSession): number | undefined {
   return undefined
 }
 
+export function isRemoteActionable(account: ConnectorUtaAccountReview): boolean {
+  return Boolean(
+    account.pendingMessage
+    && account.pendingHash
+    && (account.hiddenOperationCount ?? 0) === 0,
+  )
+}
+
 function accountStatusLine(account: ConnectorUtaAccountReview): string {
+  if (account.pendingMessage && (account.hiddenOperationCount ?? 0) > 0) {
+    return 'waiting · too large for Telegram'
+  }
   if (account.pendingMessage) return 'waiting for approval'
   if (account.stagedCount > 0) return `staged · ${account.stagedCount} not committed`
   return 'idle'

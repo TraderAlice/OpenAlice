@@ -21,6 +21,7 @@ function account(overrides: Partial<ConnectorUtaAccountReview> = {}): ConnectorU
     pendingMessage: 'long AAPL',
     pendingHash: 'abc12345',
     stagedCount: 1,
+    hiddenOperationCount: 0,
     operations: [{
       action: 'placeOrder',
       symbol: 'AAPL',
@@ -91,6 +92,36 @@ describe('Telegram UTA controls', () => {
     expect(detail.actions.flat().map((action) => action.data)).toEqual(['u:x', 'u:b'])
   })
 
+  it('does not expose Approve or Reject when operations are truncated', () => {
+    const oversized = account({
+      stagedCount: 9,
+      hiddenOperationCount: 1,
+      operations: Array.from({ length: 8 }, (_, index) => ({
+        action: 'placeOrder',
+        summary: `BUY SYM${index} MKT × 1`,
+      })),
+    })
+    const detail = formatTelegramUtaDetailPage(oversized)
+    expect(detail.text).toContain('9 operations · 1 not shown')
+    expect(detail.text).toContain('Trading as Git')
+    expect(detail.actions.flat().map((action) => action.data)).toEqual(['u:b'])
+    expect(transitionTelegramUta({
+      accountIds: ['alpaca-paper'],
+      review: review({ accounts: [oversized] }),
+      view: { kind: 'detail', index: 0 },
+    }, { kind: 'push' }, { isOwner: true }).kind).toBe('show')
+    const shown = transitionTelegramUta({
+      accountIds: ['alpaca-paper'],
+      review: review({ accounts: [oversized] }),
+      view: { kind: 'detail', index: 0 },
+    }, { kind: 'push' }, { isOwner: true })
+    expect(shown.kind).toBe('show')
+    if (shown.kind === 'show') {
+      expect(shown.form.actions.flat().map((action) => action.data)).not.toContain('u:p')
+      expect(shown.form.actions.flat().map((action) => action.data)).not.toContain('u:y')
+    }
+  })
+
   it('enqueues review from Refresh even without a prior session', () => {
     const resolution = transitionTelegramUta(undefined, { kind: 'refresh' }, { isOwner: true })
     expect(resolution).toMatchObject({ kind: 'enqueue', action: 'review' })
@@ -117,9 +148,21 @@ describe('Telegram UTA controls', () => {
       form: formatTelegramUtaLoadingPage('Pushing to the broker…'),
       session: {
         ...session,
+        consumed: true,
         view: { kind: 'loading', reason: 'Pushing to the broker…' },
       },
     })
+  })
+
+  it('ignores a second confirm after the first write was consumed', () => {
+    const session = {
+      accountIds: ['alpaca-paper'],
+      review: review(),
+      consumed: true,
+      view: { kind: 'confirm-push' as const, index: 0 },
+    }
+    expect(transitionTelegramUta(session, { kind: 'confirm' }, { isOwner: true }))
+      .toEqual({ kind: 'expired' })
   })
 
   it('rejects non-owners and expired pages', () => {

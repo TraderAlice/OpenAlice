@@ -46,6 +46,7 @@ function makeMockUTA(opts: { stageThrows?: 'stage' | 'commit' | 'push' | null; p
         calls.push({ method: 'commit', args: [msg] })
         if (opts.stageThrows === 'commit') throw new Error('Guard rejected')
         pendingMessage = msg
+        return { prepared: true, hash: 'pending-hash', message: msg, operationCount: 1 }
       }),
       push: vi.fn(async () => {
         calls.push({ method: 'push', args: [] })

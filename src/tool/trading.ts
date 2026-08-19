@@ -794,9 +794,12 @@ ONLY if the operator has enabled "Allow AI to push trades" in Settings → Agent
         }
         // AI trading enabled — execute for real. Each push() sends the committed
         // operations to the broker. Per-account failures degrade individually.
-        const results = await Promise.all(pending.map(async ({ uta }) => {
+        const results = await Promise.all(pending.map(async ({ uta, status }) => {
           try {
-            return { source: uta.id, ...compactPushResult(await uta.push()) }
+            if (!status.pendingHash) {
+              return { source: uta.id, error: 'Pending commit has no hash; refresh Trading as Git and approve there.' }
+            }
+            return { source: uta.id, ...compactPushResult(await uta.push(status.pendingHash)) }
           } catch (err) {
             return { source: uta.id, ...handleBrokerError(err) }
           }
@@ -819,7 +822,9 @@ ONLY if the operator has enabled "Allow AI to push trades" in Settings → Agent
           // reject() requires a prepared commit — prepare one transparently
           // so the AI's mental model stays "stage → reject = undo".
           if (!status.pendingHash) await uta.commit(reason ?? 'discarding staged operations')
-          return { source: uta.id, ...await uta.reject(reason) }
+          const pendingHash = status.pendingHash ?? (await uta.status()).pendingHash
+          if (!pendingHash) return { message: 'Nothing staged to reject.' }
+          return { source: uta.id, ...await uta.reject(reason, pendingHash) }
         } catch (err) {
           return handleBrokerError(err)
         }

@@ -14,7 +14,7 @@ function makeFakeUta(overrides: {
   reject?: () => Promise<void>
 } = {}) {
   const reject = overrides.reject ?? vi.fn(async () => {})
-  const commit = overrides.commit ?? vi.fn(() => {})
+  const commit = overrides.commit ?? vi.fn(() => ({ hash: 'pending-hash' }))
   const push = overrides.push ?? vi.fn(async () => ({
     hash: 'abc', message: 'ok', operationCount: 0, submitted: [], rejected: [],
   } as unknown as PushResult))
@@ -33,7 +33,7 @@ describe('executeOneShotOrder', () => {
     if (r.ok) expect(r.result.hash).toBe('abc')
     expect(stage).toHaveBeenCalledTimes(1)
     expect(commit).toHaveBeenCalledWith('place AAPL 100 MKT')
-    expect(push).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledWith('pending-hash')
     expect(reject).not.toHaveBeenCalled()
   })
 
