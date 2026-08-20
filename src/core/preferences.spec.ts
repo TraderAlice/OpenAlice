@@ -7,10 +7,12 @@ import {
   normalizeAgentRuntimeQuickAccessIds,
   readAgentRuntimesPreferences,
   readAutoQuantPreferences,
+  readAutoPredictionPreferences,
   readHarnessPreferences,
   readPreferences,
   readQuickChatPreferences,
   rememberAutoQuantDefaultWorkspace,
+  rememberAutoPredictionDefaultWorkspace,
   rememberAgentRuntimeUse,
   rememberQuickChatCredential,
   rememberQuickChatLaunch,
@@ -38,6 +40,7 @@ describe('preferences', () => {
       version: 1,
       quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null, recentLaunch: null },
       autoQuant: { defaultWorkspaceId: null },
+      autoPrediction: { defaultWorkspaceId: null },
       harness: { showHeadlessBornSessions: false },
       agentRuntimes: { quickAccessIds: [], recentAgentIds: [] },
     })
@@ -147,6 +150,23 @@ describe('preferences', () => {
     })
     expect(await readQuickChatPreferences(path)).toEqual({
       lastCredentialByAgent: {},
+      recentChatWorkspaceId: 'chat-calm-river',
+    })
+  })
+
+  it('stores the Auto Prediction default independently from other Harness preferences', async () => {
+    const path = await preferenceFile()
+    await rememberRecentChatWorkspace('chat-calm-river', path)
+    await rememberAutoQuantDefaultWorkspace('aq-main', path)
+    await rememberAutoPredictionDefaultWorkspace('prediction-main', path)
+
+    expect(await readAutoPredictionPreferences(path)).toEqual({
+      defaultWorkspaceId: 'prediction-main',
+    })
+    expect(await readAutoQuantPreferences(path)).toEqual({
+      defaultWorkspaceId: 'aq-main',
+    })
+    expect(await readQuickChatPreferences(path)).toMatchObject({
       recentChatWorkspaceId: 'chat-calm-river',
     })
   })

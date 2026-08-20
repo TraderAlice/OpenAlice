@@ -73,6 +73,7 @@ import type { ChatDisplayMode } from './chat-display-mode'
 
 const CHAT_TEMPLATE = 'chat'
 const AUTO_QUANT_TEMPLATE = 'auto-quant-v2'
+const AUTO_PREDICTION_TEMPLATE = 'auto-prediction'
 
 function nextWorkspaceTag(workspaces: readonly Workspace[], base: string): string {
   const tags = new Set(workspaces.map((workspace) => workspace.tag))
@@ -89,7 +90,7 @@ export function ChatWorkspaceSection({
   onRequestDisplayMode = () => undefined,
 }: {
   onNavigate?: () => void
-  mode?: 'chat' | 'auto-quant'
+  mode?: 'chat' | 'auto-quant' | 'prediction'
   displayMode?: ChatDisplayMode
   onRequestDisplayMode?: (mode: ChatDisplayMode) => void
 }): ReactElement | null {
@@ -98,10 +99,14 @@ export function ChatWorkspaceSection({
   const focused = useWorkspace((s) => getFocusedTab(s)?.spec)
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
 
-  const source = mode === 'auto-quant' ? 'auto-quant' : 'chat'
-  const templateName = mode === 'auto-quant' ? AUTO_QUANT_TEMPLATE : CHAT_TEMPLATE
-  const landingKind = mode === 'auto-quant' ? 'auto-quant-landing' : 'chat-landing'
-  const starterTag = mode === 'auto-quant' ? 'auto-quant' : 'chat'
+  const source = mode === 'auto-quant' ? 'auto-quant' : mode === 'prediction' ? 'prediction' : 'chat'
+  const templateName = mode === 'auto-quant'
+    ? AUTO_QUANT_TEMPLATE
+    : mode === 'prediction' ? AUTO_PREDICTION_TEMPLATE : CHAT_TEMPLATE
+  const landingKind = mode === 'auto-quant'
+    ? 'auto-quant-landing'
+    : mode === 'prediction' ? 'auto-prediction-landing' : 'chat-landing'
+  const starterTag = mode === 'auto-quant' ? 'auto-quant' : mode === 'prediction' ? 'prediction' : 'chat'
   const isWsFocus = focused?.kind === 'workspace' && focused.params.source === source
   const isManagerFocus = mode === 'chat' && focused?.kind === 'workspace-manager'
   const selection = isWsFocus
@@ -186,7 +191,9 @@ export function ChatWorkspaceSection({
   }, [mode])
 
   const preferredWorkspaceId = routeWorkspaceId
-    ?? (mode === 'auto-quant' ? ctx.autoQuantDefaultWorkspaceId : recentWorkspaceId)
+    ?? (mode === 'auto-quant'
+      ? ctx.autoQuantDefaultWorkspaceId
+      : mode === 'prediction' ? ctx.autoPredictionDefaultWorkspaceId : recentWorkspaceId)
   const focusedWorkspace = chatWorkspaces.find((workspace) =>
     workspace.id === preferredWorkspaceId)
     ?? chatWorkspaces[0]
@@ -289,6 +296,12 @@ export function ChatWorkspaceSection({
         .catch(() => undefined)
       return
     }
+    if (mode === 'prediction') {
+      void ctx.setAutoPredictionDefaultWorkspace?.(workspaceId)
+        .then(onSelected)
+        .catch(() => undefined)
+      return
+    }
     rememberViewedWorkspace(workspaceId)
     onSelected()
   }
@@ -330,7 +343,9 @@ export function ChatWorkspaceSection({
           className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2.5 text-left text-[13px] font-medium text-foreground hover:border-primary/45 hover:bg-primary/15"
         >
           <MessageSquarePlus size={15} strokeWidth={2.15} className="shrink-0 text-primary" />
-          <span>{mode === 'auto-quant' ? t('autoQuant.newResearch') : t('chat.newChat')}</span>
+          <span>{mode === 'auto-quant'
+            ? t('autoQuant.newResearch')
+            : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')}</span>
         </button>
       </div>
 
@@ -356,7 +371,9 @@ export function ChatWorkspaceSection({
           sessions={focusedWorkspace ? rosterByWorkspace.get(focusedWorkspace.id) ?? [] : []}
           loading={!ctx.hasLoaded && !showListError}
           unavailable={showListError}
-          emptyCopy={mode === 'auto-quant' ? t('autoQuant.noResearchYet') : undefined}
+          emptyCopy={mode === 'auto-quant'
+            ? t('autoQuant.noResearchYet')
+            : mode === 'prediction' ? t('autoPrediction.noResearchYet') : undefined}
           isRowActive={isRosterRowActive}
           onOpenSession={activateRosterSession}
           onPauseSession={pauseRosterSession}
@@ -438,7 +455,9 @@ export function ChatWorkspaceSection({
         {ctx.hasLoaded && chatWorkspaces.length === 0 && !showListError && (
           <li className="px-3 py-2.5">
             <p className="text-[12px] text-muted-foreground/60">
-              {mode === 'auto-quant' ? t('autoQuant.noWorkspacesYet') : t('chat.noChatWorkspacesYet')}
+              {mode === 'auto-quant'
+                ? t('autoQuant.noWorkspacesYet')
+                : mode === 'prediction' ? t('autoPrediction.noWorkspacesYet') : t('chat.noChatWorkspacesYet')}
             </p>
           </li>
         )}
@@ -477,7 +496,9 @@ export function ChatWorkspaceSection({
         workspaces={chatWorkspaces}
         displayMode={displayMode}
         showManager={mode === 'chat'}
-        createWorkspaceLabel={mode === 'auto-quant' ? t('autoQuant.newWorkspace') : t('chat.newWorkspace')}
+        createWorkspaceLabel={mode === 'auto-quant'
+          ? t('autoQuant.newWorkspace')
+          : mode === 'prediction' ? t('autoPrediction.newWorkspace') : t('chat.newWorkspace')}
         onRequestDisplayMode={onRequestDisplayMode}
         onConfigure={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id)}
         onUpgrade={() => focusedWorkspace && ctx.openAgentConfig(focusedWorkspace.id, undefined, 'template')}
@@ -588,7 +609,7 @@ export function ChatWorkspaceSection({
 }
 
 interface ChatWorkspaceContextFooterProps {
-  harness: 'chat' | 'auto-quant'
+  harness: 'chat' | 'auto-quant' | 'prediction'
   workspace: Workspace | null
   workspaces: readonly Workspace[]
   displayMode: ChatDisplayMode
@@ -615,7 +636,11 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
   const title = props.displayMode === 'focused'
     ? (props.workspace ? workspaceDisplayName(props.workspace) : t('chat.currentWorkspace'))
     : props.displayMode === 'recent'
-      ? (props.harness === 'auto-quant' ? t('autoQuant.recentResearch') : t('chat.recentConversations'))
+      ? (props.harness === 'auto-quant'
+          ? t('autoQuant.recentResearch')
+          : props.harness === 'prediction'
+            ? t('autoPrediction.recentResearch')
+            : t('chat.recentConversations'))
       : t('nav.item.workspaces')
   const subtitle = props.displayMode === 'focused'
     ? t('chat.currentWorkspace')
@@ -626,10 +651,14 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
   const upgrade = props.workspace?.upgradeAvailable ?? null
   const contextLabel = props.harness === 'auto-quant'
     ? t('autoQuant.workspaceContextLabel', { name: title })
-    : t('chat.workspaceContextLabel', { name: title })
+    : props.harness === 'prediction'
+      ? t('autoPrediction.workspaceContextLabel', { name: title })
+      : t('chat.workspaceContextLabel', { name: title })
   const contextMenuLabel = props.harness === 'auto-quant'
     ? t('autoQuant.workspaceContextMenu')
-    : t('chat.workspaceContextMenu')
+    : props.harness === 'prediction'
+      ? t('autoPrediction.workspaceContextMenu')
+      : t('chat.workspaceContextMenu')
 
   const modeOption = (
     mode: ChatDisplayMode,
@@ -736,7 +765,11 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
           >
             <ChevronRight size={14} strokeWidth={2} aria-hidden />
             <span className="min-w-0 flex-1 truncate">
-              {props.harness === 'auto-quant' ? t('autoQuant.browseResearch') : t('chat.browseWorkspace')}
+              {props.harness === 'auto-quant'
+                ? t('autoQuant.browseResearch')
+                : props.harness === 'prediction'
+                  ? t('autoPrediction.browseResearch')
+                  : t('chat.browseWorkspace')}
             </span>
           </button>
           {props.showManager && (
@@ -764,7 +797,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
 }
 
 interface FocusedChatWorkspaceProps {
-  harness: 'chat' | 'auto-quant'
+  harness: 'chat' | 'auto-quant' | 'prediction'
   workspace: Workspace | null
   sessions: readonly HarnessSession[]
   loading: boolean
@@ -782,7 +815,7 @@ interface FocusedChatWorkspaceProps {
 }
 
 interface AllWorkspaceRecentSessionsProps {
-  harness: 'chat' | 'auto-quant'
+  harness: 'chat' | 'auto-quant' | 'prediction'
   workspaces: readonly Workspace[]
   sessions: readonly HarnessSession[]
   loading: boolean
@@ -799,7 +832,7 @@ interface AllWorkspaceRecentSessionsProps {
 }
 
 interface HarnessSessionRosterProps {
-  harness: 'chat' | 'auto-quant'
+  harness: 'chat' | 'auto-quant' | 'prediction'
   sessions: readonly HarnessSession[]
   emptyCopy: string
   keyFor: (row: HarnessSession) => string
@@ -869,7 +902,11 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
 
       <div className="flex items-center gap-2 px-3 pb-1 pt-1.5">
         <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
-          {props.harness === 'auto-quant' ? t('autoQuant.recentResearch') : t('chat.recentConversations')}
+          {props.harness === 'auto-quant'
+            ? t('autoQuant.recentResearch')
+            : props.harness === 'prediction'
+              ? t('autoPrediction.recentResearch')
+              : t('chat.recentConversations')}
         </span>
         {recent.length > 0 && (
           <span className="text-[10px] tabular-nums text-muted-foreground/45">{recent.length}</span>
@@ -897,7 +934,9 @@ function HarnessSessionRoster(props: HarnessSessionRosterProps): ReactElement {
           <span className="min-w-0 flex-1 truncate">
             {props.harness === 'auto-quant'
               ? t('autoQuant.viewAllResearch', { count: recent.length })
-              : t('chat.viewAllConversations', { count: recent.length })}
+              : props.harness === 'prediction'
+                ? t('autoPrediction.viewAllResearch', { count: recent.length })
+                : t('chat.viewAllConversations', { count: recent.length })}
           </span>
           <ChevronRight
             size={13}
@@ -943,7 +982,11 @@ function AllWorkspaceRecentSessions(props: AllWorkspaceRecentSessionsProps): Rea
       <HarnessSessionRoster
         harness={props.harness}
         sessions={sessions}
-        emptyCopy={props.harness === 'auto-quant' ? t('autoQuant.noResearchYet') : t('chat.noRecentConversations')}
+        emptyCopy={props.harness === 'auto-quant'
+          ? t('autoQuant.noResearchYet')
+          : props.harness === 'prediction'
+            ? t('autoPrediction.noResearchYet')
+            : t('chat.noRecentConversations')}
         keyFor={(row) => `${row.workspaceId}:${row.resumeId}`}
         workspaceLabelFor={(row) => workspaceName.get(row.workspaceId)}
         isRowActive={props.isRowActive}

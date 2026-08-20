@@ -130,4 +130,16 @@ describe('shared product shells', () => {
       params: { wsId: 'aq-1', path: 'README.md', source: 'auto-quant' },
     })).toBe('auto-quant')
   })
+
+  it('assigns every Auto Prediction surface to its own shared Harness shell', () => {
+    expect(getViewShell({ kind: 'auto-prediction-landing', params: {} })).toBe('prediction')
+    expect(getViewShell({
+      kind: 'workspace',
+      params: { wsId: 'prediction-1', sessionId: 'codex-1', source: 'prediction' },
+    })).toBe('prediction')
+    expect(getViewShell({
+      kind: 'file-viewer',
+      params: { wsId: 'prediction-1', path: 'README.md', source: 'prediction' },
+    })).toBe('prediction')
+  })
 })

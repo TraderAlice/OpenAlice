@@ -45,7 +45,7 @@ import type {
 export type WorkspaceConversationTarget =
   | { kind: 'resume'; resumeId: string }
   | { kind: 'workspace'; workspaceId: string }
-  | { kind: 'harness'; harness: 'chat' | 'autoquant' }
+  | { kind: 'harness'; harness: 'chat' | 'autoquant' | 'prediction' }
   | { kind: 'inbox'; inboxEntryId: string; workspaceId?: string }
   | {
       kind: 'issue'
@@ -102,6 +102,7 @@ export type WorkspaceConversationResolution =
         | 'missing-workspace'
         | 'chat-workspace-unavailable'
         | 'autoquant-not-initialized'
+        | 'prediction-not-initialized'
       attributedOrigin?: SessionOrigin
       artifact?: ArtifactRef
     }

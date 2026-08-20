@@ -8,6 +8,7 @@ import {
   ListChecks,
   MessageSquare,
   Microscope,
+  Binary,
   Plug,
   Settings,
   Telescope,
@@ -28,7 +29,7 @@ import {
 } from '../live/ui-layout'
 
 type NavItemKey =
-  | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.workspaces'
+  | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.office' | 'nav.item.tradingAsGit' | 'nav.item.issue'
   | 'nav.item.portfolio' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
@@ -98,6 +99,7 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: 'nav.section.beta',
     descriptionKey: 'nav.betaDescription',
     items: [
+      { page: 'prediction',     labelKey: 'nav.item.autoPrediction', icon: Binary, defaultTab: { kind: 'auto-prediction-landing', params: {} } },
       { page: 'office',         labelKey: 'nav.item.office',       icon: Building2, defaultTab: { kind: 'office', params: {} } },
       { page: 'trading-as-git', labelKey: 'nav.item.tradingAsGit', icon: GitBranch, defaultTab: { kind: 'trading-as-git', params: {} } },
       { page: 'portfolio',      labelKey: 'nav.item.portfolio',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },

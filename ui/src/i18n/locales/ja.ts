@@ -8,6 +8,7 @@ export const ja: Resources = {
       tracked: 'トラッキング',
       chat: 'Alice に質問',
       autoQuant: 'Quant',
+      autoPrediction: 'Prediction',
       workspaces: 'ワークスペース',
       market: 'マーケット',
       news: 'ニュース',
@@ -1103,6 +1104,27 @@ export const ja: Resources = {
     initializing: 'AutoQuant を初期化中…',
     initializingBody: '固定 Harness とローカル Git Workspace を準備しています。しばらくお待ちください。',
   },
+  autoPrediction: {
+    newResearch: '予測リサーチを開始', newWorkspace: 'Auto Prediction ワークスペースを作成',
+    noWorkspacesYet: 'Auto Prediction ワークスペースはまだありません', noResearchYet: '予測リサーチセッションはまだありません',
+    recentResearch: '最近の予測リサーチ', viewAllResearch: '全 {{count}} 件の予測リサーチを表示',
+    browseResearch: '予測リサーチを閲覧', workspaceContextLabel: '予測ワークスペース：{{name}}',
+    workspaceContextMenu: '予測ワークスペースメニュー', workspacePickerDescription: '新しいリサーチを受け取る Auto Prediction ワークスペースを選択します。',
+    workspaceSessionCount_one: '{{count}} 件のリサーチセッション', workspaceSessionCount_other: '{{count}} 件のリサーチセッション',
+    researchBrowserDescription: '現在またはすべての Auto Prediction ワークスペースから予測リサーチを検索します。',
+    researchSearchPlaceholder: '予測リサーチを検索…', researchScope: '予測リサーチの範囲',
+    researchResultCount: '{{count}} 件の一致する予測リサーチ', noResearchMatches: '条件に一致する予測リサーチはありません。',
+  },
+  autoPredictionSetup: {
+    loading: 'Auto Prediction を読み込み中', loadErrorTitle: 'Auto Prediction の状態を取得できません',
+    loadErrorBody: '既定のワークスペース設定を読み込めませんでした。バックエンドの復旧後に再試行してください。', eyebrow: 'Beta Harness',
+    initializeTitle: 'Auto Prediction を初期化', initializeBody: '承認済みの Auto Prediction ソーススナップショットから永続的なローカル研究デスクを作成します。',
+    chooseTitle: 'Auto Prediction ワークスペースを選択', chooseBody: '既存のワークスペースから新しい研究を受け取るデスクを選択してください。',
+    workspaceMeta: '{{count}} セッション · スナップショット {{version}}', manageWorkspaces: 'ワークスペースを管理',
+    persistentTitle: '永続的な予測研究デスク', persistentBody: '証拠、Campaign、SQLite 状態、ファイル、Git 履歴はこのワークスペース内の Auto Prediction が所有します。',
+    initializeAction: 'Auto Prediction を初期化', initializing: 'Auto Prediction を初期化中…',
+    initializingBody: '承認済みソーススナップショットを複製して検証しています。',
+  },
   chatSetup: {
     loading: 'Ask Alice を読み込み中',
     loadErrorTitle: 'Ask Alice の状態を取得できません',
@@ -1276,6 +1298,14 @@ export const ja: Resources = {
     ex1: '堅牢なクロスセクション・モメンタム戦略を研究する',
     ex2: '直近の失敗した実験をレビューし、次の反復を提案する',
     ex3: 'BTC のボラティリティ・レジーム戦略を構築して検証する',
+  },
+  autoPredictionLanding: {
+    heading: '予測研究デスクで何を調べますか？', subheading: 'ネイティブ Coding Agent で予測市場の意味論と証拠を調査します。',
+    targetHeading: 'このワークスペースで研究セッションを開始', clearTarget: '別の予測ワークスペースを使う',
+    placeholder: '市場間の関係、決済条件、証拠の不足を説明してください…', selectWorkspace: 'Auto Prediction ワークスペースを選択',
+    newWorkspaceTarget: '新しい Auto Prediction ワークスペース', version: 'スナップショット', examplesLabel: '質問例',
+    ex1: '最新の市場カタログ証拠から市場横断の意味的関係を探してください', ex2: '保持された仮説をレビューし、最も強い反例を列挙してください',
+    ex3: 'リポジトリのチェックを実行し、次に阻まれている研究境界を説明してください',
   },
   firstRunGuide: {
     header: {
@@ -1780,6 +1810,7 @@ export const ja: Resources = {
     harness: {
       chat: 'Chat',
       'auto-quant': 'AutoQuant',
+      prediction: '予測',
       other: 'その他',
     },
     empty: '在席はまだありません。対話 Session、ヘッドレス実行、Play、拒否された依頼がここに出ます。',

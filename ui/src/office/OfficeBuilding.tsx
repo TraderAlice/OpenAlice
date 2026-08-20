@@ -52,7 +52,7 @@ export function OfficeBuilding({
   )
   const defaultGroups = useMemo(() => {
     const minimumGroupIds = new Set<string>()
-    for (const harness of ['chat', 'auto-quant', 'other'] as const) {
+    for (const harness of ['chat', 'auto-quant', 'prediction', 'other'] as const) {
       const minimum = building.config.harnessMinimumVisibleGroups[harness]
       const candidates = building.offices
         .filter((office) => office.workspace.harness === harness)

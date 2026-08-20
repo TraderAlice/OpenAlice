@@ -22,6 +22,7 @@ function activitySectionFor(page: Page): ActivitySection {
   switch (page) {
     case 'chat':                 return 'chat'
     case 'auto-quant':           return 'auto-quant'
+    case 'prediction':           return 'prediction'
     case 'inbox':                return 'inbox'
     case 'tracked':              return 'tracked'
     case 'workspaces':           return 'workspaces'

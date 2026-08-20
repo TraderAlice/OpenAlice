@@ -7,7 +7,7 @@ import { RecoverySurface, RefreshNotice } from './StateViews'
 import { workspaceDisplayTitle } from './workspace/display'
 import { useWorkspace } from '../tabs/store'
 
-export type HarnessSetupCopyPrefix = 'autoQuantSetup' | 'chatSetup'
+export type HarnessSetupCopyPrefix = 'autoQuantSetup' | 'autoPredictionSetup' | 'chatSetup'
 
 export interface HarnessSetupPageProps {
   readonly icon: ComponentType<{ className?: string }>

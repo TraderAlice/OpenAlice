@@ -40,11 +40,13 @@ import {
   type AgentId,
   getIssueDefaultAgent,
   getAutoQuantDefaultWorkspace,
+  getAutoPredictionDefaultWorkspace,
   getWorkspaceManager,
   getWorkspaceDefaultAgent,
   listTemplates,
   listWorkspaces,
   initializeAutoQuantWorkspace as apiInitializeAutoQuantWorkspace,
+  initializeAutoPredictionWorkspace as apiInitializeAutoPredictionWorkspace,
   initializeChatWorkspace as apiInitializeChatWorkspace,
   openWebPiSession as apiOpenWebPiSession,
   openResumeSession,
@@ -57,6 +59,7 @@ import {
   type SessionPresence,
   setIssueDefaultAgent as apiSetIssueDefaultAgent,
   setAutoQuantDefaultWorkspace as apiSetAutoQuantDefaultWorkspace,
+  setAutoPredictionDefaultWorkspace as apiSetAutoPredictionDefaultWorkspace,
   setWorkspaceDefaultAgent as apiSetWorkspaceDefaultAgent,
   spawnSession,
   updatePausedSessionRuntime as apiUpdatePausedSessionRuntime,
@@ -96,6 +99,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   const [autoQuantDefaultWorkspaceId, setAutoQuantDefaultWorkspaceId] = useState<string | null>(null)
   const [autoQuantPreferenceLoaded, setAutoQuantPreferenceLoaded] = useState(false)
   const [autoQuantPreferenceError, setAutoQuantPreferenceError] = useState<string | null>(null)
+  const [autoPredictionDefaultWorkspaceId, setAutoPredictionDefaultWorkspaceId] = useState<string | null>(null)
+  const [autoPredictionPreferenceLoaded, setAutoPredictionPreferenceLoaded] = useState(false)
+  const [autoPredictionPreferenceError, setAutoPredictionPreferenceError] = useState<string | null>(null)
   const { agents } = useAgentRuntimes()
   const [defaultAgent, setDefaultAgentState] = useState<string | null>(null)
   const [issueDefaultAgent, setIssueDefaultAgentState] = useState<string | null>(null)
@@ -182,6 +188,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const refreshAutoPredictionPreference = useCallback(async (): Promise<void> => {
+    try {
+      const status = await getAutoPredictionDefaultWorkspace()
+      setAutoPredictionDefaultWorkspaceId(status.defaultWorkspaceId)
+      setAutoPredictionPreferenceError(null)
+    } catch (error) {
+      setAutoPredictionPreferenceError((error as Error).message)
+    } finally {
+      setAutoPredictionPreferenceLoaded(true)
+    }
+  }, [])
+
   useEffect(() => {
     void ensureTerminalAppearancePublished()
   }, [ensureTerminalAppearancePublished])
@@ -203,7 +221,8 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     void getWorkspaceDefaultAgent().then(setDefaultAgentState).catch(() => setDefaultAgentState(null))
     void getIssueDefaultAgent().then(setIssueDefaultAgentState).catch(() => setIssueDefaultAgentState(null))
     void refreshAutoQuantPreference()
-  }, [refreshAutoQuantPreference, refreshTemplates])
+    void refreshAutoPredictionPreference()
+  }, [refreshAutoPredictionPreference, refreshAutoQuantPreference, refreshTemplates])
 
   // Reconcile tabs against the workspaces list. If a workspace or session
   // disappeared (deleted on disk / on the server), close any tabs that
@@ -360,6 +379,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     return workspace
   }, [refresh])
 
+  const initializeAutoPrediction = useCallback(async (): Promise<Workspace> => {
+    const workspace = await apiInitializeAutoPredictionWorkspace()
+    setWorkspaces((current) => [
+      workspace,
+      ...current.filter((candidate) => candidate.id !== workspace.id),
+    ])
+    setAutoPredictionDefaultWorkspaceId(workspace.id)
+    setAutoPredictionPreferenceError(null)
+    void refresh()
+    return workspace
+  }, [refresh])
+
   const initializeChat = useCallback(async (): Promise<Workspace> => {
     const workspace = await apiInitializeChatWorkspace()
     setWorkspaces((current) => [
@@ -376,13 +407,19 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setAutoQuantPreferenceError(null)
   }, [])
 
+  const setAutoPredictionDefaultWorkspace = useCallback(async (workspaceId: string): Promise<void> => {
+    const saved = await apiSetAutoPredictionDefaultWorkspace(workspaceId)
+    setAutoPredictionDefaultWorkspaceId(saved.defaultWorkspaceId)
+    setAutoPredictionPreferenceError(null)
+  }, [])
+
   const quickChat = useCallback(
     async (
       prompt: string,
       agent?: string,
       credentialSlug?: string,
       targetWsId?: string,
-      template?: 'chat' | 'auto-quant-v2',
+      template?: 'chat' | 'auto-quant-v2' | 'auto-prediction',
       model?: string | null,
       reasoningEffort?: import('../api').ModelReasoningEffort,
       credentialSource?: 'native',
@@ -435,7 +472,9 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         params: {
           wsId: workspace.id,
           sessionId: session.sessionId,
-          source: workspace.template === 'auto-quant-v2' ? 'auto-quant' : 'chat',
+          source: workspace.template === 'auto-quant-v2'
+            ? 'auto-quant'
+            : workspace.template === 'auto-prediction' ? 'prediction' : 'chat',
         },
       })
       void refresh()
@@ -732,9 +771,13 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     autoQuantDefaultWorkspaceId,
     autoQuantPreferenceLoaded,
     autoQuantPreferenceError,
+    autoPredictionDefaultWorkspaceId,
+    autoPredictionPreferenceLoaded,
+    autoPredictionPreferenceError,
     refresh,
     refreshTemplates,
     refreshAutoQuantPreference,
+    refreshAutoPredictionPreference,
     refreshWorkspaceManager,
     quickStartWorkspaceManager,
     spawn,
@@ -742,8 +785,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     setDefaultAgent,
     setIssueDefaultAgent,
     initializeAutoQuant,
+    initializeAutoPrediction,
     initializeChat,
     setAutoQuantDefaultWorkspace,
+    setAutoPredictionDefaultWorkspace,
     quickChat,
     pauseSession,
     resumeSession,
@@ -757,12 +802,16 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     renameWorkspace,
   }), [
     agents,
+    autoPredictionDefaultWorkspaceId,
+    autoPredictionPreferenceError,
+    autoPredictionPreferenceLoaded,
     autoQuantDefaultWorkspaceId,
     autoQuantPreferenceError,
     autoQuantPreferenceLoaded,
     defaultAgent,
     hasLoaded,
     initializeAutoQuant,
+    initializeAutoPrediction,
     initializeChat,
     issueDefaultAgent,
     listError,
@@ -773,6 +822,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     quickChat,
     quickStartWorkspaceManager,
     refresh,
+    refreshAutoPredictionPreference,
     refreshAutoQuantPreference,
     refreshTemplates,
     refreshWorkspaceManager,
@@ -784,6 +834,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     resumeSession,
     saveWorkspaceMetadata,
     setAutoQuantDefaultWorkspace,
+    setAutoPredictionDefaultWorkspace,
     setDefaultAgent,
     setIssueDefaultAgent,
     spawn,

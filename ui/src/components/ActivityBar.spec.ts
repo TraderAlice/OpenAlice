@@ -29,6 +29,7 @@ describe('ActivityBar navigation hierarchy', () => {
       'issue',
       'auto-quant',
       'tracked',
+      'prediction',
       'office',
       'connectors',
       'workspaces',
@@ -75,6 +76,6 @@ describe('ActivityBar navigation hierarchy', () => {
     expect(hiddenBeta?.items.map((item) => item.page)).not.toContain('office')
     expect(hiddenBeta?.items.length).toBeGreaterThan(0)
     expect(shownBeta?.items.map((item) => item.page)).toContain('office')
-    expect(shownBeta?.items[0]?.page).toBe('office')
+    expect(shownBeta?.items[0]?.page).toBe('prediction')
   })
 })

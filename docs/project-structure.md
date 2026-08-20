@@ -78,7 +78,7 @@ src/                           Alice process
 │   │                          schedules, CLI shims, file/git operations
 │   ├── adapters/              claude / codex / cursor / agy / grok / omp / opencode / pi / shell
 │   ├── cli/                   alice, alice-uta, alice-workspace, traderhub
-│   └── templates/             built-in Chat and pinned AutoQuant V2 Harnesses
+│   └── templates/             built-in Chat, pinned AutoQuant V2, and pinned Auto Prediction Harnesses
 ├── services/
 │   ├── auth/                  admin token and web session services
 │   ├── uta-client/            Alice-side UTA SDK adapters
@@ -184,6 +184,23 @@ AutoQuant uses the same durable Workspace boundary with a stricter entry rule:
 - AutoQuant's Coding Agent owns Projects, Studies, experiments, dependencies,
   artifacts, and local Git history inside that desk; Alice does not reproduce
   those lifecycles.
+
+Auto Prediction is the third source-backed conversation Harness and begins in
+the Beta section:
+
+- `autoPrediction.defaultWorkspaceId` is its explicit readiness pointer.
+- initialization clones one launcher-approved immutable commit from
+  `TraderAlice/Auto-Prediction`, retains upstream ancestry, and writes the
+  source receipt to `.alice/harness-source.json`;
+- native Coding Agent Sessions work inside that repository through the shared
+  Harness composer, roster, provenance, and Workspace lifecycle;
+- Auto Prediction continues to own its SQLite state, evidence, campaigns,
+  internal Agent workers, and Studio. Alice does not start, proxy, embed, or
+  supervise Studio in this first integration.
+
+The planned financial-dashboard Workspace and Auto Prediction Studio are the
+two concrete specimens for a later managed web-surface contract. Do not infer
+that contract from Vite development commands or add a one-off Studio launcher.
 
 Load-bearing paths:
 

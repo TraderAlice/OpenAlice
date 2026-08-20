@@ -81,8 +81,8 @@ function TabFrame({ tab, visible }: { tab: Tab; visible: boolean }) {
       // React 19 supports it as a JSX attribute.
       inert={!visible}
     >
-      {shell === 'chat' || shell === 'auto-quant' ? (
-        <ChatPageShell mode={shell === 'auto-quant' ? 'auto-quant' : 'chat'}>
+      {shell === 'chat' || shell === 'auto-quant' || shell === 'prediction' ? (
+        <ChatPageShell mode={shell}>
           <Component key={tab.id} spec={tab.spec} visible={visible} />
         </ChatPageShell>
       ) : (
