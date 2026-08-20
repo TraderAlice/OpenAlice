@@ -23,7 +23,6 @@ import { useLocale } from './i18n/useLocale'
 export type Page =
   | 'chat' | 'auto-quant' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'office' | 'automation' | 'market'
   | 'issue'
-  | 'trading-as-git'
   | 'connectors'
   | 'settings' | 'dev'
 

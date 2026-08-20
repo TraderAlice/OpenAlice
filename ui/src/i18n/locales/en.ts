@@ -24,6 +24,7 @@ export const en = {
       news: 'News',
       office: 'Office',
       tradingAsGit: 'Trading as Git',
+      broker: 'Broker',
       portfolio: 'Portfolio',
       connectors: 'Connectors',
       issue: 'Issues',

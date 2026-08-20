@@ -21,6 +21,7 @@ export const zhHant: Resources = {
       news: '新聞',
       office: '辦公室',
       tradingAsGit: '交易即 Git',
+      broker: '券商',
       portfolio: '投資組合',
       connectors: '連接器',
       issue: '議題',

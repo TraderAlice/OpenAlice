@@ -417,9 +417,9 @@ function RedirectUtaDetail() {
  * Page-owned sidebars keep the highlight in sync while the app shell stays
  * unaware of each surface's local navigation.
  *
- * `uta-detail` is intentionally Portfolio's sidebar: the URL lives
- * under /settings/uta/:id for historical reasons but the page is a
- * Portfolio drill-in (positions / equity for one account).
+ * `uta-detail` and `trading-as-git` are Broker navigator leaves. Account
+ * detail still lives under /settings/uta/:id for historical reasons;
+ * Trading as Git keeps /trading-as-git. Both highlight the Broker rail item.
  */
 function specToSection(spec: ViewSpec): ActivitySection {
   switch (spec.kind) {
@@ -444,8 +444,8 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'workspace-list':
     case 'template-catalog':
     case 'template-detail':    return 'workspaces'
-    case 'trading-as-git':     return 'trading-as-git'
     case 'connectors':         return 'connectors'
+    case 'trading-as-git':
     case 'portfolio':
     case 'uta-detail':         return 'portfolio'
     case 'issue':
