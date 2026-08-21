@@ -34,6 +34,7 @@ const VENDOR_CAPABILITY: Record<string, BarCapability> = {
   fmp: 'delayed',
   eastmoney: 'delayed',
   twse: 'delayed', // K-lines via Yahoo chart (symbols are .TW/.TWO)
+  oanda: 'realtime', // broker-fresh practice-host candles straight from v20 API
 }
 
 const BAR_INTERVALS: readonly BarInterval[] = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']

@@ -207,7 +207,12 @@ async function main() {
     return [...new Set([md.providers.equity, ...md.extraVendors])]
   }
 
-  const marketSearch = { symbolIndex, equityVendors: getEquityVendors, equityClient, cryptoClient, currencyClient, commodityCatalog }
+  const getCurrencyVendors = async () => {
+    const md = await readMarketDataConfig()
+    return [...new Set([md.providers.currency, ...md.extraVendors])]
+  }
+
+  const marketSearch = { symbolIndex, equityVendors: getEquityVendors, currencyVendors: getCurrencyVendors, equityClient, cryptoClient, currencyClient, commodityCatalog }
 
   // Federated bar layer — embedded vendor adapters + broker (UTA) OHLCV behind one
   // barId-keyed interface. Vendor branch live now; UTA branch lands with Phase 1.

@@ -24,6 +24,7 @@ const sdkKeyMapping: Record<string, string> = {
   benzinga: 'benzinga_api_key',
   tiingo: 'tiingo_token',
   biztoc: 'biztoc_api_key',
+  oanda: 'oanda_api_key',
 }
 
 function applyMapping(

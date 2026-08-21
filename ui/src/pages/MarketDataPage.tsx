@@ -42,6 +42,11 @@ const CHART_VENDORS: ChartVendor[] = [
     name: 'TWSE + TPEx 臺灣證交所',
     desc: 'Taiwan listed + OTC (上市/上櫃) — 中文/英文 search over the official company roster, plus official P/E·殖利率·股價淨值比 and company profiles yfinance lacks. No key. K-lines come from Yahoo (2330.TW / 6488.TWO).',
   },
+  {
+    id: 'oanda',
+    name: 'OANDA',
+    desc: 'Global FX, metals & CFD — realtime candles incl. EUR_GBP. Free practice API key (oanda.com → Manage API Access → Generate token).',
+  },
 ]
 
 // Data-provider keys — LOW-frequency data (boards, economy, fundamentals). The
@@ -75,6 +80,7 @@ const KEY_GROUPS: { label: string | null; providers: ProviderEntry[] }[] = [
     providers: [
       { key: 'econdb', name: 'EconDB', desc: 'Global macro indicators, country profiles, shipping data.', hint: 'econdb.com' },
       { key: 'intrinio', name: 'Intrinio', desc: 'Equities, ETFs, fundamentals, news, options snapshots.', hint: 'intrinio.com' },
+      { key: 'oanda', name: 'OANDA', desc: 'Realtime FX candles via OANDA v20 (EUR_GBP etc.) — the key unlocks a realtime vendor the hub does not serve.', hint: 'oanda.com → Manage API Access' },
     ],
   },
 ]

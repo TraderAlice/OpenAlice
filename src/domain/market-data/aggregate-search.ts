@@ -8,7 +8,9 @@
  * equity    — SymbolIndex (SEC/TMX local cache, regex, zero-latency)
  * commodity — CommodityCatalog (canonical catalog, ~25 items)
  * crypto    — cryptoClient.search on yfinance (online fuzzy)
- * currency  — currencyClient.search on yfinance (online fuzzy, XXXUSD filter)
+ * currency  — currencyClient.search fanned over every enabled currency vendor
+ *             (yfinance understood-pairs fuzzy + OANDA instrument roster, each
+ *             in its own namespace)
  */
 import type { SymbolIndex } from './equity/symbol-index.js'
 import type { CommodityCatalog } from './commodity/commodity-catalog.js'
@@ -26,6 +28,11 @@ export interface MarketSearchDeps {
    *  (via setMarketVendor → market-data.json) is picked up on the next search
    *  with no restart. A plain array is still accepted (tests, static wiring). */
   equityVendors: string[] | (() => string[] | Promise<string[]>)
+  /** Currency vendors to fan search across — same semantics as equityVendors.
+   *  Defaults to ['yfinance'] when absent (tests, static wiring): yfinance is
+   *  the per-asset default and the only one whose results carry the XXXUSD
+   *  fuzzy-search filter. Each vendor lives in its own symbol namespace. */
+  currencyVendors?: string[] | (() => string[] | Promise<string[]>)
   equityClient: EquityClientLike
   cryptoClient: CryptoClientLike
   currencyClient: CurrencyClientLike
@@ -39,8 +46,9 @@ export interface MarketSearchResult {
   name?: string | null
   assetClass: AssetClass
   /** Which vendor produced this hit — drives the barId's sourceId so getBars
-   *  routes back to the same vendor. Absent for crypto/currency/commodity
-   *  (they fall back to the configured per-asset provider). */
+   *  routes back to the same vendor. Absent for crypto/commodity and for
+   *  currency when only the default yfinance ran (falls back to the
+   *  configured per-asset provider). */
   sourceId?: string
   [key: string]: unknown
 }
@@ -88,6 +96,13 @@ export async function aggregateSymbolSearch(
     : deps.equityVendors
   const primaryEquity = equityVendors[0] ?? 'yfinance'
 
+  // Same live-resolution semantics as equityVendors; yfinance default keeps
+  // tests and static wiring honest (XXXUSD filter only applies to it).
+  const currencyVendorsRaw = typeof deps.currencyVendors === 'function'
+    ? await deps.currencyVendors()
+    : (deps.currencyVendors ?? ['yfinance'])
+  const currencyVendors = [...new Set(currencyVendorsRaw)]
+
   // Local SEC index — US-only, zero-latency, authoritative for US tickers.
   // Attributed to the primary equity vendor (its symbols feed that provider).
   const equityResults = deps.symbolIndex
@@ -98,15 +113,22 @@ export async function aggregateSymbolSearch(
     .search(q, boundedLimit)
     .map((r) => ({ ...r, assetClass: 'commodity' as const }))
 
-  // Online searches, concurrent: crypto + currency on yfinance; equity fanned
-  // out over EVERY enabled vendor (default yfinance + user-opted extras like
-  // eastmoney). Each equity vendor lives in its own symbol namespace — yfinance
-  // returns Yahoo tickers (600519.SS), eastmoney returns secids (1.600519) for
-  // CN names yfinance can't match — so all are kept as redundant candidates.
+  // Online searches, concurrent: crypto on yfinance; equity and currency each
+  // fanned out over EVERY enabled vendor (default yfinance + user-opted extras
+  // like eastmoney / oanda). Every vendor lives in its own symbol namespace —
+  // yfinance returns Yahoo tickers (600519.SS, EURUSD), eastmoney returns
+  // secids (1.600519), oanda returns broker names (EUR_GBP) — so all are kept
+  // as redundant candidates.
   const [coreSettled, equitySettled] = await Promise.all([
     Promise.allSettled([
       deps.cryptoClient.search({ query: q, provider: 'yfinance' }),
-      deps.currencyClient.search({ query: q, provider: 'yfinance' }),
+      Promise.allSettled(
+        currencyVendors.map((v) =>
+          deps.currencyClient
+            .search({ query: q, provider: v })
+            .then((rows) => ({ vendor: v, rows })),
+        ),
+      ),
     ]),
     Promise.allSettled(
       equityVendors.map((v) =>
@@ -122,12 +144,31 @@ export async function aggregateSymbolSearch(
     (r) => ({ ...r, assetClass: 'crypto' as const }),
   )
 
-  const currencyResults = (currencySettled.status === 'fulfilled' ? currencySettled.value : [])
-    .filter((r) => {
-      const sym = (r as Record<string, unknown>).symbol as string | undefined
-      return sym?.endsWith('USD')
-    })
-    .map((r) => ({ ...r, assetClass: 'currency' as const }))
+  // Currency hits keep their sourceId so getBars routes back to the vendor
+  // that produced them. The endsWith('USD') filter is a Yahoo fuzzy-search
+  // noise filter and applies ONLY to yfinance rows — OANDA's roster search
+  // returns canonical pair names (EUR_GBP) that must pass through as-is.
+  const currencyResults: MarketSearchResult[] = []
+  if (currencySettled.status === 'fulfilled') {
+    const seenCurrency = new Set<string>()
+    for (const settled of currencySettled.value) {
+      if (settled.status !== 'fulfilled') continue
+      const { vendor, rows } = settled.value
+      for (const r of rows) {
+        const item = r as Record<string, unknown>
+        if (vendor === 'yfinance') {
+          const sym = item.symbol as string | undefined
+          if (!sym?.endsWith('USD')) continue
+        }
+        const sym = String(item.symbol ?? '')
+        if (!sym) continue
+        const key = `${vendor}|${sym.toUpperCase()}`
+        if (seenCurrency.has(key)) continue
+        seenCurrency.add(key)
+        currencyResults.push({ ...r, symbol: sym, assetClass: 'currency', sourceId: vendor })
+      }
+    }
+  }
 
   // Merge equity online hits, de-duped WITHIN each vendor's namespace by
   // `vendor|symbol` (the SEC index already seeded the primary vendor's keys, so

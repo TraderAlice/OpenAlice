@@ -35,6 +35,7 @@ vi.mock('../hooks/useConfigPage', () => ({
         eia: 'test-eia-key',
         econdb: 'test-econdb-key',
         intrinio: 'test-intrinio-key',
+        oanda: 'test-oanda-key',
       },
     },
     status: 'idle',
@@ -61,7 +62,7 @@ describe('MarketDataPage provider credentials', () => {
   it('gives every key field and test action a provider-specific name', () => {
     openProviderKeys()
 
-    for (const provider of ['FMP', 'FRED', 'BLS', 'EIA', 'EconDB', 'Intrinio']) {
+    for (const provider of ['FMP', 'FRED', 'BLS', 'EIA', 'EconDB', 'Intrinio', 'OANDA']) {
       const input = screen.getByLabelText(`${provider} API key`)
       expect(screen.getByText(provider, { selector: 'label' }).getAttribute('for'))
         .toBe(input.getAttribute('id'))

@@ -446,6 +446,7 @@ export function createMarketDataRoutes(ctx: EngineContext) {
     econdb:           { credField: 'econdb_api_key',           provider: 'econdb',           model: 'AvailableIndicators',     params: {} },
     fmp:              { credField: 'fmp_api_key',              provider: 'fmp',              model: 'EquityScreener',          params: { limit: 1 } },
     intrinio:         { credField: 'intrinio_api_key',         provider: 'intrinio',         model: 'EquitySearch',            params: { query: 'AAPL', limit: 1 } },
+    oanda:            { credField: 'oanda_api_key',             provider: 'oanda',             model: 'CurrencyPairs',           params: { query: 'EUR_GBP' } },
   }
 
   const app = new Hono()
