@@ -675,7 +675,10 @@ export function useAgentLaunchConfig({
     : baseAiDetails?.model ?? null
   const modelOptions = runtimeModelOptions({
     agent: effectiveAgent,
-    credential: launchCredentialSlug ? credential : null,
+    // Catalog ownership follows the resolved access source, not whether the
+    // user explicitly picked the credential in this launch row. Installation
+    // defaults and detected Workspace credentials are Vault-backed too.
+    credential: accessMode === 'native' ? null : credential,
     defaultModel,
     presets,
   })
