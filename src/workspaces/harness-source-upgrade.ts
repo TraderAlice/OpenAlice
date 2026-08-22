@@ -192,7 +192,11 @@ export class HarnessSourceUpgradeManager {
       }
       await atomicWriteJson(join(workspace.dir, JOURNAL_REL), journal)
       try {
-        await runGit(workspace.dir, ['merge', '--no-ff', '--no-commit', target.commit])
+        await runGit(workspace.dir, [
+          '-c', 'user.email=launcher@local',
+          '-c', 'user.name=OpenAlice',
+          'merge', '--no-ff', '--no-commit', target.commit,
+        ])
         await atomicWriteJson(join(workspace.dir, RECEIPT_REL), {
           ...receipt,
           version: target.version,

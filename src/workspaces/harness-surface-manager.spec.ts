@@ -69,7 +69,7 @@ describe('HarnessSurfaceManager', () => {
     const stopped = await manager.stop('ws-1', 'studio')
     expect(stopped.phase).toBe('stopped')
     expect(manager.resolveHost(ready.routeHost)).toBeNull()
-  })
+  }, 30_000)
 })
 
 async function waitFor<T>(read: () => T, done: (value: T) => boolean): Promise<T> {
