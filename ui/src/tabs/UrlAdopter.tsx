@@ -50,6 +50,10 @@ export function UrlAdopter() {
         <Route path="/auto-quant/workspaces/:wsId/view/:path" element={<AdoptAutoQuantFileViewer />} />
         <Route path="/auto-quant/workspaces/:wsId" element={<AdoptAutoQuantWorkspace />} />
         <Route path="/auto-quant/workspaces/:wsId/s/:sessionId" element={<AdoptAutoQuantWorkspace />} />
+        <Route path="/prediction" element={<AdoptStatic spec={{ kind: 'auto-prediction-landing', params: {} }} />} />
+        <Route path="/prediction/workspaces/:wsId/view/:path" element={<AdoptAutoPredictionFileViewer />} />
+        <Route path="/prediction/workspaces/:wsId" element={<AdoptAutoPredictionWorkspace />} />
+        <Route path="/prediction/workspaces/:wsId/s/:sessionId" element={<AdoptAutoPredictionWorkspace />} />
         <Route path="/portfolio" element={<AdoptTraderStatic spec={{ kind: 'portfolio', params: {} }} />} />
         <Route path="/issues" element={<AdoptStatic spec={{ kind: 'issue', params: {} }} />} />
         <Route path="/issues/:wsId/:id" element={<AdoptIssueDetail />} />
@@ -308,6 +312,14 @@ function AdoptAutoQuantWorkspace() {
   return <AdoptStatic spec={{ kind: 'workspace', params }} />
 }
 
+function AdoptAutoPredictionWorkspace() {
+  const { wsId, sessionId } = useParams<{ wsId: string; sessionId?: string }>()
+  if (!wsId) return <Navigate to="/prediction" replace />
+  const params: Extract<ViewSpec, { kind: 'workspace' }>['params'] = { wsId, source: 'prediction' }
+  if (sessionId) params.sessionId = sessionId
+  return <AdoptStatic spec={{ kind: 'workspace', params }} />
+}
+
 function AdoptWorkspaceManager() {
   const { sessionId } = useParams<{ sessionId: string }>()
   if (!sessionId) return <Navigate to="/chat/manager" replace />
@@ -381,6 +393,19 @@ function AdoptAutoQuantFileViewer() {
   )
 }
 
+function AdoptAutoPredictionFileViewer() {
+  const { wsId, path } = useParams<{ wsId: string; path: string }>()
+  const [search] = useSearchParams()
+  if (!wsId || !path) return <Navigate to="/prediction" replace />
+  const returnSessionId = search.get('sessionId') ?? undefined
+  return (
+    <AdoptStatic spec={{
+      kind: 'file-viewer',
+      params: { wsId, path, source: 'prediction', ...(returnSessionId ? { returnSessionId } : {}) },
+    }} />
+  )
+}
+
 function AdoptTrackedFileViewer() {
   const { wsId, path } = useParams<{ wsId: string; path: string }>()
   const [search] = useSearchParams()
@@ -428,19 +453,22 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'tracked-issue-detail': return 'tracked'
     case 'chat-landing':       return 'chat'
     case 'auto-quant-landing': return 'auto-quant'
+    case 'auto-prediction-landing': return 'prediction'
     case 'workspace-manager':  return 'chat'
     case 'workspace':
       return spec.params.source === 'chat'
         ? 'chat'
-        : spec.params.source === 'auto-quant' ? 'auto-quant' : 'workspaces'
+        : spec.params.source === 'auto-quant'
+          ? 'auto-quant'
+          : spec.params.source === 'prediction' ? 'prediction' : 'workspaces'
     case 'file-viewer':
       return spec.params.source === 'chat'
         ? 'chat'
         : spec.params.source === 'auto-quant'
           ? 'auto-quant'
-        : spec.params.source === 'tracked'
-          ? 'tracked'
-          : 'workspaces'
+          : spec.params.source === 'prediction'
+            ? 'prediction'
+            : spec.params.source === 'tracked' ? 'tracked' : 'workspaces'
     case 'workspace-list':
     case 'template-catalog':
     case 'template-detail':    return 'workspaces'

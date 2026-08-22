@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 
 import {
+  readAutoPredictionPreferences,
   readAutoQuantPreferences,
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
@@ -30,17 +31,20 @@ import { logger as launcherLogger } from './logger.js'
 import { conversationCause } from './agent-runtime-log.js'
 import type { WorkspaceService } from './service.js'
 import { AUTO_QUANT_WORKSPACE_TEMPLATE } from './chat-workspace-resolver.js'
+import { AUTO_PREDICTION_WORKSPACE_TEMPLATE } from './chat-workspace-resolver.js'
 
 interface ConversationHarnessDependencies {
   readQuickChatPreferences(): Promise<{ recentChatWorkspaceId: string | null }>
   rememberRecentChatWorkspace(workspaceId: string): Promise<unknown>
   readAutoQuantPreferences(): Promise<{ defaultWorkspaceId: string | null }>
+  readAutoPredictionPreferences?(): Promise<{ defaultWorkspaceId: string | null }>
 }
 
 const defaultHarnessDependencies: ConversationHarnessDependencies = {
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
   readAutoQuantPreferences,
+  readAutoPredictionPreferences,
 }
 
 interface ArtifactTarget {
@@ -462,7 +466,9 @@ function conversationBirthReason(
   if (subject?.kind === 'issue' && subject.commentId) return 'issue-comment'
   if (resolution.mode === 'exact') return 'explicit-workspace'
   if (target.kind === 'harness') {
-    return target.harness === 'autoquant' ? 'harness-autoquant' : 'harness-chat'
+    if (target.harness === 'autoquant') return 'harness-autoquant'
+    if (target.harness === 'prediction') return 'harness-prediction'
+    return 'harness-chat'
   }
   switch (resolution.reason) {
     case 'explicit-workspace':
@@ -482,7 +488,7 @@ function conversationBirthReason(
 
 async function resolveHarnessConversationTarget(
   svc: WorkspaceService,
-  harness: 'chat' | 'autoquant',
+  harness: 'chat' | 'autoquant' | 'prediction',
   dependencies: ConversationHarnessDependencies,
 ): Promise<WorkspaceConversationResolution> {
   if (harness === 'chat') {
@@ -508,15 +514,25 @@ async function resolveHarnessConversationTarget(
     }
   }
 
-  const preferences = await dependencies.readAutoQuantPreferences().catch((err) => {
-    launcherLogger.warn('conversation.harness_autoquant_preference_read_failed', { err })
+  const prediction = harness === 'prediction'
+  const preferences = await (prediction
+    ? (dependencies.readAutoPredictionPreferences ?? readAutoPredictionPreferences)()
+    : dependencies.readAutoQuantPreferences()).catch((err) => {
+    launcherLogger.warn(prediction
+      ? 'conversation.harness_prediction_preference_read_failed'
+      : 'conversation.harness_autoquant_preference_read_failed', { err })
     return { defaultWorkspaceId: null }
   })
   const workspace = preferences.defaultWorkspaceId
     ? svc.registry.get(preferences.defaultWorkspaceId)
     : undefined
-  if (!workspace || workspace.template !== AUTO_QUANT_WORKSPACE_TEMPLATE) {
-    return { mode: 'unavailable', reason: 'autoquant-not-initialized' }
+  const expectedTemplate = prediction
+    ? AUTO_PREDICTION_WORKSPACE_TEMPLATE
+    : AUTO_QUANT_WORKSPACE_TEMPLATE
+  if (!workspace || workspace.template !== expectedTemplate) {
+    return { mode: 'unavailable', reason: prediction
+      ? 'prediction-not-initialized'
+      : 'autoquant-not-initialized' }
   }
   return {
     mode: 'reconstructed',

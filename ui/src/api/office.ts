@@ -9,7 +9,7 @@ export type OfficeEmployeeMood =
   | 'review'
   | 'failed'
 
-export type OfficeHarness = 'chat' | 'auto-quant' | 'other'
+export type OfficeHarness = 'chat' | 'auto-quant' | 'prediction' | 'other'
 
 export type OfficeBubble =
   | { kind: 'text'; text: string }

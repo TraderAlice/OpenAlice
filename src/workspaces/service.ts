@@ -178,6 +178,7 @@ import {
 } from './resume-registry.js';
 import { WorkspaceSessionRuntimeStore } from './session-runtime-store.js';
 import {
+  AUTO_PREDICTION_WORKSPACE_TEMPLATE,
   AUTO_QUANT_WORKSPACE_TEMPLATE,
   ChatWorkspaceResolver,
   TemplateWorkspaceResolver,
@@ -437,6 +438,11 @@ export interface WorkspaceService {
   resolveOrCreateChatWorkspace(preferredWorkspaceId?: string | null): Promise<ChatWorkspaceResolution>;
   /** Resolve the latest durable AutoQuant desk, creating a pinned starter when absent. */
   resolveOrCreateAutoQuantWorkspace(
+    preferredWorkspaceId?: string | null,
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution>;
+  /** Resolve the durable Auto Prediction desk, creating a pinned starter when absent. */
+  resolveOrCreateAutoPredictionWorkspace(
     preferredWorkspaceId?: string | null,
     sourceVersion?: string,
   ): Promise<TemplateWorkspaceResolution>;
@@ -1007,6 +1013,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     AUTO_QUANT_WORKSPACE_TEMPLATE,
     'auto-quant',
   );
+  const autoPredictionWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry, sessionRegistry, creator },
+    AUTO_PREDICTION_WORKSPACE_TEMPLATE,
+    'prediction',
+  );
 
   const transcriptWatcher = new TranscriptWatcher(
     launcherLogger.child({ scope: 'transcript-watch' }),
@@ -1223,6 +1234,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     sourceVersion?: string,
   ): Promise<TemplateWorkspaceResolution> =>
     autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
+  const resolveOrCreateAutoPredictionWorkspaceMethod = (
+    preferredWorkspaceId?: string | null,
+    sourceVersion?: string,
+  ): Promise<TemplateWorkspaceResolution> =>
+    autoPredictionWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion);
 
   let runtimeReadinessWorkspaceInFlight: Promise<WorkspaceMeta> | null = null;
 
@@ -3049,6 +3065,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     workspaceRuntimeActivity: workspaceRuntimeActivityMethod,
     resolveOrCreateChatWorkspace: resolveOrCreateChatWorkspaceMethod,
     resolveOrCreateAutoQuantWorkspace: resolveOrCreateAutoQuantWorkspaceMethod,
+    resolveOrCreateAutoPredictionWorkspace: resolveOrCreateAutoPredictionWorkspaceMethod,
     resolveDefaultAgentId,
     resolveAdapter,
     startWebPiSession,

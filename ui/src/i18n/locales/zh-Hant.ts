@@ -16,6 +16,7 @@ export const zhHant: Resources = {
       tracked: '追蹤',
       chat: '問 Alice',
       autoQuant: 'AutoQuant',
+      autoPrediction: 'Prediction',
       workspaces: '工作區',
       market: '市場',
       news: '新聞',
@@ -1111,6 +1112,27 @@ export const zhHant: Resources = {
     initializing: '正在初始化 AutoQuant…',
     initializingBody: '正在準備鎖定版本的 Harness 與本機 Git 工作區，可能需要一些時間。',
   },
+  autoPrediction: {
+    newResearch: '新增預測研究', newWorkspace: '新增 Auto Prediction 工作區',
+    noWorkspacesYet: '尚無 Auto Prediction 工作區', noResearchYet: '尚無預測研究工作階段',
+    recentResearch: '最近的預測研究', viewAllResearch: '查看全部 {{count}} 個預測研究工作階段',
+    browseResearch: '瀏覽預測研究', workspaceContextLabel: '預測工作區內容：{{name}}',
+    workspaceContextMenu: '預測工作區內容選單', workspacePickerDescription: '選擇接收新研究的 Auto Prediction 工作區。',
+    workspaceSessionCount_one: '{{count}} 個研究工作階段', workspaceSessionCount_other: '{{count}} 個研究工作階段',
+    researchBrowserDescription: '搜尋目前工作區或全部 Auto Prediction 工作區中的預測研究。',
+    researchSearchPlaceholder: '搜尋預測研究…', researchScope: '預測研究範圍',
+    researchResultCount: '{{count}} 個相符的預測研究工作階段', noResearchMatches: '沒有符合這些篩選條件的預測研究。',
+  },
+  autoPredictionSetup: {
+    loading: '正在載入 Auto Prediction', loadErrorTitle: '無法取得 Auto Prediction 狀態',
+    loadErrorBody: 'OpenAlice 無法讀取預設工作區偏好。請在後端恢復後重試。', eyebrow: 'Beta Harness',
+    initializeTitle: '初始化 Auto Prediction', initializeBody: '從核准的 Auto Prediction 原始碼快照建立持久的本機研究工作區。',
+    chooseTitle: '選擇 Auto Prediction 工作區', chooseBody: '已有 Auto Prediction 工作區，但尚未設定預設項目。請選擇接收新研究的工作區。',
+    workspaceMeta: '{{count}} 個工作階段 · 快照 {{version}}', manageWorkspaces: '前往工作區管理',
+    persistentTitle: '一個持久的預測研究工作區', persistentBody: '證據、Campaign、SQLite 狀態、檔案和 Git 歷史由此工作區內的 Auto Prediction 持有。',
+    initializeAction: '初始化 Auto Prediction', initializing: '正在初始化 Auto Prediction…',
+    initializingBody: '正在複製並驗證核准的原始碼快照，請稍候。',
+  },
   chatSetup: {
     loading: '正在載入 Ask Alice',
     loadErrorTitle: '暫時無法讀取 Ask Alice 狀態',
@@ -1284,6 +1306,14 @@ export const zhHant: Resources = {
     ex1: '研究一個穩健的截面動量策略',
     ex2: '覆盤最近失敗的實驗並提出下一輪迭代',
     ex3: '建立並驗證一個 BTC 波動率狀態策略',
+  },
+  autoPredictionLanding: {
+    heading: '預測研究工作區應調查什麼？', subheading: '使用原生 Coding Agent 研究預測市場語義與證據。',
+    targetHeading: '在此工作區新增研究工作階段', clearTarget: '使用其他預測研究工作區',
+    placeholder: '描述市場關係、結算問題或證據缺口…', selectWorkspace: '選擇 Auto Prediction 工作區',
+    newWorkspaceTarget: '新增 Auto Prediction 工作區', version: '快照', examplesLabel: '試著這樣問',
+    ex1: '檢查最新市場目錄證據，尋找可能的跨市場語義關係', ex2: '複核一個既有假設並列出最有力的反例',
+    ex3: '執行儲存庫檢查並說明下一處受阻的研究邊界',
   },
   firstRunGuide: {
     header: {
@@ -1788,6 +1818,7 @@ export const zhHant: Resources = {
     harness: {
       chat: 'Chat',
       'auto-quant': 'AutoQuant',
+      prediction: '預測',
       other: '其他',
     },
     empty: '還沒有占用紀錄。互動 Session、無頭執行、Play 和被拒絕的互拉會出現在這裡。',

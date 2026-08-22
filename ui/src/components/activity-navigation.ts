@@ -7,6 +7,7 @@ import {
   ListChecks,
   MessageSquare,
   Microscope,
+  Binary,
   Plug,
   Settings,
   Telescope,
@@ -27,7 +28,7 @@ import {
 } from '../live/ui-layout'
 
 type NavItemKey =
-  | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.workspaces'
+  | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.office' | 'nav.item.issue'
   | 'nav.item.broker' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
@@ -97,6 +98,7 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: 'nav.section.beta',
     descriptionKey: 'nav.betaDescription',
     items: [
+      { page: 'prediction', labelKey: 'nav.item.autoPrediction', icon: Binary, defaultTab: { kind: 'auto-prediction-landing', params: {} } },
       { page: 'office',     labelKey: 'nav.item.office',     icon: Building2, defaultTab: { kind: 'office', params: {} } },
       // Trading as Git is a Broker navigator leaf, not a rail item.
       { page: 'portfolio',  labelKey: 'nav.item.broker',     icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },

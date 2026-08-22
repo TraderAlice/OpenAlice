@@ -48,6 +48,11 @@ const autoQuantPreferencesSchema = z.object({
   defaultWorkspaceId: z.string().nullable().default(null),
 })
 
+const autoPredictionPreferencesSchema = z.object({
+  /** The durable desk behind the Auto Prediction Harness. */
+  defaultWorkspaceId: z.string().nullable().default(null),
+})
+
 const harnessPreferencesSchema = z.object({
   /**
    * Ask Alice and Auto Quant share one roster. Headless-born Sessions that
@@ -90,6 +95,9 @@ const preferencesSchema = z.object({
   autoQuant: autoQuantPreferencesSchema.default({
     defaultWorkspaceId: null,
   }),
+  autoPrediction: autoPredictionPreferencesSchema.default({
+    defaultWorkspaceId: null,
+  }),
   harness: harnessPreferencesSchema.default({
     showHeadlessBornSessions: false,
   }),
@@ -105,6 +113,7 @@ export type QuickChatPreferences = Omit<ParsedQuickChatPreferences, 'recentLaunc
   recentLaunch?: ParsedQuickChatPreferences['recentLaunch']
 }
 export type AutoQuantPreferences = z.infer<typeof autoQuantPreferencesSchema>
+export type AutoPredictionPreferences = z.infer<typeof autoPredictionPreferencesSchema>
 export type HarnessPreferences = z.infer<typeof harnessPreferencesSchema>
 export type AgentRuntimesPreferences = {
   readonly quickAccessIds: readonly string[]
@@ -143,6 +152,13 @@ export async function readQuickChatPreferences(path = preferencesPath()): Promis
 export async function readAutoQuantPreferences(path = preferencesPath()): Promise<AutoQuantPreferences> {
   const preferences = await readPreferences(path)
   return { defaultWorkspaceId: preferences.autoQuant.defaultWorkspaceId }
+}
+
+export async function readAutoPredictionPreferences(
+  path = preferencesPath(),
+): Promise<AutoPredictionPreferences> {
+  const preferences = await readPreferences(path)
+  return { defaultWorkspaceId: preferences.autoPrediction.defaultWorkspaceId }
 }
 
 export async function readHarnessPreferences(path = preferencesPath()): Promise<HarnessPreferences> {
@@ -269,6 +285,26 @@ export async function rememberAutoQuantDefaultWorkspace(
     })
     await writePreferences(updated, path)
     return { defaultWorkspaceId: updated.autoQuant.defaultWorkspaceId }
+  })
+  mutationQueue = operation
+  return operation
+}
+
+export async function rememberAutoPredictionDefaultWorkspace(
+  workspaceId: string | null,
+  path = preferencesPath(),
+): Promise<AutoPredictionPreferences> {
+  const operation = mutationQueue.catch(() => undefined).then(async () => {
+    const preferences = await readPreferences(path)
+    const updated = preferencesSchema.parse({
+      ...preferences,
+      autoPrediction: {
+        ...preferences.autoPrediction,
+        defaultWorkspaceId: workspaceId,
+      },
+    })
+    await writePreferences(updated, path)
+    return { defaultWorkspaceId: updated.autoPrediction.defaultWorkspaceId }
   })
   mutationQueue = operation
   return operation

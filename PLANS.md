@@ -29,6 +29,10 @@ the durable truth after it changes. Git history is the archive.
 
 ## Active
 
+- [[plans/auto-prediction-harness.md]] — Add Auto Prediction as a Beta,
+  source-pinned conversation Harness first; defer Studio supervision/embedding
+  until AP and the planned financial-dashboard Workspace provide two real web
+  surface specimens.
 - [[plans/antigravity-adapter.md]] — Antigravity (`agy`) CliAdapter.
   PATH `agy` only; never spawn `antigravity` / `gemini`.
   Serial PR from `feat/agy-adapter`; do not merge until Ame says so.

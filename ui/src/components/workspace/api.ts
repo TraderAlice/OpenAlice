@@ -982,6 +982,47 @@ export async function initializeAutoQuantWorkspace(): Promise<Workspace> {
   return body.workspace
 }
 
+export type AutoPredictionDefaultWorkspaceStatus = AutoQuantDefaultWorkspaceStatus
+
+export async function getAutoPredictionDefaultWorkspace(): Promise<AutoPredictionDefaultWorkspaceStatus> {
+  const res = await fetch('/api/workspaces/auto-prediction/default-workspace')
+  const body = (await res.json().catch(() => null)) as
+    | (AutoPredictionDefaultWorkspaceStatus & { message?: string })
+    | null
+  if (!res.ok || !body) {
+    throw new Error(body?.message ?? `Auto Prediction preference load failed: ${res.status}`)
+  }
+  return body
+}
+
+export async function setAutoPredictionDefaultWorkspace(
+  workspaceId: string,
+): Promise<{ defaultWorkspaceId: string; ready: true }> {
+  const res = await fetch('/api/workspaces/auto-prediction/default-workspace', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ workspaceId }),
+  })
+  const body = (await res.json().catch(() => null)) as
+    | { defaultWorkspaceId?: string; ready?: boolean; message?: string; error?: string }
+    | null
+  if (!res.ok || body?.ready !== true || typeof body.defaultWorkspaceId !== 'string') {
+    throw new Error(body?.message ?? body?.error ?? `Auto Prediction preference save failed: ${res.status}`)
+  }
+  return { defaultWorkspaceId: body.defaultWorkspaceId, ready: true }
+}
+
+export async function initializeAutoPredictionWorkspace(): Promise<Workspace> {
+  const res = await fetch('/api/workspaces/auto-prediction/initialize', { method: 'POST' })
+  const body = (await res.json().catch(() => null)) as
+    | { workspace?: Workspace; message?: string; error?: string }
+    | null
+  if (!res.ok || !body?.workspace) {
+    throw new Error(body?.message ?? body?.error ?? `Auto Prediction initialization failed: ${res.status}`)
+  }
+  return body.workspace
+}
+
 export async function initializeChatWorkspace(): Promise<Workspace> {
   const res = await fetch('/api/workspaces/chat/initialize', { method: 'POST' })
   const body = (await res.json().catch(() => null)) as
@@ -1064,7 +1105,7 @@ export async function quickChat(
   agent?: string,
   credentialSlug?: string,
   targetWsId?: string,
-  template?: 'chat' | 'auto-quant-v2',
+  template?: 'chat' | 'auto-quant-v2' | 'auto-prediction',
   model?: string | null,
   reasoningEffort?: ModelReasoningEffort,
   credentialSource?: 'native',

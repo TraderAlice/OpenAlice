@@ -11,13 +11,14 @@ import type {
 
 export const OFFICE_REVIEW_HOLD_MS = 30_000
 export const OFFICE_DRAWER_LIMIT = 6
-export type OfficeHarness = 'chat' | 'auto-quant' | 'other'
+export type OfficeHarness = 'chat' | 'auto-quant' | 'prediction' | 'other'
 
 export const OFFICE_CONFIG = {
   workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
   harnessMinimumVisibleGroups: {
     chat: 1,
     'auto-quant': 1,
+    prediction: 1,
     other: 0,
   } satisfies Record<OfficeHarness, number>,
 } as const
@@ -180,10 +181,11 @@ export function isOfficeWorkspaceSleeping(
 export function officeHarnessForTemplate(template: string): OfficeHarness {
   if (template === 'chat') return 'chat'
   if (template === 'auto-quant-v2') return 'auto-quant'
+  if (template === 'auto-prediction') return 'prediction'
   return 'other'
 }
 
-/** Chat then Quant, then everyone else. Stable id tie-break. */
+/** Chat, Quant, Prediction, then everyone else. Stable id tie-break. */
 export function compareOfficeRooms(
   a: { readonly tag: string; readonly id: string },
   b: { readonly tag: string; readonly id: string },
@@ -191,7 +193,8 @@ export function compareOfficeRooms(
   const rank = (tag: string): number => {
     if (tag === 'chat') return 0
     if (tag === 'auto-quant') return 1
-    return 2
+    if (tag === 'prediction') return 2
+    return 3
   }
   const byKind = rank(a.tag) - rank(b.tag)
   return byKind !== 0 ? byKind : a.id.localeCompare(b.id)

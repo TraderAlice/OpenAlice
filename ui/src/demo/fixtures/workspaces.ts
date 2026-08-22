@@ -65,6 +65,7 @@ export const demoWorkspace: Workspace = {
 export const DEMO_CHAT_WORKSPACE_ID = 'demo-chat-ws'
 export const DEMO_CHAT_SESSION_ID = 'demo-chat-session'
 export const DEMO_AUTO_QUANT_WORKSPACE_ID = 'demo-ws-auto-quant'
+export const DEMO_AUTO_PREDICTION_WORKSPACE_ID = 'demo-ws-auto-prediction'
 export const DEMO_MACRO_WORKSPACE_ID = 'demo-ws-macro'
 
 // A small spread of agents + states so the sidebar shows the full session
@@ -189,6 +190,23 @@ const demoIssueWorkspaces: Workspace[] = [
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
   },
   {
+    id: DEMO_AUTO_PREDICTION_WORKSPACE_ID,
+    tag: 'prediction',
+    displayName: 'Auto Prediction',
+    dir: '/demo/workspaces/auto-prediction',
+    createdAt: new Date().toISOString(),
+    template: 'auto-prediction',
+    harnessSource: {
+      schemaVersion: 1,
+      template: 'auto-prediction',
+      repository: 'https://github.com/TraderAlice/Auto-Prediction.git',
+      version: 'snapshot-26f3ae2',
+      commit: '26f3ae2d617e115850cff6fe047f6fb54c979d20',
+    },
+    sessions: [],
+    agentOverride: { claude: false, codex: false, opencode: false, pi: false },
+  },
+  {
     id: DEMO_MACRO_WORKSPACE_ID,
     tag: 'macro-research',
     displayName: 'Macro Research',
@@ -251,7 +269,25 @@ export const autoQuantTemplate: TemplateInfo = {
   },
 }
 
-export const demoTemplates: TemplateInfo[] = [chatTemplate, autoQuantTemplate]
+export const autoPredictionTemplate: TemplateInfo = {
+  name: 'auto-prediction',
+  displayName: 'Auto Prediction',
+  description: 'Agent-native prediction-market research desk pinned to an approved Auto Prediction source snapshot.',
+  groupOrder: 30,
+  defaultAgents: ['codex', 'claude'],
+  version: 'snapshot-26f3ae2',
+  hasReadme: true,
+  source: {
+    repository: 'https://github.com/TraderAlice/Auto-Prediction.git',
+    defaultVersion: 'snapshot-26f3ae2',
+    versions: [{
+      version: 'snapshot-26f3ae2',
+      commit: '26f3ae2d617e115850cff6fe047f6fb54c979d20',
+    }],
+  },
+}
+
+export const demoTemplates: TemplateInfo[] = [chatTemplate, autoQuantTemplate, autoPredictionTemplate]
 
 // Back-compat singleton for older callers (other fixture files reference
 // `demoTemplate` and we want a stable name). Points at the flagship.

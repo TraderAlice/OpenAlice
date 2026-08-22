@@ -193,8 +193,8 @@ export const conversationAskFactory: WorkspaceToolFactory = {
           .describe('Workspace for a fresh worker, or optional scope for issueId.'),
         issueId: z.string().min(1).optional()
           .describe("Issue whose attributable creator should answer. Defaults to the current Workspace; use `issue ask --owner` for the declared owner."),
-        harness: z.enum(['chat', 'autoquant']).optional()
-          .describe('Create a fresh Session in the default `chat` or `autoquant` Workspace.'),
+        harness: z.enum(['chat', 'autoquant', 'prediction']).optional()
+          .describe('Create a fresh Session in the default Chat, AutoQuant, or Prediction Workspace.'),
       }),
       execute: async ({
         prompt,
