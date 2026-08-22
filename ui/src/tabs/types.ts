@@ -58,9 +58,9 @@ export type ViewSpec =
         issue?: string
       }
     }
-  | { kind: 'chat-landing';        params: { targetWsId?: string } }
-  | { kind: 'auto-quant-landing';  params: { targetWsId?: string } }
-  | { kind: 'auto-prediction-landing'; params: { targetWsId?: string } }
+  | { kind: 'chat-landing';        params: { targetWsId?: string; initialPrompt?: string } }
+  | { kind: 'auto-quant-landing';  params: { targetWsId?: string; initialPrompt?: string } }
+  | { kind: 'auto-prediction-landing'; params: { targetWsId?: string; initialPrompt?: string } }
   | { kind: 'harness-surface'; params: { wsId: string; capability: 'studio'; source: 'auto-quant' | 'prediction' } }
   | { kind: 'workspace-manager';   params: { sessionId?: string } }
   | {

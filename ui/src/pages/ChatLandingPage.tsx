@@ -61,7 +61,7 @@ function HarnessLandingPage({
   spec,
   mode,
 }: {
-  spec: { params: { targetWsId?: string } }
+  spec: { params: { targetWsId?: string; initialPrompt?: string } }
   mode: HarnessLandingMode
 }) {
   const { t } = useTranslation()
@@ -124,7 +124,7 @@ function HarnessLandingPage({
   // loop, so it can't be seeded with a first message).
   const cliAgents = agents.filter((a) => a.kind !== 'utility')
 
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(spec.params.initialPrompt ?? '')
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [examplePage, setExamplePage] = useState(0)
@@ -548,27 +548,27 @@ function HarnessLandingPage({
   )
 }
 
-export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
   const ctx = useWorkspaces()
   const hasChatWorkspace = ctx.workspaces.some((workspace) => workspace.template === 'chat')
   if (!hasChatWorkspace) return <ChatSetupPage />
   return <HarnessLandingPage spec={spec} mode="chat" />
 }
 
-export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
   const ctx = useWorkspaces()
   const workspace = ctx.workspaces.find((candidate) =>
     candidate.id === ctx.autoQuantDefaultWorkspaceId
     && candidate.template === 'auto-quant-v2')
   if (!workspace) return <AutoQuantSetupPage />
-  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id } }} mode="auto-quant" />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="auto-quant" />
 }
 
-export function AutoPredictionLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+export function AutoPredictionLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
   const ctx = useWorkspaces()
   const workspace = ctx.workspaces.find((candidate) =>
     candidate.id === ctx.autoPredictionDefaultWorkspaceId
     && candidate.template === 'auto-prediction')
   if (!workspace) return <AutoPredictionSetupPage />
-  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id } }} mode="prediction" />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="prediction" />
 }

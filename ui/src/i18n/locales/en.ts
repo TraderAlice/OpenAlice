@@ -1090,6 +1090,13 @@ export const en = {
     startingTitle: 'Starting Studio',
     startingBody: 'OpenAlice is assigning its private ports and waiting for the Harness readiness check.',
     failedTitle: 'Studio could not start',
+    diagnosis: {
+      'missing-dependencies': 'This Workspace does not appear to have its Studio dependencies installed yet.',
+      generic: 'The Harness process exited before its Studio passed the readiness check.',
+    },
+    studioOutput: 'Studio output',
+    setupBody: 'OpenAlice does not install a Harness silently. Open a prefilled Quick Start, review the Agent and AI configuration, then ask it to inspect the repository, install declared dependencies, and verify Studio.',
+    setupWithAgent: 'Set up with Agent',
     tryAgain: 'Try again',
     phase: { stopped: 'Stopped', starting: 'Starting…', ready: 'Ready', failed: 'Failed', stopping: 'Stopping…' },
   },

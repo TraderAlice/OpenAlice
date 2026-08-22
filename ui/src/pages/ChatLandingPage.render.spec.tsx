@@ -350,6 +350,29 @@ describe('ChatLandingPage compact-height layout', () => {
     expect(screen.getByPlaceholderText('Describe the market relationship, settlement question, or evidence gap…').className)
       .toContain('min-h-[72px]')
   })
+
+  it('prefills an Auto Prediction Quick Start without launching it', () => {
+    const predictionWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'prediction-1',
+      tag: 'prediction',
+      template: 'auto-prediction',
+    }
+    workspaces = [predictionWorkspace]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, null, predictionWorkspace.id))
+
+    render(<AutoPredictionLandingPage spec={{
+      params: {
+        targetWsId: predictionWorkspace.id,
+        initialPrompt: 'Install the declared dependencies, then verify Studio.',
+      },
+    }} />)
+
+    expect((screen.getByPlaceholderText(
+      'Describe the market relationship, settlement question, or evidence gap…',
+    ) as HTMLTextAreaElement).value).toBe('Install the declared dependencies, then verify Studio.')
+    expect(mocks.quickChat).not.toHaveBeenCalled()
+  })
 })
 
 describe('ChatLandingPage Workspace inventory states', () => {

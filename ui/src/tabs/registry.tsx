@@ -473,7 +473,7 @@ const harnessSurfaceModule: ViewModule<'harness-surface'> = {
     return `${tag ?? spec.params.wsId.slice(0, 8)} · Studio`
   },
   toUrl: (spec) => `/${spec.params.source}/workspaces/${encodeURIComponent(spec.params.wsId)}/studio`,
-  Component: ({ spec }) => <HarnessSurfacePage workspaceId={spec.params.wsId} />,
+  Component: ({ spec }) => <HarnessSurfacePage workspaceId={spec.params.wsId} source={spec.params.source} />,
 }
 
 const workspaceManagerModule: ViewModule<'workspace-manager'> = {

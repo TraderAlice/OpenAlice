@@ -1079,6 +1079,13 @@ export const ja: Resources = {
     startingTitle: 'Studio を起動しています',
     startingBody: 'OpenAlice が内部ポートを割り当て、Harness の準備完了を待っています。',
     failedTitle: 'Studio を起動できませんでした',
+    diagnosis: {
+      'missing-dependencies': 'このワークスペースには Studio に必要な依存関係がまだインストールされていないようです。',
+      generic: 'Studio が準備完了になる前に Harness プロセスが終了しました。',
+    },
+    studioOutput: 'Studio の出力',
+    setupBody: 'OpenAlice は Harness を自動ではインストールしません。タスク入力済みの Quick Start を開き、Agent と AI の設定を確認してから、リポジトリの確認、依存関係のインストール、Studio の検証を依頼してください。',
+    setupWithAgent: 'Agent でセットアップ',
     tryAgain: '再試行',
     phase: { stopped: '停止', starting: '起動中…', ready: '準備完了', failed: '失敗', stopping: '停止中…' },
   },

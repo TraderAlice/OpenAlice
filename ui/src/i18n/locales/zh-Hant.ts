@@ -1086,6 +1086,13 @@ export const zhHant: Resources = {
     startingTitle: '正在啟動 Studio',
     startingBody: 'OpenAlice 正在分配內部連接埠，並等待 Harness 通過就緒檢查。',
     failedTitle: 'Studio 啟動失敗',
+    diagnosis: {
+      'missing-dependencies': '這個工作區似乎尚未安裝 Studio 所需的相依套件。',
+      generic: 'Harness 程序在 Studio 通過就緒檢查前退出了。',
+    },
+    studioOutput: 'Studio 輸出',
+    setupBody: 'OpenAlice 不會在背景安裝 Harness。請開啟已預填任務的 Quick Start，檢查 Agent 與 AI 設定後，再讓它檢查儲存庫、安裝宣告的相依套件並驗證 Studio。',
+    setupWithAgent: '使用 Agent 完成設定',
     tryAgain: '重試',
     phase: { stopped: '已停止', starting: '正在啟動…', ready: '已就緒', failed: '失敗', stopping: '正在停止…' },
   },
