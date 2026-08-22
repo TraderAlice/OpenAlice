@@ -45,8 +45,8 @@ describe('HarnessSourceUpgradeManager', () => {
       targetVersion: plan.toVersion,
     })
     expect(result).toMatchObject({ fromVersion: 'v1.0.0', toVersion: 'v1.1.0', verified: true })
-    expect(await readFile(join(fixture.workspace, 'local.txt'), 'utf8')).toBe('local work\n')
-    expect(await readFile(join(fixture.workspace, 'feature.txt'), 'utf8')).toBe('new upstream feature\n')
+    expect(normalizeLineEndings(await readFile(join(fixture.workspace, 'local.txt'), 'utf8'))).toBe('local work\n')
+    expect(normalizeLineEndings(await readFile(join(fixture.workspace, 'feature.txt'), 'utf8'))).toBe('new upstream feature\n')
     expect(JSON.parse(await readFile(join(fixture.workspace, '.alice/harness-source.json'), 'utf8'))).toMatchObject({
       version: 'v1.1.0',
       commit: fixture.v2,
@@ -89,6 +89,10 @@ describe('HarnessSourceUpgradeManager', () => {
     })).rejects.toMatchObject({ code: 'working_tree_changes' })
   })
 })
+
+function normalizeLineEndings(value: string): string {
+  return value.replaceAll('\r\n', '\n')
+}
 
 async function createFixture(options: { catalogV2?: boolean } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'harness-source-upgrade-'))
