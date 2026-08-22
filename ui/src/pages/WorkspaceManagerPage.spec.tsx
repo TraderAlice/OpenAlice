@@ -409,12 +409,30 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(await findModelEditor('MiniMax-M2.5')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/context$/)).toBeNull()
-    expect(screen.getByRole('status').textContent).toContain('Claude Code still needs its own first-run setup')
+    expect(screen.getByRole('status').textContent).toContain('Claude still needs its own first-run setup')
     expect(mocks.listAgentCredentials).toHaveBeenCalledWith('claude')
     expect(mocks.getAgentReadiness).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Adjust workspace AI' }))
     expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'claude', 'ai')
+  })
+
+  it('names Grok Build in the native first-run trust gate', async () => {
+    mocks.useWorkspaces.mockImplementation(() => context('grok'))
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: false,
+      slug: null,
+      model: null,
+      contextWindow: null,
+      wireShape: null,
+      interactiveSetupStatus: 'workspace-trust-required',
+    })
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent).toContain('Grok Build will ask you to trust this workspace')
+    expect(notice.textContent).not.toContain('Claude')
   })
 
   it('shows and launches the Manager workspace model/context from the shared config', async () => {

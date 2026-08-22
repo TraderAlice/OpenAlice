@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentLaunchConfigState } from '../../hooks/useAgentLaunchConfig'
 import { i18n } from '../../i18n'
 import type { AgentInfo, SavedCredential } from './api'
-import { AgentLaunchSelectors } from './AgentLaunchControls'
+import { AgentLaunchDetails, AgentLaunchSelectors } from './AgentLaunchControls'
 
 vi.mock('../../hooks/useAgentRuntimes', () => ({
   useAgentRuntimes: () => ({
@@ -359,5 +359,48 @@ describe('AgentLaunchSelectors keyboard menus', () => {
     await user.type(input, 'private-model-1')
     await user.click(screen.getByRole('button', { name: i18n.t('common.save') }))
     expect(selectModel).toHaveBeenCalledWith('private-model-1')
+  })
+})
+
+describe('AgentLaunchDetails setup notices', () => {
+  it('names the selected runtime instead of Claude Code', () => {
+    const grok: AgentInfo = {
+      id: 'grok',
+      displayName: 'Grok Build',
+      installed: true,
+      capabilities: {
+        parallelPerCwd: true,
+        resumeLast: true,
+        resumeById: true,
+        transcriptDiscovery: 'subprocess',
+      },
+    }
+    render(
+      <AgentLaunchDetails
+        config={launchConfig({
+          effectiveAgent: 'grok',
+          selectedAgent: grok,
+          needsCredential: false,
+          accessMode: 'native',
+          credentials: [],
+          effectiveCredential: null,
+          credential: null,
+          detectedCredential: {
+            configured: false,
+            slug: null,
+            model: null,
+            contextWindow: null,
+            wireShape: null,
+            interactiveSetupStatus: 'workspace-trust-required',
+          },
+          launchCredentialSlug: undefined,
+        })}
+        hasWorkspaceTarget
+      />,
+    )
+
+    const notice = screen.getByRole('status')
+    expect(notice.textContent).toContain('Grok Build will ask you to trust this workspace')
+    expect(notice.textContent).not.toContain('Claude')
   })
 })

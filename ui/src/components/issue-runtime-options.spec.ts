@@ -4,6 +4,7 @@ import type { Preset } from '../api'
 import type { SavedCredential } from './workspace/api'
 import { AGY_FIRST_PARTY_MODEL_IDS } from '../lib/agy-models'
 import { CURSOR_FIRST_PARTY_MODEL_IDS } from '../lib/cursor-models'
+import { GROK_FIRST_PARTY_MODEL_IDS } from '../lib/grok-models'
 import {
   issueEffortOptions,
   issueModelOptions,
@@ -105,9 +106,48 @@ describe('Issue runtime options', () => {
       modelKnown: true,
     })).toEqual([])
     expect(issueEffortOptions({ agent: 'grok', semantics: null, modelKnown: false }))
-      .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+      .toEqual(['low', 'medium', 'high', 'xhigh'])
+    expect(issueEffortOptions({
+      agent: 'grok',
+      semantics: null,
+      modelKnown: false,
+      model: 'custom-gateway-model',
+    })).toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(issueEffortOptions({ agent: 'omp', semantics: null, modelKnown: false }))
       .toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+  })
+
+  it('suggests Grok Build CLI ids on native login and keeps vault catalogs intact', () => {
+    expect(issueModelOptions({
+      agent: 'grok',
+      credential: null,
+      defaultModel: null,
+      presets,
+    }).map((model) => model.id)).toEqual([...GROK_FIRST_PARTY_MODEL_IDS])
+    const native = issueModelOptions({
+      agent: 'grok',
+      credential: null,
+      defaultModel: null,
+      presets,
+    })
+    expect(issueEffortOptions({
+      agent: 'grok',
+      semantics: issueModelSemantics('grok-4.6', native),
+      modelKnown: true,
+      model: 'grok-4.6',
+    })).toEqual(['low', 'medium', 'high', 'xhigh'])
+    expect(issueEffortOptions({
+      agent: 'grok',
+      semantics: issueModelSemantics('grok-4.5', native),
+      modelKnown: true,
+      model: 'grok-4.5',
+    })).toEqual(['low', 'medium', 'high'])
+    expect(issueModelOptions({
+      agent: 'grok',
+      credential: deepSeek,
+      defaultModel: 'deepseek-v4-flash',
+      presets,
+    }).map((model) => model.id)).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash'])
   })
 
   it('suggests Antigravity first-party Gemini slugs even when a vault catalog is bound', () => {

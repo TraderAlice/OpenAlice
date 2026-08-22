@@ -1453,6 +1453,9 @@ export const workspacesHandlers = [
       reasoningEffort: configured ? config?.reasoningEffort ?? null : null,
       reasoningMode: null,
       reasoningDefaultEnabled: null,
+      ...(agent === 'grok' && !configured
+        ? { interactiveSetupStatus: 'workspace-trust-required' as const }
+        : {}),
     })
   }),
   http.put('/api/workspaces/:id/agent-config/:agent', async ({ params, request }) => {

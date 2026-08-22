@@ -686,6 +686,7 @@ export function useAgentLaunchConfig({
     agent: effectiveAgent,
     semantics: selectedModelSemantics,
     modelKnown: selectedModelSemantics !== null,
+    model: effectiveModel,
   })
   const aiDetails = launchModel || launchReasoningEffort
     ? {

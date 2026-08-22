@@ -183,6 +183,7 @@ export const MODEL_SEMANTICS_BY_VENDOR: Registry = {
       },
     },
     'grok-4.5': {
+      contextWindow: 500_000,
       reasoning: {
         mode: 'required',
         efforts: ['low', 'medium', 'high'],
