@@ -409,12 +409,66 @@ describe('WorkspaceManagerPage runtime selection', () => {
     expect(await findModelEditor('MiniMax-M2.5')).toBeTruthy()
     expect(screen.queryByText('Saved in this workspace')).toBeNull()
     expect(screen.queryByText(/context$/)).toBeNull()
-    expect(screen.getByRole('status').textContent).toContain('Claude Code still needs its own first-run setup')
+    expect(screen.getByRole('status').textContent).toContain('Claude still needs its own first-run setup')
     expect(mocks.listAgentCredentials).toHaveBeenCalledWith('claude')
     expect(mocks.getAgentReadiness).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Adjust workspace AI' }))
     expect(mocks.openAgentConfig).toHaveBeenCalledWith('workspace-manager', 'claude', 'ai')
+  })
+
+  it('names Grok Build in the native first-run trust gate', async () => {
+    mocks.useWorkspaces.mockImplementation(() => context('grok'))
+    mocks.detectWorkspaceCredential.mockResolvedValue({
+      configured: false,
+      slug: null,
+      model: null,
+      contextWindow: null,
+      wireShape: null,
+      interactiveSetupStatus: 'workspace-trust-required',
+    })
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent).toContain('Grok Build will ask you to trust this workspace')
+    expect(notice.textContent).not.toContain('Claude')
+  })
+
+  it('keeps the inherited Vault catalog when Grok was not explicitly reselected', async () => {
+    mocks.useWorkspaces.mockImplementation(() => context('grok'))
+    mocks.listAgentCredentials.mockResolvedValue([{
+      slug: 'openrouter-1',
+      label: 'OpenRouter',
+      vendor: 'openrouter',
+      authType: 'api-key',
+      wires: { 'openai-chat': 'https://openrouter.ai/api/v1' },
+      resolvedModel: 'anthropic/claude-sonnet-4.6',
+    }])
+    mocks.getQuickChat.mockResolvedValue({
+      lastCredentialByAgent: { grok: 'openrouter-1' },
+      recentChatWorkspaceId: null,
+    })
+    mocks.getPresets.mockResolvedValue({
+      presets: [{
+        id: 'openrouter',
+        label: 'OpenRouter',
+        models: [
+          { id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
+          { id: 'openai/gpt-5.6', label: 'GPT 5.6' },
+        ],
+      }],
+    })
+
+    render(<WorkspaceManagerPage spec={{ kind: 'workspace-manager', params: {} }} />)
+
+    expect(await findModelEditor('anthropic/claude-sonnet-4.6')).toBeTruthy()
+    await waitFor(() => {
+      const options = [...document.querySelectorAll('datalist option')]
+        .map((option) => option.getAttribute('value'))
+      expect(options).toEqual(['anthropic/claude-sonnet-4.6', 'openai/gpt-5.6'])
+      expect(options).not.toContain('grok-4.6')
+    })
   })
 
   it('shows and launches the Manager workspace model/context from the shared config', async () => {

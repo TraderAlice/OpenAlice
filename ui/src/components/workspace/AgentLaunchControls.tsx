@@ -664,11 +664,12 @@ export function AgentLaunchDetails({
     }
   }
 
+  const runtimeName = config.selectedAgent?.displayName.trim() || t('chatLanding.runtimeFallback')
   const setupStatus = config.detectedCredential?.interactiveSetupStatus
   const setupNotice = setupStatus === 'runtime-onboarding-required'
-    ? t('chatLanding.claudeOnboardingRequired')
+    ? t('chatLanding.runtimeOnboardingRequired', { runtime: runtimeName })
     : setupStatus === 'workspace-trust-required'
-      ? t('chatLanding.claudeWorkspaceTrustRequired')
+      ? t('chatLanding.runtimeWorkspaceTrustRequired', { runtime: runtimeName })
       : null
 
   if (scope === null && setupNotice === null) return null
