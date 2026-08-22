@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetAgentRuntimesStore } from '../../hooks/useAgentRuntimes'
 import { i18n } from '../../i18n'
 import { WorkspaceAIPreferencesPanel } from './WorkspaceAIPreferencesPanel'
 import type { AgentInfo, Workspace } from './api'
@@ -65,6 +66,7 @@ const workspace: Workspace = {
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('zh')
   mocks.listAgentCredentials.mockResolvedValue([{ slug: 'deepseek-1', vendor: 'deepseek', authType: 'api-key', label: 'DeepSeek API' }])
   mocks.updateWorkspaceRuntimeDefaults.mockResolvedValue(workspace)

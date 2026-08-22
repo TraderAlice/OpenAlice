@@ -17,7 +17,7 @@ vi.mock('../api', () => ({
 
 const customLayout = {
   ...defaultUiLayout(),
-  hidden: ['dev', 'news'] as const,
+  hidden: ['dev', 'market'] as const,
 }
 
 beforeEach(() => {
@@ -42,7 +42,7 @@ describe('useUiLayout', () => {
     expect(result.current.loading).toBe(true)
     expect(result.current.layout.hidden).toContain('dev')
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(result.current.layout.hidden).toEqual(['dev', 'news'])
+    expect(result.current.layout.hidden).toEqual(['dev', 'market'])
     expect(result.current.error).toBeNull()
   })
 

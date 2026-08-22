@@ -6,12 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createIssue } from './mutate.js'
 import {
+  createConnectorDesk,
   createTelegramConnectorDesk,
   disableTelegramConnectorDesk,
+  findConnectorDesks,
   findTelegramConnectorDesks,
   TELEGRAM_CONNECTOR_ISSUE_ID,
   updateTelegramConnectorDesk,
-} from './telegram-connector.js'
+} from './connector-desk.js'
 
 let home: string
 let wsA: string
@@ -33,7 +35,7 @@ describe('telegram connector desk', () => {
   it('refuses the flag on the generic create path', async () => {
     const created = await createIssue(wsA, {
       title: 'Sneak',
-      telegramConnector: true,
+      connectorDesk: 'telegram',
       when: { kind: 'every', every: '4h' },
     })
     expect(created).toMatchObject({
@@ -53,7 +55,7 @@ describe('telegram connector desk', () => {
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.issue.id).toBe(TELEGRAM_CONNECTOR_ISSUE_ID)
-    expect(first.issue.telegramConnector).toBe(true)
+    expect(first.issue.connectorDesk).toBe('telegram')
     expect(first.issue.commentPrompt).toBe('{comment}')
 
     const second = await createTelegramConnectorDesk(
@@ -79,7 +81,7 @@ describe('telegram connector desk', () => {
     const disabled = await disableTelegramConnectorDesk(wsA, created.issue.id)
     expect(disabled.ok).toBe(true)
     if (!disabled.ok) return
-    expect(disabled.issue.telegramConnector).toBeUndefined()
+    expect(disabled.issue.connectorDesk).toBeUndefined()
     expect(disabled.issue.status).toBe('canceled')
     expect(await findTelegramConnectorDesks([{ id: 'ws-a', dir: wsA }])).toEqual([])
   })
@@ -100,7 +102,7 @@ describe('telegram connector desk', () => {
     expect(revived.ok).toBe(true)
     if (!revived.ok) return
     expect(revived.issue.id).toBe(TELEGRAM_CONNECTOR_ISSUE_ID)
-    expect(revived.issue.telegramConnector).toBe(true)
+    expect(revived.issue.connectorDesk).toBe('telegram')
     expect(revived.issue.status).toBe('todo')
     expect(revived.issue.commentPrompt).toBe('{comment}')
   })
@@ -135,7 +137,7 @@ describe('telegram connector desk', () => {
     expect(updated).toMatchObject({
       ok: false,
       reason: 'invalid',
-      error: 'Unsupported Telegram phone-desk cadence: 3h',
+      error: 'Unsupported phone-desk cadence: 3h',
     })
   })
 
@@ -148,5 +150,26 @@ telegramConnector: false
 x
 `)
     expect(await findTelegramConnectorDesks([{ id: 'ws-a', dir: wsA }])).toEqual([])
+  })
+
+  it('allows one desk per connector at the same time', async () => {
+    const telegram = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsA },
+      [{ id: 'ws-a', dir: wsA }, { id: 'ws-b', dir: wsB }],
+    )
+    const other = await createConnectorDesk(
+      'feishu',
+      'Feishu',
+      { id: 'ws-b', dir: wsB },
+      [{ id: 'ws-a', dir: wsA }, { id: 'ws-b', dir: wsB }],
+    )
+    expect(telegram.ok).toBe(true)
+    expect(other.ok).toBe(true)
+    if (!telegram.ok || !other.ok) return
+    expect(telegram.issue.connectorDesk).toBe('telegram')
+    expect(other.issue.connectorDesk).toBe('feishu')
+    expect(other.issue.id).toBe('feishu-phone-desk')
+    const all = await findConnectorDesks([{ id: 'ws-a', dir: wsA }, { id: 'ws-b', dir: wsB }])
+    expect(all.map((desk) => desk.connectorId).sort()).toEqual(['feishu', 'telegram'])
   })
 })

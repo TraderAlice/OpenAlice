@@ -64,7 +64,9 @@ export function WorkspacePage({ spec, visible }: Props) {
     // entry points to the targeted composer, which owns runtime + credential
     // selection.
     openOrFocus({
-      kind: source === 'auto-quant' ? 'auto-quant-landing' : 'chat-landing',
+      kind: source === 'auto-quant'
+        ? 'auto-quant-landing'
+        : source === 'prediction' ? 'auto-prediction-landing' : 'chat-landing',
       params: { targetWsId: wsId },
     })
   }

@@ -238,6 +238,8 @@ Read the relevant guide before editing its subsystem:
   delivery modes, promotions, external contributions, and risk gates.
 - [[docs/managed-workspace-runtime.md]] — [Managed Workspace runtime](docs/managed-workspace-runtime.md): Electron
   packaging, managed Pi, PortableGit/Bash, runtime profiles, and Workspace PATH.
+- [[docs/harness-web-surfaces.md]] — [Harness web surfaces](docs/harness-web-surfaces.md): Harness
+  manifests, managed Studio ports, readiness, routing, transport, lifecycle, and embedding.
 - [[docs/model-semantics-and-runtime-injection.md]] — [Model semantics and runtime injection](docs/model-semantics-and-runtime-injection.md):
   credential access, model/effort semantics, Workspace-local defaults, and
   one-run native CLI overrides.

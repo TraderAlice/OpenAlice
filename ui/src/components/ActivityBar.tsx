@@ -22,10 +22,10 @@ function activitySectionFor(page: Page): ActivitySection {
   switch (page) {
     case 'chat':                 return 'chat'
     case 'auto-quant':           return 'auto-quant'
+    case 'prediction':           return 'prediction'
     case 'inbox':                return 'inbox'
     case 'tracked':              return 'tracked'
     case 'workspaces':           return 'workspaces'
-    case 'trading-as-git':       return 'trading-as-git'
     case 'connectors':           return 'connectors'
     case 'settings':             return 'settings'
     case 'dev':                  return 'dev'
@@ -34,7 +34,6 @@ function activitySectionFor(page: Page): ActivitySection {
     case 'issue':                return 'issue'
     case 'automation':           return 'automation'
     case 'office':               return 'office'
-    case 'news':                 return 'news'
   }
 }
 
@@ -223,7 +222,7 @@ export function ActivityBar({
                               {unreadInbox > 99 ? '99+' : unreadInbox}
                             </span>
                           )}
-                          {item.page === 'trading-as-git' && pendingPush > 0 && (
+                          {item.page === 'portfolio' && pendingPush > 0 && (
                             <span
                               aria-label={t('nav.pendingPush', { count: pendingPush })}
                               className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center ${

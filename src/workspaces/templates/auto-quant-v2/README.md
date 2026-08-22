@@ -20,8 +20,10 @@ conversation, Inbox, market-data tools, and optional UTA access around the
 desk. It does not reproduce AutoQuant's Project, Study, Session, Run, Report,
 or Dossier lifecycle.
 
-The default supported source is AutoQuant V2 `v0.9.31` at commit
-`adc6363a7af5a9105811735973d4d5cfac58cf36`. The exact upstream source is
+The default supported source is AutoQuant V2 `v0.9.34` at commit
+`52d63148d826e6c35d48c3167d95a4cc7a4eb6c4`, the first pinned release whose
+generic v1 managed Studio command is directly runnable from a prepared source
+Workspace under an ordinary supervisor PATH. The exact upstream source is
 recorded in `.alice/harness-source.json`; the Workspace itself starts a fresh
 research branch at that commit while retaining AutoQuant's upstream history and
 `origin` remote for later Coding Agent-managed fetches and merges.
@@ -31,7 +33,8 @@ research branch at that commit while retaining AutoQuant's upstream history and
 The Coding Agent should:
 
 1. read the repository's `AGENTS.md`;
-2. install the declared Python 3.11/`uv` environment when it is missing;
+2. prepare the declared Python 3.11 environment with `uv sync --frozen` when it
+   is missing;
 3. run `uv run aq project list .`, `uv run aq validate .`, and
    `uv run aq orient . --json`;
 4. clarify caller-owned ambiguity through ordinary conversation;

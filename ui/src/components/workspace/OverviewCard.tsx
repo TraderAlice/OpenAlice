@@ -53,6 +53,7 @@ export function OverviewCard({
 }: Props) {
   const { t } = useTranslation()
   const w = workspace
+  const upgradeVersion = w.upgradeAvailable?.to.replace(/^v(?=\d)/, '') ?? ''
   const label = workspaceDisplayName(w)
   const hasRunning = w.sessions.some((s) => s.state === 'running')
   const previewSessions = w.sessions.slice(0, SESSION_PREVIEW_LIMIT)
@@ -106,12 +107,12 @@ export function OverviewCard({
               disabled={!onUpgrade}
               title={t('workspace.templateUpgrade', {
                 from: w.upgradeAvailable.from,
-                to: w.upgradeAvailable.to,
+                to: upgradeVersion,
               })}
-              className="oa-pressable pointer-events-auto flex min-h-10 shrink-0 items-center gap-1 rounded border border-primary/40 px-1.5 py-0.5 text-[10px] font-medium text-primary transition-colors hover:border-primary/80 hover:bg-primary/10 disabled:cursor-default disabled:hover:border-primary/40 disabled:hover:bg-transparent sm:min-h-0"
+              className={`oa-pressable pointer-events-auto flex min-h-10 shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors sm:min-h-0 ${w.upgradeAvailable.verified === false ? 'border border-warning/50 text-warning hover:bg-warning/10' : 'border border-primary/40 text-primary hover:border-primary/80 hover:bg-primary/10'}`}
             >
               <ArrowUpCircle size={10} strokeWidth={2.25} />
-              <span>v{w.upgradeAvailable.to}</span>
+              <span>v{upgradeVersion}</span>
             </button>
           )}
         </div>

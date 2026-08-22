@@ -57,7 +57,7 @@ describe('UTA — Alpaca order lifecycle', () => {
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     console.log(`  pushed: submitted=${pushResult.submitted.length}, status=${pushResult.submitted[0]?.status}`)
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
@@ -68,7 +68,7 @@ describe('UTA — Alpaca order lifecycle', () => {
     // Cancel the order
     uta!.stageCancelOrder({ orderId })
     uta!.commit('e2e: cancel limit order')
-    const cancelPush = await uta!.push()
+    const cancelPush = await uta!.push(uta!.status().pendingHash!)
     console.log(`  cancel pushed: submitted=${cancelPush.submitted.length}, status=${cancelPush.submitted[0]?.status}`)
     expect(cancelPush.submitted).toHaveLength(1)
 
@@ -146,7 +146,7 @@ describe('UTA — Alpaca TPSL bracket', () => {
       stopLoss: { price: '1' },
     })
     uta!.commit('e2e: buy AAPL with TPSL')
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     expect(pushResult.submitted).toHaveLength(1)
     const orderId = pushResult.submitted[0].orderId!
     console.log(`  TPSL bracket: orderId=${orderId}`)
@@ -167,7 +167,7 @@ describe('UTA — Alpaca TPSL bracket', () => {
     // Clean up — cancel the bracket legs then close position
     uta!.stageClosePosition({ aliceId, qty: '1' })
     uta!.commit('e2e: close TPSL AAPL')
-    await uta!.push()
+    await uta!.push(uta!.status().pendingHash!)
   }, 30_000)
 })
 
@@ -202,7 +202,7 @@ describe('UTA — Alpaca fill flow (AAPL)', () => {
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     console.log(`  pushed: submitted=${pushResult.submitted.length}, status=${pushResult.submitted[0]?.status}`)
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
@@ -227,7 +227,7 @@ describe('UTA — Alpaca fill flow (AAPL)', () => {
     // === Close 1 AAPL ===
     uta!.stageClosePosition({ aliceId, qty: '1' })
     uta!.commit('e2e: close 1 AAPL')
-    const closePush = await uta!.push()
+    const closePush = await uta!.push(uta!.status().pendingHash!)
     console.log(`  close pushed: status=${closePush.submitted[0]?.status}`)
     expect(closePush.submitted).toHaveLength(1)
 

@@ -65,7 +65,9 @@ export function FileViewerPage({ spec }: Props) {
     setSidebar(
       source === 'chat'
         ? 'chat'
-        : source === 'auto-quant' ? 'auto-quant' : 'workspaces',
+        : source === 'auto-quant'
+          ? 'auto-quant'
+          : source === 'prediction' ? 'prediction' : 'workspaces',
     )
     openOrFocus({
       kind: 'workspace',

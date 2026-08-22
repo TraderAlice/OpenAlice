@@ -143,6 +143,7 @@ describe('projectOfficeFloor', () => {
   it('maps Workspace templates into Harness offices', () => {
     expect(officeHarnessForTemplate('chat')).toBe('chat')
     expect(officeHarnessForTemplate('auto-quant-v2')).toBe('auto-quant')
+    expect(officeHarnessForTemplate('auto-prediction')).toBe('prediction')
     expect(officeHarnessForTemplate('custom')).toBe('other')
   })
 
@@ -190,12 +191,13 @@ describe('projectOfficeFloor', () => {
     ])
   })
 
-  it('orders chat then auto-quant then other rooms', () => {
+  it('orders chat then auto-quant then prediction then other rooms', () => {
     const rooms = [
       { id: 'q', tag: 'auto-quant' },
+      { id: 'p', tag: 'prediction' },
       { id: 'x', tag: 'research' },
       { id: 'c', tag: 'chat' },
     ].sort(compareOfficeRooms)
-    expect(rooms.map((room) => room.tag)).toEqual(['chat', 'auto-quant', 'research'])
+    expect(rooms.map((room) => room.tag)).toEqual(['chat', 'auto-quant', 'prediction', 'research'])
   })
 })

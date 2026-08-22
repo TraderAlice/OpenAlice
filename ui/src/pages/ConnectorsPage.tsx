@@ -368,8 +368,12 @@ export function ConnectorsPage() {
                         t={t}
                       />
 
-                      {definition.id === 'telegram' && (
-                        <TelegramDeskPanel linked={setup.linked} />
+                      {definition.capabilities?.includes('desk') && (
+                        <TelegramDeskPanel
+                          connectorId={definition.id}
+                          label={definition.label}
+                          linked={setup.linked}
+                        />
                       )}
 
                       {lastProbe?.connectorId === definition.id && (

@@ -170,7 +170,7 @@ describe('InboxPage deletion', () => {
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Couldn’t delete this Inbox entry. It is still available. Try again.',
     )
-    expect(screen.getByText(entry.comments)).toBeTruthy()
+    expect(document.querySelector('[data-markdown-variant="reading"]')?.textContent).toContain(entry.comments)
     expect(screen.getByText('Delete Inbox entry?')).toBeTruthy()
     expect(useInboxSelection.getState().selectedEntryId).toBe(entry.id)
 
@@ -247,5 +247,91 @@ describe('InboxPage responsive detail header', () => {
     const deleteEntry = screen.getByRole('button', { name: 'Delete this inbox entry' })
     expect(deleteEntry.className).toContain('h-10')
     expect(deleteEntry.className).toContain('w-10')
+  })
+})
+
+describe('InboxPage editorial reading surface', () => {
+  it('leads with a concise subject and keeps the exact comments in a reading measure', async () => {
+    const omittedTail = 'DETAIL_BODY_TAIL_MARKER'
+    const comments = [
+      '# Close report',
+      '',
+      'The book is flat after the trim.',
+      '',
+      `${'More analysis of the tape and the book. '.repeat(6)}${omittedTail}`,
+    ].join('\n')
+    const entry = {
+      id: 'inbox-reading',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments,
+      docs: [{ path: 'research/close-report.md' }],
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({
+      entries: [entry],
+      hasMore: false,
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    const article = await screen.findByRole('article')
+    expect(article.className).toContain('max-w-[46rem]')
+    expect(article.className).not.toMatch(/rounded-(xl|lg)|border-border/)
+    expect(screen.getAllByRole('heading', { name: 'Close report' })[0]?.tagName).toBe('H1')
+    const body = document.querySelector('[data-markdown-variant="reading"]')
+    expect(body?.textContent).toContain('The book is flat after the trim.')
+    expect(body?.textContent).toContain(omittedTail)
+    expect(body?.querySelector('.markdown-content--reading')).toBeTruthy()
+    expect(body?.closest('.inbox-report-body--repeats-heading')).toBeTruthy()
+
+    const attachments = screen.getByRole('heading', { name: /Attachments/ })
+    expect(attachments.tagName).toBe('H2')
+    expect(attachments.closest('section')?.className).toContain('border-t')
+  })
+
+  it('keeps a long source heading complete above the report body', async () => {
+    const heading = 'A deliberately long close report heading that remains complete in the reading pane'
+    const entry = {
+      id: 'inbox-long-heading',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: `# ${heading}\n\nThe book is flat.`,
+      docs: [],
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({ entries: [entry], hasMore: false })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    await screen.findAllByRole('heading', { level: 1, name: heading })
+    expect(document.querySelector('article > header h1')?.textContent).toBe(heading)
+    expect(document.querySelector('.inbox-report-body--repeats-heading')).toBeTruthy()
+  })
+
+  it('names attachment-only and empty updates without inventing a report body', async () => {
+    const entry = {
+      id: 'inbox-empty',
+      ts: Date.now(),
+      workspaceId: 'ws-1',
+      workspaceLabel: 'research',
+      comments: '   ',
+      docs: [{ path: 'research/close-report.md' }, { path: 'notes/context.txt' }],
+    }
+    vi.spyOn(api.inbox, 'history').mockResolvedValue({
+      entries: [entry],
+      hasMore: false,
+    })
+    useInboxSelection.getState().select(entry.id)
+
+    render(<InboxPage visible />)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'close-report.md · +1 more' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Update without a summary' })).toBeNull()
+    expect(screen.getByRole('heading', { name: /Attachments/ })).toBeTruthy()
+    expect(screen.getByText('close-report.md')).toBeTruthy()
+    expect(screen.getByText('context.txt')).toBeTruthy()
   })
 })

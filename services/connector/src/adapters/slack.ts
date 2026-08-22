@@ -12,7 +12,12 @@ import type {
   ConnectorAdapterRegistration,
 } from '../core/adapter.js'
 import {
+  DIRECT_CONNECTOR_PROXY_TRANSPORT,
+  type ConnectorProxyTransport,
+} from '../core/proxy.js'
+import {
   AdapterHealthTracker,
+  classifyNetworkStartFailure,
   decodeInboxAttachments,
   formatInboxNotification,
 } from './shared.js'
@@ -24,9 +29,13 @@ export class SlackConnectorAdapter implements ConnectorAdapter {
   private web?: WebClient
   private socket?: SocketModeClient
   private ownerUserId?: string
+  private readonly proxy: ConnectorProxyTransport
 
-  constructor(options: { startupTimeoutMs?: number } = {}) {
+  classifyStartFailure = classifyNetworkStartFailure
+
+  constructor(options: { startupTimeoutMs?: number; proxy?: ConnectorProxyTransport } = {}) {
     this.startupTimeoutMs = options.startupTimeoutMs ?? 15_000
+    this.proxy = options.proxy ?? DIRECT_CONNECTOR_PROXY_TRANSPORT
   }
 
   async start(config: ConnectorAdapterConfig, context: ConnectorAdapterContext): Promise<void> {
@@ -41,7 +50,10 @@ export class SlackConnectorAdapter implements ConnectorAdapter {
 
       this.registerCommands(context)
       const web = new WebClient(botToken)
-      const socket = new SocketModeClient({ appToken })
+      const socket = new SocketModeClient({
+        appToken,
+        ...(this.proxy.dispatcher ? { dispatcher: this.proxy.dispatcher } : {}),
+      })
       this.web = web
       this.socket = socket
 
@@ -170,6 +182,10 @@ export class SlackConnectorAdapter implements ConnectorAdapter {
       if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
       await reply('Slack settings buttons are not implemented yet. Change Inbox push in OpenAlice → Settings → Connectors.')
     })
+    context.commands.register('uta', async ({ userId, reply }) => {
+      if (!this.isOwner(userId)) return reply('This command is only available to the linked owner.')
+      await reply('UTA review buttons are not implemented for Slack yet. Approve pending trades in OpenAlice → Trading as Git.')
+    })
   }
 
   private async openOwnerDm(): Promise<string> {
@@ -192,8 +208,10 @@ export class SlackConnectorAdapter implements ConnectorAdapter {
   }
 }
 
-export function slackConnectorRegistration(): ConnectorAdapterRegistration {
-  return { definition: SLACK_CONNECTOR_DEFINITION, create: () => new SlackConnectorAdapter() }
+export function slackConnectorRegistration(
+  proxy: ConnectorProxyTransport = DIRECT_CONNECTOR_PROXY_TRANSPORT,
+): ConnectorAdapterRegistration {
+  return { definition: SLACK_CONNECTOR_DEFINITION, create: () => new SlackConnectorAdapter({ proxy }) }
 }
 
 export function isSlackDirectMessage(channelId: string | undefined): boolean {

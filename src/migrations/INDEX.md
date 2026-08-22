@@ -13,3 +13,4 @@ Each row below corresponds to an active migration in `src/migrations/`. The runn
 |----|-------------|------|---------|---------|
 | `0039_workspace_session_runtime_bindings` | 0.89.3-beta | 2026-08-11 | workspaces/state/resume-identities.json, workspaces/state/workspace-manager-sessions/*.json, workspaces/workspaces/*/.alice/sessions/*.json, workspaces/departed-workspaces/*/.alice/sessions/*.json | Move 0.89.2 Session AI bindings from the launcher identity registry into their owning Workspaces. |
 | `0040_unified_session_records` | 0.89.4-beta | 2026-08-15 | workspaces/state/resume-identities.json, workspaces/state/headless-tasks.json, workspaces/state/sessions/*.json | Give every non-purged resume identity one persistent Session roster record, including headless-born conversations. |
+| `0041_connector_desk_flag` | 0.89.5-beta | 2026-08-19 | workspaces/*/.alice/issues/*.md | Rewrite shipped telegramConnector: true Issue flags to connectorDesk: telegram. |

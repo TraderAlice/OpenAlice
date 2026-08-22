@@ -66,7 +66,7 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     console.log(`  pushed: submitted=${pushResult.submitted.length}, rejected=${pushResult.rejected.length}, status=${pushResult.submitted[0]?.status}`)
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
@@ -95,7 +95,7 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     // === Stage + Commit + Push: close 0.01 ETH ===
     uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
     uta!.commit('e2e: close 0.01 ETH')
-    const closePush = await uta!.push()
+    const closePush = await uta!.push(uta!.status().pendingHash!)
     console.log(`  close pushed: submitted=${closePush.submitted.length}, status=${closePush.submitted[0]?.status}`)
     expect(closePush.submitted).toHaveLength(1)
 
@@ -211,7 +211,7 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
       stopLoss: { price: String(slPrice) },
     })
     uta!.commit('e2e: buy ETH with TPSL')
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     expect(pushResult.submitted).toHaveLength(1)
     const orderId = pushResult.submitted[0].orderId!
     console.log(`  TPSL: orderId=${orderId}, tp=${tpPrice}, sl=${slPrice}`)
@@ -232,6 +232,6 @@ describe('UTA — Bybit lifecycle (ETH perp)', () => {
     // Clean up
     uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
     uta!.commit('e2e: close TPSL')
-    await uta!.push()
+    await uta!.push(uta!.status().pendingHash!)
   }, 60_000)
 })

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ActivityBar } from './components/ActivityBar'
+import { ActivityToasts } from './components/ActivityToasts'
 import { MobileContextBar } from './components/MobileContextBar'
 import { TabHost } from './components/TabHost'
 import { DesktopUpdatePrompt } from './components/DesktopUpdatePrompt'
@@ -20,9 +21,8 @@ import { useLocale } from './i18n/useLocale'
  * Each maps to one or more tab kinds via tabs/registry.ts (defaultSpecForActivity).
  */
 export type Page =
-  | 'chat' | 'auto-quant' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'news' | 'office' | 'automation' | 'market'
+  | 'chat' | 'auto-quant' | 'prediction' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'office' | 'automation' | 'market'
   | 'issue'
-  | 'trading-as-git'
   | 'connectors'
   | 'settings' | 'dev'
 
@@ -131,6 +131,7 @@ function AppShellContent() {
           {mainContent}
         </div>
         <UrlAdopter />
+        <ActivityToasts />
         {showFirstRunGuide && (
           <Suspense fallback={null}>
             <FirstRunGuide />

@@ -104,7 +104,11 @@ explicit commands. Its ordinary path is intentionally parameter-free:
   confirmation;
 - `l` reads the bounded, redacted log tail;
 - `d` runs read-only Doctor checks;
-- `u` performs an advisory product-update check;
+- `u` checks for a product update and, when one is available, can install it
+  after explicit confirmation through the same verified atomic installer path as
+  `openalice update --yes`. After a successful in-TUI install, the running
+  Supervisor is still the previous CLI and does not reload; the user must exit
+  and run `openalice` again;
 - `i` lists the implicit default plus registered AliceProjects, selects one
   without stopping another project, or creates a separate named complete home.
   AI vault copy is a separate command: `openalice project copy-ai-creds`;
@@ -119,7 +123,8 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web
 and agent sessions will disconnect. Detaching never implies stopping. Update
-discovery runs in the background and cannot block lifecycle controls.
+discovery runs in the background and cannot block lifecycle controls. Discovery
+never installs; only a confirmed `u` action may invoke the installer.
 
 The installed Runtime is the default provider below stored configuration and
 above cwd discovery. TUI start therefore works from any directory and shows a
@@ -158,6 +163,24 @@ resolver retains field provenance for every layer. Before terminal raw mode,
 the Supervisor reads a versioned machine-local document at
 `<Supervisor root>/config.json`. It contains machine defaults and an
 AliceProject map outside every selectable complete home.
+
+Bare `openalice` and flag-less `openalice tui` must still open a machine-level
+Supervisor shell when that document cannot be parsed. Config recovery explains
+that AliceProject configuration cannot be read and may require a newer
+OpenAlice. It does not inspect, start, open, stop, restart, or configure a
+guessed project; only help and the confirmed update path remain. Explicit
+`--project`, `--instance`, or `--home` still fail rather than silently targeting
+another home. Config recovery itself never inspects those homes. An unavailable
+registered Home still fails when an environment or flag selection is explicit,
+because that path would otherwise start a different project.
+
+The current schema (`schemaVersion: 2`) preserves additive unknown fields
+through parse and write so a later OpenAlice can add keys without being
+stripped by an older Supervisor save. Invalid known fields still fail. A
+genuinely newer `schemaVersion` is detected before unknown-field handling and
+reported as a distinct newer-schema error. Released v1 documents still
+canonicalize to v2 and still reject unknown v1 fields. Do not invent permanent
+compatibility for unreleased shapes.
 
 The `p` Setup overlay atomically edits the selected AliceProject's data home,
 browser port, and update-check policy. Its first row switches between `This
@@ -487,6 +510,10 @@ pnpm -F @traderalice/openalice-cli test
 npx tsc --noEmit
 pnpm test
 ```
+
+Config-recovery and in-TUI update work must keep the focused Supervisor config
+and TUI specs green: parser preservation, distinct newer-schema errors, recovery
+action gating, and confirmed update install dispatch.
 
 For launcher ownership, takeover, or existing-owner browser handoff:
 

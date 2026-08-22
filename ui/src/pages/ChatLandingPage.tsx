@@ -26,6 +26,7 @@ import { RecoverySurface, RefreshNotice } from '../components/StateViews'
 import { workspaceDisplayTitle } from '../components/workspace/display'
 import { useWorkspace } from '../tabs/store'
 import { useAliceProject } from '../hooks/useAliceProject'
+import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import {
   useAgentLaunchConfig,
   useAgentLaunchPreferences,
@@ -34,6 +35,7 @@ import {
 import { chatLandingExampleGroups } from '../lib/chat-landing-examples'
 import { resolveChatWorkspaceTarget, workspaceActivityMs } from '../lib/chat-workspace-target'
 import { AutoQuantSetupPage } from './AutoQuantSetupPage'
+import { AutoPredictionSetupPage } from './AutoPredictionSetupPage'
 import { ChatSetupPage } from './ChatSetupPage'
 
 export { resolveAgentRuntime as resolveChatAgent } from '../lib/agentRuntime'
@@ -53,17 +55,18 @@ export { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
  * message and hits send; `quickChat` reuses the Chat workspace, spawns a
  * fresh session seeded with that message, and focuses the session tab.
  */
-type HarnessLandingMode = 'chat' | 'auto-quant'
+type HarnessLandingMode = 'chat' | 'auto-quant' | 'prediction'
 
 function HarnessLandingPage({
   spec,
   mode,
 }: {
-  spec: { params: { targetWsId?: string } }
+  spec: { params: { targetWsId?: string; initialPrompt?: string } }
   mode: HarnessLandingMode
 }) {
   const { t } = useTranslation()
   const { project } = useAliceProject()
+  const { recordSuccessfulUse } = useAgentRuntimes()
   const {
     quickChat,
     agents,
@@ -74,9 +77,15 @@ function HarnessLandingPage({
     refresh,
   } = useWorkspaces()
   const openOrFocus = useWorkspace((s) => s.openOrFocus)
-  const templateName = mode === 'auto-quant' ? 'auto-quant-v2' : 'chat'
-  const landingKind = mode === 'auto-quant' ? 'auto-quant-landing' : 'chat-landing'
-  const copyKey = mode === 'auto-quant' ? 'autoQuantLanding' : 'chatLanding'
+  const templateName = mode === 'auto-quant'
+    ? 'auto-quant-v2'
+    : mode === 'prediction' ? 'auto-prediction' : 'chat'
+  const landingKind = mode === 'auto-quant'
+    ? 'auto-quant-landing'
+    : mode === 'prediction' ? 'auto-prediction-landing' : 'chat-landing'
+  const copyKey = mode === 'auto-quant'
+    ? 'autoQuantLanding'
+    : mode === 'prediction' ? 'autoPredictionLanding' : 'chatLanding'
   // Targeted launch: the chat sidebar's Workspace row and per-workspace "+"
   // route here with a targetWsId — "Ask Alice, but spawn the session in THIS
   // workspace" rather than the recent Chat workspace. Same composer; the send
@@ -89,7 +98,7 @@ function HarnessLandingPage({
   const workspaceBoxRef = useRef<HTMLDivElement>(null)
   const activeWorkspaceOptionRef = useRef<HTMLButtonElement>(null)
   const selectedHarnessWorkspace = useMemo(
-    () => mode === 'auto-quant'
+    () => mode !== 'chat'
       ? targetWs ?? null
       : resolveChatWorkspaceTarget(
           workspaces,
@@ -115,7 +124,7 @@ function HarnessLandingPage({
   // loop, so it can't be seeded with a first message).
   const cliAgents = agents.filter((a) => a.kind !== 'utility')
 
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(spec.params.initialPrompt ?? '')
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [examplePage, setExamplePage] = useState(0)
@@ -135,10 +144,14 @@ function HarnessLandingPage({
   const installHint = selectedInfo ? installHintFor(selectedInfo.id) : undefined
   const exampleGroups = mode === 'chat'
     ? chatLandingExampleGroups((key) => t(key as never), project?.product)
-    : [[
+    : mode === 'auto-quant' ? [[
         { id: 'quant-1', label: null, title: t('autoQuantLanding.ex1'), prompt: t('autoQuantLanding.ex1') },
         { id: 'quant-2', label: null, title: t('autoQuantLanding.ex2'), prompt: t('autoQuantLanding.ex2') },
         { id: 'quant-3', label: null, title: t('autoQuantLanding.ex3'), prompt: t('autoQuantLanding.ex3') },
+      ]] : [[
+        { id: 'prediction-1', label: null, title: t('autoPredictionLanding.ex1'), prompt: t('autoPredictionLanding.ex1') },
+        { id: 'prediction-2', label: null, title: t('autoPredictionLanding.ex2'), prompt: t('autoPredictionLanding.ex2') },
+        { id: 'prediction-3', label: null, title: t('autoPredictionLanding.ex3'), prompt: t('autoPredictionLanding.ex3') },
       ]]
   const examples = exampleGroups[examplePage % exampleGroups.length]!
 
@@ -204,6 +217,7 @@ function HarnessLandingPage({
         launchConfig.launchReasoningEffort,
         launchConfig.accessMode === 'native' ? 'native' : undefined,
       )
+      void recordSuccessfulUse(effectiveAgent).catch(() => undefined)
       if (mode === 'chat') launchPreferences.adoptRecentChatWorkspace(workspaceId)
       setValue('')
     } catch (err) {
@@ -534,18 +548,27 @@ function HarnessLandingPage({
   )
 }
 
-export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+export function ChatLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
   const ctx = useWorkspaces()
   const hasChatWorkspace = ctx.workspaces.some((workspace) => workspace.template === 'chat')
   if (!hasChatWorkspace) return <ChatSetupPage />
   return <HarnessLandingPage spec={spec} mode="chat" />
 }
 
-export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string } } }) {
+export function AutoQuantLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
   const ctx = useWorkspaces()
   const workspace = ctx.workspaces.find((candidate) =>
     candidate.id === ctx.autoQuantDefaultWorkspaceId
     && candidate.template === 'auto-quant-v2')
   if (!workspace) return <AutoQuantSetupPage />
-  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id } }} mode="auto-quant" />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="auto-quant" />
+}
+
+export function AutoPredictionLandingPage({ spec }: { spec: { params: { targetWsId?: string; initialPrompt?: string } } }) {
+  const ctx = useWorkspaces()
+  const workspace = ctx.workspaces.find((candidate) =>
+    candidate.id === ctx.autoPredictionDefaultWorkspaceId
+    && candidate.template === 'auto-prediction')
+  if (!workspace) return <AutoPredictionSetupPage />
+  return <HarnessLandingPage spec={{ params: { targetWsId: workspace.id, initialPrompt: spec.params.initialPrompt } }} mode="prediction" />
 }

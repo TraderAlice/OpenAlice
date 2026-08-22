@@ -18,7 +18,7 @@ export interface UseTelegramConnectorDesk {
  * Settings-owned bind for the Alice Project's one Telegram phone-desk Issue.
  * The board list omits this row; comments stay on the ordinary Issue detail.
  */
-export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
+export function useTelegramConnectorDesk(connectorId = 'telegram'): UseTelegramConnectorDesk {
   const [desk, setDesk] = useState<TelegramConnectorDesk | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -26,7 +26,7 @@ export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
 
   const load = useCallback(async () => {
     try {
-      const next = await api.connectors.desk.load()
+      const next = await api.connectors.desk.load(connectorId)
       if (!mounted.current) return
       setDesk(next.desk)
       setError(null)
@@ -36,7 +36,7 @@ export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
     } finally {
       if (mounted.current) setLoaded(true)
     }
-  }, [])
+  }, [connectorId])
 
   useEffect(() => {
     mounted.current = true
@@ -48,7 +48,7 @@ export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
 
   const enable = useCallback(async (wsId: string) => {
     try {
-      const next = await api.connectors.desk.create(wsId)
+      const next = await api.connectors.desk.create(wsId, connectorId)
       if (mounted.current) {
         setDesk(next)
         setError(null)
@@ -60,11 +60,11 @@ export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
       }
       return false
     }
-  }, [])
+  }, [connectorId])
 
   const disable = useCallback(async () => {
     try {
-      await api.connectors.desk.disable()
+      await api.connectors.desk.disable(connectorId)
       if (mounted.current) {
         setDesk(null)
         setError(null)
@@ -76,11 +76,11 @@ export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
       }
       return false
     }
-  }, [])
+  }, [connectorId])
 
   const saveWhat = useCallback(async (what: string) => {
     try {
-      const next = await api.connectors.desk.update({ what })
+      const next = await api.connectors.desk.update({ what }, connectorId)
       if (mounted.current) {
         setDesk(next)
         setError(null)
@@ -92,12 +92,12 @@ export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
       }
       return false
     }
-  }, [])
+  }, [connectorId])
 
   const saveCadence = useCallback(async (every: string) => {
     const when: Extract<ScheduleWhen, { kind: 'every' }> = { kind: 'every', every }
     try {
-      const next = await api.connectors.desk.update({ when })
+      const next = await api.connectors.desk.update({ when }, connectorId)
       if (mounted.current) {
         setDesk(next)
         setError(null)
@@ -109,7 +109,7 @@ export function useTelegramConnectorDesk(): UseTelegramConnectorDesk {
       }
       return false
     }
-  }, [])
+  }, [connectorId])
 
   return {
     desk,

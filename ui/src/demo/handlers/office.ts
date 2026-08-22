@@ -9,7 +9,7 @@ export const officeHandlers = [
     return HttpResponse.json({
       config: {
         workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
-        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, other: 0 },
+        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 1, other: 0 },
       },
       lastSeq: 6,
       firstSeq: 1,

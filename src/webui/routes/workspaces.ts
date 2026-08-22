@@ -90,18 +90,25 @@ import {
 } from '../../workspaces/agent-credential-readiness.js';
 import { validateTerminalViewAttributes } from '../../workspaces/terminal-view-attributes.js';
 import {
+  readAutoPredictionPreferences,
   readAutoQuantPreferences,
+  readHarnessPreferences,
   readQuickChatPreferences,
+  rememberAutoPredictionDefaultWorkspace,
   rememberAutoQuantDefaultWorkspace,
   rememberRecentChatWorkspace,
+  type AutoPredictionPreferences,
   type AutoQuantPreferences,
+  type HarnessPreferences,
   type QuickChatPreferences,
 } from '../../core/preferences.js';
 import {
+  AUTO_PREDICTION_WORKSPACE_TEMPLATE,
   AUTO_QUANT_WORKSPACE_TEMPLATE,
   CHAT_WORKSPACE_TEMPLATE,
 } from '../../workspaces/chat-workspace-resolver.js';
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
+import { HarnessSourceUpgradeError } from '../../workspaces/harness-source-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import {
   MANAGER_WORKSPACE_ID,
@@ -168,6 +175,9 @@ interface QuickChatWorkspacePreferenceDeps {
   rememberRecentChatWorkspace(workspaceId: string | null): Promise<QuickChatPreferences>;
   readAutoQuantPreferences?(): Promise<AutoQuantPreferences>;
   rememberAutoQuantDefaultWorkspace?(workspaceId: string | null): Promise<AutoQuantPreferences>;
+  readAutoPredictionPreferences?(): Promise<AutoPredictionPreferences>;
+  rememberAutoPredictionDefaultWorkspace?(workspaceId: string | null): Promise<AutoPredictionPreferences>;
+  readHarnessPreferences?(): Promise<HarnessPreferences>;
 }
 
 const defaultQuickChatWorkspacePreferenceDeps: QuickChatWorkspacePreferenceDeps = {
@@ -176,6 +186,10 @@ const defaultQuickChatWorkspacePreferenceDeps: QuickChatWorkspacePreferenceDeps 
   readAutoQuantPreferences: () => readAutoQuantPreferences(),
   rememberAutoQuantDefaultWorkspace: (workspaceId) =>
     rememberAutoQuantDefaultWorkspace(workspaceId),
+  readAutoPredictionPreferences: () => readAutoPredictionPreferences(),
+  rememberAutoPredictionDefaultWorkspace: (workspaceId) =>
+    rememberAutoPredictionDefaultWorkspace(workspaceId),
+  readHarnessPreferences: () => readHarnessPreferences(),
 };
 
 /**
@@ -262,6 +276,20 @@ export function createWorkspaceRoutes(
       : undefined;
     return workspace?.template === AUTO_QUANT_WORKSPACE_TEMPLATE ? workspace : undefined;
   };
+  const readAutoPredictionPreference = () =>
+    (quickChatPreferences.readAutoPredictionPreferences ?? readAutoPredictionPreferences)();
+  const rememberAutoPredictionWorkspace = (workspaceId: string | null) =>
+    (quickChatPreferences.rememberAutoPredictionDefaultWorkspace
+      ?? rememberAutoPredictionDefaultWorkspace)(workspaceId);
+  const resolveAutoPredictionDefaultWorkspace = async (): Promise<WorkspaceMeta | undefined> => {
+    const preference = await readAutoPredictionPreference();
+    const workspace = preference.defaultWorkspaceId
+      ? svc.registry.get(preference.defaultWorkspaceId)
+      : undefined;
+    return workspace?.template === AUTO_PREDICTION_WORKSPACE_TEMPLATE ? workspace : undefined;
+  };
+  const readHarnessPreference = () =>
+    (quickChatPreferences.readHarnessPreferences ?? readHarnessPreferences)();
 
   // Renderer truth for hidden/headless terminal color queries. App-global,
   // matching Orca's terminal-view-attribute bridge rather than a spawn env.
@@ -1092,6 +1120,80 @@ export function createWorkspaceRoutes(
     }
   });
 
+  app.get('/auto-prediction/default-workspace', async (c) => {
+    try {
+      const preference = await readAutoPredictionPreference();
+      const configured = preference.defaultWorkspaceId;
+      const workspace = configured ? svc.registry.get(configured) : undefined;
+      const valid = workspace?.template === AUTO_PREDICTION_WORKSPACE_TEMPLATE;
+      return c.json({
+        defaultWorkspaceId: valid ? workspace.id : null,
+        configuredWorkspaceId: configured,
+        ready: valid,
+      });
+    } catch (err) {
+      launcherLogger.warn('auto_prediction.preference_read_failed', { err });
+      return c.json({ error: 'preferences_read_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.put('/auto-prediction/default-workspace', async (c) => {
+    const body = await safeJson(c).catch(() => null);
+    const workspaceId = body && typeof body === 'object'
+      ? (body as Record<string, unknown>)['workspaceId']
+      : undefined;
+    if (typeof workspaceId !== 'string' || !validId(workspaceId)) {
+      return c.json({ error: 'invalid_workspace_id' }, 400);
+    }
+    const workspace = svc.registry.get(workspaceId);
+    if (!workspace) return c.json({ error: 'workspace_not_found' }, 404);
+    if (workspace.template !== AUTO_PREDICTION_WORKSPACE_TEMPLATE) {
+      return c.json({ error: 'workspace_template_mismatch' }, 400);
+    }
+    try {
+      await rememberAutoPredictionWorkspace(workspace.id);
+      return c.json({ defaultWorkspaceId: workspace.id, ready: true });
+    } catch (err) {
+      launcherLogger.warn('auto_prediction.preference_write_failed', { id: workspace.id, err });
+      return c.json({ error: 'preferences_write_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/auto-prediction/initialize', async (c) => {
+    try {
+      const preference = await readAutoPredictionPreference();
+      const configured = preference.defaultWorkspaceId
+        ? svc.registry.get(preference.defaultWorkspaceId)
+        : undefined;
+      if (configured?.template === AUTO_PREDICTION_WORKSPACE_TEMPLATE) {
+        return c.json({ workspace: await svc.publicMeta(configured) });
+      }
+      if (svc.registry.list().some((workspace) =>
+        workspace.template === AUTO_PREDICTION_WORKSPACE_TEMPLATE)) {
+        return c.json({
+          error: 'auto_prediction_workspace_selection_required',
+          message: 'select an existing Auto Prediction Workspace before continuing',
+        }, 409);
+      }
+
+      const result = await svc.resolveOrCreateAutoPredictionWorkspace();
+      if (!result.ok) {
+        const status =
+          result.code === 'tag_in_use' ? 409
+          : result.code === 'unknown_template' ? 400
+          : result.code === 'unknown_source_version' ? 400
+          : result.code === 'invalid_tag' ? 400
+          : 500;
+        return c.json({ error: result.code, message: result.message }, status as 400 | 409 | 500);
+      }
+      await rememberAutoPredictionWorkspace(result.workspace.id);
+      return c.json({ workspace: await svc.publicMeta(result.workspace) }, 201);
+    } catch (err) {
+      launcherLogger.error('auto_prediction.initialize_failed', { err });
+      return c.json({ error: 'auto_prediction_initialize_failed', message: (err as Error).message }, 500);
+    }
+  });
+
   app.post('/', async (c) => {
     const body = await safeJson(c);
     const fields = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -1271,6 +1373,7 @@ export function createWorkspaceRoutes(
           .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
       : undefined;
     try {
+      await svc.harnessSurfaces.stopWorkspace(id);
       const result = await svc.lifecycle.offboard({
         id,
         ...(typeof fields['reason'] === 'string' ? { reason: fields['reason'] } : {}),
@@ -1332,6 +1435,59 @@ export function createWorkspaceRoutes(
         return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
       }
       launcherLogger.error('workspace.template_upgrade_apply_failed', { id, err });
+      return c.json({ error: 'upgrade_apply_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.get('/:id/source-upgrade', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const preferences = await readHarnessPreference();
+      const targetVersion = c.req.query('targetVersion');
+      return c.json({
+        plan: await svc.sourceUpgrades.plan(
+          id,
+          preferences.showUnverifiedHarnessReleases,
+          targetVersion || undefined,
+        ),
+      });
+    } catch (err) {
+      if (err instanceof HarnessSourceUpgradeError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'busy' || err.code === 'working_tree_changes' ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.source_upgrade_plan_failed', { id, err });
+      return c.json({ error: 'upgrade_plan_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/:id/source-upgrade', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const body = await safeJson(c);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    if (typeof fields['planDigest'] !== 'string' || typeof fields['targetVersion'] !== 'string') {
+      return c.json({ error: 'bad_request', message: 'planDigest and targetVersion are required' }, 400);
+    }
+    try {
+      const preferences = await readHarnessPreference();
+      const result = await svc.sourceUpgrades.apply(
+        id,
+        preferences.showUnverifiedHarnessReleases,
+        { planDigest: fields['planDigest'], targetVersion: fields['targetVersion'] },
+      );
+      return c.json({ result, workspace: await svc.publicMeta(svc.registry.get(id)!) });
+    } catch (err) {
+      if (err instanceof HarnessSourceUpgradeError) {
+        const status = err.code === 'not_found' ? 404
+          : ['busy', 'working_tree_changes', 'stale_plan'].includes(err.code) ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.source_upgrade_apply_failed', { id, err });
       return c.json({ error: 'upgrade_apply_failed', message: (err as Error).message }, 500);
     }
   });
@@ -1838,7 +1994,7 @@ export function createWorkspaceRoutes(
       if (typeof rawTarget === 'string' && rawTarget.length > 0) targetWsId = rawTarget;
       const rawTemplate = fields['template'];
       if (rawTemplate !== undefined) {
-        if (rawTemplate !== 'chat' && rawTemplate !== 'auto-quant-v2') {
+        if (rawTemplate !== 'chat' && rawTemplate !== 'auto-quant-v2' && rawTemplate !== 'auto-prediction') {
           return c.json({ error: 'unknown_template' }, 400);
         }
         templateName = rawTemplate;
@@ -1856,7 +2012,7 @@ export function createWorkspaceRoutes(
       // Targeted: spawn a new session into the given existing workspace.
       const found = svc.registry.list().find((w) => w.id === targetWsId);
       if (!found) return c.json({ error: 'workspace_not_found' }, 404);
-      if (templateName === 'auto-quant-v2' && found.template !== templateName) {
+      if (templateName !== 'chat' && found.template !== templateName) {
         return c.json({ error: 'workspace_template_mismatch' }, 400);
       }
       if (templateName === 'auto-quant-v2') {
@@ -1869,6 +2025,16 @@ export function createWorkspaceRoutes(
         }
         if (defaultWorkspace.id !== found.id) {
           return c.json({ error: 'auto_quant_workspace_not_default' }, 400);
+        }
+      }
+      if (templateName === 'auto-prediction') {
+        const defaultWorkspace = await resolveAutoPredictionDefaultWorkspace().catch((err) => {
+          launcherLogger.warn('auto_prediction.preference_read_failed', { err });
+          return undefined;
+        });
+        if (!defaultWorkspace) return c.json({ error: 'auto_prediction_not_initialized' }, 409);
+        if (defaultWorkspace.id !== found.id) {
+          return c.json({ error: 'auto_prediction_workspace_not_default' }, 400);
         }
       }
       meta = found;
@@ -1888,7 +2054,21 @@ export function createWorkspaceRoutes(
                   message: 'AutoQuant needs a default Workspace before research can start',
                 };
           })()
-        : await (async () => {
+        : templateName === 'auto-prediction'
+          ? await (async () => {
+              const workspace = await resolveAutoPredictionDefaultWorkspace().catch((err) => {
+                launcherLogger.warn('auto_prediction.preference_read_failed', { err });
+                return undefined;
+              });
+              return workspace
+                ? { ok: true as const, workspace }
+                : {
+                    ok: false as const,
+                    code: 'auto_prediction_not_initialized' as const,
+                    message: 'Auto Prediction needs a default Workspace before research can start',
+                  };
+            })()
+          : await (async () => {
             const preference = await quickChatPreferences.readQuickChatPreferences().catch((err) => {
               launcherLogger.warn('quick_chat.preference_read_failed', { err });
               return null;
@@ -1902,6 +2082,7 @@ export function createWorkspaceRoutes(
           : target.code === 'unknown_source_version' ? 400
           : target.code === 'invalid_tag' ? 400
           : target.code === 'auto_quant_not_initialized' ? 409
+          : target.code === 'auto_prediction_not_initialized' ? 409
           : 500;
         launcherLogger.error('quick_chat.create_failed', {
           code: target.code,
@@ -1925,7 +2106,9 @@ export function createWorkspaceRoutes(
       initialPrompt: prompt,
       createdBy: {
         kind: 'interactive',
-        surface: templateName === 'auto-quant-v2' ? 'auto-quant' : 'quick-chat',
+        surface: templateName === 'auto-quant-v2'
+          ? 'auto-quant'
+          : templateName === 'auto-prediction' ? 'prediction' : 'quick-chat',
       },
     });
     if (!spawn.ok) return c.json(spawn.body, spawn.status as 400 | 500);

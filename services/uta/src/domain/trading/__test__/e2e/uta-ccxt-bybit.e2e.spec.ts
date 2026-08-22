@@ -50,7 +50,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     // Stage + Commit + Push: buy 0.01 ETH
     uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'BUY', orderType: 'MKT', totalQuantity: '0.01' })
     uta!.commit('e2e: buy 0.01 ETH')
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
     console.log(`  pushed: orderId=${pushResult.submitted[0].orderId}, status=${pushResult.submitted[0].status}`)
@@ -74,7 +74,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     // Close
     uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
     uta!.commit('e2e: close 0.01 ETH')
-    const closePush = await uta!.push()
+    const closePush = await uta!.push(uta!.status().pendingHash!)
     expect(closePush.submitted).toHaveLength(1)
 
     if (closePush.submitted[0].status === 'submitted') {
@@ -108,7 +108,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
       stopLoss: { price: String(slPrice) },
     })
     uta!.commit('e2e: buy 0.01 ETH with TPSL')
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     expect(pushResult.submitted).toHaveLength(1)
     const orderId = pushResult.submitted[0].orderId!
     console.log(`  TPSL order: orderId=${orderId}, tp=${tpPrice}, sl=${slPrice}`)
@@ -130,7 +130,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     // Clean up
     uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
     uta!.commit('e2e: close TPSL position')
-    await uta!.push()
+    await uta!.push(uta!.status().pendingHash!)
   }, 60_000)
 
   it('reject records user-rejected commit and clears staging', async () => {
@@ -145,7 +145,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     expect(statusBefore.pendingMessage).toBe('e2e: buy to be rejected')
 
     // Reject
-    const rejectResult = await uta!.reject('user declined')
+    const rejectResult = await uta!.reject('user declined', uta!.status().pendingHash!)
     expect(rejectResult.operationCount).toBe(1)
     expect(rejectResult.message).toContain('[rejected]')
     expect(rejectResult.message).toContain('user declined')
@@ -170,7 +170,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     uta!.stagePlaceOrder({ aliceId: ethAliceId, action: 'SELL', orderType: 'LMT', totalQuantity: '0.01', lmtPrice: '99999' })
     uta!.commit('e2e: sell to be rejected silently')
 
-    const result = await uta!.reject()
+    const result = await uta!.reject(undefined, uta!.status().pendingHash!)
     expect(result.operationCount).toBe(1)
     expect(result.message).toContain('[rejected]')
     expect(result.message).not.toContain('—')
@@ -194,7 +194,7 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     expect(JSON.stringify(status)).not.toContain(SENTINEL_LITERAL)
 
     uta!.commit('e2e: sentinel boundary')
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     expect(pushResult.submitted).toHaveLength(1)
 
     // Post-push: show + exportState + log must all be sentinel-free.
@@ -212,6 +212,6 @@ describe('UTA — Bybit demo (ETH perp)', () => {
     }
     uta!.stageClosePosition({ aliceId: ethAliceId, qty: '0.01' })
     uta!.commit('e2e: close sentinel-boundary position')
-    await uta!.push()
+    await uta!.push(uta!.status().pendingHash!)
   }, 30_000)
 })

@@ -42,6 +42,7 @@ import { useTestGate } from '../../lib/useTestGate'
 import { useWorkspaces } from '../../contexts/workspaces-context'
 import { notifyWorkspaceAgentConfigChanged } from '../../lib/workspaceAiEvents'
 import { WorkspaceTemplateUpgradePanel } from './WorkspaceTemplateUpgradePanel'
+import { WorkspaceSourceUpgradePanel } from './WorkspaceSourceUpgradePanel'
 import { WorkspaceAbsorbPanel } from './WorkspaceAbsorbPanel'
 import { WorkspaceLaunchConfigurationPanel } from './WorkspaceLaunchConfigurationPanel'
 import { WorkspaceAIPreferencesPanel } from './WorkspaceAIPreferencesPanel'
@@ -1396,11 +1397,13 @@ export function WorkspaceAIConfigModal({
             )}
 
             {section === 'template' && (
-              <WorkspaceTemplateUpgradePanel
-                wsId={wsId}
-                onWorkspaceChanged={refresh}
-                onClose={onClose}
-              />
+              workspace?.upgradeAvailable?.kind === 'source'
+                ? <WorkspaceSourceUpgradePanel wsId={wsId} onWorkspaceChanged={refresh} />
+                : <WorkspaceTemplateUpgradePanel
+                    wsId={wsId}
+                    onWorkspaceChanged={refresh}
+                    onClose={onClose}
+                  />
             )}
 
             {section === 'absorb' && workspace && (

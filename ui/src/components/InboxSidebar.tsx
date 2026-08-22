@@ -7,7 +7,8 @@ import { inboxLive } from '../live/inbox'
 import { useInboxRead } from '../live/inbox-read'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useInboxViewMode } from '../live/inbox-view-mode'
-import { groupThreads, previewForEntry } from '../live/inbox-threads'
+import { presentInboxEntry } from '../lib/inbox-presentation'
+import { groupThreads } from '../live/inbox-threads'
 import { workspaceDisplayName } from './workspace/display'
 import { Skeleton } from './StateViews'
 import type { InboxEntry } from '../api/inbox'
@@ -308,6 +309,7 @@ function WorkspaceView({
                   entry={entry}
                   active={entry.id === selectedId}
                   unread={!readIds[entry.id]}
+                  source={workspaceLabel}
                   onClick={() => onSelect(entry.id)}
                 />
               ))}
@@ -319,22 +321,33 @@ function WorkspaceView({
   )
 }
 
-/** Row inside a workspace cluster — label lives in the header, so the
- *  row shows just the push preview + time. */
+/** Row inside a workspace cluster — the workspace label lives in the
+ *  header, so the row leads with the scan subject. */
 function ClusterRow({
-  entry, active, unread, onClick,
+  entry, active, unread, source, onClick,
 }: {
   entry: InboxEntry
   active: boolean
   unread: boolean
+  source: string
   onClick: () => void
 }) {
   const { t } = useTranslation()
-  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
+  const time = formatRelativeTime(entry.ts)
+  const { subject, excerpt, rowLabel } = presentInboxEntry(entry, {
+    source,
+    unread,
+    time,
+    untitled: t('inbox.untitledUpdate'),
+    unreadLabel: t('inbox.unread'),
+    moreAttachments: (count) => t('inbox.moreAttachments', { count }),
+  })
   return (
     <div
       role="button"
       tabIndex={0}
+      aria-label={rowLabel}
+      aria-current={active || undefined}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -353,11 +366,22 @@ function ClusterRow({
         aria-hidden
         className={`mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
       />
-      <span className={`min-w-0 truncate text-[11px] leading-5 ${unread ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
-        {preview}
+      <span className="min-w-0">
+        <span
+          className={`block truncate text-[12px] leading-5 ${
+            unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+          }`}
+        >
+          {subject}
+        </span>
+        {excerpt && (
+          <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
+            {excerpt}
+          </span>
+        )}
       </span>
       <span className="col-start-2 text-[10px] text-muted-foreground/50 tabular-nums">
-        {formatRelativeTime(entry.ts)}
+        {time}
       </span>
     </div>
   )
@@ -414,12 +438,22 @@ function TimeRow({
   onClick: () => void
 }) {
   const { t } = useTranslation()
-  const preview = previewForEntry(entry) || t('inbox.untitledUpdate')
   const source = workspaceLabel ?? entry.workspaceLabel ?? entry.workspaceId
+  const time = formatRelativeTime(entry.ts)
+  const { subject, excerpt, rowLabel } = presentInboxEntry(entry, {
+    source,
+    unread,
+    time,
+    untitled: t('inbox.untitledUpdate'),
+    unreadLabel: t('inbox.unread'),
+    moreAttachments: (count) => t('inbox.moreAttachments', { count }),
+  })
   return (
     <div
       role="button"
       tabIndex={0}
+      aria-label={rowLabel}
+      aria-current={active || undefined}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -435,29 +469,33 @@ function TimeRow({
         <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
       )}
 
-      {/* Line 1: the update itself is the object users are scanning. */}
-      <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-start gap-1.5">
         <span
           aria-hidden
-          className={`shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
+          className={`mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full ${unread ? 'bg-primary' : 'bg-transparent'}`}
         />
-        <span
-          className={`min-w-0 flex-1 truncate text-[12px] ${
-            unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
-          }`}
-          title={preview}
-        >
-          {preview}
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block truncate text-[12px] leading-5 ${
+              unread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+            }`}
+          >
+            {subject}
+          </span>
+          {excerpt && (
+            <span className="mt-0.5 hidden truncate text-[11px] leading-4 text-muted-foreground/65 sm:block">
+              {excerpt}
+            </span>
+          )}
         </span>
       </div>
 
-      {/* Line 2: source and time are supporting provenance. */}
       <div className="flex min-w-0 items-center gap-2 pl-3">
         <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground/60">
           {source}
         </span>
         <span className="shrink-0 text-[10px] text-muted-foreground/60 tabular-nums">
-          {formatRelativeTime(entry.ts)}
+          {time}
         </span>
       </div>
     </div>

@@ -42,10 +42,27 @@ function generateCommitHash(content: object): CommitHash {
   return hash.slice(0, 8)
 }
 
+export class PendingHashConflictError extends Error {
+  readonly code = 'PENDING_HASH_CONFLICT' as const
+
+  constructor(message = 'Pending commit changed') {
+    super(message)
+    this.name = 'PendingHashConflictError'
+  }
+}
+
+export function isPendingHashConflict(error: unknown): boolean {
+  if (error instanceof PendingHashConflictError) return true
+  if (!error || typeof error !== 'object') return false
+  return (error as { code?: unknown }).code === 'PENDING_HASH_CONFLICT'
+    || (error as { name?: unknown }).name === 'PendingHashConflictError'
+}
+
 export class TradingGit implements ITradingGit {
   private stagingArea: Operation[] = []
   private pendingMessage: string | null = null
   private pendingHash: CommitHash | null = null
+  private inflightWrite = false
   private commits: GitCommit[] = []
   private head: CommitHash | null = null
   private currentRound: number | undefined = undefined
@@ -58,6 +75,14 @@ export class TradingGit implements ITradingGit {
   // ==================== git add / commit / push ====================
 
   add(operation: Operation): AddResult {
+    if (this.inflightWrite) {
+      throw new PendingHashConflictError('A wallet write is already in progress')
+    }
+    if (this.pendingHash !== null || this.pendingMessage !== null) {
+      throw new PendingHashConflictError(
+        'A commit is awaiting approval. Push or reject it before staging more operations.',
+      )
+    }
     this.stagingArea.push(operation)
     return {
       staged: true,
@@ -67,6 +92,9 @@ export class TradingGit implements ITradingGit {
   }
 
   commit(message: string): CommitPrepareResult {
+    if (this.inflightWrite) {
+      throw new PendingHashConflictError('A wallet write is already in progress')
+    }
     if (this.stagingArea.length === 0) {
       throw new Error('Nothing to commit: staging area is empty')
     }
@@ -88,7 +116,17 @@ export class TradingGit implements ITradingGit {
     }
   }
 
-  async push(): Promise<PushResult> {
+  async push(expectedPendingHash: string): Promise<PushResult> {
+    this.assertPrepared('push')
+    this.beginWrite(expectedPendingHash)
+    try {
+      return await this.executePush()
+    } finally {
+      this.inflightWrite = false
+    }
+  }
+
+  private async executePush(): Promise<PushResult> {
     if (this.stagingArea.length === 0) {
       throw new Error('Nothing to push: staging area is empty')
     }
@@ -146,7 +184,17 @@ export class TradingGit implements ITradingGit {
     return { hash, message, operationCount: operations.length, submitted, rejected }
   }
 
-  async reject(reason?: string): Promise<RejectResult> {
+  async reject(reason: string | undefined, expectedPendingHash: string): Promise<RejectResult> {
+    this.assertPrepared('reject')
+    this.beginWrite(expectedPendingHash)
+    try {
+      return await this.executeReject(reason)
+    } finally {
+      this.inflightWrite = false
+    }
+  }
+
+  private async executeReject(reason?: string): Promise<RejectResult> {
     if (this.stagingArea.length === 0) {
       throw new Error('Nothing to reject: staging area is empty')
     }
@@ -188,6 +236,25 @@ export class TradingGit implements ITradingGit {
     this.pendingHash = null
 
     return { hash, message, operationCount: operations.length }
+  }
+
+  private beginWrite(expectedPendingHash: string): void {
+    if (this.inflightWrite) {
+      throw new PendingHashConflictError('A wallet write is already in progress')
+    }
+    if (!expectedPendingHash || expectedPendingHash !== this.pendingHash) {
+      throw new PendingHashConflictError('Pending commit changed')
+    }
+    this.inflightWrite = true
+  }
+
+  private assertPrepared(action: 'push' | 'reject'): void {
+    if (this.stagingArea.length === 0) {
+      throw new Error(`Nothing to ${action}: staging area is empty`)
+    }
+    if (this.pendingMessage === null || this.pendingHash === null) {
+      throw new Error(`Nothing to ${action}: please commit first`)
+    }
   }
 
   /**

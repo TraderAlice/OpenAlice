@@ -9,7 +9,7 @@ It complements [[docs/workspace-issues-and-scheduling.md]] and
 
 Connector Service projects durable OpenAlice Inbox entries into optional
 external chats. It is not another agent runtime, chat input loop, or source of
-truth. Telegram, Discord, and Slack are the first adapters, not hard-coded product
+truth. Telegram, Discord, Slack, and Feishu are the first adapters, not hard-coded product
 categories.
 
 - Local Inbox append completes before any external request begins.
@@ -21,10 +21,11 @@ categories.
 - The service is optional in every trading mode, including lite.
 - Guardian may start, stop, or restart it without restarting Alice or UTA.
 - Inbox delivery remains outbound by default. Each adapter may advertise
-  `inbox` and `settings` capabilities and implement those slash commands
+  `inbox`, `settings`, and `uta` capabilities and implement those slash commands
   itself. Telegram uses an inline-button form: `/inbox` defaults to unread
-  items, can switch to the full Inbox history, and `/settings` toggles Inbox
-  push. Discord and Slack register the same
+  items, can switch to the full Inbox history, `/settings` toggles Inbox
+  push, and `/uta` reviews pending Trading-as-Git commits with Approve /
+  Reject. Discord and Slack register the same
   commands and currently reply with a placeholder. `inboxPush: false` skips Inbox
   `deliver` for that adapter and does not affect phone-desk owner chat.
   `/link`, `/status`, and `/test` stay the generic control plane. Discord
@@ -46,16 +47,24 @@ categories.
   artifact delivery back to that Connector only. Cancel does not enqueue.
   First-version pull does not change Inbox read state. Discord and Slack
   keep `/inbox` as a placeholder and reject artifact delivery as
-  unimplemented.
-- Connector Service never interprets chat. Alice owns the phone-desk Issue.
-  Connector queues owner text and Alice drains that stack only while a live
-  phone-desk Issue exists and no desk generation is running. Several stacked
-  DMs become one quoted comment. Alice projects desk comments that do not
-  contain the literal tag `[[no-reply]]`. Inbound Telegram comments are not
-  echoed back. While a desk turn is running, Alice also ships sealed mid-turn
-  `text` blocks (a tool or error followed them) so the phone chat does not
-  wait for the final reply. Tool names, status, and payloads stay off Telegram.
-  The trailing text still becomes today's reply comment.
+  unimplemented. `/uta` is the same shape: Telegram renders the review
+  panel; Discord and Slack reply with a placeholder. Connector never
+  talks to UTA. Push and reject stay Alice-owned wallet writes, gated
+  by the current trading mode. Callback data carries only page-local
+  indexes; account ids and pending hashes stay in the Connector session
+  and the Alice-validated action request.
+- Connector Service never interprets chat. Alice owns one phone-desk Issue
+  per `desk`-capable connector. Connector queues owner text keyed by
+  `connectorId`; Alice drains that stack only while that connector's live
+  desk exists and no generation is running on it. Several stacked DMs become
+  one quoted comment on that Issue. Alice projects desk comments that do not
+  contain the literal tag `[[no-reply]]`. Inbound owner comments are not
+  echoed back to that connector. While a desk turn is running, Alice also
+  ships sealed mid-turn `text` blocks (a tool or error followed them) so the
+  phone chat does not wait for the final reply. Tool names, status, and
+  payloads stay off the owner chat. The trailing text still becomes today's
+  reply comment. Telegram is the first `desk` adapter; Discord and Slack do
+  not advertise `desk` until they ingest private owner chat.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are externalized as
@@ -106,6 +115,7 @@ Workspace agent
           -> Discord Connector
           -> Telegram Connector
           -> Slack Connector
+          -> Feishu Connector
           -> future adapter
 
 Telegram owner DM
@@ -123,6 +133,19 @@ Telegram /inbox detail -> "view files" confirm
   -> Alice connector action bridge drain (not the phone-desk inbound drain)
   -> Alice re-reads Inbox entry and materializes one Workspace file
   -> Connector directed artifact delivery to the requesting adapter only
+
+Telegram /uta (or an Approve/Reject button)
+  -> Connector UTA action queue (review, or push/reject with required utaId + pendingHash)
+  -> Alice connector action bridge drain
+  -> Alice UTAManagerSDK list/status/push/reject (lite/readonly honored here)
+  -> UTA push/reject require expectedPendingHash and validate it in the same
+     request before mutation; mismatch or absence is 409 and does not write
+  -> A pending commit is immutable: UTA refuses further staging until that
+     commit is pushed or rejected, and refuses staging/recommit during a write
+  -> Connector directed UTA presentation back to the requesting adapter only
+     Commits with more operations than the Telegram page can show are not
+     remotely actionable — Approve/Reject stay off and the owner uses
+     Trading as Git.
 ```
 
 Load-bearing paths:
@@ -151,6 +174,23 @@ credentials. `data/config/connectors.json` is an AES-256-GCM sealed envelope;
 the machine key remains at `<OPENALICE_HOME>/sealing.key` outside portable
 `data/`.
 
+### Network proxy
+
+Guardian passes explicit `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and
+`NO_PROXY` values to Connector Service. The desktop Guardian also resolves the
+host system proxy through Chromium when no explicit environment value exists,
+on every supported desktop platform. Lower-case environment names are accepted
+and normalized for child processes.
+
+Connector Service owns one shared proxy transport. It installs an Undici
+dispatcher for fetch/WebSocket SDKs and gives adapters an explicit Node agent
+selector for libraries such as grammY that create their own `node-fetch`
+transport. New adapters must consume this shared context instead of reading
+environment variables or changing `http.globalAgent` / `https.globalAgent`
+themselves. Only HTTP(S) proxy URLs are currently supported; SOCKS-only rules
+remain untouched rather than being silently misrouted. Proxy URLs and
+credentials must never be logged.
+
 The Settings API never returns a bot token. It returns field definitions,
 non-secret values, and `configuredSecrets` presence markers. The Settings
 draft field is masked by default to keep tokens out of screenshots and
@@ -175,6 +215,16 @@ Core dispatch must not branch on platform IDs. Adding a connector means:
 3. register its factory at service composition;
 4. add adapter-specific tests and packaging dependencies.
 
+`ConnectorAdapter` is also the lifecycle boundary. `start()` validates durable
+configuration and arms the adapter; `stop()` is idempotent and releases every
+SDK resource. A long-lived adapter must recover transient disconnects either
+through its SDK or the shared connection supervisor. If a legacy synchronous
+`start()` still lets a transport failure escape, the adapter classifies that
+failure as `retry` or `fatal`; DeliveryManager schedules retries but never
+parses third-party or platform-specific error text itself. Health must move
+through `starting`, `awaiting_link`, `healthy`, `degraded`, and `stopped` as the
+external session changes rather than treating process startup as connectivity.
+
 The Settings renderer consumes definitions as data. The DeliveryManager test
 registers a fake third adapter to prevent a future Discord/Telegram union or
 `if (id === ...)` dispatch from becoming the architecture.
@@ -197,6 +247,18 @@ path expects Slack to host the app. Socket Mode plus the Web API is the
 current local-app shape after the 2026 Node SDK majors (`@slack/web-api` 8,
 `@slack/socket-mode` 3).
 
+Feishu/Lark is an enterprise self-built app with bot capability. OpenAlice is
+local, so Feishu uses long connection (`WSClient`) instead of a public Request
+URL. Store apps cannot use long connection. The owner pastes App ID and App
+secret, chooses `feishu` (`open.feishu.cn`) or `lark` (`open.larksuite.com`),
+starts the bot, DMs it, and runs `/link` as plain text — Feishu has no runtime
+slash-command menu. Subscribe to `im.message.receive_v1`, keep availability
+limited to the owner, and leave IP allowlists empty unless the Connector
+egress IP is listed. Group custom-bot webhooks are send-only and are not this
+connector. `/inbox`, `/settings`, and `/uta` currently reply with placeholders;
+owner-chat desk and Inbox push are implemented. Each Feishu desk is its own
+Issue (`feishu-phone-desk`), not the Telegram phone desk.
+
 Saving valid bot credentials does not mean the connector is linked. Settings
 must present the lifecycle explicitly: credentials ready, bot online and
 `awaiting_link`, then linked/healthy. Starting the linking step enables the
@@ -209,18 +271,26 @@ run `/link`. Removing the token is a different action.
 `awaiting_link` means the adapter can already receive `/link`. Telegram does
 not report that until long polling has started (`onStart`); Discord waits for
 the gateway to become ready. Publishing Telegram's slash-command menu is
-best-effort: a failed `setMyCommands` must not block polling or Inbox delivery.
-The Connector HTTP health endpoint binds before those external calls so
-Guardian can probe a `starting` adapter instead of treating the whole service
-as missing. A failed adapter stays registered with its `lastError` rather than
-collapsing to "configured but not running."
+best-effort and happens only after polling is live: a hung or failed
+`setMyCommands` must not block `start()`, long polling, owner chat, or Inbox
+delivery. `start()` arms the adapter and returns; the Bot API session is a
+supervised loop. A hung handshake is abandoned after one attempt budget
+(default 30s) and the same adapter reconnects with backoff. That budget is
+not a process-level deadline and does not stop Connector Service. The
+Connector HTTP health endpoint binds before those external calls so Guardian
+can probe a `starting` adapter instead of treating the whole service as
+missing. A failed adapter stays registered with its `lastError` rather than
+collapsing to "configured but not running." Configuration errors such as a
+missing bot token still fail `start()` and do not reconnect.
 
 Both adapters reject commands from any account other than the linked owner.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
-`/test` still sends when Inbox push is off. `/inbox` and `/settings` are
+`/test` still sends when Inbox push is off. `/inbox`, `/settings`, and `/uta` are
 capability commands: the catalog only declares them; Telegram renders
 buttons, and a connector that has not implemented the form yet must still
-answer the slash command.
+answer the slash command. `/uta` does not interpret free-text chat as
+orders; only the owner-linked slash command and its buttons may enqueue
+review, push, or reject.
 
 ### Setup lifecycle and UI ownership
 
@@ -242,20 +312,21 @@ The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
   unlink, linking instructions, and explicit test sends. The Telegram card also
-  binds the Project's one phone-desk Issue: the Workspace picker defaults to
-  the Ask Alice Chat workspace. The operator can edit What and heartbeat
-  cadence, then open the ordinary Issue detail for comments. Generic
-  Issue create/update cannot set `telegramConnector`.
-- The phone-desk Issue is hidden from the Issue board and Tracked list. It still
-  fires on `when`. Extra `telegramConnector: true` files in other Workspaces do
-  not fire. Owner DMs become comments; the desk is seeded with
-  `commentPrompt: '{comment}'` so those comments are the reply Input Prompt
-  as-is. Scheduled-fire `assistantText` is stamped as a comment. Connector
-  projects those comments unless they contain the literal tag `[[no-reply]]`
-  or arrived from Telegram. Pending comment replies also carry compact turn
-  progress. The phone desk ships sealed mid-turn `text` blocks (the last
-  consecutive text before a tool or error) and skips tool/error blocks. A
-  text already sent this way is not sent again as the final comment.
+  binds that connector's phone-desk Issue when the adapter advertises `desk`:
+  the Workspace picker defaults to the Ask Alice Chat workspace. The operator
+  can edit What and heartbeat cadence, then open the ordinary Issue detail
+  for comments. Generic Issue create/update cannot set `connectorDesk`.
+- Each phone-desk Issue is hidden from the Issue board and Tracked list. It
+  still fires on `when`. Extra desks for the same connector in other
+  Workspaces do not fire. Owner DMs become comments on that connector's
+  Issue; the desk is seeded with `commentPrompt: '{comment}'` so those
+  comments are the reply Input Prompt as-is. Scheduled-fire `assistantText`
+  is stamped as a comment. Connector projects those comments unless they
+  contain the literal tag `[[no-reply]]` or arrived from that connector.
+  Pending comment replies also carry compact turn progress. The phone desk
+  ships sealed mid-turn `text` blocks (the last consecutive text before a
+  tool or error) and skips tool/error blocks. A text already sent this way
+  is not sent again as the final comment.
 - **Beta → Connectors** is a read-only operations view: service health, adapter
   status, linked owner, and last delivery evidence.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
@@ -282,7 +353,10 @@ Each probe also records a stable reason code, check timestamp, and latency. A
 failed optional-service probe must never change Alice or Inbox availability.
 An adapter in `starting` or `awaiting_link` is online and intentionally
 incomplete, so it does not degrade the service; external notification delivery
-becomes healthy only after the owner runs `/link`.
+becomes healthy only after the owner runs `/link`. A Telegram adapter that
+cannot reach the Bot API stays `starting` or `degraded` and reconnects
+inside the Connector process; Alice reports `degraded` only while the
+adapter is `degraded`.
 The contract matrix lives in `src/services/optional-carrier/health.spec.ts`;
 `integrations.spec.ts` applies it to the real UTA and Connector response shapes.
 Guardian/process smoke tests remain responsible for proving that an enabled

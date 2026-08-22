@@ -8,10 +8,13 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorArtifactRequestSchema,
+  connectorUtaPresentationSchema,
+  connectorUtaRequestSchema,
   inboxNotificationSchema,
   isConnectorActionExpired,
   isInboxPushEnabled,
   ownerChatMessageSchema,
+  utaFailureMessage,
 } from './types.js'
 
 const baseNotification = {
@@ -44,6 +47,57 @@ describe('owner chat messages', () => {
       adapterId: 'telegram',
       text: 'x'.repeat(OWNER_CHAT_TEXT_MAX + 1),
     })).toThrow()
+  })
+})
+
+describe('UTA review control plane', () => {
+  it('keeps UTA requests to action + optional account identity', () => {
+    expect(connectorUtaRequestSchema.parse({
+      requestId: 'uta-1',
+      connectorId: 'telegram',
+      createdAt: '2026-08-14T15:02:00.000Z',
+      action: 'review',
+    }).action).toBe('review')
+    expect(() => connectorUtaRequestSchema.parse({
+      requestId: 'uta-1',
+      connectorId: 'telegram',
+      createdAt: '2026-08-14T15:02:00.000Z',
+      action: 'stage',
+    })).toThrow()
+    expect(() => connectorUtaRequestSchema.parse({
+      requestId: 'uta-1',
+      connectorId: 'telegram',
+      createdAt: '2026-08-14T15:02:00.000Z',
+      action: 'push',
+      utaId: 'alpaca-paper',
+    })).toThrow()
+    expect(connectorUtaRequestSchema.parse({
+      requestId: 'uta-1',
+      connectorId: 'telegram',
+      createdAt: '2026-08-14T15:02:00.000Z',
+      action: 'push',
+      utaId: 'alpaca-paper',
+      pendingHash: 'abc12345',
+    }).pendingHash).toBe('abc12345')
+  })
+
+  it('rejects an oversized review payload', () => {
+    expect(() => connectorUtaPresentationSchema.parse({
+      requestId: 'uta-1',
+      connectorId: 'telegram',
+      review: {
+        generatedAt: '2026-08-14T15:02:00.000Z',
+        accounts: [{
+          id: 'alpaca-paper',
+          label: 'Alpaca',
+          pendingMessage: null,
+          pendingHash: null,
+          stagedCount: 0,
+          operations: [{ action: 'placeOrder', summary: 'x'.repeat(121) }],
+        }],
+      },
+    })).toThrow()
+    expect(utaFailureMessage('conflict')).toContain('/uta')
   })
 })
 

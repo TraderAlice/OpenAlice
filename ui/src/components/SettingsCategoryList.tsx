@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import {
   Bot,
+  Cpu,
   CandlestickChart,
   FlaskConical,
   Layers3,
@@ -25,6 +26,7 @@ const CATEGORIES = [
   { labelKey: 'settings.category.appearance',  category: 'appearance',     Icon: Palette },
   { labelKey: 'settings.category.activityBar', category: 'activity-bar',   Icon: PanelLeft },
   { labelKey: 'settings.category.aiProvider',  category: 'ai-provider',    Icon: Bot },
+  { labelKey: 'settings.category.agentRuntimes', category: 'agent-runtimes', Icon: Cpu },
   { labelKey: 'settings.category.agentPermissions', category: 'agent-permissions', Icon: ShieldCheck },
   { labelKey: 'settings.category.tools',       category: 'tools',          Icon: Wrench },
   { labelKey: 'settings.category.trading',     category: 'trading',        Icon: CandlestickChart },

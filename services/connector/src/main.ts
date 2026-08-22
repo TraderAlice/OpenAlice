@@ -11,6 +11,8 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorDeliveryReceiptSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
   inboxNotificationSchema,
   ownerChatMessageSchema,
 } from '@traderalice/connector-protocol'
@@ -20,8 +22,10 @@ import { ConnectorConfigStore } from './config-store.js'
 import { discordConnectorRegistration } from './adapters/discord.js'
 import { slackConnectorRegistration } from './adapters/slack.js'
 import { telegramConnectorRegistration } from './adapters/telegram.js'
+import { feishuConnectorRegistration } from './adapters/feishu.js'
 import { ConnectorIOJournal } from './core/io-journal.js'
 import { dataPath } from '@/core/paths.js'
+import { installConnectorProxyTransport } from './core/proxy.js'
 
 const CONNECTOR_PORT = Number(process.env['OPENALICE_CONNECTOR_PORT'] ?? 47334)
 
@@ -31,10 +35,13 @@ async function main(): Promise<void> {
 
   const configStore = new ConnectorConfigStore()
   const config = await configStore.read()
+  const proxy = installConnectorProxyTransport()
+  if (proxy.active) console.log('[connector] shared HTTP proxy transport enabled')
   const registry = new ConnectorRegistry()
-  registry.register(discordConnectorRegistration())
-  registry.register(telegramConnectorRegistration())
-  registry.register(slackConnectorRegistration())
+  registry.register(discordConnectorRegistration(proxy))
+  registry.register(telegramConnectorRegistration(proxy))
+  registry.register(slackConnectorRegistration(proxy))
+  registry.register(feishuConnectorRegistration(proxy))
   const journal = new ConnectorIOJournal({
     path: dataPath('logs', 'connector-io.jsonl'),
     warn: (message) => console.warn(`[connector] ${message}`),
@@ -66,6 +73,11 @@ async function main(): Promise<void> {
   app.post('/v1/inbound/drain', async (c) => {
     return c.json({ messages: manager.drainInbound() })
   })
+  app.post('/v1/inbound/return', async (c) => {
+    const body = await c.req.json().catch(() => null) as { messages?: unknown } | null
+    manager.returnInbound(Array.isArray(body?.messages) ? body.messages : [])
+    return c.json({ ok: true })
+  })
   app.post('/v1/actions/drain', (c) => {
     return c.json({ requests: manager.drainActions() })
   })
@@ -77,6 +89,19 @@ async function main(): Promise<void> {
   app.post('/v1/artifacts/fail', async (c) => {
     const failure = connectorArtifactFailureSchema.parse(await c.req.json())
     await manager.failArtifact(failure)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
+  })
+  app.post('/v1/actions/uta/drain', (c) => {
+    return c.json({ requests: manager.drainUtaActions() })
+  })
+  app.post('/v1/uta/present', async (c) => {
+    const presentation = connectorUtaPresentationSchema.parse(await c.req.json())
+    await manager.presentUta(presentation)
+    return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: presentation.requestId }))
+  })
+  app.post('/v1/uta/fail', async (c) => {
+    const failure = connectorUtaFailureSchema.parse(await c.req.json())
+    await manager.failUta(failure)
     return c.json(connectorDeliveryReceiptSchema.parse({ accepted: true, deliveryId: failure.requestId }))
   })
   app.post('/v1/connectors/:id/test', async (c) => {
@@ -99,6 +124,7 @@ async function main(): Promise<void> {
     server.close()
     await manager.stop()
     await journal.flush()
+    await proxy.close()
     process.exit(0)
   }
   process.on('SIGINT', () => { void shutdown('SIGINT') })

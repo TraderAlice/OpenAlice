@@ -33,6 +33,15 @@ vi.mock('./registry', () => ({
   getView: vi.fn(),
 }))
 
+vi.mock('../hooks/useAliceProject', () => ({
+  useAliceProject: () => ({
+    project: { product: 'trader' },
+    loading: false,
+    error: null,
+    refresh: async () => undefined,
+  }),
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -40,6 +49,27 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('UrlAdopter file provenance', () => {
+  it('restores an Auto Prediction file deep link with its Session return context', async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        '/prediction/workspaces/prediction-1/view/evidence%2Fmarket.md?sessionId=codex-forecast',
+      ]}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'file-viewer',
+      params: {
+        wsId: 'prediction-1',
+        path: 'evidence/market.md',
+        source: 'prediction',
+        returnSessionId: 'codex-forecast',
+      },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('prediction')
+  })
+
   it('restores an Ask Alice file deep link with its Session return context', async () => {
     render(
       <MemoryRouter initialEntries={[
@@ -97,6 +127,36 @@ describe('UrlAdopter file provenance', () => {
   })
 })
 
+describe('UrlAdopter Auto Prediction', () => {
+  it('adopts the managed Prediction Studio route', async () => {
+    render(
+      <MemoryRouter initialEntries={['/prediction/workspaces/prediction-1/studio']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'harness-surface',
+      params: { wsId: 'prediction-1', capability: 'studio', source: 'prediction' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('prediction')
+  })
+
+  it('adopts the Prediction landing route', async () => {
+    render(
+      <MemoryRouter initialEntries={['/prediction']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'auto-prediction-landing',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('prediction')
+  })
+})
+
 describe('UrlAdopter Settings Harness', () => {
   it('adopts the Harness settings category from /settings/harness', async () => {
     render(
@@ -108,6 +168,22 @@ describe('UrlAdopter Settings Harness', () => {
     await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'settings',
       params: { category: 'harness' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
+  })
+})
+
+describe('UrlAdopter Settings Agent runtimes', () => {
+  it('adopts the Agent runtimes settings category from /settings/agent-runtimes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings/agent-runtimes']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'settings',
+      params: { category: 'agent-runtimes' },
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('settings')
   })
@@ -174,5 +250,35 @@ describe('UrlAdopter Tracked selection', () => {
       params: { workspace: 'workspace-1', issue: 'power-watch' },
     }))
     expect(mocks.setSidebar).toHaveBeenCalledWith('tracked')
+  })
+})
+
+describe('UrlAdopter Market News', () => {
+  it('adopts News under Market from /market/news', async () => {
+    render(
+      <MemoryRouter initialEntries={['/market/news']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'news',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('market')
+  })
+
+  it('redirects the retired /news rail route into Market', async () => {
+    render(
+      <MemoryRouter initialEntries={['/news']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'news',
+      params: {},
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('market')
   })
 })

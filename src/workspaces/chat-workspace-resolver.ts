@@ -4,6 +4,7 @@ import type { WorkspaceMeta, WorkspaceRegistry } from './workspace-registry.js';
 
 export const CHAT_WORKSPACE_TEMPLATE = 'chat';
 export const AUTO_QUANT_WORKSPACE_TEMPLATE = 'auto-quant-v2';
+export const AUTO_PREDICTION_WORKSPACE_TEMPLATE = 'auto-prediction';
 
 type CreateFailure = Extract<CreateResult, { readonly ok: false }>;
 

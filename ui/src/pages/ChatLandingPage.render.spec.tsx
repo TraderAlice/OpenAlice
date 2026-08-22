@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspacesContextValue } from '../contexts/workspaces-context'
 import { i18n } from '../i18n'
 import type { AgentInfo, Workspace } from '../components/workspace/api'
-import { AutoQuantLandingPage, ChatLandingPage } from './ChatLandingPage'
+import { resetAgentRuntimesStore } from '../hooks/useAgentRuntimes'
+import { AutoPredictionLandingPage, AutoQuantLandingPage, ChatLandingPage } from './ChatLandingPage'
 
 const mocks = vi.hoisted(() => ({
   useWorkspaces: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getAgentReadiness: vi.fn(),
   getAgentRuntimeReadiness: vi.fn(),
   probeAgentRuntimeReadiness: vi.fn(),
+  listAgents: vi.fn(),
   getWorkspaceCredentialDefaults: vi.fn(),
   getPresets: vi.fn(),
   getQuickChat: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('../components/workspace/api', async (importOriginal) => {
     getAgentReadiness: mocks.getAgentReadiness,
     getAgentRuntimeReadiness: mocks.getAgentRuntimeReadiness,
     probeAgentRuntimeReadiness: mocks.probeAgentRuntimeReadiness,
+    listAgents: mocks.listAgents,
   }
 })
 
@@ -129,6 +132,7 @@ function withInteractivePreference(
 function context(
   workspaces: readonly Workspace[],
   autoQuantDefaultWorkspaceId: string | null = null,
+  autoPredictionDefaultWorkspaceId: string | null = null,
 ): WorkspacesContextValue {
   return {
     workspaces,
@@ -146,9 +150,13 @@ function context(
     autoQuantDefaultWorkspaceId,
     autoQuantPreferenceLoaded: true,
     autoQuantPreferenceError: null,
+    autoPredictionDefaultWorkspaceId,
+    autoPredictionPreferenceLoaded: true,
+    autoPredictionPreferenceError: null,
     refresh: vi.fn(),
     refreshTemplates: vi.fn(async () => undefined),
     refreshAutoQuantPreference: vi.fn(async () => undefined),
+    refreshAutoPredictionPreference: vi.fn(async () => undefined),
     refreshWorkspaceManager: vi.fn(async () => undefined),
     quickStartWorkspaceManager: vi.fn(async () => { throw new Error('not used') }),
     spawn: vi.fn(async () => undefined),
@@ -156,8 +164,10 @@ function context(
     setDefaultAgent: vi.fn(async () => undefined),
     setIssueDefaultAgent: vi.fn(async () => undefined),
     initializeAutoQuant: vi.fn(async () => { throw new Error('not used') }),
+    initializeAutoPrediction: vi.fn(async () => { throw new Error('not used') }),
     initializeChat: vi.fn(async () => { throw new Error('not used') }),
     setAutoQuantDefaultWorkspace: vi.fn(async () => undefined),
+    setAutoPredictionDefaultWorkspace: vi.fn(async () => undefined),
     quickChat: mocks.quickChat,
     pauseSession: vi.fn(async () => undefined),
     resumeSession: vi.fn(async () => undefined),
@@ -195,6 +205,7 @@ let workspaces: Workspace[]
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  resetAgentRuntimesStore()
   await i18n.changeLanguage('en')
   workspaces = [chatWorkspace()]
   mocks.useWorkspaces.mockImplementation(() => context(workspaces))
@@ -250,6 +261,7 @@ beforeEach(async () => {
     overallReady: true,
     checkedAt: '2026-07-16T00:00:00.000Z',
   })
+  mocks.listAgents.mockResolvedValue([piAgent, opencodeAgent])
   mocks.probeAgentRuntimeReadiness.mockImplementation(() => mocks.getAgentRuntimeReadiness())
   mocks.getWorkspaceCredentialDefaults.mockResolvedValue({
     defaults: {},
@@ -319,6 +331,47 @@ describe('ChatLandingPage compact-height layout', () => {
     expect(screen.getByTestId('harness-landing-stack').className).toContain('my-auto')
     expect(screen.getByPlaceholderText('Describe the strategy, market, hypothesis, or iteration goal…').className)
       .toContain('min-h-[72px]')
+  })
+
+  it('shares the compact-height contract with the Auto Prediction landing', () => {
+    const predictionWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'prediction-1',
+      tag: 'prediction',
+      template: 'auto-prediction',
+    }
+    workspaces = [predictionWorkspace]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, null, predictionWorkspace.id))
+
+    render(<AutoPredictionLandingPage spec={{ params: {} }} />)
+
+    expect(screen.getByTestId('harness-landing-scroll').className).toContain('justify-start')
+    expect(screen.getByTestId('harness-landing-stack').className).toContain('my-auto')
+    expect(screen.getByPlaceholderText('Describe the market relationship, settlement question, or evidence gap…').className)
+      .toContain('min-h-[72px]')
+  })
+
+  it('prefills an Auto Prediction Quick Start without launching it', () => {
+    const predictionWorkspace: Workspace = {
+      ...chatWorkspace(),
+      id: 'prediction-1',
+      tag: 'prediction',
+      template: 'auto-prediction',
+    }
+    workspaces = [predictionWorkspace]
+    mocks.useWorkspaces.mockImplementation(() => context(workspaces, null, predictionWorkspace.id))
+
+    render(<AutoPredictionLandingPage spec={{
+      params: {
+        targetWsId: predictionWorkspace.id,
+        initialPrompt: 'Install the declared dependencies, then verify Studio.',
+      },
+    }} />)
+
+    expect((screen.getByPlaceholderText(
+      'Describe the market relationship, settlement question, or evidence gap…',
+    ) as HTMLTextAreaElement).value).toBe('Install the declared dependencies, then verify Studio.')
+    expect(mocks.quickChat).not.toHaveBeenCalled()
   })
 })
 

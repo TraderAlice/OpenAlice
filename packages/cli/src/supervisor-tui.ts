@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import {
   dirname,
@@ -23,6 +24,7 @@ import {
   buildManagedPiEnv,
   buildAliceProjectEnv,
   resolveLaunchContext,
+  resolveSupervisorRootPath,
   type AliceProjectLaunchConfig,
   type LaunchConfigValues,
   type MachineSupervisorConfig,
@@ -48,7 +50,9 @@ import {
   readAliceProjectLaunchConfig,
   readMachineLaunchConfig,
   readSupervisorAliceProjectRegistry,
+  isNewerSupervisorSchemaError,
   isStoredHomeUnavailableError,
+  isSupervisorConfigError,
   resolveAvailableStoredLaunchContext,
   resolveStoredLaunchContext,
   validateSupervisorAliceProjectKey,
@@ -56,6 +60,7 @@ import {
 } from './supervisor-config.ts'
 import {
   checkForUpdate,
+  downloadAndRunInstaller,
   maybeNotifyUpdate,
 } from './update.mjs'
 
@@ -114,9 +119,17 @@ interface UpdateResult {
   currentVersion?: string
   latestVersion?: string
   message?: string
+  releaseNotesUrl?: string
+  installer?: {
+    url?: string
+    versionedUrl?: string
+    sha256?: string
+  }
 }
 
 export type SupervisorPanel = 'overview' | 'logs' | 'doctor' | 'help'
+export type SupervisorMode = 'normal' | 'config-recovery'
+export type SupervisorConfigRecoveryReason = 'newer-schema' | 'unreadable'
 export type SupervisorAction =
   | 'start'
   | 'start-open'
@@ -126,17 +139,25 @@ export type SupervisorAction =
   | 'logs'
   | 'doctor'
   | 'update'
+  | 'apply-update'
+export type SupervisorConfirmation =
+  | 'stop'
+  | 'restart'
+  | 'managed-source'
+  | 'update'
 
 export interface SupervisorSnapshot {
   version: string
   channel: string
   runtime: RuntimeSummary | null
   context?: ResolvedLaunchContext
+  mode?: SupervisorMode
+  recoveryReason?: SupervisorConfigRecoveryReason
   diagnostic?: string
   panel?: SupervisorPanel
   busy?: string
   notice?: string
-  confirmation?: 'stop' | 'restart' | 'managed-source'
+  confirmation?: SupervisorConfirmation
   logs?: RuntimeLogs | null
   doctor?: DoctorReport | null
   update?: UpdateResult | null
@@ -155,6 +176,7 @@ export interface SupervisorTuiDependencies {
   diagnose?: (options: Record<string, unknown>) => Promise<DoctorReport>
   checkUpdate?: () => Promise<UpdateResult>
   discoverUpdate?: () => Promise<UpdateResult | null>
+  applyUpdate?: (result: UpdateResult) => Promise<number>
   resolveContext?: (
     flags: TuiLaunchFlags,
   ) => ResolvedLaunchContext | Promise<ResolvedLaunchContext>
@@ -205,6 +227,7 @@ interface SupervisorServices {
   diagnose: NonNullable<SupervisorTuiDependencies['diagnose']>
   checkUpdate: NonNullable<SupervisorTuiDependencies['checkUpdate']>
   discoverUpdate: NonNullable<SupervisorTuiDependencies['discoverUpdate']>
+  applyUpdate: NonNullable<SupervisorTuiDependencies['applyUpdate']>
 }
 
 export async function runSupervisorTui(
@@ -232,42 +255,51 @@ export async function runSupervisorTui(
       }
       return resolveStoredLaunchContext(flags, { env: dependencies.env })
     })
-  let context: ResolvedLaunchContext
+  let context: ResolvedLaunchContext | undefined
   let startupNotice: string | undefined
+  let configRecovery = false
+  let recoveryReason: SupervisorConfigRecoveryReason | undefined
+  let diagnosticFromConfig: string | undefined
   try {
     context = await resolveContext(launchFlags)
   } catch (error: unknown) {
     const env = dependencies.env ?? process.env
-    const explicitSelection = launchFlags.project !== undefined
-      || launchFlags.instance !== undefined
-      || launchFlags.home !== undefined
-      || env['OPENALICE_PROJECT'] !== undefined
-      || env['OPENALICE_INSTANCE'] !== undefined
-      || env['OPENALICE_HOME'] !== undefined
+    const explicitSelection = hasExplicitProjectOrHomeSelection(launchFlags, env)
+    const explicitCliSelection = hasExplicitProjectOrHomeFlags(launchFlags)
     const customResolution = dependencies.resolveContext !== undefined
       || dependencies.machineConfig !== undefined
       || dependencies.projectConfig !== undefined
-    if (
-      explicitSelection
-      || customResolution
-      || !isStoredHomeUnavailableError(error)
-    ) {
+    if (isStoredHomeUnavailableError(error)) {
+      if (explicitSelection || customResolution) throw error
+      context = await resolveAvailableStoredLaunchContext({
+        env: dependencies.env,
+      })
+      startupNotice = storedHomeRecoveryNotice(error, context.project)
+    } else if (isSupervisorConfigError(error)) {
+      if (explicitCliSelection) throw error
+      configRecovery = true
+      recoveryReason = isNewerSupervisorSchemaError(error)
+        ? 'newer-schema'
+        : 'unreadable'
+      startupNotice = configRecoveryNotice(error)
+      diagnosticFromConfig = safeError(error)
+    } else {
       throw error
     }
-    context = await resolveAvailableStoredLaunchContext({
-      env: dependencies.env,
-    })
-    startupNotice = storedHomeRecoveryNotice(error, context.project)
   }
-  let services = createServices(dependencies, context)
+  let services = createServices(dependencies, context, { configRecovery })
   let runtime: RuntimeSummary | null = null
-  let diagnostic: string | undefined
-  try {
-    runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
-  } catch (error: unknown) {
-    diagnostic = safeError(error)
+  let diagnostic: string | undefined = diagnosticFromConfig
+  if (!configRecovery && context) {
+    try {
+      runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+    } catch (error: unknown) {
+      diagnostic = safeError(error)
+    }
   }
 
+  const supervisorRoot = context?.supervisorRoot
+    ?? resolveSupervisorRootPath({ env: dependencies.env })
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const channel = dependencies.channel
     ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
@@ -275,7 +307,7 @@ export async function runSupervisorTui(
   const ui = new piTui.TUI(
     terminal,
     undefined,
-    join(context.supervisorRoot, 'logs'),
+    join(supervisorRoot, 'logs'),
   )
   let active = true
   let actionRunning = false
@@ -291,6 +323,8 @@ export async function runSupervisorTui(
     channel,
     runtime,
     context,
+    mode: configRecovery ? 'config-recovery' : 'normal',
+    recoveryReason,
     diagnostic,
     notice: startupNotice,
   }, {
@@ -366,7 +400,7 @@ export async function runSupervisorTui(
     ?? (() => inspectManagedSource())
 
   async function refreshRuntime(): Promise<void> {
-    if (!active || actionRunning) return
+    if (!active || actionRunning || configRecovery || !context) return
     try {
       const nextRuntime = await services.inspect({
         homeRoot: context.home,
@@ -381,9 +415,13 @@ export async function runSupervisorTui(
   }
 
   async function requestAction(action: SupervisorAction): Promise<void> {
+    if (configRecovery && action !== 'update' && action !== 'apply-update') {
+      screen.update({ notice: configRecoveryBlockedNotice() })
+      return
+    }
     if (
       (action === 'start' || action === 'start-open')
-      && context.appDir === null
+      && context?.appDir === null
     ) {
       try {
         await findSource(process.cwd())
@@ -397,13 +435,41 @@ export async function runSupervisorTui(
 
   async function performAction(action: SupervisorAction): Promise<void> {
     if (!active || actionRunning) return
+    if (configRecovery && action !== 'update' && action !== 'apply-update') {
+      screen.update({ notice: configRecoveryBlockedNotice() })
+      return
+    }
     actionRunning = true
     let actionFailure: string | undefined
-    const homeRoot = context.home
+    const homeRoot = context?.home
     const actionLabel = actionName(action)
-    screen.update({ busy: actionLabel, notice: undefined, diagnostic: undefined })
+    screen.update({
+      busy: actionLabel,
+      notice: undefined,
+      diagnostic: undefined,
+      ...(action === 'apply-update' ? { confirmation: undefined } : {}),
+    })
     try {
-      if (action === 'start' || action === 'start-open') {
+      if (action === 'update') {
+        const update = await services.checkUpdate()
+        screen.update({
+          update,
+          notice: formatUpdateNotice(update),
+          confirmation: update.status === 'available' ? 'update' : undefined,
+        })
+      } else if (action === 'apply-update') {
+        const update = screen.snapshot.update
+        if (update?.status !== 'available') {
+          throw new Error('No verified OpenAlice update is ready to install. Press u to check again.')
+        }
+        await services.applyUpdate(update)
+        screen.update({
+          update,
+          notice: formatUpdateInstalledNotice(update),
+        })
+      } else if (!context || homeRoot === undefined) {
+        throw new Error(configRecoveryBlockedNotice())
+      } else if (action === 'start' || action === 'start-open') {
         await services.start({
           prepare: true,
           rebuild: false,
@@ -457,9 +523,6 @@ export async function runSupervisorTui(
       } else if (action === 'doctor') {
         const doctor = await services.diagnose({ homeRoot, waitMs: 2_000 })
         screen.update({ panel: 'doctor', doctor, notice: undefined })
-      } else {
-        const update = await services.checkUpdate()
-        screen.update({ update, notice: formatUpdateNotice(update) })
       }
     } catch (error: unknown) {
       actionFailure = `${actionLabel} failed: ${safeError(error)}`
@@ -478,6 +541,10 @@ export async function runSupervisorTui(
     startAction: 'start' | 'start-open',
     sourceFailure?: string,
   ): Promise<void> {
+    if (configRecovery || !context) {
+      screen.update({ notice: configRecoveryBlockedNotice() })
+      return
+    }
     if (actionRunning) return
     const source = context.provenance.appDir.source
     if (source === 'environment' || source === 'cli-flag') {
@@ -521,6 +588,10 @@ export async function runSupervisorTui(
   }
 
   async function prepareManagedSourceAndStart(): Promise<void> {
+    if (configRecovery || !context) {
+      screen.update({ notice: configRecoveryBlockedNotice() })
+      return
+    }
     if (!active || actionRunning) return
     const startAction = managedStartAction
     managedStartAction = 'start'
@@ -561,16 +632,21 @@ export async function runSupervisorTui(
   }
 
   function openSourcePrompt(reason?: string): void {
+    if (configRecovery || !context) {
+      screen.update({ notice: configRecoveryBlockedNotice() })
+      return
+    }
+    const sourceContext = context
     if (
       sourcePromptActive
       || settingsActive
       || projectsActive
       || actionRunning
     ) return
-    const source = context.provenance.appDir.source
+    const source = sourceContext.provenance.appDir.source
     if (source === 'environment' || source === 'cli-flag') {
       screen.update({
-        notice: `Source is locked by ${context.provenance.appDir.detail}; change that override and reopen the Supervisor.`,
+        notice: `Source is locked by ${sourceContext.provenance.appDir.detail}; change that override and reopen the Supervisor.`,
       })
       return
     }
@@ -601,7 +677,7 @@ export async function runSupervisorTui(
         ]
       }
     })()
-    input.setValue(context.appDir ?? process.cwd())
+    input.setValue(sourceContext.appDir ?? process.cwd())
     input.handleInput('\u0005')
     const overlay = ui.showOverlay(input, {
       width: '80%',
@@ -633,7 +709,7 @@ export async function runSupervisorTui(
       void (async () => {
         try {
           const appDir = await findSource(requested)
-          const nextContext = await configureProject(context, { appDir })
+          const nextContext = await configureProject(sourceContext, { appDir })
           context = nextContext
           services = createServices(dependencies, context)
           screen.update({
@@ -654,6 +730,11 @@ export async function runSupervisorTui(
   }
 
   async function openSettings(): Promise<void> {
+    if (configRecovery || !context) {
+      screen.update({ notice: configRecoveryBlockedNotice() })
+      return
+    }
+    let settingsContext = context
     if (
       settingsActive
       || sourcePromptActive
@@ -670,8 +751,8 @@ export async function runSupervisorTui(
     let storedMachine: LaunchConfigValues
     try {
       ;[storedProject, storedMachine] = await Promise.all([
-        loadProjectConfig(context),
-        loadMachineConfig(context),
+        loadProjectConfig(settingsContext),
+        loadMachineConfig(settingsContext),
       ])
     } catch (error: unknown) {
       screen.update({
@@ -758,39 +839,39 @@ export async function runSupervisorTui(
       const runtimeStopped = screen.snapshot.runtime?.class === 'absent'
       const homeLocked = editingMachine
         ? undefined
-        : settingOverrideLock(context.provenance.home)
+        : settingOverrideLock(settingsContext.provenance.home)
       const portLocked = editingMachine
         ? undefined
-        : settingOverrideLock(context.provenance.port)
+        : settingOverrideLock(settingsContext.provenance.port)
       const updatesLocked = editingMachine
         ? undefined
-        : settingOverrideLock(context.provenance.updateChecks)
+        : settingOverrideLock(settingsContext.provenance.updateChecks)
       const homeAffectsRunning = !editingMachine
-        || machineDefaultAffectsCurrent('home', context)
+        || machineDefaultAffectsCurrent('home', settingsContext)
       const portAffectsRunning = !editingMachine
-        || machineDefaultAffectsCurrent('port', context)
+        || machineDefaultAffectsCurrent('port', settingsContext)
       const homeEditable = !homeLocked
         && (runtimeStopped || !homeAffectsRunning)
       const portEditable = !portLocked
         && (runtimeStopped || !portAffectsRunning)
       const layerDescription = editingMachine
         ? 'Default for AliceProjects that do not set their own value.'
-        : `Overrides machine defaults for AliceProject "${context.aliceProject.displayName}".`
+        : `Overrides machine defaults for AliceProject "${settingsContext.aliceProject.displayName}".`
       const homeItem: SettingItem = {
         id: 'home',
         label: 'Data home',
         currentValue: homeLocked
-          ? `${context.home} · locked`
+          ? `${settingsContext.home} · locked`
           : editingMachine
             ? machineHomeSettingValue(stored.home)
-            : inheritedSettingValue(stored.home, context.home),
+            : inheritedSettingValue(stored.home, settingsContext.home),
         description: homeLocked
           ?? (
             homeEditable
               ? (
                   editingMachine
                     ? 'Default complete home for the implicit AliceProject. Blank uses ~/.openalice.'
-                    : context.project === 'default'
+                    : settingsContext.project === 'default'
                     ? 'Where this AliceProject keeps settings, credentials, workspaces, and runtime state. Blank uses the inherited location.'
                     : 'Where this named AliceProject keeps its separate settings, credentials, workspaces, and runtime state.'
                 )
@@ -802,12 +883,12 @@ export async function runSupervisorTui(
           editingMachine ? 'Set machine-default complete home' : 'Set AliceProject complete home',
           stored.home ?? '',
           (value) => (
-            !editingMachine && context.project !== 'default' && value === ''
+            !editingMachine && settingsContext.project !== 'default' && value === ''
               ? 'Named AliceProjects require an explicit complete home.'
               : undefined
           ),
           done,
-          editingMachine || context.project === 'default'
+          editingMachine || settingsContext.project === 'default'
             ? 'Leave blank to inherit from the next lower-priority layer.'
             : 'Named AliceProjects require a separate complete home.',
         )
@@ -816,10 +897,10 @@ export async function runSupervisorTui(
         id: 'port',
         label: 'Browser port',
         currentValue: portLocked
-          ? `${context.port} · locked`
+          ? `${settingsContext.port} · locked`
           : editingMachine
             ? machinePortSettingValue(stored.port)
-            : portSettingValue(stored.port, context),
+            : portSettingValue(stored.port, settingsContext),
         description: portLocked
           ?? (
             portEditable
@@ -839,12 +920,12 @@ export async function runSupervisorTui(
         id: 'updateChecks',
         label: 'Update checks',
         currentValue: updatesLocked
-          ? `${context.updateChecks ? ENABLED_SETTING : DISABLED_SETTING} · locked`
+          ? `${settingsContext.updateChecks ? ENABLED_SETTING : DISABLED_SETTING} · locked`
           : editingMachine
             ? machineBooleanSettingValue(stored.updateChecks)
             : booleanSettingValue(stored.updateChecks),
         description: updatesLocked
-          ?? `${layerDescription} This AliceProject currently resolves to ${context.updateChecks ? 'enabled' : 'disabled'}.`,
+          ?? `${layerDescription} This AliceProject currently resolves to ${settingsContext.updateChecks ? 'enabled' : 'disabled'}.`,
       }
       if (!updatesLocked) {
         updateItem.values = [
@@ -853,17 +934,17 @@ export async function runSupervisorTui(
           DISABLED_SETTING,
         ]
       }
-      const runtimeItem: SettingItem = context.runtimeProvider.kind === 'bundle'
+      const runtimeItem: SettingItem = settingsContext.runtimeProvider.kind === 'bundle'
         ? {
             id: 'source',
             label: 'Installed Runtime',
-            currentValue: `OpenAlice ${screen.snapshot.version} · ${context.runtimeProvider.contentIdentity ?? 'verified'}`,
-            description: `Managed by the installer at ${context.appDir ?? 'an unavailable path'}. No source checkout is needed.`,
+            currentValue: `OpenAlice ${screen.snapshot.version} · ${settingsContext.runtimeProvider.contentIdentity ?? 'verified'}`,
+            description: `Managed by the installer at ${settingsContext.appDir ?? 'an unavailable path'}. No source checkout is needed.`,
           }
         : {
             id: 'source',
             label: 'Source checkout',
-            currentValue: context.appDir ?? 'current directory discovery',
+            currentValue: settingsContext.appDir ?? 'current directory discovery',
             description: 'Advanced development provider. Use m for managed source or c to choose a checkout.',
           }
       items.splice(0, items.length,
@@ -883,7 +964,7 @@ export async function runSupervisorTui(
         {
           id: 'config',
           label: 'Advanced config',
-          currentValue: join(context.supervisorRoot, 'config.json'),
+          currentValue: join(settingsContext.supervisorRoot, 'config.json'),
           description: 'Read-only location for machine defaults and named AliceProject settings.',
         },
       )
@@ -912,7 +993,7 @@ export async function runSupervisorTui(
         setMessage(
           scope === MACHINE_SCOPE
             ? 'Editing machine defaults. AliceProject, environment, and command-line layers remain above them.'
-            : `Editing AliceProject "${context.aliceProject.displayName}". Environment and command-line layers remain above it.`,
+            : `Editing AliceProject "${settingsContext.aliceProject.displayName}". Environment and command-line layers remain above it.`,
         )
         return
       }
@@ -921,7 +1002,7 @@ export async function runSupervisorTui(
       const editingMachine = scope === MACHINE_SCOPE
       const lock = editingMachine
         ? undefined
-        : settingOverrideLock(context.provenance[field])
+        : settingOverrideLock(settingsContext.provenance[field])
       if (lock) {
         setMessage(lock)
         restoreDisplayedValue(id)
@@ -932,7 +1013,7 @@ export async function runSupervisorTui(
         && screen.snapshot.runtime?.class !== 'absent'
         && (
           !editingMachine
-          || machineDefaultAffectsCurrent(field, context)
+          || machineDefaultAffectsCurrent(field, settingsContext)
         )
       ) {
         setMessage(`Stop OpenAlice before changing its ${field === 'home' ? 'data home' : 'browser port'}.`)
@@ -955,16 +1036,17 @@ export async function runSupervisorTui(
             }
       saving = true
       actionRunning = true
-      const layerLabel = editingMachine ? 'machine default' : `AliceProject "${context.aliceProject.displayName}"`
+      const layerLabel = editingMachine ? 'machine default' : `AliceProject "${settingsContext.aliceProject.displayName}"`
       setMessage(`Saving ${settingLabel(field)} for ${layerLabel}…`)
       try {
-        context = editingMachine
-          ? await configureMachine(context, patch)
-          : await configureProject(context, patch)
-        services = createServices(dependencies, context)
+        settingsContext = editingMachine
+          ? await configureMachine(settingsContext, patch)
+          : await configureProject(settingsContext, patch)
+        context = settingsContext
+        services = createServices(dependencies, settingsContext)
         ;[storedProject, storedMachine] = await Promise.all([
-          loadProjectConfig(context),
-          loadMachineConfig(context),
+          loadProjectConfig(settingsContext),
+          loadMachineConfig(settingsContext),
         ])
         syncItems()
         updateDisplayedValues()
@@ -1002,7 +1084,7 @@ export async function runSupervisorTui(
     const panel = new (class implements Component {
       render(width: number): string[] {
         return [
-          `OpenAlice setup · ${context.aliceProject.displayName}`,
+          `OpenAlice setup · ${settingsContext.aliceProject.displayName}`,
           '─'.repeat(Math.max(1, width)),
           '',
           ...settings.render(width),
@@ -1030,6 +1112,11 @@ export async function runSupervisorTui(
   }
 
   async function openProjects(): Promise<void> {
+    if (configRecovery || !context) {
+      screen.update({ notice: configRecoveryBlockedNotice() })
+      return
+    }
+    let projectContext = context
     if (
       projectsActive
       || sourcePromptActive
@@ -1044,7 +1131,7 @@ export async function runSupervisorTui(
     })
     let registry: SupervisorAliceProjectRegistry
     try {
-      registry = await loadProjectRegistry(context)
+      registry = await loadProjectRegistry(projectContext)
     } catch (error: unknown) {
       screen.update({
         diagnostic: `Could not load AliceProjects: ${safeError(error)}`,
@@ -1059,23 +1146,23 @@ export async function runSupervisorTui(
     projectsActive = true
     let changing = false
     let message = 'Selecting an AliceProject also makes it the next bare-start default. Copy AI credentials with openalice project copy-ai-creds.'
-    const lock = instanceSelectionOverrideLock(context)
+    const lock = instanceSelectionOverrideLock(projectContext)
     if (lock) message = lock
     const createValue = '__create_alice_project__'
     const visibleInstances = registry.projects.some(
-      (entry) => entry.key === context.project,
+      (entry) => entry.key === projectContext.project,
     )
       ? registry.projects
       : [
           ...registry.projects,
           {
-            id: context.aliceProject.id,
-            key: context.project,
-            name: context.project,
-            displayName: context.aliceProject.displayName,
-            home: context.home,
-            port: context.port,
-            portAutomatic: context.provenance.port.source === 'default',
+            id: projectContext.aliceProject.id,
+            key: projectContext.project,
+            name: projectContext.project,
+            displayName: projectContext.aliceProject.displayName,
+            home: projectContext.home,
+            port: projectContext.port,
+            portAutomatic: projectContext.provenance.port.source === 'default',
             isDefault: false,
           },
         ]
@@ -1083,7 +1170,7 @@ export async function runSupervisorTui(
       value: entry.key,
       label: [
         entry.displayName,
-        entry.key === context.project ? 'current' : undefined,
+        entry.key === projectContext.project ? 'current' : undefined,
         entry.isDefault ? 'default' : undefined,
       ].filter(Boolean).join(' · '),
       description: `${entry.home} · Web ${entry.portAutomatic ? `auto from ${entry.port}` : entry.port}`,
@@ -1108,7 +1195,7 @@ export async function runSupervisorTui(
       maxPrimaryColumnWidth: 32,
     })
     const selectedIndex = items.findIndex(
-      (item) => item.value === context.project,
+      (item) => item.value === projectContext.project,
     )
     list.setSelectedIndex(Math.max(0, selectedIndex))
     let component: Component = list
@@ -1140,8 +1227,9 @@ export async function runSupervisorTui(
       setMessage('Switching AliceProject…')
       try {
         const next = await operation()
-        context = next
-        services = createServices(dependencies, context)
+        projectContext = next
+        context = projectContext
+        services = createServices(dependencies, projectContext)
         screen.update({
           context,
           runtime: null,
@@ -1159,7 +1247,7 @@ export async function runSupervisorTui(
     const showCreateHomeInput = (name: string) => {
       const defaultHome = registry.projects.find(
         (entry) => entry.key === 'default',
-      )?.home ?? context.home
+      )?.home ?? projectContext.home
       const suggestedHome = join(
         dirname(defaultHome),
         `.openalice-${name}`,
@@ -1200,7 +1288,7 @@ export async function runSupervisorTui(
           return
         }
         void activateContext(
-          () => createProject(context, name, home),
+          () => createProject(projectContext, name, home),
           (next) => `Created and selected AliceProject ${next.aliceProject.displayName}.`,
         )
       }
@@ -1265,14 +1353,14 @@ export async function runSupervisorTui(
         return
       }
       if (
-        item.value === context.project
+        item.value === projectContext.project
         && item.value === registry.defaultProject
       ) {
-        close(`AliceProject ${context.aliceProject.displayName} is already selected.`)
+        close(`AliceProject ${projectContext.aliceProject.displayName} is already selected.`)
         return
       }
       void activateContext(
-        () => selectProject(context, item.value),
+        () => selectProject(projectContext, item.value),
         (next) => `Selected AliceProject ${next.aliceProject.displayName}; future bare starts use it.`,
       )
     }
@@ -1308,14 +1396,18 @@ export async function runSupervisorTui(
   }
 
   async function discoverUpdateInBackground(): Promise<void> {
-    if (!context.updateChecks) return
+    if (context ? !context.updateChecks : launchFlags.updateChecks === false) {
+      return
+    }
     try {
       const update = await services.discoverUpdate()
       if (!update) return
       if (!active) return
       screen.update({
         update,
-        ...(update.status === 'available' ? { notice: formatUpdateNotice(update) } : {}),
+        ...(update.status === 'available'
+          ? { notice: formatUpdateNotice(update, 'discover') }
+          : {}),
       })
     } catch {
       // Update discovery is advisory and must not disturb lifecycle control.
@@ -1448,6 +1540,8 @@ export class SupervisorScreen implements Component {
       if (matchesKey(data, 'y') || matchesKey(data, 'enter')) {
         if (this.snapshot.confirmation === 'managed-source') {
           this.onPrepareManagedSource?.()
+        } else if (this.snapshot.confirmation === 'update') {
+          this.onAction?.('apply-update')
         } else {
           this.onAction?.(this.snapshot.confirmation)
         }
@@ -1464,6 +1558,10 @@ export class SupervisorScreen implements Component {
       return true
     }
     if (matchesKey(data, 'enter')) {
+      if (isConfigRecovery(this.snapshot)) {
+        this.update({ notice: configRecoveryBlockedNotice() })
+        return true
+      }
       const action = primaryAction(this.snapshot.runtime)
       if (action && this.actionAvailable(action)) {
         this.onAction?.(action)
@@ -1479,7 +1577,9 @@ export class SupervisorScreen implements Component {
       return true
     }
     if (matchesKey(data, 'c')) {
-      if (this.snapshot.runtime?.class === 'absent') {
+      if (isConfigRecovery(this.snapshot)) {
+        this.update({ notice: configRecoveryBlockedNotice() })
+      } else if (this.snapshot.runtime?.class === 'absent') {
         this.onConfigureSource?.()
       } else {
         this.update({
@@ -1489,15 +1589,25 @@ export class SupervisorScreen implements Component {
       return true
     }
     if (matchesKey(data, 'p')) {
-      this.onSettings?.()
+      if (isConfigRecovery(this.snapshot)) {
+        this.update({ notice: configRecoveryBlockedNotice() })
+      } else {
+        this.onSettings?.()
+      }
       return true
     }
     if (matchesKey(data, 'i')) {
-      this.onProjects?.()
+      if (isConfigRecovery(this.snapshot)) {
+        this.update({ notice: configRecoveryBlockedNotice() })
+      } else {
+        this.onProjects?.()
+      }
       return true
     }
     if (matchesKey(data, 'm')) {
-      if (this.snapshot.runtime?.class === 'absent') {
+      if (isConfigRecovery(this.snapshot)) {
+        this.update({ notice: configRecoveryBlockedNotice() })
+      } else if (this.snapshot.runtime?.class === 'absent') {
         this.onRequestManagedSource?.()
       } else {
         this.update({
@@ -1520,14 +1630,28 @@ export class SupervisorScreen implements Component {
     for (const [key, action] of keyActions) {
       if (matchesKey(data, key)) {
         if (this.actionAvailable(action)) this.onAction?.(action)
-        else this.update({ notice: unavailableActionMessage(action, this.snapshot.runtime) })
+        else {
+          this.update({
+            notice: unavailableActionMessage(
+              action,
+              this.snapshot.runtime,
+              isConfigRecovery(this.snapshot),
+            ),
+          })
+        }
         return true
       }
     }
     if (matchesKey(data, 'x') || matchesKey(data, 'r')) {
       const action = matchesKey(data, 'x') ? 'stop' : 'restart'
       if (!this.actionAvailable(action)) {
-        this.update({ notice: unavailableActionMessage(action, this.snapshot.runtime) })
+        this.update({
+          notice: unavailableActionMessage(
+            action,
+            this.snapshot.runtime,
+            isConfigRecovery(this.snapshot),
+          ),
+        })
       } else {
         this.update({ confirmation: action })
       }
@@ -1546,7 +1670,7 @@ export class SupervisorScreen implements Component {
     const lines = [
       `OpenAlice  ${this.snapshot.version}  ${this.snapshot.channel}${updateBadge}`,
       '─'.repeat(Math.max(1, Math.min(width, 80))),
-      renderTabs(this.snapshot.panel ?? 'overview', narrow),
+      renderTabs(this.snapshot.panel ?? 'overview', narrow, isConfigRecovery(this.snapshot)),
       '',
     ]
 
@@ -1555,7 +1679,9 @@ export class SupervisorScreen implements Component {
     } else if (this.snapshot.panel === 'doctor') {
       lines.push(...renderDoctor(this.snapshot.doctor))
     } else if (this.snapshot.panel === 'help') {
-      lines.push(...renderHelp())
+      lines.push(...renderHelp(isConfigRecovery(this.snapshot)))
+    } else if (isConfigRecovery(this.snapshot)) {
+      lines.push(...renderConfigRecovery(this.snapshot))
     } else {
       lines.push(
         narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
@@ -1597,6 +1723,7 @@ export class SupervisorScreen implements Component {
         this.snapshot.confirmation,
         runtime,
         this.snapshot.managedSource,
+        this.snapshot.update,
       ))
     }
     if (this.snapshot.busy) lines.push('', `Working: ${this.snapshot.busy}…`)
@@ -1606,7 +1733,7 @@ export class SupervisorScreen implements Component {
     }
     lines.push(
       '',
-      ...actionBar(runtime, this.snapshot.context, width),
+      ...actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot)),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
     return lines.map((line) => truncate(line, width))
@@ -1615,21 +1742,30 @@ export class SupervisorScreen implements Component {
   invalidate(): void {}
 
   private actionAvailable(action: SupervisorAction): boolean {
+    if (isConfigRecovery(this.snapshot)) {
+      return action === 'update' || action === 'apply-update'
+    }
     const runtime = this.snapshot.runtime
     if (action === 'logs' || action === 'doctor' || action === 'update') return true
     if (action === 'start' || action === 'start-open') {
       return runtime?.class === 'absent'
     }
     if (action === 'open') return Boolean(runtime?.endpoints?.web)
+    if (action === 'apply-update') {
+      return this.snapshot.update?.status === 'available'
+    }
     return runtime?.owner?.surface === 'cli-server'
       && runtime.class !== 'absent'
       && runtime.class !== 'incompatible'
   }
 
   private selectAdjacentPanel(direction: 1 | -1): void {
-    const panels: SupervisorPanel[] = ['overview', 'logs', 'doctor', 'help']
+    const panels: SupervisorPanel[] = isConfigRecovery(this.snapshot)
+      ? ['overview', 'help']
+      : ['overview', 'logs', 'doctor', 'help']
     const current = panels.indexOf(this.snapshot.panel ?? 'overview')
     const panel = panels[(current + direction + panels.length) % panels.length]
+      ?? 'overview'
     this.update({ panel })
     if (panel === 'logs') this.onAction?.('logs')
     if (panel === 'doctor') this.onAction?.('doctor')
@@ -1638,39 +1774,69 @@ export class SupervisorScreen implements Component {
 
 function createServices(
   dependencies: SupervisorTuiDependencies,
-  context: ResolvedLaunchContext,
+  context: ResolvedLaunchContext | undefined,
+  options: { configRecovery?: boolean } = {},
 ): SupervisorServices {
-  const shared = {
-    env: buildAliceProjectEnv(
-      context,
-      buildManagedPiEnv(context, dependencies.env ?? process.env),
-    ),
+  const env = dependencies.env ?? process.env
+  const shared = context && !options.configRecovery
+    ? {
+        env: buildAliceProjectEnv(
+          context,
+          buildManagedPiEnv(context, env),
+        ),
+      }
+    : { env }
+  const refuseProjectAction = async () => {
+    throw new Error(configRecoveryBlockedNotice())
   }
   return {
-    inspect: dependencies.inspect ?? ((options) => inspectRuntime(options, shared)),
-    start: dependencies.start ?? ((options) => startRuntime(options, {
-      ...shared,
-      detached: true,
-    })),
-    stop: dependencies.stop ?? ((options) => stopRuntime(options, shared)),
-    open: dependencies.open ?? ((options) => openRuntime(options, shared)),
-    readLogs: dependencies.readLogs ?? ((options) => readRuntimeLogs(options, shared)),
-    diagnose: dependencies.diagnose ?? ((options) => diagnoseRuntime(options, shared)),
+    inspect: options.configRecovery
+      ? refuseProjectAction
+      : dependencies.inspect ?? ((inspectOptions) => inspectRuntime(inspectOptions, shared)),
+    start: options.configRecovery
+      ? refuseProjectAction
+      : dependencies.start ?? ((startOptions) => startRuntime(startOptions, {
+          ...shared,
+          detached: true,
+        })),
+    stop: options.configRecovery
+      ? refuseProjectAction
+      : dependencies.stop ?? ((stopOptions) => stopRuntime(stopOptions, shared)),
+    open: options.configRecovery
+      ? refuseProjectAction
+      : dependencies.open ?? ((openOptions) => openRuntime(openOptions, shared)),
+    readLogs: options.configRecovery
+      ? refuseProjectAction
+      : dependencies.readLogs ?? ((logOptions) => readRuntimeLogs(logOptions, shared)),
+    diagnose: options.configRecovery
+      ? refuseProjectAction
+      : dependencies.diagnose ?? ((doctorOptions) => diagnoseRuntime(doctorOptions, shared)),
     checkUpdate: dependencies.checkUpdate ?? (() => checkForUpdate({}, shared)),
     discoverUpdate: dependencies.discoverUpdate ?? (() => maybeNotifyUpdate(
       { enabled: true },
       { ...shared, interactive: true, stderr: SILENT_OUTPUT },
     )),
+    applyUpdate: dependencies.applyUpdate
+      ?? ((result) => applyVerifiedSupervisorUpdate(result, { env })),
   }
 }
 
-function renderTabs(selected: SupervisorPanel, narrow: boolean): string {
-  const labels: Array<[SupervisorPanel, string]> = [
-    ['overview', narrow ? 'Home' : 'Overview'],
-    ['logs', 'Logs'],
-    ['doctor', 'Doctor'],
-    ['help', 'Help'],
-  ]
+function renderTabs(
+  selected: SupervisorPanel,
+  narrow: boolean,
+  recovery = false,
+): string {
+  const labels: Array<[SupervisorPanel, string]> = recovery
+    ? [
+        ['overview', narrow ? 'Home' : 'Overview'],
+        ['help', 'Help'],
+      ]
+    : [
+        ['overview', narrow ? 'Home' : 'Overview'],
+        ['logs', 'Logs'],
+        ['doctor', 'Doctor'],
+        ['help', 'Help'],
+      ]
   return labels
     .map(([panel, label]) => panel === selected ? `[${label}]` : label)
     .join('  ')
@@ -1728,7 +1894,21 @@ function renderDoctor(doctor: DoctorReport | null | undefined): string[] {
   return lines
 }
 
-function renderHelp(): string[] {
+function renderHelp(recovery = false): string[] {
+  if (recovery) {
+    return [
+      'Supervisor recovery controls',
+      '',
+      'AliceProject configuration cannot be read by this OpenAlice.',
+      'This shell will not inspect, start, stop, open, or configure a project.',
+      '',
+      'u  Check for and install a product update',
+      '?  Toggle this help',
+      'q / Esc  Detach only',
+      '',
+      'After a successful update, exit and run openalice again. This process does not reload.',
+    ]
+  }
   return [
     'Supervisor controls',
     '',
@@ -1736,7 +1916,8 @@ function renderHelp(): string[] {
     's  Start in background            o  Open verified Web UI',
     'x  Stop (confirmation required)   r  Restart (confirmation required)',
     'l  Bounded redacted logs          d  Read-only Doctor',
-    'u  Check for product update       ?  Toggle this help',
+    'u  Check for and install a product update',
+    '?  Toggle this help',
     'i  Select or create an AliceProject',
     'p  Review setup for this AliceProject',
     'm  Advanced: prepare installer-managed source and start',
@@ -1747,11 +1928,32 @@ function renderHelp(): string[] {
   ]
 }
 
+function renderConfigRecovery(snapshot: SupervisorSnapshot): string[] {
+  return [
+    'AliceProject configuration cannot be read.',
+    snapshot.recoveryReason === 'newer-schema'
+      ? 'This file requires a newer OpenAlice than the running CLI.'
+      : 'It may be corrupt, or it may require a newer OpenAlice.',
+    'This Supervisor will not inspect, start, open, stop, restart, or configure a project.',
+    'Press u to check for and install an OpenAlice update, or ? for help.',
+  ]
+}
+
 function renderConfirmation(
-  action: 'stop' | 'restart' | 'managed-source',
+  action: SupervisorConfirmation,
   runtime: RuntimeSummary | null,
   managedSource?: ManagedSourcePlan | null,
+  update?: UpdateResult | null,
 ): string[] {
+  if (action === 'update') {
+    return [
+      `Install OpenAlice ${update?.latestVersion ?? 'the available update'} now?`,
+      `Current CLI: ${update?.currentVersion ?? 'this running process'}.`,
+      'This downloads the release installer, verifies its SHA-256, and atomically replaces the installed command.',
+      'This running Supervisor will not reload. After success, exit and run openalice again.',
+      'Press y / Enter to install, n / Esc to cancel.',
+    ]
+  }
   if (action === 'managed-source') {
     const selector = managedSource
       ? `${managedSource.selector.kind} ${managedSource.selector.value}`
@@ -1777,7 +1979,12 @@ function actionBar(
   runtime: RuntimeSummary | null,
   context: ResolvedLaunchContext | undefined,
   width: number,
+  recovery = false,
 ): string[] {
+  if (recovery) {
+    const actions = 'u Update · ? Help'
+    return actions.length <= width ? [actions] : ['u Update', '? Help']
+  }
   const primary = runtime?.class === 'absent'
     ? context?.runtimeProvider.kind === 'bundle'
       ? 'Enter Start & open · s Background · p Setup · i AliceProjects'
@@ -1798,7 +2005,9 @@ function actionBar(
 function unavailableActionMessage(
   action: SupervisorAction,
   runtime: RuntimeSummary | null,
+  recovery = false,
 ): string {
+  if (recovery) return configRecoveryBlockedNotice()
   if (action === 'start') return 'Start is available only when the selected Runtime is stopped.'
   if (action === 'open') return 'The selected Runtime has not advertised a verified Web endpoint.'
   if (action === 'stop' || action === 'restart') {
@@ -1819,6 +2028,7 @@ function actionName(action: SupervisorAction): string {
     logs: 'Loading logs',
     doctor: 'Running Doctor',
     update: 'Checking for updates',
+    'apply-update': 'Installing update',
   }[action]
 }
 
@@ -1830,14 +2040,97 @@ function primaryAction(
   return undefined
 }
 
-function formatUpdateNotice(update: UpdateResult): string {
+function formatUpdateNotice(
+  update: UpdateResult,
+  kind: 'check' | 'discover' = 'check',
+): string {
   if (update.status === 'available') {
-    return `OpenAlice ${update.latestVersion ?? 'update'} is available; use "openalice update" to review installation.`
+    const version = update.latestVersion ?? 'update'
+    return kind === 'discover'
+      ? `OpenAlice ${version} is available; press u to review and install it.`
+      : `OpenAlice ${version} is available. Confirm below to install it now.`
   }
   if (update.status === 'current') {
     return `OpenAlice ${update.currentVersion ?? ''} is current.`.trim()
   }
   return update.message ?? 'Automatic update is unavailable for this install channel.'
+}
+
+function formatUpdateInstalledNotice(update: UpdateResult): string {
+  const version = update.latestVersion ?? 'the new OpenAlice'
+  return `Installed ${version}. This running Supervisor is still the previous CLI and did not reload. Press q to detach, then run openalice again.`
+}
+
+function isConfigRecovery(snapshot: SupervisorSnapshot): boolean {
+  return snapshot.mode === 'config-recovery'
+}
+
+function hasExplicitProjectOrHomeFlags(flags: TuiLaunchFlags): boolean {
+  return flags.project !== undefined
+    || flags.instance !== undefined
+    || flags.home !== undefined
+}
+
+function hasExplicitProjectOrHomeSelection(
+  flags: TuiLaunchFlags,
+  env: NodeJS.ProcessEnv,
+): boolean {
+  return hasExplicitProjectOrHomeFlags(flags)
+    || env['OPENALICE_PROJECT'] !== undefined
+    || env['OPENALICE_INSTANCE'] !== undefined
+    || env['OPENALICE_HOME'] !== undefined
+}
+
+function configRecoveryNotice(error: unknown): string {
+  return isNewerSupervisorSchemaError(error)
+    ? 'AliceProject configuration requires a newer OpenAlice and cannot be read by this CLI. This shell will not inspect, start, or configure a project. Press u to check for and install an update, then exit and run openalice again.'
+    : 'AliceProject configuration cannot be read. It may be corrupt or require a newer OpenAlice. This shell will not inspect, start, or configure a project. Press u to check for and install an update, or repair the Supervisor config.'
+}
+
+function configRecoveryBlockedNotice(): string {
+  return 'AliceProject configuration cannot be used. This Supervisor will not inspect, start, open, stop, restart, or configure a guessed project.'
+}
+
+async function applyVerifiedSupervisorUpdate(
+  result: UpdateResult,
+  options: { env?: NodeJS.ProcessEnv } = {},
+): Promise<number> {
+  const layout = resolveInstalledLayout(import.meta.url)
+  if (!layout) {
+    throw new Error(
+      'This OpenAlice CLI is running from source, not an installed release. Re-run the public installer to update the installed command.',
+    )
+  }
+  if (
+    result.status !== 'available'
+    || typeof result.latestVersion !== 'string'
+    || typeof result.installer?.versionedUrl !== 'string'
+    || typeof result.installer.sha256 !== 'string'
+  ) {
+    throw new Error('Update metadata is incomplete. Press u to check again.')
+  }
+  return downloadAndRunInstaller(result, {
+    layout,
+    yes: true,
+    env: options.env ?? process.env,
+    spawnImpl: createSupervisorUpdateSpawn(),
+  })
+}
+
+function createSupervisorUpdateSpawn() {
+  return (
+    command: string,
+    args: readonly string[],
+    options: Record<string, unknown>,
+  ) => {
+    const child = spawn(command, [...args], {
+      ...options,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    child.stdout?.resume()
+    child.stderr?.resume()
+    return child
+  }
 }
 
 function runtimeStartPort(

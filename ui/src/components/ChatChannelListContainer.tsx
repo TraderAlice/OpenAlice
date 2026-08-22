@@ -20,7 +20,7 @@ export function ChatChannelListContainer({
   displayMode,
   onRequestDisplayMode,
 }: {
-  mode?: 'chat' | 'auto-quant'
+  mode?: 'chat' | 'auto-quant' | 'prediction'
   onNavigate?: () => void
   displayMode: ChatDisplayMode
   onRequestDisplayMode: (mode: ChatDisplayMode) => void

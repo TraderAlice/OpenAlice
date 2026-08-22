@@ -5,11 +5,10 @@ import { PageSidebarLayout, type PageSidebarControls } from '../components/PageS
 type NavTitleKey =
   | 'nav.item.tracked'
   | 'nav.item.workspaces'
-  | 'nav.item.tradingAsGit'
   | 'nav.item.settings'
   | 'nav.item.dev'
   | 'nav.item.market'
-  | 'nav.item.portfolio'
+  | 'nav.item.trading'
   | 'nav.item.automation'
 
 interface PageSidebarShellProps {

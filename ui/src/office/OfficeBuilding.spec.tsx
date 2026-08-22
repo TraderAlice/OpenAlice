@@ -25,7 +25,7 @@ describe('OfficeBuilding', () => {
         building={{
           config: {
             workspaceSleepAfterMs: 3 * 24 * 60 * 60 * 1000,
-            harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, other: 0 },
+            harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 1, other: 0 },
           },
           lastSeq: 1,
           firstSeq: 1,

@@ -118,4 +118,15 @@ describe('MarketSidebar search keyboard controls', () => {
     expect(useWatchlist.getState().entries).toEqual([])
     expect(getFocusedTab(useWorkspace.getState())).toBeNull()
   })
+
+  it('opens News as a Market browse leaf', () => {
+    render(<MarketSidebar />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'News' }))
+
+    expect(getFocusedTab(useWorkspace.getState())?.spec).toEqual({
+      kind: 'news',
+      params: {},
+    })
+  })
 })

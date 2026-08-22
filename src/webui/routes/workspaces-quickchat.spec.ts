@@ -53,6 +53,7 @@ function build(opts: {
   sessionsByWorkspace?: Record<string, any[]>;
   recentChatWorkspaceId?: string | null;
   autoQuantDefaultWorkspaceId?: string | null;
+  autoPredictionDefaultWorkspaceId?: string | null;
   claudeConfig?: WorkspaceAiCred | null;
   claudeInteractiveSetupStatus?: 'ready' | 'runtime-onboarding-required' | 'workspace-trust-required' | 'unknown';
   opencodeConfig?: WorkspaceAiCred | null;
@@ -181,6 +182,11 @@ function build(opts: {
     'auto-quant-v2',
     'auto-quant',
   );
+  const autoPredictionWorkspaceResolver = new TemplateWorkspaceResolver(
+    { registry: registry as any, sessionRegistry: sessionRegistry as any, creator },
+    'auto-prediction',
+    'prediction',
+  );
   const svc = {
     // Default []: today's tag never matches → creator.create path. Tests that
     // exercise targetWsId pass the workspace in so registry resolves it by id.
@@ -193,6 +199,8 @@ function build(opts: {
       chatWorkspaceResolver.resolveOrCreate(preferredWorkspaceId),
     resolveOrCreateAutoQuantWorkspace: (preferredWorkspaceId?: string | null, sourceVersion?: string) =>
       autoQuantWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion),
+    resolveOrCreateAutoPredictionWorkspace: (preferredWorkspaceId?: string | null, sourceVersion?: string) =>
+      autoPredictionWorkspaceResolver.resolveOrCreate(preferredWorkspaceId, sourceVersion),
     resolveAdapter: (_m: any, agentId?: string) => adapters[agentId ?? 'claude'] ?? claude,
     adapters: {
       get: (id: string) => adapters[id],
@@ -231,6 +239,9 @@ function build(opts: {
   const rememberAutoQuantDefaultWorkspace = vi.fn(async (workspaceId: string | null) => ({
     defaultWorkspaceId: workspaceId,
   }));
+  const rememberAutoPredictionDefaultWorkspace = vi.fn(async (workspaceId: string | null) => ({
+    defaultWorkspaceId: workspaceId,
+  }));
   const app = createWorkspaceRoutes(svc, {
     readQuickChatPreferences: vi.fn(async () => ({
       lastCredentialByAgent: {},
@@ -241,6 +252,10 @@ function build(opts: {
       defaultWorkspaceId: opts.autoQuantDefaultWorkspaceId ?? null,
     })),
     rememberAutoQuantDefaultWorkspace,
+    readAutoPredictionPreferences: vi.fn(async () => ({
+      defaultWorkspaceId: opts.autoPredictionDefaultWorkspaceId ?? null,
+    })),
+    rememberAutoPredictionDefaultWorkspace,
   });
   return {
     app,
@@ -250,6 +265,7 @@ function build(opts: {
     creator,
     rememberRecentChatWorkspace,
     rememberAutoQuantDefaultWorkspace,
+    rememberAutoPredictionDefaultWorkspace,
     setTerminalViewAttributes,
   };
 }
@@ -934,6 +950,53 @@ describe('POST /quick-chat — native auth and explicit credential overrides', (
     expect(r.status).toBe(400);
     expect(r.body.error).toBe('auto_quant_workspace_not_default');
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('requires Auto Prediction initialization instead of creating a Workspace from the composer', async () => {
+    const { app, creator } = build();
+    const r = await quickChat(app, {
+      prompt: 'evaluate this market',
+      agent: 'claude',
+      template: 'auto-prediction',
+    });
+
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('auto_prediction_not_initialized');
+    expect(creator.create).not.toHaveBeenCalled();
+  });
+
+  it('initializes the first Auto Prediction Workspace and stores it as the default', async () => {
+    const { app, creator, rememberAutoPredictionDefaultWorkspace } = build();
+    const response = await app.request('/auto-prediction/initialize', { method: 'POST' });
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(201);
+    expect(body.workspace).toMatchObject({ tag: 'prediction', template: 'auto-prediction' });
+    expect(creator.create).toHaveBeenCalledWith('prediction', 'auto-prediction');
+    expect(rememberAutoPredictionDefaultWorkspace).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('uses the selected Auto Prediction default for targetless research', async () => {
+    const existing = {
+      id: 'prediction-existing',
+      dir: '/prediction',
+      template: 'auto-prediction',
+      tag: 'prediction',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    };
+    const { app, creator, spawn } = build({
+      workspaces: [existing],
+      autoPredictionDefaultWorkspaceId: existing.id,
+    });
+
+    const r = await quickChat(app, {
+      prompt: 'evaluate this market',
+      agent: 'claude',
+      template: 'auto-prediction',
+    });
+    expect(r.status).toBe(201);
+    expect((spawn.mock.calls[0] as any[])[0]).toBe(existing.id);
+    expect(creator.create).not.toHaveBeenCalled();
   });
 
   // targetWsId — the chat sidebar's per-workspace "+": spawn INTO the given

@@ -16,9 +16,14 @@ describe('ActivityBar navigation hierarchy', () => {
       'auto-quant',
       'tracked',
       'market',
-      'news',
     ])
-    expect(beta?.items.map((item) => item.page)).toContain('office')
+    expect(beta?.items.map((item) => item.page)).toEqual([
+      'prediction',
+      'office',
+      'portfolio',
+      'connectors',
+    ])
+    expect(beta?.items.find((item) => item.page === 'portfolio')?.labelKey).toBe('nav.item.trading')
     expect(system?.items.map((item) => item.page)).toContain('workspaces')
   })
 
@@ -30,6 +35,7 @@ describe('ActivityBar navigation hierarchy', () => {
       'issue',
       'auto-quant',
       'tracked',
+      'prediction',
       'office',
       'connectors',
       'workspaces',
@@ -38,8 +44,6 @@ describe('ActivityBar navigation hierarchy', () => {
       'dev',
     ])
     expect(pages).not.toContain('market')
-    expect(pages).not.toContain('news')
-    expect(pages).not.toContain('trading-as-git')
     expect(pages).not.toContain('portfolio')
   })
 
@@ -77,6 +81,6 @@ describe('ActivityBar navigation hierarchy', () => {
     expect(hiddenBeta?.items.map((item) => item.page)).not.toContain('office')
     expect(hiddenBeta?.items.length).toBeGreaterThan(0)
     expect(shownBeta?.items.map((item) => item.page)).toContain('office')
-    expect(shownBeta?.items[0]?.page).toBe('office')
+    expect(shownBeta?.items[0]?.page).toBe('prediction')
   })
 })

@@ -80,7 +80,7 @@ describe('UTA — IBKR FX identity staging', () => {
       })
     } finally {
       if (committed || uta!.status().staged.length > 0) {
-        await uta!.reject('e2e: staging-boundary smoke cleanup')
+        await uta!.reject('e2e: staging-boundary smoke cleanup', uta!.status().pendingHash!)
       }
       expect(uta!.status().staged).toHaveLength(0)
       expect(uta!.status().pendingHash).toBeNull()
@@ -117,7 +117,7 @@ describe('UTA — IBKR order lifecycle', () => {
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     console.log(`  pushed: submitted=${pushResult.submitted.length}, status=${pushResult.submitted[0]?.status}`)
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
@@ -128,7 +128,7 @@ describe('UTA — IBKR order lifecycle', () => {
     // Cancel the order
     uta!.stageCancelOrder({ orderId })
     uta!.commit('e2e: cancel limit order')
-    const cancelPush = await uta!.push()
+    const cancelPush = await uta!.push(uta!.status().pendingHash!)
     console.log(`  cancel pushed: submitted=${cancelPush.submitted.length}, status=${cancelPush.submitted[0]?.status}`)
     expect(cancelPush.submitted).toHaveLength(1)
 
@@ -155,7 +155,7 @@ describe('UTA — IBKR TPSL pass-through', () => {
       stopLoss: { price: '100' },
     })
     uta!.commit('e2e: IBKR limit with TPSL (ignored)')
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     console.log(`  pushed with TPSL: submitted=${pushResult.submitted.length}, status=${pushResult.submitted[0]?.status}`)
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
@@ -164,7 +164,7 @@ describe('UTA — IBKR TPSL pass-through', () => {
     const orderId = pushResult.submitted[0].orderId!
     uta!.stageCancelOrder({ orderId })
     uta!.commit('e2e: cancel TPSL order')
-    await uta!.push()
+    await uta!.push(uta!.status().pendingHash!)
   }, 30_000)
 })
 
@@ -201,7 +201,7 @@ describe('UTA — IBKR fill flow (AAPL)', () => {
     expect(commitResult.prepared).toBe(true)
     console.log(`  committed: hash=${commitResult.hash}`)
 
-    const pushResult = await uta!.push()
+    const pushResult = await uta!.push(uta!.status().pendingHash!)
     console.log(`  pushed: submitted=${pushResult.submitted.length}, status=${pushResult.submitted[0]?.status}`)
     expect(pushResult.submitted).toHaveLength(1)
     expect(pushResult.rejected).toHaveLength(0)
@@ -228,7 +228,7 @@ describe('UTA — IBKR fill flow (AAPL)', () => {
     await new Promise(r => setTimeout(r, 3000))
     uta!.stageClosePosition({ aliceId, qty: '1' })
     uta!.commit('e2e: close 1 AAPL')
-    const closePush = await uta!.push()
+    const closePush = await uta!.push(uta!.status().pendingHash!)
     console.log(`  close pushed: status=${closePush.submitted[0]?.status}`)
     expect(closePush.submitted).toHaveLength(1)
 

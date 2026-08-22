@@ -4,6 +4,9 @@ import {
   connectorArtifactRequestSchema,
   connectorDeliveryReceiptSchema,
   connectorServiceHealthSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
+  connectorUtaRequestSchema,
   inboxNotificationSchema,
   inboundOwnerMessageSchema,
   ownerChatMessageSchema,
@@ -12,6 +15,9 @@ import {
   type ConnectorArtifactRequest,
   type ConnectorDeliveryReceipt,
   type ConnectorServiceHealth,
+  type ConnectorUtaFailure,
+  type ConnectorUtaPresentation,
+  type ConnectorUtaRequest,
   type InboxNotification,
   type InboundOwnerMessage,
   type OwnerChatMessage,
@@ -52,6 +58,20 @@ export class ConnectorClient {
       const parsed = inboundOwnerMessageSchema.safeParse(message)
       return parsed.success ? [parsed.data] : []
     })
+  }
+
+  /** Put unread owner DMs back after a per-desk generation block. */
+  async returnInbound(messages: InboundOwnerMessage[], signal?: AbortSignal): Promise<void> {
+    if (messages.length === 0) return
+    const response = await this.fetchImpl(new URL('/v1/inbound/return', this.baseUrl), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        messages: messages.map((message) => inboundOwnerMessageSchema.parse(message)),
+      }),
+      signal,
+    })
+    if (!response.ok) throw new Error(`Connector Service inbound return failed: ${response.status}`)
   }
 
   async sendOwnerMessage(message: OwnerChatMessage, signal?: AbortSignal): Promise<ConnectorDeliveryReceipt> {
@@ -104,6 +124,48 @@ export class ConnectorClient {
       signal,
     })
     if (!response.ok) throw new Error(`Connector Service artifact failure notify failed: ${response.status}`)
+    return connectorDeliveryReceiptSchema.parse(await response.json())
+  }
+
+  async drainUtaActions(signal?: AbortSignal): Promise<ConnectorUtaRequest[]> {
+    const response = await this.fetchImpl(new URL('/v1/actions/uta/drain', this.baseUrl), {
+      method: 'POST',
+      signal,
+    })
+    if (!response.ok) throw new Error(`Connector Service UTA drain failed: ${response.status}`)
+    const body = await response.json() as { requests?: unknown }
+    if (!Array.isArray(body.requests)) return []
+    return body.requests.flatMap((request) => {
+      const parsed = connectorUtaRequestSchema.safeParse(request)
+      return parsed.success ? [parsed.data] : []
+    })
+  }
+
+  async presentUta(
+    presentation: ConnectorUtaPresentation,
+    signal?: AbortSignal,
+  ): Promise<ConnectorDeliveryReceipt> {
+    const response = await this.fetchImpl(new URL('/v1/uta/present', this.baseUrl), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(connectorUtaPresentationSchema.parse(presentation)),
+      signal,
+    })
+    if (!response.ok) throw new Error(`Connector Service UTA present failed: ${response.status}`)
+    return connectorDeliveryReceiptSchema.parse(await response.json())
+  }
+
+  async failUta(
+    failure: ConnectorUtaFailure,
+    signal?: AbortSignal,
+  ): Promise<ConnectorDeliveryReceipt> {
+    const response = await this.fetchImpl(new URL('/v1/uta/fail', this.baseUrl), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(connectorUtaFailureSchema.parse(failure)),
+      signal,
+    })
+    if (!response.ok) throw new Error(`Connector Service UTA failure notify failed: ${response.status}`)
     return connectorDeliveryReceiptSchema.parse(await response.json())
   }
 }

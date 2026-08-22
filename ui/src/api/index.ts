@@ -98,6 +98,8 @@ export type {
   PublicConnectorConfig,
   ConnectorHealth,
   ConnectorSettingsSnapshot,
+  ConnectorDesk,
+  ConnectorDeskSnapshot,
   TelegramConnectorDesk,
   TelegramConnectorDeskSnapshot,
 } from './connectors'

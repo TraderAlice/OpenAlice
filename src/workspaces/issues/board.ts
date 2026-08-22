@@ -58,7 +58,9 @@ export interface IssuesSnapshotIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
-  /** Present only on the Project Telegram phone-desk Issue. */
+  /** Adapter id when this row is that connector's phone-desk Issue. */
+  connectorDesk?: string
+  /** @deprecated Dual-read of the 0.89.4 Telegram-only flag. */
   telegramConnector?: true
   /** True iff this issue's NAME (title, case-insensitive) is also used by an
    *  issue in a DIFFERENT workspace. A name is a global team object, so a clash
@@ -261,6 +263,7 @@ export interface IssueDetailIssue {
   nextDueAtMs?: number | null
   /** Live scheduler/worker health; present iff the Issue has a schedule. */
   automationHealth?: IssueAutomationHealth
+  connectorDesk?: string
   telegramConnector?: true
 }
 
@@ -448,7 +451,7 @@ export function detailIssue(
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
     ...(issue.commentPrompt ? { commentPrompt: issue.commentPrompt } : {}),
-    ...(issue.telegramConnector ? { telegramConnector: true as const } : {}),
+    ...(issue.connectorDesk ? { connectorDesk: issue.connectorDesk, telegramConnector: issue.connectorDesk === 'telegram' ? true as const : undefined } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,
       nextDueAtMs: markers.nextDueAtMs,
@@ -476,7 +479,7 @@ export function snapshotBoardIssue(
     ...(issue.model ? { model: issue.model } : {}),
     ...(issue.effort ? { effort: issue.effort } : {}),
     ...(issue.timeout ? { timeout: issue.timeout } : {}),
-    ...(issue.telegramConnector ? { telegramConnector: true as const } : {}),
+    ...(issue.connectorDesk ? { connectorDesk: issue.connectorDesk, telegramConnector: issue.connectorDesk === 'telegram' ? true as const : undefined } : {}),
     ...(issue.when ? { when: issue.when } : {}),
     ...(markers ? {
       lastFiredAtMs: markers.lastFiredAtMs,

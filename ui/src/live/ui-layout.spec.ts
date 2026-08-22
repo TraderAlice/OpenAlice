@@ -49,4 +49,31 @@ describe('ui-layout document', () => {
     const layout = setPageHidden(defaultUiLayout(), 'settings', true)
     expect(layout.hidden).not.toContain('settings')
   })
+
+  it('drops a retired news rail entry from persisted layouts', () => {
+    const layout = normalizeUiLayout({
+      version: 1,
+      groups: [{ id: 'primary', items: ['chat', 'market', 'news'] }],
+      hidden: ['news', 'dev'],
+    })
+    expect(layout.groups.find((group) => group.id === 'primary')?.items).not.toContain('news')
+    expect(layout.hidden).not.toContain('news')
+    expect(layout.hidden).toEqual(['dev'])
+  })
+
+  it('drops a retired trading-as-git rail entry from persisted layouts', () => {
+    const layout = normalizeUiLayout({
+      version: 1,
+      groups: [{ id: 'beta', items: ['office', 'trading-as-git', 'portfolio', 'connectors'] }],
+      hidden: ['trading-as-git', 'dev'],
+    })
+    expect(layout.groups.find((group) => group.id === 'beta')?.items).toEqual([
+      'office',
+      'portfolio',
+      'connectors',
+      'prediction',
+    ])
+    expect(layout.hidden).not.toContain('trading-as-git')
+    expect(layout.hidden).toEqual(['dev'])
+  })
 })

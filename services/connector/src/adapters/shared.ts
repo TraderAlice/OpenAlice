@@ -4,6 +4,19 @@ import type {
   ConnectorAttachment,
   InboxNotification,
 } from '@traderalice/connector-protocol'
+import type { ConnectorStartFailureDisposition } from '../core/adapter.js'
+
+/**
+ * Shared default for adapters whose SDK exposes transport failures only as
+ * errors. Keep this at the adapter boundary: DeliveryManager must never infer
+ * platform lifecycle semantics from third-party error text.
+ */
+export function classifyNetworkStartFailure(error: unknown): ConnectorStartFailureDisposition {
+  const message = formatAdapterError(error)
+  return /did not become ready|did not answer getme|api is unreachable|network request|fetch failed|econn|etimedout|enotfound|enetunreach|ehostunreach|socket disconnected|aborted delay|certificate|eai_again|socket hang up|tls connection/i.test(message)
+    ? 'retry'
+    : 'fatal'
+}
 
 export class AdapterHealthTracker {
   private value: ConnectorAdapterHealth
@@ -31,7 +44,7 @@ export class AdapterHealthTracker {
       ...this.value,
       status: 'degraded',
       detail: 'External connector is unavailable.',
-      lastError: error instanceof Error ? error.message : String(error),
+      lastError: formatAdapterError(error),
     }
   }
 
@@ -52,6 +65,14 @@ export class AdapterHealthTracker {
     }
   }
 
+  connecting(detail?: string): void {
+    this.value = {
+      ...this.value,
+      status: 'starting',
+      detail: detail ?? 'Connecting to the external platform.',
+    }
+  }
+
   stopped(): void {
     this.value = { ...this.value, status: 'stopped' }
   }
@@ -59,6 +80,60 @@ export class AdapterHealthTracker {
   get(): ConnectorAdapterHealth {
     return { ...this.value }
   }
+}
+
+export const DEFAULT_CONNECTION_ATTEMPT_TIMEOUT_MS = 30_000
+export const DEFAULT_CONNECTION_RETRY_DELAY_MS = 5_000
+export const MAX_CONNECTION_RETRY_DELAY_MS = 60_000
+
+export async function superviseLongConnection(options: {
+  isStopped: () => boolean
+  runSession: () => Promise<void>
+  disconnect: () => Promise<void>
+  onFailure: (error: unknown) => void
+  delay: (ms: number) => Promise<void>
+  reconnectDelayMs?: number
+  label: string
+}): Promise<void> {
+  let failures = 0
+  const baseDelay = options.reconnectDelayMs ?? DEFAULT_CONNECTION_RETRY_DELAY_MS
+  while (!options.isStopped()) {
+    try {
+      await options.runSession()
+      if (options.isStopped()) return
+      failures = 0
+      options.onFailure(new Error(`${options.label} session ended`))
+    } catch (error) {
+      if (options.isStopped()) return
+      failures += 1
+      options.onFailure(error)
+    }
+    await options.disconnect().catch(() => undefined)
+    if (options.isStopped()) return
+    const delayMs = Math.min(baseDelay * 2 ** Math.max(0, failures - 1), MAX_CONNECTION_RETRY_DELAY_MS)
+    console.warn(`[connector] ${options.label} reconnect in ${delayMs}ms`)
+    await options.delay(delayMs)
+  }
+}
+
+export function formatAdapterError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  const parts = [error.message]
+  const nested = 'error' in error ? (error as { error?: unknown }).error : undefined
+  let current: unknown = error.cause ?? nested
+  const seen = new Set<unknown>([error])
+  while (current && !seen.has(current) && parts.length < 4) {
+    seen.add(current)
+    if (current instanceof Error) {
+      if (current.message && !parts.includes(current.message)) parts.push(current.message)
+      current = current.cause
+      continue
+    }
+    const text = String(current)
+    if (text && !parts.includes(text)) parts.push(text)
+    break
+  }
+  return parts.join(' — ')
 }
 
 export function formatInboxNotification(notification: InboxNotification): string {

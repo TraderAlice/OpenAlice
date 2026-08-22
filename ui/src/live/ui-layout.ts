@@ -3,16 +3,15 @@ import type { Page } from '../App'
 export const ACTIVITY_PAGE_IDS = [
   'chat',
   'auto-quant',
+  'prediction',
   'inbox',
   'tracked',
   'workspaces',
   'portfolio',
-  'news',
   'office',
   'automation',
   'market',
   'issue',
-  'trading-as-git',
   'connectors',
   'settings',
   'dev',
@@ -46,8 +45,8 @@ export function defaultUiLayout(): UiLayout {
   return {
     version: 1,
     groups: [
-      { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market', 'news'] },
-      { id: 'beta', items: ['office', 'trading-as-git', 'portfolio', 'connectors'] },
+      { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market'] },
+      { id: 'beta', items: ['prediction', 'office', 'portfolio', 'connectors'] },
       { id: 'system', items: ['workspaces', 'automation', 'settings', 'dev'] },
     ],
     hidden: ['dev'],

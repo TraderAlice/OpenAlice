@@ -252,19 +252,18 @@ async function resolveChildProxyEnv(): Promise<Record<string, string>> {
   // Existing env is authoritative on every platform. Electron 39 embeds Node
   // 22.22, whose fetch stack consumes it only when NODE_USE_ENV_PROXY is set.
   const explicit = proxyEnvFromRules('', process.env)
-  if (Object.keys(explicit).length > 0 || process.env['HTTPS_PROXY'] || process.env['HTTP_PROXY'] || process.env['ALL_PROXY']) {
+  if (Object.keys(explicit).length > 0) {
     return explicit
   }
-  if (process.platform !== 'win32') return {}
 
   try {
-    // Chromium already understands Windows Internet Options, including PAC.
+    // Chromium already understands the host system proxy, including PAC.
     // Resolve one representative HTTPS API URL and pass a concrete proxy to
     // the pure-Node Alice/UTA children, whose fetch does not consult Chromium.
     const rules = await session.defaultSession.resolveProxy('https://api.openai.com/')
     return proxyEnvFromRules(rules, process.env)
   } catch (err) {
-    console.warn(`[guardian] could not resolve Windows system proxy: ${err instanceof Error ? err.message : String(err)}`)
+    console.warn(`[guardian] could not resolve system proxy: ${err instanceof Error ? err.message : String(err)}`)
     return {}
   }
 }

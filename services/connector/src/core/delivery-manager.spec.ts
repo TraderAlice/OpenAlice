@@ -7,7 +7,10 @@ import type {
 } from '@traderalice/connector-protocol'
 import type { ConnectorAdapter, ConnectorAdapterContext } from './adapter.js'
 import { ConnectorRegistry } from './adapter.js'
-import { DeliveryManager, MAX_INBOUND_OWNER_MESSAGES } from './delivery-manager.js'
+import {
+  DeliveryManager,
+  MAX_INBOUND_OWNER_MESSAGES,
+} from './delivery-manager.js'
 import { createConnectorIOEvent, type ConnectorIOEvent, type ConnectorIORecorder } from './io-events.js'
 
 class MemoryRecorder implements ConnectorIORecorder {
@@ -146,6 +149,7 @@ describe('DeliveryManager connector registry', () => {
       registry,
       config: { version: 1, adapters: { broken: { enabled: true, settings: {} } } },
       updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 60_000,
     })
 
     await manager.start()
@@ -155,6 +159,114 @@ describe('DeliveryManager connector registry', () => {
       adapters: [{ id: 'broken', status: 'degraded', lastError: 'Telegram API did not become ready' }],
     })
     await manager.stop()
+  })
+
+  it('retries a transient adapter start failure without dropping the registration', async () => {
+    let attempts = 0
+    let status: ConnectorAdapterHealth['status'] = 'degraded'
+    const adapter: ConnectorAdapter = {
+      id: 'flaky',
+      classifyStartFailure: () => 'retry',
+      start: async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('Telegram polling did not become ready within 15000ms')
+        status = 'healthy'
+      },
+      stop: async () => { status = 'stopped' },
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({ id: 'flaky', enabled: true, status }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'flaky', label: 'Flaky', description: 'Flaky adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { flaky: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 5,
+    })
+
+    await manager.start()
+    expect(attempts).toBe(1)
+    expect(manager.health().adapters[0]?.status).toBe('degraded')
+
+    await vi.waitFor(() => {
+      expect(attempts).toBe(2)
+      expect(manager.health().adapters[0]?.status).toBe('healthy')
+    })
+    await manager.stop()
+  })
+
+  it('does not retry a configuration error', async () => {
+    let attempts = 0
+    const adapter: ConnectorAdapter = {
+      id: 'invalid',
+      start: async () => {
+        attempts += 1
+        throw new Error('Telegram setting botToken is required')
+      },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({
+        id: 'invalid',
+        enabled: true,
+        status: 'degraded',
+        lastError: 'Telegram setting botToken is required',
+      }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'invalid', label: 'Invalid', description: 'Invalid adapter.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { invalid: { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 5,
+    })
+
+    await manager.start()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(attempts).toBe(1)
+    await manager.stop()
+  })
+
+  it('cancels a pending start retry on stop', async () => {
+    let attempts = 0
+    const adapter: ConnectorAdapter = {
+      id: 'slow-fail',
+      classifyStartFailure: () => 'retry',
+      start: async () => {
+        attempts += 1
+        throw new Error('Network request for \'getMe\' failed!')
+      },
+      stop: async () => undefined,
+      deliver: async () => undefined,
+      sendOwnerText: async () => undefined,
+      health: () => ({ id: 'slow-fail', enabled: true, status: 'degraded' }),
+    }
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'slow-fail', label: 'Slow fail', description: 'Fails.', fields: [], commands: [] },
+      create: () => adapter,
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { 'slow-fail': { enabled: true, settings: {} } } },
+      updateAdapterSettings: async () => undefined,
+      adapterStartRetryDelayMs: 50,
+    })
+
+    await manager.start()
+    expect(attempts).toBe(1)
+    await manager.stop()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(attempts).toBe(1)
   })
 
   it('contains adapter delivery failures', async () => {
@@ -441,6 +553,55 @@ describe('DeliveryManager connector registry', () => {
       vi.useRealTimers()
       await manager.stop()
     }
+  })
+
+  it('keeps UTA review requests off the Inbox artifact drain', async () => {
+    const presented: unknown[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: { id: 'telegram', label: 'Telegram', description: 'Telegram.', fields: [], commands: [] },
+      create: () => ({
+        id: 'telegram',
+        start: async () => undefined,
+        stop: async () => undefined,
+        deliver: async () => undefined,
+        sendOwnerText: async () => undefined,
+        presentUta: async (presentation) => { presented.push(presentation) },
+        health: () => ({ id: 'telegram', enabled: true, status: 'healthy' as const }),
+      }),
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { telegram: { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+    await manager.start()
+    const requestId = manager.enqueueUtaRequest('telegram', { action: 'review' })
+    expect(requestId.startsWith('uta-')).toBe(true)
+    expect(manager.drainActions()).toEqual([])
+    expect(manager.drainUtaActions()).toEqual([expect.objectContaining({
+      requestId,
+      connectorId: 'telegram',
+      action: 'review',
+    })])
+    await manager.presentUta({
+      requestId,
+      connectorId: 'telegram',
+      review: {
+        generatedAt: '2026-08-19T12:00:00.000Z',
+        accounts: [{
+          id: 'alpaca-paper',
+          label: 'Alpaca paper',
+          pendingMessage: 'long AAPL',
+          pendingHash: 'abc12345',
+          stagedCount: 1,
+          hiddenOperationCount: 0,
+          operations: [{ action: 'placeOrder', summary: 'BUY AAPL MKT × 10' }],
+        }],
+      },
+    })
+    expect(presented).toHaveLength(1)
+    await manager.stop()
   })
 
   it('delivers an artifact only to the requesting connector', async () => {

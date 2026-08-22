@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import {
   DEMO_AUTO_QUANT_WORKSPACE_ID,
+  DEMO_AUTO_PREDICTION_WORKSPACE_ID,
   DEMO_CHAT_WORKSPACE_ID,
   demoChatWorkspace,
   demoWorkspaces,
@@ -54,6 +55,7 @@ let demoManagerMessages: unknown[] = []
 let demoQuickChatSequence = 0
 let demoWorkspaceCreateSequence = 0
 let demoAutoQuantDefaultWorkspaceId: string | null = DEMO_AUTO_QUANT_WORKSPACE_ID
+let demoAutoPredictionDefaultWorkspaceId: string | null = DEMO_AUTO_PREDICTION_WORKSPACE_ID
 const demoCreatedWorkspaceIds = new Set<string>()
 const DEMO_WORKSPACE_TAG_RE = /^[a-z0-9][a-z0-9_-]{0,32}$/
 
@@ -65,6 +67,7 @@ export function resetDemoWorkspaceCreateState(): void {
   demoCreatedWorkspaceIds.clear()
   demoWorkspaceCreateSequence = 0
   demoAutoQuantDefaultWorkspaceId = DEMO_AUTO_QUANT_WORKSPACE_ID
+  demoAutoPredictionDefaultWorkspaceId = DEMO_AUTO_PREDICTION_WORKSPACE_ID
 }
 
 function webPiKey(wsId: string, sessionId: string): string {
@@ -376,6 +379,39 @@ export const workspacesHandlers = [
       return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
     }
     demoAutoQuantDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ workspace })
+  }),
+  http.get('/api/workspaces/auto-prediction/default-workspace', () => {
+    const workspace = demoAutoPredictionDefaultWorkspaceId
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === demoAutoPredictionDefaultWorkspaceId
+          && candidate.template === 'auto-prediction')
+      : undefined
+    return HttpResponse.json({
+      defaultWorkspaceId: workspace?.id ?? null,
+      configuredWorkspaceId: demoAutoPredictionDefaultWorkspaceId,
+      ready: workspace !== undefined,
+    })
+  }),
+  http.put('/api/workspaces/auto-prediction/default-workspace', async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as { workspaceId?: unknown } | null
+    const workspace = typeof body?.workspaceId === 'string'
+      ? demoWorkspaces.find((candidate) =>
+          candidate.id === body.workspaceId
+          && candidate.template === 'auto-prediction')
+      : undefined
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoPredictionDefaultWorkspaceId = workspace.id
+    return HttpResponse.json({ defaultWorkspaceId: workspace.id, ready: true })
+  }),
+  http.post('/api/workspaces/auto-prediction/initialize', () => {
+    const workspace = demoWorkspaces.find((candidate) => candidate.template === 'auto-prediction')
+    if (!workspace) {
+      return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
+    }
+    demoAutoPredictionDefaultWorkspaceId = workspace.id
     return HttpResponse.json({ workspace })
   }),
   http.put('/api/workspaces/terminal-view-attributes', () =>
@@ -1168,7 +1204,9 @@ export const workspacesHandlers = [
       : undefined
     const fallback = body?.template === 'auto-quant-v2'
       ? demoWorkspaces.find((workspace) => workspace.template === 'auto-quant-v2')
-      : demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
+      : body?.template === 'auto-prediction'
+        ? demoWorkspaces.find((workspace) => workspace.template === 'auto-prediction')
+        : demoWorkspaces.find((workspace) => workspace.id === demoChatWorkspace.id)
     const ws = explicit ?? fallback
     if (!ws) return HttpResponse.json({ error: 'workspace_not_found' }, { status: 404 })
 
@@ -1415,6 +1453,9 @@ export const workspacesHandlers = [
       reasoningEffort: configured ? config?.reasoningEffort ?? null : null,
       reasoningMode: null,
       reasoningDefaultEnabled: null,
+      ...(agent === 'grok' && !configured
+        ? { interactiveSetupStatus: 'workspace-trust-required' as const }
+        : {}),
     })
   }),
   http.put('/api/workspaces/:id/agent-config/:agent', async ({ params, request }) => {

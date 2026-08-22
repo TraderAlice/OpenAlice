@@ -5,10 +5,14 @@ import {
   connectorArtifactDeliverySchema,
   connectorArtifactFailureSchema,
   connectorArtifactRequestSchema,
+  connectorUtaFailureSchema,
+  connectorUtaPresentationSchema,
+  connectorUtaRequestSchema,
   artifactFailureMessage,
   inboundOwnerMessageSchema,
   isConnectorActionExpired,
   isInboxPushEnabled,
+  utaFailureMessage,
   type ConnectorAdapterConfig,
   type ConnectorAdapterHealth,
   type ConnectorArtifactDelivery,
@@ -17,6 +21,9 @@ import {
   type ConnectorConfig,
   type ConnectorDeliveryReceipt,
   type ConnectorServiceHealth,
+  type ConnectorUtaFailure,
+  type ConnectorUtaPresentation,
+  type ConnectorUtaRequest,
   type InboxNotification,
   type InboundOwnerMessage,
   type OwnerChatMessage,
@@ -39,6 +46,8 @@ export interface DeliveryManagerOptions {
   updateAdapterSettings(id: string, patch: Record<string, string | number | boolean>): Promise<void>
   startedAt?: string
   recorder?: ConnectorIORecorder
+  /** First retry delay after a transient adapter start failure. Doubles each attempt up to 60s. */
+  adapterStartRetryDelayMs?: number
 }
 
 /**
@@ -47,12 +56,16 @@ export interface DeliveryManagerOptions {
  * durable notification and performs external delivery after returning.
  */
 export const MAX_INBOUND_OWNER_MESSAGES = 100
+export const DEFAULT_ADAPTER_START_RETRY_DELAY_MS = 5_000
+const MAX_ADAPTER_START_RETRY_DELAY_MS = 60_000
 
 export class DeliveryManager {
   private readonly adapters = new Map<string, ConnectorAdapter>()
   private readonly commands = new Map<string, CommandRegistry>()
   private readonly inbound: InboundOwnerMessage[] = []
   private readonly actions: ConnectorArtifactRequest[] = []
+  private readonly utaActions: ConnectorUtaRequest[] = []
+  private readonly bootRetries = new Map<string, ReturnType<typeof setTimeout>>()
   private readonly startedAt: string
   private stopped = false
 
@@ -77,7 +90,7 @@ export class DeliveryManager {
     for (const [id, config] of Object.entries(this.options.config.adapters)) {
       if (!config.enabled || !this.adapters.has(id)) continue
       await this.bootAdapter(id, config).catch((error) => {
-        console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
+        this.handleAdapterStartFailure(id, config, error, 0)
       })
     }
   }
@@ -141,6 +154,17 @@ export class DeliveryManager {
     return this.inbound.splice(0, Math.max(0, limit))
   }
 
+  returnInbound(messages: readonly unknown[]): void {
+    const restored = messages.flatMap((message) => {
+      const parsed = inboundOwnerMessageSchema.safeParse(message)
+      return parsed.success ? [parsed.data] : []
+    })
+    if (restored.length === 0) return
+    this.inbound.unshift(...restored)
+    const overflow = this.inbound.length - MAX_INBOUND_OWNER_MESSAGES
+    if (overflow > 0) this.inbound.splice(this.inbound.length - overflow, overflow)
+  }
+
   enqueueArtifactRequest(connectorId: string, input: { entryId: string; docIndex: number }): string {
     const expired = this.expireActions()
     for (const request of expired) {
@@ -186,6 +210,116 @@ export class DeliveryManager {
 
   drainActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorArtifactRequest[] {
     return this.actions.splice(0, Math.max(0, limit))
+  }
+
+  enqueueUtaRequest(connectorId: string, input: {
+    action: 'review' | 'push' | 'reject'
+    utaId?: string
+    pendingHash?: string
+  }): string {
+    const expired = this.expireUtaActions()
+    for (const request of expired) {
+      void this.failUta({
+        requestId: request.requestId,
+        connectorId: request.connectorId,
+        reason: 'expired',
+        message: utaFailureMessage('expired'),
+      }).catch((error) => {
+        console.warn(
+          `[connector] ${request.connectorId} expired UTA-request notify failed:`,
+          error instanceof Error ? error.message : error,
+        )
+      })
+    }
+    if (this.utaActions.length >= MAX_CONNECTOR_ACTION_REQUESTS) {
+      throw new Error('Too many pending UTA requests. Try again in a moment.')
+    }
+    const request = connectorUtaRequestSchema.parse({
+      requestId: `uta-${randomUUID()}`,
+      connectorId,
+      createdAt: new Date().toISOString(),
+      action: input.action,
+      ...(input.utaId ? { utaId: input.utaId } : {}),
+      ...(input.pendingHash ? { pendingHash: input.pendingHash } : {}),
+    })
+    this.utaActions.push(request)
+    void this.record({
+      correlationId: request.requestId,
+      direction: 'inbound',
+      stage: 'action.enqueued',
+      connectorId,
+      payload: {
+        kind: 'uta',
+        requestId: request.requestId,
+        action: request.action,
+        utaId: request.utaId,
+        ttlMs: CONNECTOR_ACTION_TTL_MS,
+      },
+    })
+    return request.requestId
+  }
+
+  drainUtaActions(limit = MAX_CONNECTOR_ACTION_REQUESTS): ConnectorUtaRequest[] {
+    return this.utaActions.splice(0, Math.max(0, limit))
+  }
+
+  async presentUta(presentation: ConnectorUtaPresentation): Promise<void> {
+    const parsed = connectorUtaPresentationSchema.parse(presentation)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    await this.record({
+      correlationId: parsed.requestId,
+      direction: 'outbound',
+      stage: 'delivery.attempted',
+      connectorId: adapter.id,
+      payload: {
+        kind: 'uta',
+        requestId: parsed.requestId,
+        accountCount: parsed.review.accounts.length,
+        result: parsed.result?.kind,
+      },
+    })
+    try {
+      if (adapter.presentUta) await adapter.presentUta(parsed)
+      else {
+        const waiting = parsed.review.accounts.filter((account) => account.pendingMessage).length
+        await adapter.sendOwnerText(
+          parsed.result?.message
+          ?? parsed.review.unavailable
+          ?? (waiting > 0
+            ? `UTA: ${waiting} account${waiting === 1 ? '' : 's'} waiting for approval. Open /uta in Telegram or Trading as Git in OpenAlice.`
+            : 'UTA: nothing waiting for approval.'),
+        )
+      }
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.succeeded',
+        connectorId: adapter.id,
+        payload: { kind: 'uta', requestId: parsed.requestId },
+      })
+    } catch (error) {
+      await this.record({
+        correlationId: parsed.requestId,
+        direction: 'outbound',
+        stage: 'delivery.failed',
+        connectorId: adapter.id,
+        payload: {
+          kind: 'uta',
+          requestId: parsed.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
+  }
+
+  async failUta(failure: ConnectorUtaFailure): Promise<void> {
+    const parsed = connectorUtaFailureSchema.parse(failure)
+    const adapter = this.adapters.get(parsed.connectorId)
+    if (!adapter) throw new Error(`Connector is not running: ${parsed.connectorId}`)
+    if (adapter.failUta) await adapter.failUta(parsed)
+    else await adapter.sendOwnerText(parsed.message)
   }
 
   async deliverArtifact(delivery: ConnectorArtifactDelivery): Promise<void> {
@@ -304,6 +438,7 @@ export class DeliveryManager {
 
   async stop(): Promise<void> {
     this.stopped = true
+    for (const id of [...this.bootRetries.keys()]) this.clearAdapterStartRetry(id)
     await Promise.allSettled([...this.adapters.values()].map((adapter) => adapter.stop()))
     this.adapters.clear()
     this.commands.clear()
@@ -340,10 +475,48 @@ export class DeliveryManager {
         })
       },
       enqueueArtifactRequest: (input) => this.enqueueArtifactRequest(id, input),
+      enqueueUtaRequest: (input) => this.enqueueUtaRequest(id, input),
     }
     // Keep a failed adapter registered. start() may record a useful degraded
     // reason; dropping it here reduced Settings to "configured but not running".
     await adapter.start(config, context)
+  }
+
+  private handleAdapterStartFailure(
+    id: string,
+    config: ConnectorAdapterConfig,
+    error: unknown,
+    attempt: number,
+  ): void {
+    console.warn(`[connector] ${id} failed to start:`, error instanceof Error ? error.message : error)
+    const adapter = this.adapters.get(id)
+    if (adapter?.classifyStartFailure?.(error) !== 'retry') return
+    this.scheduleAdapterStartRetry(id, config, attempt)
+  }
+
+  private scheduleAdapterStartRetry(id: string, config: ConnectorAdapterConfig, attempt: number): void {
+    if (this.stopped) return
+    this.clearAdapterStartRetry(id)
+    const base = this.options.adapterStartRetryDelayMs ?? DEFAULT_ADAPTER_START_RETRY_DELAY_MS
+    const delayMs = Math.min(base * 2 ** attempt, MAX_ADAPTER_START_RETRY_DELAY_MS)
+    console.warn(`[connector] ${id} will retry start in ${delayMs}ms`)
+    const timer = setTimeout(() => {
+      this.bootRetries.delete(id)
+      if (this.stopped) return
+      const current = this.options.config.adapters[id]
+      if (!current?.enabled) return
+      void this.bootAdapter(id, current).catch((error) => {
+        this.handleAdapterStartFailure(id, current, error, attempt + 1)
+      })
+    }, delayMs)
+    timer.unref?.()
+    this.bootRetries.set(id, timer)
+  }
+
+  private clearAdapterStartRetry(id: string): void {
+    const timer = this.bootRetries.get(id)
+    if (timer) clearTimeout(timer)
+    this.bootRetries.delete(id)
   }
 
   private get recorder(): ConnectorIORecorder {
@@ -390,6 +563,18 @@ export class DeliveryManager {
       if (!request || isConnectorActionExpired(request.createdAt, now)) {
         if (request) expired.push(request)
         this.actions.splice(index, 1)
+      }
+    }
+    return expired
+  }
+
+  private expireUtaActions(now = Date.now()): ConnectorUtaRequest[] {
+    const expired: ConnectorUtaRequest[] = []
+    for (let index = this.utaActions.length - 1; index >= 0; index -= 1) {
+      const request = this.utaActions[index]
+      if (!request || isConnectorActionExpired(request.createdAt, now)) {
+        if (request) expired.push(request)
+        this.utaActions.splice(index, 1)
       }
     }
     return expired

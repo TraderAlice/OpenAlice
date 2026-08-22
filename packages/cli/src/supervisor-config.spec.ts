@@ -15,15 +15,19 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   createSupervisorAliceProject,
+  isNewerSupervisorSchemaError,
+  isSupervisorConfigError,
   parseSupervisorConfig,
   persistAliceProjectLaunchConfig,
   persistMachineLaunchConfig,
   persistSelectedSupervisorAliceProject,
   readMachineLaunchConfig,
   readSupervisorAliceProjectRegistry,
+  readSupervisorConfig,
   resolveAvailableStoredLaunchContext,
   resolveStoredLaunchContext,
   supervisorConfigPath,
+  writeSupervisorConfig,
 } from './supervisor-config.ts'
 
 const temporaryPaths: string[] = []
@@ -472,7 +476,7 @@ describe('Supervisor configuration', () => {
 
   it('rejects corrupt, unknown, and mismatched configuration fields', () => {
     expect(() => parseSupervisorConfig({
-      schemaVersion: 3,
+      schemaVersion: 0,
     })).toThrow(/schemaVersion must be 2/)
     expect(() => parseSupervisorConfig({
       schemaVersion: 1,
@@ -488,6 +492,104 @@ describe('Supervisor configuration', () => {
       schemaVersion: 1,
       defaultInstance: 'missing',
     })).toThrow(/not present in instances/)
+    expect(() => parseSupervisorConfig({
+      schemaVersion: 2,
+      extra: true,
+      defaults: { port: 'nope' },
+    })).toThrow(/defaults.port must be an integer/)
+  })
+
+  it('reports a newer schemaVersion before unknown-field validation', () => {
+    try {
+      parseSupervisorConfig({
+        schemaVersion: 3,
+        surprise: true,
+        defaults: { futureDefault: true },
+      })
+      throw new Error('expected newer schemaVersion to fail')
+    } catch (error) {
+      expect(isNewerSupervisorSchemaError(error)).toBe(true)
+      expect(isSupervisorConfigError(error)).toBe(true)
+      expect(error).toMatchObject({
+        code: 'ESUPERVISORSCHEMA',
+        exitCode: 2,
+      })
+      expect((error as Error).message).toMatch(/schemaVersion 3 is newer than this OpenAlice/)
+      expect((error as Error).message).not.toMatch(/unknown field/)
+      expect((error as Error).message).not.toMatch(/must be 2/)
+    }
+  })
+
+  it('preserves additive current-schema fields through parse and write', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-forward-'))
+    temporaryPaths.push(root)
+    const researchHome = join(root, 'research-home')
+    await mkdir(researchHome, { recursive: true })
+    const parsed = parseSupervisorConfig({
+      schemaVersion: 2,
+      futureRoot: 'keep-root',
+      defaults: {
+        port: 48_001,
+        futureDefault: { enabled: true },
+      },
+      projects: {
+        research: {
+          name: 'research',
+          home: researchHome,
+          futureProject: ['a', 1],
+        },
+      },
+    })
+    expect(parsed).toEqual({
+      schemaVersion: 2,
+      futureRoot: 'keep-root',
+      defaults: {
+        port: 48_001,
+        futureDefault: { enabled: true },
+      },
+      projects: {
+        research: {
+          name: 'research',
+          home: researchHome,
+          futureProject: ['a', 1],
+        },
+      },
+    })
+
+    const context = await resolveStoredLaunchContext({ project: 'research' }, {
+      homeDir: join(root, 'user'),
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+      readConfig: async () => parsed,
+    })
+    await writeSupervisorConfig(context.supervisorRoot, parsed)
+    await expect(readSupervisorConfig(context.supervisorRoot)).resolves.toEqual(parsed)
+
+    await persistAliceProjectLaunchConfig(context, { port: 48_002 }, {
+      homeDir: join(root, 'user'),
+      cwd: root,
+      platform: 'linux',
+    })
+
+    expect(JSON.parse(
+      await readFile(supervisorConfigPath(context.supervisorRoot), 'utf8'),
+    )).toEqual({
+      schemaVersion: 2,
+      futureRoot: 'keep-root',
+      defaults: {
+        port: 48_001,
+        futureDefault: { enabled: true },
+      },
+      projects: {
+        research: {
+          name: 'research',
+          home: researchHome,
+          futureProject: ['a', 1],
+          port: 48_002,
+        },
+      },
+    })
   })
 
   it('reads the released v1 instance shape and canonicalizes it as AliceProject v2', () => {

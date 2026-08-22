@@ -288,6 +288,7 @@ async function readSummary(path: string): Promise<Record<string, unknown> | null
  * byte array — prefer `output_for_prompt`. There is no workspace-local Grok
  * project file, so this adapter has no deprecated `writeAiConfig` export:
  * managed Sessions use `sessionRuntime` env only. Trust is read-only.
+ * Native `--model` suggestions live in `grok-models.ts` (live `grok models`).
  */
 export const grokAdapter: CliAdapter = {
   id: 'grok',
