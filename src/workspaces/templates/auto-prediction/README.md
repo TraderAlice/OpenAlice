@@ -1,5 +1,5 @@
 ---
-version: 0.1.0
+version: 0.1.1
 ---
 
 # Auto Prediction
@@ -15,16 +15,18 @@ and maintains research artifacts and local Git history. Auto Prediction owns
 its SQLite state, campaigns, evidence model, internal workers, and Studio.
 
 OpenAlice supplies native Agent Sessions, collaboration, Inbox, market-data
-tools, and Workspace lifecycle around the desk. This first Beta integration
-does not start, proxy, embed, or supervise Auto Prediction Studio.
+tools, Workspace lifecycle, and the managed Studio route around the desk.
+OpenAlice supervises only the command declared by `harness.json`; Auto
+Prediction retains its complete Studio and control-plane ownership.
 
 The exact upstream source is recorded in `.alice/harness-source.json`. Until
 Auto Prediction publishes releases, OpenAlice labels the approved commit as an
 experimental snapshot rather than inventing release semantics.
 
-The current approved snapshot is `snapshot-26f3ae2` at commit
-`26f3ae2d617e115850cff6fe047f6fb54c979d20`, the merge that qualifies Auto
-Prediction on Node.js 22.
+The current approved release is `v0.1.1` at commit
+`db49d9dde1386fe3f0f8e7b7c78aa3810b7438b9`. It retains the Node.js 22
+qualification and implements the generic v1 managed Studio capability. The
+earlier qualified snapshots remain selectable for source-history work.
 
 ## Starting work
 
@@ -38,5 +40,6 @@ formats owned by Auto Prediction.
 - Auto Prediction owns prediction-market research truth and application state.
 - The Coding Agent owns dependency installation and repository iteration.
 - OpenAlice owns Workspace, Session, source receipt, and collaboration state.
-- No Studio process or web-surface contract is implied by this template.
+- Studio uses the shared managed web-surface contract; no AP-specific business
+  API is implied by this template.
 - Harness upgrades are never automatic; create-time source selection is exact.

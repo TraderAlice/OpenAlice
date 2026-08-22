@@ -92,12 +92,14 @@ import { validateTerminalViewAttributes } from '../../workspaces/terminal-view-a
 import {
   readAutoPredictionPreferences,
   readAutoQuantPreferences,
+  readHarnessPreferences,
   readQuickChatPreferences,
   rememberAutoPredictionDefaultWorkspace,
   rememberAutoQuantDefaultWorkspace,
   rememberRecentChatWorkspace,
   type AutoPredictionPreferences,
   type AutoQuantPreferences,
+  type HarnessPreferences,
   type QuickChatPreferences,
 } from '../../core/preferences.js';
 import {
@@ -106,6 +108,7 @@ import {
   CHAT_WORKSPACE_TEMPLATE,
 } from '../../workspaces/chat-workspace-resolver.js';
 import { TemplateUpgradeError } from '../../workspaces/template-upgrade.js';
+import { HarnessSourceUpgradeError } from '../../workspaces/harness-source-upgrade.js';
 import { WorkspaceAbsorbError } from '../../workspaces/workspace-absorb.js';
 import {
   MANAGER_WORKSPACE_ID,
@@ -174,6 +177,7 @@ interface QuickChatWorkspacePreferenceDeps {
   rememberAutoQuantDefaultWorkspace?(workspaceId: string | null): Promise<AutoQuantPreferences>;
   readAutoPredictionPreferences?(): Promise<AutoPredictionPreferences>;
   rememberAutoPredictionDefaultWorkspace?(workspaceId: string | null): Promise<AutoPredictionPreferences>;
+  readHarnessPreferences?(): Promise<HarnessPreferences>;
 }
 
 const defaultQuickChatWorkspacePreferenceDeps: QuickChatWorkspacePreferenceDeps = {
@@ -185,6 +189,7 @@ const defaultQuickChatWorkspacePreferenceDeps: QuickChatWorkspacePreferenceDeps 
   readAutoPredictionPreferences: () => readAutoPredictionPreferences(),
   rememberAutoPredictionDefaultWorkspace: (workspaceId) =>
     rememberAutoPredictionDefaultWorkspace(workspaceId),
+  readHarnessPreferences: () => readHarnessPreferences(),
 };
 
 /**
@@ -283,6 +288,8 @@ export function createWorkspaceRoutes(
       : undefined;
     return workspace?.template === AUTO_PREDICTION_WORKSPACE_TEMPLATE ? workspace : undefined;
   };
+  const readHarnessPreference = () =>
+    (quickChatPreferences.readHarnessPreferences ?? readHarnessPreferences)();
 
   // Renderer truth for hidden/headless terminal color queries. App-global,
   // matching Orca's terminal-view-attribute bridge rather than a spawn env.
@@ -1366,6 +1373,7 @@ export function createWorkspaceRoutes(
           .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
       : undefined;
     try {
+      await svc.harnessSurfaces.stopWorkspace(id);
       const result = await svc.lifecycle.offboard({
         id,
         ...(typeof fields['reason'] === 'string' ? { reason: fields['reason'] } : {}),
@@ -1427,6 +1435,59 @@ export function createWorkspaceRoutes(
         return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
       }
       launcherLogger.error('workspace.template_upgrade_apply_failed', { id, err });
+      return c.json({ error: 'upgrade_apply_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.get('/:id/source-upgrade', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    try {
+      const preferences = await readHarnessPreference();
+      const targetVersion = c.req.query('targetVersion');
+      return c.json({
+        plan: await svc.sourceUpgrades.plan(
+          id,
+          preferences.showUnverifiedHarnessReleases,
+          targetVersion || undefined,
+        ),
+      });
+    } catch (err) {
+      if (err instanceof HarnessSourceUpgradeError) {
+        const status = err.code === 'not_found' ? 404
+          : err.code === 'busy' || err.code === 'working_tree_changes' ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.source_upgrade_plan_failed', { id, err });
+      return c.json({ error: 'upgrade_plan_failed', message: (err as Error).message }, 500);
+    }
+  });
+
+  app.post('/:id/source-upgrade', async (c) => {
+    const id = c.req.param('id');
+    if (!validId(id)) return c.json({ error: 'not_found' }, 404);
+    const body = await safeJson(c);
+    const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    if (typeof fields['planDigest'] !== 'string' || typeof fields['targetVersion'] !== 'string') {
+      return c.json({ error: 'bad_request', message: 'planDigest and targetVersion are required' }, 400);
+    }
+    try {
+      const preferences = await readHarnessPreference();
+      const result = await svc.sourceUpgrades.apply(
+        id,
+        preferences.showUnverifiedHarnessReleases,
+        { planDigest: fields['planDigest'], targetVersion: fields['targetVersion'] },
+      );
+      return c.json({ result, workspace: await svc.publicMeta(svc.registry.get(id)!) });
+    } catch (err) {
+      if (err instanceof HarnessSourceUpgradeError) {
+        const status = err.code === 'not_found' ? 404
+          : ['busy', 'working_tree_changes', 'stale_plan'].includes(err.code) ? 409
+            : 400;
+        return c.json({ error: err.code, message: err.message, plan: err.plan }, status);
+      }
+      launcherLogger.error('workspace.source_upgrade_apply_failed', { id, err });
       return c.json({ error: 'upgrade_apply_failed', message: (err as Error).message }, 500);
     }
   });

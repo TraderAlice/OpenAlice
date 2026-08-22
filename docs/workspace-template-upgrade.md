@@ -16,9 +16,11 @@ never replaces the complete Workspace directory.
 
 Only a template that explicitly declares
 `"upgradeStrategy": "managed-context"` participates. Chat opts in. AutoQuant
-V2 source pins and third-party templates remain outside this generic path.
-Choosing an AutoQuant version is a creation-time Harness decision; a future
-upgrade must define an AutoQuant-aware workflow rather than replay bootstrap.
+and Auto Prediction source pins remain outside this managed-file path: they use
+the exact-commit Git merge workflow owned by
+[[docs/harness-web-surfaces.md]]. The two operations share checkout
+serialization and recovery principles but do not replay bootstrap or pretend
+that a whole repository is a launcher-managed file set.
 
 The current managed set is intentionally narrow:
 

@@ -240,8 +240,14 @@ describe('preferences routes', () => {
   })
 
   it('reads and persists harness roster visibility', async () => {
-    const read = vi.fn(async () => ({ showHeadlessBornSessions: false }))
-    const save = vi.fn(async (next: { showHeadlessBornSessions: boolean }) => next)
+    const read = vi.fn(async () => ({
+      showHeadlessBornSessions: false,
+      showUnverifiedHarnessReleases: false,
+    }))
+    const save = vi.fn(async (next: {
+      showHeadlessBornSessions: boolean
+      showUnverifiedHarnessReleases: boolean
+    }) => next)
     const app = createPreferencesRoutes({
       readQuickChatPreferences: vi.fn(),
       rememberQuickChatCredential: vi.fn(),
@@ -254,15 +260,25 @@ describe('preferences routes', () => {
 
     expect(await (await app.request('/harness')).json()).toEqual({
       showHeadlessBornSessions: false,
+      showUnverifiedHarnessReleases: false,
     })
     const response = await app.request('/harness', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ showHeadlessBornSessions: true }),
+      body: JSON.stringify({
+        showHeadlessBornSessions: true,
+        showUnverifiedHarnessReleases: false,
+      }),
     })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ showHeadlessBornSessions: true })
-    expect(save).toHaveBeenCalledWith({ showHeadlessBornSessions: true })
+    expect(await response.json()).toEqual({
+      showHeadlessBornSessions: true,
+      showUnverifiedHarnessReleases: false,
+    })
+    expect(save).toHaveBeenCalledWith({
+      showHeadlessBornSessions: true,
+      showUnverifiedHarnessReleases: false,
+    })
   })
 
   it('reads and persists an ordered agent-runtime quick-access list', async () => {

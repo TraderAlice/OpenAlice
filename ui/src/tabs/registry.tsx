@@ -44,6 +44,7 @@ import { WorkspacePage } from '../pages/WorkspacePage'
 import { TemplateCatalogPage } from '../pages/TemplateCatalogPage'
 import { TemplateDetailPage } from '../pages/TemplateDetailPage'
 import { FileViewerPage } from '../pages/FileViewerPage'
+import { HarnessSurfacePage } from '../pages/HarnessSurfacePage'
 import { TrackedSidebar } from '../components/TrackedSidebar'
 import { WorkspacesSidebar } from '../components/workspace/WorkspacesSidebar'
 import { SettingsCategoryList } from '../components/SettingsCategoryList'
@@ -464,6 +465,17 @@ const autoPredictionLandingModule: ViewModule<'auto-prediction-landing'> = {
   Component: ({ spec }) => <AutoPredictionLandingPage spec={spec} />,
 }
 
+const harnessSurfaceModule: ViewModule<'harness-surface'> = {
+  kind: 'harness-surface',
+  shell: (spec) => spec.params.source,
+  title: (spec, ctx) => {
+    const tag = ctx.workspaces?.find((workspace) => workspace.id === spec.params.wsId)?.tag
+    return `${tag ?? spec.params.wsId.slice(0, 8)} · Studio`
+  },
+  toUrl: (spec) => `/${spec.params.source}/workspaces/${encodeURIComponent(spec.params.wsId)}/studio`,
+  Component: ({ spec }) => <HarnessSurfacePage workspaceId={spec.params.wsId} />,
+}
+
 const workspaceManagerModule: ViewModule<'workspace-manager'> = {
   kind: 'workspace-manager',
   shell: 'chat',
@@ -648,6 +660,7 @@ const VIEWS = {
   'chat-landing': chatLandingModule,
   'auto-quant-landing': autoQuantLandingModule,
   'auto-prediction-landing': autoPredictionLandingModule,
+  'harness-surface': harnessSurfaceModule,
   'workspace-manager': workspaceManagerModule,
   'workspace-list': workspaceListModule,
   workspace: workspaceModule,

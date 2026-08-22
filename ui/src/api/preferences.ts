@@ -18,10 +18,12 @@ export interface QuickChatPreferences {
 
 export interface HarnessPreferences {
   readonly showHeadlessBornSessions: boolean
+  readonly showUnverifiedHarnessReleases: boolean
 }
 
 export const DEFAULT_HARNESS_PREFERENCES: HarnessPreferences = {
   showHeadlessBornSessions: false,
+  showUnverifiedHarnessReleases: false,
 }
 
 export interface AgentRuntimesPreferences {
