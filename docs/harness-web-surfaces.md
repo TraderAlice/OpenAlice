@@ -127,7 +127,12 @@ AutoQuant and Prediction expose Studio beside New research after a default
 Workspace exists. Opening Studio starts idempotently and presents an announced
 starting state until readiness. Failure preserves bounded logs and offers
 retry; ready state embeds the Harness and offers Refresh, Restart, Logs, and
-Open separately.
+Open separately. A failed launch presents the bounded, redacted child output
+inline. When the output indicates an unprepared source checkout, the recovery
+action opens that Harness's Quick Start with a setup task prefilled. The user
+reviews the Agent, credential, model, and effort before sending it to inspect
+repository instructions, install declared dependencies, and verify Studio.
+OpenAlice does not guess or run a package-manager install itself.
 
 The iframe fills the Harness content pane. Its toolbar wraps instead of causing
 horizontal overflow, uses shared Button primitives and visible focus, announces
