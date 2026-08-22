@@ -90,7 +90,6 @@ export type ActivitySection =
   | 'inbox'
   | 'tracked'
   | 'workspaces'
-  | 'trading-as-git'
   | 'connectors'
   | 'settings'
   | 'dev'

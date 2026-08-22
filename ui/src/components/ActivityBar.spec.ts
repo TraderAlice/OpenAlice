@@ -17,7 +17,13 @@ describe('ActivityBar navigation hierarchy', () => {
       'tracked',
       'market',
     ])
-    expect(beta?.items.map((item) => item.page)).toContain('office')
+    expect(beta?.items.map((item) => item.page)).toEqual([
+      'prediction',
+      'office',
+      'portfolio',
+      'connectors',
+    ])
+    expect(beta?.items.find((item) => item.page === 'portfolio')?.labelKey).toBe('nav.item.broker')
     expect(system?.items.map((item) => item.page)).toContain('workspaces')
   })
 
@@ -38,7 +44,6 @@ describe('ActivityBar navigation hierarchy', () => {
       'dev',
     ])
     expect(pages).not.toContain('market')
-    expect(pages).not.toContain('trading-as-git')
     expect(pages).not.toContain('portfolio')
   })
 

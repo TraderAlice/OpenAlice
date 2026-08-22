@@ -45,6 +45,21 @@ describe('ui-layout', () => {
     expect(layout.hidden).toEqual(['dev'])
   })
 
+  it('drops a retired trading-as-git rail entry from persisted layouts', () => {
+    const layout = normalizeUiLayout({
+      version: 1,
+      groups: [{ id: 'beta', items: ['office', 'trading-as-git', 'portfolio', 'connectors'] }],
+      hidden: ['trading-as-git', 'dev'],
+    })
+    expect(layout.groups.find((group) => group.id === 'beta')?.items).toEqual([
+      'office',
+      'portfolio',
+      'connectors',
+    ])
+    expect(layout.hidden).not.toContain('trading-as-git')
+    expect(layout.hidden).toEqual(['dev'])
+  })
+
   it('treats a missing or malformed file as the default document', async () => {
     const path = await layoutFile()
     expect(await readUiLayout(path)).toEqual(defaultUiLayout())
