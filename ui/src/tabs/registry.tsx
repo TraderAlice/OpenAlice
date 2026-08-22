@@ -105,11 +105,11 @@ export interface ViewModule<K extends ViewKind> {
 
 // ==================== Per-kind modules ====================
 
-function BrokerArea({ children }: { children: ReactNode }) {
+function TradingArea({ children }: { children: ReactNode }) {
   return (
     <PageSidebarShell
       storageKey="portfolio"
-      titleKey="nav.item.broker"
+      titleKey="nav.item.trading"
       defaultWidth={220}
       sidebar={<PortfolioSidebar />}
     >
@@ -123,9 +123,9 @@ const portfolioModule: ViewModule<'portfolio'> = {
   title: () => 'Portfolio',
   toUrl: () => '/portfolio',
   Component: () => (
-    <BrokerArea>
+    <TradingArea>
       <PortfolioPage />
-    </BrokerArea>
+    </TradingArea>
   ),
 }
 
@@ -134,9 +134,9 @@ const tradingAsGitModule: ViewModule<'trading-as-git'> = {
   title: () => 'Trading as Git',
   toUrl: () => '/trading-as-git',
   Component: () => (
-    <BrokerArea>
+    <TradingArea>
       <TradingAsGitPage />
-    </BrokerArea>
+    </TradingArea>
   ),
 }
 
@@ -346,9 +346,9 @@ const utaDetailModule: ViewModule<'uta-detail'> = {
   title: (spec) => `Account ${spec.params.id}`,
   toUrl: (spec) => `/settings/uta/${encodeURIComponent(spec.params.id)}`,
   Component: (props) => (
-    <BrokerArea>
+    <TradingArea>
       <UTADetailPage {...props} />
-    </BrokerArea>
+    </TradingArea>
   ),
 }
 

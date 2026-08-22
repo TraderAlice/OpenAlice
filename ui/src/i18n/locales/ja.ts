@@ -14,7 +14,7 @@ export const ja: Resources = {
       news: 'ニュース',
       office: 'オフィス',
       tradingAsGit: 'Trading as Git',
-      broker: 'ブローカー',
+      trading: '取引',
       portfolio: 'ポートフォリオ',
       connectors: 'コネクター',
       issue: 'イシュー',
