@@ -10,7 +10,7 @@ import { usePendingPushCount } from '../live/trading-push'
 import { useEffect } from 'react'
 
 /**
- * Broker sidebar — Trading as Git, then Overview + per-UTA accounts.
+ * Trading sidebar — Trading as Git, then Overview + per-UTA accounts.
  *
  * - "Trading as Git" opens the staged-write review tab (`kind: 'trading-as-git'`).
  * - "All Accounts" opens the aggregate portfolio tab (`kind: 'portfolio'`).

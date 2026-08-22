@@ -14,7 +14,7 @@ export const zh: Resources = {
       news: '新闻',
       office: '办公室',
       tradingAsGit: '交易即 Git',
-      broker: '券商',
+      trading: '交易',
       portfolio: '投资组合',
       connectors: '连接器',
       issue: '议题',

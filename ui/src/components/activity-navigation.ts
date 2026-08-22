@@ -30,7 +30,7 @@ import {
 type NavItemKey =
   | 'nav.item.inbox' | 'nav.item.tracked' | 'nav.item.chat' | 'nav.item.autoQuant' | 'nav.item.autoPrediction' | 'nav.item.workspaces'
   | 'nav.item.market' | 'nav.item.office' | 'nav.item.issue'
-  | 'nav.item.broker' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
+  | 'nav.item.trading' | 'nav.item.connectors' | 'nav.item.automation' | 'nav.item.settings' | 'nav.item.dev'
 
 interface NavLeaf {
   page: Page
@@ -100,8 +100,8 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { page: 'prediction', labelKey: 'nav.item.autoPrediction', icon: Binary, defaultTab: { kind: 'auto-prediction-landing', params: {} } },
       { page: 'office',     labelKey: 'nav.item.office',     icon: Building2, defaultTab: { kind: 'office', params: {} } },
-      // Trading as Git is a Broker navigator leaf, not a rail item.
-      { page: 'portfolio',  labelKey: 'nav.item.broker',     icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
+      // Trading as Git and broker accounts are Trading navigator leaves, not rail items.
+      { page: 'portfolio',  labelKey: 'nav.item.trading',    icon: LineChart, defaultTab: { kind: 'portfolio', params: {} } },
       { page: 'connectors', labelKey: 'nav.item.connectors', icon: Plug, defaultTab: { kind: 'connectors', params: {} } },
     ],
   },

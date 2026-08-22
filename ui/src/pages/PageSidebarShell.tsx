@@ -8,7 +8,7 @@ type NavTitleKey =
   | 'nav.item.settings'
   | 'nav.item.dev'
   | 'nav.item.market'
-  | 'nav.item.broker'
+  | 'nav.item.trading'
   | 'nav.item.automation'
 
 interface PageSidebarShellProps {

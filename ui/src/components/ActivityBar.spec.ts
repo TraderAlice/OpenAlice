@@ -23,7 +23,7 @@ describe('ActivityBar navigation hierarchy', () => {
       'portfolio',
       'connectors',
     ])
-    expect(beta?.items.find((item) => item.page === 'portfolio')?.labelKey).toBe('nav.item.broker')
+    expect(beta?.items.find((item) => item.page === 'portfolio')?.labelKey).toBe('nav.item.trading')
     expect(system?.items.map((item) => item.page)).toContain('workspaces')
   })
 
