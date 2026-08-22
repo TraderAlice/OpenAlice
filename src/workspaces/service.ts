@@ -21,6 +21,7 @@ import {
   type ArtifactOrigin,
 } from '@/core/provenance-store.js';
 import {
+  readHarnessPreferences,
   readQuickChatPreferences,
   rememberRecentChatWorkspace,
 } from '@/core/preferences.js';
@@ -384,6 +385,8 @@ import {
 import { WebPiSessionHost, type WebPiSnapshot } from './webpi-session-host.js';
 import { WorkspaceRegistry, type WorkspaceMeta } from './workspace-registry.js';
 import { readHarnessSource } from './harness-source.js';
+import { HarnessSourceUpgradeManager } from './harness-source-upgrade.js';
+import { HarnessSurfaceManager } from './harness-surface-manager.js';
 import {
   createManagerWorkspaceMeta,
   MANAGER_WORKSPACE_ID,
@@ -413,9 +416,12 @@ export interface SpawnPlan {
 export interface WorkspaceService {
   readonly config: ServerConfig;
   readonly registry: WorkspaceRegistry;
+  /** Supervised Harness-owned web applications and their opaque route table. */
+  readonly harnessSurfaces: HarnessSurfaceManager;
   readonly catalog: WorkspaceCatalog;
   readonly lifecycle: WorkspaceLifecycleManager;
   readonly templateUpgrades: TemplateUpgradeManager;
+  readonly sourceUpgrades: HarnessSourceUpgradeManager;
   readonly workspaceAbsorbs: WorkspaceAbsorbManager;
   /** Coordinates runtime starts with directory-wide lifecycle operations. */
   readonly operationGuard: WorkspaceOperationGuard;
@@ -676,6 +682,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     `${config.launcherRoot}/workspaces.json`,
     launcherLogger.child({ scope: 'registry' }),
   );
+  const harnessSurfaces = new HarnessSurfaceManager(registry);
   const catalog = await WorkspaceCatalog.load(
     join(config.launcherRoot, 'state', 'workspace-catalog.json'),
     registry.list(),
@@ -2833,7 +2840,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     });
     const headless = headlessActivity.list(workspaceId);
     return {
-      busy: sessions.length > 0 || headless.length > 0,
+      busy: sessions.length > 0 || headless.length > 0 || harnessSurfaces.hasWorkspace(workspaceId),
       sessions,
       headless,
     };
@@ -2865,6 +2872,14 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     logger: launcherLogger.child({ scope: 'template-upgrade' }),
   });
   await templateUpgrades.recover();
+  const sourceUpgrades = new HarnessSourceUpgradeManager({
+    registry,
+    templates,
+    workspaceRuntimeActivity: workspaceRuntimeActivityMethod,
+    operationGuard: workspaceOperationGuard,
+    logger: launcherLogger.child({ scope: 'harness-source-upgrade' }),
+  });
+  await sourceUpgrades.recover();
   const workspaceAbsorbs = new WorkspaceAbsorbManager({
     registry,
     catalog,
@@ -2926,7 +2941,13 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     // README frontmatter, is authoritative: changing a document is not the
     // same thing as completing a reviewed three-way upgrade.
     let currentVersion: string | undefined;
-    let upgradeAvailable: { from: string; to: string } | null = null;
+    let upgradeAvailable: {
+      from: string;
+      to: string;
+      kind?: 'template' | 'source';
+      verified?: boolean;
+      commit?: string;
+    } | null = null;
     if (w.template) {
       const tpl = templates.get(w.template);
       if (tpl) {
@@ -2937,6 +2958,29 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           && compareVersions(tpl.version, currentVersion) > 0
         ) {
           upgradeAvailable = { from: currentVersion, to: tpl.version };
+        }
+        if (harnessSource && tpl.source) {
+          const harnessPreferences = await readHarnessPreferences();
+          const latest = await sourceUpgrades.latest(
+            tpl.name,
+            harnessSource.version,
+            harnessPreferences.showUnverifiedHarnessReleases,
+          ).catch((err) => {
+            launcherLogger.warn('harness_source_upgrade.discovery_failed', {
+              template: tpl.name,
+              err,
+            });
+            return null;
+          });
+          if (latest) {
+            upgradeAvailable = {
+              from: harnessSource.version,
+              to: latest.version,
+              kind: 'source',
+              verified: latest.verified,
+              commit: latest.commit,
+            };
+          }
         }
       }
     }
@@ -2961,6 +3005,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     shuttingDown = true;
     launcherLogger.info('workspaces.dispose', { reason, activeSessions: pool.size() });
     scheduleScanner.stop();
+    await harnessSurfaces.dispose();
     pool.disposeAll('plugin shutdown');
     await webPi.stopAll('plugin shutdown');
     transcriptWatcher.disposeAll();
@@ -3046,9 +3091,11 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
   return {
     config,
     registry,
+    harnessSurfaces,
     catalog,
     lifecycle,
     templateUpgrades,
+    sourceUpgrades,
     workspaceAbsorbs,
     operationGuard: workspaceOperationGuard,
     sessionRegistry,

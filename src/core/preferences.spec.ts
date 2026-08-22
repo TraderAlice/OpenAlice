@@ -41,7 +41,10 @@ describe('preferences', () => {
       quickChat: { lastCredentialByAgent: {}, recentChatWorkspaceId: null, recentLaunch: null },
       autoQuant: { defaultWorkspaceId: null },
       autoPrediction: { defaultWorkspaceId: null },
-      harness: { showHeadlessBornSessions: false },
+      harness: {
+        showHeadlessBornSessions: false,
+        showUnverifiedHarnessReleases: false,
+      },
       agentRuntimes: { quickAccessIds: [], recentAgentIds: [] },
     })
 
@@ -175,11 +178,16 @@ describe('preferences', () => {
     const path = await preferenceFile()
     expect(await readHarnessPreferences(path)).toEqual({
       showHeadlessBornSessions: false,
+      showUnverifiedHarnessReleases: false,
     })
 
-    await saveHarnessPreferences({ showHeadlessBornSessions: true }, path)
+    await saveHarnessPreferences({
+      showHeadlessBornSessions: true,
+      showUnverifiedHarnessReleases: false,
+    }, path)
     expect(await readHarnessPreferences(path)).toEqual({
       showHeadlessBornSessions: true,
+      showUnverifiedHarnessReleases: false,
     })
     expect(await readQuickChatPreferences(path)).toEqual({
       lastCredentialByAgent: {},

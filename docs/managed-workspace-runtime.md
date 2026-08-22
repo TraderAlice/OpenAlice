@@ -446,9 +446,11 @@ copies the repository, keeps its upstream ancestry and canonical `origin`,
 starts a local research branch at the approved commit, and writes
 `.alice/harness-source.json`. Bootstrap does not install Harness dependencies;
 the native Coding Agent owns environment setup, later research commits, and
-explicit fetch/merge upgrades inside the Workspace. Auto Prediction's first
-Beta integration is conversation-only: its control plane and Studio are not
-launcher-managed processes.
+explicit fetch/merge upgrades inside the Workspace. When a pinned source
+declares a v1 Studio capability, Alice may launch it with allocator-owned
+loopback ports. Electron keeps its main UI on `app://` and uses the restricted
+streaming Surface Gateway described in [[docs/harness-web-surfaces.md]]; it does
+not re-enable the ordinary Alice web listener.
 
 OpenAlice copies Workspace skills into two canonical project paths:
 

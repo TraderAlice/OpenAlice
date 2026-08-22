@@ -128,6 +128,20 @@ describe('UrlAdopter file provenance', () => {
 })
 
 describe('UrlAdopter Auto Prediction', () => {
+  it('adopts the managed Prediction Studio route', async () => {
+    render(
+      <MemoryRouter initialEntries={['/prediction/workspaces/prediction-1/studio']}>
+        <UrlAdopter />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(mocks.openOrFocus).toHaveBeenCalledWith({
+      kind: 'harness-surface',
+      params: { wsId: 'prediction-1', capability: 'studio', source: 'prediction' },
+    }))
+    expect(mocks.setSidebar).toHaveBeenCalledWith('prediction')
+  })
+
   it('adopts the Prediction landing route', async () => {
     render(
       <MemoryRouter initialEntries={['/prediction']}>

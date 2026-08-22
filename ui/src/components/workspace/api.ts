@@ -61,7 +61,13 @@ export interface Workspace {
    * Set when the source template is newer than the recorded applied baseline.
    * Opens the reviewed three-way Template Upgrade flow.
    */
-  readonly upgradeAvailable?: { from: string; to: string } | null;
+  readonly upgradeAvailable?: {
+    from: string;
+    to: string;
+    kind?: 'template' | 'source';
+    verified?: boolean;
+    commit?: string;
+  } | null;
   /** Exact external Harness source selected when this Workspace was created. */
   readonly harnessSource?: {
     readonly schemaVersion: 1;
@@ -220,6 +226,90 @@ export async function applyTemplateUpgrade(
     throw new TemplateUpgradeApiError(
       body.error ?? 'upgrade_apply_failed',
       body.message ?? `Template upgrade failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.result
+}
+
+export interface HarnessSourceUpgradePlan {
+  readonly workspaceId: string
+  readonly template: string
+  readonly fromVersion: string
+  readonly fromCommit: string
+  readonly toVersion: string
+  readonly toCommit: string
+  readonly verified: boolean
+  readonly strategy: 'source-merge'
+  readonly protocolCompatible: boolean
+  readonly manifestVersion: number | null
+  readonly planDigest: string
+  readonly blocked: boolean
+  readonly blockers: readonly string[]
+  readonly activity: TemplateUpgradePlan['activity']
+  readonly changedPaths: readonly string[]
+  readonly conflictedPaths: readonly string[]
+}
+
+export interface HarnessSourceUpgradeResult {
+  readonly workspaceId: string
+  readonly fromVersion: string
+  readonly toVersion: string
+  readonly commit: string
+  readonly verified: boolean
+}
+
+export class HarnessSourceUpgradeApiError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+    readonly plan?: HarnessSourceUpgradePlan,
+  ) {
+    super(message)
+    this.name = 'HarnessSourceUpgradeApiError'
+  }
+}
+
+export async function getHarnessSourceUpgradePlan(wsId: string): Promise<HarnessSourceUpgradePlan> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade`)
+  const body = await res.json().catch(() => ({})) as {
+    plan?: HarnessSourceUpgradePlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.plan) {
+    throw new HarnessSourceUpgradeApiError(
+      body.error ?? 'upgrade_plan_failed',
+      body.message ?? `Harness source upgrade preview failed: HTTP ${res.status}`,
+      res.status,
+      body.plan,
+    )
+  }
+  return body.plan
+}
+
+export async function applyHarnessSourceUpgrade(
+  wsId: string,
+  planDigest: string,
+  targetVersion: string,
+): Promise<HarnessSourceUpgradeResult> {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(wsId)}/source-upgrade`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ planDigest, targetVersion }),
+  })
+  const body = await res.json().catch(() => ({})) as {
+    result?: HarnessSourceUpgradeResult
+    plan?: HarnessSourceUpgradePlan
+    error?: string
+    message?: string
+  }
+  if (!res.ok || !body.result) {
+    throw new HarnessSourceUpgradeApiError(
+      body.error ?? 'upgrade_apply_failed',
+      body.message ?? `Harness source upgrade failed: HTTP ${res.status}`,
       res.status,
       body.plan,
     )

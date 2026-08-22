@@ -9,6 +9,7 @@ let recentLaunch = {
   reasoningEffort: null as string | null,
 }
 let showHeadlessBornSessions = false
+let showUnverifiedHarnessReleases = false
 let agentRuntimeQuickAccessIds: string[] = []
 let recentAgentRuntimeIds: string[] = []
 
@@ -72,17 +73,23 @@ export const preferencesHandlers = [
     HttpResponse.json({ supported: false }),
   ),
   http.get('/api/preferences/harness', () =>
-    HttpResponse.json({ showHeadlessBornSessions }),
+    HttpResponse.json({ showHeadlessBornSessions, showUnverifiedHarnessReleases }),
   ),
   http.put('/api/preferences/harness', async ({ request }) => {
     const body = (await request.json().catch(() => null)) as {
       showHeadlessBornSessions?: unknown
+      showUnverifiedHarnessReleases?: unknown
     } | null
-    if (!body || typeof body.showHeadlessBornSessions !== 'boolean') {
+    if (
+      !body
+      || typeof body.showHeadlessBornSessions !== 'boolean'
+      || typeof body.showUnverifiedHarnessReleases !== 'boolean'
+    ) {
       return HttpResponse.json({ error: 'invalid_harness_preference' }, { status: 400 })
     }
     showHeadlessBornSessions = body.showHeadlessBornSessions
-    return HttpResponse.json({ showHeadlessBornSessions })
+    showUnverifiedHarnessReleases = body.showUnverifiedHarnessReleases
+    return HttpResponse.json({ showHeadlessBornSessions, showUnverifiedHarnessReleases })
   }),
   http.get('/api/preferences/agent-runtimes', () =>
     HttpResponse.json({

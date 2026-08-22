@@ -195,17 +195,22 @@ the Beta section:
 - native Coding Agent Sessions work inside that repository through the shared
   Harness composer, roster, provenance, and Workspace lifecycle;
 - Auto Prediction continues to own its SQLite state, evidence, campaigns,
-  internal Agent workers, and Studio. Alice does not start, proxy, embed, or
-  supervise Studio in this first integration.
+  internal Agent workers, and Studio business APIs. Alice may start its
+  declared Studio capability but does not reproduce those lifecycles.
 
-The planned financial-dashboard Workspace and Auto Prediction Studio are the
-two concrete specimens for a later managed web-surface contract. Do not infer
-that contract from Vite development commands or add a one-off Studio launcher.
+AutoQuant and Auto Prediction are the first two specimens for the shared
+managed web-surface contract. Alice allocates loopback ports, supervises the
+declared foreground command, waits on Harness-owned readiness, and exposes an
+opaque host route through the current browser/SSH/Electron transport. See
+[[docs/harness-web-surfaces.md]]. A future financial-dashboard Workspace should
+implement the same observed contract rather than receive a one-off launcher.
 
 Load-bearing paths:
 
 - `src/workspaces/service.ts` — Workspace lifecycle and composition.
 - `src/workspaces/session-pool.ts` — PTY process ownership.
+- `src/workspaces/harness-surface-manager.ts` — managed Harness web processes,
+  readiness, routes, logs, and cleanup.
 - `src/workspaces/session-registry.ts` — durable session metadata.
 - `src/workspaces/workspace-runtime-settings.ts` — versioned, secret-free
   `.alice/settings.json` launch preferences.

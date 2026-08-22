@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Check,
+  AppWindow,
   ChevronDown,
   ChevronRight,
   Clock3,
@@ -331,7 +332,7 @@ export function ChatWorkspaceSection({
       {/* Starting a conversation is the primary action. Creating a Workspace is
           a lower-frequency context-boundary action attached to the list it
           affects, rather than a competing half-width CTA. */}
-      <div className="px-2 pt-2 pb-1">
+      <div className="grid grid-cols-1 gap-2 px-2 pt-2 pb-1">
         <button
           type="button"
           onClick={() => navigate({
@@ -347,6 +348,19 @@ export function ChatWorkspaceSection({
             ? t('autoQuant.newResearch')
             : mode === 'prediction' ? t('autoPrediction.newResearch') : t('chat.newChat')}</span>
         </button>
+        {mode !== 'chat' && focusedWorkspace && (
+          <button
+            type="button"
+            onClick={() => navigate({
+              kind: 'harness-surface',
+              params: { wsId: focusedWorkspace.id, capability: 'studio', source: mode },
+            })}
+            className="oa-pressable flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-[13px] font-medium text-foreground hover:border-primary/35 hover:bg-muted"
+          >
+            <AppWindow size={15} strokeWidth={2.05} className="shrink-0 text-primary" />
+            <span>{t('harnessSurface.studio')}</span>
+          </button>
+        )}
       </div>
 
       {(ctx.listError !== null || ctx.templatesError !== null) && !landingOwnsStatus && (
@@ -649,6 +663,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
       : t('chat.multiModeDescription')
   const TriggerIcon = props.displayMode === 'recent' ? Clock3 : LayoutGrid
   const upgrade = props.workspace?.upgradeAvailable ?? null
+  const upgradeVersion = upgrade?.to.replace(/^v(?=\d)/, '') ?? ''
   const contextLabel = props.harness === 'auto-quant'
     ? t('autoQuant.workspaceContextLabel', { name: title })
     : props.harness === 'prediction'
@@ -689,7 +704,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             ref={triggerRef}
             type="button"
             aria-label={upgrade
-              ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgrade.to })
+              ? t('chat.workspaceContextUpdateLabel', { name: title, version: upgradeVersion })
               : contextLabel}
             className="oa-pressable flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           />}
@@ -700,7 +715,7 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
               {title}
             </span>
             <span className={`mt-0.5 block truncate text-[10px] ${upgrade ? 'font-medium text-primary' : 'text-muted-foreground/70'}`}>
-              {upgrade ? t('chat.workspaceUpdateAvailable', { version: upgrade.to }) : subtitle}
+              {upgrade ? t('chat.workspaceUpdateAvailable', { version: upgradeVersion }) : subtitle}
             </span>
           </span>
           {upgrade && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}
@@ -749,12 +764,12 @@ function ChatWorkspaceContextFooter(props: ChatWorkspaceContextFooterProps): Rea
             <button
               type="button"
               onClick={() => closeAndRun(props.onUpgrade)}
-              aria-label={t('chat.reviewWorkspaceUpdateLabel', { version: upgrade.to })}
+              aria-label={t('chat.reviewWorkspaceUpdateLabel', { version: upgradeVersion })}
               className="flex min-h-9 w-full items-center gap-2.5 rounded-md bg-primary/10 px-2.5 py-2 text-left text-xs font-medium text-primary transition-colors hover:bg-primary/15"
             >
               <Layers3 size={14} strokeWidth={2} aria-hidden />
               <span className="min-w-0 flex-1 truncate">{t('chat.reviewWorkspaceUpdate')}</span>
-              <span className="shrink-0 tabular-nums text-[10px] text-primary/75">v{upgrade.to}</span>
+              <span className="shrink-0 tabular-nums text-[10px] text-primary/75">v{upgradeVersion}</span>
             </button>
           )}
           <button

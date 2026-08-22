@@ -135,6 +135,19 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('Ask Alice sidebar in AutoQuant mode', () => {
+  it('stacks Harness capabilities as full-width rows', () => {
+    render(
+      <WorkspacesContext.Provider value={context()}>
+        <ChatWorkspaceSection mode="auto-quant" displayMode="focused" />
+      </WorkspacesContext.Provider>,
+    )
+
+    const newResearch = screen.getByRole('button', { name: 'New research' })
+    const studio = screen.getByRole('button', { name: 'Studio' })
+    expect(newResearch.parentElement).toBe(studio.parentElement)
+    expect(newResearch.parentElement?.className).toContain('grid-cols-1')
+  })
+
   it('keeps the active research current and routes destructive actions through the More menu', async () => {
     const user = userEvent.setup()
     const onNavigate = vi.fn()

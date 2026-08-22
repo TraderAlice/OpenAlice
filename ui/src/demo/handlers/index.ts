@@ -20,6 +20,7 @@ import { preferencesHandlers } from './preferences'
 import { uiLayoutHandlers } from './ui-layout'
 import { inquiryHandlers } from './inquiries'
 import { connectorsHandlers } from './connectors'
+import { harnessSurfaceHandlers } from './harness-surfaces'
 import { catchAllHandlers } from './catchAll'
 
 // Order matters: catchAll must be LAST. MSW resolves handlers in registration
@@ -48,5 +49,6 @@ export const handlers = [
   ...uiLayoutHandlers,
   ...inquiryHandlers,
   ...connectorsHandlers,
+  ...harnessSurfaceHandlers,
   ...catchAllHandlers,
 ]

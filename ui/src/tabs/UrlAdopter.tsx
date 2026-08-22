@@ -47,10 +47,12 @@ export function UrlAdopter() {
         <Route path="/chat/workspaces/:wsId/s/:sessionId" element={<AdoptChatWorkspace />} />
         <Route path="/chat/:channelId" element={<Navigate to="/inbox" replace />} />
         <Route path="/auto-quant" element={<AdoptStatic spec={{ kind: 'auto-quant-landing', params: {} }} />} />
+        <Route path="/auto-quant/workspaces/:wsId/studio" element={<AdoptHarnessSurface source="auto-quant" />} />
         <Route path="/auto-quant/workspaces/:wsId/view/:path" element={<AdoptAutoQuantFileViewer />} />
         <Route path="/auto-quant/workspaces/:wsId" element={<AdoptAutoQuantWorkspace />} />
         <Route path="/auto-quant/workspaces/:wsId/s/:sessionId" element={<AdoptAutoQuantWorkspace />} />
         <Route path="/prediction" element={<AdoptStatic spec={{ kind: 'auto-prediction-landing', params: {} }} />} />
+        <Route path="/prediction/workspaces/:wsId/studio" element={<AdoptHarnessSurface source="prediction" />} />
         <Route path="/prediction/workspaces/:wsId/view/:path" element={<AdoptAutoPredictionFileViewer />} />
         <Route path="/prediction/workspaces/:wsId" element={<AdoptAutoPredictionWorkspace />} />
         <Route path="/prediction/workspaces/:wsId/s/:sessionId" element={<AdoptAutoPredictionWorkspace />} />
@@ -320,6 +322,12 @@ function AdoptAutoPredictionWorkspace() {
   return <AdoptStatic spec={{ kind: 'workspace', params }} />
 }
 
+function AdoptHarnessSurface({ source }: { source: 'auto-quant' | 'prediction' }) {
+  const { wsId } = useParams<{ wsId: string }>()
+  if (!wsId) return <Navigate to={`/${source}`} replace />
+  return <AdoptStatic spec={{ kind: 'harness-surface', params: { wsId, source, capability: 'studio' } }} />
+}
+
 function AdoptWorkspaceManager() {
   const { sessionId } = useParams<{ sessionId: string }>()
   if (!sessionId) return <Navigate to="/chat/manager" replace />
@@ -454,6 +462,7 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'chat-landing':       return 'chat'
     case 'auto-quant-landing': return 'auto-quant'
     case 'auto-prediction-landing': return 'prediction'
+    case 'harness-surface':    return spec.params.source
     case 'workspace-manager':  return 'chat'
     case 'workspace':
       return spec.params.source === 'chat'

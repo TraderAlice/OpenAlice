@@ -59,6 +59,8 @@ const harnessPreferencesSchema = z.object({
    * have never opened a TUI/WebPi stay off that roster unless this is true.
    */
   showHeadlessBornSessions: z.boolean().default(false),
+  /** Also discover stable upstream tags outside OpenAlice's verified catalog. */
+  showUnverifiedHarnessReleases: z.boolean().default(false),
 })
 
 /** Installation-level launcher pins. Persist ids only — never install state. */
@@ -100,6 +102,7 @@ const preferencesSchema = z.object({
   }),
   harness: harnessPreferencesSchema.default({
     showHeadlessBornSessions: false,
+    showUnverifiedHarnessReleases: false,
   }),
   agentRuntimes: agentRuntimesPreferencesSchema.default({
     quickAccessIds: [],
@@ -163,7 +166,10 @@ export async function readAutoPredictionPreferences(
 
 export async function readHarnessPreferences(path = preferencesPath()): Promise<HarnessPreferences> {
   const preferences = await readPreferences(path)
-  return { showHeadlessBornSessions: preferences.harness.showHeadlessBornSessions }
+  return {
+    showHeadlessBornSessions: preferences.harness.showHeadlessBornSessions,
+    showUnverifiedHarnessReleases: preferences.harness.showUnverifiedHarnessReleases,
+  }
 }
 
 export async function readAgentRuntimesPreferences(
@@ -321,7 +327,10 @@ export async function saveHarnessPreferences(
       harness: next,
     })
     await writePreferences(updated, path)
-    return { showHeadlessBornSessions: updated.harness.showHeadlessBornSessions }
+    return {
+      showHeadlessBornSessions: updated.harness.showHeadlessBornSessions,
+      showUnverifiedHarnessReleases: updated.harness.showUnverifiedHarnessReleases,
+    }
   })
   mutationQueue = operation
   return operation
