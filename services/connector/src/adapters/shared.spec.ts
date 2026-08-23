@@ -134,6 +134,50 @@ describe('long-connection supervisor', () => {
     expect(failures[0]).toContain('getUpdates')
     expect(disconnects.length).toBeGreaterThanOrEqual(1)
   })
+
+  it('applies bounded jitter to reconnect delays', async () => {
+    let stopped = false
+    const delays: number[] = []
+    await superviseLongConnection({
+      label: 'probe',
+      isStopped: () => stopped,
+      runSession: async () => { throw new Error('offline') },
+      disconnect: async () => undefined,
+      onFailure: () => undefined,
+      onRetryScheduled: (delayMs) => { delays.push(delayMs) },
+      delay: async () => { stopped = true },
+      reconnectDelayMs: 1_000,
+      retryJitterRatio: 0.2,
+      random: () => 1,
+    })
+
+    expect(delays).toEqual([1_200])
+  })
+
+  it('resets failure backoff after a session reached healthy state', async () => {
+    let stopped = false
+    let healthy = false
+    let sessions = 0
+    const failures: number[] = []
+    await superviseLongConnection({
+      label: 'probe',
+      isStopped: () => stopped,
+      isSessionHealthy: () => healthy,
+      runSession: async () => {
+        sessions += 1
+        healthy = sessions === 2
+        throw new Error('offline')
+      },
+      disconnect: async () => undefined,
+      onFailure: () => undefined,
+      onRetryScheduled: (_delayMs, count) => { failures.push(count) },
+      delay: async () => { if (sessions === 2) stopped = true },
+      reconnectDelayMs: 1,
+      retryJitterRatio: 0,
+    })
+
+    expect(failures).toEqual([1, 1])
+  })
 })
 
 describe('connector linking health', () => {
@@ -146,6 +190,7 @@ describe('connector linking health', () => {
       enabled: true,
       status: 'awaiting_link',
       detail: 'Bot is online and waiting for the owner to run /link.',
+      consecutiveFailures: 0,
     })
 
     tracker.healthy('owner-1')

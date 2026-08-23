@@ -26,7 +26,15 @@ export class AdapterHealthTracker {
   }
 
   healthy(owner?: string): void {
-    this.value = { ...this.value, status: 'healthy', detail: undefined, lastError: undefined, owner }
+    this.value = {
+      ...this.value,
+      status: 'healthy',
+      detail: undefined,
+      lastError: undefined,
+      nextAttemptAt: undefined,
+      consecutiveFailures: 0,
+      owner,
+    }
   }
 
   awaitingLink(): void {
@@ -35,6 +43,8 @@ export class AdapterHealthTracker {
       status: 'awaiting_link',
       detail: 'Bot is online and waiting for the owner to run /link.',
       lastError: undefined,
+      nextAttemptAt: undefined,
+      consecutiveFailures: 0,
       owner: undefined,
     }
   }
@@ -49,7 +59,19 @@ export class AdapterHealthTracker {
   }
 
   attempt(): void {
-    this.value = { ...this.value, lastAttemptAt: new Date().toISOString() }
+    this.value = {
+      ...this.value,
+      lastAttemptAt: new Date().toISOString(),
+      nextAttemptAt: undefined,
+    }
+  }
+
+  retryScheduled(delayMs: number, consecutiveFailures: number): void {
+    this.value = {
+      ...this.value,
+      nextAttemptAt: new Date(Date.now() + delayMs).toISOString(),
+      consecutiveFailures,
+    }
   }
 
   success(owner?: string): void {
@@ -59,6 +81,8 @@ export class AdapterHealthTracker {
       status: 'healthy',
       detail: undefined,
       lastError: undefined,
+      nextAttemptAt: undefined,
+      consecutiveFailures: 0,
       lastAttemptAt: this.value.lastAttemptAt ?? now,
       lastSuccessAt: now,
       owner: owner ?? this.value.owner,
@@ -89,28 +113,40 @@ export const MAX_CONNECTION_RETRY_DELAY_MS = 60_000
 export async function superviseLongConnection(options: {
   isStopped: () => boolean
   runSession: () => Promise<void>
+  isSessionHealthy?: () => boolean
   disconnect: () => Promise<void>
   onFailure: (error: unknown) => void
+  onAttempt?: () => void
+  onRetryScheduled?: (delayMs: number, consecutiveFailures: number) => void
   delay: (ms: number) => Promise<void>
   reconnectDelayMs?: number
+  retryJitterRatio?: number
+  random?: () => number
   label: string
 }): Promise<void> {
   let failures = 0
   const baseDelay = options.reconnectDelayMs ?? DEFAULT_CONNECTION_RETRY_DELAY_MS
   while (!options.isStopped()) {
     try {
+      options.onAttempt?.()
       await options.runSession()
       if (options.isStopped()) return
-      failures = 0
+      if (options.isSessionHealthy?.()) failures = 0
+      failures += 1
       options.onFailure(new Error(`${options.label} session ended`))
     } catch (error) {
       if (options.isStopped()) return
+      if (options.isSessionHealthy?.()) failures = 0
       failures += 1
       options.onFailure(error)
     }
     await options.disconnect().catch(() => undefined)
     if (options.isStopped()) return
-    const delayMs = Math.min(baseDelay * 2 ** Math.max(0, failures - 1), MAX_CONNECTION_RETRY_DELAY_MS)
+    const unjittered = Math.min(baseDelay * 2 ** Math.max(0, failures - 1), MAX_CONNECTION_RETRY_DELAY_MS)
+    const jitterRatio = options.retryJitterRatio ?? 0.2
+    const random = options.random ?? Math.random
+    const delayMs = Math.max(0, Math.round(unjittered * (1 + (random() * 2 - 1) * jitterRatio)))
+    options.onRetryScheduled?.(delayMs, failures)
     console.warn(`[connector] ${options.label} reconnect in ${delayMs}ms`)
     await options.delay(delayMs)
   }

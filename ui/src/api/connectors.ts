@@ -52,6 +52,8 @@ export interface ConnectorHealth {
       owner?: string
       lastAttemptAt?: string
       lastSuccessAt?: string
+      nextAttemptAt?: string
+      consecutiveFailures?: number
       lastError?: string
     }>
   }
@@ -96,6 +98,9 @@ export const connectorsApi = {
   },
   test(id: string): Promise<{ ok: boolean; probeId: string }> {
     return fetchJson(`/api/connectors/${encodeURIComponent(id)}/test`, { method: 'POST' })
+  },
+  reconnect(id: string): Promise<{ ok: true; scope: 'adapter' | 'service'; adapterId: string }> {
+    return fetchJson(`/api/connectors/${encodeURIComponent(id)}/reconnect`, { method: 'POST' })
   },
   desk: {
     async load(connectorId = 'telegram'): Promise<ConnectorDeskSnapshot> {
@@ -203,6 +208,11 @@ function isConnectorHealth(value: unknown): boolean {
       && isOptionalString(adapter.owner)
       && isOptionalString(adapter.lastAttemptAt)
       && isOptionalString(adapter.lastSuccessAt)
+      && isOptionalString(adapter.nextAttemptAt)
+      && (adapter.consecutiveFailures === undefined
+        || (typeof adapter.consecutiveFailures === 'number'
+          && Number.isInteger(adapter.consecutiveFailures)
+          && adapter.consecutiveFailures >= 0))
       && isOptionalString(adapter.lastError))
 }
 

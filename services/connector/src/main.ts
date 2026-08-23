@@ -108,6 +108,10 @@ async function main(): Promise<void> {
     const probeId = await manager.sendTest(c.req.param('id'))
     return c.json({ ok: true, probeId })
   })
+  app.post('/v1/connectors/:id/reconnect', async (c) => {
+    const adapter = await manager.reconnect(c.req.param('id'))
+    return c.json({ ok: true, adapter })
+  })
   app.onError((error, c) => {
     console.warn('[connector] request failed:', error instanceof Error ? error.message : error)
     return c.json({ error: error instanceof Error ? error.message : String(error) }, 400)

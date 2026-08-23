@@ -92,6 +92,38 @@ describe('DeliveryManager connector registry', () => {
     await manager.stop()
   })
 
+  it('replaces only the requested adapter during an explicit reconnect', async () => {
+    const created: FakeThirdPartyAdapter[] = []
+    const registry = new ConnectorRegistry()
+    registry.register({
+      definition: {
+        id: 'carrier-pigeon',
+        label: 'Carrier Pigeon',
+        description: 'Test-only third connector.',
+        fields: [],
+        commands: [],
+      },
+      create: () => {
+        const adapter = new FakeThirdPartyAdapter()
+        created.push(adapter)
+        return adapter
+      },
+    })
+    const manager = new DeliveryManager({
+      registry,
+      config: { version: 1, adapters: { 'carrier-pigeon': { enabled: true, settings: {} } } },
+      updateAdapterSettings: vi.fn(),
+    })
+
+    await manager.start()
+    const health = await manager.reconnect('carrier-pigeon')
+
+    expect(created).toHaveLength(2)
+    expect(created[0]?.health().status).toBe('stopped')
+    expect(health.status).toBe('healthy')
+    await manager.stop()
+  })
+
   it('reports starting adapters before external startup finishes', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => { release = resolve })

@@ -29,6 +29,7 @@ import {
   aliceProjectEnvironment,
   resolveAliceProjectIdentity,
   readAliceProjectProduct,
+  RestartBackoff,
   type RuntimeProcessLock,
 } from '../../packages/guardian-runtime/src/index.js'
 import {
@@ -148,9 +149,23 @@ async function main(): Promise<void> {
   let aliceStatus = 'starting'
   let utaStatus = skipUta ? 'disabled' : 'starting'
   let connectorStatus = connectorEnabled ? 'starting' : 'disabled'
+  let guardianStopping = false
+  let connectorRecoveryReady = false
   let alice: ChildProcess | null = null
   let uta: OptionalServiceController | null = null
   let connector: OptionalServiceController | null = null
+  const connectorRecovery = new RestartBackoff({
+    onScheduled: (delayMs, attempt) => {
+      connectorStatus = 'offline'
+      console.warn(`[guardian] Connector recovery attempt ${attempt} in ${delayMs}ms`)
+    },
+  })
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+    process.once(signal, () => {
+      guardianStopping = true
+      connectorRecovery.stop()
+    })
+  }
   const runtimeVersion = readRuntimeVersion()
   const managedSearchToolsBin = resolve(
     process.cwd(),
@@ -281,13 +296,19 @@ async function main(): Promise<void> {
   const spawnConnectorController = () => {
     connectorStatus = 'starting'
     const initial = spawnChild(connectorSpec)
+    const controller = new OptionalServiceController(connectorSpec, `${connectorUrl}/__connector/health`, initial)
     void waitForHttp(`${connectorUrl}/__connector/health`, { timeoutMs: 15_000 })
       .then((ready) => {
         connectorStatus = ready ? 'ready' : 'offline'
-        if (ready) console.log('[guardian] Connector ready')
-        else console.warn('[guardian] Connector did not become ready within 15s — continuing without external notifications')
+        if (ready) {
+          connectorRecovery.reset()
+          console.log('[guardian] Connector ready')
+        } else {
+          console.warn('[guardian] Connector did not become ready within 15s — continuing without external notifications')
+          if (connectorRecoveryReady) scheduleConnectorRecovery(controller)
+        }
       })
-    return new OptionalServiceController(connectorSpec, `${connectorUrl}/__connector/health`, initial)
+    return controller
   }
   if (connectorEnabled) connector = spawnConnectorController()
 
@@ -359,6 +380,30 @@ async function main(): Promise<void> {
   }
   if (uta) attachServiceCascade(uta)
   if (connector) attachServiceCascade(connector)
+  connectorRecoveryReady = true
+
+  function armConnectorRecovery(controller: OptionalServiceController) {
+    const watched = controller.process
+    watched.once('exit', () => {
+      if (stoppingOrReplaced() || controller.restartInProgress) return
+      scheduleConnectorRecovery(controller)
+    })
+  }
+  function stoppingOrReplaced() { return guardianStopping || connector === null || !connectorEnabled }
+  function scheduleConnectorRecovery(controller: OptionalServiceController) {
+    connectorRecovery.schedule(async () => {
+      if (stoppingOrReplaced() || connector !== controller) return true
+      connectorStatus = 'starting'
+      const ready = await controller.restart()
+      connectorStatus = ready ? 'ready' : 'offline'
+      armConnectorRecovery(controller)
+      return ready
+    })
+  }
+  if (connector) {
+    armConnectorRecovery(connector)
+    if (connectorStatus === 'offline') scheduleConnectorRecovery(connector)
+  }
 
   // Alice applies migrations before becoming ready. Re-read the service flag
   // here so an upgraded legacy Telegram install starts Connector Service on
@@ -369,6 +414,7 @@ async function main(): Promise<void> {
     connector = spawnConnectorController()
     cascade.trackChild(connector.process, { nonCritical: true })
     attachServiceCascade(connector)
+    armConnectorRecovery(connector)
   }
 
   // ── Flag watch ────────────────────────────────────────────
@@ -414,6 +460,7 @@ async function main(): Promise<void> {
             try { connector.process.kill('SIGTERM') } catch { /* noop */ }
             connector = null
             connectorStatus = 'disabled'
+            connectorRecovery.reset()
           }
           return
         }
@@ -422,9 +469,14 @@ async function main(): Promise<void> {
           connector = spawnConnectorController()
           cascade.trackChild(connector.process, { nonCritical: true })
           attachServiceCascade(connector)
+          armConnectorRecovery(connector)
           return
         }
-        await connector.restart()
+        connectorRecovery.reset()
+        const ready = await connector.restart()
+        connectorStatus = ready ? 'ready' : 'offline'
+        armConnectorRecovery(connector)
+        if (!ready) scheduleConnectorRecovery(connector)
       })()
     },
   })

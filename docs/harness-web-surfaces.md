@@ -144,6 +144,12 @@ users. Studio is a separate origin and cannot read OpenAlice application state.
 Restart removes the route and old process tree before allocating a new
 generation. Offboarding stops that Workspace's surfaces before moving its
 directory. Alice shutdown removes all routes and terminates every child tree.
+Termination snapshots descendants before signaling the package-manager wrapper;
+the wrapper exiting is not proof that detached listeners have stopped, so any
+surviving descendants receive the force phase as well. Startup failure is
+first-error-wins: a readiness timeout remains the operator-facing error even if
+termination subsequently makes the wrapper exit non-zero. Structured
+`harness_surface.failed` logs carry that same retained error.
 Runtime state is process-local and intentionally not persisted; after a crash,
 the next open starts a fresh generation.
 

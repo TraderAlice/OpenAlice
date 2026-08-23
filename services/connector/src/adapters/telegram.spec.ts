@@ -209,6 +209,36 @@ describe('Telegram polling readiness', () => {
     await adapter.stop()
   })
 
+  it('abandons a polling promise that stayed pending across host sleep', async () => {
+    vi.useFakeTimers()
+    try {
+      let attempts = 0
+      startMock.mockImplementation((options: { onStart?: () => void }) => {
+        attempts += 1
+        queueMicrotask(() => options.onStart?.())
+        return new Promise(() => undefined)
+      })
+      const adapter = new TelegramConnectorAdapter({
+        attemptTimeoutMs: 200,
+        reconnectDelayMs: 5,
+        resumeCheckIntervalMs: 10,
+        resumeGapMs: 25,
+      })
+
+      await adapter.start({ enabled: true, settings: { botToken: 'token' } }, context())
+      await vi.advanceTimersByTimeAsync(0)
+      expect(attempts).toBe(1)
+
+      vi.setSystemTime(Date.now() + 100)
+      await vi.advanceTimersByTimeAsync(20)
+
+      expect(attempts).toBeGreaterThanOrEqual(2)
+      await adapter.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('stops a pending reconnect', async () => {
     startMock.mockImplementation(() => new Promise(() => undefined))
     const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 20, reconnectDelayMs: 50 })
