@@ -47,8 +47,19 @@ function host(overrides: Partial<TelegramDeskChatHost> = {}): TelegramDeskChatHo
   }
 }
 
+function mockClient() {
+  const sent: { id: string; text: string }[] = []
+  const client = {
+    sendOwnerMessage: async (message: { id: string; text: string }) => {
+      sent.push({ id: message.id, text: message.text })
+      return { accepted: true }
+    },
+  } as unknown as ConnectorClient
+  return { client, sent }
+}
+
 describe('telegram desk chat filter', () => {
-  it('projects agent comments and skips inbound telegram or [[no-reply]]', () => {
+  it('projects agent comments, including syntax discussions, and skips inbound telegram', () => {
     const issue = { connectorDesk: 'telegram' }
     expect(shouldProjectDeskComment(issue, {
       id: 'c1', author: '@resume-a', at: 'now', markdown: 'Hello from the desk.',
@@ -58,6 +69,11 @@ describe('telegram desk chat filter', () => {
     })).toBe(false)
     expect(shouldProjectDeskComment(issue, {
       id: 'c3', author: '@resume-a', at: 'now', markdown: '[[no-reply]] nothing to say',
+    })).toBe(true)
+    expect(shouldProjectDeskComment(issue, {
+      id: 'c3', author: '@resume-a', at: 'now', markdown: '[[no-reply]] nothing to say',
+    }, {
+      triggerMetadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
     })).toBe(false)
     expect(shouldProjectDeskComment({}, {
       id: 'c4', author: '@resume-a', at: 'now', markdown: 'ordinary issue',
@@ -106,8 +122,10 @@ describe('telegram desk ingest and stamp', () => {
     )
     expect(created.ok).toBe(true)
     if (!created.ok) return
+    const { client, sent } = mockClient()
     const comment = await stampTelegramDeskScheduledFire({
       host: host(),
+      client,
       workspaceId: 'ws-a',
       issueId: created.issue.id,
       task: {
@@ -119,13 +137,22 @@ describe('telegram desk ingest and stamp', () => {
         startedAt: 1,
         status: 'done',
         finishedAt: 2,
+        trigger: {
+          kind: 'issue',
+          workspaceId: 'ws-a',
+          issueId: created.issue.id,
+          metadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
+        },
       },
       assistantText: 'Markets are quiet. [[no-reply]] no send.',
     })
     expect(comment?.markdown).toContain('[[no-reply]]')
     expect(comment?.id).toBe('comment-fire-run-1')
+    expect(sent).toEqual([])
     if (!comment) return
-    expect(shouldProjectDeskComment(created.issue, comment)).toBe(false)
+    expect(shouldProjectDeskComment(created.issue, comment, {
+      triggerMetadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
+    })).toBe(false)
   })
 
   it('does not publish partial assistant text from a failed scheduled fire', async () => {
@@ -151,6 +178,35 @@ describe('telegram desk ingest and stamp', () => {
         finishedAt: 2,
       },
       assistantText: 'Partial answer before the runtime failed.',
+    })
+
+    expect(comment).toBeNull()
+  })
+
+  it('does not consume connector control syntax without trigger metadata', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+
+    const comment = await stampTelegramDeskScheduledFire({
+      host: host(),
+      workspaceId: 'ws-a',
+      issueId: created.issue.id,
+      task: {
+        taskId: 'run-unmarked',
+        resumeId: 'resume-desk-owner',
+        wsId: 'ws-a',
+        agent: 'pi',
+        prompt: 'wake',
+        startedAt: 1,
+        status: 'done',
+        finishedAt: 2,
+        trigger: { kind: 'issue', workspaceId: 'ws-a', issueId: created.issue.id },
+      },
+      assistantText: 'We discussed [[no-reply]] syntax.',
     })
 
     expect(comment).toBeNull()

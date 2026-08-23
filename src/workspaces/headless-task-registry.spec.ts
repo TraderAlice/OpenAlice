@@ -106,14 +106,30 @@ describe('HeadlessTaskRegistry', () => {
 
   it('records a composite Issue trigger when an issue fired the run', async () => {
     const reg = await HeadlessTaskRegistry.load(path, noopLogger)
-    const fired = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'x', startedAt: 1, trigger: { kind: 'issue', workspaceId: 'home', issueId: 'daily-scan' } })
+    const fired = await createTask(reg, {
+      wsId: 'w1',
+      agent: 'codex',
+      prompt: 'x',
+      startedAt: 1,
+      trigger: {
+        kind: 'issue',
+        workspaceId: 'home',
+        issueId: 'daily-scan',
+        metadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
+      },
+    })
     const manual = await createTask(reg, { wsId: 'w1', agent: 'codex', prompt: 'y', startedAt: 2 })
-    expect(fired.trigger).toEqual({ kind: 'issue', workspaceId: 'home', issueId: 'daily-scan' })
+    expect(fired.trigger).toEqual({
+      kind: 'issue',
+      workspaceId: 'home',
+      issueId: 'daily-scan',
+      metadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
+    })
     // Manual runs leave the field absent (not undefined-valued) so the JSON stays clean.
     expect('trigger' in manual).toBe(false)
     // Persists across reload.
     const reg2 = await HeadlessTaskRegistry.load(path, noopLogger)
-    expect(reg2.get(fired.taskId)?.trigger?.issueId).toBe('daily-scan')
+    expect(reg2.get(fired.taskId)?.trigger).toEqual(fired.trigger)
   })
 
   it('persists an explicit unlimited watchdog separately from historical absence', async () => {

@@ -84,6 +84,7 @@ interface IssueSpec {
   effort?: string
   timeout?: string
   assignee?: string
+  connectorDesk?: string
   body?: string
 }
 
@@ -99,6 +100,7 @@ function issueMd(spec: IssueSpec): string {
   if (spec.model) lines.push(`model: ${spec.model}`)
   if (spec.effort) lines.push(`effort: ${spec.effort}`)
   if (spec.timeout) lines.push(`timeout: ${spec.timeout}`)
+  if (spec.connectorDesk) lines.push(`connectorDesk: ${spec.connectorDesk}`)
   // Scanner tests exercise dispatch policy, not declaration defaults. Keep the
   // historical fresh-every-fire fixture explicit now that omitted scheduled
   // ownership means recruit once (`@new-then-resume`).
@@ -167,6 +169,39 @@ function scannerFor(
 }
 
 describe('ScheduleScanner', () => {
+  it('stamps connector cron metadata on scheduled and run-now phone-desk runs', async () => {
+    const ws = await makeWs('w1', [{
+      id: 'telegram-phone-desk',
+      title: 'Telegram phone desk',
+      when: { kind: 'every', every: '30m' },
+      what: 'wake',
+      connectorDesk: 'telegram',
+    }])
+    const { scanner, dispatch } = scannerFor([ws])
+
+    await scanner.scan()
+    expect(vi.mocked(dispatch).mock.calls[0]?.[4]).toEqual({
+      kind: 'issue',
+      workspaceId: 'w1',
+      issueId: 'telegram-phone-desk',
+      metadata: {
+        kind: 'connector-cron-issue',
+        connectorId: 'telegram',
+      },
+    })
+
+    await scanner.runIssueNow('w1', 'telegram-phone-desk')
+    expect(vi.mocked(dispatch).mock.calls[1]?.[4]).toEqual({
+      kind: 'issue',
+      workspaceId: 'w1',
+      issueId: 'telegram-phone-desk',
+      metadata: {
+        kind: 'connector-cron-issue',
+        connectorId: 'telegram',
+      },
+    })
+  })
+
   it('manually retries with live Issue semantics without moving the schedule marker', async () => {
     const ws = await makeWs('w1', [{
       id: 'retry-me',

@@ -78,7 +78,7 @@ describe('sealedProgressTexts', () => {
     ]))).toEqual(['Looking at the book.', 'Checking another file.'])
   })
 
-  it('does not ship a lone trailing text, tools, errors, or [[no-reply]]', () => {
+  it('does not ship a lone trailing text, tools, or errors', () => {
     expect(sealedProgressTexts(progress([
       { type: 'text', text: 'Final answer only.' },
     ]))).toEqual([])
@@ -87,12 +87,20 @@ describe('sealedProgressTexts', () => {
       { type: 'text', text: 'After the tool.' },
     ]))).toEqual([])
     expect(sealedProgressTexts(progress([
-      { type: 'text', text: '[[no-reply]] quiet' },
-      { type: 'tool', id: 't1', name: 'Read', status: 'running' },
-    ]))).toEqual([])
-    expect(sealedProgressTexts(progress([
       { type: 'error', message: 'boom' },
     ]))).toEqual([])
+  })
+
+  it('consumes [[no-reply]] only for connector cron Issue progress', () => {
+    const snapshot = progress([
+      { type: 'text', text: 'We discussed [[no-reply]] syntax.' },
+      { type: 'tool', id: 't1', name: 'Read', status: 'running' },
+    ])
+    expect(sealedProgressTexts(snapshot)).toEqual(['We discussed [[no-reply]] syntax.'])
+    expect(sealedProgressTexts(snapshot, {
+      kind: 'connector-cron-issue',
+      connectorId: 'telegram',
+    })).toEqual([])
   })
 })
 
@@ -203,6 +211,27 @@ describe('projectDeskTurnProgress', () => {
 })
 
 describe('final comment dedup', () => {
+  it('treats [[no-reply]] as control syntax only with connector cron metadata', async () => {
+    const { client, sent } = mockClient()
+    const issue = { connectorDesk: 'telegram' }
+    const comment = {
+      id: 'comment-reply-run-quoted',
+      author: '@resume-a',
+      at: 'now',
+      markdown: 'Here is how `[[no-reply]]` works.',
+    }
+    expect(shouldProjectDeskComment(issue, comment)).toBe(true)
+    await projectDeskComment(issue, comment, client)
+    expect(sent.map((item) => item.text)).toEqual(['Here is how `[[no-reply]]` works.'])
+
+    expect(shouldProjectDeskComment(issue, comment, {
+      triggerMetadata: {
+        kind: 'connector-cron-issue',
+        connectorId: 'telegram',
+      },
+    })).toBe(false)
+  })
+
   it('skips a final comment whose markdown was already shipped as progress', async () => {
     const { client, sent } = mockClient()
     const issue = { connectorDesk: 'telegram' }

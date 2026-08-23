@@ -57,9 +57,11 @@ categories.
   per `desk`-capable connector. Connector queues owner text keyed by
   `connectorId`; Alice drains that stack only while that connector's live
   desk exists and no generation is running on it. Several stacked DMs become
-  one quoted comment on that Issue. Alice projects desk comments that do not
-  contain the literal tag `[[no-reply]]`. Inbound owner comments are not
-  echoed back to that connector. While a desk turn is running, Alice also
+  one quoted comment on that Issue. Alice suppresses a desk comment only when
+  its run carries the `connector-cron-issue` trigger metadata and its text
+  contains the literal tag `[[no-reply]]`. Ordinary chat replies treat that
+  tag as text. Inbound owner comments are not echoed back to that connector.
+  While a desk turn is running, Alice also
   ships sealed mid-turn `text` blocks (a tool or error followed them) so the
   phone chat does not wait for the final reply. Tool names, status, and
   payloads stay off the owner chat. The trailing text still becomes today's
