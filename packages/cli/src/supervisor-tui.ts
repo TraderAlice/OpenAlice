@@ -15,6 +15,17 @@ import type {
 
 import { diagnoseRuntime } from './doctor.mjs'
 import {
+  inspectMachineFleet,
+  seedMachineFleet,
+  type MachineFleetEnvelope,
+  type MachineInventory,
+  type MachineProjectInventory,
+} from './machine-inventory.ts'
+import {
+  readMachineRegistrySummary,
+  type MachineRegistrySummary,
+} from './machine-registry.ts'
+import {
   inspectRuntime,
   openRuntime,
   startRuntime,
@@ -42,6 +53,19 @@ import {
   type ManagedSourceResult,
 } from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
+import { connectSsh } from './ssh-connect.mjs'
+import {
+  createSupervisorFleetState,
+  fleetTunnelKey,
+  moveFleetSelection,
+  renderSupervisorFleet,
+  replaceFleetInventory,
+  selectedFleetMachine,
+  selectedFleetProject,
+  selectFleetProjectByKey,
+  setFleetFocus,
+  type SupervisorFleetState,
+} from './supervisor-fleet.ts'
 import {
   createSupervisorAliceProject,
   persistAliceProjectLaunchConfig,
@@ -127,7 +151,7 @@ interface UpdateResult {
   }
 }
 
-export type SupervisorPanel = 'overview' | 'logs' | 'doctor' | 'help'
+export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
 export type SupervisorMode = 'normal' | 'config-recovery'
 export type SupervisorConfigRecoveryReason = 'newer-schema' | 'unreadable'
 export type SupervisorAction =
@@ -162,6 +186,7 @@ export interface SupervisorSnapshot {
   doctor?: DoctorReport | null
   update?: UpdateResult | null
   managedSource?: ManagedSourcePlan | null
+  fleet?: SupervisorFleetState | null
 }
 
 export interface SupervisorTuiDependencies {
@@ -215,6 +240,15 @@ export interface SupervisorTuiDependencies {
   version?: string
   channel?: string
   pollIntervalMs?: number
+  seedFleet?: () => Promise<MachineFleetEnvelope>
+  inspectFleet?: () => Promise<MachineFleetEnvelope>
+  loadMachineRegistry?: () => Promise<MachineRegistrySummary>
+  connectRemoteProject?: (input: {
+    machine: MachineInventory
+    project: MachineProjectInventory
+    signal: AbortSignal
+    onReady: () => void
+  }) => Promise<number>
   resolveChannel?: () => Promise<string>
 }
 
@@ -300,6 +334,24 @@ export async function runSupervisorTui(
 
   const supervisorRoot = context?.supervisorRoot
     ?? resolveSupervisorRootPath({ env: dependencies.env })
+  let fleet: SupervisorFleetState | null = null
+  if (!configRecovery) {
+    try {
+      const seeded = await (dependencies.seedFleet ?? (() => seedMachineFleet({
+        env: dependencies.env,
+        supervisorRoot,
+        inspectRuntime: (options) => services.inspect(options),
+        loadMachineRegistry: dependencies.loadMachineRegistry,
+      })))()
+      fleet = createSupervisorFleetState(
+        seeded.generatedAt,
+        alignLocalFleetProject(seeded.machines, context, runtime),
+        context?.project,
+      )
+    } catch (error: unknown) {
+      diagnostic = diagnostic ?? safeError(error)
+    }
+  }
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const channel = dependencies.channel
     ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
@@ -314,6 +366,8 @@ export async function runSupervisorTui(
   let sourcePromptActive = false
   let settingsActive = false
   let projectsActive = false
+  let fleetRefreshing = false
+  const tunnelControllers = new Map<string, AbortController>()
   let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
@@ -327,6 +381,7 @@ export async function runSupervisorTui(
     recoveryReason,
     diagnostic,
     notice: startupNotice,
+    fleet,
   }, {
     onAction: (action) => {
       void requestAction(action)
@@ -339,6 +394,12 @@ export async function runSupervisorTui(
     },
     onProjects: () => {
       void openProjects()
+    },
+    onActivateFleet: (machine, project) => {
+      void activateFleetProject(machine, project)
+    },
+    onRefreshFleet: () => {
+      void refreshFleet()
     },
     onRequestManagedSource: () => {
       void requestManagedSource('start')
@@ -398,6 +459,42 @@ export async function runSupervisorTui(
     ?? (() => prepareManagedSource())
   const inspectManaged = dependencies.inspectManagedSource
     ?? (() => inspectManagedSource())
+  const loadMachines = dependencies.loadMachineRegistry
+    ?? (() => readMachineRegistrySummary({
+      env: dependencies.env,
+      supervisorRoot,
+    }))
+  const inspectFleet = dependencies.inspectFleet ?? (() => inspectMachineFleet({
+    env: dependencies.env,
+    supervisorRoot,
+    inspectRuntime: (options) => services.inspect(options),
+    loadMachineRegistry: loadMachines,
+  }))
+  const connectRemoteProject = dependencies.connectRemoteProject ?? (async ({
+    machine,
+    project,
+    signal,
+    onReady,
+  }) => {
+    const registry = await loadMachines()
+    const target = registry.machines.find((entry) => entry.key === machine.key)
+    if (!target) throw new Error(`Machine "${machine.key}" is no longer registered.`)
+    const remotePort = loopbackEndpointPort(project.runtime.webEndpoint)
+    if (remotePort === null) {
+      throw new Error(`AliceProject "${project.key}" does not advertise a loopback Web endpoint.`)
+    }
+    return connectSsh({
+      destination: target.sshTarget,
+      localPort: 0,
+      remotePort,
+      sshPort: target.sshPort ?? null,
+      identityFile: target.identityFile ?? null,
+      openBrowser: true,
+      waitMs: 60_000,
+      signal,
+      onReady,
+    }, { stdout: SILENT_OUTPUT })
+  })
 
   async function refreshRuntime(): Promise<void> {
     if (!active || actionRunning || configRecovery || !context) return
@@ -407,11 +504,178 @@ export async function runSupervisorTui(
         waitMs: 1_000,
       })
       if (!active) return
-      screen.update({ runtime: nextRuntime, diagnostic: undefined })
+      runtime = nextRuntime
+      const currentFleet = screen.snapshot.fleet
+      screen.update({
+        runtime: nextRuntime,
+        fleet: currentFleet && context
+          ? selectFleetProjectByKey(
+              replaceFleetInventory(
+                currentFleet,
+                currentFleet.generatedAt,
+                alignLocalFleetProject(
+                  currentFleet.machines,
+                  context,
+                  nextRuntime,
+                ),
+              ),
+              'local',
+              context.project,
+            )
+          : currentFleet,
+        diagnostic: undefined,
+      })
     } catch (error: unknown) {
       if (!active) return
       screen.update({ diagnostic: safeError(error) })
     }
+  }
+
+  async function refreshFleet(options: { quiet?: boolean } = {}): Promise<void> {
+    if (!active || configRecovery || fleetRefreshing) return
+    fleetRefreshing = true
+    if (screen.snapshot.fleet) {
+      screen.update({
+        fleet: { ...screen.snapshot.fleet, refreshing: true },
+        ...(options.quiet ? {} : { notice: 'Refreshing Machine fleet…' }),
+      })
+    }
+    try {
+      const inspected = await inspectFleet()
+      if (!active) return
+      const current = screen.snapshot.fleet ?? createSupervisorFleetState(
+        inspected.generatedAt,
+        inspected.machines,
+        context?.project,
+      )
+      screen.update({
+        fleet: replaceFleetInventory(
+          current,
+          inspected.generatedAt,
+          alignLocalFleetProject(inspected.machines, context, runtime),
+        ),
+        ...(options.quiet ? {} : { notice: 'Machine fleet refreshed.' }),
+      })
+    } catch (error: unknown) {
+      if (active) screen.update({ diagnostic: safeError(error) })
+    } finally {
+      fleetRefreshing = false
+      if (active && screen.snapshot.fleet?.refreshing) {
+        screen.update({ fleet: { ...screen.snapshot.fleet, refreshing: false } })
+      }
+    }
+  }
+
+  async function activateFleetProject(
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ): Promise<void> {
+    if (machine.key === 'local') {
+      if (!context) return
+      if (project.key !== context.project) {
+        actionRunning = true
+        screen.update({ busy: `Switching to ${project.displayName}` })
+        try {
+          context = await selectProject(context, project.key)
+          services = createServices(dependencies, context)
+          runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+          screen.update({
+            context,
+            runtime,
+            fleet: screen.snapshot.fleet
+              ? selectFleetProjectByKey(
+                  replaceFleetInventory(
+                    screen.snapshot.fleet,
+                    screen.snapshot.fleet.generatedAt,
+                    alignLocalFleetProject(
+                      screen.snapshot.fleet.machines,
+                      context,
+                      runtime,
+                    ),
+                  ),
+                  'local',
+                  context.project,
+                )
+              : screen.snapshot.fleet,
+            notice: `Selected local AliceProject ${project.key}.`,
+            diagnostic: undefined,
+          })
+          await refreshFleet({ quiet: true })
+        } catch (error: unknown) {
+          screen.update({ diagnostic: safeError(error) })
+        } finally {
+          actionRunning = false
+          screen.update({ busy: undefined })
+        }
+        return
+      }
+      const action = primaryAction(screen.snapshot.runtime)
+      if (action) await requestAction(action)
+      return
+    }
+    if (machine.connection !== 'online') {
+      screen.update({ notice: machine.issue?.message ?? 'The selected Machine is not online.' })
+      return
+    }
+    if (!machine.capabilities.openTunnel || !project.runtime.webEndpoint) {
+      screen.update({
+        notice: 'This remote AliceProject is not running with an advertised Web endpoint. Start it on the remote Machine first.',
+      })
+      return
+    }
+    const key = fleetTunnelKey(machine.key, project.key)
+    if (tunnelControllers.has(key)) {
+      screen.update({ notice: `The ${machine.key}/${project.key} tunnel is already active.` })
+      return
+    }
+    const controller = new AbortController()
+    tunnelControllers.set(key, controller)
+    updateTunnelState(key, 'connecting')
+    screen.update({ notice: `Connecting to ${machine.displayName} / ${project.displayName}…` })
+    try {
+      await connectRemoteProject({
+        machine,
+        project,
+        signal: controller.signal,
+        onReady: () => {
+          updateTunnelState(key, 'connected')
+          screen.update({ notice: `Connected to ${machine.displayName} / ${project.displayName}.` })
+        },
+      })
+      if (active && !controller.signal.aborted) {
+        screen.update({ notice: `Tunnel to ${machine.key}/${project.key} closed.` })
+      }
+    } catch (error: unknown) {
+      if (active && !controller.signal.aborted) {
+        updateTunnelState(key, 'failed')
+        screen.update({ diagnostic: safeError(error) })
+      }
+    } finally {
+      tunnelControllers.delete(key)
+      if (active) clearTunnelState(key)
+    }
+  }
+
+  function updateTunnelState(
+    key: string,
+    value: 'connecting' | 'connected' | 'failed',
+  ): void {
+    const current = screen.snapshot.fleet
+    if (!current) return
+    screen.update({
+      fleet: {
+        ...current,
+        tunnels: { ...current.tunnels, [key]: value },
+      },
+    })
+  }
+
+  function clearTunnelState(key: string): void {
+    const current = screen.snapshot.fleet
+    if (!current) return
+    const tunnels = { ...current.tunnels }
+    delete tunnels[key]
+    screen.update({ fleet: { ...current, tunnels } })
   }
 
   async function requestAction(action: SupervisorAction): Promise<void> {
@@ -1427,6 +1691,8 @@ export async function runSupervisorTui(
       settled = true
       active = false
       clearInterval(poll)
+      for (const controller of tunnelControllers.values()) controller.abort()
+      tunnelControllers.clear()
       closeSourcePrompt?.()
       closeSettings?.()
       closeProjects?.()
@@ -1451,10 +1717,13 @@ export async function runSupervisorTui(
       }
       if (
         piTui.matchesKey(data, 'q')
-        || piTui.matchesKey(data, 'escape')
         || piTui.matchesKey(data, 'ctrl+c')
       ) {
         finish()
+        return { consume: true }
+      }
+      if (piTui.matchesKey(data, 'escape')) {
+        if (!screen.handleEscape()) finish()
         return { consume: true }
       }
       return screen.handleKey(data, piTui.matchesKey)
@@ -1465,6 +1734,7 @@ export async function runSupervisorTui(
     process.once('SIGTERM', onTerminate)
     process.once('SIGINT', onTerminate)
     ui.start()
+    void refreshFleet({ quiet: true })
     void discoverUpdateInBackground()
   })
 }
@@ -1496,6 +1766,11 @@ export class SupervisorScreen implements Component {
   private readonly onConfigureSource?: () => void
   private readonly onSettings?: () => void
   private readonly onProjects?: () => void
+  private readonly onActivateFleet?: (
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ) => void
+  private readonly onRefreshFleet?: () => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
@@ -1507,16 +1782,26 @@ export class SupervisorScreen implements Component {
       onConfigureSource?: () => void
       onSettings?: () => void
       onProjects?: () => void
+      onActivateFleet?: (
+        machine: MachineInventory,
+        project: MachineProjectInventory,
+      ) => void
+      onRefreshFleet?: () => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
       requestRender?: () => void
     } = {},
   ) {
-    this.snapshot = { panel: 'overview', ...snapshot }
+    this.snapshot = {
+      panel: snapshot.fleet ? 'fleet' : 'overview',
+      ...snapshot,
+    }
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
     this.onSettings = callbacks.onSettings
     this.onProjects = callbacks.onProjects
+    this.onActivateFleet = callbacks.onActivateFleet
+    this.onRefreshFleet = callbacks.onRefreshFleet
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
@@ -1529,6 +1814,17 @@ export class SupervisorScreen implements Component {
 
   cancelConfirmation(): void {
     this.update({ confirmation: undefined, notice: 'Action cancelled.' })
+  }
+
+  handleEscape(): boolean {
+    if (
+      this.snapshot.panel === 'fleet'
+      && this.snapshot.fleet?.focus === 'projects'
+    ) {
+      this.update({ fleet: setFleetFocus(this.snapshot.fleet, 'machines') })
+      return true
+    }
+    return false
   }
 
   handleKey(
@@ -1556,6 +1852,57 @@ export class SupervisorScreen implements Component {
     if (matchesKey(data, '?')) {
       this.update({ panel: this.snapshot.panel === 'help' ? 'overview' : 'help' })
       return true
+    }
+    if (matchesKey(data, ']') || matchesKey(data, '[')) {
+      this.selectAdjacentPanel(matchesKey(data, ']') ? 1 : -1)
+      return true
+    }
+    const fleet = this.snapshot.panel === 'fleet' ? this.snapshot.fleet : null
+    if (fleet) {
+      if (matchesKey(data, 'up') || matchesKey(data, 'down')) {
+        this.update({
+          fleet: moveFleetSelection(fleet, matchesKey(data, 'down') ? 1 : -1),
+        })
+        return true
+      }
+      if (matchesKey(data, 'tab') || matchesKey(data, 'right')) {
+        this.update({ fleet: setFleetFocus(fleet, 'projects') })
+        return true
+      }
+      if (matchesKey(data, 'shift+tab') || matchesKey(data, 'left')) {
+        this.update({ fleet: setFleetFocus(fleet, 'machines') })
+        return true
+      }
+      if (matchesKey(data, 'enter')) {
+        if (fleet.focus === 'machines') {
+          this.update({ fleet: setFleetFocus(fleet, 'projects') })
+        } else {
+          const machine = selectedFleetMachine(fleet)
+          const project = selectedFleetProject(fleet)
+          if (machine && project) this.onActivateFleet?.(machine, project)
+          else this.update({ notice: 'No AliceProject is available on the selected Machine.' })
+        }
+        return true
+      }
+      const machine = selectedFleetMachine(fleet)
+      const project = selectedFleetProject(fleet)
+      const remote = machine?.key !== 'local'
+      if (matchesKey(data, 'r') && remote) {
+        this.onRefreshFleet?.()
+        return true
+      }
+      if (matchesKey(data, 'o') && remote) {
+        if (machine && project) this.onActivateFleet?.(machine, project)
+        else this.update({ notice: 'No remote AliceProject is available to connect.' })
+        return true
+      }
+      const remoteMutationKeys: KeyId[] = ['s', 'x', 'd', 'l', 'p', 'c', 'm']
+      if (remote && remoteMutationKeys.some((key) => matchesKey(data, key))) {
+        this.update({
+          notice: 'That mutation is not available for a remote selection. Use r to refresh or Enter/o to connect a running AliceProject.',
+        })
+        return true
+      }
     }
     if (matchesKey(data, 'enter')) {
       if (isConfigRecovery(this.snapshot)) {
@@ -1674,7 +2021,23 @@ export class SupervisorScreen implements Component {
       '',
     ]
 
-    if (this.snapshot.panel === 'logs') {
+    if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+      lines.push(...renderSupervisorFleet(this.snapshot.fleet, width))
+      const fleetMachine = selectedFleetMachine(this.snapshot.fleet)
+      const fleetProject = selectedFleetProject(this.snapshot.fleet)
+      if (fleetMachine?.key === 'local' && fleetProject) {
+        lines.push(
+          '',
+          narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
+          `AliceProject: ${fleetProject.displayName}`,
+          `Home: ${fleetProject.home}`,
+        )
+        if (!narrow && this.snapshot.context) {
+          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
+        }
+        lines.push('', ...renderGuidance(runtime, this.snapshot.context))
+      }
+    } else if (this.snapshot.panel === 'logs') {
       lines.push(...renderLogs(this.snapshot.logs))
     } else if (this.snapshot.panel === 'doctor') {
       lines.push(...renderDoctor(this.snapshot.doctor))
@@ -1733,7 +2096,14 @@ export class SupervisorScreen implements Component {
     }
     lines.push(
       '',
-      ...actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot)),
+      ...(this.snapshot.panel === 'fleet' && this.snapshot.fleet
+        ? fleetActionBar(
+            this.snapshot.fleet,
+            runtime,
+            this.snapshot.context,
+            width,
+          )
+        : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
     return lines.map((line) => truncate(line, width))
@@ -1762,7 +2132,7 @@ export class SupervisorScreen implements Component {
   private selectAdjacentPanel(direction: 1 | -1): void {
     const panels: SupervisorPanel[] = isConfigRecovery(this.snapshot)
       ? ['overview', 'help']
-      : ['overview', 'logs', 'doctor', 'help']
+      : ['fleet', 'overview', 'logs', 'doctor', 'help']
     const current = panels.indexOf(this.snapshot.panel ?? 'overview')
     const panel = panels[(current + direction + panels.length) % panels.length]
       ?? 'overview'
@@ -1832,6 +2202,7 @@ function renderTabs(
         ['help', 'Help'],
       ]
     : [
+        ['fleet', narrow ? 'Fleet' : 'Machines'],
         ['overview', narrow ? 'Home' : 'Overview'],
         ['logs', 'Logs'],
         ['doctor', 'Doctor'],
@@ -1840,6 +2211,39 @@ function renderTabs(
   return labels
     .map(([panel, label]) => panel === selected ? `[${label}]` : label)
     .join('  ')
+}
+
+function fleetActionBar(
+  fleet: SupervisorFleetState,
+  runtime: RuntimeSummary | null,
+  context: ResolvedLaunchContext | undefined,
+  width: number,
+): string[] {
+  const machine = selectedFleetMachine(fleet)
+  const project = selectedFleetProject(fleet)
+  if (machine?.key === 'local') {
+    return [
+      ...actionBar(runtime, context, width, false),
+      width < 72
+        ? '↑/↓ Select · ←/→ Pane · [/] Pages'
+        : '↑/↓ Select · Tab/←/→ Pane · [ / ] Pages',
+    ]
+  }
+  if (width < 72) {
+    if (fleet.focus === 'machines') {
+      return ['↑/↓ Select · Enter/→ Projects · ] Pages · ? Help']
+    }
+    return [
+      machine?.key === 'local'
+        ? '↑/↓ Select · Enter Activate · ← Machines · ] Pages'
+        : '↑/↓ Select · Enter/o Connect · r Refresh · ← Machines',
+    ]
+  }
+  const primary = project ? 'Enter/o Connect running AliceProject' : 'Enter AliceProjects'
+  return [
+    `${primary} · ↑/↓ Select · Tab/←/→ Pane · r Refresh`,
+    '[ / ] Pages · i AliceProjects · p Setup · ? Help',
+  ]
 }
 
 function renderGuidance(
@@ -2290,6 +2694,60 @@ function storedHomeRecoveryNotice(
 
 function sanitize(value: string): string {
   return value.replaceAll(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+}
+
+function loopbackEndpointPort(value: string | null): number | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') return null
+    const port = Number(url.port || '80')
+    return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null
+  } catch {
+    return null
+  }
+}
+
+function alignLocalFleetProject(
+  machines: MachineInventory[],
+  context: ResolvedLaunchContext | undefined,
+  runtime: RuntimeSummary | null,
+): MachineInventory[] {
+  if (!context) return machines
+  return machines.map((machine) => {
+    if (machine.key !== 'local') return machine
+    const existing = machine.projects.find((project) => project.key === context.project)
+    const projected: MachineProjectInventory = {
+      key: context.project,
+      id: context.aliceProject.id,
+      displayName: context.aliceProject.displayName,
+      home: context.home,
+      port: context.port,
+      portAutomatic: context.provenance.port.source === 'default',
+      product: existing?.product ?? 'trader',
+      isDefault: existing?.isDefault ?? false,
+      available: existing?.available ?? true,
+      runtime: {
+        class: runtime?.class ?? 'unavailable',
+        state: runtime?.state ?? 'unknown',
+        ownerSurface: runtime?.owner?.surface ?? null,
+        uptimeSeconds: Number.isFinite(runtime?.uptimeSeconds)
+          ? runtime?.uptimeSeconds ?? null
+          : null,
+        webEndpoint: runtime?.endpoints?.web ?? null,
+        components: Object.fromEntries(
+          Object.entries(runtime?.components ?? {})
+            .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+        ),
+      },
+    }
+    return {
+      ...machine,
+      projects: existing
+        ? machine.projects.map((project) => project.key === context.project ? projected : project)
+        : [...machine.projects, projected],
+    }
+  })
 }
 
 function truncate(value: string, width: number): string {

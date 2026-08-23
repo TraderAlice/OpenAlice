@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   inspectLocalMachine,
+  inspectMachineFleet,
   inspectRegisteredMachine,
   parseMachineInspectEnvelope,
   type MachineInspectEnvelope,
@@ -88,6 +89,7 @@ describe('Machine inventory', () => {
         destination: 'alice@example.com',
         sshPort: 2222,
         identityFile: '/keys/cloud',
+        batchMode: true,
       },
       expect.stringContaining('machine inspect local --json'),
       expect.any(Object),
@@ -99,6 +101,34 @@ describe('Machine inventory', () => {
       connection: 'online',
       projects: [{ key: 'remote-project' }],
     })
+  })
+
+  it('bounds aggregate remote refresh concurrency and preserves registry order', async () => {
+    let active = 0
+    let peak = 0
+    const machines = Array.from({ length: 9 }, (_, index) => ({
+      ...remoteMachine,
+      key: `cloud-${index}`,
+      displayName: `Cloud ${index}`,
+      sshTarget: `cloud-${index}.example.com`,
+    }))
+    const fleet = await inspectMachineFleet({
+      cliVersion: '1.2.3',
+      loadMachineRegistry: async () => ({ defaultMachine: 'local', machines }),
+      loadRegistry: async () => ({ defaultProject: 'default', projects: [] }),
+      runRemote: async (_options) => {
+        active += 1
+        peak = Math.max(peak, active)
+        await new Promise((resolve) => setTimeout(resolve, 2))
+        active -= 1
+        return JSON.stringify(remoteEnvelope())
+      },
+    })
+    expect(peak).toBeLessThanOrEqual(4)
+    expect(fleet.machines.map((machine) => machine.key)).toEqual([
+      'local',
+      ...machines.map((machine) => machine.key),
+    ])
   })
 
   it('distinguishes SSH auth, offline, and incompatible CLI failures', async () => {

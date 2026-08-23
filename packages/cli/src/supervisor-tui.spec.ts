@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { resolveLaunchContext } from './launch-context.ts'
+import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
+import { createSupervisorFleetState } from './supervisor-fleet.ts'
 import {
   resolveSupervisorChannel,
   runSupervisorTui,
@@ -49,6 +51,37 @@ describe('Supervisor TUI screen', () => {
     expect(lines.join('\n')).toContain('i AliceProjects')
     expect(lines).toContain('d Doctor · l Logs · u Update · ? Help')
     expect(lines).toContain('q / Esc / Ctrl+C  Detach without stopping')
+  })
+
+  it('renders and navigates the Machine to AliceProject fleet', () => {
+    const activated: string[] = []
+    let refreshes = 0
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'development',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState(
+        '2026-08-23T00:00:00Z',
+        fleetMachines(),
+        'default',
+      ),
+    }, {
+      onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
+      onRefreshFleet: () => { refreshes += 1 },
+    })
+
+    expect(screen.render(100).join('\n')).toContain('AliceProjects · This computer')
+    expect(screen.handleKey('down', matchesKey)).toBe(true)
+    expect(screen.handleKey('tab', matchesKey)).toBe(true)
+    expect(screen.render(100).join('\n')).toContain('AliceProjects · Cloud')
+    expect(screen.handleKey('o', matchesKey)).toBe(true)
+    expect(activated).toEqual(['cloud/research'])
+    expect(screen.handleKey('r', matchesKey)).toBe(true)
+    expect(refreshes).toBe(1)
+    expect(screen.handleKey('s', matchesKey)).toBe(true)
+    expect(screen.snapshot.notice).toContain('not available for a remote selection')
+    expect(screen.handleEscape()).toBe(true)
+    expect(screen.snapshot.fleet?.focus).toBe('machines')
   })
 
   it('uses a narrow projection and sanitizes diagnostics', () => {
@@ -216,6 +249,63 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(calls).toEqual(['start', 'open'])
+  })
+
+  it('aborts TUI-owned remote tunnels when the Supervisor detaches', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let tunnelAborted = false
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void {
+        inputListener = listener
+        return () => undefined
+      }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('down')
+          inputListener?.('tab')
+          inputListener?.('o')
+        })
+      }
+      stop(): void {}
+    }
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines(),
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({
+        cwd: '/tmp',
+        homeDir: '/home/alice',
+      }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      connectRemoteProject: async ({ signal, onReady }) => {
+        onReady()
+        queueMicrotask(() => inputListener?.('q'))
+        return new Promise<number>((resolve) => {
+          signal.addEventListener('abort', () => {
+            tunnelAborted = true
+            resolve(0)
+          }, { once: true })
+        })
+      },
+      discoverUpdate: async () => null,
+      loadTui: async () => ({
+        ProcessTerminal: class {},
+        TUI: FakeTui,
+        matchesKey,
+      }) as never,
+    })).resolves.toBe(0)
+
+    expect(tunnelAborted).toBe(true)
   })
 
   it('uses installed provenance to prepare missing source before Enter starts and opens', async () => {
@@ -743,3 +833,55 @@ describe('Supervisor TUI screen', () => {
     expect(calls).toEqual(['check', 'apply:0.90.0'])
   })
 })
+
+function fleetMachines(): MachineInventory[] {
+  const project = (key: string): MachineInventory['projects'][number] => ({
+    key,
+    id: `alice-project-${key}`,
+    displayName: key === 'default' ? 'Default AliceProject' : 'Research',
+    home: `/home/alice/${key}`,
+    port: 47_331,
+    portAutomatic: true,
+    product: 'trader',
+    isDefault: true,
+    available: true,
+    runtime: {
+      class: 'running',
+      state: 'running',
+      ownerSurface: 'cli-server',
+      uptimeSeconds: 1,
+      webEndpoint: 'http://127.0.0.1:47331',
+      components: { alice: 'ready' },
+    },
+  })
+  const machine = (
+    key: string,
+    displayName: string,
+    connection: MachineInventory['connection'],
+    projects: MachineInventory['projects'],
+  ): MachineInventory => ({
+    key,
+    displayName,
+    registered: true,
+    connection,
+    sshTarget: key === 'local' ? null : 'cloud.example.com',
+    platform: 'linux',
+    arch: 'arm64',
+    hostname: key,
+    cliVersion: '1.0.0',
+    defaultProject: projects[0]?.key ?? null,
+    projects,
+    capabilities: {
+      inspect: true,
+      lifecycle: true,
+      openTunnel: true,
+      transferReceive: false,
+      credentialReseal: false,
+    },
+    issue: null,
+  })
+  return [
+    machine('local', 'This computer', 'local', [project('default')]),
+    machine('cloud', 'Cloud', 'online', [project('research')]),
+  ]
+}

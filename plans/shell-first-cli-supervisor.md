@@ -143,6 +143,14 @@ openalice completion <bash|zsh|fish|powershell>
 
 ### TUI information architecture
 
+The local-only root described below was superseded on 2026-08-23 by the
+Machine → AliceProject Fleet increment in
+[[plans/remote-project-fleet.md]]. Fleet is now the default root; the original
+local lifecycle projection remains the Overview page and remains available for
+the selected local AliceProject. This plan continues to own that lifecycle,
+logs, Doctor, update, Setup, and terminal-restoration behavior, while the Fleet
+plan owns remote inventory, tunnels, and transfer.
+
 The minimum 80 by 24 root screen contains:
 
 1. product version, channel, and update notice;
@@ -642,6 +650,12 @@ This plan is complete only when:
 7. owner guides record the shipped architecture and final release.
 
 ## Progress Log
+
+- 2026-08-23: The Machine Fleet increment superseded the local-only root with
+  a wide two-pane/narrow drill-down Machine → AliceProject view while retaining
+  Overview and all local lifecycle actions. Remote inventory is bounded and
+  non-interactive; compatible running remote Projects open through TUI-owned
+  SSH loopback tunnels that are aborted on detach without stopping Runtime.
 
 - 2026-07-29: Audited CLI lifecycle, Guardian control, source-backed Runtime,
   installer smoke, Herdr reference, and cross-surface gates. Drafted the first

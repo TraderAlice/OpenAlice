@@ -98,6 +98,23 @@ The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 `Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
 explicit commands. Its ordinary path is intentionally parameter-free:
 
+- the default Fleet page renders `Machine → AliceProject`: ordinary terminals
+  use two panes and narrow terminals drill down from Machines to Projects;
+  selection and list windows survive resize, use Unicode display width, and
+  keep the action/detach footer visible at the supported 80×24 baseline;
+- `↑`/`↓` move within the active Fleet pane, Tab/left/right switch panes, and
+  `[`/`]` switch Fleet/Overview/Logs/Doctor/Help pages. With only the local
+  Machine, focus starts on its current AliceProject so the historical one-key
+  Enter start/open path remains intact;
+- registered Machines refresh in the background with one bounded,
+  non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
+  checking, online, unauthorized, offline, and incompatible remain distinct
+  from per-project Runtime state;
+- Enter or `o` on a running compatible remote AliceProject opens a TUI-owned
+  loopback tunnel and browser. Detaching aborts only those tunnel processes;
+  it never stops the local or remote Runtime. Remote start/stop/configuration
+  keys are refused in this read-only fleet increment;
+
 - Enter starts the persistent Runtime and opens the verified Web endpoint when
   stopped, or opens the endpoint when already running;
 - `s` starts the persistent Runtime in the background without opening a
@@ -121,7 +138,7 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 - `m` is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
 - `c` is an advanced control that chooses and remembers the selected AliceProject's source checkout;
-- `?`, Tab, and the horizontal arrows expose help and detail panels.
+- `?` toggles Help; `[` and `]` expose the other top-level panels.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web
