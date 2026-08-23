@@ -19,6 +19,7 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'tui', description: 'Open the local Supervisor TUI' },
   { name: 'create', description: 'Create a named AliceProject (Trader or Nano)' },
   { name: 'project', description: 'List, select, or copy AI credentials between AliceProjects' },
+  { name: 'machine', description: 'Register SSH hosts and inspect their AliceProjects' },
   { name: 'up', description: 'Start a persistent local Runtime in the background' },
   { name: 'run', description: 'Run a local Runtime in the foreground' },
   { name: 'down', description: 'Stop the persistent local Runtime' },
@@ -545,7 +546,8 @@ function bashCompletionCases() {
     .map(([command, options]) => `    ${command}) COMPREPLY=( $(compgen -W "${options.join(' ')}" -- "$current") ) ;;`)
     .join('\n')
   return `${lifecycle}
-    project) COMPREPLY=( $(compgen -W "list use copy-ai-creds --json --from --to --yes" -- "$current") ) ;;`
+    project) COMPREPLY=( $(compgen -W "list use copy-ai-creds --json --from --to --yes" -- "$current") ) ;;
+    machine) COMPREPLY=( $(compgen -W "list add remove inspect --target --name --ssh-port --identity --json --yes" -- "$current") ) ;;`
 }
 
 function zshCompletionCases() {
@@ -553,16 +555,21 @@ function zshCompletionCases() {
     .map(([command, options]) => `  ${command}) _values 'option' ${options.map(shellQuote).join(' ')} ;;`)
     .join('\n')
   return `${lifecycle}
-  project) _values 'option' 'list' 'use' 'copy-ai-creds' '--json' '--from' '--to' '--yes' ;;`
+  project) _values 'option' 'list' 'use' 'copy-ai-creds' '--json' '--from' '--to' '--yes' ;;
+  machine) _values 'option' 'list' 'add' 'remove' 'inspect' '--target' '--name' '--ssh-port' '--identity' '--json' '--yes' ;;`
 }
 
 function fishCompletionOptions() {
-  return Object.entries(LIFECYCLE_OPTIONS)
+  const lifecycle = Object.entries(LIFECYCLE_OPTIONS)
     .flatMap(([command, options]) => options.map((option) => {
       const name = option.slice(2)
       return `complete -c openalice -n '__fish_seen_subcommand_from ${command}' -l ${name}`
     }))
     .join('\n')
+  const machine = ['target', 'name', 'ssh-port', 'identity', 'json', 'yes']
+    .map((name) => `complete -c openalice -n '__fish_seen_subcommand_from machine' -l ${name}`)
+    .join('\n')
+  return `${lifecycle}\n${machine}`
 }
 
 function shellQuote(value) {

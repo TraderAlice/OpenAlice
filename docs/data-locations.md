@@ -150,6 +150,14 @@ another home already holds it. Existing shipped `{ "web": 3002 }` files stay
 pins; delete the key or the file to restore probing. `openalice up --port`
 and `OPENALICE_WEB_PORT` remain one-run pins and do not rewrite the file.
 
+The machine-wide Supervisor root also owns `machines.json`. This second
+registry names SSH Machines for fleet inspection; it does not move with a
+complete home and does not belong to the Electron browser profile. The local
+Machine is implicit. Stored rows contain only connection metadata (target,
+port, display name, and optional local identity-file path), never key bytes or
+AliceProject data. `remote-targets.json` beside it remains a hashed,
+non-enumerable tunnel-port cache rather than durable fleet identity.
+
 `OPENALICE_PROJECT`, `OPENALICE_HOME`, `--project`, and `--home` remain
 higher-priority one-run/automation inputs. When they fix the selected project
 or Home, the TUI explains that AliceProject selection is read-only rather than
