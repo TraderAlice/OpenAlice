@@ -1,5 +1,5 @@
 ---
-version: 0.1.1
+version: 0.1.2
 ---
 
 # Auto Prediction
@@ -19,14 +19,16 @@ tools, Workspace lifecycle, and the managed Studio route around the desk.
 OpenAlice supervises only the command declared by `harness.json`; Auto
 Prediction retains its complete Studio and control-plane ownership.
 
-The exact upstream source is recorded in `.alice/harness-source.json`. Until
-Auto Prediction publishes releases, OpenAlice labels the approved commit as an
-experimental snapshot rather than inventing release semantics.
+The exact upstream source is recorded in `.alice/harness-source.json`.
+OpenAlice pins each approved release tag to its verified commit while retaining
+earlier qualified versions for explicit selection and rollback.
 
-The current approved release is `v0.1.1` at commit
-`db49d9dde1386fe3f0f8e7b7c78aa3810b7438b9`. It retains the Node.js 22
-qualification and implements the generic v1 managed Studio capability. The
-earlier qualified snapshots remain selectable for source-history work.
+The current approved release is `v0.1.2` at commit
+`d6c9447cab29898a6eb5fa06be3598b8474cc02f`. It retains the Node.js 22
+qualification and implements the generic v1 managed Studio capability with a
+bounded startup path while the initial catalog refresh continues in the
+background. Release `v0.1.1` and the earlier qualified snapshots remain
+selectable for rollback and source-history work.
 
 ## Starting work
 

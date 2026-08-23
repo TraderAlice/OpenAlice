@@ -8,8 +8,12 @@
   "bundledSkills": [],
   "source": {
     "repository": "https://github.com/TraderAlice/Auto-Prediction.git",
-    "defaultVersion": "v0.1.1",
+    "defaultVersion": "v0.1.2",
     "versions": [
+      {
+        "version": "v0.1.2",
+        "commit": "d6c9447cab29898a6eb5fa06be3598b8474cc02f"
+      },
       {
         "version": "v0.1.1",
         "commit": "db49d9dde1386fe3f0f8e7b7c78aa3810b7438b9"
