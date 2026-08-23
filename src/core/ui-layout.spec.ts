@@ -26,6 +26,12 @@ afterEach(async () => {
 })
 
 describe('ui-layout', () => {
+  it('accepts the Auto Prediction page emitted by the Activity Bar editor', () => {
+    const layout = defaultUiLayout()
+    expect(layout.groups.find((group) => group.id === 'beta')?.items).toContain('prediction')
+    expect(() => parseUiLayoutWrite(layout)).not.toThrow()
+  })
+
   it('hides Dev by default and keeps Settings visible', () => {
     const layout = defaultUiLayout()
     expect(layout.hidden).toEqual(['dev'])
@@ -55,6 +61,7 @@ describe('ui-layout', () => {
       'office',
       'portfolio',
       'connectors',
+      'prediction',
     ])
     expect(layout.hidden).not.toContain('trading-as-git')
     expect(layout.hidden).toEqual(['dev'])

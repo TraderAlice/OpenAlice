@@ -15,6 +15,7 @@ import { dataPath } from './paths.js'
 export const ACTIVITY_PAGE_IDS = [
   'chat',
   'auto-quant',
+  'prediction',
   'inbox',
   'tracked',
   'workspaces',
@@ -64,7 +65,7 @@ export function defaultUiLayout(): UiLayout {
     version: 1,
     groups: [
       { id: 'primary', items: ['chat', 'inbox', 'issue', 'auto-quant', 'tracked', 'market'] },
-      { id: 'beta', items: ['office', 'portfolio', 'connectors'] },
+      { id: 'beta', items: ['prediction', 'office', 'portfolio', 'connectors'] },
       { id: 'system', items: ['workspaces', 'automation', 'settings', 'dev'] },
     ],
     hidden: ['dev'],
