@@ -35,6 +35,10 @@ with source checkout support retained as an explicit development fallback:
 - `openalice machine list|add|remove|inspect` owns an explicit local registry
   of SSH hosts and reads each compatible host's registered AliceProjects with
   one bounded aggregate SSH command;
+- `openalice project transfer` plans and copies one quiescent local
+  AliceProject into a new complete home on a registered SSH Machine, preserving
+  portable configuration and Workspace repositories while deliberately
+  starting with zero resumable Sessions;
 - Electron remains a complete local desktop distribution.
 
 The release-owned installer advances CLI, managed Pi, and the platform Runtime
@@ -112,6 +116,53 @@ protocol is deferred until the local/server boundary is stable.
 10. Shared Runtime facts use presentation-neutral names and versioned schemas.
     Browser layout, Electron chrome, modal state, and other client UI state do
     not become server truth.
+
+## AliceProject Transfer
+
+The first transfer direction is local AliceProject to a registered SSH
+Machine. `--plan` inventories without changing either host; apply requires an
+explicit confirmation or `--yes`. The source remains registered and unchanged,
+and the destination receives a new AliceProject id. Transfer never means
+takeover, move, merge, replacement, deletion, Runtime start, or default-project
+selection.
+
+```bash
+openalice project transfer \
+  --from research \
+  --to-machine cloud-dev \
+  --to-project research-cloud \
+  --to-home /home/alice/.openalice-research \
+  --session-owner-policy keep-blocked \
+  --plan
+```
+
+The plan reports portable file/byte totals, required destination free space,
+secret-free credential categories, excluded Session/runtime files, and exact-
+Session scheduled Issues. Apply re-probes source ownership and remote inventory,
+requires a stopped source (or the separate `--stop-source` authority), and
+refuses an occupied project key or Home.
+
+The sender uses a versioned, bounded stream over SSH stdin. The receiver checks
+normalized paths, entry types, symlink containment, sizes, checksums, available
+space, and transaction identity; writes an owner-private sibling staging Home;
+then atomically publishes and registers it without changing the remote default.
+A matching published receipt makes registration retry idempotent. Cancellation
+terminates the SSH receiver and leaves only that transaction's marked staging
+path eligible for a safe retry.
+
+Portable configuration, active and departed Workspace repositories, Git state,
+Workspace ids, and lifecycle records transfer. Absolute Workspace paths are
+rebased to the remote Home. Guardian state, Runtime payloads, ports, auth,
+headless/native conversation state, resume identities, and untracked Session
+dossiers do not. A deliberately Git-tracked `.alice/sessions` dossier remains
+as inert repository content but does not create a resumable remote Session.
+
+Home-owned AI/provider credentials can travel only in the private SSH stream.
+Broker and Connector values are decrypted in source-process memory and sealed
+on the receiver with a newly created destination key; the source sealing key is
+never copied. `--without-credentials` retains secret-free configuration and
+requires those integrations to be configured again. Exact-Session scheduled
+Issue owners require an explicit `keep-blocked` or `new-then-resume` policy.
 
 ## Layered Topology
 
