@@ -148,6 +148,27 @@ describe('joinWorkspaceHarnessSessions', () => {
     expect(rows.some((row) => row.resumeId === 'resume-directory-only')).toBe(false)
   })
 
+  it('always hides connector-owned Sessions even when ordinary headless rows are enabled', () => {
+    const connector = headlessSession({
+      id: 'session-connector',
+      resumeId: 'resume-connector',
+    })
+    const ordinary = headlessSession()
+    const rows = joinWorkspaceHarnessSessions(workspace([session(), connector, ordinary]), {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [
+        entry({ resumeId: 'resume-interactive' }),
+        entry({ resumeId: 'resume-connector', rosterVisibility: 'hidden' }),
+        entry(),
+      ],
+    }, { includeHeadlessBornSessions: true })
+
+    expect(rows.map((row) => row.resumeId)).toEqual([
+      'resume-headless-only',
+      'resume-interactive',
+    ])
+  })
+
   it('locks TUI while headless occupies and sorts running occupancy first', () => {
     const paused = session({ lastActiveAt: '2026-08-03T00:00:00.000Z' })
     const runningHeadless = entry({

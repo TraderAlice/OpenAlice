@@ -1,5 +1,10 @@
 import type { HeadlessTaskRecord, HeadlessTaskStatus } from './headless-task-registry.js'
 import {
+  issueAssigneeResumeId,
+  isConnectorDeskIssue,
+  type IssueRecord,
+} from './issues/declaration.js'
+import {
   sessionPresence,
   type ResumeIdentityRecord,
   type SessionPresence,
@@ -26,6 +31,8 @@ export interface WorkspaceSessionDirectoryEntry {
   active: boolean
   /** Secret-free birth stamp when this product Session was first allocated. */
   createdBy?: SessionCreatedBy
+  /** Product rosters must not offer transport-owned Sessions as coworkers. */
+  rosterVisibility?: 'hidden'
   runtime?: PublicSessionRuntime
   latestExecution?: {
     taskId: string
@@ -49,6 +56,22 @@ export interface WorkspaceSessionDirectory {
   sessions: WorkspaceSessionDirectoryEntry[]
 }
 
+export function connectorDeskRosterExclusions(input: {
+  issues: readonly Pick<IssueRecord, 'id' | 'assignee' | 'connectorDesk'>[]
+  executionsForIssue(issueId: string): readonly Pick<HeadlessTaskRecord, 'resumeId'>[]
+  inquiriesForIssue(issueId: string): readonly Pick<HeadlessTaskRecord, 'resumeId'>[]
+}): Set<string> {
+  const hidden = new Set<string>()
+  for (const issue of input.issues) {
+    if (!isConnectorDeskIssue(issue)) continue
+    const assignee = issueAssigneeResumeId(issue.assignee)
+    if (assignee) hidden.add(assignee)
+    for (const task of input.executionsForIssue(issue.id)) hidden.add(task.resumeId)
+    for (const task of input.inquiriesForIssue(issue.id)) hidden.add(task.resumeId)
+  }
+  return hidden
+}
+
 /** Build the public Session directory by joining backend registries while
  * deliberately whitelisting fields. Native runtime ids and launcher record ids
  * never cross this boundary; resumeId is the sole conversation handle. */
@@ -58,6 +81,7 @@ export function buildWorkspaceSessionDirectory(input: {
   interactiveFor(resumeId: string): SessionRecord | undefined
   latestExecutionFor(resumeId: string): HeadlessTaskRecord | null
   isActive(resumeId: string): boolean
+  rosterVisibilityFor?(resumeId: string): 'hidden' | undefined
 }): WorkspaceSessionDirectory {
   return {
     workspace: input.workspace,
@@ -79,6 +103,9 @@ export function buildWorkspaceSessionDirectory(input: {
           && Boolean(identity.agentSessionId),
         active: identity.lifecycle !== 'retired' && input.isActive(identity.resumeId),
         ...(identity.metadata?.createdBy ? { createdBy: identity.metadata.createdBy } : {}),
+        ...(input.rosterVisibilityFor?.(identity.resumeId) === 'hidden'
+          ? { rosterVisibility: 'hidden' as const }
+          : {}),
         ...(identity.runtimeBinding
           ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
           : {}),

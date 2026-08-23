@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildWorkspaceSessionDirectory } from './session-directory.js'
+import {
+  buildWorkspaceSessionDirectory,
+  connectorDeskRosterExclusions,
+} from './session-directory.js'
 
 describe('buildWorkspaceSessionDirectory', () => {
   it('joins useful state while hiding native and launcher ids', () => {
@@ -77,6 +80,26 @@ describe('buildWorkspaceSessionDirectory', () => {
     expect(JSON.stringify(result)).not.toContain('private repeated prompt')
   })
 
+  it('projects connector-owned Sessions as hidden roster state', () => {
+    const result = buildWorkspaceSessionDirectory({
+      workspace: { id: 'ws-1', tag: 'research' },
+      identities: [{
+        resumeId: 'resume-phone-desk',
+        wsId: 'ws-1',
+        agent: 'pi',
+        createdAt: 1,
+        updatedAt: 2,
+        lifecycle: 'active',
+      }],
+      interactiveFor: () => undefined,
+      latestExecutionFor: () => null,
+      isActive: () => false,
+      rosterVisibilityFor: () => 'hidden',
+    })
+
+    expect(result.sessions[0]?.rosterVisibility).toBe('hidden')
+  })
+
   it('projects archived presence and keeps a deleted Session non-resumable', () => {
     const archived = buildWorkspaceSessionDirectory({
       workspace: { id: 'ws-1', tag: 'research' },
@@ -121,5 +144,28 @@ describe('buildWorkspaceSessionDirectory', () => {
       presence: 'deleted',
       resumable: false,
     })
+  })
+})
+
+describe('connectorDeskRosterExclusions', () => {
+  it('finds the fixed owner plus scheduled and inbound connector conversations', () => {
+    const hidden = connectorDeskRosterExclusions({
+      issues: [
+        { id: 'telegram-phone-desk', assignee: '@resume-current', connectorDesk: 'telegram' },
+        { id: 'ordinary-issue', assignee: '@resume-visible' },
+      ],
+      executionsForIssue: (issueId) => issueId === 'telegram-phone-desk'
+        ? [{ resumeId: 'resume-scheduled' }]
+        : [{ resumeId: 'resume-visible-run' }],
+      inquiriesForIssue: (issueId) => issueId === 'telegram-phone-desk'
+        ? [{ resumeId: 'resume-inbound' }]
+        : [{ resumeId: 'resume-visible-inquiry' }],
+    })
+
+    expect([...hidden].sort()).toEqual([
+      'resume-current',
+      'resume-inbound',
+      'resume-scheduled',
+    ])
   })
 })

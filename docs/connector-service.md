@@ -72,6 +72,11 @@ categories.
   off the owner chat. The trailing text still becomes today's reply comment.
   Telegram is the first `desk` adapter; Discord and Slack do
   not advertise `desk` until they ingest private owner chat.
+- A connector phone-desk Session is transport-owned conversation state, not an
+  Ask Alice coworker. It remains attributable and resumable by its Issue, and
+  visible in Issue/Automation diagnostics, but is always excluded from the
+  Ask Alice Session roster even when the operator opts into ordinary
+  headless-born Sessions.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are externalized as

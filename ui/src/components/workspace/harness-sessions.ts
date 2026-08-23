@@ -169,6 +169,7 @@ export function joinWorkspaceHarnessSessions(
   )
   const rows = workspace.sessions.flatMap((session) => {
     const entry = directoryByResume.get(session.resumeId) ?? null
+    if (entry?.rosterVisibility === 'hidden') return []
     const presence = entryPresence(entry, session.presence ?? 'active')
     if (presence !== wanted) return []
     if (!includeHeadlessBorn && isHeadlessBornWithoutInteractive(session, entry)) return []
