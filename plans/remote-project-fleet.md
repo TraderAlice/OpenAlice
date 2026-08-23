@@ -456,7 +456,7 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   offline, wide/narrow resize, drill-down, and terminal restoration.
 - [x] Update the base Supervisor plan where its original local-only
   information architecture is superseded.
-- [ ] Open and merge the second serial PR to `dev`; inspect trailing CI before
+- [x] Open and merge the second serial PR to `dev`; inspect trailing CI before
   Increment 3.
 
 ### Increment 3 — transfer planner, exporter, and remote importer
@@ -486,7 +486,7 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   interrupted transfer, retry, publish, remote Doctor/start, tunnel, stop, and
   source-unchanged assertions.
 - [x] Update owner guides with the shipped transfer and Session boundary.
-- [ ] Open and merge the third serial PR to `dev`; inspect trailing CI before
+- [x] Open and merge the third serial PR to `dev`; inspect trailing CI before
   Increment 4.
 
 ### Increment 4 — transfer TUI wizard and recovery UX
@@ -501,7 +501,7 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 - [x] After success, select the remote project and offer separate Start,
   Connect/Open, or Done actions. Do not auto-start merely because transfer was
   approved.
-- [ ] Add wide/narrow screen and real PTY journeys for default-no, success,
+- [x] Add wide/narrow screen and real PTY journeys for default-no, success,
   auth loss, checksum failure, occupied destination, cancellation, retry, and
   terminal cleanup.
 - [x] Walk the real TUI against an isolated Docker SSH host; no user Home,
@@ -567,14 +567,16 @@ Increment 4 local progress (2026-08-23): Fleet `m` opens a focused overlay
 for destination Machine, key/Home, credential handling, exact-Session owner
 policy, plan review, live file/byte progress, cancellation, failure recovery,
 and separate Start/Connect/Done success actions. Pure wide/narrow presentation,
-screen routing, real widget default-No, and existing PTY regression journeys
-pass. The Docker SSH fixture drives the real TUI through default-No and approved
+screen routing, real widget default-No, and PTY regression journeys pass. An
+injected real-PTY matrix now covers narrow default-No, success, authentication
+loss, an occupied destination race, checksum failure with same-transaction
+retry, cancellation acknowledgement with retry, and terminal cleanup. The
+Docker SSH fixture drives the real TUI through default-No and approved
 success, proving no default-No destination, registered result, portable
-Workspace content, and no resume ledger. Additional injected auth/checksum/
-occupied/cancel retry journeys and publication remain.
+Workspace content, and no resume ledger. Publication remains.
 
-Final local gate refresh (2026-08-23): the complete CLI package passes 285
-tests and the repository passes 4,930 tests with 9 skipped, alongside root,
+Final local gate refresh (2026-08-23): the complete CLI package passes 291
+tests and the repository passes 4,936 tests with 9 skipped, alongside root,
 UI, and CLI TypeScript/build checks. Installer Docker, the expanded real SSH/TUI
 transfer Docker route, and unsigned Electron packaged Workspace acceptance all
 pass. Every fixture removed its container, image, temporary package, and
