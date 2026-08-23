@@ -127,6 +127,27 @@ try {
     throw new Error(`Remote Server did not report the bundle provider: ${JSON.stringify(running.provider)}`)
   }
 
+  console.log('[remote-ssh-smoke] registering the host and reading aggregate AliceProject inventory')
+  run('ssh', [remoteTarget,
+    '"$HOME/.openalice/bin/openalice" create alice-project --name research --home /home/smoke/.openalice-research --product nano --yes',
+  ], { env: smokeEnv })
+  run(process.execPath, [
+    cliEntry, 'machine', 'add', 'smoke-cloud', '--target', remoteTarget,
+    '--name', 'Smoke Cloud', '--yes',
+  ], { cwd: repoRoot, env: smokeEnv })
+  const fleet = JSON.parse(run(process.execPath, [
+    cliEntry, 'machine', 'inspect', 'smoke-cloud', '--json',
+  ], { cwd: repoRoot, env: smokeEnv }))
+  if (fleet.machine?.connection !== 'online') {
+    throw new Error(`Registered Machine did not become online: ${JSON.stringify(fleet)}`)
+  }
+  const inventoryProjects = fleet.machine?.projects ?? []
+  if (inventoryProjects.length !== 2
+    || !inventoryProjects.some((project) => project.key === 'default' && project.runtime?.class === 'running')
+    || !inventoryProjects.some((project) => project.key === 'research' && project.product === 'nano')) {
+    throw new Error(`Aggregate Machine inventory did not include both AliceProjects: ${JSON.stringify(fleet)}`)
+  }
+
   console.log('[remote-ssh-smoke] repairing a legacy CLI Server with its managed Pi launcher missing')
   run('ssh', [remoteTarget, 'rm -f "$HOME/.openalice/bin/pi" "$HOME/.openalice/bin/pi.cmd"'], { env: smokeEnv })
   const repairedTunnelUrl = await attachAndProbe(remoteTarget, smokeEnv, ['--yes', '--no-open', '--wait', '30'])

@@ -916,6 +916,7 @@ export function buildRemoteInstallCommand(installSource, installBaseUrl = '', wi
 export function buildRemoteSshArgs(options, remoteCommand) {
   const args = [
     '-T',
+    '-o', 'ConnectTimeout=10',
     '-o', 'ServerAliveInterval=30',
     '-o', 'ServerAliveCountMax=3',
   ]

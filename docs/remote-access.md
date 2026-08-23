@@ -32,6 +32,9 @@ with source checkout support retained as an explicit development fallback:
   matching Runtime bundle when approved, starts or reuses the remote Server,
   and opens the same loopback tunnel; explicit source providers still prepare
   build tools and checkouts when needed;
+- `openalice machine list|add|remove|inspect` owns an explicit local registry
+  of SSH hosts and reads each compatible host's registered AliceProjects with
+  one bounded aggregate SSH command;
 - Electron remains a complete local desktop distribution.
 
 The release-owned installer advances CLI, managed Pi, and the platform Runtime
@@ -246,6 +249,42 @@ openalice remote <target> --stop
 ```
 
 Neither command conflates “disconnect” with “stop my remote work.”
+
+### Registered Machines and aggregate inventory
+
+`openalice machine` adds durable fleet identity without changing the existing
+raw-target `openalice remote <target>` contract:
+
+```bash
+openalice machine list [--json]
+openalice machine add cloud --target alice@example.com [--ssh-port 22]
+  [--identity ~/.ssh/cloud] [--name "Cloud"] --yes
+openalice machine remove cloud --yes
+openalice machine inspect [cloud] [--json]
+```
+
+The implicit `local` Machine cannot be removed. SSH rows live in the
+machine-wide Supervisor root's owner-private `machines.json`; they contain a
+display name, OpenSSH target, port, and optional local identity-file path, but
+never passwords, private-key bytes, passphrases, host keys, agent material, or
+remote credentials. OpenSSH config, agent, ProxyJump, and host-key policy stay
+authoritative. Removing a row forgets local metadata only and never connects
+to or mutates the host.
+
+`machine inspect` uses the same typed inventory for local and remote Machines.
+Each remote probe invokes `openalice machine inspect local --json` once; that
+remote command reads only its Supervisor AliceProject registry and probes those
+registered complete homes. It does not scan other directories. The bounded
+response contains project identity, product, home/port, normalized Runtime
+state, safe component health, and advertised capabilities. Runtime owner PIDs,
+tokens, logs, command lines, environments, and credentials are omitted.
+
+Reachability is deliberately not Runtime state. A registered remote row is
+reported as `online`, `offline`, `unauthorized`, or `incompatible`; an online
+Machine may still contain stopped, unhealthy, or differently owned Projects.
+One unreachable Machine remains a row in the fleet result instead of failing
+the complete refresh. `remote-targets.json` continues to be only the hashed
+ephemeral local-port cache used by tunnels and is not a Machine registry.
 
 When `--app-dir` is absent, managed remote prefers the verified Runtime bundle
 installed with the matching CLI. No Git checkout or compiler is needed. On a

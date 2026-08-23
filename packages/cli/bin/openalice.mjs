@@ -30,6 +30,10 @@ import {
   formatProjectHelp,
   runProjectCommand,
 } from '../src/project-command.ts'
+import {
+  formatMachineHelp,
+  runMachineCommand,
+} from '../src/machine-command.ts'
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
@@ -153,6 +157,13 @@ Prints a completion script to stdout without modifying shell configuration.
       return 0
     }
     return runProjectCommand(args)
+  }
+  if (command === 'machine') {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatMachineHelp())
+      return 0
+    }
+    return runMachineCommand(args)
   }
   const error = new Error(`Unknown command: ${command}\n\n${formatRootHelp()}`)
   error.code = 'EUSAGE'
