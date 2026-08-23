@@ -395,16 +395,25 @@ export class DeliveryManager {
       direction: 'outbound',
       stage: 'delivery.attempted',
       connectorId: adapter.id,
-      payload: { kind: 'owner-chat', textLength: message.text.length },
+      payload: {
+        kind: 'owner-chat',
+        phase: message.phase,
+        conversationId: message.conversationId,
+        textLength: message.text?.length ?? 0,
+      },
     })
     try {
-      await adapter.sendOwnerText(message.text)
+      if (adapter.sendOwnerChat) {
+        await adapter.sendOwnerChat(message)
+      } else if (message.phase !== 'accepted' && message.text) {
+        await adapter.sendOwnerText(message.text)
+      }
       await this.record({
         correlationId,
         direction: 'outbound',
         stage: 'delivery.succeeded',
         connectorId: adapter.id,
-        payload: { kind: 'owner-chat' },
+        payload: { kind: 'owner-chat', phase: message.phase, conversationId: message.conversationId },
       })
     } catch (error) {
       await this.record({
@@ -412,7 +421,12 @@ export class DeliveryManager {
         direction: 'outbound',
         stage: 'delivery.failed',
         connectorId: adapter.id,
-        payload: { kind: 'owner-chat', error: error instanceof Error ? error.message : String(error) },
+        payload: {
+          kind: 'owner-chat',
+          phase: message.phase,
+          conversationId: message.conversationId,
+          error: error instanceof Error ? error.message : String(error),
+        },
       })
       throw error
     }

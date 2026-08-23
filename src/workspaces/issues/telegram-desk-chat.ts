@@ -29,13 +29,15 @@ import {
   findConnectorDesks,
   type ConnectorDesk,
 } from './connector-desk.js'
-import { projectDeskComment } from './telegram-desk-project.js'
+import { projectDeskComment, projectDeskLifecycle } from './telegram-desk-project.js'
 
 export {
   TELEGRAM_NO_REPLY_TAG,
   containsTelegramNoReply,
   projectDeskComment,
+  projectDeskLifecycle,
   projectDeskTurnProgress,
+  projectWorkspaceDeskFailure,
   projectWorkspaceDeskTurnProgress,
   shouldProjectDeskComment,
 } from './telegram-desk-project.js'
@@ -86,20 +88,23 @@ function quoteInboundMessage(text: string): string {
 export async function ingestTelegramOwnerMessage(
   host: ConnectorDeskChatHost,
   message: InboundOwnerMessage,
+  client?: ConnectorClient,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
-  return ingestConnectorOwnerMessages(host, [message])
+  return ingestConnectorOwnerMessages(host, [message], client)
 }
 
 export async function ingestTelegramOwnerMessages(
   host: ConnectorDeskChatHost,
   messages: readonly InboundOwnerMessage[],
+  client?: ConnectorClient,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
-  return ingestConnectorOwnerMessages(host, messages)
+  return ingestConnectorOwnerMessages(host, messages, client)
 }
 
 export async function ingestConnectorOwnerMessages(
   host: ConnectorDeskChatHost,
   messages: readonly InboundOwnerMessage[],
+  client: ConnectorClient = new ConnectorClient(resolveConnectorUrl()),
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
   const connectorId = messages[0]?.connectorId
   if (!connectorId) return { ok: false, reason: 'empty' }
@@ -142,6 +147,25 @@ export async function ingestConnectorOwnerMessages(
   })
   if (dispatched.status !== 'not_requested') {
     await updateIssueCommentDelivery(workspace.dir, desk.issue.id, appended.comment.id, dispatched.delivery)
+  }
+  if (dispatched.status === 'scheduled') {
+    await projectDeskLifecycle({
+      issue: appended.issue,
+      conversationId: appended.comment.id,
+      phase: 'accepted',
+      client,
+    }).catch(() => undefined)
+  } else {
+    const reason = dispatched.status === 'failed'
+      ? dispatched.delivery.error
+      : 'No Agent reply was scheduled for this message.'
+    await projectDeskLifecycle({
+      issue: appended.issue,
+      conversationId: appended.comment.id,
+      phase: 'failed',
+      text: `OpenAlice could not start the Agent: ${reason}`,
+      client,
+    }).catch(() => undefined)
   }
   return { ok: true, comment: appended.comment }
 }
@@ -223,7 +247,7 @@ export async function pullTelegramDeskInbound(
       leftover.push(...group)
       continue
     }
-    const result = await ingestConnectorOwnerMessages(host, group)
+    const result = await ingestConnectorOwnerMessages(host, group, client)
     if (!result.ok) {
       console.warn(`[connector] ${connectorId} phone-desk inbound skipped:`, result.reason)
     }

@@ -48,10 +48,10 @@ function host(overrides: Partial<TelegramDeskChatHost> = {}): TelegramDeskChatHo
 }
 
 function mockClient() {
-  const sent: { id: string; text: string }[] = []
+  const sent: Array<{ id: string; conversationId: string; phase: string; text?: string }> = []
   const client = {
-    sendOwnerMessage: async (message: { id: string; text: string }) => {
-      sent.push({ id: message.id, text: message.text })
+    sendOwnerMessage: async (message: { id: string; conversationId: string; phase: string; text?: string }) => {
+      sent.push(message)
       return { accepted: true }
     },
   } as unknown as ConnectorClient
@@ -102,17 +102,44 @@ describe('telegram desk ingest and stamp', () => {
       [{ id: 'ws-a', dir: wsDir }],
     )
     expect(created.ok).toBe(true)
+    const { client } = mockClient()
     const result = await ingestTelegramOwnerMessage(host(), {
       connectorId: 'telegram',
       userId: '42',
       text: 'What is the overnight risk?',
-    })
+    }, client)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.comment.author).toBe('human')
     expect(result.comment.via).toBe('telegram')
     expect(result.comment.markdown).toBe('What is the overnight risk?')
     expect(shouldProjectDeskComment(created.ok ? created.issue : { connectorDesk: 'telegram' }, result.comment)).toBe(false)
+  })
+
+  it('starts native owner-chat activity after the Agent turn is scheduled', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    const { client, sent } = mockClient()
+    const result = await ingestTelegramOwnerMessage(host({
+      conversation: () => ({
+        ask: async () => ({ status: 'accepted', taskId: 'run-1', resumeId: 'resume-1' }),
+      } as unknown as NonNullable<ReturnType<TelegramDeskChatHost['conversation']>>),
+    }), {
+      connectorId: 'telegram',
+      userId: '42',
+      text: 'What is the overnight risk?',
+    }, client)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(sent).toEqual([expect.objectContaining({
+      id: `desk-accepted-${result.comment.id}`,
+      conversationId: result.comment.id,
+      phase: 'accepted',
+    })])
   })
 
   it('stamps a scheduled fire as a comment', async () => {
@@ -242,10 +269,11 @@ describe('telegram desk ingest and stamp', () => {
       [{ id: 'ws-a', dir: wsDir }],
     )
     expect(created.ok).toBe(true)
+    const { client } = mockClient()
     const result = await ingestTelegramOwnerMessages(host(), [
       { connectorId: 'telegram', userId: '42', text: '那个事情我想了想你再改改' },
       { connectorId: 'telegram', userId: '42', text: '算了不用改了,就这样吧' },
-    ])
+    ], client)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.comment.markdown).toBe([
