@@ -94,6 +94,21 @@ describe('AliceProject transfer stream', () => {
     await expect(serialize(plan)).rejects.toThrow('changed after planning')
   })
 
+  it('reports completed portable file and byte progress', async () => {
+    const { plan } = await fixture()
+    const progress: Array<{ files: number; bytes: number; totalFiles: number; totalBytes: number }> = []
+    const output = new Writable({ write(_chunk, _encoding, callback) { callback() } })
+
+    await writeProjectTransferStream({ plan, output, onProgress: (next) => progress.push(next) })
+
+    expect(progress.at(-1)).toEqual({
+      files: plan.portable.files,
+      bytes: plan.portable.bytes,
+      totalFiles: plan.portable.files,
+      totalBytes: plan.portable.bytes,
+    })
+  })
+
   it('does not overwrite an occupied destination', async () => {
     const { destination, plan } = await fixture()
     await mkdir(destination, { recursive: true })

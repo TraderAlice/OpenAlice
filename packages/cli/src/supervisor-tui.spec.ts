@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { resolveLaunchContext } from './launch-context.ts'
 import type { MachineFleetEnvelope, MachineInventory } from './machine-inventory.ts'
@@ -55,6 +55,7 @@ describe('Supervisor TUI screen', () => {
 
   it('renders and navigates the Machine to AliceProject fleet', () => {
     const activated: string[] = []
+    const transfers: string[] = []
     let refreshes = 0
     const screen = new SupervisorScreen({
       version: 'dev',
@@ -68,9 +69,15 @@ describe('Supervisor TUI screen', () => {
     }, {
       onActivateFleet: (machine, project) => activated.push(`${machine.key}/${project.key}`),
       onRefreshFleet: () => { refreshes += 1 },
+      onTransferFleet: (project) => transfers.push(project.key),
     })
 
-    expect(screen.render(100).join('\n')).toContain('AliceProjects · This computer')
+    const localFleet = screen.render(100).join('\n')
+    expect(localFleet).toContain('AliceProjects · This computer')
+    expect(localFleet.match(/m Transfer/gu)).toHaveLength(1)
+    expect(localFleet).not.toContain('m Managed')
+    expect(screen.handleKey('m', matchesKey)).toBe(true)
+    expect(transfers).toEqual(['default'])
     expect(screen.handleKey('down', matchesKey)).toBe(true)
     expect(screen.handleKey('tab', matchesKey)).toBe(true)
     expect(screen.render(100).join('\n')).toContain('AliceProjects · Cloud')
@@ -79,9 +86,37 @@ describe('Supervisor TUI screen', () => {
     expect(screen.handleKey('r', matchesKey)).toBe(true)
     expect(refreshes).toBe(1)
     expect(screen.handleKey('s', matchesKey)).toBe(true)
-    expect(screen.snapshot.notice).toContain('not available for a remote selection')
+    expect(screen.snapshot.notice).toContain('only for a stopped remote AliceProject')
     expect(screen.handleEscape()).toBe(true)
     expect(screen.snapshot.fleet?.focus).toBe('machines')
+  })
+
+  it('offers Start for a stopped compatible remote AliceProject', () => {
+    const machines = fleetMachines()
+    machines[1]!.projects[0]!.runtime = {
+      ...machines[1]!.projects[0]!.runtime,
+      class: 'absent',
+      state: 'absent',
+      ownerSurface: null,
+      webEndpoint: null,
+    }
+    const starts: string[] = []
+    const screen = new SupervisorScreen({
+      version: 'dev',
+      channel: 'dev',
+      runtime: { class: 'absent', endpoints: {} },
+      fleet: createSupervisorFleetState('2026-08-23T00:00:00Z', machines),
+    }, {
+      onStartFleet: (machine, project) => starts.push(`${machine.key}/${project.key}`),
+    })
+
+    screen.handleKey('down', matchesKey)
+    screen.handleKey('tab', matchesKey)
+
+    expect(screen.render(100).join('\n')).toContain('s Start stopped AliceProject')
+    expect(screen.render(50).join('\n')).toContain('s Start')
+    expect(screen.handleKey('s', matchesKey)).toBe(true)
+    expect(starts).toEqual(['cloud/research'])
   })
 
   it('uses a narrow projection and sanitizes diagnostics', () => {
@@ -306,6 +341,297 @@ describe('Supervisor TUI screen', () => {
     })).resolves.toBe(0)
 
     expect(tunnelAborted).toBe(true)
+  })
+
+  it('re-probes and starts a selected stopped remote AliceProject', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    const machines = fleetMachines()
+    machines[1]!.projects[0]!.runtime = {
+      ...machines[1]!.projects[0]!.runtime,
+      class: 'absent',
+      state: 'absent',
+      ownerSurface: null,
+      webEndpoint: null,
+    }
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines,
+    }
+    const startRemoteProject = vi.fn(async () => {
+      setTimeout(() => inputListener?.('q'), 0)
+    })
+    const inspectFleet = vi.fn(async () => fleet)
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void { inputListener = listener; return () => undefined }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      start(): void {
+        queueMicrotask(() => {
+          inputListener?.('down')
+          inputListener?.('tab')
+          inputListener?.('s')
+        })
+      }
+      stop(): void {}
+    }
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet,
+      loadMachineRegistry: async () => ({
+        defaultMachine: 'local',
+        machines: [{ key: 'cloud', displayName: 'Cloud', sshTarget: 'cloud.example.com', isDefault: false }],
+      }),
+      startRemoteProject,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ProcessTerminal: class {}, TUI: FakeTui, matchesKey }) as never,
+    })).resolves.toBe(0)
+
+    expect(inspectFleet).toHaveBeenCalled()
+    expect(startRemoteProject).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'cloud', sshTarget: 'cloud.example.com' }),
+      'research',
+    )
+  })
+
+  it('keeps the transfer wizard default-no and never invokes the sender', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let overlayComponent: { handleInput?(data: string): void } | undefined
+    const send = vi.fn()
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines().map((machine) => machine.key === 'cloud'
+        ? { ...machine, capabilities: { ...machine.capabilities, transferReceive: true, credentialReseal: true } }
+        : machine),
+    }
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void { inputListener = listener; return () => undefined }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      showOverlay(component: { handleInput?(data: string): void }) {
+        overlayComponent = component
+        return {
+          hide: () => undefined,
+          focus: () => {
+            setTimeout(() => {
+              overlayComponent?.handleInput?.('\r')
+              overlayComponent?.handleInput?.('\r')
+              overlayComponent?.handleInput?.('\r')
+              overlayComponent?.handleInput?.('\r')
+              overlayComponent?.handleInput?.('\r')
+              setTimeout(() => {
+                overlayComponent?.handleInput?.('n')
+                inputListener?.('\u0003')
+              }, 20)
+            }, 0)
+          },
+        }
+      }
+      start(): void {
+        queueMicrotask(() => inputListener?.('m'))
+        setTimeout(() => inputListener?.('\u0003'), 100)
+      }
+      stop(): void {}
+    }
+    const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      planProjectTransfer: async (input) => transferPlan(input.source.home, input.destinationHome, input.destinationProjectKey),
+      sendProjectTransfer: send,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ...realTui, TUI: FakeTui }) as never,
+    })).resolves.toBe(0)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('retries the same transfer after an injected sender failure', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let overlayComponent: { render(width: number): string[]; handleInput?(data: string): void } | undefined
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines().map((machine) => machine.key === 'cloud'
+        ? { ...machine, capabilities: { ...machine.capabilities, transferReceive: true, credentialReseal: true } }
+        : machine),
+    }
+    const send = vi.fn()
+      .mockRejectedValueOnce(new Error('synthetic checksum failure'))
+      .mockResolvedValue({
+        schemaVersion: 1,
+        transferId: 'tui-transfer-test',
+        sourceProjectId: 'alice-project-default',
+        destinationProjectId: 'alice-project-tui-destination',
+        destinationHome: '/home/alice/.openalice-default-copy',
+        files: 0,
+        bytes: 0,
+        manifestSha256: 'a'.repeat(64),
+        credentials: 'included',
+        sessionsImported: 0,
+        publishedAt: '2026-08-23T00:00:01Z',
+      })
+    const waitForOverlay = async (text: string) => {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (overlayComponent?.render(100).join('\n').includes(text)) return
+        await new Promise((resolve) => setTimeout(resolve, 2))
+      }
+      throw new Error(`Transfer overlay did not render ${text}`)
+    }
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void { inputListener = listener; return () => undefined }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      showOverlay(component: typeof overlayComponent) {
+        overlayComponent = component
+        return {
+          hide: () => undefined,
+          focus: () => { void (async () => {
+            await waitForOverlay('destination Machine')
+            overlayComponent?.handleInput?.('\r')
+            await waitForOverlay('Destination AliceProject key')
+            overlayComponent?.handleInput?.('\r')
+            await waitForOverlay('Destination complete Home')
+            overlayComponent?.handleInput?.('\r')
+            await waitForOverlay('Credentials')
+            overlayComponent?.handleInput?.('\r')
+            await waitForOverlay('Exact-Session scheduled Issue owners')
+            overlayComponent?.handleInput?.('\r')
+            await waitForOverlay('Review AliceProject transfer')
+            overlayComponent?.handleInput?.('y')
+            await waitForOverlay('synthetic checksum failure')
+            overlayComponent?.handleInput?.('r')
+            await waitForOverlay('AliceProject transfer complete')
+            overlayComponent?.handleInput?.('\r')
+            inputListener?.('\u0003')
+          })() },
+        }
+      }
+      start(): void {
+        queueMicrotask(() => inputListener?.('m'))
+        setTimeout(() => inputListener?.('\u0003'), 1_000)
+      }
+      stop(): void {}
+    }
+    const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      loadMachineRegistry: async () => ({
+        defaultMachine: 'local',
+        machines: [{ key: 'cloud', displayName: 'Cloud', sshTarget: 'cloud.example.com', isDefault: false }],
+      }),
+      planProjectTransfer: async (input) => transferPlan(input.source.home, input.destinationHome, input.destinationProjectKey),
+      sendProjectTransfer: send,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ...realTui, TUI: FakeTui }) as never,
+    })).resolves.toBe(0)
+
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send.mock.calls[1]?.[0].plan.transferId).toBe('tui-transfer-test')
+  })
+
+  it('aborts an active transfer from the wizard without publishing', async () => {
+    let inputListener: ((data: string) => unknown) | undefined
+    let overlayComponent: { render(width: number): string[]; handleInput?(data: string): void } | undefined
+    let aborted = false
+    const fleet: MachineFleetEnvelope = {
+      schemaVersion: 1,
+      generatedAt: '2026-08-23T00:00:00Z',
+      machines: fleetMachines().map((machine) => machine.key === 'cloud'
+        ? { ...machine, capabilities: { ...machine.capabilities, transferReceive: true, credentialReseal: true } }
+        : machine),
+    }
+    const waitForOverlay = async (text: string) => {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (overlayComponent?.render(100).join('\n').includes(text)) return
+        await new Promise((resolve) => setTimeout(resolve, 2))
+      }
+      throw new Error(`Transfer overlay did not render ${text}`)
+    }
+    const send = vi.fn(async (input: { signal?: AbortSignal }) => new Promise<never>((_resolve, reject) => {
+      input.signal?.addEventListener('abort', () => {
+        aborted = true
+        reject(new Error('synthetic cancellation'))
+      }, { once: true })
+    }))
+    class FakeTui {
+      addChild(): void {}
+      addInputListener(listener: (data: string) => unknown): () => void { inputListener = listener; return () => undefined }
+      requestRender(): void {}
+      setShowHardwareCursor(): void {}
+      showOverlay(component: typeof overlayComponent) {
+        overlayComponent = component
+        return {
+          hide: () => undefined,
+          focus: () => { void (async () => {
+            for (const label of [
+              'destination Machine',
+              'Destination AliceProject key',
+              'Destination complete Home',
+              'Credentials',
+              'Exact-Session scheduled Issue owners',
+            ]) {
+              await waitForOverlay(label)
+              overlayComponent?.handleInput?.('\r')
+            }
+            await waitForOverlay('Review AliceProject transfer')
+            overlayComponent?.handleInput?.('y')
+            await waitForOverlay('Transferring…')
+            overlayComponent?.handleInput?.('\u001b')
+            await waitForOverlay('synthetic cancellation')
+            overlayComponent?.handleInput?.('\r')
+            inputListener?.('\u0003')
+          })() },
+        }
+      }
+      start(): void {
+        queueMicrotask(() => inputListener?.('m'))
+        setTimeout(() => inputListener?.('\u0003'), 1_000)
+      }
+      stop(): void {}
+    }
+    const realTui = await (await import('./pi-tui-loader.ts')).loadPiTui()
+
+    await expect(runSupervisorTui({}, {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      resolveContext: () => resolveLaunchContext({ cwd: '/tmp', homeDir: '/home/alice' }),
+      inspect: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      inspectTransferSource: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+      seedFleet: async () => fleet,
+      inspectFleet: async () => fleet,
+      loadMachineRegistry: async () => ({
+        defaultMachine: 'local',
+        machines: [{ key: 'cloud', displayName: 'Cloud', sshTarget: 'cloud.example.com', isDefault: false }],
+      }),
+      planProjectTransfer: async (input) => transferPlan(input.source.home, input.destinationHome, input.destinationProjectKey),
+      sendProjectTransfer: send as never,
+      discoverUpdate: async () => null,
+      loadTui: async () => ({ ...realTui, TUI: FakeTui }) as never,
+    })).resolves.toBe(0)
+
+    expect(send).toHaveBeenCalledOnce()
+    expect(aborted).toBe(true)
   })
 
   it('uses installed provenance to prepare missing source before Enter starts and opens', async () => {
@@ -884,4 +1210,21 @@ function fleetMachines(): MachineInventory[] {
     machine('local', 'This computer', 'local', [project('default')]),
     machine('cloud', 'Cloud', 'online', [project('research')]),
   ]
+}
+
+function transferPlan(sourceHome: string, destinationHome: string, destinationKey: string) {
+  return {
+    schemaVersion: 1 as const,
+    transferId: 'tui-transfer-test',
+    generatedAt: '2026-08-23T00:00:00Z',
+    source: { projectId: 'alice-project-default', key: 'default', displayName: 'Default AliceProject', home: sourceHome, product: 'trader' as const },
+    destination: { machineKey: 'cloud', projectId: 'alice-project-tui-destination', key: destinationKey, displayName: 'Default AliceProject', home: destinationHome, requiredFreeBytes: 64 * 1024 * 1024 },
+    policy: { credentials: 'include' as const, scheduledIssues: 'keep-blocked' as const },
+    portable: { entries: [], files: 0, directories: 0, symlinks: 0, bytes: 0 },
+    excluded: [],
+    credentials: { ai: { count: 0, vendors: [] }, broker: { count: 0, presets: [] }, connector: { count: 0, adapters: [] }, providerKeys: { count: 0, vendors: [] } },
+    scheduledIssues: [],
+    blockers: [],
+    readyToApply: true,
+  }
 }

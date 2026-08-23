@@ -61,11 +61,13 @@ export async function writeProjectTransferStream(input: {
   output: Writable
   readCredentials?: (home: string) => Promise<ProjectTransferCredentialBundle>
   signal?: AbortSignal
+  onProgress?: (progress: { files: number; bytes: number; totalFiles: number; totalBytes: number }) => void
 }): Promise<{ bytes: number }> {
   input.signal?.throwIfAborted()
   assertTransferPlan(input.plan)
   if (!input.plan.readyToApply) throw transferStreamError('Transfer plan has unresolved blockers.')
   let transferred = 0
+  let transferredFiles = 0
   await writeChunk(input.output, Buffer.from(`${MAGIC}\n${JSON.stringify(input.plan)}\n`, 'utf8'))
   for (let index = 0; index < input.plan.portable.entries.length; index += 1) {
     input.signal?.throwIfAborted()
@@ -99,6 +101,8 @@ export async function writeProjectTransferStream(input: {
         assertPortableFile(entry, portable.byteLength, sha256(portable))
         await writeChunk(input.output, portable)
         transferred += portable.byteLength
+        transferredFiles += 1
+        input.onProgress?.({ files: transferredFiles, bytes: transferred, totalFiles: input.plan.portable.files, totalBytes: input.plan.portable.bytes })
         continue
       }
       if (openedInfo.size !== entry.size) throw transferStreamError(`Portable file changed after planning: ${entry.path}`)
@@ -114,6 +118,8 @@ export async function writeProjectTransferStream(input: {
       }
       assertPortableFile(entry, size, hash.digest('hex'))
       transferred += size
+      transferredFiles += 1
+      input.onProgress?.({ files: transferredFiles, bytes: transferred, totalFiles: input.plan.portable.files, totalBytes: input.plan.portable.bytes })
     } finally {
       await sourceHandle.close()
     }
