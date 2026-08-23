@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(),
   save: vi.fn(),
   test: vi.fn(),
+  reconnect: vi.fn(),
   deskLoad: vi.fn(),
   openOrFocus: vi.fn(),
 }))
@@ -26,6 +27,7 @@ vi.mock('../api', async (importOriginal) => {
         load: mocks.load,
         save: mocks.save,
         test: mocks.test,
+        reconnect: mocks.reconnect,
         desk: {
           load: mocks.deskLoad,
           create: vi.fn(),
@@ -54,6 +56,7 @@ beforeEach(async () => {
   mocks.load.mockImplementation(async () => createDemoConnectorSnapshot())
   mocks.save.mockImplementation(async (config) => ({ config: redactSecrets(config) }))
   mocks.test.mockResolvedValue({ ok: true, probeId: 'connector-probe-demo' })
+  mocks.reconnect.mockResolvedValue({ ok: true, scope: 'adapter', adapterId: 'telegram' })
   mocks.deskLoad.mockResolvedValue({ desk: null })
 })
 
@@ -67,6 +70,31 @@ describe('Connector demo routes', () => {
     expect(screen.getByText('Discord')).toBeTruthy()
     expect(screen.getByText('Telegram')).toBeTruthy()
     expect(screen.getByText(/External delivery is disabled/)).toBeTruthy()
+  })
+
+  it('reconnects an unhealthy configured adapter from the operations route', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.telegram = {
+      enabled: true,
+      settings: {},
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'degraded',
+      service: {
+        status: 'degraded',
+        startedAt: '2026-08-23T00:00:00.000Z',
+        adapters: [{ id: 'telegram', enabled: true, status: 'degraded', lastError: 'offline' }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorStatusPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
+
+    await waitFor(() => expect(mocks.reconnect).toHaveBeenCalledWith('telegram'))
   })
 
   it('localizes the read-only operations route', async () => {

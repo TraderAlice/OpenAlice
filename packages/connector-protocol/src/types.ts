@@ -114,6 +114,8 @@ export const connectorAdapterHealthSchema = z.object({
   owner: z.string().optional(),
   lastAttemptAt: z.string().datetime().optional(),
   lastSuccessAt: z.string().datetime().optional(),
+  nextAttemptAt: z.string().datetime().optional(),
+  consecutiveFailures: z.number().int().min(0).optional(),
   lastError: z.string().optional(),
 })
 export type ConnectorAdapterHealth = z.infer<typeof connectorAdapterHealthSchema>

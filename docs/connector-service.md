@@ -283,7 +283,13 @@ best-effort and happens only after polling is live: a hung or failed
 delivery. `start()` arms the adapter and returns; the Bot API session is a
 supervised loop. A hung handshake is abandoned after one attempt budget
 (default 30s) and the same adapter reconnects with backoff. That budget is
-not a process-level deadline and does not stop Connector Service. The
+not a process-level deadline and does not stop Connector Service. The session
+supervisor retries indefinitely with capped exponential backoff and jitter.
+Telegram also watches the host clock while polling; a suspend/resume gap
+abandons a polling promise that can no longer settle and starts a fresh
+session. Health exposes `lastAttemptAt`, `nextAttemptAt`, and
+`consecutiveFailures` so the operator can distinguish waiting from a dead loop.
+The
 Connector HTTP health endpoint binds before those external calls so Guardian
 can probe a `starting` adapter instead of treating the whole service as
 missing. A failed adapter stays registered with its `lastError` rather than
@@ -313,7 +319,7 @@ saved but no bot process exists to receive `/link`.
 | Awaiting link | credentials sealed, owner absent | bot online with `awaiting_link` | open the private bot chat and send `/link` |
 | Linked | owner identity learned | adapter `healthy` | send tests, unlink, or receive Inbox delivery |
 | Linked offline | owner identity retained | adapter/service intentionally stopped | start the connector, or unlink and relink later |
-| Error | durable config retained | adapter `degraded` or service unavailable | inspect credentials and Connector logs |
+| Error | durable config retained | adapter `degraded` or service unavailable | reconnect the adapter, then inspect Connector logs if it persists |
 
 The surfaces deliberately have different jobs:
 
@@ -334,8 +340,15 @@ The surfaces deliberately have different jobs:
   ships sealed mid-turn `text` blocks (the last consecutive text before a
   tool or error) and skips tool/error blocks. A text already sent this way
   is not sent again as the final comment.
-- **Beta → Connectors** is a read-only operations view: service health, adapter
-  status, linked owner, and last delivery evidence.
+- **Beta → Connectors** is the operations view: service health, adapter status,
+  linked owner, last delivery evidence, and an explicit reconnect action for an
+  unhealthy configured adapter. The reconnect is adapter-scoped while the
+  service answers; if the process is unreachable, Alice asks Guardian to restart
+  the optional service instead.
+- **Activity Bar → Connectors** shows a warning count for enabled, configured
+  adapters that are degraded, stopped, unreachable, or stuck in `starting`
+  beyond the grace window. `awaiting_link` remains setup state and does not
+  warn.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
   configuration surface.
 
@@ -367,7 +380,9 @@ adapter is `degraded`.
 The contract matrix lives in `src/services/optional-carrier/health.spec.ts`;
 `integrations.spec.ts` applies it to the real UTA and Connector response shapes.
 Guardian/process smoke tests remain responsible for proving that an enabled
-service actually starts and reaches its health endpoint.
+service actually starts and reaches its health endpoint. A configured Connector
+process that exits unexpectedly is restarted by Guardian forever with capped,
+jittered backoff; manual disable and Guardian shutdown cancel recovery.
 
 ## Two-Layer External Acceptance
 

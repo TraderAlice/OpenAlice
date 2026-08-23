@@ -66,6 +66,7 @@ export class DeliveryManager {
   private readonly actions: ConnectorArtifactRequest[] = []
   private readonly utaActions: ConnectorUtaRequest[] = []
   private readonly bootRetries = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly reconnects = new Map<string, Promise<ConnectorAdapterHealth>>()
   private readonly startedAt: string
   private stopped = false
 
@@ -140,6 +141,37 @@ export class DeliveryManager {
     }
     await this.deliverToAdapter(adapter, notification, probeId)
     return probeId
+  }
+
+  async reconnect(id: string): Promise<ConnectorAdapterHealth> {
+    const active = this.reconnects.get(id)
+    if (active) return active
+    const operation = this.reconnectAdapter(id)
+    this.reconnects.set(id, operation)
+    try {
+      return await operation
+    } finally {
+      if (this.reconnects.get(id) === operation) this.reconnects.delete(id)
+    }
+  }
+
+  private async reconnectAdapter(id: string): Promise<ConnectorAdapterHealth> {
+    const config = this.options.config.adapters[id]
+    if (!config?.enabled) throw new Error(`Connector is not enabled: ${id}`)
+    if (!this.options.registry.has(id)) throw new Error(`Unknown connector adapter: ${id}`)
+    this.clearAdapterStartRetry(id)
+    const previous = this.adapters.get(id)
+    if (previous) await previous.stop()
+    this.adapters.delete(id)
+    this.commands.delete(id)
+    this.installAdapter(id)
+    try {
+      await this.bootAdapter(id, config)
+    } catch (error) {
+      this.handleAdapterStartFailure(id, config, error, 0)
+      throw error
+    }
+    return this.adapters.get(id)!.health()
   }
 
   acceptInbound(input: InboundOwnerMessage): void {

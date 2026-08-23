@@ -54,6 +54,8 @@ import { sendTelegramRichText } from './telegram-rich-text.js'
 
 const TELEGRAM_DRAFT_HEARTBEAT_MS = 20_000
 const TELEGRAM_TYPING_HEARTBEAT_MS = 4_000
+const TELEGRAM_RESUME_CHECK_INTERVAL_MS = 15_000
+const TELEGRAM_RESUME_GAP_MS = 45_000
 const MAX_FINISHED_DRAFTS = 128
 
 interface TelegramDraftSession {
@@ -70,6 +72,8 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private readonly tracker = new AdapterHealthTracker(this.id)
   private readonly attemptTimeoutMs: number
   private readonly reconnectDelayMs: number
+  private readonly resumeCheckIntervalMs: number
+  private readonly resumeGapMs: number
   private bot?: Bot
   private sessionReady = false
   private ownerUserId?: string
@@ -91,12 +95,16 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   constructor(options: {
     attemptTimeoutMs?: number
     reconnectDelayMs?: number
+    resumeCheckIntervalMs?: number
+    resumeGapMs?: number
     startupTimeoutMs?: number
     inboxStore?: IInboxStore
     proxy?: ConnectorProxyTransport
   } = {}) {
     this.attemptTimeoutMs = options.attemptTimeoutMs ?? options.startupTimeoutMs ?? DEFAULT_CONNECTION_ATTEMPT_TIMEOUT_MS
     this.reconnectDelayMs = options.reconnectDelayMs ?? DEFAULT_CONNECTION_RETRY_DELAY_MS
+    this.resumeCheckIntervalMs = options.resumeCheckIntervalMs ?? TELEGRAM_RESUME_CHECK_INTERVAL_MS
+    this.resumeGapMs = options.resumeGapMs ?? TELEGRAM_RESUME_GAP_MS
     this.inboxStore = options.inboxStore
     this.proxy = options.proxy ?? DIRECT_CONNECTOR_PROXY_TRANSPORT
   }
@@ -121,6 +129,10 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     this.loop = superviseLongConnection({
       label: 'telegram',
       isStopped: () => this.stopped,
+      isSessionHealthy: () => {
+        const status = this.tracker.get().status
+        return status === 'healthy' || status === 'awaiting_link'
+      },
       runSession: () => this.runSession(),
       disconnect: () => this.disconnectSession(),
       onFailure: (error) => {
@@ -128,6 +140,8 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
         this.tracker.degraded(error)
         console.warn('[connector] Telegram session failed:', formatAdapterError(error))
       },
+      onAttempt: () => this.tracker.attempt(),
+      onRetryScheduled: (delayMs, failures) => this.tracker.retryScheduled(delayMs, failures),
       delay: (ms) => this.delay(ms),
       reconnectDelayMs: this.reconnectDelayMs,
     }).catch((error) => {
@@ -400,9 +414,18 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       onAbort = resolve
       signal.addEventListener('abort', onAbort, { once: true })
     })
+    const sessionAbort = new AbortController()
+    const resumed = waitForResumeGap({
+      signal: sessionAbort.signal,
+      intervalMs: this.resumeCheckIntervalMs,
+      gapMs: this.resumeGapMs,
+    }).then((detected) => {
+      if (detected) throw new Error('Host resumed after sleep; reconnecting Telegram polling')
+    })
     try {
-      await Promise.race([polling, aborted])
+      await Promise.race([polling, aborted, resumed])
     } finally {
+      sessionAbort.abort()
       if (onAbort) signal.removeEventListener('abort', onAbort)
     }
   }
@@ -789,6 +812,38 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
     }
     this.finishedDrafts.add(conversationId)
   }
+}
+
+async function waitForResumeGap(options: {
+  signal: AbortSignal
+  intervalMs: number
+  gapMs: number
+  now?: () => number
+}): Promise<boolean> {
+  const now = options.now ?? Date.now
+  let expectedAt = now() + options.intervalMs
+  while (!options.signal.aborted) {
+    await abortableDelay(options.intervalMs, options.signal)
+    if (options.signal.aborted) return false
+    const current = now()
+    if (current - expectedAt >= options.gapMs) return true
+    expectedAt = current + options.intervalMs
+  }
+  return false
+}
+
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve()
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
+      resolve()
+    }
+    const timer = setTimeout(finish, ms)
+    timer.unref?.()
+    signal.addEventListener('abort', finish, { once: true })
+  })
 }
 
 export function telegramDraftId(conversationId: string): number {

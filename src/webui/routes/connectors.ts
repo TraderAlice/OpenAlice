@@ -7,6 +7,7 @@ import {
 } from '@traderalice/connector-protocol'
 import {
   readPublicConnectorConfig,
+  triggerConnectorRestart,
   writePublicConnectorConfig,
 } from '../../core/connector-config.js'
 import { connectorBridgeHealth, resolveConnectorUrl } from '../../services/connector-client/index.js'
@@ -20,9 +21,13 @@ import type { WorkspaceService } from '../../workspaces/service.js'
 export function createConnectorRoutes(deps: {
   getWorkspaceService?: () => WorkspaceService | null
   readConnectorConfig?: () => Promise<PublicConnectorConfig>
+  fetchImpl?: typeof fetch
+  restartConnectorService?: () => Promise<void>
 } = {}) {
   const app = new Hono()
   const readConnectorConfig = deps.readConnectorConfig ?? readPublicConnectorConfig
+  const fetchImpl = deps.fetchImpl ?? fetch
+  const restartConnectorService = deps.restartConnectorService ?? triggerConnectorRestart
 
   app.get('/', async (c) => c.json({
     definitions: BUILTIN_CONNECTOR_DEFINITIONS,
@@ -135,6 +140,32 @@ export function createConnectorRoutes(deps: {
       return c.json(await response.json())
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : String(error) }, 503)
+    }
+  })
+
+  app.post('/:id/reconnect', async (c) => {
+    const id = c.req.param('id')
+    if (!BUILTIN_CONNECTOR_DEFINITIONS.some((definition) => definition.id === id)) {
+      return c.json({ error: 'unknown_connector', message: `Unknown connector: ${id}` }, 404)
+    }
+    try {
+      const response = await fetchImpl(new URL(`/v1/connectors/${encodeURIComponent(id)}/reconnect`, resolveConnectorUrl()), {
+        method: 'POST',
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null) as { error?: unknown } | null
+        return c.json({
+          error: 'adapter_reconnect_failed',
+          message: typeof detail?.error === 'string'
+            ? detail.error
+            : `Connector Service reconnect failed: ${response.status}`,
+        }, 503)
+      }
+      return c.json({ ok: true, scope: 'adapter', adapterId: id })
+    } catch {
+      await restartConnectorService()
+      return c.json({ ok: true, scope: 'service', adapterId: id }, 202)
     }
   })
 

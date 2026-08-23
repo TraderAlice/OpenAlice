@@ -5,6 +5,7 @@ import { useWorkspace } from '../tabs/store'
 import type { ActivitySection } from '../tabs/types'
 import { useUnreadInboxCount } from '../live/inbox-read'
 import { usePendingPushCount } from '../live/trading-push'
+import { useConnectorWarningCount } from '../live/connector-health'
 import { useActivityBarCollapse } from '../live/activity-bar-collapse'
 import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from './ThemeToggle'
@@ -101,6 +102,7 @@ export function ActivityBar({
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const unreadInbox = useUnreadInboxCount()
   const pendingPush = usePendingPushCount()
+  const connectorWarnings = useConnectorWarningCount()
   const collapsedSections = useActivityBarCollapse((s) => s.collapsedSections)
   const setCollapsed = useActivityBarCollapse((s) => s.setCollapsed)
   const railCollapsed = useActivityBarCollapse((s) => s.railCollapsed)
@@ -230,6 +232,16 @@ export function ActivityBar({
                               }`}
                             >
                               {pendingPush > 99 ? '99+' : pendingPush}
+                            </span>
+                          )}
+                          {item.page === 'connectors' && connectorWarnings > 0 && (
+                            <span
+                              aria-label={t('nav.connectorNeedsAttention', { count: connectorWarnings })}
+                              className={`shrink-0 min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums flex items-center justify-center ${
+                                compactRail ? 'md:absolute md:-right-1 md:-top-1 md:h-4 md:min-w-4 md:px-1 md:text-[9px]' : ''
+                              }`}
+                            >
+                              {connectorWarnings > 99 ? '99+' : connectorWarnings}
                             </span>
                           )}
                         </button>

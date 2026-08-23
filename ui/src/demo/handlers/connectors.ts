@@ -82,6 +82,14 @@ export const connectorsHandlers = [
     }
     return HttpResponse.json({ ok: true, probeId: `connector-probe-demo-${id}` })
   }),
+
+  http.post('/api/connectors/:id/reconnect', ({ params }) => {
+    const id = String(params.id)
+    if (!snapshot.definitions.some((definition) => definition.id === id)) {
+      return HttpResponse.json({ error: 'unknown_connector' }, { status: 404 })
+    }
+    return HttpResponse.json({ ok: true, scope: 'adapter', adapterId: id })
+  }),
 ]
 
 function sanitizePublicConfig(input: PublicConnectorConfig): PublicConnectorConfig {
