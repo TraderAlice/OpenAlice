@@ -200,8 +200,8 @@ const demoIssueWorkspaces: Workspace[] = [
       schemaVersion: 1,
       template: 'auto-prediction',
       repository: 'https://github.com/TraderAlice/Auto-Prediction.git',
-      version: 'v0.1.1',
-      commit: 'db49d9dde1386fe3f0f8e7b7c78aa3810b7438b9',
+      version: 'v0.1.2',
+      commit: 'd6c9447cab29898a6eb5fa06be3598b8474cc02f',
     },
     sessions: [],
     agentOverride: { claude: false, codex: false, opencode: false, pi: false },
@@ -283,12 +283,16 @@ export const autoPredictionTemplate: TemplateInfo = {
   description: 'Agent-native prediction-market research desk pinned to an approved Auto Prediction source snapshot.',
   groupOrder: 30,
   defaultAgents: ['codex', 'claude'],
-  version: '0.1.1',
+  version: '0.1.2',
   hasReadme: true,
   source: {
     repository: 'https://github.com/TraderAlice/Auto-Prediction.git',
-    defaultVersion: 'v0.1.1',
+    defaultVersion: 'v0.1.2',
     versions: [
+      {
+        version: 'v0.1.2',
+        commit: 'd6c9447cab29898a6eb5fa06be3598b8474cc02f',
+      },
       {
         version: 'v0.1.1',
         commit: 'db49d9dde1386fe3f0f8e7b7c78aa3810b7438b9',
