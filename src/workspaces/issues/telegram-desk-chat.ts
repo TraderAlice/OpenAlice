@@ -2,7 +2,8 @@
  * Connector phone-desk chat hop.
  *
  * Connector only transports. Each adapter's Issue comments are that
- * specialist's transcript. The literal tag [[no-reply]] stays local.
+ * specialist's transcript. The literal tag [[no-reply]] stays local only for
+ * runs explicitly stamped with the connector-cron-issue execution profile.
  * Sealed mid-turn text blocks also project so the phone chat does not
  * wait for the final reply.
  */
@@ -151,6 +152,7 @@ export async function stampTelegramDeskScheduledFire(input: {
   issueId: string
   task: HeadlessTaskRecord
   assistantText?: string | null
+  client?: ConnectorClient
 }): Promise<IssueComment | null> {
   // A native CLI can emit partial assistant text before exiting with an error
   // or interruption. Keep that diagnostic in the run record, but do not turn
@@ -158,11 +160,17 @@ export async function stampTelegramDeskScheduledFire(input: {
   if (input.task.status !== 'done') return null
   const text = input.assistantText?.trim()
   if (!text) return null
+  const triggerMetadata = input.task.trigger?.metadata
+  if (triggerMetadata?.kind !== 'connector-cron-issue') return null
   const workspace = input.host.getWorkspace(input.workspaceId)
   if (!workspace) return null
   const desks = await findConnectorDesks(input.host.listWorkspaces())
   const desk = desks.find((item) => item.wsId === input.workspaceId && item.issue.id === input.issueId)
-  if (!desk || desk.issue.status === 'canceled') return null
+  if (
+    !desk
+    || desk.issue.status === 'canceled'
+    || desk.connectorId !== triggerMetadata.connectorId
+  ) return null
 
   const appended = await appendIssueComment(
     workspace.dir,
@@ -185,8 +193,9 @@ export async function stampTelegramDeskScheduledFire(input: {
     at: input.task.finishedAt ?? Date.now(),
     fingerprint: `telegram-desk-fire:${input.task.taskId}`,
   })
-  await projectDeskComment(appended.issue, appended.comment, undefined, {
+  await projectDeskComment(appended.issue, appended.comment, input.client, {
     progressScopeId: input.task.taskId,
+    triggerMetadata,
   }).catch(() => undefined)
   return appended.comment
 }

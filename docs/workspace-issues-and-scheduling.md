@@ -118,8 +118,11 @@ The filename stem is the stable issue id. Frontmatter:
   Owner DMs for that connector become comments on that Issue. While that desk
   is generating, later DMs for the same connector stay in the Connector
   queue; other connectors flush independently. Scheduled-fire
-  `assistantText` is stamped as a comment. Connector projects comments that
-  do not contain `[[no-reply]]` and did not arrive from that connector.
+  `assistantText` is stamped as a comment. Scheduler and Run now / Retry now
+  executions of this Issue carry `trigger.metadata.kind: connector-cron-issue`.
+  Only comments and progress from a run with that metadata consume
+  `[[no-reply]]`; ordinary chat mentions of the syntax are delivered as text.
+  Connector does not echo comments that arrived from that connector.
   While a desk turn is running, it also ships sealed mid-turn `text` blocks —
   the last consecutive text before a tool or error — and never ships tool I/O.
   The trailing text stays with the final comment. Shipped

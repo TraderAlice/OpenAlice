@@ -1964,6 +1964,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           issueId: desk.issueId,
           scopeId: desk.scopeId,
           progress,
+          triggerMetadata: rec.trigger?.metadata,
         }).catch((err) => launcherLogger.warn('telegram.desk_progress_failed', {
           taskId: rec.taskId,
           wsId: desk.workspaceId,
