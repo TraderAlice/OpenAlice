@@ -491,32 +491,32 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 
 ### Increment 4 — transfer TUI wizard and recovery UX
 
-- [ ] Add source project, destination machine, destination key/home,
+- [x] Add source project, destination machine, destination key/home,
   credential, and Session-owner-policy steps backed by the same planner.
-- [ ] Render the complete plan before mutation with included/excluded data,
+- [x] Render the complete plan before mutation with included/excluded data,
   Workspace/byte counts, credentials by non-secret category, affected Issues,
   source/destination ownership, and exact destination.
-- [ ] Render named transfer phases, byte/file progress, cancellation intent,
+- [x] Render named transfer phases, byte/file progress, cancellation intent,
   resumable/cleanup state, failure remediation, and final verification.
-- [ ] After success, select the remote project and offer separate Start,
+- [x] After success, select the remote project and offer separate Start,
   Connect/Open, or Done actions. Do not auto-start merely because transfer was
   approved.
 - [ ] Add wide/narrow screen and real PTY journeys for default-no, success,
   auth loss, checksum failure, occupied destination, cancellation, retry, and
   terminal cleanup.
-- [ ] Walk the real TUI against an isolated Docker SSH host; no user Home,
+- [x] Walk the real TUI against an isolated Docker SSH host; no user Home,
   provider account, broker, or connector may be used.
 - [ ] Open and merge the fourth serial PR to `dev`; inspect trailing CI.
 
 ### Increment 5 — completion and release evidence
 
-- [ ] Run repository TypeScript and full unit suites plus CLI package
+- [x] Run repository TypeScript and full unit suites plus CLI package
   typecheck/tests after every code increment.
-- [ ] Run `pnpm test:remote:docker` for inventory/connection/transfer changes
+- [x] Run `pnpm test:remote:docker` for inventory/connection/transfer changes
   and `pnpm test:install:docker` when the distributed CLI payload changes.
 - [ ] Run the real local browser route for transferred Workspace discovery and
   first fresh Session creation.
-- [ ] Run unsigned Electron/package Workspace smoke because the shared
+- [x] Run unsigned Electron/package Workspace smoke because the shared
   complete-home, managed-Pi, and installed CLI boundaries changed; do not use
   signing/notarization credentials.
 - [ ] Verify Linux plus macOS locally/CI and retain Windows/Git Bash archive and
@@ -562,6 +562,23 @@ fixture also proves truncated-stream failure markers and same-transaction retry.
 CLI 275 tests, the repository's 4,920 tests with 9 skipped, root TypeScript,
 install Docker, and unsigned Electron package/Workspace acceptance pass. Only
 publication remains before Increment 3 is complete.
+
+Increment 4 local progress (2026-08-23): Fleet `m` opens a focused overlay
+for destination Machine, key/Home, credential handling, exact-Session owner
+policy, plan review, live file/byte progress, cancellation, failure recovery,
+and separate Start/Connect/Done success actions. Pure wide/narrow presentation,
+screen routing, real widget default-No, and existing PTY regression journeys
+pass. The Docker SSH fixture drives the real TUI through default-No and approved
+success, proving no default-No destination, registered result, portable
+Workspace content, and no resume ledger. Additional injected auth/checksum/
+occupied/cancel retry journeys and publication remain.
+
+Final local gate refresh (2026-08-23): the complete CLI package passes 280
+tests and the repository passes 4,925 tests with 9 skipped, alongside root,
+UI, and CLI TypeScript/build checks. Installer Docker, the expanded real SSH/TUI
+transfer Docker route, and unsigned Electron packaged Workspace acceptance all
+pass. Every fixture removed its container, image, temporary package, and
+isolated AliceProject Home.
 
 Always:
 

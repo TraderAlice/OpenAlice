@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process'
 import { Writable } from 'node:stream'
+import * as pty from 'node-pty'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -226,6 +227,30 @@ try {
     'set -eu',
     'test -f /home/smoke/.openalice-interrupted/workspaces/workspaces/ws-transfer/research.txt',
     'test ! -e /home/smoke/.openalice-transfer-remote-smoke-interrupted.staging',
+  ].join('; ')], { env: smokeEnv })
+  console.log('[remote-ssh-smoke] walking the real TUI transfer wizard (default No, then success)')
+  await driveTransferTui(smokeEnv, {
+    projectKey: 'tui-migrated',
+    destinationHome: '/home/smoke/.openalice-tui-migrated',
+    approve: false,
+  })
+  console.log('[remote-ssh-smoke] TUI default-No journey completed')
+  run('ssh', [remoteTarget, 'test ! -e /home/smoke/.openalice-tui-migrated'], { env: smokeEnv })
+  await driveTransferTui(smokeEnv, {
+    projectKey: 'tui-migrated',
+    destinationHome: '/home/smoke/.openalice-tui-migrated',
+    approve: true,
+  })
+  console.log('[remote-ssh-smoke] TUI approved journey completed')
+  const tuiRegistry = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" project list --json')
+  const tuiProject = tuiRegistry.projects?.find((project) => project.key === 'tui-migrated')
+  if (tuiProject?.home !== '/home/smoke/.openalice-tui-migrated') {
+    throw new Error(`TUI registered the wrong destination: ${JSON.stringify(tuiRegistry)}`)
+  }
+  run('ssh', [remoteTarget, [
+    'set -eu',
+    'test -f /home/smoke/.openalice-tui-migrated/workspaces/workspaces/ws-transfer/research.txt',
+    'test ! -e /home/smoke/.openalice-tui-migrated/workspaces/state/resume-identities.json',
   ].join('; ')], { env: smokeEnv })
   const transferArgs = [
     cliEntry, 'project', 'transfer',
@@ -459,6 +484,51 @@ function sshWithInput(target, env, command, input) {
     status: result.status,
     stdout: typeof result.stdout === 'string' ? result.stdout : '',
   }
+}
+
+async function driveTransferTui(env, options) {
+  const child = pty.spawn(process.execPath, [cliEntry], {
+    cols: 110,
+    rows: 32,
+    cwd: repoRoot,
+    env,
+  })
+  let output = ''
+  let stage = 0
+  const writeValue = (value) => child.write(`\u0001\u000b${value}\r`)
+  return new Promise((resolvePromise, reject) => {
+    const timeout = setTimeout(() => {
+      child.kill()
+      reject(new Error(`TUI transfer wizard timed out at stage ${stage}:\n${stripAnsi(output).slice(-4_000)}`))
+    }, 90_000)
+    child.onData((data) => {
+      output += data
+      const visible = stripAnsi(output)
+      if (stage === 0 && visible.includes('m Transfer') && /Smoke Cloud\s+\d+/u.test(visible)) { stage = 1; child.write('m') }
+      else if (stage === 1 && visible.includes('destination Machine')) { stage = 2; child.write('\r') }
+      else if (stage === 2 && visible.includes('Destination AliceProject key')) { stage = 3; writeValue(options.projectKey) }
+      else if (stage === 3 && visible.includes('Destination complete Home')) { stage = 4; writeValue(options.destinationHome) }
+      else if (stage === 4 && visible.includes('Credentials')) { stage = 5; child.write('\r') }
+      else if (stage === 5 && visible.includes('Exact-Session scheduled Issue owners')) { stage = 6; child.write('\r') }
+      else if (stage === 6 && visible.includes('Review AliceProject transfer')) {
+        stage = 7
+        child.write(options.approve ? 'y' : 'n')
+      } else if (stage === 7 && !options.approve && visible.includes('Transfer cancelled')) {
+        stage = 8; child.write('q')
+      } else if (stage === 7 && options.approve && visible.includes('AliceProject transfer complete')) {
+        stage = 8; child.write('\r'); setTimeout(() => child.write('q'), 50)
+      }
+    })
+    child.onExit(({ exitCode }) => {
+      clearTimeout(timeout)
+      if (exitCode === 0 && stage === 8) resolvePromise()
+      else reject(new Error(`TUI transfer wizard exited ${exitCode} at stage ${stage}:\n${stripAnsi(output).slice(-4_000)}`))
+    })
+  })
+}
+
+function stripAnsi(value) {
+  return value.replaceAll(/\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001b\\))/gu, '')
 }
 
 function shellQuote(value) {

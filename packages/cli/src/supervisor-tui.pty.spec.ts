@@ -802,6 +802,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
+      let openedOverview = false
       let requestedManaged = false
       let detached = false
       const timeout = setTimeout(() => {
@@ -810,7 +811,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!requestedManaged && output.includes('m Managed')) {
+        if (!openedOverview && output.includes('m Transfer')) {
+          openedOverview = true
+          child.write(']')
+        } else if (!requestedManaged && output.includes('m Managed')) {
           requestedManaged = true
           child.write('m')
         } else if (!detached && output.includes('Managed source preparation is available from an installed')) {

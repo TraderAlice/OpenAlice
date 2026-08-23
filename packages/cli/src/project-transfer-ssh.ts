@@ -21,6 +21,7 @@ export async function transferProjectOverSsh(input: {
   stderr?: { write(chunk: string): unknown }
   spawnProcess?: typeof spawn
   signal?: AbortSignal
+  onProgress?: (progress: { files: number; bytes: number; totalFiles: number; totalBytes: number }) => void
 }): Promise<ProjectTransferReceipt> {
   input.signal?.throwIfAborted()
   const spawnProcess = input.spawnProcess ?? spawn
@@ -69,7 +70,7 @@ export async function transferProjectOverSsh(input: {
     else input.signal?.addEventListener('abort', () => reject(reason), { once: true })
   }
   try {
-    await writeProjectTransferStream({ plan: input.plan, output: ssh.stdin, signal: input.signal })
+    await writeProjectTransferStream({ plan: input.plan, output: ssh.stdin, signal: input.signal, onProgress: input.onProgress })
     ssh.stdin.end()
     if (input.signal) {
       await Promise.race([

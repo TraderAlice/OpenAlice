@@ -111,6 +111,11 @@ explicit commands. Its ordinary path is intentionally parameter-free:
   non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
   checking, online, unauthorized, offline, and incompatible remain distinct
   from per-project Runtime state;
+- `m` on a selected local Fleet AliceProject opens the remote-transfer wizard.
+  It selects an online compatible SSH Machine, destination key/Home, credential
+  handling, and exact-Session Issue policy; then renders the same checksum and
+  exclusion plan as the explicit command. Default No changes nothing. Success
+  offers separate Start, Connect/Open, and Done actions and never auto-starts;
 - Enter or `o` on a running compatible remote AliceProject opens a TUI-owned
   loopback tunnel and browser. Detaching aborts only those tunnel processes;
   it never stops the local or remote Runtime. Remote start/stop/configuration
@@ -136,7 +141,7 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 - `p` opens Setup for data home, browser port, update checks, and resolved
   Runtime/config provenance. Setup can edit either the selected AliceProject or
   machine defaults inherited by projects;
-- `m` is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
+- `m` on Overview is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
 - `c` is an advanced control that chooses and remembers the selected AliceProject's source checkout;
 - `?` toggles Help; `[` and `]` expose the other top-level panels.
