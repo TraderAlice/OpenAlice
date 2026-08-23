@@ -33,6 +33,14 @@ complete home and are not part of any Workspace repository. Treat the
 conversation stream as sensitive history when backing up or sharing a home;
 the occupancy journal has no prompt bodies.
 
+The explicit `openalice project transfer` operation is narrower than a raw
+complete-home backup or filesystem copy. It deliberately excludes both of
+those launcher journals, resume identities, headless tasks/logs, Runtime state,
+ports, auth, and untracked Session dossiers. It preserves portable data and
+Workspace repositories, rebases their absolute paths, and reports zero imported
+resumable Sessions. Git-tracked `.alice/sessions` bytes may remain for repository
+fidelity, but are inert without a destination resume identity.
+
 Each Workspace repository carries `.alice/settings.json`, a versioned,
 secret-free description of its recent interactive and headless Agent runtime
 choices. It may contain vault credential slugs, model ids, and effort values,
@@ -157,6 +165,12 @@ Machine is implicit. Stored rows contain only connection metadata (target,
 port, display name, and optional local identity-file path), never key bytes or
 AliceProject data. `remote-targets.json` beside it remains a hashed,
 non-enumerable tunnel-port cache rather than durable fleet identity.
+
+A received AliceProject is registered in this machine-wide registry only after
+its sibling staging Home has passed checksum and space validation and has been
+atomically published. Registration does not select it as the remote default.
+The new Home owns a new `sealing.key`; source machine locks, Runtime payloads,
+installer state, and sealing material never travel with it.
 
 `OPENALICE_PROJECT`, `OPENALICE_HOME`, `--project`, and `--home` remain
 higher-priority one-run/automation inputs. When they fix the selected project

@@ -192,10 +192,11 @@ stop, transfer, and open always re-probe the selected target.
 ### Command grammar
 
 ```bash
-openalice project transfer <source-project> \
-  --to <machine> \
-  --name <remote-project> \
-  --home <absolute-remote-home> \
+openalice project transfer \
+  --from <source-project> \
+  --to-machine <machine> \
+  --to-project <remote-project> \
+  --to-home <absolute-remote-home> \
   [--session-owner-policy keep-blocked|new-then-resume] \
   [--without-credentials] \
   [--plan] [--yes]
@@ -460,31 +461,31 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
 
 ### Increment 3 — transfer planner, exporter, and remote importer
 
-- [ ] Add the versioned transfer manifest, content inventory, exclusion
+- [x] Add the versioned transfer manifest, content inventory, exclusion
   policy, dangerous-path checks, byte/free-space estimates, and stable JSON
   plan.
-- [ ] Add source/destination quiescence and ownership checks with isolated
+- [x] Add source/destination quiescence and ownership checks with isolated
   consent for source stop; refuse foreign owners and occupied destinations.
-- [ ] Stream configuration and Workspace trees into owner-private remote
+- [x] Stream configuration and Workspace trees into owner-private remote
   staging with bounded input, safe archive extraction, checksums, and durable
   receipts.
-- [ ] Rebase active/departed Workspace registry and Catalog paths while
+- [x] Rebase active/departed Workspace registry and Catalog paths while
   preserving Workspace ids, tags, lifecycle, Git state, and files.
-- [ ] Exclude the complete Session/runtime/auth plane and verify the destination
+- [x] Exclude the complete Session/runtime/auth plane and verify the destination
   starts with zero resumable Sessions.
-- [ ] Detect exact-Session scheduled Issues and implement explicit
+- [x] Detect exact-Session scheduled Issues and implement explicit
   `keep-blocked` / `new-then-resume` policy without silent rewrites.
-- [ ] Transfer home-owned AI credentials and re-seal broker/Connector secrets
+- [x] Transfer home-owned AI credentials and re-seal broker/Connector secrets
   with a new destination key; prove plaintext never reaches archive, argv,
   env, logs, progress, or fixture snapshots.
-- [ ] Atomically publish and register the destination project; implement safe
+- [x] Atomically publish and register the destination project; implement safe
   retry/cancel/cleanup for only the resolved transaction staging path.
-- [ ] Add `openalice project transfer ... --plan|--yes`, concise human progress,
+- [x] Add `openalice project transfer ... --plan|--yes`, concise human progress,
   and a stable machine-readable result.
-- [ ] Extend the disposable Docker SSH acceptance through plan, default-no,
+- [x] Extend the disposable Docker SSH acceptance through plan, default-no,
   interrupted transfer, retry, publish, remote Doctor/start, tunnel, stop, and
   source-unchanged assertions.
-- [ ] Update owner guides with the shipped transfer and Session boundary.
+- [x] Update owner guides with the shipped transfer and Session boundary.
 - [ ] Open and merge the third serial PR to `dev`; inspect trailing CI before
   Increment 4.
 
@@ -548,6 +549,19 @@ complete CLI package passes 251 tests; the repository passes 4,896 tests with
 The unsigned `pnpm electron:smoke:workspace` packaged acceptance also passes
 the installed CLI manifest, Electron PTY, scheduled managed-Pi run, and cleanup
 contract; its temporary expanded application is removed on exit.
+
+Increment 3 core progress (2026-08-23): the planner, bounded SSH stream,
+credential re-sealing, sibling staging, checksum/free-space gates, atomic
+publish, idempotent registration retry, CLI plan/apply surface, and cancellation
+signal are implemented. The real Docker SSH route transfers synthetic portable
+configuration and a Git Workspace, excludes untracked Session/runtime/auth
+state, re-seals credentials with a distinct remote key, preserves the remote
+default, and starts/stops the received Runtime successfully. Focused planner,
+stream, transport, command, and Supervisor registration tests pass. The Docker
+fixture also proves truncated-stream failure markers and same-transaction retry.
+CLI 275 tests, the repository's 4,920 tests with 9 skipped, root TypeScript,
+install Docker, and unsigned Electron package/Workspace acceptance pass. Only
+publication remains before Increment 3 is complete.
 
 Always:
 

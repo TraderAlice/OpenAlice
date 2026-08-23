@@ -451,8 +451,8 @@ function currentMachineCapabilities(): MachineInventory['capabilities'] {
     inspect: true,
     lifecycle: true,
     openTunnel: true,
-    transferReceive: false,
-    credentialReseal: false,
+    transferReceive: true,
+    credentialReseal: true,
   }
 }
 
