@@ -123,9 +123,9 @@ export function renderTransferResult(
 }
 
 function suggestedProjectKey(sourceKey: string, machine?: MachineInventory): string {
-  if (!machine?.projects.some((project) => project.key === sourceKey)) return sourceKey
+  if (sourceKey !== 'default' && !machine?.projects.some((project) => project.key === sourceKey)) return sourceKey
   const base = `${sourceKey}-copy`.slice(0, 32).replace(/-$/u, '')
-  if (!machine.projects.some((project) => project.key === base)) return base
+  if (!machine?.projects.some((project) => project.key === base)) return base
   return `${sourceKey.slice(0, 27)}-copy2`
 }
 

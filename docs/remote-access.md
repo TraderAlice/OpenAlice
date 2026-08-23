@@ -344,9 +344,13 @@ The Supervisor Fleet page consumes that contract directly. A running remote
 AliceProject with a validated `127.0.0.1` Web endpoint can be opened through
 the existing loopback tunnel. The TUI owns an abort controller for every such
 tunnel: `q`, `Esc`, `Ctrl+C`, or process termination closes the tunnel while
-leaving Guardian and the detached remote Server untouched. Stopped or
-incompatible remote Projects remain visible but do not receive guessed
-lifecycle mutations from the read-only Fleet view.
+leaving Guardian and the detached remote Server untouched. `s` may start a
+stopped compatible Project, but only after a fresh aggregate inventory and
+Machine-registry read prove the selected key is still stopped, available, and
+lifecycle-capable. The command then invokes the registered SSH target and
+refreshes Fleet state. Stop, restart, takeover, Setup, source, logs, Doctor,
+and configuration mutations remain unavailable for remote Fleet selections;
+offline or incompatible rows never receive guessed lifecycle actions.
 
 When `--app-dir` is absent, managed remote prefers the verified Runtime bundle
 installed with the matching CLI. No Git checkout or compiler is needed. On a

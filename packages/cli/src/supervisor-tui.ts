@@ -422,6 +422,9 @@ export async function runSupervisorTui(
     onActivateFleet: (machine, project) => {
       void activateFleetProject(machine, project)
     },
+    onStartFleet: (machine, project) => {
+      void startFleetProject(machine, project)
+    },
     onRefreshFleet: () => {
       void refreshFleet()
     },
@@ -687,6 +690,38 @@ export async function runSupervisorTui(
       tunnelControllers.delete(key)
       if (active) clearTunnelState(key)
     }
+  }
+
+  async function startFleetProject(
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ): Promise<void> {
+    if (machine.key === 'local' || actionRunning) return
+    let started = false
+    actionRunning = true
+    screen.update({ busy: `Checking ${machine.key}/${project.key}`, diagnostic: undefined })
+    try {
+      const latest = await inspectFleet()
+      const remote = latest.machines.find((entry) => entry.key === machine.key)
+      const remoteProject = remote?.projects.find((entry) => entry.key === project.key)
+      if (!remote || remote.connection !== 'online') throw new Error('The selected Machine is no longer online.')
+      if (!remote.capabilities.lifecycle) throw new Error('The selected Machine does not support remote lifecycle actions.')
+      if (!remoteProject?.available) throw new Error('The selected remote AliceProject is no longer available.')
+      if (remoteProject.runtime.class !== 'absent') throw new Error('The selected remote AliceProject is not stopped.')
+      const registry = await loadMachines()
+      const registered = registry.machines.find((entry) => entry.key === machine.key)
+      if (!registered) throw new Error(`Machine "${machine.key}" is no longer registered.`)
+      screen.update({ busy: `Starting ${machine.key}/${project.key}` })
+      await startRemoteProject(registered, project.key)
+      started = true
+      screen.update({ notice: `Started ${machine.displayName} / ${project.displayName}.` })
+    } catch (error: unknown) {
+      screen.update({ diagnostic: safeError(error) })
+    } finally {
+      actionRunning = false
+      screen.update({ busy: undefined })
+    }
+    if (started) await refreshFleet({ quiet: true })
   }
 
   function updateTunnelState(
@@ -1867,8 +1902,24 @@ export async function runSupervisorTui(
       invalidate: () => undefined,
     })
     const failureComponent = (): Component => ({
-      render: (width) => ['Transfer failed', '', sanitize(state.error ?? 'Unknown error'), '', 'Enter / Esc  Close'].map((line) => truncate(line, width)),
-      handleInput: (data) => { if (piTui.matchesKey(data, 'enter') || piTui.matchesKey(data, 'escape')) close('Transfer closed. Source remains unchanged.') },
+      render: (width) => [
+        'Transfer failed',
+        '',
+        sanitize(state.error ?? 'Unknown error'),
+        '',
+        state.plan?.readyToApply
+          ? 'r  Retry the same transaction · Enter / Esc  Close'
+          : 'r  Rebuild the plan · Enter / Esc  Close',
+      ].map((line) => truncate(line, width)),
+      handleInput: (data) => {
+        if (piTui.matchesKey(data, 'r')) {
+          state.error = null
+          if (state.plan?.readyToApply) void applyTransfer()
+          else void buildReview()
+        } else if (piTui.matchesKey(data, 'enter') || piTui.matchesKey(data, 'escape')) {
+          close('Transfer closed. Source remains unchanged.')
+        }
+      },
       invalidate: () => undefined,
     })
     const applyTransfer = async () => {
@@ -2065,6 +2116,10 @@ export class SupervisorScreen implements Component {
     machine: MachineInventory,
     project: MachineProjectInventory,
   ) => void
+  private readonly onStartFleet?: (
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ) => void
   private readonly onRefreshFleet?: () => void
   private readonly onTransferFleet?: (source: MachineProjectInventory) => void
   private readonly onRequestManagedSource?: () => void
@@ -2079,6 +2134,10 @@ export class SupervisorScreen implements Component {
       onSettings?: () => void
       onProjects?: () => void
       onActivateFleet?: (
+        machine: MachineInventory,
+        project: MachineProjectInventory,
+      ) => void
+      onStartFleet?: (
         machine: MachineInventory,
         project: MachineProjectInventory,
       ) => void
@@ -2098,6 +2157,7 @@ export class SupervisorScreen implements Component {
     this.onSettings = callbacks.onSettings
     this.onProjects = callbacks.onProjects
     this.onActivateFleet = callbacks.onActivateFleet
+    this.onStartFleet = callbacks.onStartFleet
     this.onRefreshFleet = callbacks.onRefreshFleet
     this.onTransferFleet = callbacks.onTransferFleet
     this.onRequestManagedSource = callbacks.onRequestManagedSource
@@ -2194,12 +2254,20 @@ export class SupervisorScreen implements Component {
         else this.update({ notice: 'No remote AliceProject is available to connect.' })
         return true
       }
+      if (matchesKey(data, 's') && remote) {
+        if (!machine || !project) this.update({ notice: 'No remote AliceProject is available to start.' })
+        else if (machine.connection !== 'online') this.update({ notice: 'The selected Machine is not online.' })
+        else if (!machine.capabilities.lifecycle) this.update({ notice: 'This Machine does not support remote lifecycle actions.' })
+        else if (!project.available || project.runtime.class !== 'absent') this.update({ notice: 'Start is available only for a stopped remote AliceProject.' })
+        else this.onStartFleet?.(machine, project)
+        return true
+      }
       if (matchesKey(data, 'm') && !remote) {
         if (project) this.onTransferFleet?.(project)
         else this.update({ notice: 'Select a local AliceProject to transfer.' })
         return true
       }
-      const remoteMutationKeys: KeyId[] = ['s', 'x', 'd', 'l', 'p', 'c', 'm']
+      const remoteMutationKeys: KeyId[] = ['x', 'd', 'l', 'p', 'c', 'm']
       if (remote && remoteMutationKeys.some((key) => matchesKey(data, key))) {
         this.update({
           notice: 'That mutation is not available for a remote selection. Use r to refresh or Enter/o to connect a running AliceProject.',
@@ -2543,10 +2611,16 @@ function fleetActionBar(
     return [
       machine?.key === 'local'
         ? '↑/↓ Select · Enter Activate · ← Machines · ] Pages'
-        : '↑/↓ Select · Enter/o Connect · r Refresh · ← Machines',
+        : project?.runtime.class === 'absent'
+          ? '↑/↓ Select · s Start · r Refresh · ← Machines'
+          : '↑/↓ Select · Enter/o Connect · r Refresh · ← Machines',
     ]
   }
-  const primary = project ? 'Enter/o Connect running AliceProject' : 'Enter AliceProjects'
+  const primary = project?.runtime.class === 'absent'
+    ? 's Start stopped AliceProject'
+    : project
+      ? 'Enter/o Connect running AliceProject'
+      : 'Enter AliceProjects'
   return [
     `${primary} · ↑/↓ Select · Tab/←/→ Pane · r Refresh`,
     '[ / ] Pages · i AliceProjects · p Setup · ? Help',

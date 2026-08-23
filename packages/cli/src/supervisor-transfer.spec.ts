@@ -36,6 +36,13 @@ describe('Supervisor transfer wizard model', () => {
     expect(state.destinationHome).toBe('/srv/openalice/.openalice-research-copy')
   })
 
+  it('never suggests the reserved implicit default key', () => {
+    const state = createSupervisorTransferWizard(project('default'), [machine('cloud', 'online')])
+
+    expect(state.projectKey).toBe('default-copy')
+    expect(state.destinationHome).toBe('/home/alice/.openalice-default-copy')
+  })
+
   it('renders the no-Session and source-unchanged contract in narrow review', () => {
     const plan = {
       source: { displayName: 'Research', key: 'research' },

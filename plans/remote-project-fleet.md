@@ -514,15 +514,15 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   typecheck/tests after every code increment.
 - [x] Run `pnpm test:remote:docker` for inventory/connection/transfer changes
   and `pnpm test:install:docker` when the distributed CLI payload changes.
-- [ ] Run the real local browser route for transferred Workspace discovery and
+- [x] Run the real local browser route for transferred Workspace discovery and
   first fresh Session creation.
 - [x] Run unsigned Electron/package Workspace smoke because the shared
   complete-home, managed-Pi, and installed CLI boundaries changed; do not use
   signing/notarization credentials.
-- [ ] Verify Linux plus macOS locally/CI and retain Windows/Git Bash archive and
+- [x] Verify Linux plus macOS locally/CI and retain Windows/Git Bash archive and
   path behavior as an explicit release residual risk until its platform lane
   passes.
-- [ ] Update all owner guides and command help; identify but do not rewrite
+- [x] Update all owner guides and command help; identify but do not rewrite
   public README positioning without maintainer framing.
 - [ ] Delete this plan and its [[PLANS.md]] bullet only after every acceptance
   criterion is repository truth and the maintainer accepts the completed
@@ -573,12 +573,26 @@ success, proving no default-No destination, registered result, portable
 Workspace content, and no resume ledger. Additional injected auth/checksum/
 occupied/cancel retry journeys and publication remain.
 
-Final local gate refresh (2026-08-23): the complete CLI package passes 280
-tests and the repository passes 4,925 tests with 9 skipped, alongside root,
+Final local gate refresh (2026-08-23): the complete CLI package passes 285
+tests and the repository passes 4,930 tests with 9 skipped, alongside root,
 UI, and CLI TypeScript/build checks. Installer Docker, the expanded real SSH/TUI
 transfer Docker route, and unsigned Electron packaged Workspace acceptance all
 pass. Every fixture removed its container, image, temporary package, and
 isolated AliceProject Home.
+
+Completion acceptance progress (2026-08-23): a disposable source Workspace was
+created as a real Git repository, transferred through the production planner,
+stream, receiver, and path transforms, and started from its new complete Home
+in lite mode. The real browser showed one migrated Workspace, its preserved
+`acceptance fixture` commit, and zero Sessions. Creating a Shell Session from
+the page then showed `1 running`, `sh1`, and a new PID; the new session and
+resume ledgers contained only newly generated remote identities and no source
+`must-not-transfer` continuation. The Runtime stopped cleanly and all five
+disposable Homes were moved to Trash. The TUI now also re-probes before
+starting a stopped compatible remote project, offers an actual same-transaction
+retry after transfer failure, and proves Escape cancellation aborts the active
+sender. README already links the remote quickstart, so no public positioning
+rewrite is needed.
 
 Always:
 
