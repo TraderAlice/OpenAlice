@@ -12,6 +12,10 @@ import { readAliceProjectProduct, type AliceProjectProduct } from './alice-proje
 import { resolveSupervisorRootPath, type ResolveSupervisorRootOptions } from './launch-context.ts'
 import { inspectRuntime } from './lifecycle.mjs'
 import type { RegisteredMachine } from './machine-registry.ts'
+import {
+  readMachineRegistrySummary,
+  type MachineRegistrySummary,
+} from './machine-registry.ts'
 import { runSshCommand } from './remote.mjs'
 import {
   readSupervisorAliceProjectRegistry,
@@ -22,6 +26,7 @@ export const MACHINE_INVENTORY_SCHEMA_VERSION = 1
 
 export type MachineConnectionState =
   | 'local'
+  | 'checking'
   | 'online'
   | 'offline'
   | 'unauthorized'
@@ -77,6 +82,12 @@ export interface MachineInspectEnvelope {
   machine: MachineInventory
 }
 
+export interface MachineFleetEnvelope {
+  schemaVersion: 1
+  generatedAt: string
+  machines: MachineInventory[]
+}
+
 export interface MachineInventoryOptions extends ResolveSupervisorRootOptions {
   supervisorRoot?: string
   machineKey?: string
@@ -89,13 +100,19 @@ export interface MachineInventoryOptions extends ResolveSupervisorRootOptions {
   loadRegistry?: (
     context: { supervisorRoot: string },
   ) => Promise<SupervisorAliceProjectRegistry>
+  loadMachineRegistry?: () => Promise<MachineRegistrySummary>
   readProduct?: (home: string) => Promise<AliceProjectProduct>
   inspectRuntime?: (
     options: { homeRoot: string; waitMs: number },
   ) => Promise<unknown>
   checkHome?: (home: string) => Promise<void>
   runRemote?: (
-    options: { destination: string; sshPort: number | null; identityFile: string | null },
+    options: {
+      destination: string
+      sshPort: number | null
+      identityFile: string | null
+      batchMode?: boolean
+    },
     command: string,
     dependencies?: Record<string, unknown>,
   ) => Promise<string>
@@ -150,6 +167,7 @@ export async function inspectRegisteredMachine(
       destination: machine.sshTarget,
       sshPort: machine.sshPort ?? null,
       identityFile: machine.identityFile ?? null,
+      batchMode: true,
     }, REMOTE_INVENTORY_COMMAND, {
       stdout: NULL_OUTPUT,
       stderr: NULL_OUTPUT,
@@ -167,6 +185,66 @@ export async function inspectRegisteredMachine(
   } catch (error: unknown) {
     const classified = classifyRemoteInventoryError(error)
     return unavailableMachine(machine, classified.connection, classified.code, classified.message)
+  }
+}
+
+export async function seedMachineFleet(
+  options: MachineInventoryOptions = {},
+): Promise<MachineFleetEnvelope> {
+  const [local, registry] = await Promise.all([
+    inspectLocalMachine(options),
+    (options.loadMachineRegistry ?? (() => readMachineRegistrySummary(options)))(),
+  ])
+  return {
+    schemaVersion: MACHINE_INVENTORY_SCHEMA_VERSION,
+    generatedAt: local.generatedAt,
+    machines: [
+      local.machine,
+      ...registry.machines.map(registeredMachinePlaceholder),
+    ],
+  }
+}
+
+export async function inspectMachineFleet(
+  options: MachineInventoryOptions = {},
+): Promise<MachineFleetEnvelope> {
+  const registry = await (
+    options.loadMachineRegistry ?? (() => readMachineRegistrySummary(options))
+  )()
+  const [local, remotes] = await Promise.all([
+    inspectLocalMachine(options),
+    mapWithConcurrency(registry.machines, 4, (machine) => (
+      inspectRegisteredMachine(machine, options)
+    )),
+  ])
+  return {
+    schemaVersion: MACHINE_INVENTORY_SCHEMA_VERSION,
+    generatedAt: local.generatedAt,
+    machines: [local.machine, ...remotes],
+  }
+}
+
+export function registeredMachinePlaceholder(machine: RegisteredMachine): MachineInventory {
+  return {
+    key: machine.key,
+    displayName: machine.displayName,
+    registered: true,
+    connection: 'checking',
+    sshTarget: machine.sshTarget,
+    platform: null,
+    arch: null,
+    hostname: null,
+    cliVersion: null,
+    defaultProject: null,
+    projects: [],
+    capabilities: {
+      inspect: false,
+      lifecycle: false,
+      openTunnel: false,
+      transferReceive: false,
+      credentialReseal: false,
+    },
+    issue: { code: 'ECHECKING', message: 'Checking SSH reachability…' },
   }
 }
 
@@ -254,7 +332,7 @@ function isMachineInventory(value: unknown): value is MachineInventory {
   return isSelector(value['key'])
     && isSafeText(value['displayName'], 80)
     && typeof value['registered'] === 'boolean'
-    && ['local', 'online', 'offline', 'unauthorized', 'incompatible'].includes(String(value['connection']))
+    && ['local', 'checking', 'online', 'offline', 'unauthorized', 'incompatible'].includes(String(value['connection']))
     && (value['sshTarget'] === null || isSafeText(value['sshTarget'], 255))
     && (value['platform'] === null || isSafeText(value['platform'], 32))
     && (value['arch'] === null || isSafeText(value['arch'], 32))
@@ -393,6 +471,23 @@ async function readCliVersion(): Promise<string> {
   const text = await readFile(new URL('../package.json', import.meta.url), 'utf8')
   const value = JSON.parse(text) as unknown
   return isRecord(value) && typeof value['version'] === 'string' ? value['version'] : 'unknown'
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  limit: number,
+  operation: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length)
+  let next = 0
+  async function worker(): Promise<void> {
+    while (next < values.length) {
+      const index = next++
+      results[index] = await operation(values[index] as T)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, () => worker()))
+  return results
 }
 
 function inventoryError(code: string, message: string): Error & { code: string } {

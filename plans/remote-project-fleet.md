@@ -435,24 +435,25 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   isolated SSH fixture for one machine with several AliceProjects.
 - [x] Update `docs/remote-access.md`, `docs/cli-supervisor.md`, and
   `docs/data-locations.md` with shipped Increment 1 truth.
-- [ ] Open and merge the first serial PR to `dev`; inspect its checks and the
+- [x] Open and merge the first serial PR to `dev`; inspect its checks and the
   post-merge `dev` run before publishing Increment 2.
 
 ### Increment 2 — read-only fleet TUI and connection actions
 
-- [ ] Extract fleet reducer/effects and focused list/detail components from the
+- [x] Extract fleet reducer/effects and focused list/detail components from the
   current monolithic TUI path.
-- [ ] Render local plus registered machines, reachability, stale timestamps,
+- [x] Render local plus registered machines, reachability, stale timestamps,
   remote AliceProjects, Runtime/component health, and compatibility.
-- [ ] Implement wide two-pane and narrow drill-down layouts with fixed footer,
+- [x] Implement wide two-pane and narrow drill-down layouts with fixed footer,
   scrolling, resize, monochrome, Unicode-width, and terminal restoration.
-- [ ] Connect/open a selected remote project through the existing loopback
+- [x] Connect/open a selected remote project through the existing loopback
   tunnel service. Detach closes only TUI-owned tunnels.
-- [ ] Preserve local start/open/stop/restart/logs/Doctor/Setup behavior and
+- [x] Preserve local start/open/stop/restart/logs/Doctor/Setup behavior and
   refuse unsupported remote mutations by capability.
-- [ ] Add deterministic screen tests plus real PTY journeys for local, online,
-  offline, auth-required, incompatible, resize, tunnel reconnect, and detach.
-- [ ] Update the base Supervisor plan where its original local-only
+- [x] Add deterministic state/screen/tunnel-ownership tests for local, online,
+  auth-required, incompatible, and detach, plus real PTY journeys for local,
+  offline, wide/narrow resize, drill-down, and terminal restoration.
+- [x] Update the base Supervisor plan where its original local-only
   information architecture is superseded.
 - [ ] Open and merge the second serial PR to `dev`; inspect trailing CI before
   Increment 3.
@@ -537,6 +538,16 @@ full install/start/inventory/tunnel/reconnect/stop route, and
 `pnpm test:install:docker` passes the distributed payload route. Both fixtures
 removed their temporary containers and images. The final repository suite
 passes 4,887 tests with 9 skipped, alongside root TypeScript and CLI build.
+
+Increment 2 progress (2026-08-23): 101 focused Fleet/TUI/inventory/SSH/install
+tests and the CLI build pass, including real PTY resize, narrow drill-down,
+offline Machine, terminal restoration, and TUI-owned tunnel cancellation. The
+complete CLI package passes 251 tests; the repository passes 4,896 tests with
+9 skipped alongside root TypeScript. Both `pnpm test:remote:docker` and
+`pnpm test:install:docker` pass and remove their temporary Docker resources.
+The unsigned `pnpm electron:smoke:workspace` packaged acceptance also passes
+the installed CLI manifest, Electron PTY, scheduled managed-Pi run, and cleanup
+contract; its temporary expanded application is removed on exit.
 
 Always:
 

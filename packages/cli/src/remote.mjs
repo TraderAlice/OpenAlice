@@ -920,6 +920,7 @@ export function buildRemoteSshArgs(options, remoteCommand) {
     '-o', 'ServerAliveInterval=30',
     '-o', 'ServerAliveCountMax=3',
   ]
+  if (options.batchMode === true) args.push('-o', 'BatchMode=yes')
   if (options.sshPort !== null) args.push('-p', String(options.sshPort))
   if (options.identityFile !== null) args.push('-i', options.identityFile)
   args.push(options.destination, remoteCommand)

@@ -76,6 +76,71 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain('\u001b[?2004l')
   })
 
+  it('renders an offline registered Machine and preserves drill-down across resize', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
+    temporaryPaths.push(isolatedHome)
+    const supervisorHome = join(isolatedHome, 'supervisor')
+    await mkdir(supervisorHome, { recursive: true })
+    await writeFile(join(supervisorHome, 'machines.json'), `${JSON.stringify({
+      schemaVersion: 1,
+      machines: {
+        cloud: {
+          displayName: 'Cloud fixture',
+          sshTarget: '127.0.0.1',
+          sshPort: 1,
+        },
+      },
+    })}\n`)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 100,
+      rows: 28,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_SUPERVISOR_HOME: supervisorHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let selectedRemote = false
+      let drilledDown = false
+      let returned = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor offline fleet timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!selectedRemote && output.includes('Cloud fixture') && output.includes('offline')) {
+          selectedRemote = true
+          child.resize(48, 24)
+          child.write('\u001b[B\u001b[C')
+        } else if (!drilledDown && output.includes('AliceProjects · Cloud fixture')) {
+          drilledDown = true
+          child.write('\u001b')
+        } else if (drilledDown && !returned && output.includes('Enter / →  AliceProjects')) {
+          returned = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor offline fleet exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Cloud fixture')
+    expect(transcript).toContain('offline')
+    expect(transcript).toContain('AliceProjects · Cloud fixture')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
+
   it('renders an explicitly selected launch context before detach', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-context-'))
     temporaryPaths.push(isolatedHome)

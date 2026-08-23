@@ -274,7 +274,10 @@ to or mutates the host.
 `machine inspect` uses the same typed inventory for local and remote Machines.
 Each remote probe invokes `openalice machine inspect local --json` once; that
 remote command reads only its Supervisor AliceProject registry and probes those
-registered complete homes. It does not scan other directories. The bounded
+registered complete homes. Fleet probes force OpenSSH batch mode so a password,
+key-passphrase, or host-key prompt cannot seize the Supervisor TUI; those cases
+become an `unauthorized` row. Interactive tunnel commands retain normal
+OpenSSH prompting. The inventory command does not scan other directories. The bounded
 response contains project identity, product, home/port, normalized Runtime
 state, safe component health, and advertised capabilities. Runtime owner PIDs,
 tokens, logs, command lines, environments, and credentials are omitted.
@@ -285,6 +288,14 @@ Machine may still contain stopped, unhealthy, or differently owned Projects.
 One unreachable Machine remains a row in the fleet result instead of failing
 the complete refresh. `remote-targets.json` continues to be only the hashed
 ephemeral local-port cache used by tunnels and is not a Machine registry.
+
+The Supervisor Fleet page consumes that contract directly. A running remote
+AliceProject with a validated `127.0.0.1` Web endpoint can be opened through
+the existing loopback tunnel. The TUI owns an abort controller for every such
+tunnel: `q`, `Esc`, `Ctrl+C`, or process termination closes the tunnel while
+leaving Guardian and the detached remote Server untouched. Stopped or
+incompatible remote Projects remain visible but do not receive guessed
+lifecycle mutations from the read-only Fleet view.
 
 When `--app-dir` is absent, managed remote prefers the verified Runtime bundle
 installed with the matching CLI. No Git checkout or compiler is needed. On a
