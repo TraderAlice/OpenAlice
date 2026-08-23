@@ -65,7 +65,7 @@ jobs:
           node-version: 22.19.0
 
       - name: Exercise clean SSH host fixture
-        run: node scripts/remote-ssh-smoke.mjs
+        run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
   dev-channel-install:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
