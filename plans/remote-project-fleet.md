@@ -506,7 +506,7 @@ signals a guessed PID, exposes the Guardian socket, or performs trading writes.
   terminal cleanup.
 - [x] Walk the real TUI against an isolated Docker SSH host; no user Home,
   provider account, broker, or connector may be used.
-- [ ] Open and merge the fourth serial PR to `dev`; inspect trailing CI.
+- [x] Open and merge the fourth serial PR to `dev`; inspect trailing CI.
 
 ### Increment 5 — completion and release evidence
 
@@ -574,6 +574,13 @@ retry, cancellation acknowledgement with retry, and terminal cleanup. The
 Docker SSH fixture drives the real TUI through default-No and approved
 success, proving no default-No destination, registered result, portable
 Workspace content, and no resume ledger. Publication remains.
+
+Increment 4 publication follow-up (2026-08-23): the feature PR merged as
+PR #1164. Its trailing Installer Smoke exposed that the dependency-free
+managed-remote job loaded `node-pty` before reaching its non-TUI path. The
+fixture now loads PTY support only for the local interactive journey, while CI
+and release installer jobs explicitly retain the dependency-free remote path;
+both variants pass the full disposable Docker acceptance locally.
 
 Final local gate refresh (2026-08-23): the complete CLI package passes 291
 tests and the repository passes 4,936 tests with 9 skipped, alongside root,

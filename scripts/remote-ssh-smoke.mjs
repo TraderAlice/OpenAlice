@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process'
 import { Writable } from 'node:stream'
-import * as pty from 'node-pty'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,6 +18,7 @@ const image = `openalice-remote-smoke:${suffix}`
 const args = process.argv.slice(2)
 const keepImage = args.includes('--keep-image')
 const keepContainer = args.includes('--keep-container')
+const skipTui = args.includes('--skip-tui')
 let imageBuilt = false
 let container = ''
 let scratch = ''
@@ -34,12 +34,17 @@ a local acceptance gate and is not wired into PR CI.
 Options:
   --keep-image      Preserve the temporary Docker image
   --keep-container  Preserve the running fixture container (also keeps image)
+  --skip-tui        Skip the dependency-backed interactive TUI journey
   -h, --help        Show this help
 `)
   process.exit(0)
 }
 
-const unknownArgs = args.filter((arg) => !['--keep-image', '--keep-container'].includes(arg))
+const unknownArgs = args.filter((arg) => ![
+  '--keep-image',
+  '--keep-container',
+  '--skip-tui',
+].includes(arg))
 if (unknownArgs.length > 0) {
   console.error(`remote docker smoke: unknown option: ${unknownArgs[0]}`)
   process.exit(1)
@@ -228,30 +233,34 @@ try {
     'test -f /home/smoke/.openalice-interrupted/workspaces/workspaces/ws-transfer/research.txt',
     'test ! -e /home/smoke/.openalice-transfer-remote-smoke-interrupted.staging',
   ].join('; ')], { env: smokeEnv })
-  console.log('[remote-ssh-smoke] walking the real TUI transfer wizard (default No, then success)')
-  await driveTransferTui(smokeEnv, {
-    projectKey: 'tui-migrated',
-    destinationHome: '/home/smoke/.openalice-tui-migrated',
-    approve: false,
-  })
-  console.log('[remote-ssh-smoke] TUI default-No journey completed')
-  run('ssh', [remoteTarget, 'test ! -e /home/smoke/.openalice-tui-migrated'], { env: smokeEnv })
-  await driveTransferTui(smokeEnv, {
-    projectKey: 'tui-migrated',
-    destinationHome: '/home/smoke/.openalice-tui-migrated',
-    approve: true,
-  })
-  console.log('[remote-ssh-smoke] TUI approved journey completed')
-  const tuiRegistry = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" project list --json')
-  const tuiProject = tuiRegistry.projects?.find((project) => project.key === 'tui-migrated')
-  if (tuiProject?.home !== '/home/smoke/.openalice-tui-migrated') {
-    throw new Error(`TUI registered the wrong destination: ${JSON.stringify(tuiRegistry)}`)
+  if (skipTui) {
+    console.log('[remote-ssh-smoke] skipping dependency-backed TUI journey')
+  } else {
+    console.log('[remote-ssh-smoke] walking the real TUI transfer wizard (default No, then success)')
+    await driveTransferTui(smokeEnv, {
+      projectKey: 'tui-migrated',
+      destinationHome: '/home/smoke/.openalice-tui-migrated',
+      approve: false,
+    })
+    console.log('[remote-ssh-smoke] TUI default-No journey completed')
+    run('ssh', [remoteTarget, 'test ! -e /home/smoke/.openalice-tui-migrated'], { env: smokeEnv })
+    await driveTransferTui(smokeEnv, {
+      projectKey: 'tui-migrated',
+      destinationHome: '/home/smoke/.openalice-tui-migrated',
+      approve: true,
+    })
+    console.log('[remote-ssh-smoke] TUI approved journey completed')
+    const tuiRegistry = remoteJson(remoteTarget, smokeEnv, '"$HOME/.openalice/bin/openalice" project list --json')
+    const tuiProject = tuiRegistry.projects?.find((project) => project.key === 'tui-migrated')
+    if (tuiProject?.home !== '/home/smoke/.openalice-tui-migrated') {
+      throw new Error(`TUI registered the wrong destination: ${JSON.stringify(tuiRegistry)}`)
+    }
+    run('ssh', [remoteTarget, [
+      'set -eu',
+      'test -f /home/smoke/.openalice-tui-migrated/workspaces/workspaces/ws-transfer/research.txt',
+      'test ! -e /home/smoke/.openalice-tui-migrated/workspaces/state/resume-identities.json',
+    ].join('; ')], { env: smokeEnv })
   }
-  run('ssh', [remoteTarget, [
-    'set -eu',
-    'test -f /home/smoke/.openalice-tui-migrated/workspaces/workspaces/ws-transfer/research.txt',
-    'test ! -e /home/smoke/.openalice-tui-migrated/workspaces/state/resume-identities.json',
-  ].join('; ')], { env: smokeEnv })
   const transferArgs = [
     cliEntry, 'project', 'transfer',
     '--from', 'default',
@@ -487,6 +496,7 @@ function sshWithInput(target, env, command, input) {
 }
 
 async function driveTransferTui(env, options) {
+  const pty = await import('node-pty')
   const child = pty.spawn(process.execPath, [cliEntry], {
     cols: 110,
     rows: 32,
