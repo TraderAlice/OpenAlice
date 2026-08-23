@@ -132,8 +132,6 @@ export function shouldProjectDeskComment(
     consumesConnectorNoReply(opts?.triggerMetadata)
     && containsTelegramNoReply(comment.markdown)
   ) return false
-  const scope = opts?.progressScopeId ?? comment.replyTo
-  if (scope && alreadyProjectedDeskText(scope, comment.markdown)) return false
   return true
 }
 
@@ -155,6 +153,8 @@ export async function projectDeskComment(
     await client.sendOwnerMessage({
       id: `desk-${comment.id}`,
       adapterId: issue.connectorDesk,
+      conversationId: scope ?? comment.id,
+      phase: 'final',
       text: normalizeDeskText(comment.markdown),
     }, AbortSignal.timeout(5_000))
   } finally {
@@ -177,12 +177,44 @@ export async function projectDeskTurnProgress(input: {
     await client.sendOwnerMessage({
       id: deskProgressMessageId(input.scopeId, text),
       adapterId: input.issue.connectorDesk,
+      conversationId: input.scopeId,
+      phase: 'progress',
       text,
     }, AbortSignal.timeout(5_000))
     markProjectedDeskText(input.scopeId, text)
     sent.push(text)
   }
   return sent
+}
+
+export async function projectDeskLifecycle(input: {
+  issue: Pick<IssueRecord, 'connectorDesk' | 'status'>
+  conversationId: string
+  phase: 'accepted' | 'failed'
+  text?: string
+  client?: ConnectorClient
+}): Promise<void> {
+  if (!isConnectorDeskIssue(input.issue) || input.issue.status === 'canceled') return
+  const client = input.client ?? new ConnectorClient(resolveConnectorUrl())
+  await client.sendOwnerMessage({
+    id: `desk-${input.phase}-${input.conversationId}`,
+    adapterId: input.issue.connectorDesk,
+    conversationId: input.conversationId,
+    phase: input.phase,
+    ...(input.text ? { text: normalizeDeskText(input.text) } : {}),
+  }, AbortSignal.timeout(5_000))
+}
+
+export async function projectWorkspaceDeskFailure(input: {
+  wsDir: string
+  issueId: string
+  conversationId: string
+  text: string
+  client?: ConnectorClient
+}): Promise<void> {
+  const issue = await readDeskIssue(input.wsDir, input.issueId)
+  if (!issue) return
+  await projectDeskLifecycle({ ...input, issue, phase: 'failed' })
 }
 
 export async function projectWorkspaceDeskTurnProgress(input: {

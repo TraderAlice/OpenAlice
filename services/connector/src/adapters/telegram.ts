@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { Bot, InlineKeyboard, InputFile, type Context } from 'grammy'
 import { autoRetry } from '@grammyjs/auto-retry'
 import type {
@@ -7,6 +8,7 @@ import type {
   ConnectorUtaFailure,
   ConnectorUtaPresentation,
   InboxNotification,
+  OwnerChatMessage,
 } from '@traderalice/connector-protocol'
 import { isInboxPushEnabled, TELEGRAM_CONNECTOR_DEFINITION } from '@traderalice/connector-protocol'
 import { createInboxStore, type IInboxStore } from '@/core/inbox-store.js'
@@ -50,6 +52,19 @@ import {
 } from './telegram-uta.js'
 import { sendTelegramRichText } from './telegram-rich-text.js'
 
+const TELEGRAM_DRAFT_HEARTBEAT_MS = 20_000
+const TELEGRAM_TYPING_HEARTBEAT_MS = 4_000
+const MAX_FINISHED_DRAFTS = 128
+
+interface TelegramDraftSession {
+  draftId: number
+  markdown?: string
+  typingFallback: boolean
+  stopped: boolean
+  pending: Promise<void>
+  timer?: ReturnType<typeof setTimeout>
+}
+
 export class TelegramConnectorAdapter implements ConnectorAdapter {
   readonly id = 'telegram'
   private readonly tracker = new AdapterHealthTracker(this.id)
@@ -64,6 +79,8 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private readonly inboxSessions = new Map<string, TelegramInboxSession>()
   private readonly utaSessions = new Map<string, TelegramUtaSession>()
   private readonly utaPending = new Map<string, { chatId: number; messageId: number; session: TelegramUtaSession }>()
+  private readonly drafts = new Map<string, TelegramDraftSession>()
+  private readonly finishedDrafts = new Set<string>()
   private stopped = true
   private loop?: Promise<void>
   private abort?: AbortController
@@ -123,6 +140,8 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
 
   async stop(): Promise<void> {
     this.stopped = true
+    this.stopAllDrafts()
+    this.finishedDrafts.clear()
     this.abort?.abort()
     await this.disconnectSession()
     await this.loop?.catch(() => undefined)
@@ -178,6 +197,27 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
       this.tracker.degraded(error)
       throw error
     }
+  }
+
+  async sendOwnerChat(message: OwnerChatMessage): Promise<void> {
+    if (message.phase === 'accepted' || message.phase === 'progress') {
+      this.tracker.attempt()
+      try {
+        if (message.phase === 'accepted') {
+          await this.startDraft(message.conversationId)
+        } else if (message.text) {
+          await this.updateDraft(message.conversationId, message.text)
+        }
+        this.tracker.success(this.ownerUserId)
+        return
+      } catch (error) {
+        this.tracker.degraded(error)
+        throw error
+      }
+    }
+
+    await this.finishDraft(message.conversationId)
+    if (message.text) await this.sendOwnerText(message.text)
   }
 
   health(): ConnectorAdapterHealth {
@@ -280,6 +320,7 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
 
   private async disconnectSession(): Promise<void> {
     this.sessionReady = false
+    this.stopAllDrafts()
     const bot = this.bot
     this.bot = undefined
     await Promise.resolve(bot?.stop()).catch(() => undefined)
@@ -627,6 +668,139 @@ export class TelegramConnectorAdapter implements ConnectorAdapter {
   private isOwner(userId: string): boolean {
     return Boolean(this.ownerUserId && this.ownerUserId === userId)
   }
+
+  private async startDraft(conversationId: string): Promise<void> {
+    if (this.finishedDrafts.has(conversationId)) return
+    this.stopDraft(conversationId)
+    const session: TelegramDraftSession = {
+      draftId: telegramDraftId(conversationId),
+      typingFallback: false,
+      stopped: false,
+      pending: Promise.resolve(),
+    }
+    this.drafts.set(conversationId, session)
+    try {
+      await this.queueDraftRefresh(conversationId, session)
+    } finally {
+      this.armDraftHeartbeat(conversationId, session)
+    }
+  }
+
+  private async updateDraft(conversationId: string, markdown: string): Promise<void> {
+    if (this.finishedDrafts.has(conversationId)) return
+    let session = this.drafts.get(conversationId)
+    if (!session) {
+      session = {
+        draftId: telegramDraftId(conversationId),
+        typingFallback: false,
+        stopped: false,
+        pending: Promise.resolve(),
+      }
+      this.drafts.set(conversationId, session)
+    }
+    session.markdown = markdown
+    try {
+      await this.queueDraftRefresh(conversationId, session)
+    } finally {
+      this.armDraftHeartbeat(conversationId, session)
+    }
+  }
+
+  private queueDraftRefresh(conversationId: string, session: TelegramDraftSession): Promise<void> {
+    const next = session.pending.catch(() => undefined).then(async () => {
+      if (session.stopped || this.drafts.get(conversationId) !== session) return
+      await this.refreshDraft(session)
+    })
+    session.pending = next
+    return next
+  }
+
+  private async refreshDraft(session: TelegramDraftSession): Promise<void> {
+    if (!this.bot || !this.sessionReady) throw new Error('Telegram bot is not ready')
+    const chatId = telegramNumericChatId(this.chatId)
+    if (session.typingFallback) {
+      await this.bot.api.sendChatAction(chatId, 'typing')
+      return
+    }
+    try {
+      if (session.markdown) {
+        await this.bot.api.sendRichMessageDraft(chatId, session.draftId, { markdown: session.markdown })
+      } else {
+        await this.bot.api.sendMessageDraft(chatId, session.draftId, '')
+      }
+      return
+    } catch (error) {
+      if (session.markdown) {
+        try {
+          await this.bot.api.sendMessageDraft(
+            chatId,
+            session.draftId,
+            truncateTelegramText(session.markdown, 4096),
+          )
+          return
+        } catch {
+          // Fall through to the universally supported activity indicator.
+        }
+      }
+      console.warn('[connector] Telegram live draft fell back to typing:', formatAdapterError(error))
+      session.typingFallback = true
+      await this.bot.api.sendChatAction(chatId, 'typing')
+    }
+  }
+
+  private async finishDraft(conversationId: string): Promise<void> {
+    const session = this.drafts.get(conversationId)
+    if (session) {
+      this.stopDraft(conversationId)
+      await session.pending.catch(() => undefined)
+    }
+    this.markDraftFinished(conversationId)
+  }
+
+  private stopDraft(conversationId: string): void {
+    const session = this.drafts.get(conversationId)
+    if (!session) return
+    session.stopped = true
+    if (session.timer) clearTimeout(session.timer)
+    this.drafts.delete(conversationId)
+  }
+
+  private stopAllDrafts(): void {
+    for (const conversationId of [...this.drafts.keys()]) this.stopDraft(conversationId)
+  }
+
+  private armDraftHeartbeat(conversationId: string, session: TelegramDraftSession): void {
+    if (session.stopped || this.drafts.get(conversationId) !== session) return
+    if (session.timer) clearTimeout(session.timer)
+    const delay = session.typingFallback ? TELEGRAM_TYPING_HEARTBEAT_MS : TELEGRAM_DRAFT_HEARTBEAT_MS
+    session.timer = setTimeout(() => {
+      void this.queueDraftRefresh(conversationId, session).catch((error) => {
+        this.tracker.degraded(error)
+        console.warn('[connector] Telegram owner-chat activity refresh failed:', formatAdapterError(error))
+      }).finally(() => this.armDraftHeartbeat(conversationId, session))
+    }, delay)
+    session.timer.unref?.()
+  }
+
+  private markDraftFinished(conversationId: string): void {
+    if (this.finishedDrafts.size >= MAX_FINISHED_DRAFTS) {
+      const oldest = this.finishedDrafts.values().next().value
+      if (oldest !== undefined) this.finishedDrafts.delete(oldest)
+    }
+    this.finishedDrafts.add(conversationId)
+  }
+}
+
+export function telegramDraftId(conversationId: string): number {
+  const value = createHash('sha256').update(conversationId).digest().readUInt32BE(0) & 0x7fff_ffff
+  return value || 1
+}
+
+function telegramNumericChatId(chatId: string | undefined): number {
+  if (!chatId) throw new Error('Telegram private chat is not linked')
+  const numeric = Number(chatId)
+  if (!Number.isSafeInteger(numeric)) throw new Error('Telegram private chat id is invalid')
+  return numeric
 }
 
 export function telegramConnectorRegistration(

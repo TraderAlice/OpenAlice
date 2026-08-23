@@ -26,25 +26,33 @@ const baseNotification = {
 }
 
 describe('owner chat messages', () => {
-  it('rejects empty or oversized owner-chat text', () => {
-    expect(() => ownerChatMessageSchema.parse({
+  it('requires lifecycle identity and text for visible phases', () => {
+    const base = {
       id: 'desk-1',
       adapterId: 'telegram',
-      text: '',
+      conversationId: 'comment-1',
+    }
+    expect(ownerChatMessageSchema.parse({
+      ...base,
+      phase: 'accepted',
+    }).phase).toBe('accepted')
+    expect(() => ownerChatMessageSchema.parse({
+      ...base,
+      phase: 'progress',
     })).toThrow()
     expect(ownerChatMessageSchema.parse({
-      id: 'desk-1',
-      adapterId: 'telegram',
+      ...base,
+      phase: 'final',
       text: 'Markets are quiet.',
     }).text).toBe('Markets are quiet.')
     expect(ownerChatMessageSchema.parse({
-      id: 'desk-1',
-      adapterId: 'telegram',
+      ...base,
+      phase: 'failed',
       text: 'x'.repeat(OWNER_CHAT_TEXT_MAX),
     }).text).toHaveLength(OWNER_CHAT_TEXT_MAX)
     expect(() => ownerChatMessageSchema.parse({
-      id: 'desk-1',
-      adapterId: 'telegram',
+      ...base,
+      phase: 'final',
       text: 'x'.repeat(OWNER_CHAT_TEXT_MAX + 1),
     })).toThrow()
   })

@@ -350,7 +350,13 @@ describe('DeliveryManager connector registry', () => {
     })
     await manager.start()
 
-    expect(manager.enqueueOwnerChat({ id: 'desk-comment-1', adapterId: 'broken', text: 'hello' }))
+    expect(manager.enqueueOwnerChat({
+      id: 'desk-comment-1',
+      adapterId: 'broken',
+      conversationId: 'comment-1',
+      phase: 'final',
+      text: 'hello',
+    }))
       .toEqual({ accepted: true, deliveryId: 'desk-comment-1' })
     await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
       '[connector] broken owner-chat delivery failed:',
