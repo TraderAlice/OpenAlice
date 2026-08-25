@@ -284,6 +284,9 @@ collapsing to "configured but not running." Configuration errors such as a
 missing bot token still fail `start()` and do not reconnect.
 
 Both adapters reject commands from any account other than the linked owner.
+When Feishu starts with a preconfigured owner, its inbound gate silently drops
+every private-chat event from any other account before command parsing, including
+`/link` and `/status`; unauthorized chats receive no acknowledgement.
 Use `/status` for adapter health and `/test` for an explicit delivery check.
 `/test` still sends when Inbox push is off. `/inbox`, `/settings`, and `/uta` are
 capability commands: the catalog only declares them; Telegram renders

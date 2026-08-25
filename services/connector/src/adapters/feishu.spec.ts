@@ -220,16 +220,21 @@ describe('Feishu owner chat', () => {
     expect(messageCreate).toHaveBeenCalled()
   })
 
-  it('ignores group chats and non-owner text after link', async () => {
+  it('silently ignores group chats and every non-owner message after link', async () => {
     const forwardOwnerText = vi.fn(async () => undefined)
+    const updateSettings = vi.fn(async () => undefined)
     const adapter = new FeishuConnectorAdapter({ startupTimeoutMs: 200 })
     await adapter.start({
       enabled: true,
       settings: { appId: APP_ID, appSecret: APP_SECRET, ownerUserId: 'ou_owner', chatId: 'oc_chat' },
-    }, context({ forwardOwnerText }))
+    }, context({ forwardOwnerText, updateSettings }))
     await receiveHandler?.(p2pEvent('hello group', { chatType: 'group' }))
     await receiveHandler?.(p2pEvent('hello stranger', { openId: 'ou_other' }))
+    await receiveHandler?.(p2pEvent('/status', { openId: 'ou_other' }))
+    await receiveHandler?.(p2pEvent('/link', { openId: 'ou_other' }))
     expect(forwardOwnerText).not.toHaveBeenCalled()
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(messageCreate).not.toHaveBeenCalled()
     await receiveHandler?.(p2pEvent('desk please'))
     expect(forwardOwnerText).toHaveBeenCalledWith({
       text: 'desk please',

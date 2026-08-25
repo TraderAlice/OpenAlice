@@ -314,6 +314,9 @@ export class FeishuConnectorAdapter implements ConnectorAdapter {
     const userId = sender?.sender_id?.open_id?.trim()
     const chatId = message?.chat_id?.trim()
     if (!userId || !chatId) return
+    // A preconfigured owner is a hard ingress allowlist. Keep every message,
+    // including control commands, silent for all other Feishu accounts.
+    if (this.ownerUserId && !this.isOwner(userId)) return
     const text = parseFeishuMessageText(message?.content, message?.message_type).trim()
     if (!text) return
     const command = parseFeishuCommand(text)
