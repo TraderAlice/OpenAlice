@@ -249,12 +249,11 @@ export const codexAdapter: CliAdapter = {
   // call when there's no human to approve — even under approval_policy=never
   // (verified: "user cancelled MCP tool call") — so MCP is dead weight here.
   // Instead the agent reads data via `alice` and reports via `alice-workspace`
-  // (shell commands codex runs autonomously). Three GLOBAL `-c` (before `exec`)
-  // make that work:
-  //   approval_policy=never                        — don't block on approval
-  //   sandbox_mode=workspace-write                 — let it write the workspace
-  //   sandbox_workspace_write.network_access=true  — let `alice*` reach the
-  //                       loopback CLI gateway (else: "...fetch failed").
+  // (shell commands codex runs autonomously). Headless runs need the same
+  // unattended host access as interactive runs: scheduled Issues commit their
+  // report before pushing Inbox, and Codex's workspace-write sandbox protects
+  // `.git` even when the repository itself is inside the writable workspace.
+  // danger-full-access also lets `alice*` reach the loopback CLI gateway.
   // No mcp_servers head (interactive composeCommand keeps it — MCP works there
   // with a human approver). `--` terminates options before the trailing prompt.
   composeHeadlessCommand(
@@ -273,12 +272,7 @@ export const codexAdapter: CliAdapter = {
         ? ['-c', `model_reasoning_effort=${tomlString(reasoningEffort)}`]
         : []),
       ...(custom ? ['-c', `model_provider=${tomlString(CODEX_PROVIDER_NAME)}`] : []),
-      '-c',
-      'approval_policy="never"',
-      '-c',
-      'sandbox_mode="workspace-write"',
-      '-c',
-      'sandbox_workspace_write.network_access=true',
+      ...CODEX_INTERACTIVE_PERMISSION_ARGS,
       'exec',
     ];
     if (ctx.resume === 'last') return [...head, 'resume', '--json', '--last', prompt];

@@ -778,15 +778,13 @@ describe('composeHeadlessCommand (one-shot headless argv, prompt placed per-CLI)
     ]);
   });
 
-  it('codex: CLI-mode headless (no MCP) — approval/sandbox/network -c + exec --json -- <prompt>', () => {
+  it('codex: CLI-mode headless (no MCP) — unattended host access + exec --json -- <prompt>', () => {
     expect(codexAdapter.composeHeadlessCommand!(['codex'], ctx(), 'do x')).toEqual([
       'codex',
-      '-c',
-      'approval_policy="never"',
-      '-c',
-      'sandbox_mode="workspace-write"',
-      '-c',
-      'sandbox_workspace_write.network_access=true',
+      '--sandbox',
+      'danger-full-access',
+      '--ask-for-approval',
+      'never',
       'exec',
       '--json',
       '--',
