@@ -1,6 +1,6 @@
 import antigravityIcon from '@lobehub/icons-static-svg/icons/antigravity-color.svg'
 import claudeIcon from '@lobehub/icons-static-svg/icons/claude-color.svg'
-import codexIcon from '@lobehub/icons-static-svg/icons/codex-color.svg'
+import codexIcon from '@lobehub/icons-static-svg/icons/codex.svg'
 import cursorIcon from '@lobehub/icons-static-svg/icons/cursor.svg'
 import grokIcon from '@lobehub/icons-static-svg/icons/grok.svg'
 import opencodeIcon from '@lobehub/icons-static-svg/icons/opencode.svg'
@@ -21,7 +21,7 @@ interface BrandAsset {
 
 const AGENT_RUNTIME_BRANDS: Record<string, BrandAsset> = {
   claude: { src: claudeIcon },
-  codex: { src: codexIcon },
+  codex: { src: codexIcon, monochrome: true },
   cursor: { src: cursorIcon, monochrome: true },
   agy: { src: antigravityIcon },
   grok: { src: grokIcon, monochrome: true },
