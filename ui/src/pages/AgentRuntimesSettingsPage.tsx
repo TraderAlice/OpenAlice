@@ -11,7 +11,7 @@ import { installHintFor } from '../components/workspace/agentInstall'
 import type { AgentInfo, AgentRuntimeReadinessRow } from '../components/workspace/api'
 import { useAgentRuntimes } from '../hooks/useAgentRuntimes'
 import { canAddAgentRuntimeQuickAccess } from '../lib/agentRuntimeQuickAccess'
-import { agentRuntimeIcon } from '../lib/agentRuntimeIcon'
+import { AgentRuntimeIcon } from '../lib/agentRuntimeIcon'
 import { agentRuntimeSettingsStatusKey } from '../lib/agentRuntimeReadiness'
 
 const RUNTIME_COPY = {
@@ -168,14 +168,13 @@ export function AgentRuntimesSettingsPage() {
             ) : (
               <ol className="flex flex-col gap-2">
                 {pinned.map((agent, index) => {
-                  const Icon = agentRuntimeIcon(agent.id)
                   return (
                     <li
                       key={agent.id}
                       className="flex min-w-0 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 py-2"
                     >
                       <span className="w-5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
-                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <AgentRuntimeIcon agentId={agent.id} className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{agent.displayName}</span>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
@@ -272,7 +271,6 @@ function RuntimeSettingsCard({
   onProbe(): void
 }) {
   const { t } = useTranslation()
-  const Icon = agentRuntimeIcon(agent.id)
   const installed = agent.installed !== false
   const hint = installHintFor(agent.id)
   const binPath = row?.binPath ?? agent.binPath ?? null
@@ -281,7 +279,7 @@ function RuntimeSettingsCard({
     <article className="min-w-0 rounded-lg border border-border/70 bg-background px-4 py-3">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 h-5 w-5 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <h3 className="min-w-0 truncate text-[13px] font-semibold text-foreground">{agent.displayName}</h3>

@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { inputClass } from '@/components/form'
-import { agentRuntimeIcon } from '../../lib/agentRuntimeIcon'
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon'
 import { agentRuntimePickerStatusKey } from '../../lib/agentRuntimeReadiness'
 import { installHintFor } from './agentInstall'
 import type { AgentInfo, AgentRuntimeReadinessSnapshot } from './api'
@@ -62,7 +62,6 @@ function AgentRuntimeRow({
   onSelect(): void
 }) {
   const { t } = useTranslation()
-  const Icon = agentRuntimeIcon(agent.id)
   const statusKey = agentRuntimePickerStatusKey(readiness?.agents[agent.id])
   const status = statusKey ? t(statusKey) : undefined
 
@@ -74,7 +73,7 @@ function AgentRuntimeRow({
         selected ? 'text-primary' : 'text-foreground'
       } min-h-11`}
     >
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+      <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 h-4 w-4 shrink-0" />
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 truncate font-medium">{agent.displayName}</span>
@@ -92,7 +91,6 @@ function AgentRuntimeRow({
 
 function UninstalledRuntimeGuidance({ agent }: { agent: AgentInfo }) {
   const { t } = useTranslation()
-  const Icon = agentRuntimeIcon(agent.id)
   const hint = installHintFor(agent.id)
 
   const copyCommand = async () => {
@@ -106,7 +104,7 @@ function UninstalledRuntimeGuidance({ agent }: { agent: AgentInfo }) {
 
   return (
     <div className="flex w-full min-w-0 items-start gap-2 rounded-md px-2.5 py-2 text-[13px] text-muted-foreground">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+      <AgentRuntimeIcon agentId={agent.id} className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 truncate font-medium">{agent.displayName}</span>
@@ -182,8 +180,6 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
         : null)
     const selectedOutsidePrimary = selected !== null
       && !primary.some((agent) => agent.id === selected.id)
-    const SelectedIcon = agentRuntimeIcon(selected?.id)
-    const CurrentIcon = agentRuntimeIcon(selectedOutsidePrimary ? selected?.id : null)
     const normalizedQuery = query.trim().toLowerCase()
     const installed = useMemo(
       () => agents.filter((agent) => agent.installed !== false && matchesQuery(agent, normalizedQuery)),
@@ -221,7 +217,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
               className="oa-pressable inline-flex min-h-8 max-w-[190px] items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             />}
           >
-            <SelectedIcon className="h-3 w-3 shrink-0" />
+            <AgentRuntimeIcon agentId={selected?.id} className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{selected?.displayName ?? t('chatLanding.selectAgent')}</span>
             <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
           </DropdownMenuTrigger>
@@ -232,7 +228,6 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
             className="w-[min(16rem,calc(100vw-2rem))] rounded-lg border border-border/70 bg-secondary p-1 shadow-lg ring-0"
           >
             {primary.map((agent) => {
-              const Icon = agentRuntimeIcon(agent.id)
               const active = agent.id === selectedId
               const missing = agent.installed === false
               return (
@@ -245,7 +240,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                   }}
                   className={`min-h-9 gap-2 px-2.5 text-[12px] ${active ? 'text-primary' : missing ? 'text-muted-foreground' : 'text-foreground'}`}
                 >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <AgentRuntimeIcon agentId={agent.id} className="h-3.5 w-3.5 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{agent.displayName}</span>
                   {missing && (
                     <span className="shrink-0 text-[10px] text-muted-foreground">
@@ -273,7 +268,7 @@ export const AgentRuntimePicker = forwardRef<AgentRuntimePickerHandle, AgentRunt
                       selected.installed === false ? 'text-muted-foreground' : 'text-primary'
                     }`}
                   >
-                    <CurrentIcon className="h-3.5 w-3.5 shrink-0" />
+                    <AgentRuntimeIcon agentId={selectedOutsidePrimary ? selected?.id : null} className="h-3.5 w-3.5 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{selected.displayName}</span>
                     {selected.installed === false && (
                       <span className="shrink-0 text-[10px] text-muted-foreground">
