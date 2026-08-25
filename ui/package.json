@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@lobehub/icons-static-svg": "1.94.0",
     "@tiptap/markdown": "3.27.3",
     "@tiptap/react": "3.27.3",
     "@tiptap/starter-kit": "3.27.3",
