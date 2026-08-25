@@ -593,6 +593,8 @@ export const en = {
       sharedDescription: 'These installation-level options apply across Harness Workspaces.',
       showHeadlessBorn: 'Show headless-born Sessions',
       showHeadlessBornDescription: 'Off by default. Sessions that started from an Issue or API turn and have never opened a TUI or WebPi stay on the Issue page instead of the desk roster.',
+      showIssueAttached: 'Show Issue-attached Sessions',
+      showIssueAttachedDescription: 'Off by default. Sessions currently owned or occupied by an Issue stay on the Issue and Automation surfaces instead of the shared desk roster.',
       showUnverifiedReleases: 'Show unverified Harness releases',
       showUnverifiedReleasesDescription: 'Off by default. When enabled, OpenAlice also checks the upstream repository for its newest stable release. Those releases are clearly marked and still require a reviewed upgrade.',
       askAlice: 'Ask Alice',

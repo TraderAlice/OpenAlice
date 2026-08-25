@@ -123,6 +123,8 @@ export interface HarnessSessionJoinOptions {
   readonly presence?: SessionPresence
   /** When false (Ask Alice / Auto Quant default), hide headless-born never-TUI rows. */
   readonly includeHeadlessBornSessions?: boolean
+  /** When false (shared Harness default), keep current Issue owners/workers on Issue surfaces. */
+  readonly includeIssueAttachedSessions?: boolean
 }
 
 /** Running occupancy first (TUI or headless), then latest occupancy. */
@@ -152,6 +154,7 @@ export function joinWorkspaceHarnessSessions(
 ): HarnessSession[] {
   const wanted = opts.presence ?? 'active'
   const includeHeadlessBorn = opts.includeHeadlessBornSessions === true
+  const includeIssueAttached = opts.includeIssueAttachedSessions === true
   if (!directory) {
     if (wanted !== 'active') return []
     return orderHarnessSessions(
@@ -170,6 +173,7 @@ export function joinWorkspaceHarnessSessions(
   const rows = workspace.sessions.flatMap((session) => {
     const entry = directoryByResume.get(session.resumeId) ?? null
     if (entry?.rosterVisibility === 'hidden') return []
+    if (!includeIssueAttached && entry?.issueAttached) return []
     const presence = entryPresence(entry, session.presence ?? 'active')
     if (presence !== wanted) return []
     if (!includeHeadlessBorn && isHeadlessBornWithoutInteractive(session, entry)) return []

@@ -581,6 +581,8 @@ export const zh: Resources = {
       sharedDescription: '这些安装级选项作用于所有 Harness Workspace。',
       showHeadlessBorn: '显示无头出身的 Session',
       showHeadlessBornDescription: '默认关闭。从 Issue 或 API 跑起来、从未打开过 TUI / WebPi 的 Session 留在 Issue 页，不进桌子名册。',
+      showIssueAttached: '显示挂靠 Issue 的 Session',
+      showIssueAttachedDescription: '默认关闭。当前由 Issue 持有或占用的 Session 留在 Issue 与 Automation 页面，不进入共享桌子名册。',
       showUnverifiedReleases: '显示未经认证的 Harness 版本',
       showUnverifiedReleasesDescription: '默认关闭。开启后 OpenAlice 也会检查上游仓库最新的稳定版本；这些版本会明确标记，且仍需审阅后升级。',
       askAlice: 'Ask Alice',

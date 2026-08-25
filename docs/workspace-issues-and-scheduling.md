@@ -222,6 +222,14 @@ accepted and later failed; that occurrence stays one attempt and uses
 
 ## Agent and Human Surfaces
 
+Ask Alice, Auto Quant, and Auto Prediction share one Session roster policy.
+Sessions currently owned by an exact Issue assignee, plus Sessions actively
+executing an Issue, stay on Issue and Automation surfaces by default. Settings
+→ Harness may opt them into the shared roster independently from the separate
+headless-born Session preference. Connector-desk Sessions remain hidden
+regardless of either preference because they are transport-owned rather than
+ordinary coworkers.
+
 Agents normally use:
 
 ```bash

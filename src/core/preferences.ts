@@ -59,6 +59,8 @@ const harnessPreferencesSchema = z.object({
    * have never opened a TUI/WebPi stay off that roster unless this is true.
    */
   showHeadlessBornSessions: z.boolean().default(false),
+  /** Keep Sessions currently owned or occupied by an Issue off shared Harness rosters. */
+  showIssueAttachedSessions: z.boolean().default(false),
   /** Also discover stable upstream tags outside OpenAlice's verified catalog. */
   showUnverifiedHarnessReleases: z.boolean().default(false),
 })
@@ -102,6 +104,7 @@ const preferencesSchema = z.object({
   }),
   harness: harnessPreferencesSchema.default({
     showHeadlessBornSessions: false,
+    showIssueAttachedSessions: false,
     showUnverifiedHarnessReleases: false,
   }),
   agentRuntimes: agentRuntimesPreferencesSchema.default({
@@ -168,6 +171,7 @@ export async function readHarnessPreferences(path = preferencesPath()): Promise<
   const preferences = await readPreferences(path)
   return {
     showHeadlessBornSessions: preferences.harness.showHeadlessBornSessions,
+    showIssueAttachedSessions: preferences.harness.showIssueAttachedSessions,
     showUnverifiedHarnessReleases: preferences.harness.showUnverifiedHarnessReleases,
   }
 }
@@ -329,6 +333,7 @@ export async function saveHarnessPreferences(
     await writePreferences(updated, path)
     return {
       showHeadlessBornSessions: updated.harness.showHeadlessBornSessions,
+      showIssueAttachedSessions: updated.harness.showIssueAttachedSessions,
       showUnverifiedHarnessReleases: updated.harness.showUnverifiedHarnessReleases,
     }
   })

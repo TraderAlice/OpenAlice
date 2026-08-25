@@ -56,6 +56,7 @@ const recentQuickChatLaunchUpdateSchema = z.object({
 
 const harnessPreferenceUpdateSchema = z.object({
   showHeadlessBornSessions: z.boolean(),
+  showIssueAttachedSessions: z.boolean(),
   showUnverifiedHarnessReleases: z.boolean(),
 })
 
