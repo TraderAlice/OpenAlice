@@ -24,4 +24,13 @@ describe('AgentRuntimeIcon', () => {
 
     expect(container.querySelector('svg[data-agent-runtime-icon="future-runtime"]')).toBeTruthy()
   })
+
+  it('renders the Codex glyph without the color asset white tile', () => {
+    const { container } = render(<AgentRuntimeIcon agentId="codex" />)
+
+    const icon = container.querySelector<HTMLElement>('[data-agent-runtime-icon="codex"]')
+    expect(icon?.tagName).toBe('SPAN')
+    expect(icon?.classList.contains('bg-current')).toBe(true)
+    expect(container.querySelector('img[data-agent-runtime-icon="codex"]')).toBeNull()
+  })
 })
