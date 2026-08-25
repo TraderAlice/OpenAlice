@@ -100,6 +100,7 @@ import {
 import {
   buildWorkspaceSessionDirectory,
   connectorDeskRosterExclusions,
+  issueRosterAttachments,
   type WorkspaceSessionDirectory,
 } from './session-directory.js';
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
@@ -2589,6 +2590,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
           }),
         })
       : new Set<string>();
+    const issueAttachments = issueRead.ok
+      ? issueRosterAttachments({
+          issues: issueRead.issues,
+          runningExecutions: headlessTasks.list({
+            wsId,
+            status: 'running',
+          }),
+        })
+      : new Set<string>();
     return buildWorkspaceSessionDirectory({
       workspace: { id: ws.id, tag: ws.tag },
       identities: resumeRegistry.list({ wsId, limit }),
@@ -2596,6 +2606,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
       latestExecutionFor: (resumeId) => headlessTasks.latestForResumeId(resumeId),
       isActive: (resumeId) => activeResumeIds.has(resumeId),
       rosterVisibilityFor: (resumeId) => rosterExclusions.has(resumeId) ? 'hidden' : undefined,
+      issueAttachedFor: (resumeId) => issueAttachments.has(resumeId) ? true : undefined,
     });
   };
 

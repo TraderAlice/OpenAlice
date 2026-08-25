@@ -14,6 +14,8 @@ export function HarnessSettingsPage() {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const rosterToggleId = useId()
   const rosterDescriptionId = `${rosterToggleId}-description`
+  const issueRosterToggleId = useId()
+  const issueRosterDescriptionId = `${issueRosterToggleId}-description`
   const releasesToggleId = useId()
   const releasesDescriptionId = `${releasesToggleId}-description`
 
@@ -57,6 +59,24 @@ export function HarnessSettingsPage() {
                   onChange={(next) => void persist({ ...preferences, showHeadlessBornSessions: next })}
                 />
                 <SaveIndicator status={status === 'idle' && error ? 'error' : status} />
+              </div>
+            </div>
+            <div className="mt-5 flex items-start justify-between gap-4 border-t border-border pt-5">
+              <div className="min-w-0">
+                <label htmlFor={issueRosterToggleId} className="block text-sm font-medium text-foreground">
+                  {t('settings.harness.showIssueAttached')}
+                </label>
+                <p id={issueRosterDescriptionId} className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  {t('settings.harness.showIssueAttachedDescription')}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Toggle
+                  ariaLabel={t('settings.harness.showIssueAttached')}
+                  checked={preferences.showIssueAttachedSessions}
+                  disabled={status === 'saving'}
+                  onChange={(next) => void persist({ ...preferences, showIssueAttachedSessions: next })}
+                />
               </div>
             </div>
             <div className="mt-5 flex items-start justify-between gap-4 border-t border-border pt-5">

@@ -242,6 +242,7 @@ function build(
       rememberRecentChatWorkspace: async (workspaceId) => ({ lastCredentialByAgent: {}, recentChatWorkspaceId: workspaceId }),
       readHarnessPreferences: async () => ({
         showHeadlessBornSessions: false,
+        showIssueAttachedSessions: false,
         showUnverifiedHarnessReleases: false,
       }),
     }),

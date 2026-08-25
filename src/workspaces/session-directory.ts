@@ -33,6 +33,8 @@ export interface WorkspaceSessionDirectoryEntry {
   createdBy?: SessionCreatedBy
   /** Product rosters must not offer transport-owned Sessions as coworkers. */
   rosterVisibility?: 'hidden'
+  /** Live Issue ownership/occupancy. Presentation preferences decide whether to show it. */
+  issueAttached?: true
   runtime?: PublicSessionRuntime
   latestExecution?: {
     taskId: string
@@ -72,6 +74,25 @@ export function connectorDeskRosterExclusions(input: {
   return hidden
 }
 
+export function issueRosterAttachments(input: {
+  issues: readonly Pick<IssueRecord, 'id' | 'assignee'>[]
+  runningExecutions: readonly Pick<HeadlessTaskRecord, 'resumeId' | 'trigger'>[]
+}): Set<string> {
+  const attached = new Set<string>()
+  const issueIds = new Set<string>()
+  for (const issue of input.issues) {
+    issueIds.add(issue.id)
+    const assignee = issueAssigneeResumeId(issue.assignee)
+    if (assignee) attached.add(assignee)
+  }
+  for (const task of input.runningExecutions) {
+    if (task.trigger?.kind === 'issue' && issueIds.has(task.trigger.issueId)) {
+      attached.add(task.resumeId)
+    }
+  }
+  return attached
+}
+
 /** Build the public Session directory by joining backend registries while
  * deliberately whitelisting fields. Native runtime ids and launcher record ids
  * never cross this boundary; resumeId is the sole conversation handle. */
@@ -82,6 +103,7 @@ export function buildWorkspaceSessionDirectory(input: {
   latestExecutionFor(resumeId: string): HeadlessTaskRecord | null
   isActive(resumeId: string): boolean
   rosterVisibilityFor?(resumeId: string): 'hidden' | undefined
+  issueAttachedFor?(resumeId: string): true | undefined
 }): WorkspaceSessionDirectory {
   return {
     workspace: input.workspace,
@@ -106,6 +128,7 @@ export function buildWorkspaceSessionDirectory(input: {
         ...(input.rosterVisibilityFor?.(identity.resumeId) === 'hidden'
           ? { rosterVisibility: 'hidden' as const }
           : {}),
+        ...(input.issueAttachedFor?.(identity.resumeId) ? { issueAttached: true as const } : {}),
         ...(identity.runtimeBinding
           ? { runtime: projectPublicSessionRuntime(identity.runtimeBinding) }
           : {}),
@@ -124,7 +147,7 @@ export function buildWorkspaceSessionDirectory(input: {
               },
             }
           : {}),
-        ...(interactive
+        ...(interactive && interactive.surface !== 'headless'
           ? {
               interactive: {
                 name: interactive.name,

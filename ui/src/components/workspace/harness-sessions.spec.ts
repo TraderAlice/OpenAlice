@@ -106,6 +106,27 @@ describe('harness session titles', () => {
 })
 
 describe('joinWorkspaceHarnessSessions', () => {
+  it('keeps Issue-attached Sessions off the shared roster unless explicitly enabled', () => {
+    const issueOwner = session({ resumeId: 'resume-issue-owner' })
+    const directory = {
+      workspace: { id: 'ws-1', tag: 'chat-aug1' },
+      sessions: [entry({
+        resumeId: 'resume-issue-owner',
+        issueAttached: true,
+        interactive: {
+          name: 'p1',
+          state: 'paused' as const,
+          lastActiveAt: '2026-08-03T00:00:00.000Z',
+        },
+      })],
+    }
+
+    expect(joinWorkspaceHarnessSessions(workspace([issueOwner]), directory)).toEqual([])
+    expect(joinWorkspaceHarnessSessions(workspace([issueOwner]), directory, {
+      includeIssueAttachedSessions: true,
+    }).map((row) => row.resumeId)).toEqual(['resume-issue-owner'])
+  })
+
   it('uses the persistent Session roster until Directory arrives', () => {
     const rows = joinWorkspaceHarnessSessions(workspace(), null)
     expect(rows.map((row) => row.resumeId)).toEqual(['resume-interactive'])
@@ -307,6 +328,22 @@ describe('joinWorkspaceHarnessSessions', () => {
       'resume-opened',
       'resume-interactive',
     ])
+  })
+
+  it('does not treat a Directory projection of a headless record as an interactive opening', () => {
+    const bornHeadless = headlessSession({ sourceRunId: 'run-1' })
+    const projected = entry({
+      interactive: undefined,
+      createdBy: {
+        kind: 'issue',
+        workspaceId: 'ws-1',
+        issueId: 'daily-scan',
+        policy: 'new-then-resume',
+        fire: 'schedule',
+      },
+    })
+
+    expect(isHeadlessBornWithoutInteractive(bornHeadless, projected)).toBe(true)
   })
 })
 

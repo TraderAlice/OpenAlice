@@ -242,10 +242,12 @@ describe('preferences routes', () => {
   it('reads and persists harness roster visibility', async () => {
     const read = vi.fn(async () => ({
       showHeadlessBornSessions: false,
+      showIssueAttachedSessions: false,
       showUnverifiedHarnessReleases: false,
     }))
     const save = vi.fn(async (next: {
       showHeadlessBornSessions: boolean
+      showIssueAttachedSessions: boolean
       showUnverifiedHarnessReleases: boolean
     }) => next)
     const app = createPreferencesRoutes({
@@ -260,6 +262,7 @@ describe('preferences routes', () => {
 
     expect(await (await app.request('/harness')).json()).toEqual({
       showHeadlessBornSessions: false,
+      showIssueAttachedSessions: false,
       showUnverifiedHarnessReleases: false,
     })
     const response = await app.request('/harness', {
@@ -267,16 +270,19 @@ describe('preferences routes', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         showHeadlessBornSessions: true,
+        showIssueAttachedSessions: true,
         showUnverifiedHarnessReleases: false,
       }),
     })
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       showHeadlessBornSessions: true,
+      showIssueAttachedSessions: true,
       showUnverifiedHarnessReleases: false,
     })
     expect(save).toHaveBeenCalledWith({
       showHeadlessBornSessions: true,
+      showIssueAttachedSessions: true,
       showUnverifiedHarnessReleases: false,
     })
   })
