@@ -3,7 +3,9 @@
 This guide owns OpenAlice data-location selection, desktop launcher
 preferences, and the isolation contract for concurrent local AliceProjects.
 Runtime lock recovery itself belongs to `packages/guardian-runtime/`; the
-persistent state layout belongs to [[docs/project-structure.md]].
+persistent state layout belongs to [[docs/project-structure.md]]. Docker
+container replacement and leftover `guardian.lock` / `runtime.lock` recovery
+belong to [[docs/docker-deployment.md]].
 
 ## One Complete Home
 

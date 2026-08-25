@@ -93,8 +93,52 @@ docker compose down
 docker compose up -d --build
 ```
 
+If a replacement container exits immediately with `already running` and a
+reason that names another machine, the volume still holds a leftover
+Guardian/runtime lock. See [Stale Locks After Container Replacement](#stale-locks-after-container-replacement).
+
 `docker compose down` preserves the named volume. `docker compose down -v` is
 a factory reset and permanently removes user data.
+
+## Stale Locks After Container Replacement
+
+Guardian records ownership in `/data/state/guardian.lock`,
+`/data/state/runtime.lock`, and the compatibility
+`/data/workspaces/state/runtime.lock`. A graceful `docker compose stop` or
+`docker stop` releases those leases. `docker kill`, an OOM, a host crash, or
+a compose recreate that interrupts shutdown can leave them behind.
+
+The lock stores a machine identity. Docker's `/etc/machine-id` is container
+local, so a replacement container looks like another machine even when it
+mounts the same volume. Desktop and CLI keep that cross-machine refusal:
+heartbeat expiry alone must not reclaim a copied or NFS-shared home, and
+`--takeover` must not signal a PID that belongs to another host.
+
+The server image is a single-writer contract:
+
+1. The first Docker boot writes `/data/state/machine-id` and uses it as
+   `OPENALICE_MACHINE_ID`, so later recreates keep the same identity and
+   reclaim a dead PID immediately.
+2. When a leftover lock still names a previous container identity and its
+   heartbeat is stale (default 90s), Docker Guardian quarantines the lock
+   without signaling that foreign PID.
+3. A leftover lock with a still-fresh heartbeat still refuses ordinary
+   start. Wait for the heartbeat to age, or start once with `--takeover` /
+   `OPENALICE_TAKEOVER=1` after confirming no other replica shares `/data`.
+
+Do not mount the same `/data` on two live containers. Two writers on one
+home remain unsupported; a volume-stable identity cannot see PIDs in
+another container's namespace.
+
+Existing deployments that already crash-loop on days-old locks recover on
+the first boot of this image: the heartbeat is stale, so the foreign lock
+is reclaimed automatically. The operator workaround of moving the three
+`owner.json` trees aside remains valid for older images.
+
+Custom compose files that bind-mount `OPENALICE_HOME` and
+`AQ_LAUNCHER_ROOT` separately must keep both `state/` trees on the same
+persistent volume. Quarantining only one home leaves the compatibility
+Workspace lock in place.
 
 ## Backup and Restore
 

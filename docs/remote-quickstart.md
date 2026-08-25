@@ -208,9 +208,11 @@ openalice remote openalice-box \
 - For an ephemeral VM or container, place `--home` on persistent storage. The
   Runtime can be reinstalled; the home is the durable state that must survive.
 - A platform replacement can reattach a volume whose Guardian lock names the
-  removed machine. OpenAlice refuses cross-machine takeover automatically;
-  confirm the previous instance is gone before following the operator recovery
-  guidance in [[docs/remote-access.md]].
+  removed machine. Desktop and CLI still refuse automatic cross-machine
+  reclaim. Confirm the previous instance is gone, then use `--takeover` or
+  follow the operator recovery guidance in [[docs/remote-access.md]]. Docker
+  single-writer homes reclaim a stale foreign lock without signaling; see
+  [[docs/docker-deployment.md]].
 
 ## Docker Is a First-Class Alternative
 

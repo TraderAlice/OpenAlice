@@ -41,6 +41,7 @@ export interface RuntimeLockInspection {
   readonly heartbeatStale: boolean
   readonly directoryIdentity: string | null
   readonly reason: string
+  readonly foreign: boolean
 }
 
 export interface RuntimeProcessLock {
@@ -56,6 +57,7 @@ export interface RuntimeLockOptions {
   readonly guardianPid?: number
   readonly guardianStartedAt?: number
   readonly takeover?: boolean
+  readonly reclaimStaleForeign?: boolean
   readonly heartbeatMs?: number
   readonly staleHeartbeatMs?: number
   readonly initializationGraceMs?: number
@@ -80,6 +82,7 @@ export interface PrepareOpenAliceRuntimeOptions {
   readonly userDataHome: string
   readonly launcherRoot: string
   readonly takeover?: boolean
+  readonly reclaimStaleForeign?: boolean
   readonly processController?: ProcessController
   readonly staleHeartbeatMs?: number
   readonly initializationGraceMs?: number
@@ -119,13 +122,32 @@ export function takeoverRequested(env: NodeJS.ProcessEnv = process.env, argv: re
   return /^(1|true|yes|on)$/i.test(env['OPENALICE_TAKEOVER']?.trim() ?? '')
 }
 
+export function reclaimStaleForeignRequested(env: NodeJS.ProcessEnv = process.env, argv: readonly string[] = process.argv): boolean {
+  if (argv.includes('--reclaim-stale-foreign')) return true
+  return /^(1|true|yes|on)$/i.test(env['OPENALICE_RECLAIM_STALE_FOREIGN']?.trim() ?? '')
+}
+
+export function canReclaimForeignOwner(
+  current: Pick<RuntimeLockInspection, 'foreign' | 'owner' | 'heartbeatStale'>,
+  opts: Pick<RuntimeLockOptions, 'takeover' | 'reclaimStaleForeign'> = {},
+): boolean {
+  if (!current.foreign || !current.owner) return false
+  if (opts.takeover) return true
+  return Boolean(resolveReclaimStaleForeign(opts) && current.heartbeatStale)
+}
+
+function resolveReclaimStaleForeign(opts: Pick<RuntimeLockOptions, 'reclaimStaleForeign'> = {}): boolean {
+  return opts.reclaimStaleForeign ?? reclaimStaleForeignRequested()
+}
+
 export async function inspectRuntimeLock(
   lockDir: string,
-  opts: Pick<RuntimeLockOptions, 'processController' | 'staleHeartbeatMs' | 'initializationGraceMs'> = {},
+  opts: Pick<RuntimeLockOptions, 'processController' | 'staleHeartbeatMs' | 'initializationGraceMs' | 'reclaimStaleForeign'> = {},
 ): Promise<RuntimeLockInspection> {
   const controller = opts.processController ?? defaultProcessController
   const staleMs = opts.staleHeartbeatMs ?? DEFAULT_STALE_HEARTBEAT_MS
   const initGraceMs = opts.initializationGraceMs ?? DEFAULT_INITIALIZATION_GRACE_MS
+  const reclaimStaleForeign = resolveReclaimStaleForeign(opts)
   let lockStat
   try {
     lockStat = await stat(lockDir)
@@ -149,6 +171,18 @@ export async function inspectRuntimeLock(
   const heartbeatAgeMs = Number.isFinite(heartbeatAt) ? Math.max(0, Date.now() - heartbeatAt) : null
   const heartbeatStale = heartbeatAgeMs === null || heartbeatAgeMs > staleMs
   if (owner.machineId && owner.machineId !== await controller.machineId()) {
+    if (reclaimStaleForeign && heartbeatStale) {
+      return inspection(
+        lockDir,
+        'stale',
+        owner,
+        heartbeatAgeMs,
+        heartbeatStale,
+        directoryIdentity,
+        'owner belongs to another machine and its heartbeat is stale',
+        true,
+      )
+    }
     return inspection(
       lockDir,
       'active',
@@ -159,6 +193,7 @@ export async function inspectRuntimeLock(
       heartbeatStale
         ? 'owner belongs to another machine and its heartbeat is stale; refusing automatic takeover'
         : 'owner belongs to another machine',
+      true,
     )
   }
   if (!controller.isAlive(owner.pid)) {
@@ -182,22 +217,23 @@ export async function acquireRuntimeLock(
   lockDir: string,
   opts: RuntimeLockOptions = {},
 ): Promise<RuntimeProcessLock> {
-  const controller = opts.processController ?? defaultProcessController
-  const processStartedAt = opts.processStartedAt ?? currentProcessStartedAt()
+  const resolved = { ...opts, reclaimStaleForeign: resolveReclaimStaleForeign(opts) }
+  const controller = resolved.processController ?? defaultProcessController
+  const processStartedAt = resolved.processStartedAt ?? currentProcessStartedAt()
   const machineId = await controller.machineId()
   const now = new Date().toISOString()
   const owner: RuntimeLockOwner = {
     schemaVersion: 1,
-    pid: opts.pid ?? process.pid,
+    pid: resolved.pid ?? process.pid,
     hostname: hostname(),
     machineId,
     token: randomUUID(),
-    launcher: opts.launcher ?? process.env['OPENALICE_LAUNCHER'] ?? 'standalone',
+    launcher: resolved.launcher ?? process.env['OPENALICE_LAUNCHER'] ?? 'standalone',
     acquiredAt: now,
     heartbeatAt: now,
     processStartedAt: new Date(processStartedAt).toISOString(),
-    ...(opts.guardianPid ? { guardianPid: opts.guardianPid } : {}),
-    ...(opts.guardianStartedAt ? { guardianStartedAt: new Date(opts.guardianStartedAt).toISOString() } : {}),
+    ...(resolved.guardianPid ? { guardianPid: resolved.guardianPid } : {}),
+    ...(resolved.guardianStartedAt ? { guardianStartedAt: new Date(resolved.guardianStartedAt).toISOString() } : {}),
   }
 
   await mkdir(dirname(lockDir), { recursive: true })
@@ -205,18 +241,23 @@ export async function acquireRuntimeLock(
     try {
       await mkdir(lockDir)
       await writeOwnerAtomic(lockDir, owner, controller)
-      return makeLock(lockDir, owner, opts)
+      return makeLock(lockDir, owner, resolved)
     } catch (err) {
       if (!isErrno(err, 'EEXIST')) throw err
     }
 
-    const current = await inspectRuntimeLock(lockDir, opts)
+    const current = await inspectRuntimeLock(lockDir, resolved)
     if (current.state === 'missing' || current.state === 'initializing') {
       await controller.sleep(25)
       continue
     }
+    if (current.foreign && (current.state === 'stale' || canReclaimForeignOwner(current, resolved))) {
+      if (await claimAndRemove(current)) continue
+      await controller.sleep(25)
+      continue
+    }
     if (current.state === 'active') {
-      if (!opts.takeover || !current.owner) throw new RuntimeAlreadyRunningError(current)
+      if (!resolved.takeover || !current.owner) throw new RuntimeAlreadyRunningError(current)
       await recoverRuntimeOwner(current.owner, { processController: controller })
       await controller.sleep(25)
       continue
@@ -226,7 +267,7 @@ export async function acquireRuntimeLock(
     await controller.sleep(25)
   }
 
-  throw new RuntimeAlreadyRunningError(await inspectRuntimeLock(lockDir, opts))
+  throw new RuntimeAlreadyRunningError(await inspectRuntimeLock(lockDir, resolved))
 }
 
 export async function acquireOpenAliceRuntimeLocks(opts: OpenAliceRuntimeOptions): Promise<OpenAliceRuntimeLock> {
@@ -281,11 +322,13 @@ export async function acquireGuardianRuntime(opts: GuardianRuntimeOptions): Prom
  * The next Alice process performs the atomic stale-lock reclamation itself.
  */
 export async function prepareOpenAliceRuntime(opts: PrepareOpenAliceRuntimeOptions): Promise<RuntimeLockInspection[]> {
-  const inspections = await inspectOpenAliceRuntime(opts)
+  const resolved = { ...opts, reclaimStaleForeign: resolveReclaimStaleForeign(opts) }
+  const inspections = await inspectOpenAliceRuntime(resolved)
   const active = dedupeOwners(inspections.filter((row) => row.state === 'active' && row.owner !== null))
-  if (active.length > 0 && !opts.takeover) throw new RuntimeAlreadyRunningError(active[0]!)
-  for (const row of active) {
-    await recoverRuntimeOwner(row.owner!, { processController: opts.processController })
+  const blocking = active.filter((row) => !canReclaimForeignOwner(row, resolved))
+  if (blocking.length > 0 && !resolved.takeover) throw new RuntimeAlreadyRunningError(blocking[0]!)
+  for (const row of blocking) {
+    await recoverRuntimeOwner(row.owner!, { processController: resolved.processController })
   }
   return inspections
 }
@@ -461,8 +504,9 @@ function inspection(
   heartbeatStale: boolean,
   directoryIdentity: string | null,
   reason: string,
+  foreign = false,
 ): RuntimeLockInspection {
-  return { lockDir, state, owner, heartbeatAgeMs, heartbeatStale, directoryIdentity, reason }
+  return { lockDir, state, owner, heartbeatAgeMs, heartbeatStale, directoryIdentity, reason, foreign }
 }
 
 function dedupeOwners(rows: RuntimeLockInspection[]): RuntimeLockInspection[] {
