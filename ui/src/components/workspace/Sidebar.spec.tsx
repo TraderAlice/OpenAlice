@@ -151,6 +151,34 @@ describe('SessionRow actions', () => {
     title: 'Review AAPL earnings',
   }
 
+  it('shows the Session runtime brand instead of a generic agent glyph', () => {
+    const { rerender } = render(
+      <SessionRow
+        session={{ ...session, agent: 'codex' }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="codex"]')).toBeTruthy()
+
+    rerender(
+      <SessionRow
+        session={{ ...session, agent: 'claude' }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="claude"]')).toBeTruthy()
+  })
+
   it('names destructive and lifecycle actions for their target session', async () => {
     const user = userEvent.setup()
     const onPause = vi.fn()
