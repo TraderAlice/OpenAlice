@@ -151,7 +151,7 @@ describe('SessionRow actions', () => {
     title: 'Review AAPL earnings',
   }
 
-  it('shows the Session runtime brand instead of a generic agent glyph', () => {
+  it('keeps the Session runtime brand visible independently of lifecycle state', () => {
     const { rerender } = render(
       <SessionRow
         session={{ ...session, agent: 'codex' }}
@@ -163,7 +163,23 @@ describe('SessionRow actions', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="codex"]')).toBeTruthy()
+    const runningCodex = screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="codex"]')
+    expect(runningCodex).toBeTruthy()
+    expect(runningCodex?.parentElement?.className).toContain('text-foreground/80')
+
+    rerender(
+      <SessionRow
+        session={{ ...session, agent: 'codex', state: 'paused', pid: null, startedAt: null }}
+        isActive={false}
+        onSelect={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    )
+
+    const pausedCodex = screen.getByRole('button', { name: 'Review AAPL earnings' }).querySelector('[data-agent-runtime-icon="codex"]')
+    expect(pausedCodex?.parentElement?.className).toContain('text-foreground/80')
 
     rerender(
       <SessionRow
