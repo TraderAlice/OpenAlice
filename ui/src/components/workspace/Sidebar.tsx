@@ -715,7 +715,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         aria-label={selectLabel}
         aria-current={props.isActive ? 'page' : undefined}
       >
-        <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused && !headlessOccupying ? 'text-muted-foreground/40' : 'text-muted-foreground/70'}`}>
+        {/* Runtime identity stays stable across Session state. The action at the
+            right and the row treatment carry paused/running/selected state. */}
+        <span className="shrink-0 flex items-center justify-center w-3.5 text-foreground/80">
           <AgentBadgeGlyph agentId={s.agent} />
         </span>
         <span className="min-w-0 flex-1">
