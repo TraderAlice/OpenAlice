@@ -61,6 +61,7 @@ describe('HarnessSettingsPage', () => {
 
     const toggle = screen.getByRole('switch', { name: 'Show Issue-attached Sessions' })
     expect(toggle.getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByText(/Connector chat Sessions always stay hidden/)).toBeTruthy()
     fireEvent.click(toggle)
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
       showHeadlessBornSessions: false,
