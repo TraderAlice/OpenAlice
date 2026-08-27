@@ -11,7 +11,14 @@ const dirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(managers.splice(0).map((manager) => manager.dispose()))
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+  await Promise.all(dirs.splice(0).map((dir) => rm(dir, {
+    recursive: true,
+    force: true,
+    // Windows can briefly retain the child process's cwd after taskkill has
+    // reported that the process exited. Let fs.rm absorb that teardown race.
+    maxRetries: 8,
+    retryDelay: 100,
+  })))
 })
 
 describe('HarnessSurfaceManager', () => {
