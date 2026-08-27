@@ -36,7 +36,7 @@ vi.mock('../../tabs/types', () => ({
 
 vi.mock('../../hooks/useHarnessPreferences', () => ({
   useHarnessPreferences: () => ({
-    preferences: { showHeadlessBornSessions: true },
+    preferences: { showHeadlessBornSessions: true, showIssueAttachedSessions: true },
     loading: false,
     error: null,
     save: vi.fn(),

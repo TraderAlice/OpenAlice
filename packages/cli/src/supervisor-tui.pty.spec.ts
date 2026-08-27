@@ -16,6 +16,10 @@ import * as pty from 'node-pty'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const cliEntry = join(dirname(fileURLToPath(import.meta.url)), '../bin/openalice.ts')
+const transferFixtureEntry = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '__fixtures__/supervisor-transfer-tui-fixture.ts',
+)
 const cliPackageRoot = dirname(dirname(cliEntry))
 const cliVersion = JSON.parse(
   await readFile(join(cliPackageRoot, 'package.json'), 'utf8'),
@@ -29,6 +33,109 @@ afterEach(async () => {
 })
 
 describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
+  it.each([
+    ['default-no', 50, 'sends=0 aborted=false'],
+    ['success', 100, 'sends=1 aborted=false'],
+    ['auth-loss', 100, 'sends=0 aborted=false'],
+    ['occupied', 100, 'sends=0 aborted=false'],
+    ['checksum-retry', 100, 'sends=2 aborted=false'],
+    ['cancel-retry', 100, 'sends=2 aborted=true'],
+  ] as const)(
+    'drives the remote transfer %s recovery path through a real PTY',
+    async (scenario, cols, expectedResult) => {
+      const child = pty.spawn(process.execPath, [transferFixtureEntry], {
+        cols,
+        rows: 30,
+        cwd: dirname(cliEntry),
+        env: {
+          ...process.env,
+          OPENALICE_TUI_TRANSFER_SCENARIO: scenario,
+          TERM: 'xterm-256color',
+        },
+      })
+
+      const transcript = await new Promise<string>((resolve, reject) => {
+        let output = ''
+        let stage = 0
+        const timeout = setTimeout(() => {
+          child.kill()
+          reject(new Error(`Supervisor transfer ${scenario} timed out at stage ${stage}:\n${output}`))
+        }, 12_000)
+        child.onData((data) => {
+          output += data
+          if (stage === 0 && output.includes('m Transfer')) {
+            stage = 1
+            child.write('m')
+          } else if (stage === 1 && output.includes('destination Machine')) {
+            stage = 2
+            child.write('\r')
+          } else if (stage === 2 && output.includes('Destination AliceProject key')) {
+            stage = 3
+            child.write('\r')
+          } else if (stage === 3 && output.includes('Destination complete Home')) {
+            stage = 4
+            child.write('\r')
+          } else if (stage === 4 && output.includes('Credentials')) {
+            stage = 5
+            child.write('\r')
+          } else if (stage === 5 && output.includes('Exact-Session scheduled Issue owners')) {
+            stage = 6
+            child.write('\r')
+          } else if (stage === 6 && (scenario === 'auth-loss' || scenario === 'occupied')) {
+            const expected = scenario === 'auth-loss'
+              ? 'SSH authentication required after destination selection.'
+              : 'Destination key or Home became occupied before planning.'
+            if (output.includes(expected)) {
+              stage = 20
+              child.write('\r')
+            }
+          } else if (stage === 6 && output.includes('Review AliceProject transfer')) {
+            stage = scenario === 'default-no' ? 10 : 7
+            child.write(scenario === 'default-no' ? 'n' : 'y')
+          } else if (stage === 7 && scenario === 'checksum-retry' && output.includes('Synthetic checksum mismatch')) {
+            stage = 8
+            child.write('r')
+          } else if (stage === 7 && scenario === 'cancel-retry' && output.includes('Transferring')) {
+            stage = 9
+            child.write('\u001b')
+          } else if (stage === 9 && output.includes('Synthetic transfer cancellation acknowledged.')) {
+            stage = 8
+            child.write('r')
+          } else if ((stage === 7 || stage === 8) && output.includes('AliceProject transfer complete')) {
+            stage = 20
+            child.write('\r')
+          } else if (stage === 10 && output.includes('Transfer cancelled. Nothing changed.')) {
+            stage = 21
+            child.write('q')
+          } else if (stage === 20 && (
+            output.includes('Transfer closed. Source remains unchanged.')
+            || output.includes('Transferred cloud/source.')
+          )) {
+            stage = 21
+            child.write('q')
+          }
+        })
+        child.onExit(({ exitCode }) => {
+          clearTimeout(timeout)
+          if (exitCode === 0 && stage === 21) resolve(output)
+          else reject(new Error(`Supervisor transfer ${scenario} exited ${exitCode} at stage ${stage}:\n${output}`))
+        })
+      })
+
+      expect(transcript).toContain(`FIXTURE_RESULT scenario=${scenario} ${expectedResult}`)
+      if (scenario === 'auth-loss') {
+        expect(transcript).toContain('SSH authentication required after destination selection.')
+      } else if (scenario === 'occupied') {
+        expect(transcript).toContain('Destination key or Home became occupied before planning.')
+      } else {
+        expect(transcript).toContain('Sessions  0 imported')
+      }
+      expect(transcript).toContain('\u001b[?25h')
+      expect(transcript).toContain('\u001b[?2004l')
+    },
+    15_000,
+  )
+
   it('starts from the bare command and restores the terminal on detach', async () => {
     const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-tui-'))
     temporaryPaths.push(isolatedHome)
@@ -72,6 +179,71 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
     expect(transcript).toContain(`OpenAlice  ${cliVersion}  development`)
     expect(transcript).toContain('Runtime state: absent')
     expect(transcript).toContain('Supervisor controls')
+    expect(transcript).toContain('\u001b[?25h')
+    expect(transcript).toContain('\u001b[?2004l')
+  })
+
+  it('renders an offline registered Machine and preserves drill-down across resize', async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), 'openalice-cli-fleet-offline-'))
+    temporaryPaths.push(isolatedHome)
+    const supervisorHome = join(isolatedHome, 'supervisor')
+    await mkdir(supervisorHome, { recursive: true })
+    await writeFile(join(supervisorHome, 'machines.json'), `${JSON.stringify({
+      schemaVersion: 1,
+      machines: {
+        cloud: {
+          displayName: 'Cloud fixture',
+          sshTarget: '127.0.0.1',
+          sshPort: 1,
+        },
+      },
+    })}\n`)
+    const child = pty.spawn(process.execPath, [cliEntry], {
+      cols: 100,
+      rows: 28,
+      cwd: dirname(cliEntry),
+      env: {
+        ...process.env,
+        HOME: isolatedHome,
+        OPENALICE_HOME: join(isolatedHome, 'state'),
+        OPENALICE_SUPERVISOR_HOME: supervisorHome,
+        TERM: 'xterm-256color',
+      },
+    })
+
+    const transcript = await new Promise<string>((resolve, reject) => {
+      let output = ''
+      let selectedRemote = false
+      let drilledDown = false
+      let returned = false
+      const timeout = setTimeout(() => {
+        child.kill()
+        reject(new Error(`Supervisor offline fleet timed out:\n${output}`))
+      }, 8_000)
+      child.onData((data) => {
+        output += data
+        if (!selectedRemote && output.includes('Cloud fixture') && output.includes('offline')) {
+          selectedRemote = true
+          child.resize(48, 24)
+          child.write('\u001b[B\u001b[C')
+        } else if (!drilledDown && output.includes('AliceProjects · Cloud fixture')) {
+          drilledDown = true
+          child.write('\u001b')
+        } else if (drilledDown && !returned && output.includes('Enter / →  AliceProjects')) {
+          returned = true
+          child.write('q')
+        }
+      })
+      child.onExit(({ exitCode }) => {
+        clearTimeout(timeout)
+        if (exitCode === 0) resolve(output)
+        else reject(new Error(`Supervisor offline fleet exited ${exitCode}:\n${output}`))
+      })
+    })
+
+    expect(transcript).toContain('Cloud fixture')
+    expect(transcript).toContain('offline')
+    expect(transcript).toContain('AliceProjects · Cloud fixture')
     expect(transcript).toContain('\u001b[?25h')
     expect(transcript).toContain('\u001b[?2004l')
   })
@@ -737,6 +909,7 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
 
     const transcript = await new Promise<string>((resolve, reject) => {
       let output = ''
+      let openedOverview = false
       let requestedManaged = false
       let detached = false
       const timeout = setTimeout(() => {
@@ -745,7 +918,10 @@ describe.skipIf(process.platform === 'win32')('Supervisor TUI PTY', () => {
       }, 8_000)
       child.onData((data) => {
         output += data
-        if (!requestedManaged && output.includes('m Managed')) {
+        if (!openedOverview && output.includes('m Transfer')) {
+          openedOverview = true
+          child.write(']')
+        } else if (!requestedManaged && output.includes('m Managed')) {
           requestedManaged = true
           child.write('m')
         } else if (!detached && output.includes('Managed source preparation is available from an installed')) {

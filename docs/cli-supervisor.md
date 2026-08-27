@@ -48,7 +48,7 @@ openalice logs [options]
 openalice doctor [options]
 openalice open [options]
 openalice create alice-project [options]
-openalice project [list|use|copy-ai-creds] [options]
+openalice project [list|use|copy-ai-creds|transfer] [options]
 ```
 
 | Command | Contract |
@@ -56,7 +56,11 @@ openalice project [list|use|copy-ai-creds] [options]
 | `create alice-project` | Register a named complete home. Interactive or `--yes` with `--name`, `--home`, and optional `--product trader\|nano`. Product is immutable birth (Trader default; Nano never starts UTA). TUI create remains Trader-equivalent. |
 | `project list` | Print registered AliceProjects and the remembered bare-start default. `--json` emits the registry summary. |
 | `project use <key>` | Record that AliceProject as the next bare-start default. Does not start, stop, or copy another project. |
+| `machine list` | Print the implicit local Machine and explicitly registered SSH Machines. `--json` emits a versioned secret-free summary. |
+| `machine add/remove` | Atomically remember or forget local SSH connection metadata. Non-interactive mutation requires `--yes`; remote state is never changed. |
+| `machine inspect [key]` | Build a typed Machine → AliceProject inventory; each remote Machine uses one bounded aggregate SSH command. |
 | `project copy-ai-creds` | Copy AI credential rows from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Workspace launch preferences, broker accounts, and `sealing.key` are never copied. Secrets are never printed. |
+| `project transfer` | Plan or copy a stopped local AliceProject to a new complete Home on a registered SSH Machine. Portable configuration and Workspace/Git state transfer; Session/runtime/auth state does not. Credentials use the SSH stream and are re-sealed with a new remote key. The source and remote default remain unchanged. |
 | `up` | Prepare the source provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |
@@ -95,6 +99,30 @@ The TypeScript TUI reports and polls the selected Runtime, detaches with `q`,
 `Esc`, or `Ctrl+C`, and exposes the same presentation-neutral operations as the
 explicit commands. Its ordinary path is intentionally parameter-free:
 
+- the default Fleet page renders `Machine → AliceProject`: ordinary terminals
+  use two panes and narrow terminals drill down from Machines to Projects;
+  selection and list windows survive resize, use Unicode display width, and
+  keep the action/detach footer visible at the supported 80×24 baseline;
+- `↑`/`↓` move within the active Fleet pane, Tab/left/right switch panes, and
+  `[`/`]` switch Fleet/Overview/Logs/Doctor/Help pages. With only the local
+  Machine, focus starts on its current AliceProject so the historical one-key
+  Enter start/open path remains intact;
+- registered Machines refresh in the background with one bounded,
+  non-interactive (`BatchMode=yes`) SSH inventory request each. Registered,
+  checking, online, unauthorized, offline, and incompatible remain distinct
+  from per-project Runtime state;
+- `m` on a selected local Fleet AliceProject opens the remote-transfer wizard.
+  It selects an online compatible SSH Machine, destination key/Home, credential
+  handling, and exact-Session Issue policy; then renders the same checksum and
+  exclusion plan as the explicit command. Default No changes nothing. Success
+  offers separate Start, Connect/Open, and Done actions and never auto-starts;
+- Enter or `o` on a running compatible remote AliceProject opens a TUI-owned
+  loopback tunnel and browser. Detaching aborts only those tunnel processes;
+  it never stops the local or remote Runtime. `s` on a stopped compatible
+  remote AliceProject re-probes inventory and registration, then starts it
+  through the registered SSH Machine. Remote stop, restart, logs, Doctor,
+  Setup, source, and other configuration mutations remain refused;
+
 - Enter starts the persistent Runtime and opens the verified Web endpoint when
   stopped, or opens the endpoint when already running;
 - `s` starts the persistent Runtime in the background without opening a
@@ -115,10 +143,10 @@ explicit commands. Its ordinary path is intentionally parameter-free:
 - `p` opens Setup for data home, browser port, update checks, and resolved
   Runtime/config provenance. Setup can edit either the selected AliceProject or
   machine defaults inherited by projects;
-- `m` is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
+- `m` on Overview is an advanced control that confirms, prepares, remembers, and starts an installer-managed source
   aligned to the installed CLI branch/version;
 - `c` is an advanced control that chooses and remembers the selected AliceProject's source checkout;
-- `?`, Tab, and the horizontal arrows expose help and detail panels.
+- `?` toggles Help; `[` and `]` expose the other top-level panels.
 
 The TUI refuses to stop or restart Electron, development, incompatible, or
 otherwise foreign owners. Its stop/restart confirmation states that active Web
@@ -163,6 +191,13 @@ resolver retains field provenance for every layer. Before terminal raw mode,
 the Supervisor reads a versioned machine-local document at
 `<Supervisor root>/config.json`. It contains machine defaults and an
 AliceProject map outside every selectable complete home.
+
+The same Supervisor root may contain `machines.json`, a separate versioned
+registry for the implicit local computer plus named SSH hosts. It is not part
+of any AliceProject and is not selected by `OPENALICE_HOME`. Writes are atomic
+and owner-private; unknown additive fields survive rewrites, while an invalid
+or newer known schema fails visibly. This registry remains separate from the
+hashed `remote-targets.json` tunnel-port cache.
 
 Bare `openalice` and flag-less `openalice tui` must still open a machine-level
 Supervisor shell when that document cannot be parsed. Config recovery explains
@@ -459,6 +494,12 @@ completion; detailed shell installation remains user-owned.
   provenance, AliceProject roots, and managed-Pi environment projection.
 - `packages/cli/src/supervisor-config.ts` — versioned machine/AliceProject
   configuration parsing, atomic persistence, and stored-context resolution.
+- `packages/cli/src/machine-registry.ts` — explicit SSH Machine registry,
+  validation, additive-field preservation, and atomic private writes.
+- `packages/cli/src/machine-inventory.ts` — secret-free local/remote aggregate
+  AliceProject and Runtime inventory plus reachability classification.
+- `packages/cli/src/machine-command.ts` — `machine` parsing, confirmation, and
+  human/JSON presentation.
 - `packages/cli/src/managed-source.ts` — local managed checkout identity,
   validation, collision safety, and atomic preparation.
 - `packages/cli/src/supervisor-tui.ts` — `pi-tui` Supervisor application shell.

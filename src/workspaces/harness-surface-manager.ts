@@ -40,6 +40,8 @@ interface SurfaceRuntime {
   readonly entryPort: number
   phase: HarnessSurfacePhase
   child: ChildProcess | null
+  childClosed: Promise<void> | null
+  childStop: Promise<void> | null
   manifestVersion: number
   harnessVersion: string
   startedAt: string
@@ -62,7 +64,10 @@ export class HarnessSurfaceManager {
   private generation = 0
   private disposed = false
 
-  constructor(private readonly registry: WorkspaceRegistry) {}
+  constructor(
+    private readonly registry: WorkspaceRegistry,
+    private readonly options: { readinessTimeoutMs?: number } = {},
+  ) {}
 
   snapshot(workspaceId: string, capability: string): HarnessSurfaceSnapshot {
     const runtime = this.runtimes.get(keyOf(workspaceId, capability))
@@ -148,6 +153,8 @@ export class HarnessSurfaceManager {
       entryPort: ports[declared.entryPort]!,
       phase: 'starting',
       child: null,
+      childClosed: null,
+      childStop: null,
       manifestVersion: manifest.manifestVersion,
       harnessVersion: manifest.version,
       startedAt: new Date().toISOString(),
@@ -182,6 +189,7 @@ export class HarnessSurfaceManager {
         windowsHide: true,
       })
       runtime.child = child
+      runtime.childClosed = new Promise((resolve) => child.once('close', () => resolve()))
       child.stdout?.on('data', (chunk: Buffer) => appendLog(runtime, chunk))
       child.stderr?.on('data', (chunk: Buffer) => appendLog(runtime, chunk))
       child.once('error', (err) => {
@@ -189,7 +197,7 @@ export class HarnessSurfaceManager {
         this.fail(runtime, `Could not start ${declared.command[0]}`)
       })
       child.once('exit', (code, signal) => {
-        if (!this.isCurrent(runtime) || runtime.stopping) return
+        if (!this.isCurrent(runtime) || runtime.stopping || runtime.phase === 'failed') return
         const suffix = signal ? `signal ${signal}` : `exit ${code ?? 'unknown'}`
         this.fail(runtime, `Studio stopped before it was closed (${suffix})`)
       })
@@ -204,7 +212,8 @@ export class HarnessSurfaceManager {
   }
 
   private async waitForReady(runtime: SurfaceRuntime, readinessPath: string): Promise<void> {
-    const deadline = Date.now() + READINESS_TIMEOUT_MS
+    const readinessTimeoutMs = this.options.readinessTimeoutMs ?? READINESS_TIMEOUT_MS
+    const deadline = Date.now() + readinessTimeoutMs
     const url = `http://${BIND_HOST}:${runtime.entryPort}${readinessPath}`
     while (this.isCurrent(runtime) && runtime.phase === 'starting' && Date.now() < deadline) {
       try {
@@ -226,8 +235,7 @@ export class HarnessSurfaceManager {
       await delay(250)
     }
     if (this.isCurrent(runtime) && runtime.phase === 'starting') {
-      runtime.phase = 'failed'
-      runtime.error = 'Studio readiness timed out after 60 seconds'
+      this.fail(runtime, `Studio readiness timed out after ${formatDuration(readinessTimeoutMs)}`)
       await this.stopChild(runtime)
     }
   }
@@ -249,21 +257,50 @@ export class HarnessSurfaceManager {
   }
 
   private async stopChild(runtime: SurfaceRuntime): Promise<void> {
-    const child = runtime.child
-    runtime.child = null
-    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return
+    if (runtime.childStop) {
+      await runtime.childStop
+      return
+    }
+    const operation = this.stopChildOnce(runtime)
+    runtime.childStop = operation
     try {
-      await terminateProcessTree(child.pid, { gracefulMs: 4_000, forceMs: 4_000 })
-    } catch (err) {
-      appendLog(runtime, Buffer.from(`OpenAlice cleanup: ${err instanceof Error ? err.message : String(err)}\n`))
+      await operation
+    } finally {
+      if (runtime.childStop === operation) runtime.childStop = null
     }
   }
 
+  private async stopChildOnce(runtime: SurfaceRuntime): Promise<void> {
+    const child = runtime.child
+    const childClosed = runtime.childClosed
+    runtime.child = null
+    runtime.childClosed = null
+    if (!child) return
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
+      try {
+        await terminateProcessTree(child.pid, { gracefulMs: 4_000, forceMs: 4_000 })
+      } catch (err) {
+        appendLog(runtime, Buffer.from(`OpenAlice cleanup: ${err instanceof Error ? err.message : String(err)}\n`))
+      }
+    }
+    // `exit` only means the process ended. `close` additionally means Node has
+    // released its stdio handles, including the child's Workspace cwd on
+    // Windows. Give that teardown a bounded chance to finish before callers
+    // remove or replace the directory.
+    if (childClosed) await Promise.race([childClosed, delay(2_000)])
+  }
+
   private fail(runtime: SurfaceRuntime, message: string): void {
-    if (!this.isCurrent(runtime)) return
+    if (!this.isCurrent(runtime) || runtime.phase === 'failed') return
     runtime.phase = 'failed'
     runtime.error = message
     this.routes.delete(runtime.routeHost)
+    launcherLogger.warn('harness_surface.failed', {
+      workspaceId: runtime.workspaceId,
+      capability: runtime.capability,
+      generation: runtime.generation,
+      error: message,
+    })
   }
 
   private isCurrent(runtime: SurfaceRuntime): boolean {
@@ -344,6 +381,10 @@ function allocatePort(): Promise<number> {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function formatDuration(ms: number): string {
+  return ms % 1_000 === 0 ? `${ms / 1_000} seconds` : `${ms}ms`
 }
 
 function namedError(name: string, message: string): Error {

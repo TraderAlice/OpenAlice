@@ -391,6 +391,8 @@ export async function createSupervisorAliceProject(
   home: string,
   options: PersistAliceProjectConfigOptions & {
     product?: AliceProjectProduct
+    displayName?: string
+    select?: boolean
   } = {},
 ): Promise<void> {
   requireProjectKey(name, 'project')
@@ -407,13 +409,14 @@ export async function createSupervisorAliceProject(
   let normalizedHome = resolveConfiguredHome(name, home, options)
   const projectEntry: AliceProjectLaunchConfig = {
     name,
+    ...(options.displayName ? { displayName: options.displayName } : {}),
     home: normalizedHome,
     ...(product === 'nano' ? { product } : {}),
   }
   const candidate: SupervisorConfigDocument = {
     ...current,
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    defaultProject: name,
+    defaultProject: options.select === false ? current.defaultProject : name,
     projects: {
       ...current.projects,
       [name]: projectEntry,

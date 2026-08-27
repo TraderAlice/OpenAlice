@@ -84,6 +84,12 @@ and no new turn starts. A headless turn occupying that `resumeId` locks TUI
 spawn/resume and Archive; Automation continues to list dispatch records
 (`taskId`), not this roster.
 
+Connector phone-desk Sessions are a stricter exception: their Issue owns the
+conversation and OpenAlice never offers them in the Ask Alice roster, even
+when headless-born Sessions are enabled. The Session Directory projects this
+as roster visibility from the connector-desk domain; clients must not infer it
+from an Issue filename or connector-specific Session title.
+
 ## Session birth metadata
 
 Product Sessions may carry an optional, immutable `metadata.createdBy` bag on

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatRelativeTime } from '../../lib/intl';
 import type { ReactElement } from 'react';
-import { Archive, Bot, ChevronDown, ChevronRight, Code2, Cpu, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Sparkles, Square, Terminal, X, type LucideIcon } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, LayoutGrid, Library, LoaderCircle, Pencil, Play, Plus, RotateCcw, Settings as SettingsIcon, Square, Terminal, X, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { headlessApi, type HeadlessTaskRecord } from '../../api/headless';
@@ -18,6 +18,7 @@ import { sessionCoworkerLabel, workspaceDisplayName, workspaceDisplayTitle } fro
 import { orderSessionsForSidebar, orderWorkspacesForSidebar } from './sidebar-order';
 import { useReorderMotion } from './useReorderMotion';
 import { SidebarActionMenu } from './SidebarActionMenu';
+import { AgentRuntimeIcon } from '../../lib/agentRuntimeIcon';
 
 /**
  * Workspace launcher sidebar.
@@ -288,24 +289,14 @@ function agentPrefix(id: string): string {
 }
 
 /**
- * Glyph for a given agent SDK. Icon-first so users don't have to learn the
- * `c1` / `x1` / `sh1` naming convention — at-a-glance they see which CLI
- * the session is running. Unknown adapter id falls back to its first
- * letter (text), keeping the badge non-empty even for future adapters
- * before they get an icon.
+ * Session identity reuses the same brand marks as the runtime picker and
+ * settings catalog. Shell is a utility rather than an Agent Runtime, so it
+ * keeps the terminal glyph; unknown extension runtimes use the shared Bot
+ * fallback.
  */
-const AGENT_ICONS: Record<string, LucideIcon> = {
-  claude: Sparkles,
-  codex: Cpu,
-  opencode: Code2,
-  pi: Bot,
-  shell: Terminal,
-};
-
 function AgentBadgeGlyph({ agentId }: { agentId: string }): ReactElement {
-  const Icon = AGENT_ICONS[agentId];
-  if (Icon) return <Icon size={11} strokeWidth={2.25} aria-hidden="true" />;
-  return <span className="text-[10px] font-mono" aria-hidden="true">{agentPrefix(agentId)}</span>;
+  if (agentId === 'shell') return <Terminal size={11} strokeWidth={2.25} aria-hidden="true" />;
+  return <AgentRuntimeIcon agentId={agentId} className="h-3 w-3" />;
 }
 
 /** Compact high-frequency action used beside a Workspace or Session row. */
@@ -724,7 +715,9 @@ export function SessionRow(props: SessionRowProps): ReactElement {
         aria-label={selectLabel}
         aria-current={props.isActive ? 'page' : undefined}
       >
-        <span className={`shrink-0 flex items-center justify-center w-3.5 ${isPaused && !headlessOccupying ? 'text-muted-foreground/40' : 'text-muted-foreground/70'}`}>
+        {/* Runtime identity stays stable across Session state. The action at the
+            right and the row treatment carry paused/running/selected state. */}
+        <span className="shrink-0 flex items-center justify-center w-3.5 text-foreground/80">
           <AgentBadgeGlyph agentId={s.agent} />
         </span>
         <span className="min-w-0 flex-1">

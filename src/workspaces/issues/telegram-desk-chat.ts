@@ -2,7 +2,8 @@
  * Connector phone-desk chat hop.
  *
  * Connector only transports. Each adapter's Issue comments are that
- * specialist's transcript. The literal tag [[no-reply]] stays local.
+ * specialist's transcript. The literal tag [[no-reply]] stays local only for
+ * runs explicitly stamped with the connector-cron-issue execution profile.
  * Sealed mid-turn text blocks also project so the phone chat does not
  * wait for the final reply.
  */
@@ -28,13 +29,15 @@ import {
   findConnectorDesks,
   type ConnectorDesk,
 } from './connector-desk.js'
-import { projectDeskComment } from './telegram-desk-project.js'
+import { projectDeskComment, projectDeskLifecycle } from './telegram-desk-project.js'
 
 export {
   TELEGRAM_NO_REPLY_TAG,
   containsTelegramNoReply,
   projectDeskComment,
+  projectDeskLifecycle,
   projectDeskTurnProgress,
+  projectWorkspaceDeskFailure,
   projectWorkspaceDeskTurnProgress,
   shouldProjectDeskComment,
 } from './telegram-desk-project.js'
@@ -85,20 +88,23 @@ function quoteInboundMessage(text: string): string {
 export async function ingestTelegramOwnerMessage(
   host: ConnectorDeskChatHost,
   message: InboundOwnerMessage,
+  client?: ConnectorClient,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
-  return ingestConnectorOwnerMessages(host, [message])
+  return ingestConnectorOwnerMessages(host, [message], client)
 }
 
 export async function ingestTelegramOwnerMessages(
   host: ConnectorDeskChatHost,
   messages: readonly InboundOwnerMessage[],
+  client?: ConnectorClient,
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
-  return ingestConnectorOwnerMessages(host, messages)
+  return ingestConnectorOwnerMessages(host, messages, client)
 }
 
 export async function ingestConnectorOwnerMessages(
   host: ConnectorDeskChatHost,
   messages: readonly InboundOwnerMessage[],
+  client: ConnectorClient = new ConnectorClient(resolveConnectorUrl()),
 ): Promise<{ ok: true; comment: IssueComment } | { ok: false; reason: string }> {
   const connectorId = messages[0]?.connectorId
   if (!connectorId) return { ok: false, reason: 'empty' }
@@ -142,6 +148,25 @@ export async function ingestConnectorOwnerMessages(
   if (dispatched.status !== 'not_requested') {
     await updateIssueCommentDelivery(workspace.dir, desk.issue.id, appended.comment.id, dispatched.delivery)
   }
+  if (dispatched.status === 'scheduled') {
+    await projectDeskLifecycle({
+      issue: appended.issue,
+      conversationId: appended.comment.id,
+      phase: 'accepted',
+      client,
+    }).catch(() => undefined)
+  } else {
+    const reason = dispatched.status === 'failed'
+      ? dispatched.delivery.error
+      : 'No Agent reply was scheduled for this message.'
+    await projectDeskLifecycle({
+      issue: appended.issue,
+      conversationId: appended.comment.id,
+      phase: 'failed',
+      text: `OpenAlice could not start the Agent: ${reason}`,
+      client,
+    }).catch(() => undefined)
+  }
   return { ok: true, comment: appended.comment }
 }
 
@@ -151,6 +176,7 @@ export async function stampTelegramDeskScheduledFire(input: {
   issueId: string
   task: HeadlessTaskRecord
   assistantText?: string | null
+  client?: ConnectorClient
 }): Promise<IssueComment | null> {
   // A native CLI can emit partial assistant text before exiting with an error
   // or interruption. Keep that diagnostic in the run record, but do not turn
@@ -158,11 +184,17 @@ export async function stampTelegramDeskScheduledFire(input: {
   if (input.task.status !== 'done') return null
   const text = input.assistantText?.trim()
   if (!text) return null
+  const triggerMetadata = input.task.trigger?.metadata
+  if (triggerMetadata?.kind !== 'connector-cron-issue') return null
   const workspace = input.host.getWorkspace(input.workspaceId)
   if (!workspace) return null
   const desks = await findConnectorDesks(input.host.listWorkspaces())
   const desk = desks.find((item) => item.wsId === input.workspaceId && item.issue.id === input.issueId)
-  if (!desk || desk.issue.status === 'canceled') return null
+  if (
+    !desk
+    || desk.issue.status === 'canceled'
+    || desk.connectorId !== triggerMetadata.connectorId
+  ) return null
 
   const appended = await appendIssueComment(
     workspace.dir,
@@ -185,8 +217,9 @@ export async function stampTelegramDeskScheduledFire(input: {
     at: input.task.finishedAt ?? Date.now(),
     fingerprint: `telegram-desk-fire:${input.task.taskId}`,
   })
-  await projectDeskComment(appended.issue, appended.comment, undefined, {
+  await projectDeskComment(appended.issue, appended.comment, input.client, {
     progressScopeId: input.task.taskId,
+    triggerMetadata,
   }).catch(() => undefined)
   return appended.comment
 }
@@ -214,7 +247,7 @@ export async function pullTelegramDeskInbound(
       leftover.push(...group)
       continue
     }
-    const result = await ingestConnectorOwnerMessages(host, group)
+    const result = await ingestConnectorOwnerMessages(host, group, client)
     if (!result.ok) {
       console.warn(`[connector] ${connectorId} phone-desk inbound skipped:`, result.reason)
     }

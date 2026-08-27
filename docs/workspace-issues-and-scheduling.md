@@ -118,8 +118,11 @@ The filename stem is the stable issue id. Frontmatter:
   Owner DMs for that connector become comments on that Issue. While that desk
   is generating, later DMs for the same connector stay in the Connector
   queue; other connectors flush independently. Scheduled-fire
-  `assistantText` is stamped as a comment. Connector projects comments that
-  do not contain `[[no-reply]]` and did not arrive from that connector.
+  `assistantText` is stamped as a comment. Scheduler and Run now / Retry now
+  executions of this Issue carry `trigger.metadata.kind: connector-cron-issue`.
+  Only comments and progress from a run with that metadata consume
+  `[[no-reply]]`; ordinary chat mentions of the syntax are delivered as text.
+  Connector does not echo comments that arrived from that connector.
   While a desk turn is running, it also ships sealed mid-turn `text` blocks —
   the last consecutive text before a tool or error — and never ships tool I/O.
   The trailing text stays with the final comment. Shipped
@@ -218,6 +221,14 @@ accepted and later failed; that occurrence stays one attempt and uses
 **Retry now**. Creating a cron Issue still does not dump historical slots.
 
 ## Agent and Human Surfaces
+
+Ask Alice, Auto Quant, and Auto Prediction share one Session roster policy.
+Sessions currently owned by an exact Issue assignee, plus Sessions actively
+executing an Issue, stay on Issue and Automation surfaces by default. Settings
+→ Harness may opt them into the shared roster independently from the separate
+headless-born Session preference. Connector-desk Sessions remain hidden
+regardless of either preference because they are transport-owned rather than
+ordinary coworkers.
 
 Agents normally use:
 

@@ -40,6 +40,7 @@ import {
   resolveAliceProjectIdentity,
   readAliceProjectProduct,
   normalizeProcessExitCode,
+  RestartBackoff,
   takeoverRequested,
 } from '@traderalice/guardian-runtime'
 import {
@@ -194,6 +195,12 @@ let guardianControlServer = null
 let aliceStatus = 'starting'
 let utaStatus = SKIP_UTA ? 'disabled' : 'starting'
 let connectorStatus = 'disabled'
+const connectorRecovery = new RestartBackoff({
+  onScheduled: (delayMs, attempt) => {
+    connectorStatus = 'offline'
+    console.warn(`[guardian/prod] Connector recovery attempt ${attempt} in ${delayMs}ms`)
+  },
+})
 const RUNTIME_VERSION = await readRuntimeVersion()
 
 console.log('[guardian/prod] starting')
@@ -328,9 +335,11 @@ function spawnConnector() {
     stdio: 'inherit',
   })
   child.once('exit', (code, signal) => {
+    if (connectorChild === child) connectorChild = null
     if (stopping || restartingConnector) return
     connectorStatus = 'offline'
     console.error(`[guardian/prod] Connector exited unexpectedly (code=${code}, signal=${signal}) — external notifications offline, Alice stays up`)
+    scheduleConnectorRecovery()
   })
   return child
 }
@@ -407,8 +416,9 @@ async function waitForConnector() {
   return false
 }
 
-async function restartConnector() {
-  if (stopping) return
+async function restartConnector({ recovery = false } = {}) {
+  if (stopping) return false
+  if (!recovery) connectorRecovery.reset()
   const enabled = await readConnectorEnabled()
   if (!enabled) {
     if (connectorChild && connectorChild.exitCode === null) {
@@ -419,9 +429,9 @@ async function restartConnector() {
       connectorChild = null
     }
     connectorStatus = 'disabled'
-    return
+    return true
   }
-  if (restartingConnector) return
+  if (restartingConnector) return false
   restartingConnector = true
   connectorStatus = 'starting'
   try {
@@ -438,11 +448,26 @@ async function restartConnector() {
     connectorChild = spawnConnector()
     const ready = await waitForConnector()
     connectorStatus = ready ? 'ready' : 'offline'
-    if (!ready) console.error('[guardian/prod] Connector did not become ready')
-    else console.log('[guardian/prod] Connector ready')
+    if (!ready) {
+      console.error('[guardian/prod] Connector did not become ready')
+      scheduleConnectorRecovery()
+    }
+    else {
+      connectorRecovery.reset()
+      console.log('[guardian/prod] Connector ready')
+    }
+    return ready
+  } catch (error) {
+    connectorStatus = 'offline'
+    scheduleConnectorRecovery()
+    throw error
   } finally {
     restartingConnector = false
   }
+}
+
+function scheduleConnectorRecovery() {
+  connectorRecovery.schedule(() => restartConnector({ recovery: true }))
 }
 
 async function restartUTA() {
@@ -503,6 +528,7 @@ function shutdown(exitCode = 0) {
   shutdownExitCode = Math.max(shutdownExitCode, normalizeProcessExitCode(exitCode))
   if (stopping) return
   stopping = true
+  connectorRecovery.stop()
   if (aliceChild) aliceStatus = 'stopping'
   if (utaChild) utaStatus = 'stopping'
   if (connectorChild) connectorStatus = 'stopping'
@@ -599,8 +625,13 @@ async function main() {
     connectorChild = spawnConnector()
     void waitForConnector().then((ready) => {
       connectorStatus = ready ? 'ready' : 'offline'
-      if (ready) console.log('[guardian/prod] Connector ready')
-      else console.warn('[guardian/prod] Connector did not become ready within 15s — external notifications offline')
+      if (ready) {
+        connectorRecovery.reset()
+        console.log('[guardian/prod] Connector ready')
+      } else {
+        console.warn('[guardian/prod] Connector did not become ready within 15s — external notifications offline')
+        scheduleConnectorRecovery()
+      }
     })
   }
 

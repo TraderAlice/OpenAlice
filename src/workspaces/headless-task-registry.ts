@@ -41,10 +41,18 @@ export interface HeadlessTaskOutputSummary {
 /** The business object that caused an execution. This is intentionally
  * independent from `wsId`: an exact signed Session may execute in Workspace B
  * while answering a scheduled Issue whose source of truth remains Workspace A. */
+export type HeadlessTaskTriggerMetadata = {
+  readonly kind: 'connector-cron-issue'
+  readonly connectorId: string
+}
+
 export type HeadlessTaskTrigger = {
   readonly kind: 'issue'
   readonly workspaceId: string
   readonly issueId: string
+  /** Optional execution profile stamped by the dispatcher. Consumers must
+   * ignore control syntax unless the matching profile is present. */
+  readonly metadata?: HeadlessTaskTriggerMetadata
 }
 
 /** Business object that requested a headless follow-up. Product provenance

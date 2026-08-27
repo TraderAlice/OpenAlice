@@ -10,6 +10,9 @@ const stopMock = vi.fn()
 const getMe = vi.fn(async () => ({ id: 1, is_bot: true, first_name: 'OpenAlice', username: 'openalice_bot' }))
 const setMyCommands = vi.fn(async () => undefined)
 const sendRichMessage = vi.fn(async () => undefined)
+const sendMessageDraft = vi.fn(async () => true)
+const sendRichMessageDraft = vi.fn(async () => true)
+const sendChatAction = vi.fn(async () => true)
 const sendMessage = vi.fn(async () => undefined)
 const sendDocument = vi.fn(async () => undefined)
 
@@ -23,6 +26,9 @@ vi.mock('grammy', async (importOriginal) => {
         getMe,
         setMyCommands,
         sendRichMessage,
+        sendMessageDraft,
+        sendRichMessageDraft,
+        sendChatAction,
         sendMessage,
         sendDocument,
       }
@@ -88,6 +94,12 @@ describe('Telegram polling readiness', () => {
     setMyCommands.mockReset()
     setMyCommands.mockResolvedValue(undefined)
     sendRichMessage.mockReset()
+    sendMessageDraft.mockReset()
+    sendMessageDraft.mockResolvedValue(true)
+    sendRichMessageDraft.mockReset()
+    sendRichMessageDraft.mockResolvedValue(true)
+    sendChatAction.mockReset()
+    sendChatAction.mockResolvedValue(true)
     sendMessage.mockReset()
     sendDocument.mockReset()
     stopMock.mockResolvedValue(undefined)
@@ -197,6 +209,36 @@ describe('Telegram polling readiness', () => {
     await adapter.stop()
   })
 
+  it('abandons a polling promise that stayed pending across host sleep', async () => {
+    vi.useFakeTimers()
+    try {
+      let attempts = 0
+      startMock.mockImplementation((options: { onStart?: () => void }) => {
+        attempts += 1
+        queueMicrotask(() => options.onStart?.())
+        return new Promise(() => undefined)
+      })
+      const adapter = new TelegramConnectorAdapter({
+        attemptTimeoutMs: 200,
+        reconnectDelayMs: 5,
+        resumeCheckIntervalMs: 10,
+        resumeGapMs: 25,
+      })
+
+      await adapter.start({ enabled: true, settings: { botToken: 'token' } }, context())
+      await vi.advanceTimersByTimeAsync(0)
+      expect(attempts).toBe(1)
+
+      vi.setSystemTime(Date.now() + 100)
+      await vi.advanceTimersByTimeAsync(20)
+
+      expect(attempts).toBeGreaterThanOrEqual(2)
+      await adapter.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('stops a pending reconnect', async () => {
     startMock.mockImplementation(() => new Promise(() => undefined))
     const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 20, reconnectDelayMs: 50 })
@@ -234,6 +276,12 @@ describe('Telegram rich outbound text', () => {
     getMe.mockReset()
     getMe.mockResolvedValue({ id: 1, is_bot: true, first_name: 'OpenAlice', username: 'openalice_bot' })
     sendRichMessage.mockReset()
+    sendMessageDraft.mockReset()
+    sendMessageDraft.mockResolvedValue(true)
+    sendRichMessageDraft.mockReset()
+    sendRichMessageDraft.mockResolvedValue(true)
+    sendChatAction.mockReset()
+    sendChatAction.mockResolvedValue(true)
     sendMessage.mockReset()
     sendDocument.mockReset()
     startMock.mockImplementation((options: { onStart?: () => void }) => {
@@ -256,6 +304,70 @@ describe('Telegram rich outbound text', () => {
     expect(sendRichMessage).toHaveBeenCalledWith('99', { markdown })
     expect(sendMessage).not.toHaveBeenCalled()
     await adapter.stop()
+  })
+
+  it('shows a native draft before model text, updates it, then persists the final reply', async () => {
+    const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 200, reconnectDelayMs: 20 })
+    await startUntilReady(adapter, { botToken: 'token', ownerUserId: '42', chatId: '99' })
+
+    await adapter.sendOwnerChat({
+      id: 'accepted-1', adapterId: 'telegram', conversationId: 'comment-1', phase: 'accepted',
+    })
+    await adapter.sendOwnerChat({
+      id: 'progress-1', adapterId: 'telegram', conversationId: 'comment-1', phase: 'progress',
+      text: 'Checking the market.',
+    })
+    await adapter.sendOwnerChat({
+      id: 'final-1', adapterId: 'telegram', conversationId: 'comment-1', phase: 'final',
+      text: 'The market is quiet.',
+    })
+    await adapter.sendOwnerChat({
+      id: 'late-progress', adapterId: 'telegram', conversationId: 'comment-1', phase: 'progress',
+      text: 'Late transport update.',
+    })
+
+    const draftId = expect.any(Number)
+    expect(sendMessageDraft).toHaveBeenCalledWith(99, draftId, '')
+    expect(sendRichMessageDraft).toHaveBeenCalledWith(99, draftId, { markdown: 'Checking the market.' })
+    expect(sendRichMessageDraft).toHaveBeenCalledTimes(1)
+    expect(sendRichMessage).toHaveBeenCalledWith('99', { markdown: 'The market is quiet.' })
+    await adapter.stop()
+  })
+
+  it('falls back to Telegram typing when live drafts are unavailable', async () => {
+    sendMessageDraft.mockRejectedValueOnce(new Error('method unavailable'))
+    const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 200, reconnectDelayMs: 20 })
+    await startUntilReady(adapter, { botToken: 'token', ownerUserId: '42', chatId: '99' })
+
+    await adapter.sendOwnerChat({
+      id: 'accepted-1', adapterId: 'telegram', conversationId: 'comment-1', phase: 'accepted',
+    })
+
+    expect(sendChatAction).toHaveBeenCalledWith(99, 'typing')
+    await adapter.stop()
+  })
+
+  it('refreshes an active draft before its TTL and stops after the final reply', async () => {
+    const adapter = new TelegramConnectorAdapter({ attemptTimeoutMs: 200, reconnectDelayMs: 20 })
+    await startUntilReady(adapter, { botToken: 'token', ownerUserId: '42', chatId: '99' })
+    vi.useFakeTimers()
+    try {
+      await adapter.sendOwnerChat({
+        id: 'accepted-1', adapterId: 'telegram', conversationId: 'comment-1', phase: 'accepted',
+      })
+      expect(sendMessageDraft).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(sendMessageDraft).toHaveBeenCalledTimes(2)
+
+      await adapter.sendOwnerChat({
+        id: 'final-1', adapterId: 'telegram', conversationId: 'comment-1', phase: 'final', text: 'Done.',
+      })
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(sendMessageDraft).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+      await adapter.stop()
+    }
   })
 
   it('sends Inbox notifications as rich GFM', async () => {

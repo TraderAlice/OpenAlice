@@ -131,8 +131,8 @@ describe('AgentRuntimePicker', () => {
       i18n.t('chatLanding.agentNotInstalled'),
     )
     expect(screen.getByText('npm install -g @openai/codex')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Pi' }).querySelector('svg')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Grok Build/ }).querySelector('svg')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Pi' }).querySelector('[data-agent-runtime-icon="pi"]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Grok Build/ }).querySelector('[data-agent-runtime-icon="grok"]')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Pi' }))
     expect(onSelect).toHaveBeenCalledWith('pi')

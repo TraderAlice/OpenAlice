@@ -55,6 +55,7 @@ vi.mock('../../tabs/types', () => ({
 
 const harnessPreference = vi.hoisted(() => ({
   showHeadlessBornSessions: true,
+  showIssueAttachedSessions: true,
 }))
 
 vi.mock('../../hooks/useHarnessPreferences', () => ({
@@ -168,6 +169,7 @@ beforeEach(async () => {
   directoryState.directories = new Map()
   focusedTabState.tab = null
   harnessPreference.showHeadlessBornSessions = true
+  harnessPreference.showIssueAttachedSessions = true
   window.localStorage.clear()
   await i18n.changeLanguage('en')
 })

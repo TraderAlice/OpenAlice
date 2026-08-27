@@ -322,6 +322,47 @@ describe('Supervisor configuration', () => {
     expect(saved.projects.research.product).toBeUndefined()
   })
 
+  it('registers a transferred AliceProject without changing the remote default', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-transfer-register-'))
+    temporaryPaths.push(root)
+    const homeDir = join(root, 'user')
+    const context = await resolveStoredLaunchContext({}, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+      env: { XDG_CONFIG_HOME: join(root, 'config') },
+    })
+    await createSupervisorAliceProject(
+      context,
+      'research',
+      join(root, 'research-home'),
+      { homeDir, cwd: root, platform: 'linux' },
+    )
+    await createSupervisorAliceProject(
+      context,
+      'migrated',
+      join(root, 'migrated-home'),
+      {
+        homeDir,
+        cwd: root,
+        platform: 'linux',
+        displayName: 'Migrated Alice',
+        select: false,
+      },
+    )
+
+    const registry = await readSupervisorAliceProjectRegistry(context, {
+      homeDir,
+      cwd: root,
+      platform: 'linux',
+    })
+    expect(registry.defaultProject).toBe('research')
+    expect(registry.projects.find((project) => project.key === 'migrated')).toMatchObject({
+      displayName: 'Migrated Alice',
+      isDefault: false,
+    })
+  })
+
   it('stamps NanoAlice product on create and does not rewrite it later', async () => {
     const root = await mkdtemp(join(tmpdir(), 'openalice-supervisor-nano-'))
     temporaryPaths.push(root)

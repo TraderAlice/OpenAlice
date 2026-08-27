@@ -130,6 +130,28 @@ describe('OpenAlice SSH connector', () => {
     await expect(result).resolves.toBe(0)
   })
 
+  it('closes a TUI-owned tunnel when its abort signal fires', async () => {
+    const child = new FakeChild()
+    child.kill.mockImplementation(() => {
+      queueMicrotask(() => child.emit('exit', 0, 'SIGTERM'))
+      return true
+    })
+    const controller = new AbortController()
+    const result = connectSsh({
+      ...parseSshConnectArgs(['host', '--no-open']),
+      signal: controller.signal,
+    }, {
+      allocatePort: async () => 40123,
+      spawnProcess: () => child,
+      waitForRuntime: async () => ({ authed: true }),
+      stdout: { write: vi.fn() },
+    })
+    await vi.waitFor(() => expect(child.listenerCount('exit')).toBeGreaterThan(0))
+    controller.abort()
+    await expect(result).resolves.toBe(0)
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+  })
+
   it('falls back cleanly when a remembered port is occupied', async () => {
     const child = new FakeChild()
     const stdout = { write: vi.fn() }

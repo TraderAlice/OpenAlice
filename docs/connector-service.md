@@ -57,14 +57,26 @@ categories.
   per `desk`-capable connector. Connector queues owner text keyed by
   `connectorId`; Alice drains that stack only while that connector's live
   desk exists and no generation is running on it. Several stacked DMs become
-  one quoted comment on that Issue. Alice projects desk comments that do not
-  contain the literal tag `[[no-reply]]`. Inbound owner comments are not
-  echoed back to that connector. While a desk turn is running, Alice also
-  ships sealed mid-turn `text` blocks (a tool or error followed them) so the
-  phone chat does not wait for the final reply. Tool names, status, and
-  payloads stay off the owner chat. The trailing text still becomes today's
-  reply comment. Telegram is the first `desk` adapter; Discord and Slack do
+  one quoted comment on that Issue. Alice suppresses a desk comment only when
+  its run carries the `connector-cron-issue` trigger metadata and its text
+  contains the literal tag `[[no-reply]]`. Ordinary chat replies treat that
+  tag as text. Inbound owner comments are not echoed back to that connector.
+  While a desk turn is running, Alice also
+  projects an explicit `accepted | progress | final | failed` lifecycle.
+  Telegram turns `accepted` into a native Bot API live draft immediately,
+  refreshes that draft every 20 seconds, and replaces it with sealed mid-turn
+  `text` blocks (a tool or error followed them). If live drafts are unavailable,
+  Telegram refreshes the ordinary typing action every four seconds. Final and
+  failed replies are always persistent messages; ephemeral progress never
+  suppresses an identical final answer. Tool names, status, and payloads stay
+  off the owner chat. The trailing text still becomes today's reply comment.
+  Telegram is the first `desk` adapter; Discord and Slack do
   not advertise `desk` until they ingest private owner chat.
+- A connector phone-desk Session is transport-owned conversation state, not an
+  Ask Alice coworker. It remains attributable and resumable by its Issue, and
+  visible in Issue/Automation diagnostics, but is always excluded from the
+  Ask Alice Session roster even when the operator opts into ordinary
+  headless-born Sessions.
 - Each adapter serves one owner account/private chat. Group and channel
   broadcasting are out of scope.
 - Inbox `docs` that are Markdown or static HTML reports are externalized as
@@ -276,7 +288,13 @@ best-effort and happens only after polling is live: a hung or failed
 delivery. `start()` arms the adapter and returns; the Bot API session is a
 supervised loop. A hung handshake is abandoned after one attempt budget
 (default 30s) and the same adapter reconnects with backoff. That budget is
-not a process-level deadline and does not stop Connector Service. The
+not a process-level deadline and does not stop Connector Service. The session
+supervisor retries indefinitely with capped exponential backoff and jitter.
+Telegram also watches the host clock while polling; a suspend/resume gap
+abandons a polling promise that can no longer settle and starts a fresh
+session. Health exposes `lastAttemptAt`, `nextAttemptAt`, and
+`consecutiveFailures` so the operator can distinguish waiting from a dead loop.
+The
 Connector HTTP health endpoint binds before those external calls so Guardian
 can probe a `starting` adapter instead of treating the whole service as
 missing. A failed adapter stays registered with its `lastError` rather than
@@ -306,7 +324,7 @@ saved but no bot process exists to receive `/link`.
 | Awaiting link | credentials sealed, owner absent | bot online with `awaiting_link` | open the private bot chat and send `/link` |
 | Linked | owner identity learned | adapter `healthy` | send tests, unlink, or receive Inbox delivery |
 | Linked offline | owner identity retained | adapter/service intentionally stopped | start the connector, or unlink and relink later |
-| Error | durable config retained | adapter `degraded` or service unavailable | inspect credentials and Connector logs |
+| Error | durable config retained | adapter `degraded` or service unavailable | reconnect the adapter, then inspect Connector logs if it persists |
 
 The surfaces deliberately have different jobs:
 
@@ -327,8 +345,15 @@ The surfaces deliberately have different jobs:
   ships sealed mid-turn `text` blocks (the last consecutive text before a
   tool or error) and skips tool/error blocks. A text already sent this way
   is not sent again as the final comment.
-- **Beta → Connectors** is a read-only operations view: service health, adapter
-  status, linked owner, and last delivery evidence.
+- **Beta → Connectors** is the operations view: service health, adapter status,
+  linked owner, last delivery evidence, and an explicit reconnect action for an
+  unhealthy configured adapter. The reconnect is adapter-scoped while the
+  service answers; if the process is unreachable, Alice asks Guardian to restart
+  the optional service instead.
+- **Activity Bar → Connectors** shows a warning count for enabled, configured
+  adapters that are degraded, stopped, unreachable, or stuck in `starting`
+  beyond the grace window. `awaiting_link` remains setup state and does not
+  warn.
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
   configuration surface.
 
@@ -360,7 +385,9 @@ adapter is `degraded`.
 The contract matrix lives in `src/services/optional-carrier/health.spec.ts`;
 `integrations.spec.ts` applies it to the real UTA and Connector response shapes.
 Guardian/process smoke tests remain responsible for proving that an enabled
-service actually starts and reaches its health endpoint.
+service actually starts and reaches its health endpoint. A configured Connector
+process that exits unexpectedly is restarted by Guardian forever with capped,
+jittered backoff; manual disable and Guardian shutdown cancel recovery.
 
 ## Two-Layer External Acceptance
 

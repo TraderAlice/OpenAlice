@@ -70,6 +70,41 @@ describe('HarnessSurfaceManager', () => {
     expect(stopped.phase).toBe('stopped')
     expect(manager.resolveHost(ready.routeHost)).toBeNull()
   }, 30_000)
+
+  it('preserves the readiness timeout when terminating the child also produces an exit event', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'openalice-harness-timeout-'))
+    dirs.push(dir)
+    const program = [
+      "process.on('SIGTERM',()=>process.exit(1))",
+      "setInterval(()=>{},1000)",
+    ].join(';')
+    await writeFile(join(dir, 'harness.json'), JSON.stringify({
+      manifestVersion: 1,
+      version: 'test-timeout',
+      capabilities: {
+        studio: {
+          command: [process.execPath, '-e', program],
+          ports: ['http'],
+          entryPort: 'http',
+          readinessPath: '/health',
+        },
+      },
+    }))
+    const registry = { get: (id: string) => id === 'ws-timeout' ? { id, dir } : undefined } as WorkspaceRegistry
+    const manager = new HarnessSurfaceManager(registry, { readinessTimeoutMs: 50 })
+    managers.push(manager)
+
+    await manager.start('ws-timeout', 'studio')
+    const failed = await waitFor(
+      () => manager.snapshot('ws-timeout', 'studio'),
+      (value) => value.phase === 'failed',
+    )
+
+    expect(failed.error).toBe('Studio readiness timed out after 50ms')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(manager.snapshot('ws-timeout', 'studio').error)
+      .toBe('Studio readiness timed out after 50ms')
+  })
 })
 
 async function waitFor<T>(read: () => T, done: (value: T) => boolean): Promise<T> {

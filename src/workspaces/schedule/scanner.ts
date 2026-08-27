@@ -209,6 +209,7 @@ export class ScheduleScanner {
       issueAssigneeResumeId(issue.assignee) ?? undefined,
       issueAssigneeClaimsFirstSession(issue.assignee),
       issueTimeoutMs(issue.timeout),
+      issue.connectorDesk,
       true,
     )
   }
@@ -308,6 +309,7 @@ export class ScheduleScanner {
           issueAssigneeResumeId(issue.assignee) ?? undefined,
           issueAssigneeClaimsFirstSession(issue.assignee),
           issueTimeoutMs(issue.timeout),
+          issue.connectorDesk,
           nowMs,
         )
       }
@@ -336,6 +338,7 @@ export class ScheduleScanner {
     resumeId: string | undefined,
     claimFreshSession: boolean,
     timeoutMs: number | undefined,
+    connectorDesk: string | undefined,
     nowMs: number,
   ): Promise<void> {
     try {
@@ -348,6 +351,7 @@ export class ScheduleScanner {
         resumeId,
         claimFreshSession,
         timeoutMs,
+        connectorDesk,
       )
       await this.deps.markers.set(issueWorkspace.id, taskId, nowMs)
       this.deps.logger.info('schedule.fired', {
@@ -400,6 +404,7 @@ export class ScheduleScanner {
     resumeId?: string,
     claimFreshSession = false,
     timeoutMs?: number,
+    connectorDesk?: string,
     manual = false,
   ): Promise<{ taskId: string }> {
     const dispatchKey = `${issueWorkspace.id}:${issueId}`
@@ -428,6 +433,14 @@ export class ScheduleScanner {
         kind: 'issue',
         workspaceId: issueWorkspace.id,
         issueId,
+        ...(connectorDesk
+          ? {
+              metadata: {
+                kind: 'connector-cron-issue' as const,
+                connectorId: connectorDesk,
+              },
+            }
+          : {}),
       }
       // Fresh recruits only: exact @resumeId continues an existing Session.
       const createdBy: SessionCreatedBy | undefined = resumeId

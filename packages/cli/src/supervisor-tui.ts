@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import {
   dirname,
   join,
+  posix,
 } from 'node:path'
 import type {
   Component,
@@ -14,6 +15,18 @@ import type {
 } from '@earendil-works/pi-tui'
 
 import { diagnoseRuntime } from './doctor.mjs'
+import {
+  inspectMachineFleet,
+  seedMachineFleet,
+  type MachineFleetEnvelope,
+  type MachineInventory,
+  type MachineProjectInventory,
+} from './machine-inventory.ts'
+import {
+  readMachineRegistrySummary,
+  type MachineRegistrySummary,
+  type RegisteredMachine,
+} from './machine-registry.ts'
 import {
   inspectRuntime,
   openRuntime,
@@ -42,6 +55,30 @@ import {
   type ManagedSourceResult,
 } from './managed-source.ts'
 import { loadPiTui } from './pi-tui-loader.ts'
+import { connectSsh } from './ssh-connect.mjs'
+import { buildRemoteSshArgs } from './remote.mjs'
+import { planProjectTransfer, type ProjectTransferPlan } from './project-transfer.ts'
+import { transferProjectOverSsh } from './project-transfer-ssh.ts'
+import type { ProjectTransferReceipt } from './project-transfer-stream.ts'
+import {
+  createSupervisorFleetState,
+  fleetTunnelKey,
+  moveFleetSelection,
+  renderSupervisorFleet,
+  replaceFleetInventory,
+  selectedFleetMachine,
+  selectedFleetProject,
+  selectFleetProjectByKey,
+  setFleetFocus,
+  type SupervisorFleetState,
+} from './supervisor-fleet.ts'
+import {
+  createSupervisorTransferWizard,
+  renderTransferPlanReview,
+  renderTransferResult,
+  selectTransferDestination,
+  selectedTransferDestination,
+} from './supervisor-transfer.ts'
 import {
   createSupervisorAliceProject,
   persistAliceProjectLaunchConfig,
@@ -127,7 +164,7 @@ interface UpdateResult {
   }
 }
 
-export type SupervisorPanel = 'overview' | 'logs' | 'doctor' | 'help'
+export type SupervisorPanel = 'fleet' | 'overview' | 'logs' | 'doctor' | 'help'
 export type SupervisorMode = 'normal' | 'config-recovery'
 export type SupervisorConfigRecoveryReason = 'newer-schema' | 'unreadable'
 export type SupervisorAction =
@@ -162,6 +199,7 @@ export interface SupervisorSnapshot {
   doctor?: DoctorReport | null
   update?: UpdateResult | null
   managedSource?: ManagedSourcePlan | null
+  fleet?: SupervisorFleetState | null
 }
 
 export interface SupervisorTuiDependencies {
@@ -215,6 +253,24 @@ export interface SupervisorTuiDependencies {
   version?: string
   channel?: string
   pollIntervalMs?: number
+  seedFleet?: () => Promise<MachineFleetEnvelope>
+  inspectFleet?: () => Promise<MachineFleetEnvelope>
+  loadMachineRegistry?: () => Promise<MachineRegistrySummary>
+  connectRemoteProject?: (input: {
+    machine: MachineInventory
+    project: MachineProjectInventory
+    signal: AbortSignal
+    onReady: () => void
+  }) => Promise<number>
+  planProjectTransfer?: typeof planProjectTransfer
+  sendProjectTransfer?: (input: {
+    machine: RegisteredMachine
+    plan: ProjectTransferPlan
+    signal?: AbortSignal
+    onProgress?: (progress: { files: number; bytes: number; totalFiles: number; totalBytes: number }) => void
+  }) => Promise<ProjectTransferReceipt>
+  inspectTransferSource?: (home: string) => Promise<RuntimeSummary>
+  startRemoteProject?: (machine: RegisteredMachine, projectKey: string) => Promise<void>
   resolveChannel?: () => Promise<string>
 }
 
@@ -300,6 +356,24 @@ export async function runSupervisorTui(
 
   const supervisorRoot = context?.supervisorRoot
     ?? resolveSupervisorRootPath({ env: dependencies.env })
+  let fleet: SupervisorFleetState | null = null
+  if (!configRecovery) {
+    try {
+      const seeded = await (dependencies.seedFleet ?? (() => seedMachineFleet({
+        env: dependencies.env,
+        supervisorRoot,
+        inspectRuntime: (options) => services.inspect(options),
+        loadMachineRegistry: dependencies.loadMachineRegistry,
+      })))()
+      fleet = createSupervisorFleetState(
+        seeded.generatedAt,
+        alignLocalFleetProject(seeded.machines, context, runtime),
+        context?.project,
+      )
+    } catch (error: unknown) {
+      diagnostic = diagnostic ?? safeError(error)
+    }
+  }
   const piTui = await (dependencies.loadTui ?? loadPiTui)(dependencies.env)
   const channel = dependencies.channel
     ?? await (dependencies.resolveChannel ?? resolveSupervisorChannel)()
@@ -314,10 +388,14 @@ export async function runSupervisorTui(
   let sourcePromptActive = false
   let settingsActive = false
   let projectsActive = false
+  let transferActive = false
+  let fleetRefreshing = false
+  const tunnelControllers = new Map<string, AbortController>()
   let managedStartAction: 'start' | 'start-open' = 'start'
   let closeSourcePrompt: (() => void) | null = null
   let closeSettings: (() => void) | null = null
   let closeProjects: (() => void) | null = null
+  let closeTransfer: (() => void) | null = null
   const screen = new SupervisorScreen({
     version: dependencies.version ?? readCliVersion(),
     channel,
@@ -327,6 +405,7 @@ export async function runSupervisorTui(
     recoveryReason,
     diagnostic,
     notice: startupNotice,
+    fleet,
   }, {
     onAction: (action) => {
       void requestAction(action)
@@ -339,6 +418,18 @@ export async function runSupervisorTui(
     },
     onProjects: () => {
       void openProjects()
+    },
+    onActivateFleet: (machine, project) => {
+      void activateFleetProject(machine, project)
+    },
+    onStartFleet: (machine, project) => {
+      void startFleetProject(machine, project)
+    },
+    onRefreshFleet: () => {
+      void refreshFleet()
+    },
+    onTransferFleet: (source) => {
+      void openTransferWizard(source)
     },
     onRequestManagedSource: () => {
       void requestManagedSource('start')
@@ -398,6 +489,48 @@ export async function runSupervisorTui(
     ?? (() => prepareManagedSource())
   const inspectManaged = dependencies.inspectManagedSource
     ?? (() => inspectManagedSource())
+  const loadMachines = dependencies.loadMachineRegistry
+    ?? (() => readMachineRegistrySummary({
+      env: dependencies.env,
+      supervisorRoot,
+    }))
+  const inspectFleet = dependencies.inspectFleet ?? (() => inspectMachineFleet({
+    env: dependencies.env,
+    supervisorRoot,
+    inspectRuntime: (options) => services.inspect(options),
+    loadMachineRegistry: loadMachines,
+  }))
+  const connectRemoteProject = dependencies.connectRemoteProject ?? (async ({
+    machine,
+    project,
+    signal,
+    onReady,
+  }) => {
+    const registry = await loadMachines()
+    const target = registry.machines.find((entry) => entry.key === machine.key)
+    if (!target) throw new Error(`Machine "${machine.key}" is no longer registered.`)
+    const remotePort = loopbackEndpointPort(project.runtime.webEndpoint)
+    if (remotePort === null) {
+      throw new Error(`AliceProject "${project.key}" does not advertise a loopback Web endpoint.`)
+    }
+    return connectSsh({
+      destination: target.sshTarget,
+      localPort: 0,
+      remotePort,
+      sshPort: target.sshPort ?? null,
+      identityFile: target.identityFile ?? null,
+      openBrowser: true,
+      waitMs: 60_000,
+      signal,
+      onReady,
+    }, { stdout: SILENT_OUTPUT })
+  })
+  const planTransfer = dependencies.planProjectTransfer ?? planProjectTransfer
+  const sendTransfer = dependencies.sendProjectTransfer ?? ((input) => transferProjectOverSsh(input))
+  const inspectTransferSource = dependencies.inspectTransferSource
+    ?? ((home) => inspectRuntime({ homeRoot: home, waitMs: 2_000 }))
+  const startRemoteProject = dependencies.startRemoteProject
+    ?? ((machine, projectKey) => runRemoteProjectStart(machine, projectKey))
 
   async function refreshRuntime(): Promise<void> {
     if (!active || actionRunning || configRecovery || !context) return
@@ -407,11 +540,210 @@ export async function runSupervisorTui(
         waitMs: 1_000,
       })
       if (!active) return
-      screen.update({ runtime: nextRuntime, diagnostic: undefined })
+      runtime = nextRuntime
+      const currentFleet = screen.snapshot.fleet
+      screen.update({
+        runtime: nextRuntime,
+        fleet: currentFleet && context
+          ? selectFleetProjectByKey(
+              replaceFleetInventory(
+                currentFleet,
+                currentFleet.generatedAt,
+                alignLocalFleetProject(
+                  currentFleet.machines,
+                  context,
+                  nextRuntime,
+                ),
+              ),
+              'local',
+              context.project,
+            )
+          : currentFleet,
+        diagnostic: undefined,
+      })
     } catch (error: unknown) {
       if (!active) return
       screen.update({ diagnostic: safeError(error) })
     }
+  }
+
+  async function refreshFleet(options: { quiet?: boolean } = {}): Promise<void> {
+    if (!active || configRecovery || fleetRefreshing) return
+    fleetRefreshing = true
+    if (screen.snapshot.fleet) {
+      screen.update({
+        fleet: { ...screen.snapshot.fleet, refreshing: true },
+        ...(options.quiet ? {} : { notice: 'Refreshing Machine fleet…' }),
+      })
+    }
+    try {
+      const inspected = await inspectFleet()
+      if (!active) return
+      const current = screen.snapshot.fleet ?? createSupervisorFleetState(
+        inspected.generatedAt,
+        inspected.machines,
+        context?.project,
+      )
+      screen.update({
+        fleet: replaceFleetInventory(
+          current,
+          inspected.generatedAt,
+          alignLocalFleetProject(inspected.machines, context, runtime),
+        ),
+        ...(options.quiet ? {} : { notice: 'Machine fleet refreshed.' }),
+      })
+    } catch (error: unknown) {
+      if (active) screen.update({ diagnostic: safeError(error) })
+    } finally {
+      fleetRefreshing = false
+      if (active && screen.snapshot.fleet?.refreshing) {
+        screen.update({ fleet: { ...screen.snapshot.fleet, refreshing: false } })
+      }
+    }
+  }
+
+  async function activateFleetProject(
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ): Promise<void> {
+    if (machine.key === 'local') {
+      if (!context) return
+      if (project.key !== context.project) {
+        actionRunning = true
+        screen.update({ busy: `Switching to ${project.displayName}` })
+        try {
+          context = await selectProject(context, project.key)
+          services = createServices(dependencies, context)
+          runtime = await services.inspect({ homeRoot: context.home, waitMs: 2_000 })
+          screen.update({
+            context,
+            runtime,
+            fleet: screen.snapshot.fleet
+              ? selectFleetProjectByKey(
+                  replaceFleetInventory(
+                    screen.snapshot.fleet,
+                    screen.snapshot.fleet.generatedAt,
+                    alignLocalFleetProject(
+                      screen.snapshot.fleet.machines,
+                      context,
+                      runtime,
+                    ),
+                  ),
+                  'local',
+                  context.project,
+                )
+              : screen.snapshot.fleet,
+            notice: `Selected local AliceProject ${project.key}.`,
+            diagnostic: undefined,
+          })
+          await refreshFleet({ quiet: true })
+        } catch (error: unknown) {
+          screen.update({ diagnostic: safeError(error) })
+        } finally {
+          actionRunning = false
+          screen.update({ busy: undefined })
+        }
+        return
+      }
+      const action = primaryAction(screen.snapshot.runtime)
+      if (action) await requestAction(action)
+      return
+    }
+    if (machine.connection !== 'online') {
+      screen.update({ notice: machine.issue?.message ?? 'The selected Machine is not online.' })
+      return
+    }
+    if (!machine.capabilities.openTunnel || !project.runtime.webEndpoint) {
+      screen.update({
+        notice: 'This remote AliceProject is not running with an advertised Web endpoint. Start it on the remote Machine first.',
+      })
+      return
+    }
+    const key = fleetTunnelKey(machine.key, project.key)
+    if (tunnelControllers.has(key)) {
+      screen.update({ notice: `The ${machine.key}/${project.key} tunnel is already active.` })
+      return
+    }
+    const controller = new AbortController()
+    tunnelControllers.set(key, controller)
+    updateTunnelState(key, 'connecting')
+    screen.update({ notice: `Connecting to ${machine.displayName} / ${project.displayName}…` })
+    try {
+      await connectRemoteProject({
+        machine,
+        project,
+        signal: controller.signal,
+        onReady: () => {
+          updateTunnelState(key, 'connected')
+          screen.update({ notice: `Connected to ${machine.displayName} / ${project.displayName}.` })
+        },
+      })
+      if (active && !controller.signal.aborted) {
+        screen.update({ notice: `Tunnel to ${machine.key}/${project.key} closed.` })
+      }
+    } catch (error: unknown) {
+      if (active && !controller.signal.aborted) {
+        updateTunnelState(key, 'failed')
+        screen.update({ diagnostic: safeError(error) })
+      }
+    } finally {
+      tunnelControllers.delete(key)
+      if (active) clearTunnelState(key)
+    }
+  }
+
+  async function startFleetProject(
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ): Promise<void> {
+    if (machine.key === 'local' || actionRunning) return
+    let started = false
+    actionRunning = true
+    screen.update({ busy: `Checking ${machine.key}/${project.key}`, diagnostic: undefined })
+    try {
+      const latest = await inspectFleet()
+      const remote = latest.machines.find((entry) => entry.key === machine.key)
+      const remoteProject = remote?.projects.find((entry) => entry.key === project.key)
+      if (!remote || remote.connection !== 'online') throw new Error('The selected Machine is no longer online.')
+      if (!remote.capabilities.lifecycle) throw new Error('The selected Machine does not support remote lifecycle actions.')
+      if (!remoteProject?.available) throw new Error('The selected remote AliceProject is no longer available.')
+      if (remoteProject.runtime.class !== 'absent') throw new Error('The selected remote AliceProject is not stopped.')
+      const registry = await loadMachines()
+      const registered = registry.machines.find((entry) => entry.key === machine.key)
+      if (!registered) throw new Error(`Machine "${machine.key}" is no longer registered.`)
+      screen.update({ busy: `Starting ${machine.key}/${project.key}` })
+      await startRemoteProject(registered, project.key)
+      started = true
+      screen.update({ notice: `Started ${machine.displayName} / ${project.displayName}.` })
+    } catch (error: unknown) {
+      screen.update({ diagnostic: safeError(error) })
+    } finally {
+      actionRunning = false
+      screen.update({ busy: undefined })
+    }
+    if (started) await refreshFleet({ quiet: true })
+  }
+
+  function updateTunnelState(
+    key: string,
+    value: 'connecting' | 'connected' | 'failed',
+  ): void {
+    const current = screen.snapshot.fleet
+    if (!current) return
+    screen.update({
+      fleet: {
+        ...current,
+        tunnels: { ...current.tunnels, [key]: value },
+      },
+    })
+  }
+
+  function clearTunnelState(key: string): void {
+    const current = screen.snapshot.fleet
+    if (!current) return
+    const tunnels = { ...current.tunnels }
+    delete tunnels[key]
+    screen.update({ fleet: { ...current, tunnels } })
   }
 
   async function requestAction(action: SupervisorAction): Promise<void> {
@@ -1395,6 +1727,283 @@ export async function runSupervisorTui(
     overlay.focus()
   }
 
+  async function openTransferWizard(source: MachineProjectInventory): Promise<void> {
+    if (transferActive || sourcePromptActive || settingsActive || projectsActive || actionRunning) return
+    const fleetState = screen.snapshot.fleet
+    if (!fleetState) return
+    actionRunning = true
+    screen.update({ busy: 'Checking transfer source', notice: undefined, diagnostic: undefined })
+    try {
+      const sourceRuntime = await inspectTransferSource(source.home)
+      if (sourceRuntime.class !== 'absent') {
+        screen.update({ notice: `Stop local AliceProject ${source.key} before transfer. No source process was changed.` })
+        return
+      }
+    } catch (error: unknown) {
+      screen.update({ diagnostic: `Could not inspect transfer source: ${safeError(error)}` })
+      return
+    } finally {
+      actionRunning = false
+      screen.update({ busy: undefined })
+    }
+
+    const state = createSupervisorTransferWizard(source, fleetState.machines)
+    if (state.destinations.length === 0) {
+      screen.update({ notice: 'No online compatible SSH Machine can receive an AliceProject.' })
+      return
+    }
+    transferActive = true
+    let component: Component
+    let message = 'Choose the SSH Machine that will own the new AliceProject.'
+    let transferController: AbortController | null = null
+    const theme: SelectListTheme = {
+      selectedPrefix: (text) => text,
+      selectedText: (text) => text,
+      description: (text) => text,
+      scrollInfo: (text) => text,
+      noMatch: (text) => text,
+    }
+    const setMessage = (next: string) => { message = next; ui.requestRender() }
+    const close = (notice = 'Transfer cancelled. Nothing changed.') => {
+      if (!transferActive) return
+      transferController?.abort()
+      transferActive = false
+      closeTransfer = null
+      overlay.hide()
+      ui.setShowHardwareCursor(false)
+      screen.update({ notice })
+    }
+    const showInput = (
+      title: string,
+      initial: string,
+      detail: string,
+      validate: (value: string) => string | undefined,
+      submit: (value: string) => void,
+      back: () => void,
+    ) => {
+      const input = new (class extends piTui.Input {
+        detailText = detail
+        override render(width: number): string[] {
+          return [title, '', ...super.render(width), '', sanitize(this.detailText), '', 'Enter  Continue · Esc  Back']
+        }
+      })()
+      input.setValue(initial)
+      input.focused = true
+      ui.setShowHardwareCursor(true)
+      input.onEscape = () => { input.focused = false; ui.setShowHardwareCursor(false); back() }
+      input.onSubmit = (value) => {
+        const normalized = value.trim()
+        const issue = validate(normalized)
+        if (issue) { input.detailText = issue; input.invalidate(); ui.requestRender(); return }
+        input.focused = false
+        ui.setShowHardwareCursor(false)
+        submit(normalized)
+      }
+      component = input
+      ui.requestRender()
+    }
+    const showChoice = (
+      title: string,
+      items: SelectItem[],
+      select: (value: string) => void,
+      back: () => void,
+    ) => {
+      const list = new piTui.SelectList(items, Math.min(8, items.length), theme)
+      list.onSelect = (item) => select(item.value)
+      list.onCancel = back
+      component = new (class implements Component {
+        render(width: number): string[] { return [title, '', ...list.render(width)] }
+        handleInput(data: string): void { list.handleInput(data) }
+        invalidate(): void { list.invalidate() }
+      })()
+      ui.requestRender()
+    }
+    const showDestination = () => showChoice(
+      `Transfer ${source.displayName} · destination Machine`,
+      state.destinations.map((machine) => ({
+        value: machine.key,
+        label: machine.displayName,
+        description: `${machine.sshTarget ?? machine.key} · ${machine.projects.length} AliceProject(s)`,
+      })),
+      (value) => {
+        selectTransferDestination(state, value)
+        state.phase = 'project-key'
+        showProjectKey()
+      },
+      () => close(),
+    )
+    const showProjectKey = () => showInput(
+      'Destination AliceProject key', state.projectKey,
+      'A new registry key; existing remote AliceProjects are never replaced.',
+      (value) => validateSupervisorAliceProjectKey(value),
+      (value) => { state.projectKey = value; state.phase = 'home'; showHome() },
+      showDestination,
+    )
+    const showHome = () => showInput(
+      'Destination complete Home', state.destinationHome,
+      'Must be a new absolute POSIX path on the SSH Machine.',
+      (value) => posix.isAbsolute(value) ? undefined : 'Enter an absolute remote path.',
+      (value) => { state.destinationHome = value; state.phase = 'credentials'; showCredentials() },
+      showProjectKey,
+    )
+    const showCredentials = () => showChoice(
+      'Credentials', [
+        { value: 'include', label: 'Transfer and re-seal', description: 'AI/provider values travel through SSH stdin; broker/Connector secrets get a new remote key.' },
+        { value: 'omit', label: 'Leave credentials behind', description: 'Portable configuration remains; integrations require remote setup.' },
+      ],
+      (value) => { state.credentials = value === 'omit' ? 'omit' : 'include'; state.phase = 'issue-policy'; showIssuePolicy() },
+      showHome,
+    )
+    const showIssuePolicy = () => showChoice(
+      'Exact-Session scheduled Issue owners', [
+        { value: 'keep-blocked', label: 'Keep blocked', description: 'Preserve exact old owners; they remain unavailable remotely.' },
+        { value: 'new-then-resume', label: 'Create new Session on fire', description: 'Rewrite only affected scheduled Issues to @new-then-resume.' },
+      ],
+      (value) => { state.issuePolicy = value === 'new-then-resume' ? 'new-then-resume' : 'keep-blocked'; void buildReview() },
+      showCredentials,
+    )
+    const buildReview = async () => {
+      const destination = selectedTransferDestination(state)!
+      state.phase = 'planning'
+      setMessage('Building a checksum and exclusion plan…')
+      component = { render: () => ['Planning transfer…'], invalidate: () => undefined }
+      try {
+        const latest = await inspectFleet()
+        const remote = latest.machines.find((machine) => machine.key === destination.key)
+        if (!remote || remote.connection !== 'online') throw new Error('Destination Machine is no longer online.')
+        if (remote.projects.some((project) => project.key === state.projectKey || remoteHomesOverlap(project.home, state.destinationHome))) {
+          throw new Error('Destination key or Home now conflicts with a registered remote AliceProject.')
+        }
+        state.plan = await planTransfer({
+          source: { id: source.id, key: source.key, displayName: source.displayName, home: source.home, port: source.port, portAutomatic: source.portAutomatic, isDefault: source.isDefault },
+          destinationMachineKey: destination.key,
+          destinationProjectKey: state.projectKey,
+          destinationDisplayName: source.displayName,
+          destinationHome: state.destinationHome,
+          credentials: state.credentials,
+          scheduledIssues: state.issuePolicy,
+          env: dependencies.env ?? process.env,
+        })
+        state.phase = 'review'
+        component = reviewComponent()
+        setMessage('Review every boundary before transfer. Default is No.')
+      } catch (error: unknown) {
+        state.phase = 'failed'; state.error = safeError(error)
+        component = failureComponent()
+        setMessage('Planning failed; neither Machine was changed.')
+      }
+    }
+    const reviewComponent = (): Component => ({
+      render: (width) => renderTransferPlanReview(state.plan!, width),
+      handleInput: (data) => {
+        if (piTui.matchesKey(data, 'escape') || piTui.matchesKey(data, 'n')) close()
+        else if ((piTui.matchesKey(data, 'y') || piTui.matchesKey(data, 'enter')) && state.plan?.readyToApply) void applyTransfer()
+      },
+      invalidate: () => undefined,
+    })
+    const failureComponent = (): Component => ({
+      render: (width) => [
+        'Transfer failed',
+        '',
+        sanitize(state.error ?? 'Unknown error'),
+        '',
+        state.plan?.readyToApply
+          ? 'r  Retry the same transaction · Enter / Esc  Close'
+          : 'r  Rebuild the plan · Enter / Esc  Close',
+      ].map((line) => truncate(line, width)),
+      handleInput: (data) => {
+        if (piTui.matchesKey(data, 'r')) {
+          state.error = null
+          if (state.plan?.readyToApply) void applyTransfer()
+          else void buildReview()
+        } else if (piTui.matchesKey(data, 'enter') || piTui.matchesKey(data, 'escape')) {
+          close('Transfer closed. Source remains unchanged.')
+        }
+      },
+      invalidate: () => undefined,
+    })
+    const applyTransfer = async () => {
+      const destination = selectedTransferDestination(state)!
+      const registry = await loadMachines()
+      const machine = registry.machines.find((entry) => entry.key === destination.key)
+      if (!machine) { state.error = 'Destination Machine is no longer registered.'; state.phase = 'failed'; component = failureComponent(); return }
+      state.phase = 'transferring'
+      transferController = new AbortController()
+      let progress = { files: 0, bytes: 0, totalFiles: state.plan!.portable.files, totalBytes: state.plan!.portable.bytes }
+      component = {
+        render: () => [
+          'Transferring…',
+          '',
+          `${progress.files}/${progress.totalFiles} files · ${formatTransferProgress(progress.bytes, progress.totalBytes)}`,
+          'Checksums are verified before atomic publish.',
+          'Esc / Ctrl+C  Cancel',
+        ],
+        handleInput: (data) => {
+          if (piTui.matchesKey(data, 'escape')) {
+            transferController?.abort()
+            setMessage('Cancelling transfer; the remote receiver will retain only marked transaction staging.')
+          }
+        },
+        invalidate: () => undefined,
+      }
+      setMessage('Streaming portable files and private credential frames over SSH…')
+      try {
+        const sourceRuntime = await inspectTransferSource(source.home)
+        if (sourceRuntime.class !== 'absent') throw new Error('Source Runtime changed after planning; transfer was not started.')
+        const latest = await inspectFleet()
+        const remote = latest.machines.find((entry) => entry.key === destination.key)
+        if (!remote || remote.connection !== 'online' || !remote.capabilities.transferReceive) {
+          throw new Error('Destination Machine changed after planning; transfer was not started.')
+        }
+        if (remote.projects.some((project) => project.key === state.projectKey || remoteHomesOverlap(project.home, state.destinationHome))) {
+          throw new Error('Destination key or Home changed after planning; transfer was not started.')
+        }
+        state.receipt = await sendTransfer({
+          machine,
+          plan: state.plan!,
+          signal: transferController.signal,
+          onProgress: (next) => { progress = next; ui.requestRender() },
+        })
+        state.phase = 'success'
+        component = successComponent(machine)
+        setMessage('Published and registered. Source and remote default remain unchanged.')
+        await refreshFleet({ quiet: true })
+      } catch (error: unknown) {
+        state.phase = 'failed'; state.error = safeError(error); component = failureComponent()
+        setMessage('Transfer did not complete. Retry uses only its marked transaction staging.')
+      }
+      ui.requestRender()
+    }
+    const successComponent = (machine: RegisteredMachine): Component => ({
+      render: (width) => renderTransferResult(state.receipt!, machine.displayName, state.projectKey, width),
+      handleInput: (data) => {
+        if (piTui.matchesKey(data, 'enter') || piTui.matchesKey(data, 'escape')) { close(`Transferred ${machine.key}/${state.projectKey}.`) }
+        else if (piTui.matchesKey(data, 's')) void (async () => {
+          setMessage(`Starting ${machine.key}/${state.projectKey}…`)
+          try { await startRemoteProject(machine, state.projectKey); await refreshFleet({ quiet: true }); setMessage('Remote Runtime started. Press o to connect/open.') }
+          catch (error: unknown) { setMessage(`Could not start remote Runtime: ${safeError(error)}`) }
+        })()
+        else if (piTui.matchesKey(data, 'o')) void (async () => {
+          await refreshFleet({ quiet: true })
+          const remote = screen.snapshot.fleet?.machines.find((entry) => entry.key === machine.key)
+          const project = remote?.projects.find((entry) => entry.key === state.projectKey)
+          if (remote && project) { close(`Transferred ${machine.key}/${state.projectKey}.`); await activateFleetProject(remote, project) }
+          else setMessage('Refresh did not find the transferred AliceProject yet.')
+        })()
+      },
+      invalidate: () => undefined,
+    })
+    showDestination()
+    const panel = new (class implements Component {
+      render(width: number): string[] { return ['AliceProject Remote Transfer', '─'.repeat(Math.max(1, width)), '', ...component.render(width), '', sanitize(message)] }
+      handleInput(data: string): void { component.handleInput?.(data) }
+      invalidate(): void { component.invalidate() }
+    })()
+    const overlay = ui.showOverlay(panel, { width: '92%', maxHeight: '92%', anchor: 'center', margin: 1 })
+    closeTransfer = () => close()
+    overlay.focus()
+  }
+
   async function discoverUpdateInBackground(): Promise<void> {
     if (context ? !context.updateChecks : launchFlags.updateChecks === false) {
       return
@@ -1427,9 +2036,12 @@ export async function runSupervisorTui(
       settled = true
       active = false
       clearInterval(poll)
+      for (const controller of tunnelControllers.values()) controller.abort()
+      tunnelControllers.clear()
       closeSourcePrompt?.()
       closeSettings?.()
       closeProjects?.()
+      closeTransfer?.()
       removeInputListener()
       process.off('SIGTERM', onTerminate)
       process.off('SIGINT', onTerminate)
@@ -1438,7 +2050,7 @@ export async function runSupervisorTui(
     }
     const onTerminate = () => finish()
     const removeInputListener = ui.addInputListener((data) => {
-      if (sourcePromptActive || settingsActive || projectsActive) {
+      if (sourcePromptActive || settingsActive || projectsActive || transferActive) {
         if (piTui.matchesKey(data, 'ctrl+c')) {
           finish()
           return { consume: true }
@@ -1451,10 +2063,13 @@ export async function runSupervisorTui(
       }
       if (
         piTui.matchesKey(data, 'q')
-        || piTui.matchesKey(data, 'escape')
         || piTui.matchesKey(data, 'ctrl+c')
       ) {
         finish()
+        return { consume: true }
+      }
+      if (piTui.matchesKey(data, 'escape')) {
+        if (!screen.handleEscape()) finish()
         return { consume: true }
       }
       return screen.handleKey(data, piTui.matchesKey)
@@ -1465,6 +2080,7 @@ export async function runSupervisorTui(
     process.once('SIGTERM', onTerminate)
     process.once('SIGINT', onTerminate)
     ui.start()
+    void refreshFleet({ quiet: true })
     void discoverUpdateInBackground()
   })
 }
@@ -1496,6 +2112,16 @@ export class SupervisorScreen implements Component {
   private readonly onConfigureSource?: () => void
   private readonly onSettings?: () => void
   private readonly onProjects?: () => void
+  private readonly onActivateFleet?: (
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ) => void
+  private readonly onStartFleet?: (
+    machine: MachineInventory,
+    project: MachineProjectInventory,
+  ) => void
+  private readonly onRefreshFleet?: () => void
+  private readonly onTransferFleet?: (source: MachineProjectInventory) => void
   private readonly onRequestManagedSource?: () => void
   private readonly onPrepareManagedSource?: () => void
   private readonly requestRender?: () => void
@@ -1507,16 +2133,33 @@ export class SupervisorScreen implements Component {
       onConfigureSource?: () => void
       onSettings?: () => void
       onProjects?: () => void
+      onActivateFleet?: (
+        machine: MachineInventory,
+        project: MachineProjectInventory,
+      ) => void
+      onStartFleet?: (
+        machine: MachineInventory,
+        project: MachineProjectInventory,
+      ) => void
+      onRefreshFleet?: () => void
+      onTransferFleet?: (source: MachineProjectInventory) => void
       onRequestManagedSource?: () => void
       onPrepareManagedSource?: () => void
       requestRender?: () => void
     } = {},
   ) {
-    this.snapshot = { panel: 'overview', ...snapshot }
+    this.snapshot = {
+      panel: snapshot.fleet ? 'fleet' : 'overview',
+      ...snapshot,
+    }
     this.onAction = callbacks.onAction
     this.onConfigureSource = callbacks.onConfigureSource
     this.onSettings = callbacks.onSettings
     this.onProjects = callbacks.onProjects
+    this.onActivateFleet = callbacks.onActivateFleet
+    this.onStartFleet = callbacks.onStartFleet
+    this.onRefreshFleet = callbacks.onRefreshFleet
+    this.onTransferFleet = callbacks.onTransferFleet
     this.onRequestManagedSource = callbacks.onRequestManagedSource
     this.onPrepareManagedSource = callbacks.onPrepareManagedSource
     this.requestRender = callbacks.requestRender
@@ -1529,6 +2172,17 @@ export class SupervisorScreen implements Component {
 
   cancelConfirmation(): void {
     this.update({ confirmation: undefined, notice: 'Action cancelled.' })
+  }
+
+  handleEscape(): boolean {
+    if (
+      this.snapshot.panel === 'fleet'
+      && this.snapshot.fleet?.focus === 'projects'
+    ) {
+      this.update({ fleet: setFleetFocus(this.snapshot.fleet, 'machines') })
+      return true
+    }
+    return false
   }
 
   handleKey(
@@ -1556,6 +2210,70 @@ export class SupervisorScreen implements Component {
     if (matchesKey(data, '?')) {
       this.update({ panel: this.snapshot.panel === 'help' ? 'overview' : 'help' })
       return true
+    }
+    if (matchesKey(data, ']') || matchesKey(data, '[')) {
+      this.selectAdjacentPanel(matchesKey(data, ']') ? 1 : -1)
+      return true
+    }
+    const fleet = this.snapshot.panel === 'fleet' ? this.snapshot.fleet : null
+    if (fleet) {
+      if (matchesKey(data, 'up') || matchesKey(data, 'down')) {
+        this.update({
+          fleet: moveFleetSelection(fleet, matchesKey(data, 'down') ? 1 : -1),
+        })
+        return true
+      }
+      if (matchesKey(data, 'tab') || matchesKey(data, 'right')) {
+        this.update({ fleet: setFleetFocus(fleet, 'projects') })
+        return true
+      }
+      if (matchesKey(data, 'shift+tab') || matchesKey(data, 'left')) {
+        this.update({ fleet: setFleetFocus(fleet, 'machines') })
+        return true
+      }
+      if (matchesKey(data, 'enter')) {
+        if (fleet.focus === 'machines') {
+          this.update({ fleet: setFleetFocus(fleet, 'projects') })
+        } else {
+          const machine = selectedFleetMachine(fleet)
+          const project = selectedFleetProject(fleet)
+          if (machine && project) this.onActivateFleet?.(machine, project)
+          else this.update({ notice: 'No AliceProject is available on the selected Machine.' })
+        }
+        return true
+      }
+      const machine = selectedFleetMachine(fleet)
+      const project = selectedFleetProject(fleet)
+      const remote = machine?.key !== 'local'
+      if (matchesKey(data, 'r') && remote) {
+        this.onRefreshFleet?.()
+        return true
+      }
+      if (matchesKey(data, 'o') && remote) {
+        if (machine && project) this.onActivateFleet?.(machine, project)
+        else this.update({ notice: 'No remote AliceProject is available to connect.' })
+        return true
+      }
+      if (matchesKey(data, 's') && remote) {
+        if (!machine || !project) this.update({ notice: 'No remote AliceProject is available to start.' })
+        else if (machine.connection !== 'online') this.update({ notice: 'The selected Machine is not online.' })
+        else if (!machine.capabilities.lifecycle) this.update({ notice: 'This Machine does not support remote lifecycle actions.' })
+        else if (!project.available || project.runtime.class !== 'absent') this.update({ notice: 'Start is available only for a stopped remote AliceProject.' })
+        else this.onStartFleet?.(machine, project)
+        return true
+      }
+      if (matchesKey(data, 'm') && !remote) {
+        if (project) this.onTransferFleet?.(project)
+        else this.update({ notice: 'Select a local AliceProject to transfer.' })
+        return true
+      }
+      const remoteMutationKeys: KeyId[] = ['x', 'd', 'l', 'p', 'c', 'm']
+      if (remote && remoteMutationKeys.some((key) => matchesKey(data, key))) {
+        this.update({
+          notice: 'That mutation is not available for a remote selection. Use r to refresh or Enter/o to connect a running AliceProject.',
+        })
+        return true
+      }
     }
     if (matchesKey(data, 'enter')) {
       if (isConfigRecovery(this.snapshot)) {
@@ -1674,7 +2392,23 @@ export class SupervisorScreen implements Component {
       '',
     ]
 
-    if (this.snapshot.panel === 'logs') {
+    if (this.snapshot.panel === 'fleet' && this.snapshot.fleet) {
+      lines.push(...renderSupervisorFleet(this.snapshot.fleet, width))
+      const fleetMachine = selectedFleetMachine(this.snapshot.fleet)
+      const fleetProject = selectedFleetProject(this.snapshot.fleet)
+      if (fleetMachine?.key === 'local' && fleetProject) {
+        lines.push(
+          '',
+          narrow ? `Runtime: ${state}` : `Runtime state: ${state}`,
+          `AliceProject: ${fleetProject.displayName}`,
+          `Home: ${fleetProject.home}`,
+        )
+        if (!narrow && this.snapshot.context) {
+          lines.push(`Resolved: home ${formatProvenance(this.snapshot.context.provenance.home)} · port ${formatPortResolution(this.snapshot.context)}`)
+        }
+        lines.push('', ...renderGuidance(runtime, this.snapshot.context))
+      }
+    } else if (this.snapshot.panel === 'logs') {
       lines.push(...renderLogs(this.snapshot.logs))
     } else if (this.snapshot.panel === 'doctor') {
       lines.push(...renderDoctor(this.snapshot.doctor))
@@ -1733,7 +2467,14 @@ export class SupervisorScreen implements Component {
     }
     lines.push(
       '',
-      ...actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot)),
+      ...(this.snapshot.panel === 'fleet' && this.snapshot.fleet
+        ? fleetActionBar(
+            this.snapshot.fleet,
+            runtime,
+            this.snapshot.context,
+            width,
+          )
+        : actionBar(runtime, this.snapshot.context, width, isConfigRecovery(this.snapshot))),
       'q / Esc / Ctrl+C  Detach without stopping',
     )
     return lines.map((line) => truncate(line, width))
@@ -1762,7 +2503,7 @@ export class SupervisorScreen implements Component {
   private selectAdjacentPanel(direction: 1 | -1): void {
     const panels: SupervisorPanel[] = isConfigRecovery(this.snapshot)
       ? ['overview', 'help']
-      : ['overview', 'logs', 'doctor', 'help']
+      : ['fleet', 'overview', 'logs', 'doctor', 'help']
     const current = panels.indexOf(this.snapshot.panel ?? 'overview')
     const panel = panels[(current + direction + panels.length) % panels.length]
       ?? 'overview'
@@ -1832,6 +2573,7 @@ function renderTabs(
         ['help', 'Help'],
       ]
     : [
+        ['fleet', narrow ? 'Fleet' : 'Machines'],
         ['overview', narrow ? 'Home' : 'Overview'],
         ['logs', 'Logs'],
         ['doctor', 'Doctor'],
@@ -1840,6 +2582,49 @@ function renderTabs(
   return labels
     .map(([panel, label]) => panel === selected ? `[${label}]` : label)
     .join('  ')
+}
+
+function fleetActionBar(
+  fleet: SupervisorFleetState,
+  runtime: RuntimeSummary | null,
+  context: ResolvedLaunchContext | undefined,
+  width: number,
+): string[] {
+  const machine = selectedFleetMachine(fleet)
+  const project = selectedFleetProject(fleet)
+  if (machine?.key === 'local') {
+    return [
+      ...actionBar(runtime, context, width, false)
+        .map((line) => line
+          .replace(' · m Managed', '')
+          .replace('m Managed · ', '')
+          .replace('  m Managed', '')),
+      width < 72
+        ? 'm Transfer · ↑/↓ Select · ←/→ Pane'
+        : 'm Transfer · ↑/↓ Select · Tab/←/→ Pane · [ / ] Pages',
+    ]
+  }
+  if (width < 72) {
+    if (fleet.focus === 'machines') {
+      return ['↑/↓ Select · Enter/→ Projects · ] Pages · ? Help']
+    }
+    return [
+      machine?.key === 'local'
+        ? '↑/↓ Select · Enter Activate · ← Machines · ] Pages'
+        : project?.runtime.class === 'absent'
+          ? '↑/↓ Select · s Start · r Refresh · ← Machines'
+          : '↑/↓ Select · Enter/o Connect · r Refresh · ← Machines',
+    ]
+  }
+  const primary = project?.runtime.class === 'absent'
+    ? 's Start stopped AliceProject'
+    : project
+      ? 'Enter/o Connect running AliceProject'
+      : 'Enter AliceProjects'
+  return [
+    `${primary} · ↑/↓ Select · Tab/←/→ Pane · r Refresh`,
+    '[ / ] Pages · i AliceProjects · p Setup · ? Help',
+  ]
 }
 
 function renderGuidance(
@@ -1920,7 +2705,7 @@ function renderHelp(recovery = false): string[] {
     '?  Toggle this help',
     'i  Select or create an AliceProject',
     'p  Review setup for this AliceProject',
-    'm  Advanced: prepare installer-managed source and start',
+    'm  Fleet: transfer local project · Overview: prepare managed source',
     'c  Advanced: choose and remember a source checkout',
     'Tab / arrows  Change panel        q / Esc  Detach only',
     '',
@@ -2290,6 +3075,101 @@ function storedHomeRecoveryNotice(
 
 function sanitize(value: string): string {
   return value.replaceAll(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+}
+
+function loopbackEndpointPort(value: string | null): number | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') return null
+    const port = Number(url.port || '80')
+    return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null
+  } catch {
+    return null
+  }
+}
+
+function remoteHomesOverlap(left: string, right: string): boolean {
+  const leftPath = posix.normalize(left)
+  const rightPath = posix.normalize(right)
+  const leftRelative = posix.relative(leftPath, rightPath)
+  const rightRelative = posix.relative(rightPath, leftPath)
+  return leftRelative === ''
+    || (!leftRelative.startsWith('../') && leftRelative !== '..')
+    || (!rightRelative.startsWith('../') && rightRelative !== '..')
+}
+
+function formatTransferProgress(bytes: number, total: number): string {
+  if (total <= 0) return '0 B'
+  const percent = Math.min(100, Math.floor((bytes / total) * 100))
+  return `${percent}% · ${bytes}/${total} bytes`
+}
+
+async function runRemoteProjectStart(
+  machine: RegisteredMachine,
+  projectKey: string,
+): Promise<void> {
+  if (!/^[a-z][a-z0-9_-]{0,31}$/u.test(projectKey)) throw new Error('Invalid remote AliceProject key.')
+  const command = `set -eu
+cli=$(command -v openalice 2>/dev/null || { [ ! -x "$HOME/.openalice/bin/openalice" ] || printf '%s\\n' "$HOME/.openalice/bin/openalice"; })
+[ -n "$cli" ] || exit 127
+exec "$cli" up --project ${projectKey} --wait 30`
+  const child = spawn('ssh', buildRemoteSshArgs({
+    destination: machine.sshTarget,
+    sshPort: machine.sshPort ?? null,
+    identityFile: machine.identityFile ?? null,
+  }, command), { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
+  let stderr = ''
+  child.stderr?.on('data', (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(-4_096) })
+  await new Promise<void>((resolvePromise, reject) => {
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      if (code === 0) resolvePromise()
+      else reject(new Error(`Remote start failed ${signal ? `with ${signal}` : `with code ${code ?? 'unknown'}`}${stderr.trim() ? `: ${stderr.trim()}` : ''}`))
+    })
+  })
+}
+
+function alignLocalFleetProject(
+  machines: MachineInventory[],
+  context: ResolvedLaunchContext | undefined,
+  runtime: RuntimeSummary | null,
+): MachineInventory[] {
+  if (!context) return machines
+  return machines.map((machine) => {
+    if (machine.key !== 'local') return machine
+    const existing = machine.projects.find((project) => project.key === context.project)
+    const projected: MachineProjectInventory = {
+      key: context.project,
+      id: context.aliceProject.id,
+      displayName: context.aliceProject.displayName,
+      home: context.home,
+      port: context.port,
+      portAutomatic: context.provenance.port.source === 'default',
+      product: existing?.product ?? 'trader',
+      isDefault: existing?.isDefault ?? false,
+      available: existing?.available ?? true,
+      runtime: {
+        class: runtime?.class ?? 'unavailable',
+        state: runtime?.state ?? 'unknown',
+        ownerSurface: runtime?.owner?.surface ?? null,
+        uptimeSeconds: Number.isFinite(runtime?.uptimeSeconds)
+          ? runtime?.uptimeSeconds ?? null
+          : null,
+        webEndpoint: runtime?.endpoints?.web ?? null,
+        components: Object.fromEntries(
+          Object.entries(runtime?.components ?? {})
+            .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+        ),
+      },
+    }
+    return {
+      ...machine,
+      projects: existing
+        ? machine.projects.map((project) => project.key === context.project ? projected : project)
+        : [...machine.projects, projected],
+    }
+  })
 }
 
 function truncate(value: string, width: number): string {

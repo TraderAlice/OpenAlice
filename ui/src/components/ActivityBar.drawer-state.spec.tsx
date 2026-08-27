@@ -29,6 +29,10 @@ vi.mock('../live/trading-push', () => ({
   usePendingPushCount: () => 0,
 }))
 
+vi.mock('../live/connector-health', () => ({
+  useConnectorWarningCount: () => 0,
+}))
+
 vi.mock('../live/activity-bar-collapse', () => ({
   useActivityBarCollapse: (selector: (state: Record<string, unknown>) => unknown) => selector({
     collapsedSections: {},

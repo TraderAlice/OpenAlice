@@ -108,6 +108,8 @@ async function main(): Promise<void> {
   const dataHome = await mkdtemp(join(tmpdir(), 'openalice-guardian-smoke-'))
   const launcherRoot = resolve(dataHome, 'workspaces')
   const flagPath = resolve(dataHome, 'data/control/restart-uta.flag')
+  await mkdir(resolve(dataHome, 'data/config'), { recursive: true })
+  await writeFile(resolve(dataHome, 'data/config/connector-service.json'), JSON.stringify({ enabled: true }))
 
   // ── Spawn the full stack ──────────────────────────────────
   // POSIX: detached so the whole process group can be force-killed on cleanup.
@@ -190,9 +192,10 @@ async function main(): Promise<void> {
   // Parse the ports Guardian prints in its banner (robust to port-probe shifts).
   await waitFor('guardian banner printed', () => /Alice\s+→\s+http:\/\/localhost:\d+/.test(out))
   const utaPort = Number(/UTA\s+→\s+http:\/\/127\.0\.0\.1:(\d+)/.exec(out)?.[1])
+  const connectorPort = Number(/Connector→\s+http:\/\/127\.0\.0\.1:(\d+)/.exec(out)?.[1])
   const webPort = Number(/Alice\s+→\s+http:\/\/localhost:(\d+)/.exec(out)?.[1])
-  if (!utaPort || !webPort) fail(`could not parse ports from banner:\n${out.slice(-600)}`)
-  console.log(`  parsed ports → UTA:${utaPort} Alice:${webPort}`)
+  if (!utaPort || !connectorPort || !webPort) fail(`could not parse ports from banner:\n${out.slice(-600)}`)
+  console.log(`  parsed ports → UTA:${utaPort} Connector:${connectorPort} Alice:${webPort}`)
 
   // UTA tsx spawn worked → health responds.
   let health: UtaHealth | null = null
@@ -201,6 +204,9 @@ async function main(): Promise<void> {
     return health !== null
   })
   const startedAt0 = health!.startedAt
+  await waitFor('Connector health 200 (connector child spawned)', async () => {
+    try { return (await fetch(`http://127.0.0.1:${connectorPort}/__connector/health`)).ok } catch { return false }
+  })
 
   // Alice tsx spawn worked → web plugin bound its port.
   await waitFor('Alice listening (alice child spawned)', () => portBound(webPort))
@@ -262,6 +268,17 @@ async function main(): Promise<void> {
   }
   console.log('✓ duplicate dev refused the writer lock without disturbing discovery')
 
+  const connectorPid0 = rediscovered.componentDetail.connector?.pid
+  if (!connectorPid0) fail(`dev discovery did not report the Connector pid: ${JSON.stringify(rediscovered.componentDetail)}`)
+  if (IS_WIN) spawnSync('taskkill', ['/pid', String(connectorPid0), '/T', '/F'])
+  else process.kill(connectorPid0, 'SIGKILL')
+  await waitFor('Connector recovered after an unexpected process crash', async () => {
+    const current = await readRuntimeStatus({ homeRoot: dataHome, timeoutMs: 2_000 })
+    const currentPid = current.componentDetail.connector?.pid
+    if (!currentPid || currentPid === connectorPid0 || current.components.connector !== 'ready') return false
+    try { return (await fetch(`http://127.0.0.1:${connectorPort}/__connector/health`)).ok } catch { return false }
+  })
+
   console.log('\n✅ HARD checks passed — all three children spawned and bound.')
   summary(`✅ **Guardian boot smoke passed (${process.platform})** — UTA/Alice/Vite spawned; dev discovery stayed read-only through a duplicate start.`)
 
@@ -297,9 +314,10 @@ async function main(): Promise<void> {
   forceCleanup()
   await sleep(5_000)
   const stillUta = await portBound(utaPort)
+  const stillConnector = await portBound(connectorPort)
   const stillWeb = await portBound(webPort)
-  if (stillUta || stillWeb) {
-    const which = [stillUta && `UTA:${utaPort}`, stillWeb && `Alice:${webPort}`].filter(Boolean).join(', ')
+  if (stillUta || stillConnector || stillWeb) {
+    const which = [stillUta && `UTA:${utaPort}`, stillConnector && `Connector:${connectorPort}`, stillWeb && `Alice:${webPort}`].filter(Boolean).join(', ')
     console.warn(`⚠️  Ports still bound after tree-kill (a process escaped the tree): ${which}`)
     summary(`⚠️ Teardown on ${process.platform}: ${which} still bound after tree-kill.`)
   } else {

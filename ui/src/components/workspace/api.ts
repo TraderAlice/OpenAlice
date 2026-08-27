@@ -867,6 +867,10 @@ export interface WorkspaceSessionDirectoryEntry {
   readonly active: boolean;
   /** Present when this product Session was allocated after birth metadata shipped. */
   readonly createdBy?: SessionCreatedBy;
+  /** Hidden Sessions remain available to their owning Issue and diagnostics. */
+  readonly rosterVisibility?: 'hidden';
+  /** Current Issue ownership/occupancy; shared roster preferences may hide it. */
+  readonly issueAttached?: true;
   readonly runtime?: {
     readonly credentialSource: 'native' | 'vault' | 'workspace';
     readonly credentialSlug?: string;

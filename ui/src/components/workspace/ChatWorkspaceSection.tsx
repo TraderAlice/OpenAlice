@@ -132,7 +132,11 @@ export function ChatWorkspaceSection({
   const { preferences: harnessPreferences } = useHarnessPreferences()
   const rosterJoin = useMemo(() => ({
     includeHeadlessBornSessions: harnessPreferences.showHeadlessBornSessions,
-  }), [harnessPreferences.showHeadlessBornSessions])
+    includeIssueAttachedSessions: harnessPreferences.showIssueAttachedSessions,
+  }), [
+    harnessPreferences.showHeadlessBornSessions,
+    harnessPreferences.showIssueAttachedSessions,
+  ])
   const sessionDirectories = useWorkspaceSessionDirectories(chatWorkspaceIds)
   const rosterByWorkspace = useMemo(() => {
     const next = new Map<string, HarnessSession[]>()
@@ -543,6 +547,7 @@ export function ChatWorkspaceSection({
         workspaces={chatWorkspaces}
         directories={sessionDirectories.directories}
         includeHeadlessBornSessions={harnessPreferences.showHeadlessBornSessions}
+        includeIssueAttachedSessions={harnessPreferences.showIssueAttachedSessions}
         currentWorkspaceId={conversationWorkspaceId}
         isRowActive={isRosterRowActive}
         restoreFocusRef={dialogRestoreFocusRef}

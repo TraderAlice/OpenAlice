@@ -47,8 +47,19 @@ function host(overrides: Partial<TelegramDeskChatHost> = {}): TelegramDeskChatHo
   }
 }
 
+function mockClient() {
+  const sent: Array<{ id: string; conversationId: string; phase: string; text?: string }> = []
+  const client = {
+    sendOwnerMessage: async (message: { id: string; conversationId: string; phase: string; text?: string }) => {
+      sent.push(message)
+      return { accepted: true }
+    },
+  } as unknown as ConnectorClient
+  return { client, sent }
+}
+
 describe('telegram desk chat filter', () => {
-  it('projects agent comments and skips inbound telegram or [[no-reply]]', () => {
+  it('projects agent comments, including syntax discussions, and skips inbound telegram', () => {
     const issue = { connectorDesk: 'telegram' }
     expect(shouldProjectDeskComment(issue, {
       id: 'c1', author: '@resume-a', at: 'now', markdown: 'Hello from the desk.',
@@ -58,6 +69,11 @@ describe('telegram desk chat filter', () => {
     })).toBe(false)
     expect(shouldProjectDeskComment(issue, {
       id: 'c3', author: '@resume-a', at: 'now', markdown: '[[no-reply]] nothing to say',
+    })).toBe(true)
+    expect(shouldProjectDeskComment(issue, {
+      id: 'c3', author: '@resume-a', at: 'now', markdown: '[[no-reply]] nothing to say',
+    }, {
+      triggerMetadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
     })).toBe(false)
     expect(shouldProjectDeskComment({}, {
       id: 'c4', author: '@resume-a', at: 'now', markdown: 'ordinary issue',
@@ -86,17 +102,44 @@ describe('telegram desk ingest and stamp', () => {
       [{ id: 'ws-a', dir: wsDir }],
     )
     expect(created.ok).toBe(true)
+    const { client } = mockClient()
     const result = await ingestTelegramOwnerMessage(host(), {
       connectorId: 'telegram',
       userId: '42',
       text: 'What is the overnight risk?',
-    })
+    }, client)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.comment.author).toBe('human')
     expect(result.comment.via).toBe('telegram')
     expect(result.comment.markdown).toBe('What is the overnight risk?')
     expect(shouldProjectDeskComment(created.ok ? created.issue : { connectorDesk: 'telegram' }, result.comment)).toBe(false)
+  })
+
+  it('starts native owner-chat activity after the Agent turn is scheduled', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    const { client, sent } = mockClient()
+    const result = await ingestTelegramOwnerMessage(host({
+      conversation: () => ({
+        ask: async () => ({ status: 'accepted', taskId: 'run-1', resumeId: 'resume-1' }),
+      } as unknown as NonNullable<ReturnType<TelegramDeskChatHost['conversation']>>),
+    }), {
+      connectorId: 'telegram',
+      userId: '42',
+      text: 'What is the overnight risk?',
+    }, client)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(sent).toEqual([expect.objectContaining({
+      id: `desk-accepted-${result.comment.id}`,
+      conversationId: result.comment.id,
+      phase: 'accepted',
+    })])
   })
 
   it('stamps a scheduled fire as a comment', async () => {
@@ -106,8 +149,10 @@ describe('telegram desk ingest and stamp', () => {
     )
     expect(created.ok).toBe(true)
     if (!created.ok) return
+    const { client, sent } = mockClient()
     const comment = await stampTelegramDeskScheduledFire({
       host: host(),
+      client,
       workspaceId: 'ws-a',
       issueId: created.issue.id,
       task: {
@@ -119,13 +164,22 @@ describe('telegram desk ingest and stamp', () => {
         startedAt: 1,
         status: 'done',
         finishedAt: 2,
+        trigger: {
+          kind: 'issue',
+          workspaceId: 'ws-a',
+          issueId: created.issue.id,
+          metadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
+        },
       },
       assistantText: 'Markets are quiet. [[no-reply]] no send.',
     })
     expect(comment?.markdown).toContain('[[no-reply]]')
     expect(comment?.id).toBe('comment-fire-run-1')
+    expect(sent).toEqual([])
     if (!comment) return
-    expect(shouldProjectDeskComment(created.issue, comment)).toBe(false)
+    expect(shouldProjectDeskComment(created.issue, comment, {
+      triggerMetadata: { kind: 'connector-cron-issue', connectorId: 'telegram' },
+    })).toBe(false)
   })
 
   it('does not publish partial assistant text from a failed scheduled fire', async () => {
@@ -151,6 +205,35 @@ describe('telegram desk ingest and stamp', () => {
         finishedAt: 2,
       },
       assistantText: 'Partial answer before the runtime failed.',
+    })
+
+    expect(comment).toBeNull()
+  })
+
+  it('does not consume connector control syntax without trigger metadata', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+
+    const comment = await stampTelegramDeskScheduledFire({
+      host: host(),
+      workspaceId: 'ws-a',
+      issueId: created.issue.id,
+      task: {
+        taskId: 'run-unmarked',
+        resumeId: 'resume-desk-owner',
+        wsId: 'ws-a',
+        agent: 'pi',
+        prompt: 'wake',
+        startedAt: 1,
+        status: 'done',
+        finishedAt: 2,
+        trigger: { kind: 'issue', workspaceId: 'ws-a', issueId: created.issue.id },
+      },
+      assistantText: 'We discussed [[no-reply]] syntax.',
     })
 
     expect(comment).toBeNull()
@@ -186,10 +269,11 @@ describe('telegram desk ingest and stamp', () => {
       [{ id: 'ws-a', dir: wsDir }],
     )
     expect(created.ok).toBe(true)
+    const { client } = mockClient()
     const result = await ingestTelegramOwnerMessages(host(), [
       { connectorId: 'telegram', userId: '42', text: '那个事情我想了想你再改改' },
       { connectorId: 'telegram', userId: '42', text: '算了不用改了,就这样吧' },
-    ])
+    ], client)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.comment.markdown).toBe([

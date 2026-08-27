@@ -1,42 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { TFunction } from 'i18next'
 import { CircleAlert, Plug, RefreshCw, Settings2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { api, type ConnectorHealth, type ConnectorSettingsSnapshot } from '../api'
+import type { ConnectorHealth, ConnectorSettingsSnapshot } from '../api'
 import { PageHeader } from '../components/PageHeader'
 import { Spinner } from '../components/StateViews'
 import { useWorkspace } from '../tabs/store'
-
-const REFRESH_INTERVAL_MS = 15_000
+import {
+  reconnectConnector,
+  refreshConnectorHealth,
+  useConnectorHealthState,
+} from '../live/connector-health'
 
 export function ConnectorStatusPage() {
-  const [snapshot, setSnapshot] = useState<ConnectorSettingsSnapshot | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const { snapshot, loading, refreshing, error, lastUpdatedAt } = useConnectorHealthState()
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const { t } = useTranslation()
 
-  const load = useCallback(async (background = false) => {
-    if (background) setRefreshing(true)
+  const reconnect = useCallback(async (id: string) => {
+    setReconnectingId(id)
+    setActionError(null)
     try {
-      setSnapshot(await api.connectors.load())
-      setLastUpdated(new Date())
-      setError(null)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError))
+      await reconnectConnector(id)
+    } catch (reconnectError) {
+      setActionError(reconnectError instanceof Error ? reconnectError.message : String(reconnectError))
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      setReconnectingId(null)
     }
   }, [])
-
-  useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => { void load(true) }, REFRESH_INTERVAL_MS)
-    return () => window.clearInterval(timer)
-  }, [load])
 
   const configure = useCallback(() => {
     openOrFocus({ kind: 'settings', params: { category: 'connectors' } })
@@ -49,10 +42,10 @@ export function ConnectorStatusPage() {
         description={t('connectorStatus.description')}
         right={(
           <div className="flex items-center gap-2">
-            {lastUpdated && (
+            {lastUpdatedAt && (
               <span className="hidden text-[11px] text-muted-foreground/60 sm:inline">
                 {t('connectorStatus.updated', {
-                  time: lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  time: new Date(lastUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 })}
               </span>
             )}
@@ -60,7 +53,7 @@ export function ConnectorStatusPage() {
               type="button"
               className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:border-primary/50 disabled:opacity-50"
               disabled={refreshing}
-              onClick={() => void load(true)}
+              onClick={() => void refreshConnectorHealth()}
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               {t('connectorStatus.refresh')}
@@ -82,7 +75,13 @@ export function ConnectorStatusPage() {
           {loading && !snapshot ? (
             <div className="flex justify-center py-24"><Spinner /></div>
           ) : snapshot ? (
-            <ConnectorOverview snapshot={snapshot} onConfigure={configure} t={t} />
+            <ConnectorOverview
+              snapshot={snapshot}
+              onConfigure={configure}
+              onReconnect={reconnect}
+              reconnectingId={reconnectingId}
+              t={t}
+            />
           ) : null}
 
           {error && (
@@ -94,6 +93,12 @@ export function ConnectorStatusPage() {
               </div>
             </div>
           )}
+          {actionError && (
+            <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive" role="alert">
+              <CircleAlert size={17} className="mt-0.5 shrink-0" />
+              <p>{actionError}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -103,10 +108,14 @@ export function ConnectorStatusPage() {
 function ConnectorOverview({
   snapshot,
   onConfigure,
+  onReconnect,
+  reconnectingId,
   t,
 }: {
   snapshot: ConnectorSettingsSnapshot
   onConfigure: () => void
+  onReconnect: (id: string) => Promise<void>
+  reconnectingId: string | null
   t: TFunction
 }) {
   const runtimeById = useMemo(
@@ -208,6 +217,17 @@ function ConnectorOverview({
                   <dd className="text-foreground">
                     {runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : t('connectorStatus.noDeliveryYet')}
                   </dd>
+                  {runtime?.nextAttemptAt && (
+                    <>
+                      <dt className="text-muted-foreground">{t('connectorStatus.nextRetry')}</dt>
+                      <dd className="text-foreground">
+                        {t('connectorStatus.nextRetryAt', {
+                          time: formatDate(runtime.nextAttemptAt),
+                          count: runtime.consecutiveFailures ?? 1,
+                        })}
+                      </dd>
+                    </>
+                  )}
                 </dl>
 
                 {(runtime?.detail || runtime?.lastError) && (
@@ -223,6 +243,20 @@ function ConnectorOverview({
                     onClick={onConfigure}
                   >
                     {t('connectorStatus.configureAdapter', { name: definition.label })}
+                  </button>
+                )}
+                {configured && snapshot.config.serviceEnabled && config.enabled
+                  && runtime?.status !== 'healthy' && runtime?.status !== 'awaiting_link' && (
+                  <button
+                    type="button"
+                    className="oa-pressable mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-foreground hover:border-primary/50 disabled:opacity-50"
+                    disabled={reconnectingId === definition.id}
+                    onClick={() => void onReconnect(definition.id)}
+                  >
+                    <RefreshCw size={13} className={reconnectingId === definition.id ? 'animate-spin motion-reduce:animate-none' : ''} />
+                    {reconnectingId === definition.id
+                      ? t('connectorStatus.reconnecting')
+                      : t('connectorStatus.reconnect')}
                   </button>
                 )}
               </article>

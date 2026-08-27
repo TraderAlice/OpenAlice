@@ -9,7 +9,11 @@ export interface ProcessController {
   isAlive(pid: number): boolean
   startedAt(pid: number): Promise<number | null>
   machineId(): Promise<string>
-  signalTree(pid: number, signal: NodeJS.Signals): Promise<void>
+  signalTree(
+    pid: number,
+    signal: NodeJS.Signals,
+    knownPids?: readonly number[],
+  ): Promise<readonly number[] | void>
   sleep(ms: number): Promise<void>
 }
 
@@ -80,13 +84,20 @@ export async function terminateProcessTree(
   const controller = opts.controller ?? defaultProcessController
   if (!controller.isAlive(pid)) return
 
-  await controller.signalTree(pid, 'SIGTERM')
-  if (await waitForProcessExit(pid, opts.gracefulMs ?? 5_000, controller)) return
+  const gracefulTargets = uniquePids([
+    pid,
+    ...((await controller.signalTree(pid, 'SIGTERM')) ?? []),
+  ])
+  if (await waitForProcessesExit(gracefulTargets, opts.gracefulMs ?? 5_000, controller)) return
 
-  await controller.signalTree(pid, 'SIGKILL')
-  if (await waitForProcessExit(pid, opts.forceMs ?? 5_000, controller)) return
+  const forceTargets = uniquePids([
+    ...gracefulTargets,
+    ...((await controller.signalTree(pid, 'SIGKILL', gracefulTargets)) ?? []),
+  ])
+  if (await waitForProcessesExit(forceTargets, opts.forceMs ?? 5_000, controller)) return
 
-  throw new Error(`process tree ${pid} did not exit after SIGTERM and SIGKILL`)
+  const survivors = forceTargets.filter((target) => controller.isAlive(target))
+  throw new Error(`process tree ${pid} did not exit after SIGTERM and SIGKILL (survivors: ${survivors.join(', ')})`)
 }
 
 export async function waitForProcessExit(
@@ -101,6 +112,20 @@ export async function waitForProcessExit(
     waitedMs += delayMs
   }
   return !controller.isAlive(pid)
+}
+
+async function waitForProcessesExit(
+  pids: readonly number[],
+  timeoutMs: number,
+  controller: ProcessController,
+): Promise<boolean> {
+  let waitedMs = 0
+  while (pids.some((pid) => controller.isAlive(pid)) && waitedMs < timeoutMs) {
+    const delayMs = Math.min(50, Math.max(1, timeoutMs - waitedMs))
+    await controller.sleep(delayMs)
+    waitedMs += delayMs
+  }
+  return pids.every((pid) => !controller.isAlive(pid))
 }
 
 async function readProcessStartedAt(pid: number): Promise<number | null> {
@@ -153,7 +178,11 @@ async function readMachineId(): Promise<string> {
   return `hostname:${hostname()}`
 }
 
-async function signalProcessTree(pid: number, signal: NodeJS.Signals): Promise<void> {
+async function signalProcessTree(
+  pid: number,
+  signal: NodeJS.Signals,
+  knownPids?: readonly number[],
+): Promise<readonly number[]> {
   if (process.platform === 'win32') {
     const args = ['/pid', String(pid), '/T']
     if (signal === 'SIGKILL') args.push('/F')
@@ -162,18 +191,26 @@ async function signalProcessTree(pid: number, signal: NodeJS.Signals): Promise<v
     } catch {
       // The process may have exited between the liveness check and taskkill.
     }
-    return
+    return [pid]
   }
 
-  if (signal === 'SIGKILL') {
-    for (const childPid of await descendantPids(pid)) {
-      try { process.kill(childPid, signal) } catch { /* already gone */ }
-    }
+  const targets = uniquePids(knownPids?.length
+    ? knownPids
+    : [...await listDescendantPids(pid), pid])
+  // Signal descendants before their wrapper. Package managers and shell shims
+  // can exit immediately, reparenting children before a later tree walk.
+  for (const target of targets.filter((target) => target !== pid)) {
+    try { process.kill(target, signal) } catch { /* already gone */ }
   }
   try { process.kill(pid, signal) } catch { /* already gone */ }
+  return targets
 }
 
-async function descendantPids(rootPid: number): Promise<number[]> {
+function uniquePids(values: readonly number[]): number[] {
+  return [...new Set(values.filter((value) => Number.isInteger(value) && value > 0))]
+}
+
+export async function listDescendantPids(rootPid: number): Promise<number[]> {
   try {
     const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,ppid='], { timeout: 2_000 })
     const children = new Map<number, number[]>()

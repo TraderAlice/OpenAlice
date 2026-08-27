@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   save: vi.fn(),
   preferences: {
     showHeadlessBornSessions: false,
+    showIssueAttachedSessions: false,
     showUnverifiedHarnessReleases: false,
   },
 }))
@@ -27,6 +28,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   mocks.preferences.showHeadlessBornSessions = false
+  mocks.preferences.showIssueAttachedSessions = false
   mocks.preferences.showUnverifiedHarnessReleases = false
 })
 
@@ -49,6 +51,21 @@ describe('HarnessSettingsPage', () => {
     fireEvent.click(toggle)
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
       showHeadlessBornSessions: true,
+      showIssueAttachedSessions: false,
+      showUnverifiedHarnessReleases: false,
+    }))
+  })
+
+  it('opts into showing Sessions attached to Issues independently', async () => {
+    render(<HarnessSettingsPage />)
+
+    const toggle = screen.getByRole('switch', { name: 'Show Issue-attached Sessions' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByText(/Connector chat Sessions always stay hidden/)).toBeTruthy()
+    fireEvent.click(toggle)
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      showHeadlessBornSessions: false,
+      showIssueAttachedSessions: true,
       showUnverifiedHarnessReleases: false,
     }))
   })
@@ -60,6 +77,7 @@ describe('HarnessSettingsPage', () => {
     fireEvent.click(toggle)
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
       showHeadlessBornSessions: false,
+      showIssueAttachedSessions: false,
       showUnverifiedHarnessReleases: true,
     }))
   })
