@@ -590,7 +590,7 @@ export const zhHant: Resources = {
       showHeadlessBorn: '顯示無頭出身的 Session',
       showHeadlessBornDescription: '預設關閉。從 Issue 或 API 跑起來、從未開過 TUI / WebPi 的 Session 留在 Issue 頁，不進桌子名冊。',
       showIssueAttached: '顯示掛靠 Issue 的 Session',
-      showIssueAttachedDescription: '預設關閉。目前由 Issue 持有或佔用的 Session 留在 Issue 與 Automation 頁面，不進入共享桌子名冊。',
+      showIssueAttachedDescription: '預設關閉。開啟後，普通 Issue 目前持有或佔用的 Session 會進入共享桌子名冊；Connector 聊天 Session 一律隱藏。',
       showUnverifiedReleases: '顯示未經認證的 Harness 版本',
       showUnverifiedReleasesDescription: '預設關閉。開啟後 OpenAlice 也會檢查上游倉庫最新的穩定版本；這些版本會明確標記，且仍需審閱後升級。',
       askAlice: 'Ask Alice',
