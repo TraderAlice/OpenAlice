@@ -40,6 +40,8 @@ interface SurfaceRuntime {
   readonly entryPort: number
   phase: HarnessSurfacePhase
   child: ChildProcess | null
+  childClosed: Promise<void> | null
+  childStop: Promise<void> | null
   manifestVersion: number
   harnessVersion: string
   startedAt: string
@@ -151,6 +153,8 @@ export class HarnessSurfaceManager {
       entryPort: ports[declared.entryPort]!,
       phase: 'starting',
       child: null,
+      childClosed: null,
+      childStop: null,
       manifestVersion: manifest.manifestVersion,
       harnessVersion: manifest.version,
       startedAt: new Date().toISOString(),
@@ -185,6 +189,7 @@ export class HarnessSurfaceManager {
         windowsHide: true,
       })
       runtime.child = child
+      runtime.childClosed = new Promise((resolve) => child.once('close', () => resolve()))
       child.stdout?.on('data', (chunk: Buffer) => appendLog(runtime, chunk))
       child.stderr?.on('data', (chunk: Buffer) => appendLog(runtime, chunk))
       child.once('error', (err) => {
@@ -252,14 +257,37 @@ export class HarnessSurfaceManager {
   }
 
   private async stopChild(runtime: SurfaceRuntime): Promise<void> {
-    const child = runtime.child
-    runtime.child = null
-    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return
-    try {
-      await terminateProcessTree(child.pid, { gracefulMs: 4_000, forceMs: 4_000 })
-    } catch (err) {
-      appendLog(runtime, Buffer.from(`OpenAlice cleanup: ${err instanceof Error ? err.message : String(err)}\n`))
+    if (runtime.childStop) {
+      await runtime.childStop
+      return
     }
+    const operation = this.stopChildOnce(runtime)
+    runtime.childStop = operation
+    try {
+      await operation
+    } finally {
+      if (runtime.childStop === operation) runtime.childStop = null
+    }
+  }
+
+  private async stopChildOnce(runtime: SurfaceRuntime): Promise<void> {
+    const child = runtime.child
+    const childClosed = runtime.childClosed
+    runtime.child = null
+    runtime.childClosed = null
+    if (!child) return
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
+      try {
+        await terminateProcessTree(child.pid, { gracefulMs: 4_000, forceMs: 4_000 })
+      } catch (err) {
+        appendLog(runtime, Buffer.from(`OpenAlice cleanup: ${err instanceof Error ? err.message : String(err)}\n`))
+      }
+    }
+    // `exit` only means the process ended. `close` additionally means Node has
+    // released its stdio handles, including the child's Workspace cwd on
+    // Windows. Give that teardown a bounded chance to finish before callers
+    // remove or replace the directory.
+    if (childClosed) await Promise.race([childClosed, delay(2_000)])
   }
 
   private fail(runtime: SurfaceRuntime, message: string): void {
