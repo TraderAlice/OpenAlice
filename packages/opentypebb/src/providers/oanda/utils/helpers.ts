@@ -112,9 +112,29 @@ export async function getOandaCandles(
 ): Promise<OandaCandle[]> {
   const token = oandaToken(credentials)
   const account = await getOandaAccount(credentials)
+export async function getOandaCandles(
+  credentials: Record<string, string> | null,
+  instrument: string,
+  granularity: string,
+  count: number,
+  startDate?: string | null,
+  endDate?: string | null,
+): Promise<OandaCandle[]> {
+  const token = oandaToken(credentials)
+  const account = await getOandaAccount(credentials)
+  const capped = Math.min(Math.max(Math.trunc(count), 1), 5000)
+
+  const qs = new URLSearchParams({
+    granularity,
+    price: 'M',
+    count: String(capped),
+  })
+  if (startDate) qs.set('from', `${startDate}T00:00:00Z`)
+  if (endDate) qs.set('to', `${endDate}T23:59:59Z`)
+
   const url =
     `${OANDA_BASE_URL}/v3/accounts/${account.id}/instruments/${encodeURIComponent(instrument)}/candles` +
-    `?granularity=${encodeURIComponent(granularity)}&price=M&count=${Math.min(Math.max(Math.trunc(count), 1), 5000)}`
+    `?${qs.toString()}`
   const res = await amakeRequest<{ candles?: OandaCandle[] }>(url, {
     headers: { Authorization: `Bearer ${token}` },
     timeoutMs: 15_000,
