@@ -41,6 +41,7 @@ interface SurfaceRuntime {
   phase: HarnessSurfacePhase
   child: ChildProcess | null
   childClosed: Promise<void> | null
+  childStop: Promise<void> | null
   manifestVersion: number
   harnessVersion: string
   startedAt: string
@@ -153,6 +154,7 @@ export class HarnessSurfaceManager {
       phase: 'starting',
       child: null,
       childClosed: null,
+      childStop: null,
       manifestVersion: manifest.manifestVersion,
       harnessVersion: manifest.version,
       startedAt: new Date().toISOString(),
@@ -255,6 +257,20 @@ export class HarnessSurfaceManager {
   }
 
   private async stopChild(runtime: SurfaceRuntime): Promise<void> {
+    if (runtime.childStop) {
+      await runtime.childStop
+      return
+    }
+    const operation = this.stopChildOnce(runtime)
+    runtime.childStop = operation
+    try {
+      await operation
+    } finally {
+      if (runtime.childStop === operation) runtime.childStop = null
+    }
+  }
+
+  private async stopChildOnce(runtime: SurfaceRuntime): Promise<void> {
     const child = runtime.child
     const childClosed = runtime.childClosed
     runtime.child = null
