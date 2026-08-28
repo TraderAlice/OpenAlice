@@ -636,6 +636,27 @@ Spawn-compass environment increment (2026-08-29):
 - `pnpm test` passed: 599 files / 4995 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Quiet-floor scene increment (2026-08-29):
+
+- Audited the true zero-Workspace route and the filtered all-sleeping route. The former abandoned Office
+  completely for a page-level paragraph; the latter covered the whole map with a Dashboard-like empty card.
+- Compared keeping the page copy, retaining the full-map overlay, and preserving the floor with a compact
+  in-world system notice. Chose the in-world notice so the map, Alice, spawn compass, landmarks, Operations
+  Board, movement controls, and day/night atmosphere remain the product even when there are no desks.
+- Empty map layout now has an explicit 960×672 zero-pod scene with Alice centered at (480, 336), rather than
+  inheriting a phantom one-pod calculation. OfficePage always renders the game surface when floor data exists.
+- The generated signal receiver now anchors a single physical 16-bit notice below Alice. A truly empty Office
+  explains where active Sessions will appear without offering a meaningless filter action; an all-sleeping
+  Office offers All groups and restores its hidden pods in place.
+- Added layout, building, and page coverage for the centered zero state, generated receiver, map retention,
+  absence of the All groups action when nothing exists, and the sleeping-to-all-groups transition.
+- Browser-played the standard two-group floor, true zero-Workspace floor, and all-sleeping floor. At
+  1280×720 and 760×900 the notice stays inside the camera without covering Alice, the Operations Board,
+  or movement controls; All groups restores both hidden pods and no scenario adds horizontal overflow.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 4998 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

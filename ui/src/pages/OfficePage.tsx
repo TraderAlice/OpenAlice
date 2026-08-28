@@ -150,10 +150,7 @@ export function OfficePage() {
       {loading && !building && (
         <p className="px-4 pt-3 text-sm text-muted-foreground md:px-6">{t('office.loadingFloor')}</p>
       )}
-      {building && building.offices.length === 0 && (
-        <p className="px-4 pt-3 text-sm text-muted-foreground md:px-6">{t('office.noWorkspace')}</p>
-      )}
-      {building && building.offices.length > 0 && (
+      {building && (
         <div className="oa-office-layout">
           <div className="oa-office-main">
             <div

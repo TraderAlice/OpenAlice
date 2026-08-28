@@ -19,7 +19,7 @@ beforeEach(async () => {
 })
 
 describe('OfficeBuilding', () => {
-  it('uses the generated signal receiver for a quiet floor', () => {
+  it('keeps an empty Office inside the game world with Alice centered', () => {
     render(
       <OfficeBuilding
         building={{
@@ -40,9 +40,55 @@ describe('OfficeBuilding', () => {
     )
 
     const building = screen.getByTestId('office-building')
+    const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
+    const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+    const spawnCompass = screen.getByTestId('office-spawn-compass')
+    const quietNotice = screen.getByRole('status')
+    expect(map).toBeTruthy()
+    expect(alice.style.left).toBe('480px')
+    expect(alice.style.top).toBe('336px')
+    expect(spawnCompass.style.left).toBe(alice.style.left)
+    expect(spawnCompass.style.top).toBe(alice.style.top)
+    expect(quietNotice.dataset.kind).toBe('empty')
+    expect(screen.getByText('No Workspace yet')).toBeTruthy()
+    expect(screen.getByText('No one is at a desk in this office. Active Sessions appear here.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'All groups' })).toBeNull()
     expect(building.querySelector<HTMLImageElement>('.oa-office-quiet__radar img')?.src)
       .toContain('/office/hud/signal-receiver-v1.png')
     expect(building.querySelector('svg')).toBeNull()
+  })
+
+  it('offers sleeping groups from the in-world quiet notice', async () => {
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 1,
+          firstSeq: 1,
+          offices: [{
+            workspace: { id: 'sleeping-1', tag: 'sleeping', harness: 'other' },
+            lastInteractionAt: 1,
+            sleeping: true,
+            employees: [],
+          }],
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('status').dataset.kind).toBe('sleeping')
+    expect(screen.getByText('All groups are asleep')).toBeTruthy()
+    expect(screen.queryByTestId('office-pod-sleeping-1')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'All groups' }))
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByTestId('office-pod-sleeping-1')).toBeTruthy()
   })
 
   it('filters sleeping groups and lets Alice move around the continuous map', async () => {

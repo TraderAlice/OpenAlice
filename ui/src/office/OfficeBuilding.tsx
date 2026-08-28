@@ -507,15 +507,27 @@ export function OfficeBuilding({
               <small>ALICE</small>
             </div>
           {groups.length === 0 && (
-            <div className="oa-office-quiet">
+            <div
+              className="oa-office-quiet"
+              role="status"
+              data-kind={building.offices.length === 0 ? 'empty' : 'sleeping'}
+            >
               <span className="oa-office-quiet__radar" aria-hidden>
                 <img src={OFFICE_HUD_ASSETS.signalReceiver} alt="" style={officePixelImg} />
               </span>
-              <p>{t('office.floorQuiet')}</p>
-              <span>{t('office.floorQuietHint', { days: sleepAfterDays })}</span>
-              <button type="button" onClick={() => setShowAll(true)}>
-                {t('office.allGroups')}
-              </button>
+              <div className="oa-office-quiet__copy">
+                <p>{building.offices.length === 0 ? t('office.noWorkspace') : t('office.floorQuiet')}</p>
+                <span>
+                  {building.offices.length === 0
+                    ? t('office.emptyFloor')
+                    : t('office.floorQuietHint', { days: sleepAfterDays })}
+                </span>
+                {building.offices.length > 0 && (
+                  <button type="button" onClick={() => setShowAll(true)}>
+                    {t('office.allGroups')}
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {mapLayout.pods.map((layout) => {
