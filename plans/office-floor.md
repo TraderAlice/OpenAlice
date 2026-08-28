@@ -402,6 +402,25 @@ Alice-walk-cycle increment (2026-08-29):
 - `pnpm test` passed: 596 files / 4987 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Workspace-placard increment (2026-08-29):
+
+- Compared restyling the existing CSS card, baking one image per Workspace, and placing live DOM text
+  over a generated blank prop. Chose the generated physical prop plus DOM overlay: it adds material and
+  perspective without freezing Workspace names, localization, or agent counts into raster text.
+- Used the locked Office style master with the built-in image generator to create a wide walnut-framed,
+  deep-teal 16-bit placard on a flat magenta key. Removed the key locally, cropped the transparent canvas,
+  verified RGBA alpha, and registered `workspace-sign-v1.png` in the generated furniture pack.
+- Rebuilt the label hierarchy as Harness and agent-count metadata above a two-line Workspace title. The
+  sign consumes fixed Office palette seed roles so its cream/teal lettering remains part of the physical
+  prop in both Day and Night instead of washing into theme-dependent gray.
+- Browser-checked the real Demo route in Day and Night: `Semis and supply chain` renders at the global
+  14px text scale without ellipsis or overflow, both pods remain readable, and the signs now read as
+  world objects rather than floating webpage cards.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 596 files / 4987 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

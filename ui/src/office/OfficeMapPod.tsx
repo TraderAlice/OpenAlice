@@ -60,15 +60,24 @@ export function OfficeMapPod({
     >
       <header
         className="oa-office-pod__sign"
-        style={{ zIndex: officeDepthAt(layout.y + 44) }}
+        style={{ zIndex: officeDepthAt(layout.y + 62) }}
       >
-        <div>
-          <span>{harnessTitle}</span>
+        <img
+          src={OFFICE_FURNITURE.generated.workspaceSign}
+          alt=""
+          aria-hidden
+          className="oa-office-pod__sign-asset"
+          style={officePixelImg}
+        />
+        <div className="oa-office-pod__sign-content">
+          <div className="oa-office-pod__sign-meta">
+            <span>{harnessTitle}</span>
+            <span className="oa-office-pod__count">
+              {t('office.agentCount', { count: group.employees.length })}
+            </span>
+          </div>
           <h3>{title}</h3>
         </div>
-        <span className="oa-office-pod__count">
-          {t('office.agentCount', { count: group.employees.length })}
-        </span>
       </header>
 
       <div className="oa-office-pod__floor">
