@@ -1295,86 +1295,185 @@
 }
 
 .oa-office-runtime {
-  display: grid;
-  gap: 8px;
+  color: var(--gba-ink);
 }
 
 .oa-office-runtime__log {
   display: grid;
-  gap: 1px;
+  gap: 9px;
 }
 
 .oa-office-runtime__event {
   position: relative;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
   min-width: 0;
-  padding: 9px 9px 9px 12px;
-  border-left: 1px solid var(--office-line);
-  background: color-mix(in srgb, var(--foreground) 2.5%, transparent);
+  min-height: 86px;
+  padding: 8px;
+  border: 3px solid var(--gba-ink);
+  border-radius: 3px;
+  background: var(--gba-paper);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent);
 }
 
-.oa-office-runtime__event::before {
-  position: absolute;
-  top: 14px;
-  left: -3px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  content: "";
-  background: var(--muted-foreground);
-  box-shadow: 0 0 0 2px var(--office-ink);
+.oa-office-runtime__event[data-kind="alert"] {
+  border-color: color-mix(in srgb, var(--gba-alert) 72%, var(--gba-ink));
 }
 
-.oa-office-runtime__event .text-foreground {
-  color: var(--office-text);
-  font-size: 10px;
+.oa-office-runtime__badge {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid var(--gba-ink);
+  border-radius: 2px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--gba-water) 24%, transparent), transparent 58%),
+    var(--gba-moss-dark);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--gba-paper) 20%, transparent);
 }
 
-.oa-office-runtime__event .text-muted-foreground {
-  color: var(--office-text-muted);
+.oa-office-runtime__badge img {
+  display: block;
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.oa-office-runtime__content {
+  min-width: 0;
+}
+
+.oa-office-runtime__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+}
+
+.oa-office-runtime__type,
+.oa-office-runtime__seq {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  padding: 1px 6px;
+  border: 2px solid var(--gba-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-runtime__type {
+  color: var(--gba-paper);
+  background: var(--gba-moss-dark);
+}
+
+.oa-office-runtime__event[data-kind="alert"] .oa-office-runtime__type {
+  background: color-mix(in srgb, var(--gba-alert) 72%, var(--gba-ink));
+}
+
+.oa-office-runtime__seq {
+  color: var(--gba-ink-soft);
+  background: var(--gba-floor-alt);
+}
+
+.oa-office-runtime__heading time {
+  margin-left: auto;
+  color: var(--gba-ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+
+.oa-office-runtime__identity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.oa-office-runtime__identity strong {
+  color: var(--gba-ink);
+}
+
+.oa-office-runtime__identity span {
+  color: var(--gba-ink-soft);
 }
 
 .oa-office-runtime__detail {
-  display: -webkit-box;
-  margin: 5px 0 0;
-  overflow: hidden;
-  color: color-mix(in srgb, var(--foreground) 82%, var(--muted-foreground));
-  font-size: 10px;
-  line-height: 1.45;
+  margin: 7px 0 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--gba-water);
+  color: var(--gba-ink);
+  background: color-mix(in srgb, var(--gba-water) 9%, var(--gba-cream));
+  line-height: 1.35;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
 }
 
 .oa-office-runtime__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 8px;
-  margin-top: 5px;
-  color: var(--office-text-muted);
+  gap: 5px;
+  margin: 7px 0 0;
+  padding: 0;
+  color: var(--gba-ink-soft);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 8px;
+  list-style: none;
+}
+
+.oa-office-runtime__meta li {
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--gba-ink) 55%, transparent);
+  background: var(--gba-cream);
 }
 
 .oa-office-runtime__open {
-  margin-top: 7px;
-  padding: 4px 7px;
-  border: 1px solid var(--office-line);
-  border-radius: 4px;
-  color: var(--office-cyan);
-  background: transparent;
-  font-size: 9px;
+  display: flex;
+  min-height: 42px;
+  align-self: center;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 3px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-paper);
+  background: var(--gba-moss-dark);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--gba-ink) 32%, transparent);
+  font-weight: 900;
   cursor: pointer;
+}
+
+.oa-office-runtime__open > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid var(--gba-paper);
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.oa-office-runtime__open:is(:hover, :focus-visible) {
+  color: var(--gba-ink);
+  background: var(--gba-water);
+  outline: 3px solid var(--gba-paper);
+  outline-offset: -6px;
 }
 
 .oa-office-runtime__empty,
 .oa-office-runtime__error {
   padding: 12px;
-  border: 1px dashed var(--office-line);
-  border-radius: 7px;
-  color: var(--office-text-muted);
-  background: color-mix(in srgb, var(--foreground) 2%, transparent);
-  font-size: 10px;
+  border: 3px dashed var(--gba-ink-soft);
+  border-radius: 3px;
+  color: var(--gba-ink-soft);
+  background: var(--gba-cream);
   line-height: 1.5;
 }
 
@@ -1605,6 +1704,152 @@
   .oa-office-desk,
   .oa-office-cabinet {
     transition: none;
+  }
+}
+
+/* The operations log is an in-world action journal, not a dashboard timeline. */
+.oa-office-window-scrim {
+  position: absolute;
+  inset: 52px 0 0;
+  z-index: 19;
+  background: color-mix(in srgb, var(--gba-ink) 28%, transparent);
+  pointer-events: none;
+}
+
+.oa-office-window--log .oa-office-window__header img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.oa-office-window--log .oa-office-window__header button > span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.oa-office-window--log .oa-office-window__body {
+  padding: 12px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--gba-moss) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--gba-moss) 8%, transparent) 1px, transparent 1px),
+    var(--gba-cream);
+  background-size: 16px 16px;
+}
+
+.oa-office-replay-panel {
+  margin-bottom: 12px;
+  border: 3px solid var(--gba-ink);
+  border-radius: 3px;
+  background: var(--gba-paper);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent);
+}
+
+.oa-office-replay-panel summary {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  color: var(--gba-paper);
+  background: var(--gba-ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  list-style: none;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.oa-office-replay-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.oa-office-replay-panel summary::before {
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 8px solid var(--gba-water);
+  content: "";
+}
+
+.oa-office-replay-panel[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.oa-office-replay-panel[open] summary {
+  border-bottom: 3px solid var(--gba-ink);
+}
+
+.oa-office-replay-panel .oa-office-replay {
+  padding: 9px;
+}
+
+.oa-office-replay__live {
+  min-height: 36px;
+  border: 2px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-paper);
+  background: var(--gba-moss-dark);
+  font-weight: 900;
+}
+
+.oa-office-replay__live:disabled {
+  color: var(--gba-ink-soft);
+  background: var(--gba-floor-alt);
+  opacity: 1;
+}
+
+.oa-office-replay__range {
+  accent-color: var(--gba-water);
+}
+
+@container (max-width: 760px) {
+  .oa-office-runtime__event {
+    grid-template-columns: 50px minmax(0, 1fr);
+  }
+
+  .oa-office-runtime__badge {
+    width: 50px;
+    height: 50px;
+  }
+
+  .oa-office-runtime__badge img {
+    width: 46px;
+    height: 46px;
+  }
+
+  .oa-office-runtime__open {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@container (max-width: 480px) {
+  .oa-office-window--log .oa-office-window__body {
+    padding: 8px;
+  }
+
+  .oa-office-runtime__event {
+    gap: 7px;
+    padding: 6px;
+  }
+
+  .oa-office-runtime__heading time {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-office-runtime__event,
+  .oa-office-runtime__open,
+  .oa-office-replay-panel summary::before {
+    transition: none;
+    animation: none;
   }
 }
 
@@ -2088,10 +2333,20 @@
 }
 
 .oa-office-window--log {
+  --gba-ink: var(--office-gba-ink-seed);
+  --gba-ink-soft: var(--office-gba-ink-soft-seed);
+  --gba-cream: var(--office-gba-cream-seed);
+  --gba-paper: var(--office-gba-paper-seed);
+  --gba-moss: var(--office-gba-moss-seed);
+  --gba-moss-dark: var(--office-gba-moss-dark-seed);
+  --gba-floor-alt: var(--office-gba-floor-alt-seed);
+  --gba-water: var(--office-gba-water-seed);
+  --gba-alert: var(--office-gba-alert-seed);
   top: 72px;
   right: 12%;
   bottom: 20px;
   width: 76%;
+  color: var(--gba-ink);
 }
 
 .oa-office-window__header {
@@ -2620,11 +2875,6 @@
 
 .oa-office-inspect__facts > div + div {
   border-left: 2px solid color-mix(in srgb, var(--gba-ink) 24%, transparent);
-}
-
-.oa-office-replay-panel {
-  border: 0;
-  background: transparent;
 }
 
 /* Continuous overworld map and camera. */
@@ -3924,5 +4174,24 @@
   .oa-office-alice[data-walking="true"][data-direction="up"] > .oa-office-alice__sprite,
   .oa-office-alice[data-walking="true"][data-direction="down"] > .oa-office-alice__sprite {
     animation: none;
+  }
+}
+
+.oa-office-runtime__type,
+.oa-office-runtime__seq,
+.oa-office-runtime__heading time,
+.oa-office-runtime__meta li,
+.oa-office-runtime__open > span,
+.oa-office-replay-panel summary,
+.oa-office-window--log .oa-office-window__header button > span {
+  font-size: var(--text-xs) !important;
+}
+
+@container (max-width: 760px) {
+  .oa-office-window--log {
+    top: 60px;
+    right: 8px;
+    bottom: 8px;
+    width: calc(100% - 16px);
   }
 }

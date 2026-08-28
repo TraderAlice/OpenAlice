@@ -1884,6 +1884,7 @@ export const zhHant: Resources = {
     amenityCoffee: '茶水車',
     amenityPlant: '盆栽',
     timeline: '占用日誌',
+    eventDetails: '事件詳情',
     log: '日誌',
     replay: '重放',
     replayLive: '直播',

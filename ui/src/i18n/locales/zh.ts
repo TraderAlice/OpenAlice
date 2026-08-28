@@ -1876,6 +1876,7 @@ export const zh: Resources = {
     amenityCoffee: '茶水车',
     amenityPlant: '盆栽',
     timeline: '占用日志',
+    eventDetails: '事件详情',
     log: '日志',
     replay: '重放',
     replayLive: '直播',

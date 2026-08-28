@@ -1909,6 +1909,7 @@ export const en = {
     amenityCoffee: 'Coffee',
     amenityPlant: 'Plant',
     timeline: 'Occupancy log',
+    eventDetails: 'Event details',
     log: 'Log',
     replay: 'Replay',
     replayLive: 'Live',

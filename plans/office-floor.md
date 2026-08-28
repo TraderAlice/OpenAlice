@@ -247,6 +247,33 @@ Harness-neighborhood increment (2026-08-29):
 - `pnpm test` passed: 589 files / 4967 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Operations-journal increment (2026-08-29):
+
+- Real-browser replay found the next largest visual discontinuity: opening Occupancy log replaced the
+  game floor with a generic admin timeline, tiny text tags, default-looking action buttons, and no
+  visual grammar for lifecycle, message, tool, or alert events.
+- Compared three approaches: reskin the existing timeline, build a two-pane event inspector, or turn
+  the chronological feed into a GBA action journal. Chose the single-column action journal because it
+  keeps scan order and narrow-screen behavior while making every event readable as a game record.
+- The journal keeps all real runtime facts in text; generated assets only encode four stable event
+  categories. This avoids decorative fiction and lets status, Workspace, Session, surface, cause,
+  metrics, and Run navigation remain authoritative.
+- Generated four transparent 16-bit badges from the locked Office style master: lifecycle door,
+  message transcript, tool kit, and alert beacon. The existing generated logbook also replaces the
+  remaining vector header glyph.
+- Rebuilt each event as a bordered journal record with sequence, relative time, Session, agent,
+  Workspace, narrative detail, metadata chips, and an explicit `A · Open Runs` action. Replay remains
+  native and keyboard-operable inside a physical fold-out deck.
+- Added a map-only modal scrim and bound the journal to stable Office seed colors after real Night-mode
+  play exposed unreadable theme mixing. Day and Night now share the same paper, ink, teal, and brass
+  contrast instead of washing the window gray.
+- Browser-confirmed Day, Night, 760 px narrow layout, Replay expansion, Escape focus return to the
+  operations board, and the real Open Runs navigation path.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 4993 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 Proximity-interaction increment (2026-08-29):
 
 - Compared collision-triggered actions, a permanent interaction list, and proximity interaction.
