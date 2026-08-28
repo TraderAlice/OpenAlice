@@ -1820,7 +1820,7 @@ export const zhHant: Resources = {
     groups: '小組',
     floorView: '樓層檢視',
     mapLabel: 'Office 地圖。拖動查看地圖，使用方向鍵或 WASD 移動 Alice，靠近物件後按 Enter 或空白鍵互動。',
-    mapHint: 'WASD 移動 · Enter 互動',
+    mapHint: '移動 · WASD / 方向鍵',
     resetMap: '重設地圖視角',
     aliceAvatar: 'Office 地圖上的 Alice',
     activeRooms: '活躍房間',

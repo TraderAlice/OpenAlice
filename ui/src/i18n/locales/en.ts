@@ -1845,7 +1845,7 @@ export const en = {
     groups: 'Groups',
     floorView: 'Floor view',
     mapLabel: 'Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.',
-    mapHint: 'Move: WASD · Interact: Enter',
+    mapHint: 'MOVE · WASD / ARROWS',
     resetMap: 'Reset map view',
     aliceAvatar: 'Alice on the office map',
     activeRooms: 'Active rooms',

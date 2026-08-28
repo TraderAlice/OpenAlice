@@ -2807,19 +2807,51 @@
   z-index: 15;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   color: var(--gba-cream);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 7px;
   pointer-events: none;
 }
 
-.oa-office-map-controls > span {
+.oa-office-map-controls__move {
   display: flex;
+  max-width: 220px;
   align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
+  gap: 5px;
+  overflow: hidden;
+  padding: 3px 7px 3px 3px;
+  border: 2px solid var(--gba-paper);
+  border-radius: 2px;
   background: color-mix(in srgb, var(--gba-ink) 88%, transparent);
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 160ms steps(4, end),
+    padding 160ms steps(4, end),
+    border-width 160ms steps(4, end),
+    opacity 120ms steps(3, end),
+    transform 160ms steps(4, end);
+  white-space: nowrap;
+}
+
+.oa-office-map-controls__move > img {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  object-fit: contain;
+}
+
+.oa-office-map-controls[data-learned='true'] {
+  gap: 0;
+}
+
+.oa-office-map-controls[data-learned='true'] .oa-office-map-controls__move {
+  max-width: 0;
+  padding-inline: 0;
+  border-width: 0;
+  opacity: 0;
+  transform: translateX(6px);
 }
 
 .oa-office-map-controls button {
@@ -2833,6 +2865,18 @@
   background: var(--gba-ink);
   cursor: pointer;
   pointer-events: auto;
+}
+
+.oa-office-map-controls button img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.oa-office-map-controls button:is(:hover, :focus-visible) {
+  border-color: var(--gba-water);
+  outline: 2px solid color-mix(in srgb, var(--gba-water) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .oa-office-interact-prompt {
@@ -3715,7 +3759,8 @@
 @media (prefers-reduced-motion: reduce) {
   .oa-office-operations-board[data-live="true"] img,
   .oa-office-operations-board[data-nearby="true"],
-  .oa-office-pod__sign {
+  .oa-office-pod__sign,
+  .oa-office-map-controls__move {
     animation: none;
     transition: none;
   }
@@ -3740,7 +3785,7 @@
 .oa-office-pod__count,
 .oa-office-nameplate,
 .oa-office-alice small,
-.oa-office-map-controls > span,
+.oa-office-map-controls__move,
 .oa-office-window__header span,
 .oa-office-inspect__kicker {
   font-size: var(--text-xs) !important;

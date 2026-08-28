@@ -1,4 +1,4 @@
-import { LocateFixed, Menu, Move, Radio, ScrollText, X } from 'lucide-react'
+import { Menu, Radio, ScrollText, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -8,6 +8,7 @@ import type {
 } from '../api/office'
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
+import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
 import { OfficeMapPod } from './OfficeMapPod'
 import {
@@ -53,6 +54,7 @@ export function OfficeBuilding({
   const [aliceWalking, setAliceWalking] = useState(false)
   const [aliceBumped, setAliceBumped] = useState(false)
   const [panning, setPanning] = useState(false)
+  const [controlsLearned, setControlsLearned] = useState(false)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const viewportRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -351,6 +353,7 @@ export function OfficeBuilding({
           }[key]
           if (!movement) return
           event.preventDefault()
+          setControlsLearned(true)
           setAliceDirection(movement.direction)
           const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
           if (move.bumped) {
@@ -386,6 +389,9 @@ export function OfficeBuilding({
         onPointerMove={(event) => {
           const drag = dragRef.current
           if (!drag || drag.pointerId !== event.pointerId) return
+          if (Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY) >= 4) {
+            setControlsLearned(true)
+          }
           setCamera(clampCamera(
             drag.cameraX + event.clientX - drag.startX,
             drag.cameraY + event.clientY - drag.startY,
@@ -538,10 +544,18 @@ export function OfficeBuilding({
           </div>
         </div>
 
-        <div className="oa-office-map-controls">
-          <span><Move size={12} />{t('office.mapHint')}</span>
+        <div className="oa-office-map-controls" data-learned={controlsLearned}>
+          <span className="oa-office-map-controls__move">
+            <img src={OFFICE_HUD_ASSETS.movePad} alt="" aria-hidden style={officePixelImg} />
+            <span>{t('office.mapHint')}</span>
+          </span>
           <button type="button" onClick={resetMap} aria-label={t('office.resetMap')}>
-            <LocateFixed size={14} />
+            <img
+              src={OFFICE_HUD_ASSETS.resetCompass}
+              alt=""
+              aria-hidden
+              style={officePixelImg}
+            />
           </button>
         </div>
       </div>
