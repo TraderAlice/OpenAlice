@@ -1,9 +1,10 @@
-import { Users, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { employeesForOffice } from './desk-slots'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
+import { officePixelImg } from './furniture'
+import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeCoworkerLabel } from './label'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -35,11 +36,11 @@ export function OfficeRosterWindow({
     >
       <header className="oa-office-window__header">
         <div>
-          <Users size={15} />
+          <img src={OFFICE_HUD_ASSETS.rosterBadge} alt="" aria-hidden style={officePixelImg} />
           <span>{roomName} · {t('office.roster')}</span>
         </div>
         <button type="button" autoFocus aria-label={t('common.close')} onClick={onClose}>
-          <X size={15} />
+          <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
         </button>
       </header>
       <div className="oa-office-roster__body">

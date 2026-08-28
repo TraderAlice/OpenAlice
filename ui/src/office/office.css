@@ -4012,6 +4012,93 @@
     drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
+/* Generated command glyphs keep transient Office windows inside the game-art vocabulary. */
+.oa-office-hud__signal {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.oa-office-hud__signal img {
+  display: block;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.oa-office-window__header > div > img {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  object-fit: contain;
+}
+
+.oa-office-window__header button,
+.oa-office-window__close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.oa-office-window__header button img,
+.oa-office-window__close img {
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.oa-office-window__header button:is(:hover, :focus-visible) img,
+.oa-office-window__close:is(:hover, :focus-visible) img {
+  filter: brightness(1.16) drop-shadow(0 0 4px var(--gba-water));
+}
+
+.oa-office-window__header button:focus-visible,
+.oa-office-window__close:focus-visible {
+  outline: 3px solid var(--gba-paper);
+  outline-offset: 1px;
+}
+
+.oa-office-inspect__open img {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  object-fit: contain;
+}
+
+.oa-office-drawer img {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  object-fit: contain;
+}
+
+.oa-office-inspect__empty > img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.oa-office-quiet__radar {
+  width: 72px;
+  height: 72px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.oa-office-quiet__radar img {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
 .oa-office-map-landmark {
   position: absolute;
   pointer-events: none;

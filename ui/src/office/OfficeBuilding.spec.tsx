@@ -19,6 +19,32 @@ beforeEach(async () => {
 })
 
 describe('OfficeBuilding', () => {
+  it('uses the generated signal receiver for a quiet floor', () => {
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 0,
+          firstSeq: 0,
+          offices: [],
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+      />,
+    )
+
+    const building = screen.getByTestId('office-building')
+    expect(building.querySelector<HTMLImageElement>('.oa-office-quiet__radar img')?.src)
+      .toContain('/office/hud/signal-receiver-v1.png')
+    expect(building.querySelector('svg')).toBeNull()
+  })
+
   it('filters sleeping groups and lets Alice move around the continuous map', async () => {
     const onOpenFiles = vi.fn()
     const onOpenRoster = vi.fn()
@@ -84,6 +110,9 @@ describe('OfficeBuilding', () => {
     expect(controls?.dataset.learned).toBe('false')
     expect(controls?.querySelector<HTMLImageElement>('.oa-office-map-controls__move img')?.src)
       .toContain('/office/hud/move-pad-v1.png')
+    expect(screen.getByTestId('office-building').querySelector<HTMLImageElement>('.oa-office-hud__signal img')?.src)
+      .toContain('/office/hud/signal-receiver-v1.png')
+    expect(screen.getByTestId('office-building').querySelector('svg')).toBeNull()
     expect(screen.getByRole('button', { name: 'Reset map view' }).querySelector('img')?.src)
       .toContain('/office/hud/reset-compass-v1.png')
     const alice = screen.getByRole('img', { name: 'Alice on the office map' })
