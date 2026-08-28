@@ -11,10 +11,11 @@ afterEach(() => {
 })
 
 describe('OfficeAliceSprite', () => {
-  it('uses authored side-running rows only for horizontal walking', () => {
+  it('uses the generated rear view for north and authored rows for other directions', () => {
     expect(officeAlicePose('right', true)).toBe('walk-right')
     expect(officeAlicePose('left', true)).toBe('walk-left')
-    expect(officeAlicePose('up', true)).toBe('idle')
+    expect(officeAlicePose('up', true)).toBe('idle-back')
+    expect(officeAlicePose('up', false)).toBe('idle-back')
     expect(officeAlicePose('down', true)).toBe('idle')
 
     const { container, rerender } = render(
@@ -39,6 +40,18 @@ describe('OfficeAliceSprite', () => {
       />,
     )
     expect(container.firstElementChild?.getAttribute('data-pose')).toBe('walk-left')
+
+    rerender(
+      <OfficeAliceSprite
+        direction="up"
+        walking={false}
+        reducedMotion
+        label="Alice"
+        scale={0.2}
+      />,
+    )
+    expect(container.firstElementChild?.getAttribute('data-pose')).toBe('idle-back')
+    expect((container.firstElementChild as HTMLElement).style.backgroundImage).toContain('back-v1.png')
   })
 
   it('advances the authored run cycle while Alice keeps moving', () => {

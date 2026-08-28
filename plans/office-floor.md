@@ -576,6 +576,26 @@ Command-glyph increment (2026-08-29):
 - `pnpm test` passed: 599 files / 4993 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+North-facing Alice increment (2026-08-29):
+
+- Real-browser movement found a spatial credibility break: Alice's interaction cone and collision state
+  faced north, but the character kept showing her front-facing idle pose. Compared preserving that shortcut,
+  transforming the side-run frames, and generating the missing identity-consistent rear view. Chose a real
+  rear view so direction reads immediately without distorting the canonical Alice art.
+- Used the built-in image generator with the canonical `alice-maid` atlas as the identity reference to create
+  one straight rear-view 16-bit sprite. The service twice returned a baked RGB checkerboard, so packaging
+  preserved the generated character pixels and removed only the connected light background locally. The
+  shipped `back-v1.png` is a 192×208 RGBA asset with a clean silhouette at map scale.
+- Moved sheet, cell, and atlas ownership from the whole pack to each pose. North-facing Alice now selects the
+  generated one-cell rear sheet while front idle and both authored eight-frame horizontal runs stay on the
+  canonical Codex v2 atlas. Walking north keeps the existing CSS step motion instead of inventing fake frames.
+- Browser-played Day at 1280×720 and Night at 760×900. Turning north selects `idle-back`, turning south restores
+  `idle`, the loaded image URL resolves to the generated asset, and neither layout adds horizontal overflow.
+- Focused sprite-pack and Alice component specs passed: 2 files / 3 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 4994 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
