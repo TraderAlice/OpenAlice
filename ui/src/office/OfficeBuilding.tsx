@@ -18,6 +18,7 @@ import {
 import { officeCoworkerLabel } from './label'
 import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
 import { layoutOfficeMap } from './map-layout'
+import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeBuilding({
@@ -357,12 +358,23 @@ export function OfficeBuilding({
             <div
               className="oa-office-map-wall"
               aria-hidden
-              style={{ backgroundImage: `url(${OFFICE_FURNITURE.generated.wallWindow})` }}
+              style={{
+                backgroundImage: `url(${OFFICE_FURNITURE.generated.wallWindow})`,
+                zIndex: officeDepthAt(112),
+              }}
             />
-            <div className="oa-office-map-landmark oa-office-map-landmark--plant" aria-hidden>
+            <div
+              className="oa-office-map-landmark oa-office-map-landmark--plant"
+              aria-hidden
+              style={{ zIndex: officeDepthAt(178) }}
+            >
               <img src={OFFICE_FURNITURE.generated.plant} alt="" style={officePixelImg} />
             </div>
-            <div className="oa-office-map-landmark oa-office-map-landmark--terminal" aria-hidden>
+            <div
+              className="oa-office-map-landmark oa-office-map-landmark--terminal"
+              aria-hidden
+              style={{ zIndex: officeDepthAt(183) }}
+            >
               <img src={OFFICE_FURNITURE.generated.terminal} alt="" style={officePixelImg} />
             </div>
             <div
@@ -371,7 +383,7 @@ export function OfficeBuilding({
               aria-label={t('office.aliceAvatar')}
               data-direction={aliceDirection}
               data-bumped={aliceBumped}
-              style={{ left: alice.x, top: alice.y }}
+              style={{ left: alice.x, top: alice.y, zIndex: officeDepthAt(alice.y) }}
             >
               <span className="oa-office-alice__sprite" aria-hidden>
                 <OfficeEmployeeSprite

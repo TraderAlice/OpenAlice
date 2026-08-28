@@ -32,11 +32,13 @@ describe('OfficeDesk', () => {
       roomName: 'Chat',
       selected: false,
       nearby: false,
+      depth: 107,
       reducedMotion: true,
       onSelect: () => undefined,
     }
     const { container, rerender } = render(<OfficeDesk {...props} />)
 
+    expect(screen.getByRole('button').style.zIndex).toBe('107')
     expect(screen.queryByText('research')).toBeNull()
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-agent')).toBe('claude')
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-reduced-motion')).toBe('true')

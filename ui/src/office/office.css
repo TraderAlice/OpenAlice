@@ -2733,7 +2733,6 @@
   --oa-office-bump-x: 0px;
   --oa-office-bump-y: 2px;
   position: absolute;
-  z-index: 12;
   display: grid;
   width: 34px;
   height: 42px;
@@ -2969,7 +2968,6 @@
 
 .oa-office-pod__sign {
   position: relative;
-  z-index: 13;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -3049,7 +3047,6 @@
   position: absolute;
   bottom: 3px;
   left: -3px;
-  z-index: 5;
   width: 58px;
   height: 68px;
   object-fit: contain;
@@ -3094,14 +3091,13 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  z-index: 2;
+  z-index: auto;
 }
 
 .oa-office-pod__cabinet {
   position: absolute;
   right: -2px;
   bottom: 2px;
-  z-index: 7;
   width: 40px;
   height: 54px;
   padding: 0;
@@ -3140,7 +3136,6 @@
   position: absolute;
   top: 5px;
   right: -4px;
-  z-index: 7;
   width: 42px;
   height: 58px;
   padding: 0;
@@ -3504,7 +3499,6 @@
   top: 0;
   right: 0;
   left: 0;
-  z-index: 1;
   height: 102px;
   border-bottom: 4px solid var(--gba-ink);
   background-repeat: repeat-x;
@@ -3516,7 +3510,6 @@
 
 .oa-office-map-landmark {
   position: absolute;
-  z-index: 2;
   pointer-events: none;
 }
 

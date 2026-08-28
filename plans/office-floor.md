@@ -342,6 +342,26 @@ Facing-interaction increment (2026-08-29):
 - `pnpm test` passed: 594 files / 4982 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Y-depth increment (2026-08-29):
+
+- Compared keeping fixed component layers, sorting complete Workspace pods, and sorting every map object
+  from its floor contact point. Fixed layers preserve the paper-doll look, while whole-pod sorting fails
+  when Alice walks among furniture inside a pod. Chose one shared Y-depth function because it matches the
+  painter algorithm used by classic top-down maps and keeps DOM-native controls intact.
+- Workspace signs, all four workstation slots, cabinets, personnel boards, Harness props, wall landmarks,
+  and Alice now consume the same map-space depth scale. Rugs remain on the floor, while activity bubbles
+  and labels remain local overlays inside their correctly sorted world object.
+- Removed the desk-list stacking context and the fixed Alice/sign/prop layers that previously forced Alice
+  to paint over furniture everywhere. The sign remains non-solid: Alice visibly disappears behind it when
+  walking north and reappears in front after crossing its floor line.
+- Browser-played the real Demo route across both sides of a Workspace sign: at y=264 Alice paints behind
+  the sign's y=284 floor line, then paints in front at y=312. Rechecked the six-person roster and focus
+  return, employee collision/inspection, spawn-facing cabinet prompt, and Files navigation after sorting.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 595 files / 4984 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
