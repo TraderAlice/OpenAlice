@@ -4,6 +4,8 @@ import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { OfficeDesk } from './OfficeDesk'
 import { deskSlotsForOffice, visibleEmployeesForOffice } from './desk-slots'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
+import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
+import { officeDepthAt } from './scene-depth'
 
 export function OfficeMapPod({
   group,
@@ -56,7 +58,10 @@ export function OfficeMapPod({
       data-active={active}
       data-sleeping={group.sleeping}
     >
-      <header className="oa-office-pod__sign">
+      <header
+        className="oa-office-pod__sign"
+        style={{ zIndex: officeDepthAt(layout.y + 44) }}
+      >
         <div>
           <span>{harnessTitle}</span>
           <h3>{title}</h3>
@@ -79,7 +84,10 @@ export function OfficeMapPod({
           alt=""
           aria-hidden
           className="oa-office-pod__harness-prop"
-          style={officePixelImg}
+          style={{
+            ...officePixelImg,
+            zIndex: officeDepthAt(layout.y + layout.height - 6),
+          }}
         />
         <ul className="oa-office-pod__desks">
           {slots.map((employee, index) => (
@@ -96,6 +104,7 @@ export function OfficeMapPod({
                 employee
                 && nearbyTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
               )}
+              depth={officeDepthAt(layout.y + OFFICE_DESK_CENTERS[index].y)}
               reducedMotion={reducedMotion}
               spriteScale={0.23}
               onSelect={() => employee && onSelectEmployee(group.workspace.id, employee)}
@@ -106,6 +115,7 @@ export function OfficeMapPod({
         <button
           type="button"
           className="oa-office-pod__cabinet"
+          style={{ zIndex: officeDepthAt(layout.y + OFFICE_CABINET_CENTER.y + 24) }}
           data-nearby={nearbyTargetId === `cabinet:${group.workspace.id}`}
           onClick={() => onOpenFiles(group.workspace.id)}
           aria-label={`${t('office.cabinet')} · ${title}`}
@@ -118,6 +128,7 @@ export function OfficeMapPod({
             id={`office-roster-${group.workspace.id}`}
             type="button"
             className="oa-office-pod__roster"
+            style={{ zIndex: officeDepthAt(layout.y + OFFICE_ROSTER_CENTER.y + 25) }}
             data-nearby={nearbyTargetId === `roster:${group.workspace.id}`}
             onClick={() => onOpenRoster(group.workspace.id)}
             aria-label={`${t('office.roster')} · ${title}`}
