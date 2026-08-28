@@ -9,6 +9,7 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding } from '../office/OfficeBuilding'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
+import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
@@ -242,7 +243,7 @@ export function OfficePage() {
                       <span>{t('office.timeline')}</span>
                     </div>
                     <button type="button" autoFocus aria-label={t('common.close')} onClick={closeLog}>
-                      <span aria-hidden>×</span>
+                      <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
                     </button>
                   </header>
                   <div className="oa-office-window__body">

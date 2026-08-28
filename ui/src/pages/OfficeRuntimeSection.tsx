@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../api'
 import type { AgentRuntimeEvent, AgentRuntimeEventType } from '../api/agentRuntimeLog'
 import { formatRelativeTime } from '../lib/intl'
+import { officePixelImg } from '../office/furniture'
+import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
 import { useWorkspace } from '../tabs/store'
 
@@ -46,6 +48,7 @@ export function OfficeRuntimeSection() {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const [entries, setEntries] = useState<AgentRuntimeEvent[]>([])
+  const [selectedSeq, setSelectedSeq] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -67,6 +70,16 @@ export function OfficeRuntimeSection() {
     return () => clearInterval(id)
   }, [load])
 
+  useEffect(() => {
+    if (entries.length === 0) {
+      setSelectedSeq(null)
+      return
+    }
+    setSelectedSeq((current) => entries.some((event) => event.seq === current)
+      ? current
+      : entries[0].seq)
+  }, [entries])
+
   if (loading && entries.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
   }
@@ -87,6 +100,42 @@ export function OfficeRuntimeSection() {
     )
   }
 
+  const selectedEvent = entries.find((event) => event.seq === selectedSeq) ?? entries[0]
+  const selectedPayload = selectedEvent.payload
+  const selectedDetail = eventDetail(selectedEvent)
+  const selectedKind = officeLogAssetKind(selectedEvent.type)
+  const selectedMeta = [
+    selectedPayload.surface,
+    causeLabel(selectedEvent),
+    selectedPayload.status,
+    selectedPayload.metrics
+      ? `${selectedPayload.metrics.textBlocks} text · ${selectedPayload.metrics.toolCalls} tools${selectedPayload.metrics.toolFailures > 0 ? ` · ${selectedPayload.metrics.toolFailures} failed` : ''}`
+      : null,
+    selectedPayload.reason,
+    selectedPayload.launchErrorCode,
+  ].filter((value): value is string => Boolean(value))
+  const moveJournalSelection = (keyboardEvent: KeyboardEvent<HTMLButtonElement>) => {
+    const buttons = Array.from(
+      keyboardEvent.currentTarget.closest('ol')
+        ?.querySelectorAll<HTMLButtonElement>('button') ?? [],
+    )
+    const index = buttons.indexOf(keyboardEvent.currentTarget)
+    const nextIndex = keyboardEvent.key === 'ArrowDown'
+      ? Math.min(buttons.length - 1, index + 1)
+      : keyboardEvent.key === 'ArrowUp'
+        ? Math.max(0, index - 1)
+        : keyboardEvent.key === 'Home'
+          ? 0
+          : keyboardEvent.key === 'End'
+            ? buttons.length - 1
+            : null
+    if (nextIndex == null || nextIndex === index) return
+    keyboardEvent.preventDefault()
+    const next = buttons[nextIndex]
+    next.focus()
+    setSelectedSeq(Number(next.dataset.seq))
+  }
+
   return (
     <div className="oa-office-runtime">
       {error && (
@@ -94,58 +143,70 @@ export function OfficeRuntimeSection() {
           {t('office.paused')}: {error}
         </div>
       )}
-      <div data-testid="runtime-log" className="oa-office-runtime__log">
-        {entries.map((event) => {
-          const payload = event.payload
-          const detail = eventDetail(event)
-          const kind = officeLogAssetKind(event.type)
-          const meta = [
-            payload.surface,
-            causeLabel(event),
-            payload.status,
-            payload.metrics
-              ? `${payload.metrics.textBlocks} text · ${payload.metrics.toolCalls} tools${payload.metrics.toolFailures > 0 ? ` · ${payload.metrics.toolFailures} failed` : ''}`
-              : null,
-            payload.reason,
-            payload.launchErrorCode,
-          ].filter((value): value is string => Boolean(value))
-          return (
-            <article key={event.seq} className="oa-office-runtime__event" data-kind={kind}>
-              <div className="oa-office-runtime__badge" aria-hidden>
-                <img src={OFFICE_LOG_ASSETS[kind]} alt="" />
-              </div>
-              <div className="oa-office-runtime__content">
-                <header className="oa-office-runtime__heading">
-                  <span className="oa-office-runtime__type">{eventLabel(event.type)}</span>
-                  <span className="oa-office-runtime__seq">#{String(event.seq).padStart(4, '0')}</span>
-                  <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
-                </header>
-                <div className="oa-office-runtime__identity">
-                  <strong>@{payload.resumeId || '—'}</strong>
-                  <span>{payload.agent || '—'} · {payload.workspaceId || '—'}</span>
-                </div>
-                {detail && (
-                  <p className="oa-office-runtime__detail">
-                    {detail}
-                  </p>
-                )}
-                <ul className="oa-office-runtime__meta" aria-label={t('office.eventDetails')}>
-                  {meta.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
-                </ul>
-              </div>
-              {payload.taskId && (
+      <div data-testid="runtime-log" className="oa-office-runtime__journal">
+        <ol className="oa-office-runtime__index" aria-label={t('office.timeline')}>
+          {entries.map((event) => {
+            const payload = event.payload
+            const kind = officeLogAssetKind(event.type)
+            const active = event.seq === selectedEvent.seq
+            return (
+              <li key={event.seq}>
                 <button
                   type="button"
-                  className="oa-office-runtime__open"
-                  onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
+                  aria-pressed={active}
+                  data-kind={kind}
+                  data-seq={event.seq}
+                  onClick={() => setSelectedSeq(event.seq)}
+                  onKeyDown={moveJournalSelection}
                 >
-                  <span aria-hidden>A</span>
-                  {t('office.openRun')}
+                  <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
+                  <span className="oa-office-runtime__index-copy">
+                    <strong>{eventLabel(event.type)}</strong>
+                    <small>@{payload.resumeId || '—'}</small>
+                  </span>
+                  <span className="oa-office-runtime__index-meta">
+                    <b>#{String(event.seq).padStart(4, '0')}</b>
+                    <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
+                  </span>
+                  <i aria-hidden>▶</i>
                 </button>
-              )}
-            </article>
-          )
-        })}
+              </li>
+            )
+          })}
+        </ol>
+
+        <article className="oa-office-runtime__event" data-kind={selectedKind}>
+          <div className="oa-office-runtime__badge" aria-hidden>
+            <img src={OFFICE_LOG_ASSETS[selectedKind]} alt="" style={officePixelImg} />
+          </div>
+          <div className="oa-office-runtime__content">
+            <header className="oa-office-runtime__heading">
+              <span className="oa-office-runtime__type">{eventLabel(selectedEvent.type)}</span>
+              <span className="oa-office-runtime__seq">#{String(selectedEvent.seq).padStart(4, '0')}</span>
+              <time dateTime={new Date(selectedEvent.ts).toISOString()}>{formatRelativeTime(selectedEvent.ts)}</time>
+            </header>
+            <div className="oa-office-runtime__identity">
+              <strong>@{selectedPayload.resumeId || '—'}</strong>
+              <span>{selectedPayload.agent || '—'} · {selectedPayload.workspaceId || '—'}</span>
+            </div>
+            {selectedDetail && (
+              <p className="oa-office-runtime__detail">{selectedDetail}</p>
+            )}
+            <ul className="oa-office-runtime__meta" aria-label={t('office.eventDetails')}>
+              {selectedMeta.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+            </ul>
+          </div>
+          {selectedPayload.taskId && (
+            <button
+              type="button"
+              className="oa-office-runtime__open"
+              onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
+            >
+              <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+              {t('office.openRun')}
+            </button>
+          )}
+        </article>
       </div>
     </div>
   )

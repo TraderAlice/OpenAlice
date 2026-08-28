@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
@@ -57,10 +58,12 @@ describe('OfficeRuntimeSection', () => {
       }],
     })
     const { container } = render(<OfficeRuntimeSection />)
-    expect(await screen.findByText('@resume-alice')).toBeTruthy()
-    expect(screen.getByText('#0001')).toBeTruthy()
+    expect((await screen.findAllByText('@resume-alice')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('#0001').length).toBeGreaterThan(0)
     expect(screen.getByText(/webpi/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /started.*@resume-alice.*#0001/i }).getAttribute('aria-pressed'))
+      .toBe('true')
     expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
       .toContain('/office/log/lifecycle-v1.png')
   })
@@ -106,13 +109,27 @@ describe('OfficeRuntimeSection', () => {
       ],
     })
     const { container } = render(<OfficeRuntimeSection />)
-    expect(await screen.findByText('workspace_list · completed')).toBeTruthy()
-    expect(screen.getByText('Desk is clear.')).toBeTruthy()
+    expect(await screen.findByText('Desk is clear.')).toBeTruthy()
     expect(screen.getByText(/1 text · 1 tools/)).toBeTruthy()
-    expect(Array.from(container.querySelectorAll<HTMLImageElement>('.oa-office-runtime__badge img'))
+    expect(screen.getByRole('button', { name: /stopped.*#0002/i }).getAttribute('aria-pressed'))
+      .toBe('true')
+    expect(Array.from(container.querySelectorAll<HTMLImageElement>('.oa-office-runtime__index img'))
       .map((image) => image.src)).toEqual([
       expect.stringContaining('/office/log/lifecycle-v1.png'),
       expect.stringContaining('/office/log/tool-action-v1.png'),
     ])
+
+    await userEvent.click(screen.getByRole('button', { name: /tool.*#0001/i }))
+    expect(screen.getByText('workspace_list · completed')).toBeTruthy()
+    expect(screen.queryByText('Desk is clear.')).toBeNull()
+    expect(screen.getByRole('button', { name: /tool.*#0001/i }).getAttribute('aria-pressed'))
+      .toBe('true')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
+      .toContain('/office/log/tool-action-v1.png')
+
+    await userEvent.keyboard('{ArrowUp}')
+    expect(screen.getByText('Desk is clear.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /stopped.*#0002/i }).getAttribute('aria-pressed'))
+      .toBe('true')
   })
 })

@@ -98,6 +98,8 @@ describe('OfficePage localization', () => {
     expect(screen.getByText('Office occupancy')).toBeTruthy()
     expect(screen.getByRole('dialog', { name: '占用日志' }).querySelector<HTMLImageElement>('header img')?.src)
       .toContain('/office/hud/occupancy-log-v1.png')
+    expect(screen.getByRole('button', { name: '关闭' }).querySelector<HTMLImageElement>('img')?.src)
+      .toContain('/office/hud/window-close-v1.png')
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByText('Office occupancy')).toBeNull()

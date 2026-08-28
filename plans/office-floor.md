@@ -743,6 +743,26 @@ Filing-cabinet interaction follow-up (2026-08-29):
 - `pnpm test` passed: 600 files / 5004 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Operations-journal follow-up (2026-08-29):
+
+- Played the Agent file and Operations Board windows. Agent inspection already reads as a compact character
+  dialogue, but Operations still rendered every event as a full independent card with a repeated Runs button.
+  The pixel border changed the skin without changing the dashboard-feed information architecture.
+- Compared a glyph-only polish pass, Session grouping, and a GBA-style journal with a compact index plus one
+  selected detail. Chose the journal because it preserves every event and real exit without inventing grouping
+  semantics, while making scanning and reading distinct player actions.
+- Rebuilt the live runtime feed as a scrollable event directory and a single detail pane. Poll refreshes keep
+  the current selection when that sequence still exists; otherwise the newest event becomes active. Mouse,
+  Arrow Up/Down, Home, and End all move the selected record and its detail together.
+- Replaced the last raw close `×` and CSS letter-button with the generated Office close and Session-portal
+  glyphs. Reduced-motion mode disables journal row movement as well as the shared window opening animation.
+- Browser-played six live Demo events at 1280×720 and 760×900. Selection, detail kind, keyboard focus, generated
+  asset loads, Runs exit, and zero horizontal overflow all hold; the narrow layout stacks index above detail.
+- Focused runtime and page specs passed: 2 files / 6 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 600 files / 5004 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
