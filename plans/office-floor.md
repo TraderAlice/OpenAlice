@@ -421,6 +421,25 @@ Workspace-placard increment (2026-08-29):
 - `pnpm test` passed: 596 files / 4987 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Interactive-placard increment (2026-08-29):
+
+- Replayed the generated placard on current `dev` and found that its visual affordance contradicted its
+  semantics: the largest Workspace object was a non-focusable `header`, while the much smaller filing
+  cabinet was the only direct Files control.
+- Compared leaving the sign informational, opening a new Workspace inspector, and making the sign share
+  the cabinet's existing Files action. Chose the native-button Files action because it fulfills the world
+  object's promise without adding another modal, menu, or Dashboard layer.
+- Added explicit hover, pressed, focus-visible, sleeping, and reduced-motion states to the physical prop.
+  The generated image and live text remain unchanged; only the interaction contract now matches what the
+  object already communicates visually.
+- Browser-verified pointer click and native Enter activation to `/workspaces/demo-chat-ws`; rechecked Day
+  and Night, a 760px viewport with both 264×64 controls unclipped, a visible focus ring, and emulated
+  reduced motion with transitions effectively disabled.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 596 files / 4987 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

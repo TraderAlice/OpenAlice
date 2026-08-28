@@ -58,9 +58,13 @@ export function OfficeMapPod({
       data-active={active}
       data-sleeping={group.sleeping}
     >
-      <header
+      <button
+        type="button"
         className="oa-office-pod__sign"
         style={{ zIndex: officeDepthAt(layout.y + 62) }}
+        onClick={() => onOpenFiles(group.workspace.id)}
+        aria-label={t('office.interactFiles', { name: title })}
+        title={t('office.cabinetHint')}
       >
         <img
           src={OFFICE_FURNITURE.generated.workspaceSign}
@@ -78,7 +82,7 @@ export function OfficeMapPod({
           </div>
           <h3>{title}</h3>
         </div>
-      </header>
+      </button>
 
       <div className="oa-office-pod__floor">
         <img

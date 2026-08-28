@@ -2975,13 +2975,22 @@
 .oa-office-pod__sign {
   --office-sign-meta: var(--office-gba-water-seed);
   --office-sign-text: var(--office-gba-cream-seed);
+  appearance: none;
   position: relative;
   width: 100%;
   min-width: 0;
   height: 64px;
   justify-self: center;
+  padding: 0;
+  border: 0;
   color: var(--office-sign-text);
+  background: transparent;
   filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
+  font: inherit;
+  text-align: left;
+  transition:
+    transform var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .oa-office-pod__sign-asset {
@@ -3040,6 +3049,29 @@
   color: var(--office-sign-meta);
   letter-spacing: 0;
   text-transform: none;
+}
+
+.oa-office-pod__sign:focus-visible {
+  outline: none;
+  filter:
+    brightness(1.12)
+    drop-shadow(0 0 4px var(--gba-water))
+    drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
+}
+
+.oa-office-pod__sign:active {
+  transform: translateY(1px);
+  filter: brightness(0.96) drop-shadow(1px 1px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oa-office-pod__sign:hover {
+    transform: translateY(-1px);
+    filter:
+      brightness(1.08)
+      drop-shadow(0 0 3px color-mix(in srgb, var(--gba-water) 58%, transparent))
+      drop-shadow(2px 4px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
+  }
 }
 
 .oa-office-pod__floor {
@@ -3101,6 +3133,15 @@
 .oa-office-pod[data-sleeping="true"] .oa-office-pod__sign {
   opacity: 0.68;
   filter: grayscale(0.35) drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 18%, transparent));
+}
+
+.oa-office-pod[data-sleeping="true"] .oa-office-pod__sign:is(:hover, :focus-visible) {
+  opacity: 0.9;
+  filter:
+    grayscale(0.18)
+    brightness(1.08)
+    drop-shadow(0 0 4px var(--gba-water))
+    drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 18%, transparent));
 }
 
 .oa-office-pod__desks {
@@ -3611,8 +3652,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .oa-office-operations-board[data-live="true"] img,
-  .oa-office-operations-board[data-nearby="true"] {
+  .oa-office-operations-board[data-nearby="true"],
+  .oa-office-pod__sign {
     animation: none;
+    transition: none;
+  }
+
+  .oa-office-pod__sign:is(:hover, :active) {
+    transform: none;
   }
 }
 
