@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { OfficeDesk } from './OfficeDesk'
-import { deskSlotsForOffice } from './desk-slots'
+import { deskSlotsForOffice, visibleEmployeesForOffice } from './desk-slots'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 
 export function OfficeMapPod({
@@ -15,6 +15,7 @@ export function OfficeMapPod({
   onSelectEmployee,
   onOpenEmployee,
   onOpenFiles,
+  nearbyTargetId,
 }: {
   group: OfficeRoomSnapshot
   layout: { x: number; y: number; width: number; height: number }
@@ -25,11 +26,10 @@ export function OfficeMapPod({
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenFiles: (workspaceId: string) => void
+  nearbyTargetId?: string | null
 }) {
   const { t } = useTranslation()
-  const visibleEmployees = [...group.employees]
-    .sort((a, b) => Number(a.mood === 'idle') - Number(b.mood === 'idle'))
-    .slice(0, 4)
+  const visibleEmployees = visibleEmployeesForOffice(group.employees)
   const slots = deskSlotsForOffice(visibleEmployees, 4)
   const active = group.employees.some((employee) => employee.mood !== 'idle')
   const harnessProp = group.workspace.harness === 'chat'
@@ -90,6 +90,10 @@ export function OfficeMapPod({
                 && selected?.workspaceId === group.workspace.id
                 && employee.resumeId === selected.resumeId,
               )}
+              nearby={Boolean(
+                employee
+                && nearbyTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
+              )}
               reducedMotion={reducedMotion}
               spriteScale={0.2}
               onSelect={() => employee && onSelectEmployee(group.workspace.id, employee)}
@@ -100,6 +104,7 @@ export function OfficeMapPod({
         <button
           type="button"
           className="oa-office-pod__cabinet"
+          data-nearby={nearbyTargetId === `cabinet:${group.workspace.id}`}
           onClick={() => onOpenFiles(group.workspace.id)}
           aria-label={`${t('office.cabinet')} · ${title}`}
           title={t('office.cabinetHint')}

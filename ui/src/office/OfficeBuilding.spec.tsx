@@ -21,6 +21,7 @@ beforeEach(async () => {
 describe('OfficeBuilding', () => {
   it('filters sleeping groups and lets Alice move around the continuous map', async () => {
     const onOpenFiles = vi.fn()
+    const onSelectEmployee = vi.fn()
     render(
       <OfficeBuilding
         building={{
@@ -35,7 +36,17 @@ describe('OfficeBuilding', () => {
               workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
               lastInteractionAt: Date.now(),
               sleeping: false,
-              employees: [],
+              employees: [{
+                resumeId: 'resume-alice',
+                agent: 'codex',
+                name: 'c1',
+                title: 'Desk mate',
+                mood: 'working',
+                bubble: null,
+                lastSeq: 1,
+                lastInteractionAt: Date.now(),
+                drawers: [],
+              }],
             },
             {
               workspace: { id: 'quant-1', tag: 'auto-quant', harness: 'auto-quant' },
@@ -51,14 +62,14 @@ describe('OfficeBuilding', () => {
             },
           ],
         }}
-        onSelectEmployee={vi.fn()}
+        onSelectEmployee={onSelectEmployee}
         onOpenEmployee={vi.fn()}
         onOpenFiles={onOpenFiles}
       />,
     )
     expect(screen.getByTestId('office-building')).toBeTruthy()
     expect(screen.getByTestId('office-wall')).toBeTruthy()
-    const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice.')
+    const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
     expect(map).toBeTruthy()
     const alice = screen.getByRole('img', { name: 'Alice on the office map' })
     expect(alice.style.left).toBe('480px')
@@ -86,6 +97,18 @@ describe('OfficeBuilding', () => {
     expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)
       .toBe('translate3d(-100px, -50px, 0)')
     fireEvent.pointerUp(map, { pointerId: 1 })
+    await userEvent.keyboard('aasss')
+    expect(screen.getByText('Open chat files')).toBeTruthy()
+    await userEvent.keyboard('{Enter}')
+    expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
+    await userEvent.keyboard('aaaaaaaawww')
+    expect(screen.getByText('Talk to Desk mate')).toBeTruthy()
+    expect(screen.getByTestId('office-desk-resume-alice').dataset.nearby).toBe('true')
+    await userEvent.keyboard('{Enter}')
+    expect(onSelectEmployee).toHaveBeenCalledWith(
+      'chat-1',
+      expect.objectContaining({ resumeId: 'resume-alice' }),
+    )
     expect(screen.getByTestId('office-pod-chat-1')).toBeTruthy()
     expect(screen.getByTestId('office-pod-quant-1')).toBeTruthy()
     expect(screen.queryByTestId('office-pod-quant-old')).toBeNull()
