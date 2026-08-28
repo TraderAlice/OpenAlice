@@ -31,7 +31,7 @@ describe('Office map collision', () => {
     const move = moveAliceOnOfficeMap(current, { x: -24, y: 0 }, layout)
 
     expect(move).toMatchObject({ position: current, bumped: true, obstacleId: 'desk:chat-1:0' })
-    expect(nearestOfficeInteractionTarget(current, [{
+    expect(nearestOfficeInteractionTarget(current, 'left', [{
       id: 'employee:chat-1:resume-1',
       kind: 'employee',
       ...desk,

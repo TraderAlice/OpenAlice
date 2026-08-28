@@ -64,8 +64,9 @@ Session、Files 或 provenance。
 
 - 单击员工：选中并在底部打开游戏对话框；再次操作进入 Session。
 - 单击 Workspace 铭牌/档案柜：打开该 Workspace Files。
-- Alice 靠近员工或档案柜时，只高亮距离最近的对象并显示单一游戏按键提示；Enter/Space
-  执行与鼠标点击相同的动作，不用键盘用户在地图对象之间 Tab 巡航。
+- Alice 靠近员工、档案柜或名册板时，只高亮面向锥形范围内的最佳对象并显示单一游戏
+  按键提示；正侧方和背后对象不抢提示。Enter/Space 执行与鼠标点击相同的动作，不用
+  键盘用户在地图对象之间 Tab 巡航。
 - 拖动空地：平移镜头；不得触发员工点击。
 - WASD/方向键：移动 Alice；靠近视口安全边缘时镜头跟随，地图保持可键盘聚焦并提供
   可读 label。
@@ -323,6 +324,22 @@ Runtime-coworker increment (2026-08-29):
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 594 files / 4981 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
+Facing-interaction increment (2026-08-29):
+
+- Replaced pure nearest-distance selection with a facing-aware interaction cone. The cone keeps a small
+  foot-level tolerance, widens in front of Alice, and rejects objects directly to the side or behind her.
+- Movement updates facing before collision resolution, so pressing toward a solid desk, cabinet, or roster
+  board turns Alice in place and immediately exposes that object without allowing her to walk through it.
+- Preserved mouse behavior and the single Enter/Space prompt; only keyboard/game interaction targeting
+  changed. Existing collision, camera, cabinet, employee, and roster routes remain DOM-native.
+- Browser-played the real Demo route: spawn faces the cabinet rather than the roster behind Alice; moving up
+  then bump-turning left selects the roster without changing position; navigating around the rug and bumping
+  down into a desk selects the Pi employee; Enter opens the correct roster, Agent file, and Workspace Files.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 594 files / 4982 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
 ## Completion

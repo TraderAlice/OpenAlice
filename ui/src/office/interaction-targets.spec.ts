@@ -43,9 +43,47 @@ describe('Office interaction targets', () => {
     })
     expect(nearestOfficeInteractionTarget(
       { x: employee!.x + 24, y: employee!.y },
+      'left',
       targets,
     )?.id).toBe(employee?.id)
-    expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, targets)).toBeNull()
+    expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'down', targets)).toBeNull()
+  })
+
+  it('selects only an object in Alice’s facing cone', () => {
+    const targets = [
+      {
+        id: 'cabinet:up',
+        kind: 'cabinet' as const,
+        x: 0,
+        y: -48,
+        workspaceId: 'up',
+        roomName: 'Up',
+      },
+      {
+        id: 'cabinet:down',
+        kind: 'cabinet' as const,
+        x: 0,
+        y: 48,
+        workspaceId: 'down',
+        roomName: 'Down',
+      },
+      {
+        id: 'cabinet:side',
+        kind: 'cabinet' as const,
+        x: 58,
+        y: 10,
+        workspaceId: 'side',
+        roomName: 'Side',
+      },
+    ]
+
+    expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'up', targets)?.id)
+      .toBe('cabinet:up')
+    expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'down', targets)?.id)
+      .toBe('cabinet:down')
+    expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'right', targets)?.id)
+      .toBe('cabinet:side')
+    expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'left', targets)).toBeNull()
   })
 
   it('keeps Alice inside the camera safe area without escaping map bounds', () => {
