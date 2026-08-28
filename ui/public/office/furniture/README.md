@@ -20,9 +20,17 @@ runtime asset. Generate each new prop as a standalone transparent image using
 that master as the style reference, verify its alpha channel, and add it to
 `ui/src/office/furniture.ts` before use.
 
+Environment textures may be opaque when they intentionally fill the entire
+canvas. Repeating floor textures must stay orthographic and quiet; wall modules
+must tile horizontally; Workspace rugs define a functional neighborhood but
+must not recreate card or room boundaries.
+
 Current runtime assets:
 
 - `workstation-v1.png`
 - `filing-cabinet-v1.png`
 - `terminal-kiosk-v1.png`
 - `plant-v1.png`
+- `wall-window-v1.png`
+- `floor-tile-v1.png`
+- `workspace-rug-v1.png`

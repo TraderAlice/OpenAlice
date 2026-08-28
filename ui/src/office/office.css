@@ -2404,10 +2404,8 @@
   display: block;
   transform-origin: top left;
   background-color: var(--gba-floor);
-  background-image:
-    linear-gradient(90deg, color-mix(in srgb, var(--gba-ink) 7%, transparent) 1px, transparent 1px),
-    linear-gradient(color-mix(in srgb, var(--gba-ink) 7%, transparent) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-repeat: repeat;
+  background-size: 96px 96px;
   will-change: transform;
 }
 
@@ -2552,10 +2550,8 @@
 .oa-office-map {
   isolation: isolate;
   background-color: var(--gba-floor);
-  background-image:
-    linear-gradient(90deg, color-mix(in srgb, var(--gba-ink) 7%, transparent) 1px, transparent 1px),
-    linear-gradient(color-mix(in srgb, var(--gba-ink) 7%, transparent) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-repeat: repeat;
+  background-size: 96px 96px;
 }
 
 .oa-office-map::before {
@@ -2644,7 +2640,7 @@
 .oa-office-pod__sign {
   z-index: 6;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 26px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   width: calc(100% - 24px);
@@ -2694,27 +2690,6 @@
   text-transform: none;
 }
 
-.oa-office-pod__sign button {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 2px;
-  color: var(--gba-paper);
-  background: var(--gba-moss-dark);
-}
-
-.oa-office-pod__sign button:hover {
-  background: var(--gba-ink);
-}
-
-.oa-office-pod__sign button:focus-visible {
-  outline: 3px solid var(--gba-water);
-  outline-offset: 2px;
-}
-
 .oa-office-pod__floor {
   position: relative;
   min-height: 0;
@@ -2722,6 +2697,21 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.oa-office-pod__rug {
+  position: absolute;
+  inset: 10px 12px 4px;
+  z-index: 0;
+  width: calc(100% - 24px);
+  height: calc(100% - 14px);
+  object-fit: fill;
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.oa-office-pod[data-sleeping="true"] .oa-office-pod__rug {
+  opacity: 0.4;
 }
 
 .oa-office-pod[data-harness="auto-quant"] .oa-office-pod__floor {
@@ -2744,6 +2734,40 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  z-index: 2;
+}
+
+.oa-office-pod__cabinet {
+  position: absolute;
+  right: -2px;
+  bottom: 2px;
+  z-index: 7;
+  width: 40px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 120ms steps(2, end), filter 120ms steps(2, end);
+}
+
+.oa-office-pod__cabinet img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.7);
+  filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
+}
+
+.oa-office-pod__cabinet:hover {
+  transform: translateY(-3px) scale(1.06);
+  filter: brightness(1.08);
+}
+
+.oa-office-pod__cabinet:focus-visible {
+  outline: 3px solid var(--gba-water);
+  outline-offset: 2px;
 }
 
 .oa-office-pod__desks > li {
@@ -2923,7 +2947,7 @@
 }
 
 .oa-office-pod .oa-office-bubble {
-  top: -18px !important;
+  top: -4px !important;
   left: 50%;
   z-index: 12 !important;
   max-width: 110px;
@@ -3052,33 +3076,13 @@
   right: 0;
   left: 0;
   z-index: 1;
-  display: grid;
-  height: 96px;
-  grid-template-columns: repeat(3, 120px);
-  align-items: center;
-  justify-content: space-around;
+  height: 102px;
   border-bottom: 4px solid var(--gba-ink);
-  background:
-    linear-gradient(
-      color-mix(in srgb, var(--gba-paper) 42%, transparent),
-      transparent 18px
-    ),
-    color-mix(in srgb, var(--gba-cream) 76%, var(--gba-floor));
+  background-repeat: repeat-x;
+  background-position: top left;
+  background-size: 204px 102px;
   box-shadow: 0 7px 0 color-mix(in srgb, var(--gba-ink) 12%, transparent);
   pointer-events: none;
-}
-
-.oa-office-map-wall > span {
-  width: 112px;
-  height: 48px;
-  border: 4px solid var(--gba-ink);
-  background:
-    linear-gradient(90deg, transparent 47%, var(--gba-ink) 47% 53%, transparent 53%),
-    linear-gradient(transparent 47%, var(--gba-ink) 47% 53%, transparent 53%),
-    var(--gba-water);
-  box-shadow:
-    inset 0 0 0 4px color-mix(in srgb, var(--gba-paper) 44%, transparent),
-    3px 4px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent);
 }
 
 .oa-office-map-landmark {
@@ -3161,7 +3165,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .oa-office-pod .oa-office-desk,
-  .oa-office-pod .oa-office-desk[data-selected="true"]::after {
+  .oa-office-pod .oa-office-desk[data-selected="true"]::after,
+  .oa-office-pod__cabinet {
     transition: none;
     animation: none;
   }
