@@ -1,5 +1,5 @@
 import { Radio } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type {
@@ -14,6 +14,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
+import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
@@ -51,6 +52,7 @@ export function OfficeBuilding({
   onOpenLog: (origin: 'menu' | 'operations') => void
 }) {
   const { t } = useTranslation()
+  const officeTime = useEffectivePreferenceSlot()
   const reducedMotion = useReducedMotion()
   const [showAll, setShowAll] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -236,6 +238,7 @@ export function OfficeBuilding({
     <div
       data-testid="office-building"
       className="oa-office-building"
+      data-office-time={officeTime}
     >
       <header
         data-testid="office-wall"
@@ -427,9 +430,10 @@ export function OfficeBuilding({
               className="oa-office-map-wall"
               aria-hidden
               style={{
-                backgroundImage: `url(${OFFICE_FURNITURE.generated.wallWindow})`,
+                '--office-wall-day': `url(${OFFICE_FURNITURE.generated.wallWindow})`,
+                '--office-wall-night': `url(${OFFICE_FURNITURE.generated.wallWindowNight})`,
                 zIndex: officeDepthAt(112),
-              }}
+              } as CSSProperties}
             />
             <div
               className="oa-office-map-landmark oa-office-map-landmark--plant"

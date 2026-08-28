@@ -274,6 +274,26 @@ Operations-journal increment (2026-08-29):
 - `pnpm test` passed: 599 files / 4993 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Night-environment increment (2026-08-29):
+
+- Real-browser Day/Night comparison found that Night was only a theme-variable wash: physical Office
+  UI lost contrast, Alice and HUD labels faded, while the windows and floor still described daytime.
+- Compared reusing Day unchanged, applying one blue filter to the whole game, and authoring a true
+  after-hours environment state. Chose the third option so indoor UI stays readable and night is
+  communicated by the world rather than by dimming text and characters.
+- The interaction model is unchanged. Office physical UI now owns a stable 16-bit seed palette across
+  app themes; Night swaps only the window view, floor ambience, and restrained machine glow.
+- Edited the generated wall/window module into a geometry-locked night variant with deep-blue exterior
+  glass, tiny distant building lights, and warm indoor walls. A second background-extraction pass
+  converted the baked checkerboard into genuine alpha without replacing the daytime asset.
+- Browser-verified explicit Day and Night, Auto resolving to Night under the system dark preference,
+  the Night pause menu and Agent file, and a 760 px-wide Night viewport. The generated module tiled
+  without a seam and physical labels, prompts, status colors, and focusable controls stayed legible.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- focused Office and semantic-color specs passed: 3 files / 10 tests
+- `pnpm test` passed: 599 files / 4993 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 Proximity-interaction increment (2026-08-29):
 
 - Compared collision-triggered actions, a permanent interaction list, and proximity interaction.

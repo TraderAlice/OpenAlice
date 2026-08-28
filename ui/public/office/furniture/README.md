@@ -32,9 +32,15 @@ Current runtime assets:
 - `terminal-kiosk-v1.png`
 - `plant-v1.png`
 - `wall-window-v1.png`
+- `wall-window-night-v1.png` — geometry-matched after-hours window variant
 - `floor-tile-v1.png`
 - `workspace-rug-v1.png`
 - `coffee-station-v1.png` — Chat neighborhood social prop
+
+`wall-window-night-v1.png` was produced as a geometry-locked lighting edit of
+the daytime window module, followed by a background-extraction pass to restore
+real alpha. `OfficeBuilding` selects the day or night module from the effective
+theme preference, including system-resolved Auto mode.
 - `server-rack-v1.png` — AutoQuant neighborhood operations prop
 - `personnel-board-v1.png` — interactive roster prop for groups with more than four Sessions
 - `operations-board-v1.png` — floor landmark that opens the live occupancy log and replay
