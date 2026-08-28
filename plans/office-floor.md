@@ -617,6 +617,25 @@ First-touch interaction increment (2026-08-29):
 - `pnpm test` passed: 599 files / 4995 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Spawn-compass environment increment (2026-08-29):
+
+- Replayed the neutral spawn after removing the premature Files prompt. The interaction was now correct,
+  but Alice still appeared on an algorithmically empty patch of floor with no arrival or gathering meaning.
+- Compared a CSS marker, reusing the Workspace rug, and generating a dedicated floor inlay. Chose a new
+  inlay because CSS would regress to programmer-drawn vector language and a rug would imply a third Workspace.
+- Used the built-in image generator with the locked Office style master to create a flat orthographic
+  Operations compass: worn brass, teal enamel, parchment highlights, four restrained cardinal notches,
+  no words, arrows, glow, button depth, or interaction promise. Generated on a flat magenta key, removed
+  locally with the ImageGen skill helper, and packaged as a 144×144 RGBA PNG with transparent corners.
+- Registered the asset in the Office furniture pack and anchored it to `mapLayout.alice`. It remains at the
+  reset point when Alice walks away, paints below every actor and prop, and owns no collision or pointer target.
+- Browser-checked Night and Day at 1280×720 plus Day at 760×900. The medallion reads as a floor inset,
+  stays centered under Alice at reset, leaves the movement and prompt rules unchanged, and adds no overflow.
+- Focused furniture and OfficeBuilding specs passed: 2 files / 4 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 4995 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

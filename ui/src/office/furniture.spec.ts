@@ -17,6 +17,7 @@ describe('OFFICE_FURNITURE', () => {
     expect(OFFICE_FURNITURE.generated.cabinet).toBe('/office/furniture/filing-cabinet-v1.png')
     expect(OFFICE_FURNITURE.generated.operationsBoard).toBe('/office/furniture/operations-board-v1.png')
     expect(OFFICE_FURNITURE.generated.workspaceSign).toBe('/office/furniture/workspace-sign-v1.png')
+    expect(OFFICE_FURNITURE.generated.spawnCompass).toBe('/office/furniture/spawn-compass-v1.png')
     expect(OFFICE_FURNITURE.generated.wallWindowNight).toBe('/office/furniture/wall-window-night-v1.png')
     for (const url of [
       OFFICE_FURNITURE.desk,
@@ -52,5 +53,13 @@ describe('OFFICE_FURNITURE', () => {
       OFFICE_FURNITURE.generated.wallWindowNight.replace(/^\//, ''),
     ))
     expect(nightWindow[25]).toBe(6)
+
+    const spawnCompass = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.spawnCompass.replace(/^\//, ''),
+    ))
+    expect(spawnCompass[25]).toBe(6)
+    expect(spawnCompass.readUInt32BE(16)).toBe(144)
+    expect(spawnCompass.readUInt32BE(20)).toBe(144)
   })
 })

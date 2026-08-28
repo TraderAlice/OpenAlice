@@ -474,6 +474,18 @@ export function OfficeBuilding({
                 style={officePixelImg}
               />
             </button>
+            <img
+              src={OFFICE_FURNITURE.generated.spawnCompass}
+              alt=""
+              aria-hidden
+              data-testid="office-spawn-compass"
+              className="oa-office-spawn-compass"
+              style={{
+                ...officePixelImg,
+                left: mapLayout.alice.x,
+                top: mapLayout.alice.y,
+              }}
+            />
             <div
               className="oa-office-alice"
               role="img"
