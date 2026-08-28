@@ -8,7 +8,7 @@ import type {
 } from '../api/office'
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
-import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
+import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
 import { OfficeMapPod } from './OfficeMapPod'
 import {
   nearestOfficeInteractionTarget,
@@ -48,7 +48,8 @@ export function OfficeBuilding({
   const [camera, setCamera] = useState({ x: 0, y: 0 })
   const [alice, setAlice] = useState({ x: 480, y: 336 })
   const aliceRef = useRef(alice)
-  const [aliceDirection, setAliceDirection] = useState<'up' | 'right' | 'down' | 'left'>('down')
+  const [aliceDirection, setAliceDirection] = useState<OfficeAliceDirection>('down')
+  const [aliceWalking, setAliceWalking] = useState(false)
   const [aliceBumped, setAliceBumped] = useState(false)
   const [panning, setPanning] = useState(false)
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -62,6 +63,7 @@ export function OfficeBuilding({
   } | null>(null)
   const bumpTimerRef = useRef<number | null>(null)
   const bumpFrameRef = useRef<number | null>(null)
+  const walkTimerRef = useRef<number | null>(null)
   const awakeGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
@@ -150,8 +152,11 @@ export function OfficeBuilding({
     aliceRef.current = mapLayout.alice
     setAlice(mapLayout.alice)
     setAliceDirection('down')
+    setAliceWalking(false)
   }
   const showCollisionBump = () => {
+    if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
+    setAliceWalking(false)
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
     setAliceBumped(false)
@@ -160,14 +165,21 @@ export function OfficeBuilding({
       bumpTimerRef.current = window.setTimeout(() => setAliceBumped(false), 140)
     })
   }
+  const showAliceWalking = () => {
+    if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
+    setAliceWalking(true)
+    walkTimerRef.current = window.setTimeout(() => setAliceWalking(false), 150)
+  }
   useEffect(() => () => {
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
+    if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
   }, [])
   useLayoutEffect(() => {
     aliceRef.current = mapLayout.alice
     setAlice(mapLayout.alice)
     setAliceDirection('down')
+    setAliceWalking(false)
     setCamera(centeredCamera())
   // Reframe only when the visible map geometry changes, not on every live poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -310,6 +322,7 @@ export function OfficeBuilding({
           const next = move.position
           aliceRef.current = next
           setAlice(next)
+          showAliceWalking()
           const viewport = viewportRef.current?.getBoundingClientRect()
           if (viewport) {
             setCamera((currentCamera) => officeCameraFollowingAlice(
@@ -411,12 +424,14 @@ export function OfficeBuilding({
               role="img"
               aria-label={t('office.aliceAvatar')}
               data-direction={aliceDirection}
+              data-walking={aliceWalking}
               data-bumped={aliceBumped}
               style={{ left: alice.x, top: alice.y, zIndex: officeDepthAt(alice.y) }}
             >
               <span className="oa-office-alice__sprite" aria-hidden>
-                <OfficeEmployeeSprite
-                  mood="idle"
+                <OfficeAliceSprite
+                  direction={aliceDirection}
+                  walking={aliceWalking}
                   reducedMotion={reducedMotion}
                   label={t('office.aliceAvatar')}
                   scale={0.2}
