@@ -1813,7 +1813,7 @@ export const ja: Resources = {
     groups: 'グループ',
     floorView: 'フロア表示',
     mapLabel: 'Office マップ。ドラッグで移動し、矢印キーまたは WASD で Alice を動かします。近くの対象には Enter または Space で操作します。',
-    mapHint: 'WASD 移動 · Enter 操作',
+    mapHint: '移動 · WASD / 矢印キー',
     resetMap: 'マップ表示をリセット',
     aliceAvatar: 'Office マップ上の Alice',
     activeRooms: '稼働中の部屋',

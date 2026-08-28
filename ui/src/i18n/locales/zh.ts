@@ -1812,7 +1812,7 @@ export const zh: Resources = {
     groups: '小组',
     floorView: '楼层视图',
     mapLabel: 'Office 地图。拖动查看地图，使用方向键或 WASD 移动 Alice，靠近对象后按回车或空格互动。',
-    mapHint: 'WASD 移动 · 回车互动',
+    mapHint: '移动 · WASD / 方向键',
     resetMap: '重置地图视角',
     aliceAvatar: 'Office 地图上的 Alice',
     activeRooms: '活跃房间',

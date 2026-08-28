@@ -462,6 +462,25 @@ World-action-prompt increment (2026-08-29):
 - `pnpm test` passed: 597 files / 4990 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Pixel-control-HUD increment (2026-08-29):
+
+- Replayed current `dev` and compared keeping the permanent help strip, replacing it with a larger
+  command panel, and turning it into a first-use game tutorial. Chose the one-time tutorial because the
+  target-attached world prompt already teaches Enter, while movement only needs to be taught once.
+- Used the locked Office style master with the built-in image generator to create separate 16-bit D-pad
+  and recenter-compass controls on flat magenta keys. Removed the keys locally, cropped and resized the
+  sprites to 128px RGBA PNGs, and registered them in an Office HUD asset pack.
+- The movement plaque now folds away after the first keyboard step or meaningful pointer pan. The pixel
+  compass remains as the native, focusable reset control, and resetting preserves the learned state for
+  the current visit instead of replaying the tutorial.
+- Browser-played the real Demo route at 1280×720 in Day and Night and at 760×900. The initial HUD stays
+  inside the map, a keyboard step collapses it from the full tutorial to the 28px compass, Reset recenters
+  Alice without replaying the hint, and emulated reduced motion suppresses the stepped transition.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 598 files / 4991 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
