@@ -722,6 +722,27 @@ Vacant-workstation follow-up (2026-08-29):
 - `pnpm test` passed: 599 files / 5002 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Filing-cabinet interaction follow-up (2026-08-29):
+
+- Played the map-to-detail interaction chain and found that the Workspace sign and physical filing cabinet
+  immediately navigated out of Office into the ordinary Workspaces surface. The first interaction therefore
+  discarded the game world instead of examining the object Alice had approached.
+- Compared retaining the teleport, duplicating the full Workspace file browser inside Office, and adding an
+  in-world cabinet manifest with explicit exits. Chose the manifest: it keeps the first interaction spatial,
+  avoids copying another feature's file-tree ownership, and preserves a deliberate path to deeper work.
+- Added a modal 16-bit filing-cabinet window that aggregates real employee drawer records, sorts them newest
+  first, identifies the coworker who filed each record, and reuses generated Office command glyphs. Record
+  selection still opens its real report/issue/inbox destination; a separate portal enters full Workspace files.
+- Empty cabinets receive an authored in-world empty state rather than a blank panel. Escape and the generated
+  close control restore focus to the exact sign or cabinet that opened the window, while the map stays inert.
+- Browser-played a populated Semis cabinet and empty Auto Quant cabinet at 1280×720 and 760×900. The first
+  click remains in Office, the window has no horizontal overflow, the real report opens correctly, and only
+  the explicit Workspace portal leaves the map.
+- Focused cabinet, building, and page specs passed: 3 files / 8 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 600 files / 5004 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

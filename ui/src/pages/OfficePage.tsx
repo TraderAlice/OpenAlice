@@ -8,6 +8,7 @@ import { useOfficeFloor } from '../hooks/useOfficeFloor'
 import { useInboxSelection } from '../live/inbox-selection'
 import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding } from '../office/OfficeBuilding'
+import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
@@ -35,6 +36,8 @@ export function OfficePage() {
   const [logOpen, setLogOpen] = useState(false)
   const logOriginRef = useRef<'menu' | 'operations'>('menu')
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
+  const [cabinetWorkspaceId, setCabinetWorkspaceId] = useState<string | null>(null)
+  const cabinetOriginRef = useRef<'sign' | 'cabinet'>('cabinet')
   const { building, loading, error } = useOfficeFloor(asOfSeq)
 
   const selectedSeat = useMemo(() => {
@@ -59,6 +62,16 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, rosterWorkspaceId, workspaces])
+  const cabinetOffice = useMemo(() => {
+    if (!building || !cabinetWorkspaceId) return null
+    const office = building.offices.find((item) => item.workspace.id === cabinetWorkspaceId)
+    if (!office) return null
+    const workspace = workspaces.find((item) => item.id === office.workspace.id)
+    return {
+      office,
+      roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
+    }
+  }, [building, cabinetWorkspaceId, workspaces])
   const closeLog = () => {
     setLogOpen(false)
     requestAnimationFrame(() => {
@@ -85,6 +98,14 @@ export function OfficePage() {
       document.getElementById(`office-roster-${workspaceId}`)?.focus()
     })
   }
+  const closeCabinet = () => {
+    const workspaceId = cabinetWorkspaceId
+    const origin = cabinetOriginRef.current
+    setCabinetWorkspaceId(null)
+    requestAnimationFrame(() => {
+      document.getElementById(`office-${origin}-${workspaceId}`)?.focus()
+    })
+  }
 
   const openEmployee = (workspaceId: string, employee: OfficeFloorEmployee) => {
     const workspace = workspaces.find((item) => item.id === workspaceId)
@@ -99,7 +120,7 @@ export function OfficePage() {
     })
   }
 
-  const openFiles = (workspaceId: string) => {
+  const openWorkspaceFiles = (workspaceId: string) => {
     const workspace = workspaces.find((item) => item.id === workspaceId)
     const source = workspace ? sourceForTag(workspace.tag) : undefined
     useWorkspaceSidePanels.getState().setFiles(true)
@@ -155,8 +176,16 @@ export function OfficePage() {
           <div className="oa-office-main">
             <div
               className="oa-office-scene"
-              aria-hidden={logOpen || Boolean(selectedSeat) || Boolean(rosterOffice) || undefined}
-              inert={logOpen || Boolean(selectedSeat) || Boolean(rosterOffice) || undefined}
+              aria-hidden={logOpen
+                || Boolean(selectedSeat)
+                || Boolean(rosterOffice)
+                || Boolean(cabinetOffice)
+                || undefined}
+              inert={logOpen
+                || Boolean(selectedSeat)
+                || Boolean(rosterOffice)
+                || Boolean(cabinetOffice)
+                || undefined}
             >
               <OfficeBuilding
                 building={building}
@@ -165,21 +194,33 @@ export function OfficePage() {
                   return workspace ? workspaceDisplayName(workspace) : tag
                 }}
                 selected={selected}
-                interactionSuspended={logOpen || Boolean(selectedSeat) || Boolean(rosterOffice)}
+                interactionSuspended={logOpen
+                  || Boolean(selectedSeat)
+                  || Boolean(rosterOffice)
+                  || Boolean(cabinetOffice)}
                 onSelectEmployee={(workspaceId, employee) => {
                   setSelected({ workspaceId, resumeId: employee.resumeId })
                   setLogOpen(false)
+                  setCabinetWorkspaceId(null)
                 }}
                 onOpenEmployee={openEmployee}
-                onOpenFiles={openFiles}
+                onOpenFiles={(workspaceId, origin) => {
+                  cabinetOriginRef.current = origin
+                  setCabinetWorkspaceId(workspaceId)
+                  setSelected(null)
+                  setRosterWorkspaceId(null)
+                  setLogOpen(false)
+                }}
                 onOpenRoster={(workspaceId) => {
                   setRosterWorkspaceId(workspaceId)
                   setSelected(null)
+                  setCabinetWorkspaceId(null)
                   setLogOpen(false)
                 }}
                 onOpenLog={(origin) => {
                   logOriginRef.current = origin
                   setLogOpen(true)
+                  setCabinetWorkspaceId(null)
                 }}
               />
             </div>
@@ -219,7 +260,7 @@ export function OfficePage() {
                 </section>
               </>
             )}
-            {!logOpen && selectedSeat && (
+            {!logOpen && !cabinetOffice && selectedSeat && (
               <OfficeInspectRail
                 employee={selectedSeat.employee}
                 roomName={selectedSeat.roomName}
@@ -228,7 +269,7 @@ export function OfficePage() {
                 onClose={closeEmployee}
               />
             )}
-            {!logOpen && !selectedSeat && rosterOffice && (
+            {!logOpen && !selectedSeat && !cabinetOffice && rosterOffice && (
               <OfficeRosterWindow
                 group={rosterOffice.office}
                 roomName={rosterOffice.roomName}
@@ -240,6 +281,17 @@ export function OfficePage() {
                   })
                 }}
                 onClose={closeRoster}
+              />
+            )}
+            {!logOpen && !selectedSeat && !rosterOffice && cabinetOffice && (
+              <OfficeCabinetWindow
+                group={cabinetOffice.office}
+                roomName={cabinetOffice.roomName}
+                onOpenWorkspaceFiles={() => openWorkspaceFiles(cabinetOffice.office.workspace.id)}
+                onOpenRecord={(employee, item) => {
+                  openDrawer(cabinetOffice.office.workspace.id, employee, item)
+                }}
+                onClose={closeCabinet}
               />
             )}
           </div>

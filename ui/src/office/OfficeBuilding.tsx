@@ -48,7 +48,7 @@ export function OfficeBuilding({
   interactionSuspended?: boolean
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
-  onOpenFiles: (workspaceId: string) => void
+  onOpenFiles: (workspaceId: string, origin: 'sign' | 'cabinet') => void
   onOpenRoster: (workspaceId: string) => void
   onOpenLog: (origin: 'menu' | 'operations') => void
 }) {
@@ -343,7 +343,7 @@ export function OfficeBuilding({
             if (nearbyTarget.kind === 'employee') {
               onSelectEmployee(nearbyTarget.workspaceId, nearbyTarget.employee)
             } else if (nearbyTarget.kind === 'cabinet') {
-              onOpenFiles(nearbyTarget.workspaceId)
+              onOpenFiles(nearbyTarget.workspaceId, 'cabinet')
             } else if (nearbyTarget.kind === 'roster') {
               onOpenRoster(nearbyTarget.workspaceId)
             } else {

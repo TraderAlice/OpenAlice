@@ -7,8 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '../i18n'
 import { OfficePage } from './OfficePage'
 
-const { officeFloorMock } = vi.hoisted(() => ({
+const { officeFloorMock, openOrFocusMock } = vi.hoisted(() => ({
   officeFloorMock: vi.fn(),
+  openOrFocusMock: vi.fn(),
 }))
 
 vi.mock('./OfficeRuntimeSection', () => ({
@@ -48,12 +49,13 @@ const defaultOfficeFloor = () => ({
 
 vi.mock('../tabs/store', () => ({
   useWorkspace: (select: (state: { openOrFocus: () => void }) => unknown) =>
-    select({ openOrFocus: vi.fn() }),
+    select({ openOrFocus: openOrFocusMock }),
 }))
 
 beforeEach(async () => {
   await i18n.changeLanguage('zh')
   officeFloorMock.mockReturnValue(defaultOfficeFloor())
+  openOrFocusMock.mockClear()
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: true,
     addEventListener: vi.fn(),
@@ -109,6 +111,31 @@ describe('OfficePage localization', () => {
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(operations)
+    })
+  })
+
+  it('inspects a filing cabinet in Office before explicitly entering Workspace files', async () => {
+    const { container } = render(<OfficePage />)
+
+    const sign = screen.getByRole('button', { name: '查看 chat 文件' })
+    await userEvent.click(sign)
+
+    expect(screen.getByRole('dialog', { name: '档案柜 · chat' })).toBeTruthy()
+    expect(screen.getByText('这里还没有归档任何工位记录。')).toBeTruthy()
+    expect(openOrFocusMock).not.toHaveBeenCalled()
+    expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: '档案柜 · chat' })).toBeNull()
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(sign)
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: '档案柜 · chat' }))
+    await userEvent.click(screen.getByRole('button', { name: '进入 Workspace 文件' }))
+    expect(openOrFocusMock).toHaveBeenCalledWith({
+      kind: 'workspace',
+      params: { wsId: 'chat-1', source: 'chat' },
     })
   })
 })

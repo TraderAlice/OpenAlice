@@ -28,7 +28,7 @@ export function OfficeMapPod({
   reducedMotion: boolean
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
-  onOpenFiles: (workspaceId: string) => void
+  onOpenFiles: (workspaceId: string, origin: 'sign' | 'cabinet') => void
   onOpenRoster: (workspaceId: string) => void
   nearbyTargetId?: string | null
 }) {
@@ -59,10 +59,11 @@ export function OfficeMapPod({
       data-sleeping={group.sleeping}
     >
       <button
+        id={`office-sign-${group.workspace.id}`}
         type="button"
         className="oa-office-pod__sign"
         style={{ zIndex: officeDepthAt(layout.y + 62) }}
-        onClick={() => onOpenFiles(group.workspace.id)}
+        onClick={() => onOpenFiles(group.workspace.id, 'sign')}
         aria-label={t('office.interactFiles', { name: title })}
         title={t('office.cabinetHint')}
       >
@@ -126,11 +127,12 @@ export function OfficeMapPod({
           ))}
         </ul>
         <button
+          id={`office-cabinet-${group.workspace.id}`}
           type="button"
           className="oa-office-pod__cabinet"
           style={{ zIndex: officeDepthAt(layout.y + OFFICE_CABINET_CENTER.y + 24) }}
           data-nearby={nearbyTargetId === `cabinet:${group.workspace.id}`}
-          onClick={() => onOpenFiles(group.workspace.id)}
+          onClick={() => onOpenFiles(group.workspace.id, 'cabinet')}
           aria-label={`${t('office.cabinet')} · ${title}`}
           title={t('office.cabinetHint')}
         >
