@@ -38,7 +38,13 @@ Current runtime assets:
 - `server-rack-v1.png` — AutoQuant neighborhood operations prop
 - `personnel-board-v1.png` — interactive roster prop for groups with more than four Sessions
 - `operations-board-v1.png` — floor landmark that opens the live occupancy log and replay
+- `workspace-sign-v1.png` — blank physical placard behind live Workspace, Harness, and agent text
 
 `operations-board-v1.png` was generated from the locked style master as a freestanding, width-dominant
 mission console with an abstract teal status display and no baked words. The built-in image generator
 rendered it on a flat magenta key; the repository copy uses locally extracted transparent alpha.
+
+`workspace-sign-v1.png` was generated from the same style master as a wide walnut-and-teal physical
+placard with no baked text. Runtime HTML supplies the localized Harness label, Workspace title, and
+agent count over its quiet center panel, preserving dynamic data and accessible text without reverting
+to a dashboard card.

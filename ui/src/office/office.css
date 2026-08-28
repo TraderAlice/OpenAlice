@@ -2967,60 +2967,77 @@
   position: absolute;
   z-index: auto;
   display: grid;
-  grid-template-rows: 42px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
   box-sizing: border-box;
   padding: 0 12px 12px;
 }
 
 .oa-office-pod__sign {
+  --office-sign-meta: var(--office-gba-water-seed);
+  --office-sign-text: var(--office-gba-cream-seed);
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  width: calc(100% - 24px);
+  width: 100%;
   min-width: 0;
-  min-height: 36px;
+  height: 64px;
   justify-self: center;
-  padding: 4px 6px 4px 9px;
-  border: 2px solid var(--gba-ink);
-  border-radius: 2px;
-  color: var(--gba-ink);
-  background: var(--gba-paper);
-  box-shadow: 3px 3px 0 color-mix(in srgb, var(--gba-ink) 26%, transparent);
+  color: var(--office-sign-text);
+  filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
 }
 
-.oa-office-pod__sign > div {
+.oa-office-pod__sign-asset {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+.oa-office-pod__sign-content {
+  position: absolute;
+  inset: 12px 22px 11px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: center;
   min-width: 0;
 }
 
-.oa-office-pod__sign span {
+.oa-office-pod__sign-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.oa-office-pod__sign-meta span {
   display: block;
   overflow: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 7px;
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1.1;
+  color: var(--office-sign-meta);
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .oa-office-pod__sign h3 {
+  display: -webkit-box;
   overflow: hidden;
-  margin: 1px 0 0;
+  margin: 2px 0 0;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
-  font-size: 11px;
   font-weight: 800;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.05;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .oa-office-pod__sign .oa-office-pod__count {
-  color: color-mix(in srgb, var(--gba-ink) 66%, transparent);
-  font-size: 7px;
+  flex: none;
+  color: var(--office-sign-meta);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -3082,7 +3099,8 @@
 }
 
 .oa-office-pod[data-sleeping="true"] .oa-office-pod__sign {
-  color: color-mix(in srgb, var(--gba-ink) 62%, transparent);
+  opacity: 0.68;
+  filter: grayscale(0.35) drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 18%, transparent));
 }
 
 .oa-office-pod__desks {
@@ -3609,7 +3627,7 @@
 
 .oa-office-kicker,
 .oa-office-hud__status,
-.oa-office-pod__sign > div > span,
+.oa-office-pod__sign-meta > span,
 .oa-office-pod__count,
 .oa-office-nameplate,
 .oa-office-alice small,
@@ -3626,11 +3644,11 @@
 }
 
 .oa-office-pod {
-  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
 }
 
 .oa-office-pod__sign {
-  min-height: 44px;
+  min-height: 64px;
 }
 
 .oa-office-pause-menu {
