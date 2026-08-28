@@ -11,6 +11,7 @@ export function OfficeDesk({
   employee,
   roomName,
   selected,
+  nearby,
   reducedMotion,
   spriteScale,
   onSelect,
@@ -19,6 +20,7 @@ export function OfficeDesk({
   employee: OfficeFloorEmployee | null
   roomName: string
   selected: boolean
+  nearby?: boolean
   reducedMotion: boolean
   spriteScale?: number
   onSelect: () => void
@@ -46,6 +48,7 @@ export function OfficeDesk({
         onDoubleClick={() => employee && onOpen?.()}
         className="oa-office-desk"
         data-selected={selected}
+        data-nearby={nearby}
         data-occupied={Boolean(employee)}
         data-mood={employee?.mood}
         style={{ width: station.widthPx, height: station.heightPx }}

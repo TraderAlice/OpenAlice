@@ -10,6 +10,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
 import { OfficeMapPod } from './OfficeMapPod'
+import {
+  nearestOfficeInteractionTarget,
+  officeCameraFollowingAlice,
+  officeInteractionTargets,
+} from './interaction-targets'
+import { officeCoworkerLabel } from './label'
 import { layoutOfficeMap } from './map-layout'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -83,6 +89,18 @@ export function OfficeBuilding({
   const groupById = useMemo(
     () => new Map(groups.map((group) => [group.workspace.id, group])),
     [groups],
+  )
+  const resolveGroupTitle = useMemo(
+    () => groupTitle ?? ((_workspaceId: string, tag: string) => tag),
+    [groupTitle],
+  )
+  const interactionTargets = useMemo(
+    () => officeInteractionTargets(groups, mapLayout, resolveGroupTitle),
+    [groups, mapLayout, resolveGroupTitle],
+  )
+  const nearbyTarget = useMemo(
+    () => nearestOfficeInteractionTarget(alice, interactionTargets),
+    [alice, interactionTargets],
   )
   const sleepAfterDays = Math.max(
     1,
@@ -222,6 +240,15 @@ export function OfficeBuilding({
         aria-label={t('office.mapLabel')}
         onKeyDown={(event) => {
           const key = event.key.toLowerCase()
+          if ((key === 'enter' || key === ' ') && nearbyTarget && !selected) {
+            event.preventDefault()
+            if (nearbyTarget.kind === 'employee') {
+              onSelectEmployee(nearbyTarget.workspaceId, nearbyTarget.employee)
+            } else {
+              onOpenFiles(nearbyTarget.workspaceId)
+            }
+            return
+          }
           const movement = {
             arrowleft: { x: -24, y: 0, direction: 'left' as const },
             a: { x: -24, y: 0, direction: 'left' as const },
@@ -235,10 +262,22 @@ export function OfficeBuilding({
           if (!movement) return
           event.preventDefault()
           setAliceDirection(movement.direction)
-          setAlice((current) => ({
-            x: Math.min(mapLayout.width - 24, Math.max(24, current.x + movement.x)),
-            y: Math.min(mapLayout.height - 24, Math.max(24, current.y + movement.y)),
-          }))
+          setAlice((current) => {
+            const next = {
+              x: Math.min(mapLayout.width - 24, Math.max(24, current.x + movement.x)),
+              y: Math.min(mapLayout.height - 24, Math.max(24, current.y + movement.y)),
+            }
+            const viewport = viewportRef.current?.getBoundingClientRect()
+            if (viewport) {
+              setCamera((currentCamera) => officeCameraFollowingAlice(
+                next,
+                currentCamera,
+                viewport,
+                mapLayout,
+              ))
+            }
+            return next
+          })
         }}
         onPointerDown={(event) => {
           if ((event.target as HTMLElement).closest('button')) return
@@ -330,7 +369,7 @@ export function OfficeBuilding({
                 key={layout.id}
                 group={group}
                 layout={layout}
-                title={(groupTitle ?? ((_workspaceId, tag) => tag))(
+                title={resolveGroupTitle(
                   group.workspace.id,
                   group.workspace.tag,
                 )}
@@ -340,11 +379,23 @@ export function OfficeBuilding({
                 onSelectEmployee={onSelectEmployee}
                 onOpenEmployee={onOpenEmployee}
                 onOpenFiles={onOpenFiles}
+                nearbyTargetId={nearbyTarget?.id}
               />
             )
           })}
           </div>
         </div>
+
+        {nearbyTarget && !selected && (
+          <div className="oa-office-interact-prompt" role="status">
+            <kbd>{t('office.interactKey')}</kbd>
+            <span>
+              {nearbyTarget.kind === 'employee'
+                ? t('office.interactTalk', { name: officeCoworkerLabel(nearbyTarget.employee) })
+                : t('office.interactFiles', { name: nearbyTarget.roomName })}
+            </span>
+          </div>
+        )}
 
         <div className="oa-office-map-controls">
           <span><Move size={12} />{t('office.mapHint')}</span>

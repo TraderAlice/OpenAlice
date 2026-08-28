@@ -64,8 +64,11 @@ Session、Files 或 provenance。
 
 - 单击员工：选中并在底部打开游戏对话框；再次操作进入 Session。
 - 单击 Workspace 铭牌/档案柜：打开该 Workspace Files。
+- Alice 靠近员工或档案柜时，只高亮距离最近的对象并显示单一游戏按键提示；Enter/Space
+  执行与鼠标点击相同的动作，不用键盘用户在地图对象之间 Tab 巡航。
 - 拖动空地：平移镜头；不得触发员工点击。
-- WASD/方向键：移动 Alice；地图保持可键盘聚焦并提供可读 label。
+- WASD/方向键：移动 Alice；靠近视口安全边缘时镜头跟随，地图保持可键盘聚焦并提供
+  可读 label。
 - `Live map` / `All groups`、Replay、Log：收入暂停菜单；主地图只保留当前位置和真实
   活动提示。
 - 默认无选中对象时不显示大对话框，只在首次进入时短暂提供操作提示。
@@ -235,6 +238,23 @@ Harness-neighborhood increment (2026-08-29):
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 589 files / 4967 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
+Proximity-interaction increment (2026-08-29):
+
+- Compared collision-triggered actions, a permanent interaction list, and proximity interaction.
+  Chose a 78px nearest-target radius with an explicit Enter/Space action: it behaves like a GBA
+  overworld without accidental navigation or Dashboard chrome.
+- Projected the four visible employee desks and Workspace filing cabinet into the shared map coordinate
+  system; the same employee ordering now drives both rendering and keyboard target positions.
+- Added nearest-object highlight, a compact game-button prompt, Enter/Space dispatch, and camera
+  following inside a viewport safe area. Mouse and focusable-button behavior remain intact.
+- Browser-played the real `/office` demo from Alice spawn to the Chat cabinet and employee desk;
+  confirmed Enter opens Workspace Files, Space opens employee dialogue, and a 17-step walk keeps Alice
+  visible while the camera follows.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 590 files / 4970 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
 ## Completion
