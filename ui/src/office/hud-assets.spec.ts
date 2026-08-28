@@ -10,8 +10,11 @@ const publicRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../publi
 
 describe('OFFICE_HUD_ASSETS', () => {
   it('ships generated RGBA pixel controls', () => {
+    expect(OFFICE_HUD_ASSETS.menuTerminal).toBe('/office/hud/menu-terminal-v1.png')
     expect(OFFICE_HUD_ASSETS.movePad).toBe('/office/hud/move-pad-v1.png')
     expect(OFFICE_HUD_ASSETS.resetCompass).toBe('/office/hud/reset-compass-v1.png')
+    expect(OFFICE_HUD_ASSETS.groupGrid).toBe('/office/hud/group-grid-v1.png')
+    expect(OFFICE_HUD_ASSETS.occupancyLog).toBe('/office/hud/occupancy-log-v1.png')
 
     for (const url of Object.values(OFFICE_HUD_ASSETS)) {
       const bytes = readFileSync(resolve(publicRoot, url.replace(/^\//, '')))
