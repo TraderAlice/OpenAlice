@@ -4,6 +4,11 @@ import { visibleEmployeesForOffice } from './desk-slots'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
 
 export const OFFICE_INTERACTION_RADIUS = 84
+export const OFFICE_INTERACTION_SIDE_REACH = 52
+export const OFFICE_INTERACTION_MIN_SIDE_REACH = 18
+export const OFFICE_INTERACTION_BACK_REACH = 8
+
+export type OfficeFacingDirection = 'up' | 'right' | 'down' | 'left'
 
 export type OfficeInteractionTarget =
   | {
@@ -82,17 +87,37 @@ export function officeInteractionTargets(
 
 export function nearestOfficeInteractionTarget(
   alice: { x: number; y: number },
+  facing: OfficeFacingDirection,
   targets: readonly OfficeInteractionTarget[],
   radius = OFFICE_INTERACTION_RADIUS,
 ): OfficeInteractionTarget | null {
   let nearest: OfficeInteractionTarget | null = null
-  let nearestDistanceSquared = radius * radius
+  let nearestScore = Number.POSITIVE_INFINITY
+  const vector = {
+    up: { x: 0, y: -1 },
+    right: { x: 1, y: 0 },
+    down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+  }[facing]
 
   for (const target of targets) {
-    const distanceSquared = (target.x - alice.x) ** 2 + (target.y - alice.y) ** 2
-    if (distanceSquared > nearestDistanceSquared) continue
+    const dx = target.x - alice.x
+    const dy = target.y - alice.y
+    const distanceSquared = dx ** 2 + dy ** 2
+    if (distanceSquared > radius * radius) continue
+    const forward = dx * vector.x + dy * vector.y
+    const sideways = Math.abs(dx * vector.y - dy * vector.x)
+    const sideReach = Math.min(
+      OFFICE_INTERACTION_SIDE_REACH,
+      Math.max(OFFICE_INTERACTION_MIN_SIDE_REACH, forward + OFFICE_INTERACTION_MIN_SIDE_REACH),
+    )
+    if (forward < -OFFICE_INTERACTION_BACK_REACH || sideways > sideReach) {
+      continue
+    }
+    const score = distanceSquared + sideways ** 2
+    if (score > nearestScore) continue
     nearest = target
-    nearestDistanceSquared = distanceSquared
+    nearestScore = score
   }
 
   return nearest

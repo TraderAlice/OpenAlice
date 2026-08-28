@@ -114,8 +114,8 @@ export function OfficeBuilding({
     [groups, mapLayout, resolveGroupTitle],
   )
   const nearbyTarget = useMemo(
-    () => nearestOfficeInteractionTarget(alice, interactionTargets),
-    [alice, interactionTargets],
+    () => nearestOfficeInteractionTarget(alice, aliceDirection, interactionTargets),
+    [alice, aliceDirection, interactionTargets],
   )
   const sleepAfterDays = Math.max(
     1,
