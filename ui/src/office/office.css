@@ -3536,6 +3536,62 @@
   height: 78px;
 }
 
+.oa-office-operations-board {
+  position: absolute;
+  width: 176px;
+  height: 132px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: filter 120ms steps(2, end), transform 120ms steps(2, end);
+}
+
+.oa-office-operations-board img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
+}
+
+.oa-office-operations-board[data-live="true"] img {
+  animation: oa-office-operations-live 1.4s steps(2, end) infinite;
+}
+
+.oa-office-operations-board:hover {
+  filter: brightness(1.08);
+  transform: translate(-50%, calc(-50% - 3px)) scale(1.03);
+}
+
+.oa-office-operations-board:focus-visible {
+  outline: 3px solid var(--gba-water);
+  outline-offset: -14px;
+}
+
+.oa-office-operations-board[data-nearby="true"] {
+  filter: brightness(1.1) drop-shadow(0 0 6px var(--gba-water));
+  animation: oa-office-nearby 800ms steps(2, end) infinite;
+}
+
+@keyframes oa-office-operations-live {
+  50% {
+    filter:
+      drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent))
+      brightness(1.12)
+      saturate(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-office-operations-board[data-live="true"] img,
+  .oa-office-operations-board[data-nearby="true"] {
+    animation: none;
+  }
+}
+
 /*
  * Office typography contract: consume the global Tailwind type scale.
  * Pixel-art styling comes from weight, borders and rendering, never tiny text.

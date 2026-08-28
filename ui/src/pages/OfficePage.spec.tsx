@@ -72,5 +72,13 @@ describe('OfficePage localization', () => {
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: '菜单' }))
     })
+
+    const operations = screen.getByRole('button', { name: '行动看板' })
+    await userEvent.click(operations)
+    expect(screen.getByText('Office occupancy')).toBeTruthy()
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(operations)
+    })
   })
 })

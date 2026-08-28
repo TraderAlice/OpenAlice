@@ -23,6 +23,7 @@ describe('OfficeBuilding', () => {
     const onOpenFiles = vi.fn()
     const onOpenRoster = vi.fn()
     const onSelectEmployee = vi.fn()
+    const onOpenLog = vi.fn()
     render(
       <OfficeBuilding
         building={{
@@ -67,6 +68,7 @@ describe('OfficeBuilding', () => {
         onOpenEmployee={vi.fn()}
         onOpenFiles={onOpenFiles}
         onOpenRoster={onOpenRoster}
+        onOpenLog={onOpenLog}
       />,
     )
     expect(screen.getByTestId('office-building')).toBeTruthy()
@@ -75,6 +77,9 @@ describe('OfficeBuilding', () => {
     expect(map).toBeTruthy()
     const alice = screen.getByRole('img', { name: 'Alice on the office map' })
     expect(alice.style.left).toBe('480px')
+    const operations = screen.getByRole('button', { name: 'Operations board' })
+    expect(operations.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/furniture/operations-board-v1.png')
     Object.defineProperties(map, {
       setPointerCapture: { value: vi.fn() },
       releasePointerCapture: { value: vi.fn() },
@@ -105,6 +110,14 @@ describe('OfficeBuilding', () => {
     expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
     await userEvent.click(screen.getByRole('button', { name: 'Reset map view' }))
     await userEvent.click(map)
+    await userEvent.keyboard('wwww')
+    expect(alice.style.top).toBe('264px')
+    expect(screen.getByText('Check live operations')).toBeTruthy()
+    expect(operations.dataset.nearby).toBe('true')
+    await userEvent.keyboard('{Enter}')
+    expect(onOpenLog).toHaveBeenCalledWith('operations')
+    await userEvent.click(screen.getByRole('button', { name: 'Reset map view' }))
+    await userEvent.click(map)
     await userEvent.keyboard('wwwaaaaaaaasss')
     expect(alice.style.left).toBe('288px')
     expect(alice.style.top).toBe('288px')
@@ -133,6 +146,8 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-pod-quant-old')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Filing cabinet · chat' }))
     expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
+    await userEvent.click(operations)
+    expect(onOpenLog).toHaveBeenCalledWith('operations')
   })
 
   it('renders an interactive personnel board for groups larger than the four-desk map', async () => {
@@ -167,6 +182,7 @@ describe('OfficeBuilding', () => {
         onOpenEmployee={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={onOpenRoster}
+        onOpenLog={vi.fn()}
       />,
     )
 

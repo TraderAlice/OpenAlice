@@ -30,6 +30,7 @@ describe('Office interaction targets', () => {
     const targets = officeInteractionTargets([group], layout, (_id, tag) => tag)
     const employee = targets.find((target) => target.kind === 'employee')
     const cabinet = targets.find((target) => target.kind === 'cabinet')
+    const operations = targets.find((target) => target.kind === 'operations')
 
     expect(employee).toMatchObject({
       id: 'employee:chat-1:resume-1',
@@ -40,6 +41,12 @@ describe('Office interaction targets', () => {
       id: 'cabinet:chat-1',
       x: layout.pods[0]!.x + 270,
       y: layout.pods[0]!.y + 187,
+    })
+    expect(operations).toEqual({
+      id: 'operations',
+      kind: 'operations',
+      x: layout.width / 2,
+      y: 204,
     })
     expect(nearestOfficeInteractionTarget(
       { x: employee!.x + 24, y: employee!.y },

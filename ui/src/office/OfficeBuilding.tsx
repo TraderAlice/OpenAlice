@@ -17,6 +17,7 @@ import {
 } from './interaction-targets'
 import { officeCoworkerLabel } from './label'
 import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
+import { officeOperationsBoardPosition } from './map-landmarks'
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
@@ -38,7 +39,7 @@ export function OfficeBuilding({
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenFiles: (workspaceId: string) => void
   onOpenRoster: (workspaceId: string) => void
-  onOpenLog?: () => void
+  onOpenLog: (origin: 'menu' | 'operations') => void
 }) {
   const { t } = useTranslation()
   const reducedMotion = useReducedMotion()
@@ -113,6 +114,10 @@ export function OfficeBuilding({
   const interactionTargets = useMemo(
     () => officeInteractionTargets(groups, mapLayout, resolveGroupTitle),
     [groups, mapLayout, resolveGroupTitle],
+  )
+  const operationsBoard = useMemo(
+    () => officeOperationsBoardPosition(mapLayout.width),
+    [mapLayout.width],
   )
   const nearbyTarget = useMemo(
     () => nearestOfficeInteractionTarget(alice, aliceDirection, interactionTargets),
@@ -251,7 +256,7 @@ export function OfficeBuilding({
                 role="menuitem"
                 onClick={() => {
                   setMenuOpen(false)
-                  onOpenLog?.()
+                  onOpenLog('menu')
                 }}
               >
                 <ScrollText size={13} />
@@ -277,8 +282,10 @@ export function OfficeBuilding({
               onSelectEmployee(nearbyTarget.workspaceId, nearbyTarget.employee)
             } else if (nearbyTarget.kind === 'cabinet') {
               onOpenFiles(nearbyTarget.workspaceId)
-            } else {
+            } else if (nearbyTarget.kind === 'roster') {
               onOpenRoster(nearbyTarget.workspaceId)
+            } else {
+              onOpenLog('operations')
             }
             return
           }
@@ -377,6 +384,28 @@ export function OfficeBuilding({
             >
               <img src={OFFICE_FURNITURE.generated.terminal} alt="" style={officePixelImg} />
             </div>
+            <button
+              id="office-operations-board"
+              type="button"
+              className="oa-office-operations-board"
+              data-live={stats.active > 0}
+              data-nearby={nearbyTarget?.kind === 'operations'}
+              aria-label={t('office.operationsBoard')}
+              title={t('office.operationsBoardHint')}
+              onClick={() => onOpenLog('operations')}
+              style={{
+                left: operationsBoard.x,
+                top: operationsBoard.y,
+                zIndex: officeDepthAt(operationsBoard.y + 43),
+              }}
+            >
+              <img
+                src={OFFICE_FURNITURE.generated.operationsBoard}
+                alt=""
+                aria-hidden
+                style={officePixelImg}
+              />
+            </button>
             <div
               className="oa-office-alice"
               role="img"
@@ -441,7 +470,9 @@ export function OfficeBuilding({
                 ? t('office.interactTalk', { name: officeCoworkerLabel(nearbyTarget.employee) })
                 : nearbyTarget.kind === 'cabinet'
                   ? t('office.interactFiles', { name: nearbyTarget.roomName })
-                  : t('office.interactRoster', { name: nearbyTarget.roomName })}
+                  : nearbyTarget.kind === 'roster'
+                    ? t('office.interactRoster', { name: nearbyTarget.roomName })
+                    : t('office.interactOperations')}
             </span>
           </div>
         )}

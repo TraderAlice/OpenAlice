@@ -362,6 +362,25 @@ Y-depth increment (2026-08-29):
 - `pnpm test` passed: 595 files / 4984 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Operations-board increment (2026-08-29):
+
+- Compared shrinking the one-row map, filling the north aisle with decorative set dressing, and turning
+  the existing occupancy log into a world landmark. Chose the Operations Board because it gives the empty
+  aisle a gameplay purpose and spatializes an existing action without adding another Dashboard surface.
+- Used the locked Office style master with the built-in image generator to create a freestanding 16-bit
+  mission console on a flat magenta key. Removed the key locally, verified an RGBA asset with transparent
+  alpha, and registered `operations-board-v1.png` in the generated furniture pack.
+- The board owns a real map coordinate, Y-depth, collision footprint, facing-aware interaction target,
+  mouse button, keyboard prompt, active-screen pulse, and reduced-motion fallback. Enter opens the same
+  occupancy log/replay as the pause menu; closing returns focus to the board when that was the entry point.
+- Browser-played the real Demo route in Day and Night: four north steps expose the board prompt at y=264,
+  a fifth step bumps without moving Alice, Enter opens the occupancy log, and close returns focus to
+  `office-operations-board`. The original spawn-facing cabinet prompt remains the default first action.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 595 files / 4985 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
