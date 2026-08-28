@@ -1,9 +1,9 @@
-import { FolderOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { OfficeDesk } from './OfficeDesk'
 import { deskSlotsForOffice } from './desk-slots'
+import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 
 export function OfficeMapPod({
   group,
@@ -55,17 +55,16 @@ export function OfficeMapPod({
         <span className="oa-office-pod__count">
           {t('office.agentCount', { count: group.employees.length })}
         </span>
-        <button
-          type="button"
-          onClick={() => onOpenFiles(group.workspace.id)}
-          aria-label={`${t('office.cabinet')} · ${title}`}
-          title={t('office.cabinetHint')}
-        >
-          <FolderOpen size={13} />
-        </button>
       </header>
 
       <div className="oa-office-pod__floor">
+        <img
+          src={OFFICE_FURNITURE.generated.workspaceRug}
+          alt=""
+          aria-hidden
+          className="oa-office-pod__rug"
+          style={officePixelImg}
+        />
         <ul className="oa-office-pod__desks">
           {slots.map((employee, index) => (
             <OfficeDesk
@@ -84,6 +83,15 @@ export function OfficeMapPod({
             />
           ))}
         </ul>
+        <button
+          type="button"
+          className="oa-office-pod__cabinet"
+          onClick={() => onOpenFiles(group.workspace.id)}
+          aria-label={`${t('office.cabinet')} · ${title}`}
+          title={t('office.cabinetHint')}
+        >
+          <img src={OFFICE_FURNITURE.generated.cabinet} alt="" style={officePixelImg} />
+        </button>
       </div>
     </section>
   )

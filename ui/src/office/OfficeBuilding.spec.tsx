@@ -20,6 +20,7 @@ beforeEach(async () => {
 
 describe('OfficeBuilding', () => {
   it('filters sleeping groups and lets Alice move around the continuous map', async () => {
+    const onOpenFiles = vi.fn()
     render(
       <OfficeBuilding
         building={{
@@ -52,7 +53,7 @@ describe('OfficeBuilding', () => {
         }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
-        onOpenFiles={vi.fn()}
+        onOpenFiles={onOpenFiles}
       />,
     )
     expect(screen.getByTestId('office-building')).toBeTruthy()
@@ -97,5 +98,7 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-pod-chat-1')).toBeTruthy()
     expect(screen.getByTestId('office-pod-quant-1')).toBeTruthy()
     expect(screen.getByTestId('office-pod-quant-old')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Filing cabinet · chat' }))
+    expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
   })
 })

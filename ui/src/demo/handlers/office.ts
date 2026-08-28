@@ -1,5 +1,12 @@
 import { http, HttpResponse } from 'msw'
 
+import {
+  DEMO_AUTO_QUANT_WORKSPACE_ID,
+  DEMO_CHAT_RESUME_ID,
+  DEMO_CHAT_SESSION_ID,
+  DEMO_CHAT_WORKSPACE_ID,
+} from '../fixtures/workspaces'
+
 export const officeHandlers = [
   http.get('/api/office/floor', ({ request }) => {
     const asOfRaw = new URL(request.url).searchParams.get('asOfSeq')
@@ -16,16 +23,16 @@ export const officeHandlers = [
       ...(asOfSeq != null ? { asOfSeq } : {}),
       offices: [
         {
-          workspace: { id: 'chat-demo', tag: 'chat', harness: 'chat' },
+          workspace: { id: DEMO_CHAT_WORKSPACE_ID, tag: 'chat', harness: 'chat' },
           lastInteractionAt: now,
           sleeping: false,
           employees: [
             {
-              resumeId: 'resume-chat-demo',
+              resumeId: DEMO_CHAT_RESUME_ID,
               agent: 'codex',
               name: 'c1',
               title: 'Desk mate',
-              sessionRecordId: 'codex-demo-1',
+              sessionRecordId: DEMO_CHAT_SESSION_ID,
               mood: working ? 'working' : 'idle',
               surface: 'headless',
               bubble: working ? { kind: 'tool', name: 'workspace_list' } : null,
@@ -43,7 +50,7 @@ export const officeHandlers = [
           ],
         },
         {
-          workspace: { id: 'quant-demo', tag: 'auto-quant', harness: 'auto-quant' },
+          workspace: { id: DEMO_AUTO_QUANT_WORKSPACE_ID, tag: 'auto-quant', harness: 'auto-quant' },
           lastInteractionAt: now,
           sleeping: false,
           employees: [],

@@ -279,13 +279,14 @@ export function OfficeBuilding({
               width: mapLayout.width,
               height: mapLayout.height,
               transform: `translate3d(${camera.x}px, ${camera.y}px, 0)`,
+              backgroundImage: `url(${OFFICE_FURNITURE.generated.floorTile})`,
             }}
           >
-            <div className="oa-office-map-wall" aria-hidden>
-              <span />
-              <span />
-              <span />
-            </div>
+            <div
+              className="oa-office-map-wall"
+              aria-hidden
+              style={{ backgroundImage: `url(${OFFICE_FURNITURE.generated.wallWindow})` }}
+            />
             <div className="oa-office-map-landmark oa-office-map-landmark--plant" aria-hidden>
               <img src={OFFICE_FURNITURE.generated.plant} alt="" style={officePixelImg} />
             </div>

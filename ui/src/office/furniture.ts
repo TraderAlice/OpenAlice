@@ -13,6 +13,9 @@ export const OFFICE_FURNITURE = {
     cabinet: '/office/furniture/filing-cabinet-v1.png',
     terminal: '/office/furniture/terminal-kiosk-v1.png',
     plant: '/office/furniture/plant-v1.png',
+    wallWindow: '/office/furniture/wall-window-v1.png',
+    floorTile: '/office/furniture/floor-tile-v1.png',
+    workspaceRug: '/office/furniture/workspace-rug-v1.png',
   },
 } as const
 

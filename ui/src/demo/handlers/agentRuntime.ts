@@ -1,5 +1,11 @@
 import { http, HttpResponse } from 'msw'
 
+import {
+  DEMO_CHAT_RESUME_ID,
+  DEMO_CHAT_SESSION_ID,
+  DEMO_CHAT_WORKSPACE_ID,
+} from '../fixtures/workspaces'
+
 const now = Date.now()
 let demoSonnerSeq = 6
 const demoSonnerEvents: Array<Record<string, unknown>> = []
@@ -18,8 +24,8 @@ export const agentRuntimeHandlers = [
         ts: now - 12_000,
         type: 'runtime.stopped',
         payload: {
-          workspaceId: 'chat-demo',
-          resumeId: 'resume-chat-demo',
+          workspaceId: DEMO_CHAT_WORKSPACE_ID,
+          resumeId: DEMO_CHAT_RESUME_ID,
           agent: 'codex',
           surface: 'headless',
           taskId: 'run-demo-quant',
@@ -33,8 +39,8 @@ export const agentRuntimeHandlers = [
         ts: now - 18_000,
         type: 'runtime.turn.text',
         payload: {
-          workspaceId: 'chat-demo',
-          resumeId: 'resume-chat-demo',
+          workspaceId: DEMO_CHAT_WORKSPACE_ID,
+          resumeId: DEMO_CHAT_RESUME_ID,
           agent: 'codex',
           surface: 'headless',
           taskId: 'run-demo-quant',
@@ -46,8 +52,8 @@ export const agentRuntimeHandlers = [
         ts: now - 40_000,
         type: 'runtime.turn.tool',
         payload: {
-          workspaceId: 'chat-demo',
-          resumeId: 'resume-chat-demo',
+          workspaceId: DEMO_CHAT_WORKSPACE_ID,
+          resumeId: DEMO_CHAT_RESUME_ID,
           agent: 'codex',
           surface: 'headless',
           taskId: 'run-demo-quant',
@@ -61,8 +67,8 @@ export const agentRuntimeHandlers = [
         ts: now - 50_000,
         type: 'runtime.turn.tool',
         payload: {
-          workspaceId: 'chat-demo',
-          resumeId: 'resume-chat-demo',
+          workspaceId: DEMO_CHAT_WORKSPACE_ID,
+          resumeId: DEMO_CHAT_RESUME_ID,
           agent: 'codex',
           surface: 'headless',
           taskId: 'run-demo-quant',
@@ -77,14 +83,14 @@ export const agentRuntimeHandlers = [
         type: 'runtime.started',
         causedBy: 1,
         payload: {
-          workspaceId: 'chat-demo',
-          resumeId: 'resume-chat-demo',
+          workspaceId: DEMO_CHAT_WORKSPACE_ID,
+          resumeId: DEMO_CHAT_RESUME_ID,
           agent: 'codex',
           surface: 'headless',
           taskId: 'run-demo-quant',
           cause: {
             kind: 'conversation',
-            from: { kind: 'session', workspaceId: 'chat-demo', resumeId: 'resume-caller', agent: 'pi' },
+            from: { kind: 'session', workspaceId: DEMO_CHAT_WORKSPACE_ID, resumeId: 'resume-caller', agent: 'pi' },
             resolution: 'exact',
           },
         },
@@ -94,10 +100,10 @@ export const agentRuntimeHandlers = [
         ts: now - 97_000,
         type: 'session.born',
         payload: {
-          workspaceId: 'chat-demo',
-          resumeId: 'resume-chat-demo',
+          workspaceId: DEMO_CHAT_WORKSPACE_ID,
+          resumeId: DEMO_CHAT_RESUME_ID,
           agent: 'codex',
-          sessionRecordId: 'codex-demo-1',
+          sessionRecordId: DEMO_CHAT_SESSION_ID,
         },
       },
     ],

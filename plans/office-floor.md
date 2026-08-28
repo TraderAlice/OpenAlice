@@ -118,7 +118,8 @@ Session、Files 或 provenance。
 
 - [x] 添加生成式 top-down asset registry 和风格母版；第一批透明 PNG 覆盖工位、档案柜、
   终端机和植物，CSS 不再负责绘制已接入物件
-- [ ] 将 desk/cabinet/terminal 从正面排队改为俯视 pod 构图
+- [x] 将 desk/cabinet/terminal 从正面排队改为生成式俯视物件；档案柜成为地图内 Files
+  交互，而不是铭牌图标
 - [x] 地图 Alice 与工位员工复用 Codex pet v2；移动时只做 atlas 支持的左右镜像
 - [ ] 员工超出 pod 舒适容量时使用可进入/可展开的小组人数提示，不显示 `+58`
 - [x] 统一 tile、阴影、像素缩放和主色卡映射
@@ -200,6 +201,23 @@ Generated-asset increment (2026-08-29):
 - `pnpm test` passed: 587 files / 4965 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 - Browser rechecked the real `/office` demo route after asset integration
+
+Environment-asset increment (2026-08-29):
+
+- Generated and alpha-checked a repeating wall/window module, seamless floor texture, and
+  Workspace rug from the same locked style master
+- Replaced CSS grid flooring and CSS-drawn windows with generated environment assets while
+  preserving one continuous floor and DOM-native map controls
+- Promoted the generated filing cabinet to a focusable map object that opens Workspace Files;
+  removed the Files icon from the Workspace sign
+- Repaired the Office demo projection so its Workspace, Session, and `resumeId` identities resolve
+  against the shared demo roster; browser-confirmed Files opens instead of `Workspace not found`
+- Browser rechecked Alice keyboard movement, employee selection, generated asset scaling, and the
+  employee dialog with the map context preserved
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 588 files / 4966 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
 
 ## Completion
 

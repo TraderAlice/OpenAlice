@@ -64,6 +64,7 @@ export const demoWorkspace: Workspace = {
 // history visible.
 export const DEMO_CHAT_WORKSPACE_ID = 'demo-chat-ws'
 export const DEMO_CHAT_SESSION_ID = 'demo-chat-session'
+export const DEMO_CHAT_RESUME_ID = 'demo-resume-chat'
 export const DEMO_AUTO_QUANT_WORKSPACE_ID = 'demo-ws-auto-quant'
 export const DEMO_AUTO_PREDICTION_WORKSPACE_ID = 'demo-ws-auto-prediction'
 export const DEMO_MACRO_WORKSPACE_ID = 'demo-ws-macro'
@@ -74,7 +75,7 @@ export const DEMO_MACRO_WORKSPACE_ID = 'demo-ws-macro'
 const demoChatSessions: SessionRecord[] = [
   {
     id: DEMO_CHAT_SESSION_ID,
-    resumeId: 'demo-resume-chat',
+    resumeId: DEMO_CHAT_RESUME_ID,
     wsId: DEMO_CHAT_WORKSPACE_ID,
     agent: 'pi',
     name: 'p1',
