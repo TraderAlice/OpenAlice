@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
 import { officeBubbleText } from './bubble-text'
-import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
+import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { officeCoworkerLabel } from './label'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -46,7 +46,8 @@ export function OfficeInspectRail({
         {employee ? (
           <>
             <div className="oa-office-inspect__portrait" aria-hidden>
-              <OfficeEmployeeSprite
+              <OfficeCoworkerSprite
+                agent={employee.agent}
                 mood={employee.mood}
                 reducedMotion={reducedMotion}
                 label={officeCoworkerLabel(employee)}

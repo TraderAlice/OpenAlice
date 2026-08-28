@@ -30,8 +30,8 @@ Session、Files 或 provenance。
 4. 固定三桌加 `+N` 不能解释真实 Session 密度。
 5. 底部帮助框长驻遮挡地图；详情和日志仍有网页面板层级。
 6. 地图缺少自动构图，空白、遮挡和镜头初始位置依赖手调坐标。
-7. 地图角色和工位员工必须复用现有 `alice-maid` Codex pet v2 pack；不能再画一套
-   CSS 占位人替代产品已有角色资产。
+7. Alice 和所有工位员工共用 `alice-maid` 会抹平主角与 NPC 身份；Alice 保留正式 pet
+   atlas，员工必须使用同画风、按 runtime 可辨识的正式位图角色，不能退回 CSS 占位人。
 
 ## Design decision
 
@@ -87,14 +87,17 @@ Session、Files 或 provenance。
 
 ## Asset boundary
 
-`alice-maid` Codex pet v2 是当前 Alice 与所有 Session 员工共用的正式角色 pack，
-通过 `OfficeSpritePack` 保持可替换。角色的 mood 行继续由 runtime log 驱动；地图移动
-只做左右镜像，不能把 mood atlas 行误当成四方向行。
+`alice-maid` Codex pet v2 是 Alice 唯一使用的正式主角 pack，通过 `OfficeSpritePack`
+保持可替换。Session 员工使用独立的 runtime coworker registry；Codex、Claude、Pi、
+OpenCode 有正式生成角色，其他 runtime 稳定映射到最接近的 archetype，绝不回退成 Alice。
+员工 mood 继续由 runtime log 驱动，并以离散 CSS 动作和状态点表达；未来有可靠的四方向
+atlas 后再替换静态 coworker，不把 mood atlas 行误当成方向行。
 
 第一版 top-down 家具占位资产遵守统一规范：
 
 - 16×16 tile 基础网格；人物和桌组可占 32×32 / 48×48；
-- 地图主角和每个工位都消费同一个 `alice-maid` v2 adapter，并按场景缩放；
+- 地图主角消费 `alice-maid` v2 adapter；工位、名册和 Agent 档案消费同一 runtime
+  coworker asset registry；
 - top-down desk、terminal、cabinet、rug corner、sign、plant；
 - 所有缺失资产在 asset registry 和 CSS 中保留 `TODO(asset)`，替换资产不得修改场景
   数据模型或布局算法。
@@ -125,7 +128,8 @@ Session、Files 或 provenance。
   终端机和植物，CSS 不再负责绘制已接入物件
 - [x] 将 desk/cabinet/terminal 从正面排队改为生成式俯视物件；档案柜成为地图内 Files
   交互，而不是铭牌图标
-- [x] 地图 Alice 与工位员工复用 Codex pet v2；移动时只做 atlas 支持的左右镜像
+- [x] Alice 独占 Codex pet v2，员工使用按 runtime 区分的生成角色；移动时 Alice 只做
+  atlas 支持的左右镜像
 - [x] 员工超出 pod 舒适容量时使用可进入/可展开的小组人数提示，不显示 `+58`
 - [x] 统一 tile、阴影、像素缩放和主色卡映射
 
@@ -297,6 +301,28 @@ Roster-board increment (2026-08-29):
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 592 files / 4978 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
+Runtime-coworker increment (2026-08-29):
+
+- Compared palette-shifting Alice, generating complete directional atlases, and introducing authored
+  static overworld coworkers with discrete mood motion. Chose the static runtime archetypes because they
+  immediately restore protagonist/NPC identity while keeping a clean upgrade path to future atlases.
+- Generated Codex, Claude, Pi, and OpenCode coworkers against the locked environment master and Alice
+  proportion reference. Rejected the first outputs because their checkerboard was baked into RGB, then
+  background-extracted, alpha-checked, and losslessly packaged the corrected assets as WebP.
+- Added one runtime asset registry shared by map desks, the six-person roster, and Agent-file portraits.
+  Known aliases map intentionally; unknown runtimes receive a stable archetype and never render as Alice.
+- Replaced always-on activity bubbles and nameplates with progressive disclosure: the map stays readable,
+  while hover/focus/proximity/selection reveals identity and proximity reveals the current activity.
+- Browser-played the real Demo route at native viewport: all four runtime silhouettes are visible on the
+  shared floor, approaching Claude reveals only Claude's name/activity, the roster shows six correctly
+  mapped portraits, and the Agent file preserves the selected Claude portrait while Alice keeps her atlas.
+- Repaired the semantic-color integration after the first full run rejected literal runtime accents;
+  coworker badges now consume theme-owned terminal color roles in Day and Night modes.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 594 files / 4981 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
 ## Completion

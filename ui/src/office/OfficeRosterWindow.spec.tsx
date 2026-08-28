@@ -49,6 +49,12 @@ describe('OfficeRosterWindow', () => {
 
     expect(screen.getByText('6 team members')).toBeTruthy()
     expect(screen.getAllByRole('button')).toHaveLength(7)
+    const coworkerImages = screen.getByTestId('office-roster-window')
+      .querySelectorAll<HTMLImageElement>('.oa-office-coworker img')
+    expect(coworkerImages).toHaveLength(6)
+    expect(coworkerImages[0]?.getAttribute('src')).toBe('/office/coworkers/codex-v1.webp')
+    expect(coworkerImages[5]?.getAttribute('src')).toBe('/office/coworkers/claude-v1.webp')
+    expect(Array.from(coworkerImages).some((image) => image.src.includes('alice-maid'))).toBe(false)
     await userEvent.click(screen.getByRole('button', { name: /Research session 6.*c1/i }))
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))
     await userEvent.keyboard('{Escape}')

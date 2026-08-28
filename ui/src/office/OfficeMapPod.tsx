@@ -97,7 +97,7 @@ export function OfficeMapPod({
                 && nearbyTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
               )}
               reducedMotion={reducedMotion}
-              spriteScale={0.2}
+              spriteScale={0.23}
               onSelect={() => employee && onSelectEmployee(group.workspace.id, employee)}
               onOpen={() => employee && onOpenEmployee(group.workspace.id, employee)}
             />

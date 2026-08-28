@@ -53,8 +53,8 @@ describe('OfficeInspectRail', () => {
     )
 
     expect(screen.getByText('Polishing the Office floor.')).toBeTruthy()
-    expect(container.querySelector<HTMLElement>('.oa-office-inspect__portrait > div')?.style.backgroundImage)
-      .toContain('/office/packs/alice-maid/spritesheet.webp')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
+      .toContain('/office/coworkers/codex-v1.webp')
 
     await userEvent.click(screen.getByRole('button', { name: 'Open session' }))
     expect(onOpen).toHaveBeenCalledOnce()

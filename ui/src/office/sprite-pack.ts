@@ -1,7 +1,7 @@
 /**
  * Office only depends on this pack interface. Codex pet v2 is the first
- * adapter — not part of the employee / desk / office model. Swap `pose()`
- * and `sheetUrl` to change generators later.
+ * adapter — not part of the employee / desk / office model. It now belongs
+ * exclusively to Alice; runtime coworkers use generated static overworld art.
  */
 export type OfficeEmployeeMood =
   | 'idle'
