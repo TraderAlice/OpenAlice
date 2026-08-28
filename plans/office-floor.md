@@ -116,7 +116,8 @@ Session、Files 或 provenance。
 
 ### 2. Establish top-down visual grammar
 
-- [ ] 添加 top-down placeholder asset registry 和替换注释
+- [x] 添加生成式 top-down asset registry 和风格母版；第一批透明 PNG 覆盖工位、档案柜、
+  终端机和植物，CSS 不再负责绘制已接入物件
 - [ ] 将 desk/cabinet/terminal 从正面排队改为俯视 pod 构图
 - [x] 地图 Alice 与工位员工复用 Codex pet v2；移动时只做 atlas 支持的左右镜像
 - [ ] 员工超出 pod 舒适容量时使用可进入/可展开的小组人数提示，不显示 `+58`
@@ -186,6 +187,19 @@ Current verification (2026-08-16):
   pointer pan, Reset, Day and Night, 760px narrow viewport, and emulated reduced motion
 - Pause menu uses the shared Popover primitive; Escape dismissal, focus return, menu roles,
   viewport containment, and the occupancy dialog path were rechecked after the migration
+
+Generated-asset increment (2026-08-29):
+
+- Generated and alpha-checked a 16-bit top-down furniture style master plus standalone
+  workstation, filing-cabinet, terminal-kiosk, and plant sprites
+- Integrated the workstation into every pod and replaced the CSS plant / water-cooler placeholders
+  with generated plant / terminal assets; the filing cabinet is registered but not yet promoted to
+  the Files interaction object
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 587 files / 4965 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+- Browser rechecked the real `/office` demo route after asset integration
 
 ## Completion
 

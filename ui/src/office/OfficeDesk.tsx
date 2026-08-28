@@ -57,9 +57,12 @@ export function OfficeDesk({
         style={{ width: station.widthPx, height: station.heightPx }}
       >
         <span className="oa-office-topdown-station" aria-hidden>
-          <span className="oa-office-topdown-station__desk" />
-          <span className="oa-office-topdown-station__terminal" />
-          <span className="oa-office-topdown-station__chair" />
+          <img
+            src={OFFICE_FURNITURE.generated.workstation}
+            alt=""
+            className="oa-office-topdown-station__asset"
+            style={officePixelImg}
+          />
         </span>
         {employee?.bubble && (
           <span
