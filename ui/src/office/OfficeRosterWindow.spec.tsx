@@ -33,7 +33,7 @@ describe('OfficeRosterWindow', () => {
     }))
     const onSelect = vi.fn()
     const onClose = vi.fn()
-    render(
+    const { container } = render(
       <OfficeRosterWindow
         group={{
           workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
@@ -55,6 +55,11 @@ describe('OfficeRosterWindow', () => {
     expect(coworkerImages[0]?.getAttribute('src')).toBe('/office/coworkers/codex-v1.webp')
     expect(coworkerImages[5]?.getAttribute('src')).toBe('/office/coworkers/claude-v1.webp')
     expect(Array.from(coworkerImages).some((image) => image.src.includes('alice-maid'))).toBe(false)
+    expect(screen.getByRole('button', { name: 'Close' }).querySelector('img')?.getAttribute('src'))
+      .toBe('/office/hud/window-close-v1.png')
+    expect(container.querySelector('.oa-office-window__header > div > img')?.getAttribute('src'))
+      .toBe('/office/hud/roster-badge-v1.png')
+    expect(container.querySelector('svg')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: /Research session 6.*c1/i }))
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))
     await userEvent.keyboard('{Escape}')

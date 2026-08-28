@@ -15,6 +15,11 @@ describe('OFFICE_HUD_ASSETS', () => {
     expect(OFFICE_HUD_ASSETS.resetCompass).toBe('/office/hud/reset-compass-v1.png')
     expect(OFFICE_HUD_ASSETS.groupGrid).toBe('/office/hud/group-grid-v1.png')
     expect(OFFICE_HUD_ASSETS.occupancyLog).toBe('/office/hud/occupancy-log-v1.png')
+    expect(OFFICE_HUD_ASSETS.signalReceiver).toBe('/office/hud/signal-receiver-v1.png')
+    expect(OFFICE_HUD_ASSETS.rosterBadge).toBe('/office/hud/roster-badge-v1.png')
+    expect(OFFICE_HUD_ASSETS.windowClose).toBe('/office/hud/window-close-v1.png')
+    expect(OFFICE_HUD_ASSETS.sessionPortal).toBe('/office/hud/session-portal-v1.png')
+    expect(OFFICE_HUD_ASSETS.drawerRecord).toBe('/office/hud/drawer-record-v1.png')
 
     for (const url of Object.values(OFFICE_HUD_ASSETS)) {
       const bytes = readFileSync(resolve(publicRoot, url.replace(/^\//, '')))

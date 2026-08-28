@@ -552,6 +552,30 @@ Pause-command-menu increment (2026-08-29):
 - `pnpm test` passed: 598 files / 4991 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Command-glyph increment (2026-08-29):
+
+- Real-browser replay of the Team roster and Agent file found the remaining visual discontinuity:
+  generic Lucide line icons still represented the live signal, roster, close, open-session, file, and
+  empty-selection actions inside otherwise physical 16-bit windows.
+- Compared CSS-drawn pixel symbols, reusing the small existing HUD set, and generating a complete Office
+  command-glyph family. Chose the generated family so each action has a distinct physical object and the
+  same teal, cream, charcoal, brass, and cyan-light material language as the map.
+- Generated five independent transparent sprites against the locked style master: a radio receiver,
+  personnel badge, mechanical close latch, terminal doorway, and drawer record. The first Session doorway
+  baked in a checkerboard, so a second background-extraction pass produced genuine RGBA before packaging.
+- Replaced every remaining `lucide-react` use under `ui/src/office/`; live labels, button semantics, focus
+  rings, keyboard behavior, and accessible names remain DOM-owned rather than baked into the images.
+- Browser-verified the Night Roster and Agent file at 1280×720 and 760×900. The glyphs retain readable
+  silhouettes, the generated close latch keeps visible autofocus, and the responsive windows do not add
+  horizontal overflow.
+- Browser-rechecked Day after the responsive pass; the physical glyph palette remains independent of the
+  surrounding app theme and every close action still returns through the existing dialog lifecycle.
+- The quiet-floor path is projection-tested with the same generated receiver and no SVG fallback.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- focused Office glyph/window specs passed: 4 files / 6 tests
+- `pnpm test` passed: 599 files / 4993 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

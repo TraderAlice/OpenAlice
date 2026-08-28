@@ -1,4 +1,3 @@
-import { Radio } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -246,7 +245,7 @@ export function OfficeBuilding({
       >
         <div className="oa-office-hud__identity">
           <span className="oa-office-hud__signal" aria-hidden>
-            <Radio size={15} strokeWidth={2.2} />
+            <img src={OFFICE_HUD_ASSETS.signalReceiver} alt="" style={officePixelImg} />
           </span>
           <div>
             <p className="oa-office-kicker">{t('office.commandCenter')}</p>
@@ -494,7 +493,7 @@ export function OfficeBuilding({
           {groups.length === 0 && (
             <div className="oa-office-quiet">
               <span className="oa-office-quiet__radar" aria-hidden>
-                <Radio size={22} strokeWidth={1.5} />
+                <img src={OFFICE_HUD_ASSETS.signalReceiver} alt="" style={officePixelImg} />
               </span>
               <p>{t('office.floorQuiet')}</p>
               <span>{t('office.floorQuietHint', { days: sleepAfterDays })}</span>
