@@ -682,6 +682,25 @@ Workstation-crew increment (2026-08-29):
 - `pnpm test` passed: 599 files / 4998 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Exceptional-state emote follow-up (2026-08-29):
+
+- Compared the new crew against Pokémon Emerald, Golden Sun, and Mother 3 interior scenes. Their useful
+  shared constraint is selective signaling: the world stays quiet, exceptional NPC state gets one short
+  overhead symbol, and detailed copy waits for the interaction window. Persistent labels would turn the
+  map back into a dashboard.
+- Generated a quiet three-dot parchment bubble for `waiting` and a jagged warning bubble for `failed`, each
+  on a flat magenta key. Processed both with the ImageGen chroma-key helper, validated alpha coverage and
+  transparent corners, and packaged them as 12KB and 20KB map assets.
+- Exceptional emotes render only at waiting/failed desks. An actual nearby/selected tool bubble takes
+  priority and removes the emote, so one worker never stacks two messages. Normal work remains unlabelled;
+  both emotes keep stepped animation and honor reduced motion.
+- Browser-played working, waiting, failed, idle, and selected-with-tool states at 1280×720 and 760×900.
+  Both emotes remain readable without covering Alice, Workspace signs, or map controls, and add no overflow.
+- Focused coworker registry and desk specs passed: 2 files / 6 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 5001 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -34,6 +34,11 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerArchetype, OfficeCowo
   },
 }
 
+export const OFFICE_COWORKER_EMOTES = {
+  waiting: '/office/coworkers/waiting-emote-v1.png',
+  failed: '/office/coworkers/failed-emote-v1.png',
+} as const
+
 const AGENT_ARCHETYPE: Record<string, OfficeCoworkerArchetype> = {
   codex: 'codex',
   cursor: 'codex',

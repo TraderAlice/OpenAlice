@@ -4,6 +4,7 @@ import type { OfficeFloorEmployee } from '../api/office'
 import { officeBubbleText } from './bubble-text'
 import { officeCoworkerLabel } from './label'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
+import { OFFICE_COWORKER_EMOTES } from './coworker-sprites'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { officeStationComposition } from './station'
 
@@ -31,6 +32,9 @@ export function OfficeDesk({
   const { t } = useTranslation()
   const station = officeStationComposition()
   const showBubble = Boolean(employee?.bubble && (selected || nearby))
+  const emote = !showBubble && employee && (employee.mood === 'waiting' || employee.mood === 'failed')
+    ? { mood: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
+    : null
   const label = employee
     ? t('office.employeeLabel', {
       name: officeCoworkerLabel(employee),
@@ -70,6 +74,17 @@ export function OfficeDesk({
             style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
           >
             {officeBubbleText(employee.bubble, t)}
+          </span>
+        )}
+        {emote && (
+          <span
+            className="oa-office-mood-emote"
+            data-mood={emote.mood}
+            data-reduced-motion={reducedMotion || undefined}
+            data-testid={`office-emote-${emote.mood}`}
+            aria-hidden
+          >
+            <img src={emote.src} alt="" style={officePixelImg} />
           </span>
         )}
         {employee && (

@@ -3649,6 +3649,47 @@
   font-size: 7px;
 }
 
+.oa-office-mood-emote {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  z-index: 13;
+  display: block;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.oa-office-mood-emote img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
+}
+
+.oa-office-mood-emote[data-mood="waiting"] {
+  animation: oa-office-emote-waiting 1.4s steps(2, end) infinite;
+}
+
+.oa-office-mood-emote[data-mood="failed"] {
+  animation: oa-office-emote-failed 700ms steps(2, end) infinite;
+}
+
+.oa-office-mood-emote[data-reduced-motion="true"] {
+  animation: none;
+}
+
+@keyframes oa-office-emote-waiting {
+  50% { transform: translate(-50%, -2px); }
+}
+
+@keyframes oa-office-emote-failed {
+  25% { transform: translate(-52%, -2px); }
+  75% { transform: translate(-48%, -2px); }
+}
+
 .oa-office-main {
   border-width: 3px;
   box-shadow: 7px 8px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent);

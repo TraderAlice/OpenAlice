@@ -33,3 +33,11 @@ OpenCode preserve that framing while carrying their portrait hair, headgear,
 outerwear, and accent colors. Checkerboard outputs went through background
 extraction before the transparent sources were cropped and packaged for the
 runtime. Portrait sprites remain the identity view in roster and Agent windows.
+
+`waiting-emote-v1.png` and `failed-emote-v1.png` are exceptional-state map
+signals. The waiting desk gets a quiet three-dot parchment bubble; a failed desk
+gets a jagged warning bubble. Normal work stays unlabelled, and an actual tool
+bubble replaces the emote when Alice approaches so the map never stacks two
+messages over one worker. Both icons were generated on a flat magenta key,
+processed with the ImageGen chroma-key helper, alpha-checked, and packaged at
+map scale.

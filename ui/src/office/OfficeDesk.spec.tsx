@@ -49,4 +49,29 @@ describe('OfficeDesk', () => {
     rerender(<OfficeDesk {...props} nearby />)
     expect(screen.getByText('research')).toBeTruthy()
   })
+
+  it.each([
+    ['waiting', '/office/coworkers/waiting-emote-v1.png'],
+    ['failed', '/office/coworkers/failed-emote-v1.png'],
+  ] as const)('shows the generated %s emote until detailed bubble copy takes priority', (mood, src) => {
+    const stateEmployee = { ...employee, mood, bubble: { kind: 'tool' as const, name: 'research' } }
+    const props = {
+      employee: stateEmployee,
+      roomName: 'Chat',
+      selected: false,
+      nearby: false,
+      depth: 107,
+      reducedMotion: true,
+      onSelect: () => undefined,
+    }
+    const { rerender } = render(<OfficeDesk {...props} />)
+
+    const emote = screen.getByTestId(`office-emote-${mood}`)
+    expect(emote.dataset.reducedMotion).toBe('true')
+    expect(emote.querySelector('img')?.getAttribute('src')).toBe(src)
+
+    rerender(<OfficeDesk {...props} nearby />)
+    expect(screen.queryByTestId(`office-emote-${mood}`)).toBeNull()
+    expect(screen.getByText('research')).toBeTruthy()
+  })
 })

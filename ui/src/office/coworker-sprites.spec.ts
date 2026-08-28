@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { OFFICE_COWORKER_SPRITES, officeCoworkerSpriteForAgent } from './coworker-sprites'
+import {
+  OFFICE_COWORKER_EMOTES,
+  OFFICE_COWORKER_SPRITES,
+  officeCoworkerSpriteForAgent,
+} from './coworker-sprites'
 
 describe('Office coworker sprite registry', () => {
   it('maps authored runtimes to distinct generated coworkers', () => {
@@ -20,5 +24,12 @@ describe('Office coworker sprite registry', () => {
     )
     expect(officeCoworkerSpriteForAgent('future-agent').portraitSrc).not.toContain('alice-maid')
     expect(officeCoworkerSpriteForAgent('future-agent').deskSrc).toContain('-desk-v1.png')
+  })
+
+  it('owns exceptional desk-state emotes as generated Office assets', () => {
+    expect(OFFICE_COWORKER_EMOTES).toEqual({
+      waiting: '/office/coworkers/waiting-emote-v1.png',
+      failed: '/office/coworkers/failed-emote-v1.png',
+    })
   })
 })
