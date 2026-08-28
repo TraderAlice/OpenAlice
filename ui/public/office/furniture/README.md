@@ -34,3 +34,5 @@ Current runtime assets:
 - `wall-window-v1.png`
 - `floor-tile-v1.png`
 - `workspace-rug-v1.png`
+- `coffee-station-v1.png` — Chat neighborhood social prop
+- `server-rack-v1.png` — AutoQuant neighborhood operations prop

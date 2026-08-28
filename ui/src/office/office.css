@@ -2058,7 +2058,7 @@
   bottom: 10px;
   left: 12px;
   width: auto;
-  max-height: 192px;
+  max-height: 220px;
   overflow: auto;
   color: var(--gba-ink);
 }
@@ -2071,31 +2071,43 @@
 
 .oa-office-inspect__profile {
   display: grid;
-  grid-template-columns: minmax(160px, 0.9fr) minmax(250px, 1.5fr) minmax(120px, 0.65fr);
+  grid-template-columns: 76px minmax(180px, 1fr) minmax(250px, 1.35fr) minmax(120px, 0.65fr);
   align-items: center;
   gap: 7px 12px;
   padding: 10px 46px 10px 12px;
 }
 
 .oa-office-inspect__kicker {
-  grid-column: 1 / -1;
   margin: 0;
   color: var(--gba-moss-dark);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 8px;
 }
 
-.oa-office-inspect__identity {
-  margin: 0;
-}
-
-.oa-office-inspect__avatar {
-  width: 40px;
-  height: 40px;
+.oa-office-inspect__portrait {
+  display: grid;
+  width: 76px;
+  height: 82px;
+  place-items: end center;
+  overflow: hidden;
   border: 3px solid var(--gba-ink);
   border-radius: 3px;
-  color: var(--gba-paper);
-  background: var(--gba-moss-dark);
+  background:
+    linear-gradient(180deg, var(--gba-water) 0 56%, var(--gba-moss) 56% 61%, var(--gba-cream) 61%);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--gba-paper) 64%, transparent);
+}
+
+.oa-office-inspect__portrait > div {
+  transform: translateY(8px);
+}
+
+.oa-office-inspect__dialogue {
+  min-width: 0;
+}
+
+.oa-office-inspect__identity {
+  display: block;
+  margin: 3px 0 0;
 }
 
 .oa-office-inspect__identity p {
@@ -2106,6 +2118,32 @@
 .oa-office-inspect__identity span:not(.oa-office-inspect__avatar) {
   color: var(--gba-ink-soft);
   font-size: 8px;
+}
+
+.oa-office-inspect__dialogue blockquote {
+  position: relative;
+  min-height: 38px;
+  margin: 7px 0 0;
+  padding: 7px 9px;
+  border: 2px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-ink);
+  background: var(--gba-cream);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.oa-office-inspect__dialogue blockquote::before {
+  position: absolute;
+  top: 8px;
+  left: -7px;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid var(--gba-ink);
+  border-left: 2px solid var(--gba-ink);
+  background: var(--gba-cream);
+  content: "";
+  transform: rotate(45deg);
 }
 
 .oa-office-inspect__facts {
@@ -2131,16 +2169,26 @@
 .oa-office-inspect__facts dd {
   color: var(--gba-ink);
   font-size: 8px;
+  align-items: flex-start;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .oa-office-inspect__open {
   min-height: 38px;
   border: 3px solid var(--gba-ink);
   border-radius: 3px;
-  color: var(--gba-paper);
+  color: var(--gba-cream);
   background: var(--gba-moss-dark);
   box-shadow: inset -3px -3px color-mix(in srgb, var(--gba-ink) 24%, transparent);
   font-size: 10px;
+  text-shadow: 1px 1px 0 var(--gba-ink);
+}
+
+.oa-office-inspect__actions {
+  align-self: stretch;
+  display: grid;
 }
 
 .oa-office-inspect__open:hover {
@@ -2225,11 +2273,15 @@
   }
 
   .oa-office-inspect__profile {
-    grid-template-columns: 1fr 1.4fr;
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .oa-office-inspect__facts,
+  .oa-office-inspect__actions {
+    grid-column: 1 / -1;
   }
 
   .oa-office-inspect__open {
-    grid-column: 1 / -1;
     min-height: 30px;
   }
 }
@@ -2712,6 +2764,35 @@
 
 .oa-office-pod[data-sleeping="true"] .oa-office-pod__rug {
   opacity: 0.4;
+}
+
+.oa-office-pod__harness-prop {
+  position: absolute;
+  bottom: 3px;
+  left: -3px;
+  z-index: 5;
+  width: 58px;
+  height: 68px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
+  transform-origin: bottom center;
+}
+
+.oa-office-pod[data-harness="chat"] .oa-office-pod__harness-prop {
+  width: 72px;
+  height: 72px;
+}
+
+.oa-office-pod[data-harness="auto-quant"][data-active="true"] .oa-office-pod__harness-prop {
+  filter:
+    drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent))
+    drop-shadow(0 0 4px color-mix(in srgb, var(--gba-water) 65%, transparent));
+}
+
+.oa-office-pod[data-sleeping="true"] .oa-office-pod__harness-prop {
+  opacity: 0.58;
+  filter: grayscale(0.45) drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 18%, transparent));
 }
 
 .oa-office-pod[data-harness="auto-quant"] .oa-office-pod__floor {

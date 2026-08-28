@@ -9,6 +9,7 @@ import {
   DEMO_CHAT_SESSION_ID,
   DEMO_CHAT_WORKSPACE_ID,
 } from '../fixtures/workspaces'
+import { demoWorkspaceFiles } from '../fixtures/inbox'
 import { officeHandlers } from './office'
 
 const server = setupServer(...officeHandlers)
@@ -24,7 +25,11 @@ describe('demo Office handlers', () => {
     const body = await response.json() as {
       offices: Array<{
         workspace: { id: string }
-        employees: Array<{ resumeId: string; sessionRecordId?: string }>
+        employees: Array<{
+          resumeId: string
+          sessionRecordId?: string
+          drawers: Array<{ path?: string }>
+        }>
       }>
     }
 
@@ -35,5 +40,8 @@ describe('demo Office handlers', () => {
     ])
     expect(body.offices[0]?.employees[0]?.sessionRecordId).toBe(DEMO_CHAT_SESSION_ID)
     expect(body.offices[0]?.employees[0]?.resumeId).toBe(DEMO_CHAT_RESUME_ID)
+    const drawerPath = body.offices[0]?.employees[0]?.drawers[0]?.path
+    expect(drawerPath).toBe('rotation/ai-chain-2026-06-02.md')
+    expect(demoWorkspaceFiles[drawerPath ?? '']).toBeTruthy()
   })
 })

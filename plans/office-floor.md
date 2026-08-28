@@ -219,6 +219,24 @@ Environment-asset increment (2026-08-29):
 - `pnpm test` passed: 588 files / 4966 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Harness-neighborhood increment (2026-08-29):
+
+- Compared three ways to distinguish Harnesses: stronger pod colors/borders, complete room-specific
+  backgrounds, and generated set dressing on the shared floor. Chose generated set dressing because
+  it adds readable world semantics without restoring card boundaries or fragmenting the continuous map.
+- Generated and alpha-checked a Chat coffee station and AutoQuant server rack from the locked Office
+  style master; Prediction retains the generated terminal kiosk and generic groups retain the plant.
+- Rebuilt employee inspection as a compact RPG dialogue: the real animated employee sprite is the
+  portrait, live activity becomes dialogue, state/location stay readable, and drawers act as inventory.
+- Repaired the demo drawer provenance path to open an actual shared demo Workspace artifact instead of
+  ending at a file-not-found state.
+- Browser-confirmed the real `/office` route, both Harness props, employee selection, responsive field
+  wrapping, Open session to the recorded WebPi session, and drawer-to-file navigation.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 589 files / 4967 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
