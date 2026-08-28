@@ -1,7 +1,7 @@
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import type { OfficeMapLayout } from './map-layout'
 import { visibleEmployeesForOffice } from './desk-slots'
-import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS } from './pod-geometry'
+import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
 
 export const OFFICE_INTERACTION_RADIUS = 84
 
@@ -18,6 +18,14 @@ export type OfficeInteractionTarget =
   | {
     id: string
     kind: 'cabinet'
+    x: number
+    y: number
+    workspaceId: string
+    roomName: string
+  }
+  | {
+    id: string
+    kind: 'roster'
     x: number
     y: number
     workspaceId: string
@@ -57,6 +65,16 @@ export function officeInteractionTargets(
       workspaceId: group.workspace.id,
       roomName,
     })
+    if (group.employees.length > 4) {
+      targets.push({
+        id: `roster:${group.workspace.id}`,
+        kind: 'roster',
+        x: pod.x + OFFICE_ROSTER_CENTER.x,
+        y: pod.y + OFFICE_ROSTER_CENTER.y,
+        workspaceId: group.workspace.id,
+        roomName,
+      })
+    }
   }
 
   return targets

@@ -18,6 +18,7 @@ export const OFFICE_FURNITURE = {
     workspaceRug: '/office/furniture/workspace-rug-v1.png',
     coffeeStation: '/office/furniture/coffee-station-v1.png',
     serverRack: '/office/furniture/server-rack-v1.png',
+    personnelBoard: '/office/furniture/personnel-board-v1.png',
   },
 } as const
 

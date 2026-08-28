@@ -21,6 +21,7 @@ beforeEach(async () => {
 describe('OfficeBuilding', () => {
   it('filters sleeping groups and lets Alice move around the continuous map', async () => {
     const onOpenFiles = vi.fn()
+    const onOpenRoster = vi.fn()
     const onSelectEmployee = vi.fn()
     render(
       <OfficeBuilding
@@ -65,6 +66,7 @@ describe('OfficeBuilding', () => {
         onSelectEmployee={onSelectEmployee}
         onOpenEmployee={vi.fn()}
         onOpenFiles={onOpenFiles}
+        onOpenRoster={onOpenRoster}
       />,
     )
     expect(screen.getByTestId('office-building')).toBeTruthy()
@@ -131,5 +133,47 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-pod-quant-old')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Filing cabinet · chat' }))
     expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
+  })
+
+  it('renders an interactive personnel board for groups larger than the four-desk map', async () => {
+    const onOpenRoster = vi.fn()
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 1,
+          firstSeq: 1,
+          offices: [{
+            workspace: { id: 'chat-full', tag: 'chat', harness: 'chat' },
+            lastInteractionAt: 1,
+            sleeping: false,
+            employees: Array.from({ length: 6 }, (_, index) => ({
+              resumeId: `resume-${index}`,
+              agent: 'codex',
+              name: `x${index + 1}`,
+              title: `Session ${index + 1}`,
+              mood: index < 2 ? 'working' as const : 'idle' as const,
+              bubble: null,
+              lastSeq: 1,
+              lastInteractionAt: 1,
+              drawers: [],
+            })),
+          }],
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={onOpenRoster}
+      />,
+    )
+
+    expect(screen.getAllByTestId(/^office-desk-/)).toHaveLength(4)
+    const board = screen.getByRole('button', { name: 'Team roster · chat' })
+    expect(board.querySelector('img')?.getAttribute('src')).toBe('/office/furniture/personnel-board-v1.png')
+    await userEvent.click(board)
+    expect(onOpenRoster).toHaveBeenCalledWith('chat-full')
   })
 })

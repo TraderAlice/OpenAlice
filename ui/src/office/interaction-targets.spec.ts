@@ -62,4 +62,25 @@ describe('Office interaction targets', () => {
       { width: 1200, height: 900 },
     )).toEqual({ x: 0, y: 0 })
   })
+
+  it('adds a roster target only when a group exceeds the visible desk count', () => {
+    const layout = layoutOfficeMap([{ id: 'chat-1', harness: 'chat' }])
+    const crowded = {
+      ...group,
+      employees: Array.from({ length: 5 }, (_, index) => ({
+        ...group.employees[0]!,
+        resumeId: `resume-${index}`,
+      })),
+    }
+
+    expect(officeInteractionTargets([group], layout, (_id, tag) => tag)
+      .some((target) => target.kind === 'roster')).toBe(false)
+    expect(officeInteractionTargets([crowded], layout, (_id, tag) => tag))
+      .toContainEqual(expect.objectContaining({
+        id: 'roster:chat-1',
+        kind: 'roster',
+        x: layout.pods[0]!.x + 270,
+        y: layout.pods[0]!.y + 83,
+      }))
+  })
 })

@@ -1,5 +1,5 @@
 import type { OfficeMapLayout } from './map-layout'
-import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS } from './pod-geometry'
+import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
 
 export const OFFICE_WALL_FLOOR_EDGE = 112
 export const OFFICE_ALICE_HALF_WIDTH = 10
@@ -19,7 +19,10 @@ export interface OfficeMoveResult {
   obstacleId?: string
 }
 
-export function officeCollisionRects(layout: OfficeMapLayout): OfficeCollisionRect[] {
+export function officeCollisionRects(
+  layout: OfficeMapLayout,
+  rosterWorkspaceIds: ReadonlySet<string> = new Set(),
+): OfficeCollisionRect[] {
   const rects: OfficeCollisionRect[] = [
     { id: 'wall', x: 0, y: 0, width: layout.width, height: OFFICE_WALL_FLOOR_EDGE },
     { id: 'landmark:plant', x: 62, y: 150, width: 42, height: 28 },
@@ -43,6 +46,15 @@ export function officeCollisionRects(layout: OfficeMapLayout): OfficeCollisionRe
       width: 36,
       height: 48,
     })
+    if (rosterWorkspaceIds.has(pod.id)) {
+      rects.push({
+        id: `roster:${pod.id}`,
+        x: pod.x + OFFICE_ROSTER_CENTER.x - 18,
+        y: pod.y + OFFICE_ROSTER_CENTER.y - 25,
+        width: 36,
+        height: 50,
+      })
+    }
     rects.push({
       id: `harness-prop:${pod.id}`,
       x: pod.x,
