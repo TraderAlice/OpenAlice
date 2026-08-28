@@ -308,61 +308,6 @@
   margin: 0 auto;
 }
 
-.oa-office-quiet {
-  display: grid;
-  min-height: 280px;
-  place-items: center;
-  align-content: center;
-  gap: 8px;
-  padding: 30px;
-  border: 1px dashed color-mix(in srgb, var(--primary) 24%, transparent);
-  border-radius: 12px;
-  background:
-    radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--primary) 9%, transparent), transparent 10rem),
-    color-mix(in srgb, var(--foreground) 3%, transparent);
-  text-align: center;
-}
-
-.oa-office-quiet__radar {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  margin-bottom: 4px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent);
-  border-radius: 50%;
-  color: var(--office-cyan);
-  background: color-mix(in srgb, var(--primary) 6%, transparent);
-  box-shadow: 0 0 30px color-mix(in srgb, var(--primary) 8%, transparent);
-}
-
-.oa-office-quiet p {
-  margin: 0;
-  color: var(--office-text);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.oa-office-quiet > span:not(.oa-office-quiet__radar) {
-  max-width: 25rem;
-  color: var(--office-text-muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.oa-office-quiet button {
-  min-height: 30px;
-  margin-top: 6px;
-  padding: 0 12px;
-  border: 1px solid var(--office-line);
-  border-radius: 6px;
-  color: var(--office-cyan-bright);
-  background: color-mix(in srgb, var(--primary) 7%, transparent);
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 .oa-office-amenity {
   position: fixed;
   z-index: 0;
@@ -2669,36 +2614,6 @@
   background: var(--gba-cream);
 }
 
-.oa-office-quiet {
-  min-height: 100%;
-  border: 4px solid var(--gba-ink);
-  border-radius: 4px;
-  color: var(--gba-ink);
-  background: var(--gba-paper);
-}
-
-.oa-office-quiet__radar {
-  border: 3px solid var(--gba-ink);
-  border-radius: 3px;
-  color: var(--gba-paper);
-  background: var(--gba-moss-dark);
-}
-
-.oa-office-quiet p {
-  color: var(--gba-ink);
-}
-
-.oa-office-quiet > span:not(.oa-office-quiet__radar) {
-  color: var(--gba-ink-soft);
-}
-
-.oa-office-quiet button {
-  border: 3px solid var(--gba-ink);
-  border-radius: 3px;
-  color: var(--gba-paper);
-  background: var(--gba-moss-dark);
-}
-
 @keyframes oa-office-gba-blink {
   50% { opacity: 0.35; }
 }
@@ -4094,19 +4009,84 @@
   object-fit: contain;
 }
 
+.oa-office-quiet {
+  position: absolute;
+  top: 280px;
+  left: 560px;
+  z-index: 500;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  width: 320px;
+  min-height: 104px;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 12px 14px 12px 10px;
+  border: 3px solid var(--gba-ink);
+  border-radius: 3px;
+  color: var(--gba-ink);
+  background: var(--gba-cream);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--gba-moss) 22%, transparent),
+    5px 6px 0 color-mix(in srgb, var(--gba-ink) 26%, transparent);
+}
+
 .oa-office-quiet__radar {
-  width: 72px;
-  height: 72px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
 }
 
 .oa-office-quiet__radar img {
   display: block;
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
+}
+
+.oa-office-quiet__copy {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.oa-office-quiet p {
+  margin: 0;
+  color: var(--gba-ink);
+  font-weight: 800;
+}
+
+.oa-office-quiet__copy > span {
+  color: var(--gba-ink-soft);
+  line-height: 1.35;
+}
+
+.oa-office-quiet button {
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 0 12px;
+  border: 3px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-paper);
+  background: var(--gba-moss-dark);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.oa-office-quiet button:is(:hover, :focus-visible) {
+  border-color: var(--gba-water);
+  outline: 2px solid color-mix(in srgb, var(--gba-water) 42%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 800px) {
+  .oa-office-quiet {
+    top: 130px;
+    left: 570px;
+    width: 250px;
+  }
 }
 
 .oa-office-map-landmark {
