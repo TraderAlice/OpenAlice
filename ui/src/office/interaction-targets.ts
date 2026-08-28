@@ -2,7 +2,12 @@ import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import type { OfficeMapLayout } from './map-layout'
 import { visibleEmployeesForOffice } from './desk-slots'
 import { officeOperationsBoardPosition } from './map-landmarks'
-import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
+import {
+  OFFICE_CABINET_CENTER,
+  OFFICE_DESK_CENTERS,
+  OFFICE_ROSTER_CENTER,
+  OFFICE_SIGN_CENTER,
+} from './pod-geometry'
 
 export const OFFICE_INTERACTION_RADIUS = 72
 export const OFFICE_INTERACTION_SIDE_REACH = 52
@@ -12,6 +17,14 @@ export const OFFICE_INTERACTION_BACK_REACH = 8
 export type OfficeFacingDirection = 'up' | 'right' | 'down' | 'left'
 
 export type OfficeInteractionTarget =
+  | {
+    id: string
+    kind: 'sign'
+    x: number
+    y: number
+    workspaceId: string
+    roomName: string
+  }
   | {
     id: string
     kind: 'employee'
@@ -56,6 +69,14 @@ export function officeInteractionTargets(
     const group = groupsById.get(pod.id)
     if (!group) continue
     const roomName = groupTitle(group.workspace.id, group.workspace.tag)
+    targets.push({
+      id: `sign:${group.workspace.id}`,
+      kind: 'sign',
+      x: pod.x + OFFICE_SIGN_CENTER.x,
+      y: pod.y + OFFICE_SIGN_CENTER.y,
+      workspaceId: group.workspace.id,
+      roomName,
+    })
     visibleEmployeesForOffice(group.employees).forEach((employee, index) => {
       const center = OFFICE_DESK_CENTERS[index]
       if (!center) return

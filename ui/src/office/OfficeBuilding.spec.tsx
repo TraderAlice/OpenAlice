@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -89,6 +89,62 @@ describe('OfficeBuilding', () => {
       fireEvent.pointerUp(moveRight, { pointerId: 3 })
       act(() => vi.advanceTimersByTime(500))
       expect(alice.style.left).toBe('528px')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('walks Alice to a distant world object before activating it', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    try {
+      const onOpenFiles = vi.fn()
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 0, other: 0 },
+            },
+            lastSeq: 1,
+            firstSeq: 1,
+            offices: [
+              {
+                workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
+                lastInteractionAt: 1,
+                sleeping: false,
+                employees: [],
+              },
+              {
+                workspace: { id: 'quant-1', tag: 'quant', harness: 'auto-quant' },
+                lastInteractionAt: 1,
+                sleeping: false,
+                employees: [],
+              },
+            ],
+          }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenFiles={onOpenFiles}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+      const sign = screen.getByRole('button', { name: 'Inspect chat files' })
+      fireEvent.click(sign)
+      expect(onOpenFiles).not.toHaveBeenCalled()
+      expect(sign.dataset.route).toBe('true')
+      expect(screen.getByText('Walking to chat')).toBeTruthy()
+      expect(`${alice.style.left}:${alice.style.top}`).not.toBe('480px:336px')
+      act(() => vi.advanceTimersByTime(5_000))
+      expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'sign')
+      expect(sign.dataset.route).toBe('false')
     } finally {
       vi.useRealTimers()
     }
@@ -266,9 +322,9 @@ describe('OfficeBuilding', () => {
     expect(onOpenLog).toHaveBeenCalledWith('operations')
     await userEvent.click(screen.getByRole('button', { name: 'Reset map view' }))
     await userEvent.click(map)
-    await userEvent.keyboard('wwwaaaaaaaasss')
-    expect(alice.style.left).toBe('288px')
-    expect(alice.style.top).toBe('288px')
+    await userEvent.keyboard('sssssaaaaaaawwwwa')
+    expect(alice.style.left).toBe('312px')
+    expect(alice.style.top).toBe('384px')
     const talkPrompt = screen.getByRole('status', { name: 'Talk to Desk mate' })
     expect(talkPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/talk-bubble-v1.png')
@@ -288,7 +344,7 @@ describe('OfficeBuilding', () => {
       .toContain('/office/furniture/server-rack-v1.png')
     const workspaceSign = screen.getByRole('button', { name: 'Inspect chat files' })
     await userEvent.click(workspaceSign)
-    expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'sign')
+    await waitFor(() => expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'sign'))
     const menuTrigger = screen.getByRole('button', { name: 'Menu' })
     menuTrigger.focus()
     await userEvent.keyboard('{ArrowDown}')
@@ -320,9 +376,9 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-pod-quant-1')).toBeTruthy()
     expect(screen.getByTestId('office-pod-quant-old')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Filing cabinet · chat' }))
-    expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'cabinet')
+    await waitFor(() => expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'cabinet'))
     await userEvent.click(operations)
-    expect(onOpenLog).toHaveBeenCalledWith('operations')
+    await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
   })
 
   it('renders an interactive personnel board for groups larger than the four-desk map', async () => {
@@ -387,7 +443,17 @@ describe('OfficeBuilding', () => {
     expect(screen.queryByRole('status')).toBeNull()
     expect(board.dataset.nearby).toBe('false')
 
+    view.rerender(
+      <OfficeBuilding
+        building={building}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={onOpenRoster}
+        onOpenLog={vi.fn()}
+      />,
+    )
     await userEvent.click(board)
-    expect(onOpenRoster).toHaveBeenCalledWith('chat-full')
+    await waitFor(() => expect(onOpenRoster).toHaveBeenCalledWith('chat-full'))
   })
 })

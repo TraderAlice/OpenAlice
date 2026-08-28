@@ -29,10 +29,16 @@ describe('Office interaction targets', () => {
   it('projects employee desks and cabinets into shared map coordinates', () => {
     const layout = layoutOfficeMap([{ id: 'chat-1', harness: 'chat' }])
     const targets = officeInteractionTargets([group], layout, (_id, tag) => tag)
+    const sign = targets.find((target) => target.kind === 'sign')
     const employee = targets.find((target) => target.kind === 'employee')
     const cabinet = targets.find((target) => target.kind === 'cabinet')
     const operations = targets.find((target) => target.kind === 'operations')
 
+    expect(sign).toMatchObject({
+      id: 'sign:chat-1',
+      x: layout.pods[0]!.x + 144,
+      y: layout.pods[0]!.y + 32,
+    })
     expect(employee).toMatchObject({
       id: 'employee:chat-1:resume-1',
       x: layout.pods[0]!.x + 90,

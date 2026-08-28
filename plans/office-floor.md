@@ -837,6 +837,31 @@ Touch-controls follow-up (2026-08-29):
 - `pnpm test` passed: 600 files / 5007 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Click-to-interact pathfinding follow-up (2026-08-29):
+
+- Played the finished desktop floor and found that every desk, filing cabinet, personnel board, sign, and
+  Operations board still opened from across the map. Alice's movement and collision loop was therefore an
+  optional skin: the shortest way to use Office was to ignore its player character and click through scenery.
+- Compared disabling distant objects until Alice was nearby, showing a `move closer` rejection, and translating
+  a click into collision-aware walk-to-interact. Chose walk-to-interact because it keeps the spatial rule without
+  making mouse users imitate a D-pad; touch and keyboard movement remain first-class manual controls.
+- Added a deterministic 24px-grid breadth-first pathfinder over the real Office collision graph. It searches for
+  the shortest reachable tile whose facing cone contains the requested object, animates each existing Alice walk
+  step, follows with the existing camera, turns toward the target, and only then invokes the real interaction.
+- Workspace signs are now interaction targets and physical obstacles rather than labels Alice can walk through.
+  All world-object clicks route through the same interaction graph; the selected destination receives a restrained
+  amber lock highlight while a polite live status announces where Alice is walking.
+- Manual keyboard movement, touch-pad input, map dragging, Reset, Menu, layout changes, and a second target click
+  cancel the current route immediately. Unreachable routes fail closed instead of teleporting or opening remotely.
+- Browser-played a distant Auto Quant sign at 1280x800 and 760x900. The cabinet remained closed during the walk,
+  Alice navigated around real signs and furniture, faced upward on arrival, and only then opened the empty cabinet.
+  Also captured an in-progress desk route with its target lock and verified blank-map input cancels the route before
+  selection. The narrow route retains its D-pad and zero horizontal overflow.
+- Focused path, target, collision, and building specs passed: 4 files / 20 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 601 files / 5011 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

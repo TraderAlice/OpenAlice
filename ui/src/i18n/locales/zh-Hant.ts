@@ -1826,6 +1826,7 @@ export const zhHant: Resources = {
     moveAliceRight: '向右移動 Alice',
     moveAliceDown: '向下移動 Alice',
     moveAliceLeft: '向左移動 Alice',
+    walkingTo: '正在前往 {{name}}',
     resetMap: '重設地圖視角',
     aliceAvatar: 'Office 地圖上的 Alice',
     activeRooms: '活躍房間',

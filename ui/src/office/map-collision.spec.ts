@@ -14,6 +14,7 @@ describe('Office map collision', () => {
   it('blocks the wall, desks, filing cabinets, props, and landmarks', () => {
     const ids = officeCollisionRects(layout).map((rect) => rect.id)
     expect(ids).toContain('wall')
+    expect(ids).toContain('sign:chat-1')
     expect(ids).toContain('desk:chat-1:0')
     expect(ids).toContain('cabinet:chat-1')
     expect(ids).toContain('harness-prop:chat-1')

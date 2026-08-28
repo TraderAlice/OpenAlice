@@ -1851,6 +1851,7 @@ export const en = {
     moveAliceRight: 'Move Alice right',
     moveAliceDown: 'Move Alice down',
     moveAliceLeft: 'Move Alice left',
+    walkingTo: 'Walking to {{name}}',
     resetMap: 'Reset map view',
     aliceAvatar: 'Alice on the office map',
     activeRooms: 'Active rooms',

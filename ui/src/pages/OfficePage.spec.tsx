@@ -109,7 +109,7 @@ describe('OfficePage localization', () => {
 
     const operations = screen.getByRole('button', { name: '行动看板' })
     await userEvent.click(operations)
-    expect(screen.getByText('Office occupancy')).toBeTruthy()
+    await vi.waitFor(() => expect(screen.getByText('Office occupancy')).toBeTruthy())
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(operations)
@@ -122,7 +122,9 @@ describe('OfficePage localization', () => {
     const sign = screen.getByRole('button', { name: '查看 chat 文件' })
     await userEvent.click(sign)
 
-    expect(screen.getByRole('dialog', { name: '档案柜 · chat' })).toBeTruthy()
+    await vi.waitFor(() => {
+      expect(screen.getByRole('dialog', { name: '档案柜 · chat' })).toBeTruthy()
+    })
     expect(screen.getByText('这里还没有归档任何工位记录。')).toBeTruthy()
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
@@ -134,7 +136,7 @@ describe('OfficePage localization', () => {
     })
 
     await userEvent.click(screen.getByRole('button', { name: '档案柜 · chat' }))
-    await userEvent.click(screen.getByRole('button', { name: '进入 Workspace 文件' }))
+    await userEvent.click(await screen.findByRole('button', { name: '进入 Workspace 文件' }))
     expect(openOrFocusMock).toHaveBeenCalledWith({
       kind: 'workspace',
       params: { wsId: 'chat-1', source: 'chat' },

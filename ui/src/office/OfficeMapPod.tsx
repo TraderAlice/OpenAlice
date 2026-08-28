@@ -19,6 +19,7 @@ export function OfficeMapPod({
   onOpenFiles,
   onOpenRoster,
   nearbyTargetId,
+  routeTargetId,
 }: {
   group: OfficeRoomSnapshot
   layout: { x: number; y: number; width: number; height: number }
@@ -31,6 +32,7 @@ export function OfficeMapPod({
   onOpenFiles: (workspaceId: string, origin: 'sign' | 'cabinet') => void
   onOpenRoster: (workspaceId: string) => void
   nearbyTargetId?: string | null
+  routeTargetId?: string | null
 }) {
   const { t } = useTranslation()
   const visibleEmployees = visibleEmployeesForOffice(group.employees)
@@ -63,6 +65,7 @@ export function OfficeMapPod({
         type="button"
         className="oa-office-pod__sign"
         style={{ zIndex: officeDepthAt(layout.y + 62) }}
+        data-route={routeTargetId === `sign:${group.workspace.id}`}
         onClick={() => onOpenFiles(group.workspace.id, 'sign')}
         aria-label={t('office.interactFiles', { name: title })}
         title={t('office.cabinetHint')}
@@ -118,6 +121,10 @@ export function OfficeMapPod({
                 employee
                 && nearbyTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
               )}
+              targeted={Boolean(
+                employee
+                && routeTargetId === `employee:${group.workspace.id}:${employee.resumeId}`
+              )}
               depth={officeDepthAt(layout.y + OFFICE_DESK_CENTERS[index].y)}
               reducedMotion={reducedMotion}
               spriteScale={0.23}
@@ -132,6 +139,7 @@ export function OfficeMapPod({
           className="oa-office-pod__cabinet"
           style={{ zIndex: officeDepthAt(layout.y + OFFICE_CABINET_CENTER.y + 24) }}
           data-nearby={nearbyTargetId === `cabinet:${group.workspace.id}`}
+          data-route={routeTargetId === `cabinet:${group.workspace.id}`}
           onClick={() => onOpenFiles(group.workspace.id, 'cabinet')}
           aria-label={`${t('office.cabinet')} · ${title}`}
           title={t('office.cabinetHint')}
@@ -145,6 +153,7 @@ export function OfficeMapPod({
             className="oa-office-pod__roster"
             style={{ zIndex: officeDepthAt(layout.y + OFFICE_ROSTER_CENTER.y + 25) }}
             data-nearby={nearbyTargetId === `roster:${group.workspace.id}`}
+            data-route={routeTargetId === `roster:${group.workspace.id}`}
             onClick={() => onOpenRoster(group.workspace.id)}
             aria-label={`${t('office.roster')} · ${title}`}
             title={t('office.rosterHint')}

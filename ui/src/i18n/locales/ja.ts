@@ -1819,6 +1819,7 @@ export const ja: Resources = {
     moveAliceRight: 'Aliceを右へ移動',
     moveAliceDown: 'Aliceを下へ移動',
     moveAliceLeft: 'Aliceを左へ移動',
+    walkingTo: '{{name}}へ移動中',
     resetMap: 'マップ表示をリセット',
     aliceAvatar: 'Office マップ上の Alice',
     activeRooms: '稼働中の部屋',

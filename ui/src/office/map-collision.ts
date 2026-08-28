@@ -1,6 +1,11 @@
 import type { OfficeMapLayout } from './map-layout'
 import { officeOperationsBoardPosition } from './map-landmarks'
-import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
+import {
+  OFFICE_CABINET_CENTER,
+  OFFICE_DESK_CENTERS,
+  OFFICE_ROSTER_CENTER,
+  OFFICE_SIGN_CENTER,
+} from './pod-geometry'
 
 export const OFFICE_WALL_FLOOR_EDGE = 112
 export const OFFICE_ALICE_HALF_WIDTH = 10
@@ -39,6 +44,13 @@ export function officeCollisionRects(
   ]
 
   for (const pod of layout.pods) {
+    rects.push({
+      id: `sign:${pod.id}`,
+      x: pod.x + OFFICE_SIGN_CENTER.x - 126,
+      y: pod.y + OFFICE_SIGN_CENTER.y - 22,
+      width: 252,
+      height: 44,
+    })
     OFFICE_DESK_CENTERS.forEach((center, index) => {
       rects.push({
         id: `desk:${pod.id}:${index}`,
@@ -90,7 +102,7 @@ export function moveAliceOnOfficeMap(
   current: { x: number; y: number },
   movement: { x: number; y: number },
   layout: OfficeMapLayout,
-  collisionRects = officeCollisionRects(layout),
+  collisionRects: readonly OfficeCollisionRect[] = officeCollisionRects(layout),
 ): OfficeMoveResult {
   const candidate = {
     x: Math.min(layout.width - 24, Math.max(24, current.x + movement.x)),

@@ -13,6 +13,7 @@ export function OfficeDesk({
   roomName,
   selected,
   nearby,
+  targeted,
   depth,
   reducedMotion,
   spriteScale,
@@ -23,6 +24,7 @@ export function OfficeDesk({
   roomName: string
   selected: boolean
   nearby?: boolean
+  targeted?: boolean
   depth: number
   reducedMotion: boolean
   spriteScale?: number
@@ -56,6 +58,7 @@ export function OfficeDesk({
         className="oa-office-desk"
         data-selected={selected}
         data-nearby={nearby}
+        data-route={targeted}
         data-occupied={Boolean(employee)}
         data-mood={employee?.mood}
         style={{ width: station.widthPx, height: station.heightPx, zIndex: depth }}

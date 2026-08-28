@@ -16,12 +16,14 @@ import {
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
+import { officeInteractionPath } from './interaction-path'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
 import { OfficeMapPod } from './OfficeMapPod'
 import {
   nearestOfficeInteractionTarget,
   officeCameraFollowingAlice,
   officeInteractionTargets,
+  type OfficeInteractionTarget,
 } from './interaction-targets'
 import { officeInteractionPromptPlacement } from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
@@ -74,6 +76,7 @@ export function OfficeBuilding({
   const [aliceBumped, setAliceBumped] = useState(false)
   const [panning, setPanning] = useState(false)
   const [controlsLearned, setControlsLearned] = useState(false)
+  const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const viewportRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -89,6 +92,8 @@ export function OfficeBuilding({
   const walkTimerRef = useRef<number | null>(null)
   const touchMoveDelayRef = useRef<number | null>(null)
   const touchMoveRepeatRef = useRef<number | null>(null)
+  const routeTimerRef = useRef<number | null>(null)
+  const routeGenerationRef = useRef(0)
   const awakeGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
@@ -142,6 +147,18 @@ export function OfficeBuilding({
     () => officeInteractionTargets(groups, mapLayout, resolveGroupTitle),
     [groups, mapLayout, resolveGroupTitle],
   )
+  const interactionTargetById = useMemo(
+    () => new Map(interactionTargets.map((target) => [target.id, target])),
+    [interactionTargets],
+  )
+  const routeTarget = routeTargetId ? interactionTargetById.get(routeTargetId) : null
+  const routeTargetName = routeTarget
+    ? routeTarget.kind === 'employee'
+      ? officeCoworkerLabel(routeTarget.employee)
+      : routeTarget.kind === 'operations'
+        ? t('office.operationsBoard')
+        : routeTarget.roomName
+    : null
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
     [mapLayout.width],
@@ -176,7 +193,7 @@ export function OfficeBuilding({
         label: t('office.interactTalk', { name: target }),
       }
     }
-    if (nearbyTarget.kind === 'cabinet') {
+    if (nearbyTarget.kind === 'cabinet' || nearbyTarget.kind === 'sign') {
       return {
         icon: OFFICE_HUD_ASSETS.drawerRecord,
         action: t('office.interactActionFiles'),
@@ -219,6 +236,7 @@ export function OfficeBuilding({
     )
   }
   const resetMap = () => {
+    cancelAutoWalk()
     setCamera(centeredCamera())
     aliceRef.current = mapLayout.alice
     setAlice(mapLayout.alice)
@@ -263,17 +281,67 @@ export function OfficeBuilding({
       ))
     }
   }
-  const activateNearbyTarget = () => {
-    if (!nearbyTarget || selected) return
-    if (nearbyTarget.kind === 'employee') {
-      onSelectEmployee(nearbyTarget.workspaceId, nearbyTarget.employee)
-    } else if (nearbyTarget.kind === 'cabinet') {
-      onOpenFiles(nearbyTarget.workspaceId, 'cabinet')
-    } else if (nearbyTarget.kind === 'roster') {
-      onOpenRoster(nearbyTarget.workspaceId)
+  const activateTarget = (target: OfficeInteractionTarget) => {
+    if (target.kind === 'employee') {
+      onSelectEmployee(target.workspaceId, target.employee)
+    } else if (target.kind === 'sign') {
+      onOpenFiles(target.workspaceId, 'sign')
+    } else if (target.kind === 'cabinet') {
+      onOpenFiles(target.workspaceId, 'cabinet')
+    } else if (target.kind === 'roster') {
+      onOpenRoster(target.workspaceId)
     } else {
       onOpenLog('operations')
     }
+  }
+  const activateNearbyTarget = () => {
+    if (!nearbyTarget || selected) return
+    activateTarget(nearbyTarget)
+  }
+  function cancelAutoWalk() {
+    routeGenerationRef.current += 1
+    if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
+    routeTimerRef.current = null
+    setRouteTargetId(null)
+  }
+  const requestTargetInteraction = (targetId: string, activate?: () => void) => {
+    if (selected || interactionSuspended) return
+    const target = interactionTargetById.get(targetId)
+    if (!target) return
+    cancelAutoWalk()
+    const generation = routeGenerationRef.current
+    const path = officeInteractionPath(aliceRef.current, target, mapLayout, collisionRects)
+    if (!path) {
+      showCollisionBump()
+      return
+    }
+    setControlsLearned(true)
+    setRouteTargetId(targetId)
+    let stepIndex = 0
+    const finish = () => {
+      if (routeGenerationRef.current !== generation) return
+      setAliceDirection(path.facing)
+      setAliceWalking(false)
+      setRouteTargetId(null)
+      routeTimerRef.current = window.setTimeout(() => {
+        if (routeGenerationRef.current !== generation) return
+        routeTimerRef.current = null
+        const action = activate ?? (() => activateTarget(target))
+        action()
+      }, reducedMotion ? 0 : 80)
+    }
+    const advance = () => {
+      if (routeGenerationRef.current !== generation) return
+      const step = path.steps[stepIndex]
+      if (!step) {
+        finish()
+        return
+      }
+      moveAlice(OFFICE_MOVEMENTS[step.direction])
+      stepIndex += 1
+      routeTimerRef.current = window.setTimeout(advance, reducedMotion ? 0 : 96)
+    }
+    advance()
   }
   const stopTouchMove = () => {
     if (touchMoveDelayRef.current != null) window.clearTimeout(touchMoveDelayRef.current)
@@ -282,6 +350,7 @@ export function OfficeBuilding({
     touchMoveRepeatRef.current = null
   }
   const startTouchMove = (movement: OfficeMovement) => {
+    cancelAutoWalk()
     stopTouchMove()
     moveAlice(movement)
     touchMoveDelayRef.current = window.setTimeout(() => {
@@ -292,6 +361,8 @@ export function OfficeBuilding({
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
+    routeGenerationRef.current += 1
+    if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
     stopTouchMove()
   // Timer refs are stable for the component lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -319,6 +390,7 @@ export function OfficeBuilding({
     }
   }, [])
   useLayoutEffect(() => {
+    cancelAutoWalk()
     aliceRef.current = mapLayout.alice
     setAlice(mapLayout.alice)
     setAliceDirection('down')
@@ -362,7 +434,13 @@ export function OfficeBuilding({
         </div>
 
         <div className="oa-office-hud__actions">
-          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenu
+            open={menuOpen}
+            onOpenChange={(open) => {
+              if (open) cancelAutoWalk()
+              setMenuOpen(open)
+            }}
+          >
             <DropdownMenuTrigger
               render={<button
                 type="button"
@@ -446,10 +524,12 @@ export function OfficeBuilding({
           }[key]
           if (!movement) return
           event.preventDefault()
+          cancelAutoWalk()
           moveAlice(movement)
         }}
         onPointerDown={(event) => {
           if ((event.target as HTMLElement).closest('button')) return
+          cancelAutoWalk()
           event.currentTarget.setPointerCapture(event.pointerId)
           dragRef.current = {
             pointerId: event.pointerId,
@@ -522,9 +602,10 @@ export function OfficeBuilding({
               className="oa-office-operations-board"
               data-live={stats.active > 0}
               data-nearby={nearbyTarget?.kind === 'operations'}
+              data-route={routeTargetId === 'operations'}
               aria-label={t('office.operationsBoard')}
               title={t('office.operationsBoardHint')}
-              onClick={() => onOpenLog('operations')}
+              onClick={() => requestTargetInteraction('operations')}
               style={{
                 left: operationsBoard.x,
                 top: operationsBoard.y,
@@ -570,6 +651,11 @@ export function OfficeBuilding({
               </span>
               <small>ALICE</small>
             </div>
+            {routeTargetName && (
+              <span className="sr-only" role="status" aria-live="polite">
+                {t('office.walkingTo', { name: routeTargetName })}
+              </span>
+            )}
           {groups.length === 0 && (
             <div
               className="oa-office-quiet"
@@ -609,11 +695,19 @@ export function OfficeBuilding({
                 harnessTitle={t(`office.harness.${group.workspace.harness}`)}
                 selected={selected}
                 reducedMotion={reducedMotion}
-                onSelectEmployee={onSelectEmployee}
-                onOpenEmployee={onOpenEmployee}
-                onOpenFiles={onOpenFiles}
-                onOpenRoster={onOpenRoster}
+                onSelectEmployee={(workspaceId, employee) => requestTargetInteraction(
+                  `employee:${workspaceId}:${employee.resumeId}`,
+                )}
+                onOpenEmployee={(workspaceId, employee) => requestTargetInteraction(
+                  `employee:${workspaceId}:${employee.resumeId}`,
+                  () => onOpenEmployee(workspaceId, employee),
+                )}
+                onOpenFiles={(workspaceId, origin) => requestTargetInteraction(
+                  `${origin}:${workspaceId}`,
+                )}
+                onOpenRoster={(workspaceId) => requestTargetInteraction(`roster:${workspaceId}`)}
                 nearbyTargetId={nearbyTarget?.id}
+                routeTargetId={routeTargetId}
               />
             )
           })}
