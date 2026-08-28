@@ -99,6 +99,8 @@ describe('OfficeBuilding', () => {
     await userEvent.keyboard('d')
     expect(alice.style.left).toBe('504px')
     expect(alice.dataset.direction).toBe('right')
+    expect(alice.dataset.walking).toBe('true')
+    expect(alice.querySelector('[data-pose="walk-right"]')).toBeTruthy()
     fireEvent.pointerDown(map, { pointerId: 1, clientX: 400, clientY: 300 })
     fireEvent.pointerMove(map, { pointerId: 1, clientX: 300, clientY: 250 })
     expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)

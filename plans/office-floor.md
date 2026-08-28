@@ -129,8 +129,8 @@ atlas 后再替换静态 coworker，不把 mood atlas 行误当成方向行。
   终端机和植物，CSS 不再负责绘制已接入物件
 - [x] 将 desk/cabinet/terminal 从正面排队改为生成式俯视物件；档案柜成为地图内 Files
   交互，而不是铭牌图标
-- [x] Alice 独占 Codex pet v2，员工使用按 runtime 区分的生成角色；移动时 Alice 只做
-  atlas 支持的左右镜像
+- [x] Alice 独占 Codex pet v2，员工使用按 runtime 区分的生成角色；水平移动消费 atlas
+  正式左右跑步行，纵向移动不伪造缺失的背面帧
 - [x] 员工超出 pod 舒适容量时使用可进入/可展开的小组人数提示，不显示 `+58`
 - [x] 统一 tile、阴影、像素缩放和主色卡映射
 
@@ -379,6 +379,27 @@ Operations-board increment (2026-08-29):
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 595 files / 4985 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
+Alice-walk-cycle increment (2026-08-29):
+
+- Compared a CSS-only bob, generating a replacement four-direction Alice, and consuming the authored
+  movement rows already present in the canonical Alice v2 atlas. Chose the existing right/left run rows
+  plus a restrained vertical step bob: it improves game feel without replacing Alice or mislabeling a
+  side-running frame as a nonexistent back-facing frame.
+- Replaced the employee-mood adapter with an Alice-specific pose contract: idle, walk-right, and walk-left.
+  Horizontal steps now animate the eight authored run frames; vertical steps retain the correct frontal
+  silhouette while sharing the discrete footfall motion.
+- Added a 96ms three-step map-position transition and a 150ms walking hold so taps read as tile steps and
+  held keys maintain a continuous run cycle. Collision immediately cancels walking before the directional
+  bump, and reduced motion disables both interpolation and bobbing while preserving pose/state feedback.
+- Browser-played the real Demo route: a right step enters `walk-right` and advances to frame 1 before
+  returning to idle; a left step selects the separately authored `walk-left`; northward movement keeps
+  the frontal pose and walking state; collision at the Operations Board cancels walking and shows bump
+  without changing the y=264 logical position.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 596 files / 4987 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
 ## Completion
