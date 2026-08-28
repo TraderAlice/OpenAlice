@@ -69,6 +69,8 @@ Session、Files 或 provenance。
 - 拖动空地：平移镜头；不得触发员工点击。
 - WASD/方向键：移动 Alice；靠近视口安全边缘时镜头跟随，地图保持可键盘聚焦并提供
   可读 label。
+- 墙、地标、工位、档案柜和 Harness 道具使用地图坐标脚印阻挡 Alice；Workspace 铭牌
+  使用前景深度遮挡而不是横跨小组的整块碰撞墙。
 - `Live map` / `All groups`、Replay、Log：收入暂停菜单；主地图只保留当前位置和真实
   活动提示。
 - 默认无选中对象时不显示大对话框，只在首次进入时短暂提供操作提示。
@@ -255,6 +257,26 @@ Proximity-interaction increment (2026-08-29):
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 590 files / 4970 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
+Map-collision increment (2026-08-29):
+
+- Compared whole-pod collision, DOM hit testing, and shared-coordinate furniture footprints. Chose
+  deterministic footprint rectangles so the same tile geometry works in browser, tests, and large maps.
+- Added collision for the generated wall, global plant/terminal landmarks, all four workstation slots,
+  filing cabinets, and Harness props. Alice keeps an intentionally small foot hitbox and returns a
+  directional 140ms bump rather than sliding through an object.
+- Changed Workspace signs from a physical wall to a foreground depth layer after real play showed that
+  a full-width sign collider created a needless detour. Alice now passes behind the sign while desks and
+  furniture remain solid.
+- Increased the nearest-object action radius from 78px to 84px so collision never strands a valid action
+  just outside reach.
+- Browser-played the real `/office` route: confirmed the generated wall stops Alice at y=144, empty desks
+  stop a straight-line path, the employee remains reachable by walking around the desk, cabinet collision
+  leaves Files in range, and the bump state appears without violating reduced motion.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 591 files / 4974 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
 ## Completion

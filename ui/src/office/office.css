@@ -2528,6 +2528,8 @@
 }
 
 .oa-office-alice {
+  --oa-office-bump-x: 0px;
+  --oa-office-bump-y: 2px;
   position: absolute;
   z-index: 12;
   display: grid;
@@ -2536,6 +2538,34 @@
   place-items: center;
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+
+.oa-office-alice[data-direction="up"] {
+  --oa-office-bump-y: -2px;
+}
+
+.oa-office-alice[data-direction="right"] {
+  --oa-office-bump-x: 2px;
+  --oa-office-bump-y: 0px;
+}
+
+.oa-office-alice[data-direction="left"] {
+  --oa-office-bump-x: -2px;
+  --oa-office-bump-y: 0px;
+}
+
+.oa-office-alice[data-bumped="true"] {
+  animation: oa-office-collision-bump 140ms steps(2, end);
+}
+
+@keyframes oa-office-collision-bump {
+  50% {
+    transform: translate(
+      calc(-50% + var(--oa-office-bump-x)),
+      calc(-50% + var(--oa-office-bump-y))
+    );
+    filter: brightness(1.18);
+  }
 }
 
 /* Alice uses the checked-in Codex pet v2 pack through OfficeEmployeeSprite. */
@@ -2728,7 +2758,7 @@
 /* Shared top-down scene graph. Workspace pods are map objects, not rooms. */
 .oa-office-pod {
   position: absolute;
-  z-index: 2;
+  z-index: auto;
   display: grid;
   grid-template-rows: 42px minmax(0, 1fr);
   box-sizing: border-box;
@@ -2736,7 +2766,8 @@
 }
 
 .oa-office-pod__sign {
-  z-index: 6;
+  position: relative;
+  z-index: 13;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -3318,6 +3349,10 @@
   .oa-office-pod .oa-office-desk[data-nearby="true"],
   .oa-office-pod__cabinet[data-nearby="true"],
   .oa-office-interact-prompt {
+    animation: none;
+  }
+
+  .oa-office-alice[data-bumped="true"] {
     animation: none;
   }
 }

@@ -1,17 +1,9 @@
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import type { OfficeMapLayout } from './map-layout'
 import { visibleEmployeesForOffice } from './desk-slots'
+import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS } from './pod-geometry'
 
-export const OFFICE_INTERACTION_RADIUS = 78
-
-const DESK_CENTERS = [
-  { x: 90, y: 97 },
-  { x: 198, y: 97 },
-  { x: 90, y: 170 },
-  { x: 198, y: 170 },
-] as const
-
-const CABINET_CENTER = { x: 270, y: 187 } as const
+export const OFFICE_INTERACTION_RADIUS = 84
 
 export type OfficeInteractionTarget =
   | {
@@ -45,7 +37,7 @@ export function officeInteractionTargets(
     if (!group) continue
     const roomName = groupTitle(group.workspace.id, group.workspace.tag)
     visibleEmployeesForOffice(group.employees).forEach((employee, index) => {
-      const center = DESK_CENTERS[index]
+      const center = OFFICE_DESK_CENTERS[index]
       if (!center) return
       targets.push({
         id: `employee:${group.workspace.id}:${employee.resumeId}`,
@@ -60,8 +52,8 @@ export function officeInteractionTargets(
     targets.push({
       id: `cabinet:${group.workspace.id}`,
       kind: 'cabinet',
-      x: pod.x + CABINET_CENTER.x,
-      y: pod.y + CABINET_CENTER.y,
+      x: pod.x + OFFICE_CABINET_CENTER.x,
+      y: pod.y + OFFICE_CABINET_CENTER.y,
       workspaceId: group.workspace.id,
       roomName,
     })

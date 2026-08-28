@@ -1,5 +1,5 @@
 import { LocateFixed, Menu, Move, Radio, ScrollText, X } from 'lucide-react'
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type {
@@ -16,6 +16,7 @@ import {
   officeInteractionTargets,
 } from './interaction-targets'
 import { officeCoworkerLabel } from './label'
+import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
 import { layoutOfficeMap } from './map-layout'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -42,7 +43,9 @@ export function OfficeBuilding({
   const [menuOpen, setMenuOpen] = useState(false)
   const [camera, setCamera] = useState({ x: 0, y: 0 })
   const [alice, setAlice] = useState({ x: 480, y: 336 })
+  const aliceRef = useRef(alice)
   const [aliceDirection, setAliceDirection] = useState<'up' | 'right' | 'down' | 'left'>('down')
+  const [aliceBumped, setAliceBumped] = useState(false)
   const [panning, setPanning] = useState(false)
   const viewportRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -53,6 +56,8 @@ export function OfficeBuilding({
     cameraX: number
     cameraY: number
   } | null>(null)
+  const bumpTimerRef = useRef<number | null>(null)
+  const bumpFrameRef = useRef<number | null>(null)
   const awakeGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
@@ -85,6 +90,10 @@ export function OfficeBuilding({
       harness: group.workspace.harness,
     }))),
     [groups],
+  )
+  const collisionRects = useMemo(
+    () => officeCollisionRects(mapLayout),
+    [mapLayout],
   )
   const groupById = useMemo(
     () => new Map(groups.map((group) => [group.workspace.id, group])),
@@ -126,10 +135,25 @@ export function OfficeBuilding({
   }
   const resetMap = () => {
     setCamera(centeredCamera())
+    aliceRef.current = mapLayout.alice
     setAlice(mapLayout.alice)
     setAliceDirection('down')
   }
+  const showCollisionBump = () => {
+    if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
+    if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
+    setAliceBumped(false)
+    bumpFrameRef.current = window.requestAnimationFrame(() => {
+      setAliceBumped(true)
+      bumpTimerRef.current = window.setTimeout(() => setAliceBumped(false), 140)
+    })
+  }
+  useEffect(() => () => {
+    if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
+    if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
+  }, [])
   useLayoutEffect(() => {
+    aliceRef.current = mapLayout.alice
     setAlice(mapLayout.alice)
     setAliceDirection('down')
     setCamera(centeredCamera())
@@ -262,22 +286,23 @@ export function OfficeBuilding({
           if (!movement) return
           event.preventDefault()
           setAliceDirection(movement.direction)
-          setAlice((current) => {
-            const next = {
-              x: Math.min(mapLayout.width - 24, Math.max(24, current.x + movement.x)),
-              y: Math.min(mapLayout.height - 24, Math.max(24, current.y + movement.y)),
-            }
-            const viewport = viewportRef.current?.getBoundingClientRect()
-            if (viewport) {
-              setCamera((currentCamera) => officeCameraFollowingAlice(
-                next,
-                currentCamera,
-                viewport,
-                mapLayout,
-              ))
-            }
-            return next
-          })
+          const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
+          if (move.bumped) {
+            showCollisionBump()
+            return
+          }
+          const next = move.position
+          aliceRef.current = next
+          setAlice(next)
+          const viewport = viewportRef.current?.getBoundingClientRect()
+          if (viewport) {
+            setCamera((currentCamera) => officeCameraFollowingAlice(
+              next,
+              currentCamera,
+              viewport,
+              mapLayout,
+            ))
+          }
         }}
         onPointerDown={(event) => {
           if ((event.target as HTMLElement).closest('button')) return
@@ -337,6 +362,7 @@ export function OfficeBuilding({
               role="img"
               aria-label={t('office.aliceAvatar')}
               data-direction={aliceDirection}
+              data-bumped={aliceBumped}
               style={{ left: alice.x, top: alice.y }}
             >
               <span className="oa-office-alice__sprite" aria-hidden>
