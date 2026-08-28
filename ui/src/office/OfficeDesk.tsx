@@ -1,17 +1,11 @@
 import { useTranslation } from 'react-i18next'
 
-import type { OfficeBubble, OfficeFloorEmployee } from '../api/office'
+import type { OfficeFloorEmployee } from '../api/office'
+import { officeBubbleText } from './bubble-text'
 import { officeCoworkerLabel } from './label'
 import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { officeStationComposition } from './station'
-
-function OfficeBubbleText({ bubble }: { bubble: OfficeBubble }) {
-  const { t } = useTranslation()
-  if (bubble.kind === 'text' || bubble.kind === 'error') return bubble.text
-  if (bubble.kind === 'tool') return String(t('office.bubbleTool', { name: bubble.name }))
-  return String(t('office.bubbleRejected'))
-}
 
 export function OfficeDesk({
   employee,
@@ -69,7 +63,7 @@ export function OfficeDesk({
             className="oa-office-bubble"
             style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
           >
-            <OfficeBubbleText bubble={employee.bubble} />
+            {officeBubbleText(employee.bubble, t)}
           </span>
         )}
         {employee && (

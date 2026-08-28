@@ -32,6 +32,13 @@ export function OfficeMapPod({
     .slice(0, 4)
   const slots = deskSlotsForOffice(visibleEmployees, 4)
   const active = group.employees.some((employee) => employee.mood !== 'idle')
+  const harnessProp = group.workspace.harness === 'chat'
+    ? OFFICE_FURNITURE.generated.coffeeStation
+    : group.workspace.harness === 'auto-quant'
+      ? OFFICE_FURNITURE.generated.serverRack
+      : group.workspace.harness === 'prediction'
+        ? OFFICE_FURNITURE.generated.terminal
+        : OFFICE_FURNITURE.generated.plant
 
   return (
     <section
@@ -63,6 +70,13 @@ export function OfficeMapPod({
           alt=""
           aria-hidden
           className="oa-office-pod__rug"
+          style={officePixelImg}
+        />
+        <img
+          src={harnessProp}
+          alt=""
+          aria-hidden
+          className="oa-office-pod__harness-prop"
           style={officePixelImg}
         />
         <ul className="oa-office-pod__desks">
