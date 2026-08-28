@@ -1877,6 +1877,7 @@ export const ja: Resources = {
     amenityCoffee: 'ティーカート',
     amenityPlant: '観葉植物',
     timeline: '在席ログ',
+    eventDetails: 'イベント詳細',
     log: 'ログ',
     replay: '再生',
     replayLive: 'ライブ',
