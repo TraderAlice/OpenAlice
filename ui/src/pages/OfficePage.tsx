@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ScrollText, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -33,6 +33,7 @@ export function OfficePage() {
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
+  const logOriginRef = useRef<'menu' | 'operations'>('menu')
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
   const { building, loading, error } = useOfficeFloor(asOfSeq)
 
@@ -58,14 +59,15 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, rosterWorkspaceId, workspaces])
-  const focusMenu = () => {
-    requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>('.oa-office-pause-trigger')?.focus()
-    })
-  }
   const closeLog = () => {
     setLogOpen(false)
-    focusMenu()
+    requestAnimationFrame(() => {
+      if (logOriginRef.current === 'operations') {
+        document.getElementById('office-operations-board')?.focus()
+      } else {
+        document.querySelector<HTMLElement>('.oa-office-pause-trigger')?.focus()
+      }
+    })
   }
   const closeEmployee = () => {
     const resumeId = selected?.resumeId
@@ -177,7 +179,10 @@ export function OfficePage() {
                   setSelected(null)
                   setLogOpen(false)
                 }}
-                onOpenLog={() => setLogOpen(true)}
+                onOpenLog={(origin) => {
+                  logOriginRef.current = origin
+                  setLogOpen(true)
+                }}
               />
             </div>
             {logOpen && (

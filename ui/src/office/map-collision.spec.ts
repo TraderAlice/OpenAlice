@@ -19,6 +19,7 @@ describe('Office map collision', () => {
     expect(ids).toContain('harness-prop:chat-1')
     expect(ids).toContain('landmark:plant')
     expect(ids).toContain('landmark:terminal')
+    expect(ids).toContain('operations')
   })
 
   it('stops Alice before a workstation while keeping its employee interactable', () => {
@@ -81,6 +82,21 @@ describe('Office map collision', () => {
       bumped: true,
       obstacleId: 'wall',
     })
+  })
+
+  it('stops Alice at the operations board while keeping its log interaction in range', () => {
+    const current = { x: layout.width / 2, y: 264 }
+    expect(moveAliceOnOfficeMap(current, { x: 0, y: -24 }, layout)).toMatchObject({
+      position: current,
+      bumped: true,
+      obstacleId: 'operations',
+    })
+    expect(nearestOfficeInteractionTarget(current, 'up', [{
+      id: 'operations',
+      kind: 'operations',
+      x: layout.width / 2,
+      y: 204,
+    }])?.id).toBe('operations')
   })
 
   it('adds collision only for roster boards that exist on the map', () => {

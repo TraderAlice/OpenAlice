@@ -15,6 +15,7 @@ describe('OFFICE_FURNITURE', () => {
     expect(OFFICE_FURNITURE.cabinet).toBe('/office/furniture/cabinet.png')
     expect(OFFICE_FURNITURE.generated.workstation).toBe('/office/furniture/workstation-v1.png')
     expect(OFFICE_FURNITURE.generated.cabinet).toBe('/office/furniture/filing-cabinet-v1.png')
+    expect(OFFICE_FURNITURE.generated.operationsBoard).toBe('/office/furniture/operations-board-v1.png')
     for (const url of [
       OFFICE_FURNITURE.desk,
       OFFICE_FURNITURE.chair,
@@ -31,5 +32,11 @@ describe('OFFICE_FURNITURE', () => {
       expect([...bytes.subarray(0, 8)]).toEqual(PNG_MAGIC)
       expect(bytes.byteLength).toBeGreaterThan(1000)
     }
+
+    const operations = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.operationsBoard.replace(/^\//, ''),
+    ))
+    expect(operations[25]).toBe(6) // PNG color type 6: RGBA.
   })
 })

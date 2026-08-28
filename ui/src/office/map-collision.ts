@@ -1,4 +1,5 @@
 import type { OfficeMapLayout } from './map-layout'
+import { officeOperationsBoardPosition } from './map-landmarks'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
 
 export const OFFICE_WALL_FLOOR_EDGE = 112
@@ -23,10 +24,18 @@ export function officeCollisionRects(
   layout: OfficeMapLayout,
   rosterWorkspaceIds: ReadonlySet<string> = new Set(),
 ): OfficeCollisionRect[] {
+  const operations = officeOperationsBoardPosition(layout.width)
   const rects: OfficeCollisionRect[] = [
     { id: 'wall', x: 0, y: 0, width: layout.width, height: OFFICE_WALL_FLOOR_EDGE },
     { id: 'landmark:plant', x: 62, y: 150, width: 42, height: 28 },
     { id: 'landmark:terminal', x: layout.width - 100, y: 145, width: 42, height: 38 },
+    {
+      id: 'operations',
+      x: operations.x - 68,
+      y: operations.y - 34,
+      width: 136,
+      height: 69,
+    },
   ]
 
   for (const pod of layout.pods) {

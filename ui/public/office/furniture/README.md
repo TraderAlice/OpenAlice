@@ -37,3 +37,8 @@ Current runtime assets:
 - `coffee-station-v1.png` — Chat neighborhood social prop
 - `server-rack-v1.png` — AutoQuant neighborhood operations prop
 - `personnel-board-v1.png` — interactive roster prop for groups with more than four Sessions
+- `operations-board-v1.png` — floor landmark that opens the live occupancy log and replay
+
+`operations-board-v1.png` was generated from the locked style master as a freestanding, width-dominant
+mission console with an abstract teal status display and no baked words. The built-in image generator
+rendered it on a flat magenta key; the repository copy uses locally extracted transparent alpha.
