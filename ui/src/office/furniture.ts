@@ -8,6 +8,12 @@ export const OFFICE_FURNITURE = {
   cabinet: '/office/furniture/cabinet.png',
   coffee: '/office/furniture/coffee.png',
   plant: '/office/furniture/plant.png',
+  generated: {
+    workstation: '/office/furniture/workstation-v1.png',
+    cabinet: '/office/furniture/filing-cabinet-v1.png',
+    terminal: '/office/furniture/terminal-kiosk-v1.png',
+    plant: '/office/furniture/plant-v1.png',
+  },
 } as const
 
 export const OFFICE_MIN_DESKS = 2

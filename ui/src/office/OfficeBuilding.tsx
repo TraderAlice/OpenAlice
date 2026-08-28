@@ -7,6 +7,7 @@ import type {
   OfficeFloorEmployee,
 } from '../api/office'
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
+import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
 import { OfficeMapPod } from './OfficeMapPod'
 import { layoutOfficeMap } from './map-layout'
@@ -286,10 +287,10 @@ export function OfficeBuilding({
               <span />
             </div>
             <div className="oa-office-map-landmark oa-office-map-landmark--plant" aria-hidden>
-              <i />
+              <img src={OFFICE_FURNITURE.generated.plant} alt="" style={officePixelImg} />
             </div>
-            <div className="oa-office-map-landmark oa-office-map-landmark--water" aria-hidden>
-              <i />
+            <div className="oa-office-map-landmark oa-office-map-landmark--terminal" aria-hidden>
+              <img src={OFFICE_FURNITURE.generated.terminal} alt="" style={officePixelImg} />
             </div>
             <div
               className="oa-office-alice"
