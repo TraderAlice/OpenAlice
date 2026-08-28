@@ -45,6 +45,7 @@ theme preference, including system-resolved Auto mode.
 - `personnel-board-v1.png` — interactive roster prop for groups with more than four Sessions
 - `operations-board-v1.png` — floor landmark that opens the live occupancy log and replay
 - `workspace-sign-v1.png` — blank physical placard behind live Workspace, Harness, and agent text
+- `spawn-compass-v1.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
 
 `operations-board-v1.png` was generated from the locked style master as a freestanding, width-dominant
 mission console with an abstract teal status display and no baked words. The built-in image generator
