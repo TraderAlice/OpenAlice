@@ -440,6 +440,28 @@ Interactive-placard increment (2026-08-29):
 - `pnpm test` passed: 596 files / 4987 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+World-action-prompt increment (2026-08-29):
+
+- Replayed current `dev` and compared the two remaining motion/HUD candidates. Coworkers already consume
+  live mood-specific stepped animation; the larger defect was the fixed 360px action window, which
+  covered the floor and truncated `Open Semis and supply chain files` to an ambiguous ellipsis.
+- Compared widening the fixed window, moving it into the bottom HUD, and attaching it to the current
+  world target. Chose the target-attached callout because it preserves the relationship between action
+  and object instead of making another screen-space toolbar.
+- Added a pure four-side placement function. It places the callout beyond the target and away from Alice,
+  then uses the current camera and measured viewport—not invisible map bounds—to flip the callout inward
+  before it reaches a clipped edge. ResizeObserver keeps that decision current across responsive changes.
+- Rebuilt the prompt as a compact teal 16-bit speech plaque with a directional pixel tail, live DOM key
+  and action text, two-line wrapping, stable Office palette seed colors, and a reduced-motion entrance.
+- Browser-played the cabinet and Operations Board routes. The first narrow pass exposed bottom clipping,
+  and the first Night pass exposed gray text; both were repaired. Final checks passed at 1280×720 and
+  760×900, Day and Night, emulated reduced motion, full long text, and Enter navigation to the real
+  Workspace route.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 597 files / 4990 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
