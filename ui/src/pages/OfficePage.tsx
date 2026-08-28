@@ -168,6 +168,7 @@ export function OfficePage() {
                   return workspace ? workspaceDisplayName(workspace) : tag
                 }}
                 selected={selected}
+                interactionSuspended={logOpen || Boolean(selectedSeat) || Boolean(rosterOffice)}
                 onSelectEmployee={(workspaceId, employee) => {
                   setSelected({ workspaceId, resumeId: employee.resumeId })
                   setLogOpen(false)

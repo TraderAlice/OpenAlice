@@ -596,6 +596,27 @@ North-facing Alice increment (2026-08-29):
 - `pnpm test` passed: 599 files / 4994 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+First-touch interaction increment (2026-08-29):
+
+- Replayed the current reset path and found that Alice spawned 79px from the nearest filing cabinet while
+  the 84px interaction radius immediately painted a large Files prompt. That made opening a Workspace look
+  like the intended first action instead of letting the movement tutorial lead exploration.
+- Compared moving the spawn point, delaying the prompt, and tightening the facing cone. Chose a 72px radius:
+  it clears the neutral spawn while every employee, cabinet, roster board, and Operations Board remains
+  reachable from outside its collision footprint. The existing directional side/back gates remain unchanged.
+- Browser movement also found that the roster and Occupancy log left the map prompt/highlight visible behind
+  their modal windows. `OfficePage` now explicitly suspends world interaction for every Office overlay;
+  `OfficeBuilding` clears its nearby target, prompt, and highlight for the complete suspended state.
+- Browser-played reset, two-step roster approach, Enter activation, roster close, and Operations log. Reset
+  has no target or prompt, the roster prompt appears only after approaching, and both windows leave the
+  underlying scene inert with no nearby highlight or prompt.
+- Rechecked the neutral reset state at 760×900 in the dark Office surface: no horizontal overflow, no
+  premature target, and no visible text below the 12px Office minimum.
+- Focused interaction, OfficeBuilding, and OfficePage specs passed: 3 files / 9 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 4995 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

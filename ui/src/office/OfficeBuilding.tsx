@@ -35,6 +35,7 @@ export function OfficeBuilding({
   building,
   groupTitle,
   selected,
+  interactionSuspended = false,
   onSelectEmployee,
   onOpenEmployee,
   onOpenFiles,
@@ -44,6 +45,7 @@ export function OfficeBuilding({
   building: OfficeBuildingSnapshot
   groupTitle?: (workspaceId: string, tag: string) => string
   selected?: { workspaceId: string; resumeId: string } | null
+  interactionSuspended?: boolean
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenFiles: (workspaceId: string) => void
@@ -134,8 +136,10 @@ export function OfficeBuilding({
     [mapLayout.width],
   )
   const nearbyTarget = useMemo(
-    () => nearestOfficeInteractionTarget(alice, aliceDirection, interactionTargets),
-    [alice, aliceDirection, interactionTargets],
+    () => interactionSuspended || selected
+      ? null
+      : nearestOfficeInteractionTarget(alice, aliceDirection, interactionTargets),
+    [alice, aliceDirection, interactionSuspended, interactionTargets, selected],
   )
   const promptPlacement = useMemo(
     () => nearbyTarget
@@ -525,7 +529,7 @@ export function OfficeBuilding({
               />
             )
           })}
-          {nearbyTarget && promptPlacement && !selected && (
+          {nearbyTarget && promptPlacement && (
             <div
               className="oa-office-interact-prompt"
               role="status"
