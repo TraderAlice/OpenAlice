@@ -31,6 +31,15 @@ import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
 
+const OFFICE_MOVEMENTS = {
+  left: { x: -24, y: 0, direction: 'left' as const },
+  right: { x: 24, y: 0, direction: 'right' as const },
+  up: { x: 0, y: -24, direction: 'up' as const },
+  down: { x: 0, y: 24, direction: 'down' as const },
+}
+
+type OfficeMovement = (typeof OFFICE_MOVEMENTS)[keyof typeof OFFICE_MOVEMENTS]
+
 export function OfficeBuilding({
   building,
   groupTitle,
@@ -78,6 +87,8 @@ export function OfficeBuilding({
   const bumpTimerRef = useRef<number | null>(null)
   const bumpFrameRef = useRef<number | null>(null)
   const walkTimerRef = useRef<number | null>(null)
+  const touchMoveDelayRef = useRef<number | null>(null)
+  const touchMoveRepeatRef = useRef<number | null>(null)
   const awakeGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
@@ -230,10 +241,60 @@ export function OfficeBuilding({
     setAliceWalking(true)
     walkTimerRef.current = window.setTimeout(() => setAliceWalking(false), 150)
   }
+  const moveAlice = (movement: OfficeMovement) => {
+    setControlsLearned(true)
+    setAliceDirection(movement.direction)
+    const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
+    if (move.bumped) {
+      showCollisionBump()
+      return
+    }
+    const next = move.position
+    aliceRef.current = next
+    setAlice(next)
+    showAliceWalking()
+    const viewport = viewportRef.current?.getBoundingClientRect()
+    if (viewport) {
+      setCamera((currentCamera) => officeCameraFollowingAlice(
+        next,
+        currentCamera,
+        viewport,
+        mapLayout,
+      ))
+    }
+  }
+  const activateNearbyTarget = () => {
+    if (!nearbyTarget || selected) return
+    if (nearbyTarget.kind === 'employee') {
+      onSelectEmployee(nearbyTarget.workspaceId, nearbyTarget.employee)
+    } else if (nearbyTarget.kind === 'cabinet') {
+      onOpenFiles(nearbyTarget.workspaceId, 'cabinet')
+    } else if (nearbyTarget.kind === 'roster') {
+      onOpenRoster(nearbyTarget.workspaceId)
+    } else {
+      onOpenLog('operations')
+    }
+  }
+  const stopTouchMove = () => {
+    if (touchMoveDelayRef.current != null) window.clearTimeout(touchMoveDelayRef.current)
+    if (touchMoveRepeatRef.current != null) window.clearInterval(touchMoveRepeatRef.current)
+    touchMoveDelayRef.current = null
+    touchMoveRepeatRef.current = null
+  }
+  const startTouchMove = (movement: OfficeMovement) => {
+    stopTouchMove()
+    moveAlice(movement)
+    touchMoveDelayRef.current = window.setTimeout(() => {
+      touchMoveRepeatRef.current = window.setInterval(() => moveAlice(movement), 96)
+    }, 220)
+  }
   useEffect(() => () => {
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
+    stopTouchMove()
+  // Timer refs are stable for the component lifetime.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useLayoutEffect(() => {
     const viewport = viewportRef.current
@@ -370,49 +431,22 @@ export function OfficeBuilding({
           const key = event.key.toLowerCase()
           if ((key === 'enter' || key === ' ') && nearbyTarget && !selected) {
             event.preventDefault()
-            if (nearbyTarget.kind === 'employee') {
-              onSelectEmployee(nearbyTarget.workspaceId, nearbyTarget.employee)
-            } else if (nearbyTarget.kind === 'cabinet') {
-              onOpenFiles(nearbyTarget.workspaceId, 'cabinet')
-            } else if (nearbyTarget.kind === 'roster') {
-              onOpenRoster(nearbyTarget.workspaceId)
-            } else {
-              onOpenLog('operations')
-            }
+            activateNearbyTarget()
             return
           }
           const movement = {
-            arrowleft: { x: -24, y: 0, direction: 'left' as const },
-            a: { x: -24, y: 0, direction: 'left' as const },
-            arrowright: { x: 24, y: 0, direction: 'right' as const },
-            d: { x: 24, y: 0, direction: 'right' as const },
-            arrowup: { x: 0, y: -24, direction: 'up' as const },
-            w: { x: 0, y: -24, direction: 'up' as const },
-            arrowdown: { x: 0, y: 24, direction: 'down' as const },
-            s: { x: 0, y: 24, direction: 'down' as const },
+            arrowleft: OFFICE_MOVEMENTS.left,
+            a: OFFICE_MOVEMENTS.left,
+            arrowright: OFFICE_MOVEMENTS.right,
+            d: OFFICE_MOVEMENTS.right,
+            arrowup: OFFICE_MOVEMENTS.up,
+            w: OFFICE_MOVEMENTS.up,
+            arrowdown: OFFICE_MOVEMENTS.down,
+            s: OFFICE_MOVEMENTS.down,
           }[key]
           if (!movement) return
           event.preventDefault()
-          setControlsLearned(true)
-          setAliceDirection(movement.direction)
-          const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
-          if (move.bumped) {
-            showCollisionBump()
-            return
-          }
-          const next = move.position
-          aliceRef.current = next
-          setAlice(next)
-          showAliceWalking()
-          const viewport = viewportRef.current?.getBoundingClientRect()
-          if (viewport) {
-            setCamera((currentCamera) => officeCameraFollowingAlice(
-              next,
-              currentCamera,
-              viewport,
-              mapLayout,
-            ))
-          }
+          moveAlice(movement)
         }}
         onPointerDown={(event) => {
           if ((event.target as HTMLElement).closest('button')) return
@@ -596,11 +630,18 @@ export function OfficeBuilding({
                 zIndex: officeDepthAt(nearbyTarget.y) + 1000,
               }}
             >
-              <img src={promptPresentation.icon} alt="" aria-hidden style={officePixelImg} />
-              <span className="oa-office-interact-prompt__copy" aria-hidden>
-                <strong>{promptPresentation.action}</strong>
-              </span>
-              <kbd aria-hidden>{t('office.interactKey')}</kbd>
+              <button
+                type="button"
+                className="oa-office-interact-prompt__action"
+                aria-label={t('office.interactNow', { action: promptPresentation.label })}
+                onClick={activateNearbyTarget}
+              >
+                <img src={promptPresentation.icon} alt="" aria-hidden style={officePixelImg} />
+                <span className="oa-office-interact-prompt__copy" aria-hidden>
+                  <strong>{promptPresentation.action}</strong>
+                </span>
+                <kbd aria-hidden>{t('office.interactKey')}</kbd>
+              </button>
             </div>
           )}
           </div>
@@ -619,6 +660,34 @@ export function OfficeBuilding({
               style={officePixelImg}
             />
           </button>
+        </div>
+        <div className="oa-office-touch-dpad" role="group" aria-label={t('office.touchControls')}>
+          <img src={OFFICE_HUD_ASSETS.movePad} alt="" aria-hidden style={officePixelImg} />
+          {([
+            ['up', t('office.moveAliceUp')],
+            ['left', t('office.moveAliceLeft')],
+            ['right', t('office.moveAliceRight')],
+            ['down', t('office.moveAliceDown')],
+          ] as const).map(([direction, label]) => (
+            <button
+              key={direction}
+              type="button"
+              data-direction={direction}
+              aria-label={label}
+              onPointerDown={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                event.currentTarget.setPointerCapture?.(event.pointerId)
+                startTouchMove(OFFICE_MOVEMENTS[direction])
+              }}
+              onPointerUp={stopTouchMove}
+              onPointerCancel={stopTouchMove}
+              onLostPointerCapture={stopTouchMove}
+              onClick={(event) => {
+                if (event.detail === 0) moveAlice(OFFICE_MOVEMENTS[direction])
+              }}
+            />
+          ))}
         </div>
       </div>
     </div>

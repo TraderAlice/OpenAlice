@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -56,6 +56,42 @@ describe('OfficeBuilding', () => {
     expect(building.querySelector<HTMLImageElement>('.oa-office-quiet__radar img')?.src)
       .toContain('/office/hud/signal-receiver-v1.png')
     expect(building.querySelector('svg')).toBeNull()
+  })
+
+  it('moves from the touch pad immediately and repeats while held', () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+            },
+            lastSeq: 0,
+            firstSeq: 0,
+            offices: [],
+          }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+      const moveRight = screen.getByRole('button', { name: 'Move Alice right' })
+      fireEvent.pointerDown(moveRight, { pointerId: 3 })
+      expect(alice.style.left).toBe('504px')
+      act(() => vi.advanceTimersByTime(320))
+      expect(alice.style.left).toBe('528px')
+      fireEvent.pointerUp(moveRight, { pointerId: 3 })
+      act(() => vi.advanceTimersByTime(500))
+      expect(alice.style.left).toBe('528px')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('offers sleeping groups from the in-world quiet notice', async () => {
@@ -156,6 +192,10 @@ describe('OfficeBuilding', () => {
     expect(controls?.dataset.learned).toBe('false')
     expect(controls?.querySelector<HTMLImageElement>('.oa-office-map-controls__move img')?.src)
       .toContain('/office/hud/move-pad-v1.png')
+    const touchPad = screen.getByRole('group', { name: 'Move Alice' })
+    expect(touchPad.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/hud/move-pad-v1.png')
+    expect(screen.getAllByRole('button', { name: /Move Alice (up|right|down|left)/ })).toHaveLength(4)
     expect(screen.getByTestId('office-building').querySelector<HTMLImageElement>('.oa-office-hud__signal img')?.src)
       .toContain('/office/hud/signal-receiver-v1.png')
     expect(screen.getByTestId('office-building').querySelector('svg')).toBeNull()
@@ -212,7 +252,7 @@ describe('OfficeBuilding', () => {
     expect(interactionPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/drawer-record-v1.png')
     expect(interactionPrompt.textContent).toContain('Files')
-    await userEvent.keyboard('{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: 'Interact: Inspect chat files' }))
     expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'cabinet')
     await userEvent.click(screen.getByRole('button', { name: 'Reset map view' }))
     expect(controls?.dataset.learned).toBe('true')

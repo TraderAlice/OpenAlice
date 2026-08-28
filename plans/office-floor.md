@@ -815,6 +815,28 @@ Roster-navigation follow-up (2026-08-29):
 - `pnpm test` passed: 600 files / 5006 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Touch-controls follow-up (2026-08-29):
+
+- Played Office inside the 760px mobile shell and found that its only movement guidance was `WASD / ARROWS`.
+  Touch users could view the floor but could neither move Alice nor execute the nearby Enter interaction, so
+  the game surface was functionally keyboard-only at the breakpoint where the application becomes mobile.
+- Compared retaining keyboard-only controls, adding click-to-teleport/pathfinding, and promoting the existing
+  generated move-pad into a real directional controller. Chose the controller because it preserves Alice's
+  facing, collision, nearby-target, and camera rules instead of introducing a second movement model.
+- The generated 16-bit move-pad is now an actual four-way touch control at narrow widths. A tap advances one
+  24px world step; holding a direction repeats after a short deliberate delay. Pointer release, cancellation,
+  capture loss, unmount, and collision all stop safely through the same movement path used by the keyboard.
+- Nearby world badges are now real buttons as well as live status announcements. Touch players can tap the
+  object-bound TALK, FILES, ROSTER, or REVIEW action directly; keyboard Enter/Space and full accessible target
+  labels remain intact. Four locales include explicit movement and action names.
+- Browser-played the 760x900 route using only the D-pad to approach a personnel board and tap the world action
+  into its team roster. At 1280x900 the pad is absent and keyboard movement still works. Both widths retain zero
+  horizontal overflow, and the narrow control does not replace or bypass map collision.
+- Focused building spec passed: 1 file / 5 tests, including press-and-hold repetition and tappable interaction.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 600 files / 5007 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

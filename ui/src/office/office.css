@@ -3312,14 +3312,9 @@
 
 .oa-office-interact-prompt {
   position: absolute;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
   width: max-content;
   min-height: 38px;
-  align-items: center;
-  gap: 5px;
   max-width: 176px;
-  padding: 3px 5px 3px 3px;
   border: 3px solid var(--gba-ink);
   border-radius: 2px;
   color: var(--office-gba-cream-seed);
@@ -3336,7 +3331,28 @@
   animation: oa-office-interact-in 120ms steps(2, end);
 }
 
-.oa-office-interact-prompt > img {
+.oa-office-interact-prompt__action {
+  display: grid;
+  width: 100%;
+  min-height: 38px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px 3px 3px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.oa-office-interact-prompt__action:focus-visible {
+  outline: 3px solid var(--gba-water);
+  outline-offset: 3px;
+}
+
+.oa-office-interact-prompt__action > img {
   display: block;
   width: 34px;
   height: 34px;
@@ -3426,6 +3442,52 @@
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.oa-office-touch-dpad {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 15;
+  display: none;
+  width: 96px;
+  height: 96px;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  pointer-events: none;
+}
+
+.oa-office-touch-dpad > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent));
+}
+
+.oa-office-touch-dpad button {
+  position: relative;
+  z-index: 1;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.oa-office-touch-dpad button[data-direction='up'] { grid-area: 1 / 2; }
+.oa-office-touch-dpad button[data-direction='left'] { grid-area: 2 / 1; }
+.oa-office-touch-dpad button[data-direction='right'] { grid-area: 2 / 3; }
+.oa-office-touch-dpad button[data-direction='down'] { grid-area: 3 / 2; }
+
+.oa-office-touch-dpad button:is(:hover, :focus-visible, :active) {
+  background: color-mix(in srgb, var(--gba-water) 32%, transparent);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--gba-cream) 60%, transparent);
 }
 
 @keyframes oa-office-interact-in {
@@ -4474,6 +4536,14 @@
 }
 
 @container (max-width: 760px) {
+  .oa-office-touch-dpad {
+    display: grid;
+  }
+
+  .oa-office-map-controls__move {
+    display: none;
+  }
+
   .oa-office-hud__status span:not(:first-child) {
     display: none;
   }
