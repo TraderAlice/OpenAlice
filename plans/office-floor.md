@@ -763,6 +763,32 @@ Operations-journal follow-up (2026-08-29):
 - `pnpm test` passed: 600 files / 5004 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Context-action follow-up (2026-08-29):
+
+- Played the map at 1280×720 and 760×900 and found that approaching a busy desk stacked its task bubble,
+  nameplate, and a 280px `Enter + full sentence` banner. The callout obscured adjacent furniture on desktop
+  and crossed roughly half a Workspace on the narrow layout, undoing the world-first interaction model.
+- Compared a reskinned sentence banner, a fixed bottom command bar, and a compact object-bound action badge.
+  Chose the badge because it keeps the target relationship, avoids competing with the bottom Agent window,
+  and lets the highlighted world object carry identity while the prompt carries only the available action.
+- Generated `talk-bubble-v1.png` with the built-in image generator from the Office style master: one cream
+  parchment conversation glyph with charcoal pixel outline and teal dots on a flat magenta key. Ran the shared
+  chroma-key removal helper, cropped and nearest-neighbor packaged it as a 128×128 RGBA PNG, and verified four
+  transparent corners plus 64.38% non-empty subject coverage.
+- Rebuilt nearby prompts as generated glyph + short localized action + Enter. Employee, cabinet, roster, and
+  operations targets use TALK, FILES, ROSTER, and REVIEW respectively; full target-aware sentences remain the
+  accessible status names. Existing generated drawer, roster, and occupancy glyphs provide the other actions.
+- The first 196px version still repeated a truncated target name and touched Alice, so real-browser feedback
+  removed that redundant line. The final 176px maximum keeps every English action untruncated without hiding
+  the task bubble, target highlight, or player label.
+- Browser-played all four prompt kinds at 760×900 and the operations prompt at 1280×720. Generated image loads,
+  side placement, complete labels, Agent-file Enter interaction, Operations-log Enter interaction, and map
+  visibility all hold with no new horizontal overflow.
+- Focused building, placement, and HUD-asset specs passed: 3 files / 8 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 600 files / 5004 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

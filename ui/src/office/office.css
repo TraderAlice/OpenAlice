@@ -3313,13 +3313,13 @@
 .oa-office-interact-prompt {
   position: absolute;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   width: max-content;
-  min-height: 42px;
+  min-height: 38px;
   align-items: center;
-  gap: 7px;
-  max-width: 280px;
-  padding: 6px 9px 6px 6px;
+  gap: 5px;
+  max-width: 176px;
+  padding: 3px 5px 3px 3px;
   border: 3px solid var(--gba-ink);
   border-radius: 2px;
   color: var(--office-gba-cream-seed);
@@ -3328,12 +3328,20 @@
     inset 0 0 0 2px color-mix(in srgb, var(--gba-water) 36%, transparent),
     3px 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 800;
   line-height: 1.2;
   pointer-events: none;
   transform-origin: center;
   animation: oa-office-interact-in 120ms steps(2, end);
+}
+
+.oa-office-interact-prompt > img {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter: drop-shadow(1px 2px 0 color-mix(in srgb, var(--gba-ink) 30%, transparent));
 }
 
 .oa-office-interact-prompt::after {
@@ -3391,8 +3399,8 @@
 }
 
 .oa-office-interact-prompt kbd {
-  min-width: 48px;
-  padding: 4px 6px;
+  min-width: 38px;
+  padding: 3px 4px;
   border: 2px solid var(--office-gba-paper-seed);
   border-radius: 2px;
   color: var(--office-gba-cream-seed);
@@ -3404,11 +3412,20 @@
   text-transform: uppercase;
 }
 
-.oa-office-interact-prompt span {
+.oa-office-interact-prompt__copy {
   position: relative;
   z-index: 1;
+  display: grid;
   min-width: 0;
-  text-wrap: balance;
+  gap: 1px;
+}
+
+.oa-office-interact-prompt__copy strong {
+  color: var(--office-gba-cream-seed);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 @keyframes oa-office-interact-in {

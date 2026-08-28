@@ -52,7 +52,7 @@ describe('officeInteractionPromptPlacement', () => {
   it('uses the current camera viewport rather than invisible map space', () => {
     expect(officeInteractionPromptPlacement(
       { x: 480, y: 360 },
-      { x: 438, y: 427 },
+      { x: 438, y: 450 },
       { width: 760, height: 530 },
       { x: -113, y: 0 },
     ).side).toBe('above')

@@ -155,6 +155,36 @@ export function OfficeBuilding({
       : null,
     [alice, camera, mapLayout.height, mapLayout.width, nearbyTarget, viewportSize],
   )
+  const promptPresentation = (() => {
+    if (!nearbyTarget) return null
+    if (nearbyTarget.kind === 'employee') {
+      const target = officeCoworkerLabel(nearbyTarget.employee)
+      return {
+        icon: OFFICE_HUD_ASSETS.talkBubble,
+        action: t('office.interactActionTalk'),
+        label: t('office.interactTalk', { name: target }),
+      }
+    }
+    if (nearbyTarget.kind === 'cabinet') {
+      return {
+        icon: OFFICE_HUD_ASSETS.drawerRecord,
+        action: t('office.interactActionFiles'),
+        label: t('office.interactFiles', { name: nearbyTarget.roomName }),
+      }
+    }
+    if (nearbyTarget.kind === 'roster') {
+      return {
+        icon: OFFICE_HUD_ASSETS.rosterBadge,
+        action: t('office.interactActionRoster'),
+        label: t('office.interactRoster', { name: nearbyTarget.roomName }),
+      }
+    }
+    return {
+      icon: OFFICE_HUD_ASSETS.occupancyLog,
+      action: t('office.interactActionOperations'),
+      label: t('office.interactOperations'),
+    }
+  })()
   const sleepAfterDays = Math.max(
     1,
     Math.round(building.config.workspaceSleepAfterMs / (24 * 60 * 60 * 1000)),
@@ -553,10 +583,12 @@ export function OfficeBuilding({
               />
             )
           })}
-          {nearbyTarget && promptPlacement && (
+          {nearbyTarget && promptPlacement && promptPresentation && (
             <div
               className="oa-office-interact-prompt"
               role="status"
+              aria-label={promptPresentation.label}
+              data-kind={nearbyTarget.kind}
               data-side={promptPlacement.side}
               style={{
                 left: promptPlacement.x,
@@ -564,16 +596,11 @@ export function OfficeBuilding({
                 zIndex: officeDepthAt(nearbyTarget.y) + 1000,
               }}
             >
-              <kbd>{t('office.interactKey')}</kbd>
-              <span>
-                {nearbyTarget.kind === 'employee'
-                  ? t('office.interactTalk', { name: officeCoworkerLabel(nearbyTarget.employee) })
-                  : nearbyTarget.kind === 'cabinet'
-                    ? t('office.interactFiles', { name: nearbyTarget.roomName })
-                    : nearbyTarget.kind === 'roster'
-                      ? t('office.interactRoster', { name: nearbyTarget.roomName })
-                      : t('office.interactOperations')}
+              <img src={promptPresentation.icon} alt="" aria-hidden style={officePixelImg} />
+              <span className="oa-office-interact-prompt__copy" aria-hidden>
+                <strong>{promptPresentation.action}</strong>
               </span>
+              <kbd aria-hidden>{t('office.interactKey')}</kbd>
             </div>
           )}
           </div>

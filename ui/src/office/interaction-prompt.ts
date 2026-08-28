@@ -7,8 +7,8 @@ export interface OfficeInteractionPromptPlacement {
 }
 
 const OFFICE_PROMPT_GAP = 34
-const OFFICE_PROMPT_MAX_WIDTH = 280
-const OFFICE_PROMPT_MAX_HEIGHT = 72
+const OFFICE_PROMPT_MAX_WIDTH = 176
+const OFFICE_PROMPT_MAX_HEIGHT = 56
 const OFFICE_PROMPT_VIEWPORT_MARGIN = 12
 
 /**
