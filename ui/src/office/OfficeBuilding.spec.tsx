@@ -71,10 +71,15 @@ describe('OfficeBuilding', () => {
         onOpenLog={onOpenLog}
       />,
     )
-    expect(screen.getByTestId('office-building')).toBeTruthy()
+    expect(screen.getByTestId('office-building').dataset.officeTime).toBe('night')
     expect(screen.getByTestId('office-wall')).toBeTruthy()
     const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
     expect(map).toBeTruthy()
+    const mapWall = map.querySelector<HTMLElement>('.oa-office-map-wall')
+    expect(mapWall?.style.getPropertyValue('--office-wall-day'))
+      .toContain('/office/furniture/wall-window-v1.png')
+    expect(mapWall?.style.getPropertyValue('--office-wall-night'))
+      .toContain('/office/furniture/wall-window-night-v1.png')
     const controls = map.parentElement?.querySelector<HTMLElement>('.oa-office-map-controls')
     expect(controls?.dataset.learned).toBe('false')
     expect(controls?.querySelector<HTMLImageElement>('.oa-office-map-controls__move img')?.src)

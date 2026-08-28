@@ -1853,25 +1853,20 @@
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* GBA floor direction                                                         */
-/*                                                                            */
-/* TODO(asset): replace the CSS-drawn wall trim, floor tiles, rug borders and */
-/* map window with a single 8px-grid office tileset. Current furniture sprites */
-/* remain as composition placeholders and intentionally keep hard pixel edges. */
-/* -------------------------------------------------------------------------- */
+/* Stable physical palette: app theme changes the time of day, not legibility. */
 
 .oa-office-page {
-  --gba-ink: color-mix(in srgb, var(--foreground) 78%, var(--office-gba-ink-seed));
-  --gba-ink-soft: color-mix(in srgb, var(--foreground) 52%, var(--office-gba-ink-soft-seed));
-  --gba-cream: color-mix(in srgb, var(--card) 76%, var(--office-gba-cream-seed));
-  --gba-paper: color-mix(in srgb, var(--card) 62%, var(--office-gba-paper-seed));
-  --gba-moss: color-mix(in srgb, var(--primary) 34%, var(--office-gba-moss-seed));
-  --gba-moss-dark: color-mix(in srgb, var(--primary) 24%, var(--office-gba-moss-dark-seed));
-  --gba-floor: color-mix(in srgb, var(--card) 48%, var(--office-gba-floor-seed));
-  --gba-floor-alt: color-mix(in srgb, var(--card) 45%, var(--office-gba-floor-alt-seed));
-  --gba-water: color-mix(in srgb, var(--primary) 54%, var(--office-gba-water-seed));
-  --gba-alert: color-mix(in srgb, var(--destructive) 64%, var(--office-gba-alert-seed));
+  --gba-ink: var(--office-gba-ink-seed);
+  --gba-ink-soft: var(--office-gba-ink-soft-seed);
+  --gba-cream: var(--office-gba-cream-seed);
+  --gba-paper: var(--office-gba-paper-seed);
+  --gba-moss: var(--office-gba-moss-seed);
+  --gba-moss-dark: var(--office-gba-moss-dark-seed);
+  --gba-floor: var(--office-gba-floor-seed);
+  --gba-floor-alt: var(--office-gba-floor-alt-seed);
+  --gba-water: var(--office-gba-water-seed);
+  --gba-alert: var(--office-gba-alert-seed);
+  --gba-live: var(--office-gba-live);
   --office-text: var(--gba-ink);
   --office-text-muted: var(--gba-ink-soft);
   --office-cyan: var(--gba-water);
@@ -3265,6 +3260,16 @@
     );
 }
 
+.oa-office-building[data-office-time="night"] .oa-office-map::before {
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      color-mix(in srgb, var(--gba-water) 13%, transparent),
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--office-gba-night-floor) 30%, transparent);
+}
+
 .oa-office-map-zone {
   z-index: 1;
 }
@@ -3984,11 +3989,27 @@
   left: 0;
   height: 102px;
   border-bottom: 4px solid var(--gba-ink);
+  background-image: var(--office-wall-day);
   background-repeat: repeat-x;
   background-position: top left;
   background-size: 204px 102px;
   box-shadow: 0 7px 0 color-mix(in srgb, var(--gba-ink) 12%, transparent);
   pointer-events: none;
+}
+
+.oa-office-building[data-office-time="night"] .oa-office-map-wall {
+  background-image: var(--office-wall-night);
+  box-shadow:
+    0 7px 0 color-mix(in srgb, var(--gba-ink) 18%, transparent),
+    0 10px 18px color-mix(in srgb, var(--gba-water) 12%, transparent);
+}
+
+.oa-office-building[data-office-time="night"] .oa-office-map-landmark--terminal img,
+.oa-office-building[data-office-time="night"] .oa-office-operations-board[data-live="true"] img,
+.oa-office-building[data-office-time="night"] .oa-office-pod[data-active="true"] .oa-office-topdown-station__asset {
+  filter:
+    drop-shadow(0 0 5px color-mix(in srgb, var(--gba-water) 60%, transparent))
+    drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
 .oa-office-map-landmark {
