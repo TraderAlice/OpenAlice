@@ -8,7 +8,8 @@ describe('Office coworker sprite registry', () => {
     expect(officeCoworkerSpriteForAgent('claude')).toBe(OFFICE_COWORKER_SPRITES.claude)
     expect(officeCoworkerSpriteForAgent('pi')).toBe(OFFICE_COWORKER_SPRITES.pi)
     expect(officeCoworkerSpriteForAgent('opencode')).toBe(OFFICE_COWORKER_SPRITES.opencode)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.src)).size).toBe(4)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(4)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(4)
   })
 
   it('keeps aliases intentional and unknown runtimes stable without returning Alice', () => {
@@ -17,6 +18,7 @@ describe('Office coworker sprite registry', () => {
     expect(officeCoworkerSpriteForAgent('future-agent')).toBe(
       officeCoworkerSpriteForAgent('future-agent'),
     )
-    expect(officeCoworkerSpriteForAgent('future-agent').src).not.toContain('alice-maid')
+    expect(officeCoworkerSpriteForAgent('future-agent').portraitSrc).not.toContain('alice-maid')
+    expect(officeCoworkerSpriteForAgent('future-agent').deskSrc).toContain('-desk-v1.png')
   })
 })

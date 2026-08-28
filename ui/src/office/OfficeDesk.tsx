@@ -113,6 +113,7 @@ export function OfficeDesk({
               reducedMotion={reducedMotion}
               label={label}
               scale={spriteScale ?? station.sprite.scale}
+              pose="desk"
             />
           </span>
         )}

@@ -2,29 +2,34 @@ export type OfficeCoworkerArchetype = 'codex' | 'claude' | 'pi' | 'opencode'
 
 export interface OfficeCoworkerSpriteAsset {
   id: OfficeCoworkerArchetype
-  src: string
+  portraitSrc: string
+  deskSrc: string
   accent: string
 }
 
 export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerArchetype, OfficeCoworkerSpriteAsset> = {
   codex: {
     id: 'codex',
-    src: '/office/coworkers/codex-v1.webp',
+    portraitSrc: '/office/coworkers/codex-v1.webp',
+    deskSrc: '/office/coworkers/codex-desk-v1.png',
     accent: 'var(--terminal-yellow)',
   },
   claude: {
     id: 'claude',
-    src: '/office/coworkers/claude-v1.webp',
+    portraitSrc: '/office/coworkers/claude-v1.webp',
+    deskSrc: '/office/coworkers/claude-desk-v1.png',
     accent: 'var(--terminal-red)',
   },
   pi: {
     id: 'pi',
-    src: '/office/coworkers/pi-v1.webp',
+    portraitSrc: '/office/coworkers/pi-v1.webp',
+    deskSrc: '/office/coworkers/pi-desk-v1.png',
     accent: 'var(--terminal-cyan)',
   },
   opencode: {
     id: 'opencode',
-    src: '/office/coworkers/opencode-v1.webp',
+    portraitSrc: '/office/coworkers/opencode-v1.webp',
+    deskSrc: '/office/coworkers/opencode-desk-v1.png',
     accent: 'var(--terminal-magenta)',
   },
 }

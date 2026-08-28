@@ -41,9 +41,10 @@ describe('OfficeDesk', () => {
     expect(screen.getByRole('button').style.zIndex).toBe('107')
     expect(screen.queryByText('research')).toBeNull()
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-agent')).toBe('claude')
+    expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-pose')).toBe('desk')
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-reduced-motion')).toBe('true')
     expect(container.querySelector<HTMLImageElement>('.oa-office-coworker img')?.src)
-      .toContain('/office/coworkers/claude-v1.webp')
+      .toContain('/office/coworkers/claude-desk-v1.png')
 
     rerender(<OfficeDesk {...props} nearby />)
     expect(screen.getByText('research')).toBeTruthy()

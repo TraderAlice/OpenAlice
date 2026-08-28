@@ -657,6 +657,31 @@ Quiet-floor scene increment (2026-08-29):
 - `pnpm test` passed: 599 files / 4998 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Workstation-crew increment (2026-08-29):
+
+- Real-browser close inspection found the map still compressed full-body, front-facing portrait art into
+  48px desk seats. The result loaded correctly but read as a pile of unrelated character and furniture
+  layers, and contradicted the workstation's upward-facing chair/monitor projection.
+- Compared tuning the portrait scale, reviving the unused CSS circle-and-block agent, and generating a
+  dedicated seated map pose. Chose generated poses because map-scale silhouettes need their own camera and
+  spatial direction; neither a smaller portrait nor programmer-drawn tokens fixes the underlying art model.
+- Used the built-in image generator with the Office style master, each existing coworker portrait, the
+  workstation projection, and a locked Codex sample pose. Added Codex, Claude, Pi, and OpenCode rear-view
+  seated sprites with identity-specific hair, headgear, outerwear, and accents. Checkerboard outputs went
+  through background-extraction edits; all four packaged PNGs have genuine alpha.
+- Map desks now select the `desk` pose while roster and Agent windows retain the full portrait. The four
+  characters face their monitors, occupy the chair footprint, preserve mood/reduced-motion animation, and
+  remain distinguishable without enlarging the workstation hit target.
+- Removed the abandoned CSS-only top-down desk and agent primitives so there is one authored workstation
+  composition rather than a hidden parallel vector-like implementation.
+- Focused sprite, desk, roster, and Agent-window specs passed: 4 files / 5 tests.
+- Browser-played the normal floor at 1280×720 and 760×900. All four desk assets load with the `desk` pose,
+  keep their mood animations, add no horizontal overflow, and remain visually separate from Alice and the
+  workstation furniture. Clicking a worker still opens the inert Agent window with the correct full portrait.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 4998 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

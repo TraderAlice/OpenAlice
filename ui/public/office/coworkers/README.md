@@ -24,3 +24,12 @@ WebP and alpha-checked before integration.
 
 Known runtimes map to the closest authored archetype. Unknown future runtime
 names receive a stable hash-selected archetype; they never fall back to Alice.
+
+The four `*-desk-v1.png` files are a separate generated map-scale pose family.
+Each employee is seated, seen from a top-down three-quarter rear view, and faces
+the workstation monitor instead of standing front-facing inside the chair. The
+Codex pose established the locked camera and silhouette; Claude, Pi, and
+OpenCode preserve that framing while carrying their portrait hair, headgear,
+outerwear, and accent colors. Checkerboard outputs went through background
+extraction before the transparent sources were cropped and packaged for the
+runtime. Portrait sprites remain the identity view in roster and Agent windows.
