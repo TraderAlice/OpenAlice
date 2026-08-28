@@ -1,4 +1,4 @@
-import { Menu, Radio, ScrollText, X } from 'lucide-react'
+import { Radio } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -6,7 +6,14 @@ import type {
   OfficeBuildingSnapshot,
   OfficeFloorEmployee,
 } from '../api/office'
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
@@ -258,64 +265,61 @@ export function OfficeBuilding({
         </div>
 
         <div className="oa-office-hud__actions">
-          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-            <PopoverTrigger
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger
               render={<button
                 type="button"
                 className="oa-office-pause-trigger"
                 aria-label={t('office.pauseMenu')}
+                data-open={menuOpen}
               />}
             >
-              {menuOpen ? <X size={15} /> : <Menu size={15} />}
+              <img
+                src={OFFICE_HUD_ASSETS.menuTerminal}
+                alt=""
+                aria-hidden
+                style={officePixelImg}
+              />
               {t('office.pauseMenu')}
-            </PopoverTrigger>
-            <PopoverContent
-              role="menu"
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
               aria-label={t('office.floorView')}
               align="end"
               sideOffset={8}
               className="oa-office-pause-menu"
             >
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-pressed={!showAll}
-                aria-checked={!showAll}
-                onClick={() => {
-                  setShowAll(false)
+              <div className="oa-office-pause-menu__header" role="presentation">
+                <img src={OFFICE_HUD_ASSETS.menuTerminal} alt="" style={officePixelImg} />
+                <span>{t('office.floorView')}</span>
+              </div>
+              <DropdownMenuRadioGroup
+                value={showAll ? 'all' : 'live'}
+                onValueChange={(value) => {
+                  setShowAll(value === 'all')
                   setCamera({ x: 0, y: 0 })
                   setMenuOpen(false)
                 }}
               >
-                <span className="oa-office-awake-dot" aria-hidden />
-                {t('office.liveMap')}
-              </button>
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-pressed={showAll}
-                aria-checked={showAll}
-                onClick={() => {
-                  setShowAll(true)
-                  setCamera({ x: 0, y: 0 })
-                  setMenuOpen(false)
-                }}
-              >
-                {t('office.allGroups')}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
+                <DropdownMenuRadioItem value="live">
+                  <img src={OFFICE_HUD_ASSETS.resetCompass} alt="" aria-hidden style={officePixelImg} />
+                  <span>{t('office.liveMap')}</span>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="all">
+                  <img src={OFFICE_HUD_ASSETS.groupGrid} alt="" aria-hidden style={officePixelImg} />
+                  <span>{t('office.allGroups')}</span>
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              <DropdownMenuItem
                 onClick={() => {
                   setMenuOpen(false)
                   onOpenLog('menu')
                 }}
               >
-                <ScrollText size={13} />
-                {t('office.timeline')}
-              </button>
-            </PopoverContent>
-          </Popover>
+                <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden style={officePixelImg} />
+                <span>{t('office.timeline')}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

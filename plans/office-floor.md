@@ -481,6 +481,30 @@ Pixel-control-HUD increment (2026-08-29):
 - `pnpm test` passed: 598 files / 4991 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Pause-command-menu increment (2026-08-29):
+
+- Replayed the employee Agent file, six-person roster, and pause menu on current `dev`. The character and
+  roster windows already read as game panels, but the portalled pause menu lost every Office-local palette
+  variable: its background was transparent, its 8px text disappeared into the windows, and its plain
+  Popover buttons did not support arrow-key menu navigation.
+- Compared a CSS-only contrast patch, a compact GBA command window with generated glyphs, and a full-screen
+  pause scene. Chose the compact command window because it keeps the map spatially present while fixing the
+  broken surface and replacing the remaining Menu/Close/ScrollText vectors in that interaction.
+- Used the locked Office style master with the built-in image generator to create transparent 16-bit menu
+  terminal, four-room grid, and operations-log icons. Cropped each to a 128px RGBA sprite; Live Map reuses
+  the existing compass so the vocabulary remains consistent.
+- Replaced the plain Popover with the shared Base UI DropdownMenu primitives. Pointer selection, Up/Down,
+  Enter, Escape, radio state, menu dismissal, and trigger focus return now follow the repository control
+  contract; the hidden default vector indicator is replaced visually by the Office pixel diamond.
+- The portal now owns stable GBA seed colors, 14px command labels, 44px targets, a physical title plate,
+  focus/selected states, and reduced-motion suppression. Browser-played Day at 1280×720 and Night at
+  760×900 with no horizontal overflow; keyboard All Groups and pointer Occupancy Log both reached their
+  real destinations.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 598 files / 4991 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
