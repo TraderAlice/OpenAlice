@@ -62,7 +62,9 @@ export function OfficeDesk({
       >
         <span className="oa-office-topdown-station" aria-hidden>
           <img
-            src={OFFICE_FURNITURE.generated.workstation}
+            src={employee
+              ? OFFICE_FURNITURE.generated.workstation
+              : OFFICE_FURNITURE.generated.vacantWorkstation}
             alt=""
             className="oa-office-topdown-station__asset"
             style={officePixelImg}

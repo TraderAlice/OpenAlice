@@ -26,6 +26,26 @@ beforeEach(async () => {
 })
 
 describe('OfficeDesk', () => {
+  it('keeps a powered-down generated workstation visible in a vacant slot', () => {
+    const { container } = render(
+      <OfficeDesk
+        employee={null}
+        roomName="Auto Quant"
+        selected={false}
+        depth={107}
+        reducedMotion={false}
+        onSelect={() => undefined}
+      />,
+    )
+
+    const desk = screen.getByRole('button', { name: 'Empty desk in Auto Quant office' })
+    expect(desk.hasAttribute('disabled')).toBe(true)
+    expect(desk.dataset.occupied).toBe('false')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-topdown-station__asset')?.src)
+      .toContain('/office/furniture/vacant-workstation-v1.png')
+    expect(container.querySelector('.oa-office-coworker')).toBeNull()
+  })
+
   it('keeps the floor quiet until the coworker is nearby or selected', () => {
     const props = {
       employee,

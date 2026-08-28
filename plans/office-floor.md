@@ -701,6 +701,27 @@ Exceptional-state emote follow-up (2026-08-29):
 - `pnpm test` passed: 599 files / 5001 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Vacant-workstation follow-up (2026-08-29):
+
+- Real-browser inspection found that a zero-agent Workspace still owned four semantic desk slots, but the
+  generic disabled-button opacity and a second station opacity multiplied to roughly 19%. Auto Quant read
+  as an empty rug and unfinished asset load instead of a dormant department.
+- Compared leaving the rug empty, adding explanatory UI copy, and keeping physical powered-down furniture.
+  Chose powered-down furniture: classic overhead rooms communicate function through persistent scenery,
+  while copy would turn a world-state distinction into another dashboard empty state.
+- Generated one empty-chair workstation variant that preserves the occupied station footprint while turning
+  off the monitor and tower glow. It was produced on a flat magenta key, processed with the ImageGen
+  chroma-key helper, alpha-checked, and packaged as a 256×256 RGBA PNG.
+- Vacant Session slots now select the powered-down asset at a restrained 82% opacity. They remain disabled,
+  never show interaction prompts or selection state, and preserve the existing workstation collision box.
+- Browser-played the normal two-group floor in Day and Night at 1280×720 plus Day at 760×900. All four
+  vacant assets load at native 256×256, add no horizontal overflow, remain legible without competing with
+  occupied bright-screen desks, and stop Alice without pretending to be interactive.
+- Focused desk and furniture specs passed: 2 files / 5 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 599 files / 5002 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

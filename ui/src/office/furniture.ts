@@ -10,6 +10,7 @@ export const OFFICE_FURNITURE = {
   plant: '/office/furniture/plant.png',
   generated: {
     workstation: '/office/furniture/workstation-v1.png',
+    vacantWorkstation: '/office/furniture/vacant-workstation-v1.png',
     cabinet: '/office/furniture/filing-cabinet-v1.png',
     terminal: '/office/furniture/terminal-kiosk-v1.png',
     plant: '/office/furniture/plant-v1.png',

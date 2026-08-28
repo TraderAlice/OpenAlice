@@ -3623,7 +3623,12 @@
 }
 
 .oa-office-pod .oa-office-desk[data-occupied="false"] .oa-office-topdown-station {
-  opacity: 0.42;
+  opacity: 1;
+}
+
+.oa-office-pod .oa-office-desk[data-occupied="false"] {
+  opacity: 0.82;
+  filter: saturate(0.82) brightness(0.92);
 }
 
 .oa-office-pod .oa-office-nameplate {

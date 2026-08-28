@@ -14,6 +14,7 @@ describe('OFFICE_FURNITURE', () => {
     expect(OFFICE_FURNITURE.chair).toBe('/office/furniture/chair.png')
     expect(OFFICE_FURNITURE.cabinet).toBe('/office/furniture/cabinet.png')
     expect(OFFICE_FURNITURE.generated.workstation).toBe('/office/furniture/workstation-v1.png')
+    expect(OFFICE_FURNITURE.generated.vacantWorkstation).toBe('/office/furniture/vacant-workstation-v1.png')
     expect(OFFICE_FURNITURE.generated.cabinet).toBe('/office/furniture/filing-cabinet-v1.png')
     expect(OFFICE_FURNITURE.generated.operationsBoard).toBe('/office/furniture/operations-board-v1.png')
     expect(OFFICE_FURNITURE.generated.workspaceSign).toBe('/office/furniture/workspace-sign-v1.png')
@@ -41,6 +42,14 @@ describe('OFFICE_FURNITURE', () => {
       OFFICE_FURNITURE.generated.operationsBoard.replace(/^\//, ''),
     ))
     expect(operations[25]).toBe(6) // PNG color type 6: RGBA.
+
+    const vacantWorkstation = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.vacantWorkstation.replace(/^\//, ''),
+    ))
+    expect(vacantWorkstation[25]).toBe(6)
+    expect(vacantWorkstation.readUInt32BE(16)).toBe(256)
+    expect(vacantWorkstation.readUInt32BE(20)).toBe(256)
 
     const workspaceSign = readFileSync(resolve(
       publicRoot,

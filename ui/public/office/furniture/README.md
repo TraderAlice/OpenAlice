@@ -28,6 +28,7 @@ must not recreate card or room boundaries.
 Current runtime assets:
 
 - `workstation-v1.png`
+- `vacant-workstation-v1.png` — powered-down empty-chair variant for unoccupied Session slots
 - `filing-cabinet-v1.png`
 - `terminal-kiosk-v1.png`
 - `plant-v1.png`
@@ -55,3 +56,8 @@ rendered it on a flat magenta key; the repository copy uses locally extracted tr
 placard with no baked text. Runtime HTML supplies the localized Harness label, Workspace title, and
 agent count over its quiet center panel, preserving dynamic data and accessible text without reverting
 to a dashboard card.
+
+`vacant-workstation-v1.png` preserves the workstation footprint while removing the cyan screen and tower
+glow. It was generated on a flat magenta key, processed with the ImageGen chroma-key helper, and packaged
+with real alpha. Empty slots remain disabled scenery, but no longer disappear into the rug as if their
+assets failed to load.
