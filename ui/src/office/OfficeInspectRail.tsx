@@ -15,6 +15,7 @@ export function OfficeInspectRail({
   onOpen,
   onOpenDrawer,
   onClose,
+  returnToRoster = false,
   children,
 }: {
   employee: OfficeFloorEmployee | null
@@ -22,6 +23,7 @@ export function OfficeInspectRail({
   onOpen: () => void
   onOpenDrawer: (item: OfficeDrawerItem) => void
   onClose?: () => void
+  returnToRoster?: boolean
   children?: ReactNode
 }) {
   const { t } = useTranslation()
@@ -39,8 +41,19 @@ export function OfficeInspectRail({
       }}
     >
       {onClose && (
-        <button type="button" autoFocus className="oa-office-window__close" aria-label={t('common.close')} onClick={onClose}>
-          <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
+        <button
+          type="button"
+          autoFocus
+          className="oa-office-window__close"
+          aria-label={returnToRoster ? t('office.backToRoster') : t('common.close')}
+          onClick={onClose}
+        >
+          <img
+            src={returnToRoster ? OFFICE_HUD_ASSETS.windowBack : OFFICE_HUD_ASSETS.windowClose}
+            alt=""
+            aria-hidden
+            style={officePixelImg}
+          />
         </button>
       )}
       <div className="oa-office-inspect__profile">

@@ -42,6 +42,7 @@ describe('OfficeRosterWindow', () => {
           employees,
         }}
         roomName="Semis and supply chain"
+        focusResumeId="resume-5"
         onSelect={onSelect}
         onClose={onClose}
       />,
@@ -60,7 +61,9 @@ describe('OfficeRosterWindow', () => {
     expect(container.querySelector('.oa-office-window__header > div > img')?.getAttribute('src'))
       .toBe('/office/hud/roster-badge-v1.png')
     expect(container.querySelector('svg')).toBeNull()
-    await userEvent.click(screen.getByRole('button', { name: /Research session 6.*c1/i }))
+    const focusedMember = screen.getByRole('button', { name: /Research session 6.*c1/i })
+    expect(document.activeElement).toBe(focusedMember)
+    await userEvent.click(focusedMember)
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()

@@ -21,6 +21,7 @@ describe('OFFICE_HUD_ASSETS', () => {
     expect(OFFICE_HUD_ASSETS.sessionPortal).toBe('/office/hud/session-portal-v1.png')
     expect(OFFICE_HUD_ASSETS.drawerRecord).toBe('/office/hud/drawer-record-v1.png')
     expect(OFFICE_HUD_ASSETS.talkBubble).toBe('/office/hud/talk-bubble-v1.png')
+    expect(OFFICE_HUD_ASSETS.windowBack).toBe('/office/hud/window-back-v1.png')
 
     for (const url of Object.values(OFFICE_HUD_ASSETS)) {
       const bytes = readFileSync(resolve(publicRoot, url.replace(/^\//, '')))

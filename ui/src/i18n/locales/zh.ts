@@ -1874,6 +1874,7 @@ export const zh: Resources = {
     rosterCount_one: '{{count}} 名成员',
     rosterCount_other: '{{count}} 名成员',
     rosterSelectHint: '选择一名同事，查看 Agent 档案。',
+    backToRoster: '返回小组名册',
     emptyDesk: '{{name}} 办公室的空工位',
     selectDesk: '点一张桌子，查看这名员工。',
     selectDeskHint: 'Agent 状态、当前工作和最近事件会显示在这里。',

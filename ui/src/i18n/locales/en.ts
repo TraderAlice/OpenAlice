@@ -1907,6 +1907,7 @@ export const en = {
     rosterCount_one: '{{count}} team member',
     rosterCount_other: '{{count}} team members',
     rosterSelectHint: 'Choose a teammate to inspect their Agent file.',
+    backToRoster: 'Back to team roster',
     emptyDesk: 'Empty desk in {{name}} office',
     selectDesk: 'Select a desk to inspect that employee.',
     selectDeskHint: 'Agent status, current work, and recent events will appear here.',

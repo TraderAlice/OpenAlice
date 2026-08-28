@@ -14,6 +14,7 @@ Live labels, button behavior, focus rings, and accessible names remain DOM-owned
 - `session-portal-v1.png` — open the selected Agent session
 - `drawer-record-v1.png` — open a provenance record from an Agent desk
 - `talk-bubble-v1.png` — nearby conversation action in the compact world prompt
+- `window-back-v1.png` — return from an Agent file to its originating team roster
 
 All assets use `docs/assets/office/style-master-v1.png` as their visual reference.
 The command glyphs are separate transparent images so their silhouettes remain

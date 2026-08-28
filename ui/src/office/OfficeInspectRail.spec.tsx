@@ -70,4 +70,24 @@ describe('OfficeInspectRail', () => {
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('uses the generated roster-return control when opened from the team list', async () => {
+    const onClose = vi.fn()
+    render(
+      <OfficeInspectRail
+        employee={employee}
+        roomName="Chat"
+        onOpen={vi.fn()}
+        onOpenDrawer={vi.fn()}
+        onClose={onClose}
+        returnToRoster
+      />,
+    )
+
+    const back = screen.getByRole('button', { name: 'Back to team roster' })
+    expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v1.png')
+    expect(document.activeElement).toBe(back)
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledOnce()
+  })
 })

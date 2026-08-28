@@ -11,11 +11,13 @@ import { useReducedMotion } from './use-reduced-motion'
 export function OfficeRosterWindow({
   group,
   roomName,
+  focusResumeId,
   onSelect,
   onClose,
 }: {
   group: OfficeRoomSnapshot
   roomName: string
+  focusResumeId?: string | null
   onSelect: (employee: OfficeFloorEmployee) => void
   onClose: () => void
 }) {
@@ -39,7 +41,7 @@ export function OfficeRosterWindow({
           <img src={OFFICE_HUD_ASSETS.rosterBadge} alt="" aria-hidden style={officePixelImg} />
           <span>{roomName} · {t('office.roster')}</span>
         </div>
-        <button type="button" autoFocus aria-label={t('common.close')} onClick={onClose}>
+        <button type="button" autoFocus={!focusResumeId} aria-label={t('common.close')} onClick={onClose}>
           <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
         </button>
       </header>
@@ -51,7 +53,12 @@ export function OfficeRosterWindow({
         <ul>
           {employees.map((employee) => (
             <li key={employee.resumeId}>
-              <button type="button" onClick={() => onSelect(employee)}>
+              <button
+                type="button"
+                autoFocus={employee.resumeId === focusResumeId}
+                data-resume-id={employee.resumeId}
+                onClick={() => onSelect(employee)}
+              >
                 <span className="oa-office-roster__portrait" aria-hidden>
                   <OfficeCoworkerSprite
                     agent={employee.agent}

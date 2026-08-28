@@ -1875,6 +1875,7 @@ export const ja: Resources = {
     rosterCount_one: '{{count}} 人のメンバー',
     rosterCount_other: '{{count}} 人のメンバー',
     rosterSelectHint: 'メンバーを選んで Agent ファイルを確認します。',
+    backToRoster: 'チーム名簿に戻る',
     emptyDesk: '{{name}} オフィスの空き机',
     selectDesk: '机を選ぶと、その従業員を確認できます。',
     selectDeskHint: 'Agent の状態、現在の作業、最近のイベントがここに表示されます。',

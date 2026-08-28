@@ -37,6 +37,11 @@ export function OfficePage() {
   const [logOpen, setLogOpen] = useState(false)
   const logOriginRef = useRef<'menu' | 'operations'>('menu')
   const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
+  const [rosterFocusResumeId, setRosterFocusResumeId] = useState<string | null>(null)
+  const employeeOriginRef = useRef<
+    | { kind: 'map' }
+    | { kind: 'roster'; workspaceId: string; resumeId: string }
+  >({ kind: 'map' })
   const [cabinetWorkspaceId, setCabinetWorkspaceId] = useState<string | null>(null)
   const cabinetOriginRef = useRef<'sign' | 'cabinet'>('cabinet')
   const { building, loading, error } = useOfficeFloor(asOfSeq)
@@ -86,6 +91,11 @@ export function OfficePage() {
   const closeEmployee = () => {
     const resumeId = selected?.resumeId
     setSelected(null)
+    if (employeeOriginRef.current.kind === 'roster') {
+      setRosterWorkspaceId(employeeOriginRef.current.workspaceId)
+      setRosterFocusResumeId(employeeOriginRef.current.resumeId)
+      return
+    }
     requestAnimationFrame(() => {
       const desks = document.querySelectorAll<HTMLElement>('[data-testid^="office-desk-"]')
       Array.from(desks).find((desk) =>
@@ -95,6 +105,7 @@ export function OfficePage() {
   const closeRoster = () => {
     const workspaceId = rosterWorkspaceId
     setRosterWorkspaceId(null)
+    setRosterFocusResumeId(null)
     requestAnimationFrame(() => {
       document.getElementById(`office-roster-${workspaceId}`)?.focus()
     })
@@ -200,7 +211,9 @@ export function OfficePage() {
                   || Boolean(rosterOffice)
                   || Boolean(cabinetOffice)}
                 onSelectEmployee={(workspaceId, employee) => {
+                  employeeOriginRef.current = { kind: 'map' }
                   setSelected({ workspaceId, resumeId: employee.resumeId })
+                  setRosterFocusResumeId(null)
                   setLogOpen(false)
                   setCabinetWorkspaceId(null)
                 }}
@@ -214,6 +227,7 @@ export function OfficePage() {
                 }}
                 onOpenRoster={(workspaceId) => {
                   setRosterWorkspaceId(workspaceId)
+                  setRosterFocusResumeId(null)
                   setSelected(null)
                   setCabinetWorkspaceId(null)
                   setLogOpen(false)
@@ -268,13 +282,20 @@ export function OfficePage() {
                 onOpen={() => openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
                 onOpenDrawer={(item) => openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}
                 onClose={closeEmployee}
+                returnToRoster={employeeOriginRef.current.kind === 'roster'}
               />
             )}
             {!logOpen && !selectedSeat && !cabinetOffice && rosterOffice && (
               <OfficeRosterWindow
                 group={rosterOffice.office}
                 roomName={rosterOffice.roomName}
+                focusResumeId={rosterFocusResumeId}
                 onSelect={(employee) => {
+                  employeeOriginRef.current = {
+                    kind: 'roster',
+                    workspaceId: rosterOffice.office.workspace.id,
+                    resumeId: employee.resumeId,
+                  }
                   setRosterWorkspaceId(null)
                   setSelected({
                     workspaceId: rosterOffice.office.workspace.id,

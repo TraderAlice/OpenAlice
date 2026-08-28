@@ -140,4 +140,51 @@ describe('OfficePage localization', () => {
       params: { wsId: 'chat-1', source: 'chat' },
     })
   })
+
+  it('returns from an Agent file to the originating roster member', async () => {
+    const employees = Array.from({ length: 6 }, (_, index) => ({
+      resumeId: `resume-${index}`,
+      agent: index % 2 === 0 ? 'codex' : 'claude',
+      name: `x${index + 1}`,
+      title: `研究同事 ${index + 1}`,
+      mood: index < 2 ? 'working' as const : 'idle' as const,
+      bubble: null,
+      lastSeq: 1,
+      lastInteractionAt: 1,
+      drawers: [],
+    }))
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        offices: [{
+          ...defaultOfficeFloor().building.offices[0],
+          employees,
+        }],
+      },
+    })
+
+    render(<OfficePage />)
+
+    const rosterBoard = screen.getByRole('button', { name: '小组名册 · chat' })
+    await userEvent.click(rosterBoard)
+    expect(screen.getByRole('dialog', { name: '小组名册 · chat' })).toBeTruthy()
+
+    const member = screen.getByRole('button', { name: /研究同事 2.*claude.*x2/i })
+    await userEvent.click(member)
+    expect(screen.getByRole('dialog', { name: '研究同事 2' })).toBeTruthy()
+    const back = screen.getByRole('button', { name: '返回小组名册' })
+    expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v1.png')
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: '小组名册 · chat' })).toBeTruthy()
+    const restoredMember = screen.getByRole('button', { name: /研究同事 2.*claude.*x2/i })
+    expect(document.activeElement).toBe(restoredMember)
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(rosterBoard)
+    })
+  })
 })

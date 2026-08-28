@@ -789,6 +789,32 @@ Context-action follow-up (2026-08-29):
 - `pnpm test` passed: 600 files / 5004 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Roster-navigation follow-up (2026-08-29):
+
+- Played the six-member team roster into an Agent file and found that closing the file discarded the roster
+  and returned to the floor. A party-list-to-character-detail flow therefore lost both its menu layer and the
+  member the player had just inspected, unlike a coherent RPG menu stack.
+- Compared keeping the current floor exit, stacking two simultaneous modal windows, and replacing the roster
+  with Agent detail while retaining an explicit return edge. Chose replacement plus return: it preserves one
+  modal at a time, keeps the map inert, and makes Back return to the exact originating menu context.
+- Generated `window-back-v1.png` with the built-in image generator from the Office style master: one cream
+  left arrow with charcoal pixel outline, teal shadow, and native transparent background. Cropped and packaged
+  it with nearest-neighbor scaling as a 128×128 RGBA PNG; all four corners are transparent and subject coverage
+  is 29.86%.
+- Agent files now remember whether they came from a map desk or team roster. Roster-origin files show the
+  generated Back control; button activation or Escape recreates the same roster and autofocuses the originating
+  employee row. A second Escape closes the roster and restores the physical personnel-board focus.
+- Direct map-desk inspection deliberately retains the generated Close control and restores the desk focus, so
+  the two entry paths no longer share an incorrect exit. Freshly opened rosters still autofocus Close; only a
+  returning roster autofocuses its prior member.
+- Browser-played roster → second employee → Back → focused member → Escape → map at 1280×720 and 760×900.
+  Also verified the direct-map Close path, generated asset load, single-dialog semantics, responsive layout,
+  and no new horizontal overflow.
+- Focused page, Agent-file, roster, and HUD-asset specs passed: 4 files / 8 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 600 files / 5006 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
