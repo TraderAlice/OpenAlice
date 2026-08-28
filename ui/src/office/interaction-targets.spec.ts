@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { OfficeRoomSnapshot } from '../api/office'
 import {
+  OFFICE_INTERACTION_RADIUS,
   nearestOfficeInteractionTarget,
   officeCameraFollowingAlice,
   officeInteractionTargets,
@@ -91,6 +92,72 @@ describe('Office interaction targets', () => {
     expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'right', targets)?.id)
       .toBe('cabinet:side')
     expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'left', targets)).toBeNull()
+  })
+
+  it('starts outside interaction range but keeps every object reachable from a safe approach', () => {
+    const twoGroupLayout = layoutOfficeMap([
+      { id: 'chat-1', harness: 'chat' },
+      { id: 'quant-1', harness: 'auto-quant' },
+    ])
+    const quantGroup: OfficeRoomSnapshot = {
+      ...group,
+      workspace: { id: 'quant-1', tag: 'quant', harness: 'auto-quant' },
+      employees: [],
+    }
+    const projected = officeInteractionTargets(
+      [group, quantGroup],
+      twoGroupLayout,
+      (_id, tag) => tag,
+    )
+
+    expect(OFFICE_INTERACTION_RADIUS).toBe(72)
+    expect(nearestOfficeInteractionTarget(twoGroupLayout.alice, 'down', projected)).toBeNull()
+
+    const safeApproaches = [
+      {
+        id: 'employee',
+        target: {
+          id: 'employee:test',
+          kind: 'employee' as const,
+          x: 0,
+          y: 0,
+          workspaceId: 'test',
+          roomName: 'Test',
+          employee: group.employees[0]!,
+        },
+      },
+      {
+        id: 'cabinet',
+        target: {
+          id: 'cabinet:test',
+          kind: 'cabinet' as const,
+          x: 0,
+          y: 0,
+          workspaceId: 'test',
+          roomName: 'Test',
+        },
+      },
+      {
+        id: 'roster',
+        target: {
+          id: 'roster:test',
+          kind: 'roster' as const,
+          x: 0,
+          y: 0,
+          workspaceId: 'test',
+          roomName: 'Test',
+        },
+      },
+      {
+        id: 'operations',
+        target: { id: 'operations' as const, kind: 'operations' as const, x: 0, y: 0 },
+      },
+    ]
+
+    for (const { id, target } of safeApproaches) {
+      expect(nearestOfficeInteractionTarget({ x: 0, y: 64 }, 'up', [target])?.kind)
+        .toBe(id)
+    }
   })
 
   it('keeps Alice inside the camera safe area without escaping map bounds', () => {

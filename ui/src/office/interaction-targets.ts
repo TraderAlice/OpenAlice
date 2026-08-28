@@ -4,7 +4,7 @@ import { visibleEmployeesForOffice } from './desk-slots'
 import { officeOperationsBoardPosition } from './map-landmarks'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
 
-export const OFFICE_INTERACTION_RADIUS = 84
+export const OFFICE_INTERACTION_RADIUS = 72
 export const OFFICE_INTERACTION_SIDE_REACH = 52
 export const OFFICE_INTERACTION_MIN_SIDE_REACH = 18
 export const OFFICE_INTERACTION_BACK_REACH = 8

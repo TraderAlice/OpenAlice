@@ -230,32 +230,33 @@ describe('OfficeBuilding', () => {
 
   it('renders an interactive personnel board for groups larger than the four-desk map', async () => {
     const onOpenRoster = vi.fn()
-    render(
-      <OfficeBuilding
-        building={{
-          config: {
-            workspaceSleepAfterMs: 1,
-            harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 0, prediction: 0, other: 0 },
-          },
+    const building = {
+      config: {
+        workspaceSleepAfterMs: 1,
+        harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 0, prediction: 0, other: 0 },
+      },
+      lastSeq: 1,
+      firstSeq: 1,
+      offices: [{
+        workspace: { id: 'chat-full', tag: 'chat', harness: 'chat' as const },
+        lastInteractionAt: 1,
+        sleeping: false,
+        employees: Array.from({ length: 6 }, (_, index) => ({
+          resumeId: `resume-${index}`,
+          agent: 'codex',
+          name: `x${index + 1}`,
+          title: `Session ${index + 1}`,
+          mood: index < 2 ? 'working' as const : 'idle' as const,
+          bubble: null,
           lastSeq: 1,
-          firstSeq: 1,
-          offices: [{
-            workspace: { id: 'chat-full', tag: 'chat', harness: 'chat' },
-            lastInteractionAt: 1,
-            sleeping: false,
-            employees: Array.from({ length: 6 }, (_, index) => ({
-              resumeId: `resume-${index}`,
-              agent: 'codex',
-              name: `x${index + 1}`,
-              title: `Session ${index + 1}`,
-              mood: index < 2 ? 'working' as const : 'idle' as const,
-              bubble: null,
-              lastSeq: 1,
-              lastInteractionAt: 1,
-              drawers: [],
-            })),
-          }],
-        }}
+          lastInteractionAt: 1,
+          drawers: [],
+        })),
+      }],
+    }
+    const view = render(
+      <OfficeBuilding
+        building={building}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
         onOpenFiles={vi.fn()}
@@ -267,6 +268,26 @@ describe('OfficeBuilding', () => {
     expect(screen.getAllByTestId(/^office-desk-/)).toHaveLength(4)
     const board = screen.getByRole('button', { name: 'Team roster · chat' })
     expect(board.querySelector('img')?.getAttribute('src')).toBe('/office/furniture/personnel-board-v1.png')
+    const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
+    map.focus()
+    await userEvent.keyboard('aw')
+    expect(screen.getByText('View chat roster')).toBeTruthy()
+    expect(board.dataset.nearby).toBe('true')
+
+    view.rerender(
+      <OfficeBuilding
+        building={building}
+        interactionSuspended
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={onOpenRoster}
+        onOpenLog={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(board.dataset.nearby).toBe('false')
+
     await userEvent.click(board)
     expect(onOpenRoster).toHaveBeenCalledWith('chat-full')
   })
