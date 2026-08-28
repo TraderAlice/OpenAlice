@@ -15,6 +15,7 @@ import {
   officeCameraFollowingAlice,
   officeInteractionTargets,
 } from './interaction-targets'
+import { officeInteractionPromptPlacement } from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
 import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
 import { officeOperationsBoardPosition } from './map-landmarks'
@@ -52,6 +53,7 @@ export function OfficeBuilding({
   const [aliceWalking, setAliceWalking] = useState(false)
   const [aliceBumped, setAliceBumped] = useState(false)
   const [panning, setPanning] = useState(false)
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const viewportRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{
@@ -125,6 +127,20 @@ export function OfficeBuilding({
     () => nearestOfficeInteractionTarget(alice, aliceDirection, interactionTargets),
     [alice, aliceDirection, interactionTargets],
   )
+  const promptPlacement = useMemo(
+    () => nearbyTarget
+      ? officeInteractionPromptPlacement(
+          alice,
+          nearbyTarget,
+          {
+            width: viewportSize.width || mapLayout.width,
+            height: viewportSize.height || mapLayout.height,
+          },
+          camera,
+        )
+      : null,
+    [alice, camera, mapLayout.height, mapLayout.width, nearbyTarget, viewportSize],
+  )
   const sleepAfterDays = Math.max(
     1,
     Math.round(building.config.workspaceSleepAfterMs / (24 * 60 * 60 * 1000)),
@@ -174,6 +190,28 @@ export function OfficeBuilding({
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
+  }, [])
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const updateViewportSize = () => {
+      const rect = viewport.getBoundingClientRect()
+      setViewportSize((current) => (
+        current.width === rect.width && current.height === rect.height
+          ? current
+          : { width: rect.width, height: rect.height }
+      ))
+    }
+    updateViewportSize()
+    const observer = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updateViewportSize)
+    observer?.observe(viewport)
+    window.addEventListener('resize', updateViewportSize)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', updateViewportSize)
+    }
   }, [])
   useLayoutEffect(() => {
     aliceRef.current = mapLayout.alice
@@ -474,23 +512,31 @@ export function OfficeBuilding({
               />
             )
           })}
+          {nearbyTarget && promptPlacement && !selected && (
+            <div
+              className="oa-office-interact-prompt"
+              role="status"
+              data-side={promptPlacement.side}
+              style={{
+                left: promptPlacement.x,
+                top: promptPlacement.y,
+                zIndex: officeDepthAt(nearbyTarget.y) + 1000,
+              }}
+            >
+              <kbd>{t('office.interactKey')}</kbd>
+              <span>
+                {nearbyTarget.kind === 'employee'
+                  ? t('office.interactTalk', { name: officeCoworkerLabel(nearbyTarget.employee) })
+                  : nearbyTarget.kind === 'cabinet'
+                    ? t('office.interactFiles', { name: nearbyTarget.roomName })
+                    : nearbyTarget.kind === 'roster'
+                      ? t('office.interactRoster', { name: nearbyTarget.roomName })
+                      : t('office.interactOperations')}
+              </span>
+            </div>
+          )}
           </div>
         </div>
-
-        {nearbyTarget && !selected && (
-          <div className="oa-office-interact-prompt" role="status">
-            <kbd>{t('office.interactKey')}</kbd>
-            <span>
-              {nearbyTarget.kind === 'employee'
-                ? t('office.interactTalk', { name: officeCoworkerLabel(nearbyTarget.employee) })
-                : nearbyTarget.kind === 'cabinet'
-                  ? t('office.interactFiles', { name: nearbyTarget.roomName })
-                  : nearbyTarget.kind === 'roster'
-                    ? t('office.interactRoster', { name: nearbyTarget.roomName })
-                    : t('office.interactOperations')}
-            </span>
-          </div>
-        )}
 
         <div className="oa-office-map-controls">
           <span><Move size={12} />{t('office.mapHint')}</span>

@@ -2837,37 +2837,91 @@
 
 .oa-office-interact-prompt {
   position: absolute;
-  bottom: 66px;
-  left: 50%;
-  z-index: 17;
-  display: flex;
-  min-height: 34px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  width: max-content;
+  min-height: 42px;
   align-items: center;
-  gap: 8px;
-  max-width: min(360px, calc(100% - 32px));
-  padding: 5px 9px 5px 6px;
+  gap: 7px;
+  max-width: 280px;
+  padding: 6px 9px 6px 6px;
   border: 3px solid var(--gba-ink);
-  border-radius: 3px;
-  color: var(--gba-ink);
-  background: var(--gba-paper);
+  border-radius: 2px;
+  color: var(--office-gba-cream-seed);
+  background: var(--office-gba-moss-dark-seed);
   box-shadow:
-    inset 0 0 0 2px var(--gba-cream),
-    4px 4px 0 color-mix(in srgb, var(--gba-ink) 30%, transparent);
+    inset 0 0 0 2px color-mix(in srgb, var(--gba-water) 36%, transparent),
+    3px 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--text-sm);
   font-weight: 800;
+  line-height: 1.2;
   pointer-events: none;
-  transform: translateX(-50%);
-  animation: oa-office-gba-window 120ms steps(2, end);
+  transform-origin: center;
+  animation: oa-office-interact-in 120ms steps(2, end);
+}
+
+.oa-office-interact-prompt::after {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--gba-ink);
+  background: var(--office-gba-moss-dark-seed);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.oa-office-interact-prompt[data-side="above"] {
+  transform: translate(-50%, -100%);
+}
+
+.oa-office-interact-prompt[data-side="above"]::after {
+  bottom: -7px;
+  left: calc(50% - 5px);
+  border-top: 0;
+  border-left: 0;
+}
+
+.oa-office-interact-prompt[data-side="below"] {
+  transform: translate(-50%, 0);
+}
+
+.oa-office-interact-prompt[data-side="below"]::after {
+  top: -7px;
+  left: calc(50% - 5px);
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.oa-office-interact-prompt[data-side="left"] {
+  transform: translate(-100%, -50%);
+}
+
+.oa-office-interact-prompt[data-side="left"]::after {
+  top: calc(50% - 5px);
+  right: -7px;
+  border-bottom: 0;
+  border-left: 0;
+}
+
+.oa-office-interact-prompt[data-side="right"] {
+  transform: translate(0, -50%);
+}
+
+.oa-office-interact-prompt[data-side="right"]::after {
+  top: calc(50% - 5px);
+  left: -7px;
+  border-top: 0;
+  border-right: 0;
 }
 
 .oa-office-interact-prompt kbd {
-  min-width: 52px;
-  padding: 4px 7px;
-  border: 2px solid var(--gba-ink);
+  min-width: 48px;
+  padding: 4px 6px;
+  border: 2px solid var(--office-gba-paper-seed);
   border-radius: 2px;
-  color: var(--gba-cream);
-  background: var(--gba-moss-dark);
+  color: var(--office-gba-cream-seed);
+  background: var(--office-gba-ink-seed);
   box-shadow: inset -2px -2px color-mix(in srgb, var(--gba-ink) 28%, transparent);
   font: inherit;
   text-align: center;
@@ -2876,9 +2930,17 @@
 }
 
 .oa-office-interact-prompt span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  text-wrap: balance;
+}
+
+@keyframes oa-office-interact-in {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
 }
 
 /* One shared floor: Harnesses are aligned map zones, not separate rooms. */
