@@ -8,7 +8,8 @@ export function officeAlicePose(
   direction: OfficeAliceDirection,
   walking: boolean,
 ): OfficeAlicePose {
-  if (!walking || direction === 'up' || direction === 'down') return 'idle'
+  if (direction === 'up') return 'idle-back'
+  if (!walking || direction === 'down') return 'idle'
   return direction === 'left' ? 'walk-left' : 'walk-right'
 }
 
@@ -47,8 +48,8 @@ export function OfficeAliceSprite({
     return () => window.clearTimeout(timer)
   }, [action, pose.durationsMs, pose.frames, reducedMotion])
 
-  const displayWidth = pack.cell.width * scale
-  const displayHeight = pack.cell.height * scale
+  const displayWidth = pose.cell.width * scale
+  const displayHeight = pose.cell.height * scale
   return (
     <div
       aria-hidden
@@ -59,9 +60,9 @@ export function OfficeAliceSprite({
       style={{
         width: displayWidth,
         height: displayHeight,
-        backgroundImage: `url(${pack.sheetUrl})`,
+        backgroundImage: `url(${pose.sheetUrl})`,
         backgroundRepeat: 'no-repeat',
-        backgroundSize: `${pack.atlas.columns * displayWidth}px ${pack.atlas.rows * displayHeight}px`,
+        backgroundSize: `${pose.atlas.columns * displayWidth}px ${pose.atlas.rows * displayHeight}px`,
         backgroundPosition: `-${frame * displayWidth}px -${pose.row * displayHeight}px`,
         imageRendering: 'pixelated',
       }}
