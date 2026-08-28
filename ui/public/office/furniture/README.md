@@ -36,3 +36,4 @@ Current runtime assets:
 - `workspace-rug-v1.png`
 - `coffee-station-v1.png` — Chat neighborhood social prop
 - `server-rack-v1.png` — AutoQuant neighborhood operations prop
+- `personnel-board-v1.png` — interactive roster prop for groups with more than four Sessions

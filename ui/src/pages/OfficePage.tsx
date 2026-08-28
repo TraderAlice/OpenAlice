@@ -11,6 +11,7 @@ import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding } from '../office/OfficeBuilding'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
+import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
 import '../office/office.css'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
@@ -32,6 +33,7 @@ export function OfficePage() {
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
+  const [rosterWorkspaceId, setRosterWorkspaceId] = useState<string | null>(null)
   const { building, loading, error } = useOfficeFloor(asOfSeq)
 
   const selectedSeat = useMemo(() => {
@@ -46,6 +48,16 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, selected, workspaces])
+  const rosterOffice = useMemo(() => {
+    if (!building || !rosterWorkspaceId) return null
+    const office = building.offices.find((item) => item.workspace.id === rosterWorkspaceId)
+    if (!office) return null
+    const workspace = workspaces.find((item) => item.id === office.workspace.id)
+    return {
+      office,
+      roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
+    }
+  }, [building, rosterWorkspaceId, workspaces])
   const focusMenu = () => {
     requestAnimationFrame(() => {
       document.querySelector<HTMLElement>('.oa-office-pause-trigger')?.focus()
@@ -62,6 +74,13 @@ export function OfficePage() {
       const desks = document.querySelectorAll<HTMLElement>('[data-testid^="office-desk-"]')
       Array.from(desks).find((desk) =>
         desk.dataset.testid === `office-desk-${resumeId}`)?.focus()
+    })
+  }
+  const closeRoster = () => {
+    const workspaceId = rosterWorkspaceId
+    setRosterWorkspaceId(null)
+    requestAnimationFrame(() => {
+      document.getElementById(`office-roster-${workspaceId}`)?.focus()
     })
   }
 
@@ -137,8 +156,8 @@ export function OfficePage() {
           <div className="oa-office-main">
             <div
               className="oa-office-scene"
-              aria-hidden={logOpen || Boolean(selectedSeat) || undefined}
-              inert={logOpen || Boolean(selectedSeat) || undefined}
+              aria-hidden={logOpen || Boolean(selectedSeat) || Boolean(rosterOffice) || undefined}
+              inert={logOpen || Boolean(selectedSeat) || Boolean(rosterOffice) || undefined}
             >
               <OfficeBuilding
                 building={building}
@@ -153,6 +172,11 @@ export function OfficePage() {
                 }}
                 onOpenEmployee={openEmployee}
                 onOpenFiles={openFiles}
+                onOpenRoster={(workspaceId) => {
+                  setRosterWorkspaceId(workspaceId)
+                  setSelected(null)
+                  setLogOpen(false)
+                }}
                 onOpenLog={() => setLogOpen(true)}
               />
             </div>
@@ -196,6 +220,20 @@ export function OfficePage() {
                 onOpen={() => openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
                 onOpenDrawer={(item) => openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}
                 onClose={closeEmployee}
+              />
+            )}
+            {!logOpen && !selectedSeat && rosterOffice && (
+              <OfficeRosterWindow
+                group={rosterOffice.office}
+                roomName={rosterOffice.roomName}
+                onSelect={(employee) => {
+                  setRosterWorkspaceId(null)
+                  setSelected({
+                    workspaceId: rosterOffice.office.workspace.id,
+                    resumeId: employee.resumeId,
+                  })
+                }}
+                onClose={closeRoster}
               />
             )}
           </div>

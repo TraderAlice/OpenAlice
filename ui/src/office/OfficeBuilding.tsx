@@ -27,6 +27,7 @@ export function OfficeBuilding({
   onSelectEmployee,
   onOpenEmployee,
   onOpenFiles,
+  onOpenRoster,
   onOpenLog,
 }: {
   building: OfficeBuildingSnapshot
@@ -35,6 +36,7 @@ export function OfficeBuilding({
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenFiles: (workspaceId: string) => void
+  onOpenRoster: (workspaceId: string) => void
   onOpenLog?: () => void
 }) {
   const { t } = useTranslation()
@@ -91,9 +93,13 @@ export function OfficeBuilding({
     }))),
     [groups],
   )
+  const rosterWorkspaceIds = useMemo(
+    () => new Set(groups.filter((group) => group.employees.length > 4).map((group) => group.workspace.id)),
+    [groups],
+  )
   const collisionRects = useMemo(
-    () => officeCollisionRects(mapLayout),
-    [mapLayout],
+    () => officeCollisionRects(mapLayout, rosterWorkspaceIds),
+    [mapLayout, rosterWorkspaceIds],
   )
   const groupById = useMemo(
     () => new Map(groups.map((group) => [group.workspace.id, group])),
@@ -268,8 +274,10 @@ export function OfficeBuilding({
             event.preventDefault()
             if (nearbyTarget.kind === 'employee') {
               onSelectEmployee(nearbyTarget.workspaceId, nearbyTarget.employee)
-            } else {
+            } else if (nearbyTarget.kind === 'cabinet') {
               onOpenFiles(nearbyTarget.workspaceId)
+            } else {
+              onOpenRoster(nearbyTarget.workspaceId)
             }
             return
           }
@@ -405,6 +413,7 @@ export function OfficeBuilding({
                 onSelectEmployee={onSelectEmployee}
                 onOpenEmployee={onOpenEmployee}
                 onOpenFiles={onOpenFiles}
+                onOpenRoster={onOpenRoster}
                 nearbyTargetId={nearbyTarget?.id}
               />
             )
@@ -418,7 +427,9 @@ export function OfficeBuilding({
             <span>
               {nearbyTarget.kind === 'employee'
                 ? t('office.interactTalk', { name: officeCoworkerLabel(nearbyTarget.employee) })
-                : t('office.interactFiles', { name: nearbyTarget.roomName })}
+                : nearbyTarget.kind === 'cabinet'
+                  ? t('office.interactFiles', { name: nearbyTarget.roomName })
+                  : t('office.interactRoster', { name: nearbyTarget.roomName })}
             </span>
           </div>
         )}

@@ -82,4 +82,10 @@ describe('Office map collision', () => {
       obstacleId: 'wall',
     })
   })
+
+  it('adds collision only for roster boards that exist on the map', () => {
+    expect(officeCollisionRects(layout).map((rect) => rect.id)).not.toContain('roster:chat-1')
+    expect(officeCollisionRects(layout, new Set(['chat-1'])).map((rect) => rect.id))
+      .toContain('roster:chat-1')
+  })
 })

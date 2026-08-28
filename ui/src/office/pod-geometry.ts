@@ -6,3 +6,4 @@ export const OFFICE_DESK_CENTERS = [
 ] as const
 
 export const OFFICE_CABINET_CENTER = { x: 270, y: 187 } as const
+export const OFFICE_ROSTER_CENTER = { x: 270, y: 83 } as const

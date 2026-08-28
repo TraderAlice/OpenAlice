@@ -126,7 +126,7 @@ Session、Files 或 provenance。
 - [x] 将 desk/cabinet/terminal 从正面排队改为生成式俯视物件；档案柜成为地图内 Files
   交互，而不是铭牌图标
 - [x] 地图 Alice 与工位员工复用 Codex pet v2；移动时只做 atlas 支持的左右镜像
-- [ ] 员工超出 pod 舒适容量时使用可进入/可展开的小组人数提示，不显示 `+58`
+- [x] 员工超出 pod 舒适容量时使用可进入/可展开的小组人数提示，不显示 `+58`
 - [x] 统一 tile、阴影、像素缩放和主色卡映射
 
 ### 3. Simplify game chrome
@@ -277,6 +277,26 @@ Map-collision increment (2026-08-29):
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 591 files / 4974 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
+Roster-board increment (2026-08-29):
+
+- Compared expanding every pod, rotating visible employees through four desks, and adding a dedicated
+  world object. Chose a generated personnel board because it preserves the readable four-desk map while
+  making every Session discoverable through an intentional game interaction.
+- Generated and alpha-checked a freestanding personnel board from the locked Office style master; it is
+  rendered only for Workspace groups with more than four Sessions and participates in proximity targeting
+  and map collision.
+- Added a keyboard-accessible GBA party-style roster window. It sorts active employees first, lists the
+  full group rather than a truncated projection, and routes selection into the existing Agent-file dialogue.
+- Expanded the shared Office demo from one hand-authored employee to all six real Chat Sessions, preserving
+  their actual Session IDs, resume IDs, agents, states, surfaces, and the verified provenance drawer.
+- Browser-played the real Demo route: Enter opened the board from Alice's spawn, all six employees appeared,
+  the hidden fifth/sixth Session could be inspected, Open session resolved to
+  `/workspaces/demo-chat-ws/s/demo-chat-headless-codex`, and Escape returned focus to the board.
+- `npx tsc --noEmit` passed
+- `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 592 files / 4978 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
 ## Completion

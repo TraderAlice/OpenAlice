@@ -15,6 +15,7 @@ export function OfficeMapPod({
   onSelectEmployee,
   onOpenEmployee,
   onOpenFiles,
+  onOpenRoster,
   nearbyTargetId,
 }: {
   group: OfficeRoomSnapshot
@@ -26,6 +27,7 @@ export function OfficeMapPod({
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenFiles: (workspaceId: string) => void
+  onOpenRoster: (workspaceId: string) => void
   nearbyTargetId?: string | null
 }) {
   const { t } = useTranslation()
@@ -111,6 +113,19 @@ export function OfficeMapPod({
         >
           <img src={OFFICE_FURNITURE.generated.cabinet} alt="" style={officePixelImg} />
         </button>
+        {group.employees.length > 4 && (
+          <button
+            id={`office-roster-${group.workspace.id}`}
+            type="button"
+            className="oa-office-pod__roster"
+            data-nearby={nearbyTargetId === `roster:${group.workspace.id}`}
+            onClick={() => onOpenRoster(group.workspace.id)}
+            aria-label={`${t('office.roster')} · ${title}`}
+            title={t('office.rosterHint')}
+          >
+            <img src={OFFICE_FURNITURE.generated.personnelBoard} alt="" style={officePixelImg} />
+          </button>
+        )}
       </div>
     </section>
   )
