@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { employeesForOffice } from './desk-slots'
-import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
+import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { officeCoworkerLabel } from './label'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -52,7 +52,8 @@ export function OfficeRosterWindow({
             <li key={employee.resumeId}>
               <button type="button" onClick={() => onSelect(employee)}>
                 <span className="oa-office-roster__portrait" aria-hidden>
-                  <OfficeEmployeeSprite
+                  <OfficeCoworkerSprite
+                    agent={employee.agent}
                     mood={employee.mood}
                     reducedMotion={reducedMotion}
                     label={officeCoworkerLabel(employee)}

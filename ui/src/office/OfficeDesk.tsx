@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { OfficeFloorEmployee } from '../api/office'
 import { officeBubbleText } from './bubble-text'
 import { officeCoworkerLabel } from './label'
-import { OfficeEmployeeSprite } from './OfficeEmployeeSprite'
+import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { officeStationComposition } from './station'
 
@@ -28,6 +28,7 @@ export function OfficeDesk({
 }) {
   const { t } = useTranslation()
   const station = officeStationComposition()
+  const showBubble = Boolean(employee?.bubble && (selected || nearby))
   const label = employee
     ? t('office.employeeLabel', {
       name: officeCoworkerLabel(employee),
@@ -61,7 +62,7 @@ export function OfficeDesk({
             style={officePixelImg}
           />
         </span>
-        {employee?.bubble && (
+        {employee?.bubble && showBubble && (
           <span
             className="oa-office-bubble"
             style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
@@ -73,7 +74,7 @@ export function OfficeDesk({
           <span
             className="oa-office-nameplate"
             style={{
-              top: employee.bubble ? station.name.topPx + 20 : station.name.topPx,
+              top: showBubble ? station.name.topPx + 20 : station.name.topPx,
               zIndex: station.name.zIndex,
             }}
           >
@@ -104,7 +105,8 @@ export function OfficeDesk({
               zIndex: station.sprite.zIndex,
             }}
           >
-            <OfficeEmployeeSprite
+            <OfficeCoworkerSprite
+              agent={employee.agent}
               mood={employee.mood}
               reducedMotion={reducedMotion}
               label={label}

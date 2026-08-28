@@ -870,12 +870,67 @@
   transform: translateX(-50%);
 }
 
-.oa-office-desk[data-mood="working"] .oa-office-sprite {
-  animation: oa-office-working 1.8s steps(2, end) infinite;
+.oa-office-coworker {
+  position: relative;
+  display: block;
+  flex: none;
+  transform-origin: center bottom;
 }
 
-.oa-office-desk[data-mood="talking"] .oa-office-sprite {
-  animation: oa-office-talking 1.1s ease-in-out infinite;
+.oa-office-coworker::after {
+  position: absolute;
+  right: -1px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--gba-ink);
+  border-radius: 50%;
+  background: var(--oa-coworker-accent);
+  box-shadow: 1px 1px 0 color-mix(in srgb, var(--gba-ink) 54%, transparent);
+  content: "";
+}
+
+.oa-office-coworker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(1px 2px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
+  transform-origin: center bottom;
+}
+
+.oa-office-coworker[data-mood="working"] img {
+  animation: oa-office-coworker-working 900ms steps(2, end) infinite;
+}
+
+.oa-office-coworker[data-mood="talking"] img {
+  animation: oa-office-coworker-talking 700ms steps(2, end) infinite;
+}
+
+.oa-office-coworker[data-mood="waiting"] img {
+  animation: oa-office-coworker-waiting 1.4s steps(2, end) infinite;
+}
+
+.oa-office-coworker[data-mood="review"] img {
+  animation: oa-office-coworker-review 1.2s steps(2, end) infinite;
+}
+
+.oa-office-coworker[data-mood="failed"] img {
+  filter: grayscale(0.35) drop-shadow(1px 2px 0 color-mix(in srgb, var(--gba-alert) 46%, transparent));
+  animation: oa-office-coworker-failed 1.6s steps(2, end) infinite;
+}
+
+.oa-office-coworker[data-mood="idle"]::after {
+  background: var(--gba-ink-soft);
+}
+
+.oa-office-coworker[data-mood="failed"]::after {
+  background: var(--gba-alert);
+}
+
+.oa-office-coworker[data-reduced-motion="true"] img {
+  animation: none;
 }
 
 .oa-office-desk[data-mood="failed"] {
@@ -1431,14 +1486,26 @@
   50% { opacity: 1; transform: scale(1); }
 }
 
-@keyframes oa-office-working {
-  0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(-2px); }
+@keyframes oa-office-coworker-working {
+  50% { transform: translateY(-2px); filter: brightness(1.08); }
 }
 
-@keyframes oa-office-talking {
-  0%, 100% { transform: translateX(-50%) rotate(-1deg); }
-  50% { transform: translateX(-50%) rotate(1deg); }
+@keyframes oa-office-coworker-talking {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes oa-office-coworker-waiting {
+  50% { transform: translateX(1px); }
+}
+
+@keyframes oa-office-coworker-review {
+  50% { filter: brightness(1.1) drop-shadow(0 0 3px var(--gba-water)); }
+}
+
+@keyframes oa-office-coworker-failed {
+  8%, 24% { transform: translateX(-1px); }
+  16%, 32% { transform: translateX(1px); }
 }
 
 @keyframes oa-office-window-in {
@@ -1530,7 +1597,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .oa-office-live-dot,
-  .oa-office-desk[data-mood] .oa-office-sprite {
+  .oa-office-coworker img {
     animation: none;
   }
 
@@ -2137,7 +2204,7 @@
   background: linear-gradient(180deg, var(--gba-water) 0 60%, var(--gba-cream) 60%);
 }
 
-.oa-office-roster__portrait > div {
+.oa-office-roster__portrait > .oa-office-coworker {
   transform: translateY(5px);
 }
 
@@ -2232,7 +2299,7 @@
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--gba-paper) 64%, transparent);
 }
 
-.oa-office-inspect__portrait > div {
+.oa-office-inspect__portrait > .oa-office-coworker {
   transform: translateY(8px);
 }
 
@@ -2703,7 +2770,7 @@
   }
 }
 
-/* Alice uses the checked-in Codex pet v2 pack through OfficeEmployeeSprite. */
+/* Alice alone uses the checked-in Codex pet v2 pack through OfficeEmployeeSprite. */
 .oa-office-alice > .oa-office-alice__sprite {
   display: block;
   width: 38.4px;
@@ -3168,6 +3235,20 @@
   display: block;
   bottom: -2px !important;
   z-index: 4 !important;
+}
+
+.oa-office-pod .oa-office-nameplate {
+  opacity: 0;
+  transform: translateX(-50%) translateY(3px);
+  transition: opacity 100ms steps(2, end), transform 100ms steps(2, end);
+}
+
+.oa-office-pod .oa-office-desk:hover .oa-office-nameplate,
+.oa-office-pod .oa-office-desk:focus-visible .oa-office-nameplate,
+.oa-office-pod .oa-office-desk[data-selected="true"] .oa-office-nameplate,
+.oa-office-pod .oa-office-desk[data-nearby="true"] .oa-office-nameplate {
+  opacity: 1;
+  transform: translateX(-50%);
 }
 
 .oa-office-topdown-station {
