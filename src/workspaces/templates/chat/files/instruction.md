@@ -58,6 +58,7 @@ relevant skill before the first domain command and never guess flags.
 | Peer addressing, Agent conversation, Inbox, Issues and provenance | `alice-workspace` | `alice-workspace` |
 | Issue files, schedules, headless delivery contracts | `.alice/issues/` + `alice-workspace issue` | `self-scheduling` |
 | Accounts, positions, orders, trading-as-git | `alice-uta` | `alice-uta` |
+| Quant Lab, LEAN backtesting, strategy research, integrity | `alice-quant` | `quant-lab` |
 | Optional sources Alice does not ship | `opencli` | `opencli-reader` |
 
 Use the bundled research skills (`build-thesis`, `sector-rotation`,
