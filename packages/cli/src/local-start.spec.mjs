@@ -277,6 +277,115 @@ describe('OpenAlice local Runtime launcher', () => {
     }
   })
 
+  it('confirms direct activation through the Bun compatibility launcher', async () => {
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const pending = {
+        schemaVersion: 1,
+        activeRelease: '0.92.0-darwin-arm64-bbbbbbbbbbbbbbbb',
+        previousRelease: '0.91.0-darwin-arm64-aaaaaaaaaaaaaaaa',
+        productVersion: '0.92.0',
+        state: 'pending',
+        activatedAt: '2026-08-30T01:00:00.000Z',
+      }
+      const confirmActivationImpl = vi.fn(async () => ({
+        ...pending,
+        state: 'confirmed',
+        confirmedAt: '2026-08-30T01:01:00.000Z',
+      }))
+      await expect(startLocal({
+        ...parseLocalStartArgs(['--no-open']),
+        homeRoot: '/tmp/alice-home',
+      }, {
+        activationLayout: {
+          kind: 'bun',
+          currentPath: '/cli/current',
+          releasesDir: '/cli/releases',
+        },
+        readActivationReceiptImpl: async () => pending,
+        realpathImpl: async (path) => path.endsWith('current')
+          ? '/cli/releases/0.92.0-darwin-arm64-bbbbbbbbbbbbbbbb'
+          : '/cli/releases',
+        installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+        confirmActivationImpl,
+        probeRuntime: async () => true,
+        readRuntimeStatus: async () => ({
+          class: 'running',
+          owner: { surface: 'cli', pid: 123 },
+          provider: { kind: 'bun', contentIdentity: 'bbbbbbbbbbbbbbbb' },
+          endpoints: { web: 'http://127.0.0.1:47331' },
+        }),
+        stdout: { write: vi.fn() },
+      })).resolves.toBe(0)
+      expect(confirmActivationImpl).toHaveBeenCalledOnce()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('rolls back direct activation when the Bun compatibility launcher exits early', async () => {
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const child = new FakeChild()
+      const pending = {
+        schemaVersion: 1,
+        activeRelease: '0.92.0-darwin-arm64-bbbbbbbbbbbbbbbb',
+        previousRelease: '0.91.0-darwin-arm64-aaaaaaaaaaaaaaaa',
+        productVersion: '0.92.0',
+        state: 'pending',
+        activatedAt: '2026-08-30T01:00:00.000Z',
+      }
+      const activateReleaseImpl = vi.fn(async () => undefined)
+      const spawnProcess = () => {
+        setImmediate(() => child.emit('exit', 1, null))
+        return child
+      }
+      await expect(startLocal(parseLocalStartArgs([
+        '--home', '/tmp/alice-home',
+        '--no-open',
+      ]), {
+        env: { OPENALICE_APP_HOME: '/release/share/openalice' },
+        activationLayout: {
+          kind: 'bun',
+          currentPath: '/cli/current',
+          releasesDir: '/cli/releases',
+          lockDir: '/cli/install.lock',
+        },
+        readActivationReceiptImpl: async () => pending,
+        realpathImpl: async (path) => path.endsWith('current')
+          ? `/cli/releases/${pending.activeRelease}`
+          : '/cli/releases',
+        installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+        assertNoLiveInstallerImpl: async () => undefined,
+        inspectRollbackImpl: async () => ({
+          current: { name: pending.activeRelease },
+          target: { name: pending.previousRelease },
+        }),
+        activateReleaseImpl,
+        markActivationRolledBackImpl: async () => undefined,
+        runtimeExecutable: '/release/bin/openalice',
+        probeRuntime: async () => false,
+        readRuntimeStatus: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+        spawnProcess,
+        waitForRuntime: async () => new Promise(() => undefined),
+        stdout: { write: vi.fn() },
+      })).rejects.toMatchObject({
+        code: 'EEARLYEXIT',
+        rollback: {
+          failedRelease: pending.activeRelease,
+          restoredRelease: pending.previousRelease,
+        },
+      })
+      expect(activateReleaseImpl).toHaveBeenCalledWith(
+        expect.any(Object),
+        pending.previousRelease,
+        expect.any(Object),
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('uses Corepack when pnpm is not installed', async () => {
     const commands = []
     let artifactsReady = false

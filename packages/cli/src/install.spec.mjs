@@ -51,6 +51,13 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
 
     expect(result.stdout).toContain('Agent Runtimes remain user-owned')
     expect(await readlink(join(installRoot, 'cli', 'current'))).toBe(`releases/${releaseName}`)
+    expect(JSON.parse(await readFile(join(installRoot, 'cli', 'activation.json'), 'utf8'))).toMatchObject({
+      schemaVersion: 1,
+      activeRelease: releaseName,
+      previousRelease: null,
+      productVersion: '0.91.0',
+      state: 'pending',
+    })
     const provenance = JSON.parse(await readFile(join(installRoot, 'cli', 'provenance', `${releaseName}.json`), 'utf8'))
     expect(provenance).toMatchObject({
       schemaVersion: 3,
@@ -86,6 +93,12 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
       `0.91.0-${platform}-${architecture}-${'3'.repeat(16)}`,
       `0.92.0-${platform}-${architecture}-${'4'.repeat(16)}`,
     ])
+    expect(JSON.parse(await readFile(join(installRoot, 'cli', 'activation.json'), 'utf8'))).toMatchObject({
+      activeRelease: `0.92.0-${platform}-${architecture}-${'4'.repeat(16)}`,
+      previousRelease: `0.91.0-${platform}-${architecture}-${'3'.repeat(16)}`,
+      productVersion: '0.92.0',
+      state: 'pending',
+    })
     const debug = await execFileAsync(join(installRoot, 'bin', 'openalice'), ['debug-env'])
     expect(debug.stdout).toContain(`|${'4'.repeat(16)}|direct`)
   })
@@ -108,6 +121,42 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
     await expect(readFile(join(installRoot, 'data', 'preserved'), 'utf8')).resolves.toBe('state')
     await expect(execFileAsync(join(installRoot, 'bin', 'openalice'), ['--version']))
       .resolves.toMatchObject({ stdout: '0.91.0\n' })
+  })
+
+  it('retains the exact pending rollback release even when retention is one', async () => {
+    const first = await makeReleaseArchive('0.91.0', 'a'.repeat(16))
+    const second = await makeReleaseArchive('0.92.0', 'b'.repeat(16))
+    const installRoot = join(first.root, 'installed')
+    await runInstaller(first, installRoot, ['--yes'], { OPENALICE_INSTALL_KEEP_RELEASES: '1' })
+    await runInstaller(second, installRoot, ['--yes'], { OPENALICE_INSTALL_KEEP_RELEASES: '1' })
+
+    expect((await readdir(join(installRoot, 'cli', 'releases'))).sort()).toEqual([
+      `0.91.0-${platform}-${architecture}-${'a'.repeat(16)}`,
+      `0.92.0-${platform}-${architecture}-${'b'.repeat(16)}`,
+    ])
+  })
+
+  it('restores the exact previous pointer when installation fails after activation', async () => {
+    const first = await makeReleaseArchive('0.91.0', 'c'.repeat(16))
+    const second = await makeReleaseArchive('0.92.0', 'd'.repeat(16))
+    const installRoot = join(first.root, 'installed')
+    const previousName = `0.91.0-${platform}-${architecture}-${'c'.repeat(16)}`
+    const failedName = `0.92.0-${platform}-${architecture}-${'d'.repeat(16)}`
+    await runInstaller(first, installRoot, ['--yes'])
+    await mkdir(join(installRoot, 'data'), { recursive: true })
+    await writeFile(join(installRoot, 'data', 'preserved'), 'state')
+    await rm(join(installRoot, 'bin', 'openalice'))
+    await mkdir(join(installRoot, 'bin', 'openalice'))
+
+    await expect(runInstaller(second, installRoot, ['--yes'])).rejects.toBeTruthy()
+    expect(await readlink(join(installRoot, 'cli', 'current'))).toBe(`releases/${previousName}`)
+    expect(JSON.parse(await readFile(join(installRoot, 'cli', 'activation.json'), 'utf8'))).toMatchObject({
+      activeRelease: failedName,
+      previousRelease: previousName,
+      state: 'rolled_back',
+      failureCode: 'EINSTALL',
+    })
+    await expect(readFile(join(installRoot, 'data', 'preserved'), 'utf8')).resolves.toBe('state')
   })
 
   it('rejects missing consent and a bad archive checksum before activation', async () => {
@@ -190,14 +239,14 @@ describe.skipIf(process.platform === 'win32')('OpenAlice native CLI installer', 
   })
 })
 
-async function runInstaller(fixture, installRoot, extraArgs) {
+async function runInstaller(fixture, installRoot, extraArgs, extraEnv = {}) {
   return await execFileAsync('bash', [installer,
     '--archive', fixture.archive,
     '--sha256', fixture.sha256,
     '--install-dir', installRoot,
     '--no-modify-path',
     ...extraArgs,
-  ], { env: { ...process.env, HOME: fixture.root } })
+  ], { env: { ...process.env, HOME: fixture.root, ...extraEnv } })
 }
 
 async function makeReleaseArchive(version, contentIdentity) {

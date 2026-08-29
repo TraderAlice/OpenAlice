@@ -104,6 +104,12 @@ command and never overwrite or remove manager-owned files. Stop a running
 Runtime with `openalice down` before changing the installed version; a running
 Guardian keeps its already-mapped executable until stopped.
 
+If the manager replaces the installed package while an older Guardian remains
+active, `openalice status` and `openalice up` compare content identities and
+report the new product version as pending activation. OpenAlice never rolls
+back npm, Bun, Homebrew, or AUR files: the owning manager remains the only
+writer. Stopping and starting the Runtime activates the installed package.
+
 Package-manager uninstall removes installation files only. OpenAlice data,
 AliceProjects, credentials, broker state, and user-owned Agent Runtimes remain
 outside the package manager's payload.

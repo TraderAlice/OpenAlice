@@ -7,6 +7,11 @@ import {
   aliceProjectEnvironment,
   resolveAliceProjectIdentity,
 } from './alice-project.ts'
+import {
+  reconcileActivation,
+  resolveActivationContext,
+  rollbackFailedActivation,
+} from './activation-runtime.mjs'
 
 import { buildManagedPiEnvForHome } from './launch-context.ts'
 import {
@@ -111,21 +116,25 @@ export async function startLocal(options, dependencies = {}) {
   const localUrl = `http://${LOOPBACK}:${options.port}`
   const probeRuntime = dependencies.probeRuntime ?? probeOpenAlice
   const launchBrowser = dependencies.launchBrowser ?? openBrowser
+  const readRuntimeStatus = dependencies.readRuntimeStatus ?? readGuardianRuntimeStatus
+  const readConfiguredWebPort = dependencies.readConfiguredWebPort ?? readHomeWebPort
+  const activation = await resolveActivationContext(env, dependencies)
 
   if (await probeRuntime(localUrl)) {
+    const status = await readRuntimeStatus({ homeRoot, timeoutMs: 500 }, { ...dependencies, env, homeDir })
+    await reconcileActivation(status, activation, dependencies)
     stdout.write(`OpenAlice is already running at ${localUrl}\n`)
     if (options.openBrowser) await launchBrowser(localUrl)
     return 0
   }
 
-  const readRuntimeStatus = dependencies.readRuntimeStatus ?? readGuardianRuntimeStatus
-  const readConfiguredWebPort = dependencies.readConfiguredWebPort ?? readHomeWebPort
-  const status = await readRuntimeStatus({ homeRoot, timeoutMs: 500 }, { env, homeDir })
+  const status = await readRuntimeStatus({ homeRoot, timeoutMs: 500 }, { ...dependencies, env, homeDir })
   const discoveredUrl = status.endpoints?.web
     ?? (status.class === 'owned_elsewhere'
       ? configuredLocalUrl(await readConfiguredWebPort(homeRoot))
       : null)
   if (discoveredUrl && discoveredUrl !== localUrl && await probeRuntime(discoveredUrl)) {
+    await reconcileActivation(status, activation, dependencies)
     stdout.write(`OpenAlice is already running at ${discoveredUrl} for ${homeRoot}\n`)
     if (options.openBrowser) await launchBrowser(discoveredUrl)
     return 0
@@ -144,7 +153,7 @@ export async function startLocal(options, dependencies = {}) {
   const appDir = standalone
     ? resolveBunResourceRoot(env, dependencies.runtimeExecutable ?? process.execPath)
     : await resolveRoot(requestedAppDir)
-  const runtimeProvider = resolveLocalRuntimeProvider(appDir, env)
+  const runtimeProvider = resolveLocalRuntimeProvider(appDir, env, activation.contentIdentity)
   const prepareSource = dependencies.prepareSource ?? prepareSourceCheckout
   if (!standalone) await prepareSource(appDir, options, { stdout, env })
 
@@ -187,7 +196,9 @@ export async function startLocal(options, dependencies = {}) {
     runtime.once('error', reject)
     runtime.once('exit', (code, signal) => {
       if (!ready) {
-        reject(new Error(`Local OpenAlice exited before it was ready (code=${String(code)}, signal=${String(signal)})`))
+        const error = new Error(`Local OpenAlice exited before it was ready (code=${String(code)}, signal=${String(signal)})`)
+        error.code = 'EEARLYEXIT'
+        reject(error)
       }
     })
   })
@@ -199,6 +210,11 @@ export async function startLocal(options, dependencies = {}) {
       startupSignals.promise,
     ])
     ready = true
+    const readyStatus = await readRuntimeStatus(
+      { homeRoot, timeoutMs: 1_000 },
+      { ...dependencies, env: runtimeEnv, homeDir },
+    )
+    await reconcileActivation(readyStatus, activation, dependencies)
     const runtimeExit = holdRuntime(runtime)
     startupSignals.release()
     stdout.write(`OpenAlice source: ${appDir}\n`)
@@ -211,15 +227,32 @@ export async function startLocal(options, dependencies = {}) {
     readinessAbort.abort()
     startupSignals.release()
     runtime.kill('SIGTERM')
+    if (
+      !error?.code
+      && error instanceof Error
+      && error.message.startsWith('OpenAlice did not become ready')
+    ) error.code = 'ETIMEDOUT'
+    const rollback = await rollbackFailedActivation(activation, error, dependencies)
+    if (rollback) {
+      const wrapped = new Error(
+        `${error instanceof Error ? error.message : String(error)}. The failed direct-install activation was rolled back to ${rollback.restoredRelease}. Run openalice again to start the restored release. User data was not changed.`,
+      )
+      wrapped.code = error?.code ?? 'ESTART'
+      wrapped.cause = error
+      wrapped.rollback = rollback
+      throw wrapped
+    }
     throw error
   }
 }
 
-function resolveLocalRuntimeProvider(appDir, env) {
+function resolveLocalRuntimeProvider(appDir, env, installedIdentity = null) {
   if (isBunStandalone()) {
     return {
       kind: 'bun',
-      contentIdentity: env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim() || null,
+      contentIdentity: env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim()
+        || installedIdentity
+        || null,
     }
   }
   const managedPath = env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()

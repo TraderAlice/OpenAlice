@@ -235,16 +235,68 @@ fi
 cli_root="$INSTALL_DIR/cli"
 releases_dir="$cli_root/releases"
 provenance_dir="$cli_root/provenance"
+activation_path="$cli_root/activation.json"
 bin_dir="$INSTALL_DIR/bin"
 lock_dir="$INSTALL_DIR/.cli-install.lock"
 staging_dir=""
 lock_owned=false
+previous_release_name=""
+activation_receipt_written=false
+activation_switched=false
+install_complete=false
 
 cleanup() {
+  cleanup_status=$?
+  trap - EXIT INT TERM HUP
+  if [[ "$cleanup_status" -ne 0 && "$install_complete" != true && "$activation_receipt_written" == true ]]; then
+    set +e
+    rollback_restored=true
+    if [[ "$activation_switched" == true ]]; then
+      if [[ -n "$previous_release_name" ]]; then
+        rollback_link="$cli_root/current.rollback.$$"
+        rm -f "$rollback_link"
+        if ! ln -s "releases/$previous_release_name" "$rollback_link"; then
+          rollback_restored=false
+        elif [[ "$platform" == darwin ]]; then
+          mv -fh "$rollback_link" "$cli_root/current" || rollback_restored=false
+        else
+          mv -Tf "$rollback_link" "$cli_root/current" || rollback_restored=false
+        fi
+      else
+        rm -f "$cli_root/current" || rollback_restored=false
+      fi
+    fi
+    if [[ "$rollback_restored" == true ]]; then
+      rollback_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      activation_next="$activation_path.next.$$"
+      cat >"$activation_next" <<EOF
+{
+  "schemaVersion": 1,
+  "activeRelease": "$release_name",
+  "previousRelease": $([[ -n "$previous_release_name" ]] && printf '"%s"' "$previous_release_name" || printf 'null'),
+  "productVersion": "$artifact_version",
+  "state": "rolled_back",
+  "activatedAt": "$activated_at",
+  "rolledBackAt": "$rollback_at",
+  "failureCode": "EINSTALL"
+}
+EOF
+      chmod 600 "$activation_next" && mv -f "$activation_next" "$activation_path" \
+        || printf 'Warning: restored the previous release but could not record rollback metadata.\n' >&2
+    else
+      printf 'Warning: automatic restoration of the previous OpenAlice release failed; inspect %s before retrying.\n' "$cli_root/current" >&2
+    fi
+    [[ -z "${rollback_link:-}" ]] || rm -f "$rollback_link"
+    set -e
+  fi
   [[ -z "$staging_dir" ]] || rm -rf "$staging_dir"
   if [[ "$lock_owned" == true ]]; then rm -rf "$lock_dir"; fi
+  exit "$cleanup_status"
 }
-trap cleanup EXIT INT TERM HUP
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 mkdir -p "$INSTALL_DIR"
 if [[ -d "$lock_dir" ]]; then
@@ -348,13 +400,42 @@ cat >"$provenance_dir/$release_name.json" <<EOF
 }
 EOF
 
-next_link="$cli_root/current.next.$$"
-rm -f "$next_link"
-ln -s "releases/$release_name" "$next_link"
-if [[ "$platform" == darwin ]]; then
-  mv -fh "$next_link" "$cli_root/current"
-else
-  mv -Tf "$next_link" "$cli_root/current"
+if [[ -L "$cli_root/current" ]]; then
+  previous_release_path="$(CDPATH= cd -- "$cli_root/current" && pwd -P)"
+  canonical_releases_dir="$(CDPATH= cd -- "$releases_dir" && pwd -P)"
+  [[ "$(dirname "$previous_release_path")" == "$canonical_releases_dir" ]] \
+    || fail "The active OpenAlice release pointer leaves the installer-owned releases directory"
+  previous_release_name="$(basename "$previous_release_path")"
+  [[ "$previous_release_name" =~ ^[A-Za-z0-9._+-]+$ ]] \
+    || fail "The active OpenAlice release name is invalid"
+fi
+
+if [[ "$previous_release_name" != "$release_name" ]]; then
+  activated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  activation_next="$activation_path.next.$$"
+  cat >"$activation_next" <<EOF
+{
+  "schemaVersion": 1,
+  "activeRelease": "$release_name",
+  "previousRelease": $([[ -n "$previous_release_name" ]] && printf '"%s"' "$previous_release_name" || printf 'null'),
+  "productVersion": "$artifact_version",
+  "state": "pending",
+  "activatedAt": "$activated_at"
+}
+EOF
+  chmod 600 "$activation_next"
+  mv -f "$activation_next" "$activation_path"
+  activation_receipt_written=true
+
+  next_link="$cli_root/current.next.$$"
+  rm -f "$next_link"
+  ln -s "releases/$release_name" "$next_link"
+  if [[ "$platform" == darwin ]]; then
+    mv -fh "$next_link" "$cli_root/current"
+  else
+    mv -Tf "$next_link" "$cli_root/current"
+  fi
+  activation_switched=true
 fi
 
 write_launcher() {
@@ -387,6 +468,7 @@ EOF
 write_launcher openalice
 for helper in alice alice-workspace alice-uta traderhub; do write_launcher "$helper" "$helper"; done
 "$bin_dir/openalice" --version >/dev/null
+install_complete=true
 
 if [[ "$legacy_detected" == true ]]; then
   rm -f "$bin_dir/pi" "$bin_dir/pi.cmd" "$bin_dir/openalice.cmd"
@@ -401,7 +483,9 @@ if [[ -e "${release_paths[0]}" ]]; then
   while IFS= read -r retained_release; do
     [[ -n "$retained_release" ]] || continue
     release_count=$((release_count + 1))
-    if (( release_count > KEEP_RELEASES )) && [[ "$retained_release" != "$active_release" ]]; then
+    if (( release_count > KEEP_RELEASES )) \
+      && [[ "$retained_release" != "$active_release" ]] \
+      && [[ -z "$previous_release_name" || "$retained_release" != "$releases_dir/$previous_release_name" ]]; then
       retained_name="$(basename "$retained_release")"
       rm -rf "$retained_release"
       rm -f "$provenance_dir/$retained_name.json"

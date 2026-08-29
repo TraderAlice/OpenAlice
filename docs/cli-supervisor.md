@@ -64,7 +64,7 @@ openalice project [list|use|copy-ai-creds|transfer] [options]
 | `up` | Prepare the selected provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |
-| `status` | Read normalized status without mutation |
+| `status` | Read normalized status and activation state without mutation |
 | `logs` | Read a bounded, redacted tail from safe Runtime log rotations |
 | `doctor` | Run read-only provenance, ownership, readiness, component, provider, update-metadata, and log-layout checks |
 | `open` | Require an advertised Web endpoint and a successful `/api/auth/status` probe before invoking the platform browser opener |
@@ -74,9 +74,18 @@ when no owner exists. Ordinary start never signals another owner. `--takeover`
 delegates replacement to Guardian's established discover, TERM, grace, KILL,
 wait, then acquire ordering.
 
-Stable installs currently use the verified bundle provider. The in-progress
-Bun standalone provider skips source preparation and re-enters one executable
-as distinct Guardian/Alice/UTA/Connector processes; its release gate lives in
+Lifecycle inspection compares the installed native content identity with the
+running Guardian provider. `status`, TUI polling, and an idempotent `up` expose
+a pending activation when the installed package differs from the live Runtime.
+For direct Bash installs, first successful readiness confirms the installer's
+activation receipt; a first-start early exit, timeout, or execution failure
+restores the exact retained pointer without touching user data. A
+package-manager install is only reported as pending because its manager remains
+the sole owner of package files.
+
+Native CLI installs use the Bun standalone provider, which skips source
+preparation and re-enters one executable as distinct
+Guardian/Alice/UTA/Connector processes; its release gate lives in
 [[plans/bun-cli-distribution.md]]. `up` and `run` remain
 browserless lifecycle commands and accept home, port, wait, and takeover
 options; `--app-dir` is an advanced source override with the preparation and

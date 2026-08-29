@@ -1,7 +1,11 @@
 import { EventEmitter } from 'node:events'
+import { chmod, mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { readActivationReceipt, recordPendingActivation } from './activation.mjs'
 
 import {
   inspectRuntime,
@@ -9,6 +13,12 @@ import {
   startRuntime,
   stopRuntime,
 } from './lifecycle.mjs'
+
+const temporaryPaths = []
+
+afterEach(async () => {
+  await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+})
 
 describe('OpenAlice Runtime lifecycle core', () => {
   it('inspects the selected complete home without presentation side effects', async () => {
@@ -36,6 +46,184 @@ describe('OpenAlice Runtime lifecycle core', () => {
       status: expect.objectContaining({ class: 'running' }),
     }))
     expect(resolveRoot).not.toHaveBeenCalled()
+  })
+
+  it('reports a package-manager activation when installed and running content differ', async () => {
+    const status = await inspectRuntime(startOptions(), {
+      activationLayout: null,
+      installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+      cliVersion: '0.92.0',
+      readStatus: async () => runningStatus('aaaaaaaaaaaaaaaa'),
+    })
+    expect(status.pendingActivation).toEqual({
+      productVersion: '0.92.0',
+      restartRequired: true,
+      reason: 'The installed OpenAlice package differs from the running Runtime',
+    })
+  })
+
+  it('reports a direct activation against an older live Runtime and confirms matching up readiness', async () => {
+    const fixture = await makeActivationLayout()
+    await recordPendingActivation(fixture.layout, {
+      activeRelease: fixture.currentName,
+      previousRelease: fixture.previousName,
+      productVersion: '0.92.0',
+    })
+    const dependencies = {
+      activationLayout: fixture.layout,
+      installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+    }
+
+    const pending = await inspectRuntime(startOptions(), {
+      ...dependencies,
+      readStatus: async () => runningStatus('aaaaaaaaaaaaaaaa'),
+    })
+    expect(pending.pendingActivation).toMatchObject({
+      productVersion: '0.92.0',
+      restartRequired: true,
+    })
+    expect((await readActivationReceipt(fixture.layout)).state).toBe('pending')
+
+    const confirmed = await startRuntime(startOptions(), {
+      ...dependencies,
+      readStatus: async () => runningStatus('bbbbbbbbbbbbbbbb'),
+    })
+    expect(confirmed.status.pendingActivation).toBeNull()
+    expect((await readActivationReceipt(fixture.layout)).state).toBe('confirmed')
+  })
+
+  it('does not let a still-running previous CLI confirm the new direct activation', async () => {
+    const fixture = await makeActivationLayout()
+    await recordPendingActivation(fixture.layout, {
+      activeRelease: fixture.currentName,
+      previousRelease: fixture.previousName,
+      productVersion: '0.92.0',
+    })
+    const result = await startRuntime(startOptions(), {
+      activationLayout: fixture.layout,
+      installedContentIdentityImpl: () => 'aaaaaaaaaaaaaaaa',
+      readStatus: async () => runningStatus('aaaaaaaaaaaaaaaa'),
+    })
+    expect(result.status.pendingActivation).toMatchObject({ productVersion: '0.92.0' })
+    expect((await readActivationReceipt(fixture.layout)).state).toBe('pending')
+  })
+
+  it('restores the exact previous direct release when first readiness exits early', async () => {
+    const fixture = await makeActivationLayout()
+    await recordPendingActivation(fixture.layout, {
+      activeRelease: fixture.currentName,
+      previousRelease: fixture.previousName,
+      productVersion: '0.92.0',
+    })
+    const child = new FakeChild()
+    child.pid = 456
+    const spawnProcess = () => {
+      setImmediate(() => child.emit('exit', 1, null))
+      return child
+    }
+
+    await expect(startRuntime(startOptions(), {
+      activationLayout: fixture.layout,
+      installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+      detached: true,
+      env: {},
+      nodeBinary: '/test/node',
+      resolveRoot: async (path) => path,
+      prepareSource: async () => ({ prepared: false }),
+      spawnProcess,
+      openFile: async () => ({ fd: 9, close: async () => undefined }),
+      mkdirImpl: async () => undefined,
+      readStatus: async () => absentStatus(),
+      sleep: async () => new Promise(() => undefined),
+    })).rejects.toMatchObject({
+      code: 'EEARLYEXIT',
+      message: expect.stringContaining(`rolled back to ${fixture.previousName}`),
+      rollback: {
+        failedRelease: fixture.currentName,
+        restoredRelease: fixture.previousName,
+      },
+    })
+    expect(await readlink(fixture.layout.currentPath)).toBe(`releases/${fixture.previousName}`)
+    expect(await readActivationReceipt(fixture.layout)).toMatchObject({
+      state: 'rolled_back',
+      failureCode: 'EEARLYEXIT',
+    })
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+  })
+
+  it('does not race a live installer while handling readiness failure', async () => {
+    const fixture = await makeActivationLayout()
+    await recordPendingActivation(fixture.layout, {
+      activeRelease: fixture.currentName,
+      previousRelease: fixture.previousName,
+      productVersion: '0.92.0',
+    })
+    await mkdir(fixture.layout.lockDir)
+    await writeFile(resolve(fixture.layout.lockDir, 'pid'), `${process.pid}\n`)
+    const child = new FakeChild()
+    const spawnProcess = () => {
+      setImmediate(() => child.emit('exit', 1, null))
+      return child
+    }
+
+    await expect(startRuntime(startOptions(), {
+      activationLayout: fixture.layout,
+      installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+      detached: true,
+      env: {},
+      nodeBinary: '/test/node',
+      resolveRoot: async (path) => path,
+      prepareSource: async () => ({ prepared: false }),
+      spawnProcess,
+      openFile: async () => ({ fd: 9, close: async () => undefined }),
+      mkdirImpl: async () => undefined,
+      readStatus: async () => absentStatus(),
+      sleep: async () => new Promise(() => undefined),
+    })).rejects.toMatchObject({ code: 'EEARLYEXIT' })
+    expect(await readlink(fixture.layout.currentPath)).toBe(`releases/${fixture.currentName}`)
+    expect((await readActivationReceipt(fixture.layout)).state).toBe('pending')
+  })
+
+  it('does not roll back a confirmed activation or an initial install without a previous release', async () => {
+    for (const receipt of [
+      { state: 'confirmed', previousRelease: 'previous-release' },
+      { state: 'pending', previousRelease: null },
+    ]) {
+      const child = new FakeChild()
+      const activateReleaseImpl = vi.fn()
+      const spawnProcess = () => {
+        setImmediate(() => child.emit('exit', 1, null))
+        return child
+      }
+      await expect(startRuntime(startOptions(), {
+        activationLayout: {
+          kind: 'bun',
+          currentPath: '/cli/current',
+          releasesDir: '/releases',
+        },
+        readActivationReceiptImpl: async () => ({
+          schemaVersion: 1,
+          activeRelease: 'current-release',
+          productVersion: '0.92.0',
+          activatedAt: '2026-08-30T01:00:00.000Z',
+          ...receipt,
+        }),
+        realpathImpl: async (path) => path.endsWith('current') ? '/releases/current-release' : '/releases',
+        installedContentIdentityImpl: () => 'bbbbbbbbbbbbbbbb',
+        activateReleaseImpl,
+        detached: true,
+        env: {},
+        nodeBinary: '/test/node',
+        resolveRoot: async (path) => path,
+        prepareSource: async () => ({ prepared: false }),
+        spawnProcess,
+        openFile: async () => ({ fd: 9, close: async () => undefined }),
+        mkdirImpl: async () => undefined,
+        readStatus: async () => absentStatus(),
+        sleep: async () => new Promise(() => undefined),
+      })).rejects.toMatchObject({ code: 'EEARLYEXIT' })
+      expect(activateReleaseImpl).not.toHaveBeenCalled()
+    }
   })
 
   it('starts a detached Guardian and emits readiness as structured state', async () => {
@@ -287,7 +475,7 @@ function startOptions() {
   }
 }
 
-function runningStatus() {
+function runningStatus(contentIdentity = null) {
   return {
     protocol: 1,
     class: 'running',
@@ -302,6 +490,10 @@ function runningStatus() {
       launchRoot: '/tmp/OpenAlice',
     },
     endpoints: { web: 'http://127.0.0.1:41000' },
+    provider: {
+      kind: contentIdentity ? 'bun' : 'source',
+      ...(contentIdentity ? { contentIdentity } : {}),
+    },
     components: { alice: 'ready', uta: 'disabled', connector: 'disabled' },
     capabilities: ['runtime.stop'],
   }
@@ -326,4 +518,46 @@ class FakeChild extends EventEmitter {
   signalCode = null
   kill = vi.fn()
   unref = vi.fn()
+}
+
+async function makeActivationLayout() {
+  const root = await mkdtemp(resolve(tmpdir(), 'openalice-lifecycle-'))
+  temporaryPaths.push(root)
+  const cliDir = resolve(root, 'cli')
+  const releasesDir = resolve(cliDir, 'releases')
+  const provenanceDir = resolve(cliDir, 'provenance')
+  const previousName = '0.91.0-linux-x64-aaaaaaaaaaaaaaaa'
+  const currentName = '0.92.0-linux-x64-bbbbbbbbbbbbbbbb'
+  await mkdir(provenanceDir, { recursive: true })
+  for (const [name, version] of [[previousName, '0.91.0'], [currentName, '0.92.0']]) {
+    const executable = resolve(releasesDir, name, 'bin', 'openalice')
+    await mkdir(resolve(executable, '..'), { recursive: true })
+    await writeFile(executable, '#!/bin/sh\nexit 0\n')
+    await chmod(executable, 0o755)
+    await writeFile(resolve(provenanceDir, `${name}.json`), `${JSON.stringify({
+      schemaVersion: 3,
+      repository: 'TraderAlice/OpenAlice',
+      cliVersion: version,
+      selector: { kind: 'version', value: `v${version}` },
+      installerUrl: 'https://openalice.ai/install',
+      updateChannel: 'stable',
+      method: 'direct',
+      artifact: { platform: 'linux', arch: 'x64', sha256: '0'.repeat(64) },
+      installedAt: '2026-08-30T01:00:00.000Z',
+    })}\n`)
+  }
+  await symlink(`releases/${currentName}`, resolve(cliDir, 'current'))
+  return {
+    previousName,
+    currentName,
+    layout: {
+      kind: 'bun',
+      cliDir,
+      releasesDir,
+      currentPath: resolve(cliDir, 'current'),
+      provenanceDir,
+      activationPath: resolve(cliDir, 'activation.json'),
+      lockDir: resolve(root, '.cli-install.lock'),
+    },
+  }
 }

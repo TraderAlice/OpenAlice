@@ -93,6 +93,7 @@ The direct installer owns only:
 - release-owned Git and OpenAlice resources;
 - `openalice` and Workspace helper launchers;
 - the `cli/current` activation pointer;
+- the direct-install `cli/activation.json` readiness receipt;
 - per-release provenance;
 - the installer lock and update-check cache;
 - its marked shell `PATH` block.
@@ -124,6 +125,7 @@ The default install root is `~/.openalice`, independent from any
 │   └── traderhub
 ├── cli/
 │   ├── current -> releases/<active-release>
+│   ├── activation.json
 │   ├── releases/<version>-<platform>-<arch>-<content-id>/
 │   ├── provenance/<release-name>.json
 │   └── staging/
@@ -166,11 +168,13 @@ After consent, the transaction:
 4. validates and smoke-runs the staged release;
 5. moves the release into its immutable content-addressed directory;
 6. writes provenance outside the release;
-7. atomically replaces `cli/current` using platform-correct symlink semantics;
+7. records the exact previous release as a pending activation, then atomically
+   replaces `cli/current` using platform-correct symlink semantics;
 8. atomically replaces installer-owned launchers;
-9. verifies the stable `openalice` launcher;
-10. retains the newest three releases by default and collects older inactive
-    installer-owned releases;
+9. verifies the stable `openalice` launcher, restoring the exact previous
+   pointer if this post-activation install step fails;
+10. retains the newest three releases by default and never collects the exact
+    pending rollback release;
 11. writes one marked PATH block when requested;
 12. releases the lock and removes staging on every exit path.
 
@@ -212,7 +216,16 @@ For a stable direct install, `openalice update` downloads the versioned Bash
 installer, verifies the installer's manifest checksum, and invokes it with the
 exact advertised `--version`, current install root, and ordinary consent. A
 running process keeps its already-mapped executable; the new pointer affects
-the next invocation.
+the next invocation. `openalice status` and an idempotent `openalice up` report
+the pending product version while an older Guardian is still active.
+
+The first successful Guardian plus Alice HTTP readiness from the newly active
+content confirms `cli/activation.json`. If that first start exits early, times
+out, or cannot execute, the CLI validates the retained provenance and restores
+the exact previous `cli/current` target atomically. It does not start that
+release automatically and it never changes user data; the error tells the user
+to run `openalice` again. An initial install has no previous release and
+therefore reports the failure without inventing a rollback target.
 
 Rollback is local and download-free:
 
@@ -223,9 +236,11 @@ openalice rollback --to <full-retained-release-name> --yes
 ```
 
 It validates both releases and their provenance, refuses to race a live
-installer, and atomically switches only `cli/current`. It does not alter user
-data or remove releases. The current process is not hot-reloaded; run
-`openalice` again after update or rollback.
+installer, records the inverse switch as a pending activation, and atomically
+switches only `cli/current`. Its first readiness receives the same recovery
+protection as an update. It does not alter user data or remove releases. The
+current process is not hot-reloaded; run `openalice` again after update or
+rollback.
 
 ## Uninstall
 
@@ -312,4 +327,5 @@ credentials or broker accounts.
 | `failed SHA-256 verification` | Stop; artifact bytes and trusted checksum disagree |
 | `Existing release ... is damaged` | Preserve the collision for inspection; do not overwrite it |
 | `No previous OpenAlice release is retained` | Install/update once more before rollback is available |
+| startup says the activation was rolled back | The new direct-install Runtime failed first readiness; run `openalice` again to start the restored release |
 | update reports a non-stable channel | Refresh with the same selector instead of crossing trust boundaries |

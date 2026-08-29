@@ -19,6 +19,7 @@ export function resolveInstalledLayout(moduleUrl = import.meta.url, options = {}
       releaseDir,
       currentPath: join(cliDir, 'current'),
       provenanceDir: join(cliDir, 'provenance'),
+      activationPath: join(cliDir, 'activation.json'),
       binDir: join(installRoot, 'bin'),
       lockDir: join(installRoot, '.cli-install.lock'),
       updateCachePath: join(installRoot, '.cli-update-check.json'),

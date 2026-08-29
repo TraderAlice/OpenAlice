@@ -443,6 +443,9 @@ function formatExistingRuntime(status) {
   const lines = [`OpenAlice Runtime is already running at ${status.endpoints.web ?? 'an unknown endpoint'}`]
   lines.push(`Home: ${status.home}`)
   if (status.owner) lines.push(`Owner: ${status.owner.surface} (pid ${status.owner.pid})`)
+  if (status.pendingActivation?.productVersion) {
+    lines.push(`Pending activation: ${status.pendingActivation.productVersion}${status.pendingActivation.restartRequired ? ' (restart required)' : ''}`)
+  }
   return `${lines.join('\n')}\n`
 }
 
