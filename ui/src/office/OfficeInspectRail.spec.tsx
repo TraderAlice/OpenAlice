@@ -128,8 +128,12 @@ describe('OfficeInspectRail', () => {
     expect(document.activeElement).toBe(toggle)
     await userEvent.keyboard('{Tab}')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open session' }))
+    const profile = container.querySelector<HTMLElement>('.oa-office-inspect__profile')
+    expect(profile).toBeTruthy()
+    if (profile) profile.scrollTop = 80
     await userEvent.click(toggle)
     expect(title.dataset.expanded).toBe('true')
+    expect(profile?.scrollTop).toBe(0)
     expect(screen.getByRole('button', { name: 'Collapse title' })).toBeTruthy()
   })
 

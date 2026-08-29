@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
@@ -34,6 +34,7 @@ export function OfficeInspectRail({
   const [titleExpanded, setTitleExpanded] = useState(false)
   const [focusedDrawerId, setFocusedDrawerId] = useState(employee?.drawers[0]?.id ?? null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
   const titleToggleRef = useRef<HTMLButtonElement>(null)
   const openButtonRef = useRef<HTMLButtonElement>(null)
   const drawerListRef = useRef<HTMLUListElement>(null)
@@ -49,6 +50,11 @@ export function OfficeInspectRail({
     setFocusedDrawerId(employee?.drawers[0]?.id ?? null)
     setTitleExpanded(false)
   }, [employee?.resumeId, employee?.drawers])
+
+  useLayoutEffect(() => {
+    if (!titleExpanded || !profileRef.current) return
+    profileRef.current.scrollTop = 0
+  }, [titleExpanded])
 
   const employeeLabel = employee ? officeCoworkerLabel(employee) : ''
   const titleCanExpand = employeeLabel.length > 72
@@ -82,7 +88,7 @@ export function OfficeInspectRail({
           <OfficeWindowControlGlyph kind={returnToRoster ? 'back' : 'close'} />
         </button>
       )}
-      <div className="oa-office-inspect__profile">
+      <div ref={profileRef} className="oa-office-inspect__profile">
         {employee ? (
           <>
             <div className="oa-office-inspect__portrait" aria-hidden>
