@@ -1,13 +1,30 @@
-import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../api'
 import type { AgentRuntimeEvent, AgentRuntimeEventType } from '../api/agentRuntimeLog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { formatRelativeTime } from '../lib/intl'
 import { officePixelImg } from '../office/furniture'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
 import { useWorkspace } from '../tabs/store'
+
+type OfficeLogChannel = 'all' | 'agent' | 'inbox' | 'news'
+
+const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['all', 'agent', 'inbox', 'news']
+const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
+  all: 'office.logChannelAll',
+  agent: 'office.logChannelAgent',
+  inbox: 'office.logChannelInbox',
+  news: 'office.logChannelNews',
+} as const satisfies Record<OfficeLogChannel, string>
+
+function eventChannel(event: AgentRuntimeEvent): Exclude<OfficeLogChannel, 'all'> {
+  if (event.type === 'inbox.received') return 'inbox'
+  if (event.type === 'news.ingested') return 'news'
+  return 'agent'
+}
 
 function eventLabel(type: AgentRuntimeEventType): string {
   if (type === 'runtime.turn.text') return 'text'
@@ -81,6 +98,7 @@ export function OfficeRuntimeSection() {
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const [entries, setEntries] = useState<AgentRuntimeEvent[]>([])
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null)
+  const [channel, setChannel] = useState<OfficeLogChannel>('all')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -103,15 +121,30 @@ export function OfficeRuntimeSection() {
     return () => clearInterval(id)
   }, [load])
 
+  const channelCounts = useMemo(() => {
+    const counts: Record<OfficeLogChannel, number> = {
+      all: entries.length,
+      agent: 0,
+      inbox: 0,
+      news: 0,
+    }
+    for (const event of entries) counts[eventChannel(event)] += 1
+    return counts
+  }, [entries])
+  const visibleEntries = useMemo(
+    () => channel === 'all' ? entries : entries.filter((event) => eventChannel(event) === channel),
+    [channel, entries],
+  )
+
   useEffect(() => {
-    if (entries.length === 0) {
+    if (visibleEntries.length === 0) {
       setSelectedSeq(null)
       return
     }
-    setSelectedSeq((current) => entries.some((event) => event.seq === current)
+    setSelectedSeq((current) => visibleEntries.some((event) => event.seq === current)
       ? current
-      : entries[0].seq)
-  }, [entries])
+      : visibleEntries[0].seq)
+  }, [visibleEntries])
 
   if (loading && entries.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
@@ -133,7 +166,29 @@ export function OfficeRuntimeSection() {
     )
   }
 
-  const selectedEvent = entries.find((event) => event.seq === selectedSeq) ?? entries[0]
+  const channelLabel = t(OFFICE_LOG_CHANNEL_LABEL_KEYS[channel])
+  const selectedEvent = visibleEntries.find((event) => event.seq === selectedSeq) ?? visibleEntries[0]
+  if (!selectedEvent) {
+    return (
+      <div className="oa-office-runtime">
+        <Tabs value={channel} onValueChange={(value) => setChannel(value as OfficeLogChannel)}>
+          <TabsList className="oa-office-runtime__channels" aria-label={t('office.logChannels')}>
+            {OFFICE_LOG_CHANNELS.map((item) => (
+              <TabsTrigger key={item} value={item}>
+                <span>{t(OFFICE_LOG_CHANNEL_LABEL_KEYS[item])}</span>
+                <b>{channelCounts[item]}</b>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value={channel} className="oa-office-runtime__panel">
+            <div className="oa-office-runtime__empty">
+              {t('office.logChannelEmpty', { channel: channelLabel })}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    )
+  }
   const selectedPayload = selectedEvent.payload
   const selectedDetail = eventDetail(selectedEvent)
   const selectedKind = officeLogAssetKind(selectedEvent.type)
@@ -195,9 +250,19 @@ export function OfficeRuntimeSection() {
           {t('office.paused')}: {error}
         </div>
       )}
-      <div data-testid="runtime-log" className="oa-office-runtime__journal">
-        <ol className="oa-office-runtime__index" aria-label={t('office.timeline')}>
-          {entries.map((event) => {
+      <Tabs value={channel} onValueChange={(value) => setChannel(value as OfficeLogChannel)}>
+        <TabsList className="oa-office-runtime__channels" aria-label={t('office.logChannels')}>
+          {OFFICE_LOG_CHANNELS.map((item) => (
+            <TabsTrigger key={item} value={item}>
+              <span>{t(OFFICE_LOG_CHANNEL_LABEL_KEYS[item])}</span>
+              <b>{channelCounts[item]}</b>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value={channel} className="oa-office-runtime__panel">
+        <div data-testid="runtime-log" className="oa-office-runtime__journal">
+        <ol className="oa-office-runtime__index" aria-label={`${t('office.timeline')} · ${channelLabel}`}>
+          {visibleEntries.map((event) => {
             const payload = event.payload
             const kind = officeLogAssetKind(event.type)
             const active = event.seq === selectedEvent.seq
@@ -293,6 +358,8 @@ export function OfficeRuntimeSection() {
           )}
         </article>
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

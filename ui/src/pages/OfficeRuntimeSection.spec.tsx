@@ -143,4 +143,87 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('button', { name: /stopped.*#0002/i }).getAttribute('aria-pressed'))
       .toBe('true')
   })
+
+  it('keeps granular events while switching between product activity channels', async () => {
+    const now = Date.now()
+    query.mockResolvedValue({
+      lastSeq: 4,
+      total: 4,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
+      entries: [
+        {
+          seq: 4,
+          ts: now,
+          type: 'news.ingested',
+          payload: { newsItemId: 8, source: 'Wire', title: 'Market headline' },
+        },
+        {
+          seq: 3,
+          ts: now - 1_000,
+          type: 'inbox.received',
+          payload: { inboxEntryId: 'inbox-3', agent: 'codex', summary: 'Agent report' },
+        },
+        {
+          seq: 2,
+          ts: now - 2_000,
+          type: 'runtime.turn.tool',
+          payload: { resumeId: 'resume-a', toolName: 'workspace_list', toolStatus: 'completed' },
+        },
+        {
+          seq: 1,
+          ts: now - 3_000,
+          type: 'runtime.started',
+          payload: { resumeId: 'resume-a', agent: 'pi', workspaceId: 'chat-a' },
+        },
+      ],
+    })
+    render(<OfficeRuntimeSection />)
+
+    const allTab = await screen.findByRole('tab', { name: /All\s*4/ })
+    expect(allTab.getAttribute('data-active')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: /Agent\s*2/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Inbox\s*1/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
+    expect(screen.getByRole('list', { name: 'Activity log · All' }).children).toHaveLength(4)
+
+    await userEvent.click(screen.getByRole('tab', { name: /Inbox\s*1/ }))
+    expect(screen.getByRole('list', { name: 'Activity log · Inbox' }).children).toHaveLength(1)
+    expect(screen.getByText('Agent report')).toBeTruthy()
+    expect(screen.queryByText('Market headline')).toBeNull()
+
+    await userEvent.click(screen.getByRole('tab', { name: /News\s*1/ }))
+    expect(screen.getByRole('list', { name: 'Activity log · News' }).children).toHaveLength(1)
+    expect(screen.getByText('Market headline')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('tab', { name: /Agent\s*2/ }))
+    expect(screen.getByRole('list', { name: 'Activity log · Agent' }).children).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /tool.*#0002/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /News ingested/i })).toBeNull()
+  })
+
+  it('keeps channel navigation available when the selected channel is empty', async () => {
+    query.mockResolvedValue({
+      lastSeq: 1,
+      total: 1,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
+      entries: [{
+        seq: 1,
+        ts: Date.now(),
+        type: 'news.ingested',
+        payload: { newsItemId: 1, source: 'Wire', title: 'Only headline' },
+      }],
+    })
+    render(<OfficeRuntimeSection />)
+
+    await userEvent.click(await screen.findByRole('tab', { name: /Inbox\s*0/ }))
+    expect(screen.getByText('No Inbox activity in this journal page.')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('tab', { name: /News\s*1/ }))
+    expect(screen.getByText('Only headline')).toBeTruthy()
+  })
 })

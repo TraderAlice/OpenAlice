@@ -105,6 +105,11 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(/@container \(max-width: 760px\) \{\s*\.oa-office-window--log\s*\{[^}]*bottom: 8px;[^}]*max-height: none;/)
   })
 
+  it('keeps four log channels on one game-menu row until a phone needs two rows', () => {
+    expect(css).toMatch(/\.oa-office-runtime__channels\s*\{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/)
+    expect(css).toMatch(/@container \(max-width: 480px\) \{[\s\S]*?\.oa-office-runtime__channels\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+  })
+
   it('lets input capability own touch controls independently of stage width', () => {
     expect(coarseTouchStart).toBeGreaterThan(touchLayoutStart)
     expect(coarseTouchEnd).toBeGreaterThan(coarseTouchStart)

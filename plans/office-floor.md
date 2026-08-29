@@ -2487,6 +2487,22 @@ Persistent terminal-attention follow-up (2026-08-30):
   appeared in Sonner, auto-walked to Inbox, and returned again with both terminals calm. Root/UI TypeScript passed, as
   did the full 613-file Vitest run (5,086 tests; one file and nine tests skipped).
 
+Activity-log channel follow-up (2026-08-30):
+
+- The first real journal window preserved every event in chronological order, but per-item News ingestion occupied 27
+  of the latest 50 rows on the live Project and made Agent work or Inbox deliveries difficult to find.
+- Compared batching News rows, prioritizing Agent events above chronology, and adding explicit journal channels. Chose
+  channels because batching would discard the requested article-level grain and priority sorting would make replay
+  order untrustworthy. `All` remains the exact journal; `Agent`, `Inbox`, and `News` are projections of the same page.
+- Added a shared Base UI tab primitive styled as a four-slot 16-bit menu strip, with live per-channel counts, selected
+  state, standard keyboard semantics, and a two-by-two phone layout below 480px. A channel switch selects its newest
+  visible event; event-row arrow navigation stays within the active channel, and empty channels retain the switcher and
+  explain that the current journal page has no matching activity.
+- Browser-tested the live 50-row Project journal at 1052x734. The `All 50 / Agent 18 / Inbox 5 / News 27` strip fit
+  without shrinking the detail pane; Agent removed every News row, Inbox retained its report detail, and News retained
+  individual headlines plus the Open News action. Root/UI TypeScript passed, as did the full 613-file Vitest run (5,089
+  tests; one file and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
