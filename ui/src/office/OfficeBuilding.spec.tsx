@@ -989,6 +989,16 @@ describe('OfficeBuilding', () => {
     expect(board.querySelector('img')?.getAttribute('src')).toBe('/office/furniture/personnel-board-v2.png')
     expect(board.querySelector('.oa-office-pod__roster-count')?.textContent).toBe('+2')
     const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filing cabinet · chat' }))
+    expect(screen.getByTestId('office-route-status').textContent)
+      .toContain('Walking to Filing cabinet · chat')
+    fireEvent.keyDown(map, { key: 'Escape' })
+    fireEvent.click(board)
+    expect(screen.getByTestId('office-route-status').textContent)
+      .toContain('Walking to Team roster · chat')
+    fireEvent.keyDown(map, { key: 'Escape' })
+
     map.focus()
     await userEvent.keyboard('aw')
     const rosterPrompt = screen.getByRole('status', { name: 'View chat roster · 2 more teammates' })

@@ -2800,6 +2800,23 @@ Roster-overflow landmark follow-up (2026-08-30):
   617-file Vitest run (5,117 passing; one file and nine tests skipped), and the production build; the existing
   large-chunk advisory is unchanged.
 
+Distinct route-destination follow-up (2026-08-30):
+
+- Clicking the newly labelled Prediction roster board exposed a separate feedback seam: auto-walk said only
+  `Walking to office-lab-prediction`. The sign, filing cabinet, roster, and every in-room target therefore collapsed to
+  the same destination copy even though the route pointer was aimed at a specific object.
+- Compared adding generic object prefixes everywhere, showing only the object, and distinguishing only ambiguous
+  in-room facilities. Chose the third rule: Workspace signs retain the room name, coworkers retain their callsign,
+  global stations retain their unique facility name, while cabinets and rosters read `Object · room`.
+- Filing-cabinet and roster routes now use localized object names plus the real Workspace display name. The transient
+  game status widened from 330px to a bounded 420px and allows a two-line destination, preserving the cancel command
+  while avoiding a desktop-only ellipsis that initially hid the room even after the semantic fix.
+- Browser-played the real eight-person roster route and the distant Chat cabinet route. The visible status rendered
+  `Walking to Team roster · office-lab-prediction` and `Walking to Filing cabinet · office-lab-chat` in full while the
+  target outline, footsteps, and existing cancellation state remained intact. Focused Building/responsive-style specs
+  passed (2 files / 29 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,117 passing; one file
+  and nine tests skipped), and the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

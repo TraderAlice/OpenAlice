@@ -3254,7 +3254,7 @@
   z-index: 16;
   display: grid;
   width: max-content;
-  max-width: min(330px, calc(100% - 58px));
+  max-width: min(420px, calc(100% - 58px));
   min-height: 36px;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
@@ -3295,10 +3295,12 @@
 }
 
 .oa-office-route-status__copy strong {
+  display: -webkit-box;
   overflow: hidden;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .oa-office-route-status__cancel {

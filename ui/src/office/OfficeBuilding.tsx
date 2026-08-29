@@ -301,7 +301,11 @@ export function OfficeBuilding({
             ? t('office.inboxStation')
             : routeTarget.kind === 'news-service'
               ? t('office.newsStation')
-          : routeTarget.roomName
+              : routeTarget.kind === 'cabinet'
+                ? `${t('office.cabinet')} · ${routeTarget.roomName}`
+                : routeTarget.kind === 'roster'
+                  ? `${t('office.roster')} · ${routeTarget.roomName}`
+                  : routeTarget.roomName
     : null
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),

@@ -69,9 +69,11 @@ describe('Office responsive style contract', () => {
   })
 
   it('gives narrow auto-route status a second line for cancellation guidance', () => {
+    expect(css).toMatch(/\.oa-office-route-status\s*\{[^}]*max-width:\s*min\(420px,/s)
     expect(narrowLiveCss).toContain('.oa-office-route-status')
     expect(narrowLiveCss).toContain('grid-template-columns: 30px minmax(0, 1fr)')
     expect(narrowLiveCss).toContain('.oa-office-route-status__cancel')
+    expect(css).toMatch(/\.oa-office-route-status__copy strong\s*\{[^}]*-webkit-line-clamp:\s*2/s)
     expect(narrowLiveCss).toContain('grid-column: 2')
   })
 
