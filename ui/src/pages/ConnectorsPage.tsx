@@ -1190,7 +1190,7 @@ function SetupStatePanel({
         </div>
         {canRun && (
           <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
-            <div className="mr-1 flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/60 px-3">
+            <div className="mr-1 flex min-h-10 items-center gap-2">
               <span className="text-[12px] font-medium text-foreground">
                 {t('connectorSettings.useConnector', { name: definition.label })}
               </span>

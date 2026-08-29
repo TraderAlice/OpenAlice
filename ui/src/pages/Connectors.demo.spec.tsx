@@ -487,7 +487,10 @@ describe('Connector demo routes', () => {
     expect(screen.queryByRole('textbox', { name: 'Discord Application ID' })).toBeNull()
     const sendTest = screen.getByRole('button', { name: 'Send test' })
     const lifecycle = sendTest.closest('section') as HTMLElement
+    const runtimeToggle = within(lifecycle).getByRole('switch', { name: 'Turn Discord on or off' })
     expect(sendTest).toBeTruthy()
+    expect(runtimeToggle.parentElement?.className).not.toContain('border')
+    expect(runtimeToggle.parentElement?.className).not.toContain('rounded')
     expect(screen.queryByText('owner-1')).toBeNull()
 
     fireEvent.click(manage)

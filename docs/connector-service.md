@@ -366,6 +366,10 @@ The surfaces deliberately have different jobs:
   The adapter dialog localizes its close control and gives that control a larger
   mobile touch target while retaining the shared primitive's focus restoration,
   Escape, and backdrop behavior.
+  Runtime and Chat switches use their localized label (and Chat's explicit
+  On/Off text) directly beside the shared Toggle; they are not wrapped in a
+  second bordered pseudo-button. The Toggle remains the only switch control and
+  owns its hit target, focus, disabled, and checked semantics.
   Test-delivery progress, probe confirmation, and test/reconnect failures remain
   inside the same lifecycle panel as their action; feedback is adapter-scoped and
   announced without making the operator search below unrelated settings.

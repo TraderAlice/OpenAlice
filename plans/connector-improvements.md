@@ -307,6 +307,18 @@ external adapters remain optional projections rather than sources of truth.
     lifecycle panel because it owns a runtime switch, link instructions, test,
     reconnect, or actionable progress. This removes no control or state and does
     not change field disclosure, keyboard order, autosave, or narrow behavior.
+28. **A Toggle should look like the control, not sit inside another control.**
+    The lifecycle `Use <platform>` and Chat On/Off controls currently add a
+    rounded bordered background around the shared Toggle, making each cluster
+    resemble a compound button while the adjacent Inbox Toggle is unframed.
+    Removing all visible labels would be lighter but would also remove Chat's
+    explicit On/Off state. The chosen model retains `Use <platform>` and Chat's
+    localized On/Off text, then removes only the secondary border, fill, radius,
+    and padding. The shared Toggle continues to own its 40 px hit target,
+    disabled state, focus ring, `role=switch`, and `aria-checked`; lifecycle copy
+    and Chat text keep state from depending on color. Action wrapping and header
+    alignment stay responsive, and real buttons such as Send test keep their
+    distinct bordered shape.
 
 ## Ordered Work
 
@@ -367,6 +379,8 @@ external adapters remain optional projections rather than sources of truth.
         from non-clickable channel surfaces.
   - [x] Remove the actionless duplicate lifecycle panel from first-time
         credential setup while retaining status in overview/navigation.
+  - [x] Remove pseudo-button containers around lifecycle and Chat toggles while
+        preserving visible state labels and shared Toggle semantics.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -602,6 +616,21 @@ Slack Setup, and Feishu Ready. The live process still predates setup-link
 metadata as already recorded by the platform-preparation increment; it was not
 restarted. No credential, delivery, or Connector control was changed, and the
 viewport was reset.
+
+The direct-toggle increment passed 41 focused lifecycle, Chat panel, overview,
+and Connector demo tests, UI and root typechecks, the production build, and all
+5,120 repository tests. The component contracts assert that runtime and Chat
+switch wrappers contain neither border
+nor rounded-container classes while preserving `Use <platform>`, localized
+On/Off text, `role=switch`, and existing enable/disable behavior. Real Default
+AliceProject acceptance at 1,052 x 734 showed Feishu runtime, Inbox, and Chat
+switches using one consistent visual grammar; Send test remained a distinct
+button. At 390 x 844 the runtime actions wrapped in order, Chat retained visible
+On state, all switch hit targets remained available, and the page width exactly
+matched the viewport. No Toggle or Connector action was invoked, and the
+viewport was reset. The desktop pass also exposed a separate sticky-navigator
+gap that can reveal a preceding channel's scrolling controls; that is the next
+owned increment rather than hidden in this visual-only change.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

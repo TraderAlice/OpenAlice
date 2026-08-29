@@ -119,6 +119,10 @@ describe('TelegramDeskPanel', () => {
   it('defaults the unbound picker to the Ask Alice Chat workspace', () => {
     render(<TelegramDeskPanel linked label="Telegram" />)
     expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe('ws-b')
+    const toggle = screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' })
+    expect(toggle.parentElement?.className).not.toContain('border')
+    expect(toggle.parentElement?.className).not.toContain('rounded')
+    expect(screen.getByText('Off')).toBeTruthy()
   })
 
   it('falls back to the active Chat workspace when Ask Alice has no remembered target', () => {

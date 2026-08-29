@@ -73,7 +73,7 @@ export function TelegramDeskPanel({
           </div>
         </div>
         {linked ? (
-          <div className="flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/45 px-3">
+          <div className="flex min-h-10 items-center gap-2">
             <span className="text-[12px] font-medium text-foreground">
               {desk ? t('connectorSettings.desk.on') : t('connectorSettings.desk.off')}
             </span>
