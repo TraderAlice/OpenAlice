@@ -435,7 +435,7 @@ describe('OfficeBuilding', () => {
                 name: 'c1',
                 title: 'Desk mate',
                 mood: 'working',
-                bubble: null,
+                bubble: { kind: 'tool', name: 'research' },
                 lastSeq: 1,
                 lastInteractionAt: Date.now(),
                 drawers: [],
@@ -598,10 +598,12 @@ describe('OfficeBuilding', () => {
       'chat-1',
       expect.objectContaining({ resumeId: 'resume-alice' }),
     ))
-    const talkPrompt = screen.getByRole('status', { name: 'Talk to Desk mate' })
+    const talkPrompt = screen.getByRole('status', { name: 'Talk to Desk mate · Researching…' })
     expect(talkPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/talk-bubble-v2.png')
     expect(talkPrompt.textContent).toContain('Talk')
+    expect(talkPrompt.textContent).toContain('Researching…')
+    expect(screen.getByTestId('office-desk-resume-alice').querySelector('.oa-office-bubble')).toBeNull()
     expect(screen.getByTestId('office-desk-resume-alice').dataset.nearby).toBe('true')
     onSelectEmployee.mockClear()
     await userEvent.click(map)

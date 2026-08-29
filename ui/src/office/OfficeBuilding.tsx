@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
+import { officeBubbleText } from './bubble-text'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeInteractionPath, type OfficeInteractionPathStep } from './interaction-path'
@@ -32,7 +33,10 @@ import {
   officeInteractionTargets,
   type OfficeInteractionTarget,
 } from './interaction-targets'
-import { officeInteractionPromptPlacement } from './interaction-prompt'
+import {
+  OFFICE_PROMPT_DETAIL_MAX_WIDTH,
+  officeInteractionPromptPlacement,
+} from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
 import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
 import {
@@ -228,6 +232,9 @@ export function OfficeBuilding({
             height: viewportSize.height || mapLayout.height,
           },
           camera,
+          nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
+            ? OFFICE_PROMPT_DETAIL_MAX_WIDTH
+            : undefined,
         )
       : null,
     [alice, camera, mapLayout.height, mapLayout.width, nearbyTarget, viewportSize],
@@ -240,6 +247,9 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.talkBubble,
         action: t('office.interactActionTalk'),
         label: t('office.interactTalk', { name: target }),
+        detail: nearbyTarget.employee.bubble
+          ? officeBubbleText(nearbyTarget.employee.bubble, t)
+          : null,
       }
     }
     if (nearbyTarget.kind === 'sign') {
@@ -247,6 +257,7 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.sessionPortal,
         action: t('office.interactActionWorkspace'),
         label: t('office.interactWorkspace', { name: nearbyTarget.roomName }),
+        detail: null,
       }
     }
     if (nearbyTarget.kind === 'cabinet') {
@@ -254,6 +265,7 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.drawerRecord,
         action: t('office.interactActionFiles'),
         label: t('office.interactFiles', { name: nearbyTarget.roomName }),
+        detail: null,
       }
     }
     if (nearbyTarget.kind === 'roster') {
@@ -261,6 +273,7 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.rosterBadge,
         action: t('office.interactActionRoster'),
         label: t('office.interactRoster', { name: nearbyTarget.roomName }),
+        detail: null,
       }
     }
     if (nearbyTarget.kind === 'floor-terminal') {
@@ -268,12 +281,14 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.menuTerminal,
         action: t('office.interactActionTerminal'),
         label: t('office.interactTerminal'),
+        detail: null,
       }
     }
     return {
       icon: OFFICE_HUD_ASSETS.occupancyLog,
       action: t('office.interactActionOperations'),
       label: t('office.interactOperations'),
+      detail: null,
     }
   })()
   const sleepAfterDays = Math.max(
@@ -971,9 +986,12 @@ export function OfficeBuilding({
             <div
               className="oa-office-interact-prompt"
               role="status"
-              aria-label={promptPresentation.label}
+              aria-label={promptPresentation.detail
+                ? `${promptPresentation.label} · ${promptPresentation.detail}`
+                : promptPresentation.label}
               data-kind={nearbyTarget.kind}
               data-side={promptPlacement.side}
+              data-has-detail={Boolean(promptPresentation.detail) || undefined}
               style={{
                 left: promptPlacement.x,
                 top: promptPlacement.y,
@@ -987,6 +1005,7 @@ export function OfficeBuilding({
                 <img src={promptPresentation.icon} alt="" aria-hidden style={officePixelImg} />
                 <span className="oa-office-interact-prompt__copy" aria-hidden>
                   <strong>{promptPresentation.action}</strong>
+                  {promptPresentation.detail && <small>{promptPresentation.detail}</small>}
                 </span>
                 <kbd aria-hidden>
                   <span data-input="keyboard">{t('office.interactKey')}</span>

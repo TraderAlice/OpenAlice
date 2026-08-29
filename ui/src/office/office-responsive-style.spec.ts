@@ -11,6 +11,12 @@ const narrowLiveEnd = css.indexOf('@media (prefers-reduced-motion: reduce)', nar
 const narrowLiveCss = css.slice(narrowLiveStart, narrowLiveEnd)
 
 describe('Office responsive style contract', () => {
+  it('keeps detailed interaction prompts inside the phone map', () => {
+    expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]')
+    expect(narrowLiveCss).toContain('max-width: 168px')
+    expect(narrowLiveCss).toContain('grid-template-columns: 30px minmax(0, 1fr) 32px')
+  })
+
   it('keeps the live-floor identity and Menu on the first phone HUD row', () => {
     expect(narrowLiveStart).toBeGreaterThan(-1)
     expect(narrowLiveEnd).toBeGreaterThan(narrowLiveStart)

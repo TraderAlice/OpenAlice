@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { officeInteractionPromptPlacement } from './interaction-prompt'
+import {
+  OFFICE_PROMPT_DETAIL_MAX_WIDTH,
+  officeInteractionPromptPlacement,
+} from './interaction-prompt'
 
 const map = { width: 960, height: 720 }
 const camera = { x: 0, y: 0 }
@@ -56,5 +59,19 @@ describe('officeInteractionPromptPlacement', () => {
       { width: 760, height: 530 },
       { x: -113, y: 0 },
     ).side).toBe('above')
+  })
+
+  it('reserves the wider edge boundary only for a prompt with detail copy', () => {
+    const alice = { x: 360, y: 360 }
+    const target = { x: 240, y: 360 }
+
+    expect(officeInteractionPromptPlacement(alice, target, map, camera).side).toBe('left')
+    expect(officeInteractionPromptPlacement(
+      alice,
+      target,
+      map,
+      camera,
+      OFFICE_PROMPT_DETAIL_MAX_WIDTH,
+    ).side).toBe('right')
   })
 })

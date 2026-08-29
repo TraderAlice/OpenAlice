@@ -728,39 +728,6 @@
     0 0 18px color-mix(in srgb, var(--primary) 48%, transparent);
 }
 
-.oa-office-bubble {
-  position: absolute;
-  left: 50%;
-  max-width: 92%;
-  padding: 4px 7px;
-  overflow: hidden;
-  transform: translateX(-50%);
-  border: 1px solid color-mix(in srgb, var(--office-label-foreground) 34%, transparent);
-  border-radius: 7px;
-  color: var(--office-label-foreground);
-  background: var(--office-label);
-  box-shadow: 0 3px 0 color-mix(in srgb, var(--office-label-foreground) 15%, transparent);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 9px;
-  font-weight: 650;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.oa-office-bubble::after {
-  position: absolute;
-  bottom: -4px;
-  left: 50%;
-  width: 7px;
-  height: 7px;
-  content: "";
-  transform: translateX(-50%) rotate(45deg);
-  border-right: 1px solid color-mix(in srgb, var(--office-label-foreground) 34%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--office-label-foreground) 34%, transparent);
-  background: var(--office-label);
-}
-
 .oa-office-nameplate {
   position: absolute;
   left: 50%;
@@ -2607,16 +2574,6 @@
   border-radius: 1px;
 }
 
-.oa-office-bubble {
-  padding: 4px 6px;
-  border: 3px solid var(--gba-ink);
-  border-radius: 3px;
-  color: var(--gba-ink);
-  background: var(--gba-paper);
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--gba-ink) 25%, transparent);
-  font-size: 8px;
-}
-
 .oa-office-room__overflow {
   border: 2px solid var(--gba-paper);
   border-radius: 2px;
@@ -3729,7 +3686,7 @@
   position: absolute;
   width: max-content;
   min-height: 38px;
-  max-width: 176px;
+  max-width: 216px;
   border: 3px solid var(--gba-ink);
   border-radius: 2px;
   color: var(--office-gba-cream-seed);
@@ -3854,6 +3811,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.oa-office-interact-prompt__copy small {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--office-gba-cream-seed) 78%, var(--office-gba-water-seed));
+  font-size: var(--text-xs) !important;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: none;
   white-space: nowrap;
 }
 
@@ -4630,15 +4597,6 @@
   box-shadow: none;
 }
 
-.oa-office-pod .oa-office-bubble {
-  top: -4px !important;
-  left: 50%;
-  z-index: 12 !important;
-  max-width: 110px;
-  transform: translateX(-50%);
-  font-size: 7px;
-}
-
 .oa-office-mood-emote {
   position: absolute;
   top: -30px;
@@ -5371,6 +5329,26 @@
 }
 
 @container (max-width: 520px) {
+  .oa-office-interact-prompt[data-has-detail="true"] {
+    max-width: 168px;
+  }
+
+  .oa-office-interact-prompt[data-has-detail="true"] .oa-office-interact-prompt__action {
+    grid-template-columns: 30px minmax(0, 1fr) 32px;
+    gap: 3px;
+    padding: 3px;
+  }
+
+  .oa-office-interact-prompt[data-has-detail="true"] .oa-office-interact-prompt__action > img {
+    width: 30px;
+    height: 30px;
+  }
+
+  .oa-office-interact-prompt[data-has-detail="true"] kbd {
+    min-width: 32px;
+    padding-inline: 2px;
+  }
+
   .oa-office-building:not([data-replay="true"]) .oa-office-hud {
     grid-template-areas:
       "identity actions"

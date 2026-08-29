@@ -46,7 +46,7 @@ describe('OfficeDesk', () => {
     expect(container.querySelector('.oa-office-coworker')).toBeNull()
   })
 
-  it('keeps the floor quiet until the coworker is nearby or selected', () => {
+  it('leaves live work copy to the shared interaction prompt', () => {
     const props = {
       employee,
       roomName: 'Chat',
@@ -74,13 +74,13 @@ describe('OfficeDesk', () => {
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Open issue scan')
 
     rerender(<OfficeDesk {...props} nearby />)
-    expect(screen.getByText('Researching…').getAttribute('title')).toBe('research')
+    expect(screen.queryByText('Researching…')).toBeNull()
   })
 
   it.each([
     ['waiting', '/office/coworkers/waiting-emote-v1.png'],
     ['failed', '/office/coworkers/failed-emote-v1.png'],
-  ] as const)('shows the generated %s emote until detailed bubble copy takes priority', (mood, src) => {
+  ] as const)('keeps the generated %s emote while interaction copy moves to the prompt', (mood, src) => {
     const stateEmployee = { ...employee, mood, bubble: { kind: 'tool' as const, name: 'research' } }
     const props = {
       employee: stateEmployee,
@@ -98,7 +98,7 @@ describe('OfficeDesk', () => {
     expect(emote.querySelector('img')?.getAttribute('src')).toBe(src)
 
     rerender(<OfficeDesk {...props} nearby />)
-    expect(screen.queryByTestId(`office-emote-${mood}`)).toBeNull()
-    expect(screen.getByText('Researching…')).toBeTruthy()
+    expect(screen.getByTestId(`office-emote-${mood}`)).toBeTruthy()
+    expect(screen.queryByText('Researching…')).toBeNull()
   })
 })

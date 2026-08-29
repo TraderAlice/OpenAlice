@@ -10,6 +10,7 @@ const OFFICE_PROMPT_GAP = 34
 const OFFICE_PROMPT_MAX_WIDTH = 176
 const OFFICE_PROMPT_MAX_HEIGHT = 56
 const OFFICE_PROMPT_VIEWPORT_MARGIN = 12
+export const OFFICE_PROMPT_DETAIL_MAX_WIDTH = 216
 
 /**
  * Put the action callout on the far side of its target from Alice. This keeps
@@ -21,6 +22,7 @@ export function officeInteractionPromptPlacement(
   target: { x: number; y: number },
   viewport: { width: number; height: number },
   camera: { x: number; y: number },
+  maxWidth = OFFICE_PROMPT_MAX_WIDTH,
 ): OfficeInteractionPromptPlacement {
   const dx = target.x - alice.x
   const dy = target.y - alice.y
@@ -36,11 +38,11 @@ export function officeInteractionPromptPlacement(
   const screenY = target.y + camera.y
   if (
     side === 'left'
-    && screenX - OFFICE_PROMPT_GAP - OFFICE_PROMPT_MAX_WIDTH < OFFICE_PROMPT_VIEWPORT_MARGIN
+    && screenX - OFFICE_PROMPT_GAP - maxWidth < OFFICE_PROMPT_VIEWPORT_MARGIN
   ) side = 'right'
   if (
     side === 'right'
-    && screenX + OFFICE_PROMPT_GAP + OFFICE_PROMPT_MAX_WIDTH
+    && screenX + OFFICE_PROMPT_GAP + maxWidth
       > viewport.width - OFFICE_PROMPT_VIEWPORT_MARGIN
   ) side = 'left'
   if (

@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee } from '../api/office'
-import { officeBubbleText } from './bubble-text'
 import { officeCoworkerLabel } from './label'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OFFICE_COWORKER_EMOTES } from './coworker-sprites'
@@ -35,8 +34,7 @@ export function OfficeDesk({
 }) {
   const { t } = useTranslation()
   const station = officeStationComposition()
-  const showBubble = Boolean(employee?.bubble && (selected || nearby))
-  const emote = !showBubble && employee && (employee.mood === 'waiting' || employee.mood === 'failed')
+  const emote = employee && (employee.mood === 'waiting' || employee.mood === 'failed')
     ? { mood: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
     : null
   const label = employee
@@ -76,15 +74,6 @@ export function OfficeDesk({
             style={officePixelImg}
           />
         </span>
-        {employee?.bubble && showBubble && (
-          <span
-            className="oa-office-bubble"
-            title={employee.bubble.kind === 'tool' ? employee.bubble.name : undefined}
-            style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
-          >
-            {officeBubbleText(employee.bubble, t)}
-          </span>
-        )}
         {emote && (
           <span
             className="oa-office-mood-emote"
@@ -100,7 +89,7 @@ export function OfficeDesk({
           <span
             className="oa-office-nameplate"
             style={{
-              top: showBubble ? station.name.topPx + 20 : station.name.topPx,
+              top: station.name.topPx,
               zIndex: station.name.zIndex,
             }}
           >

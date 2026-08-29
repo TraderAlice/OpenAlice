@@ -1791,6 +1791,26 @@ Phone live-HUD hierarchy follow-up (2026-08-29):
   OfficeBuilding coverage passed: 2 files / 11 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 607-file Vitest
   run (5,031 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Coworker interaction-dialogue follow-up (2026-08-29):
+
+- Played the route from an Agent file back to the desk cluster and caught a deterministic information-layer conflict:
+  an employee's live work bubble appears whenever that desk is nearby, exactly when the Talk prompt appears. On both
+  desktop and phone the two independently positioned pixel plates competed around Alice and obscured one another.
+- Compared moving the desk bubble farther away, hiding it near Alice, and merging status with the interaction prompt.
+  Chose one RPG dialogue plate: Talk and Enter/A remain the primary row, while `Researching…` or the current live work
+  copy becomes a quieter second row. The action retains a complete combined accessible name, so visual consolidation
+  does not remove the employee state from keyboard or screen-reader play.
+- Removed the standalone desk bubble and its obsolete station layer/CSS rather than retaining a compatibility path.
+  Waiting and failed generated emotes remain on the coworker sprite; detailed live copy now belongs to the shared
+  interaction prompt while the selected Agent file continues to own its full status quote.
+- Browser-played the integrated prompt at 1280x720: it measured 198.8x46px, rendered the full Talk, Researching, and
+  Enter hierarchy, produced zero standalone bubbles, and kept zero page overflow. At 390x844, a 168px compact layout
+  reduces the generated icon and A-key columns just enough to preserve the full status copy with a 17px viewport
+  margin. A native phone load and a desktop-to-phone hot resize were both exercised.
+- Focused building, desk, prompt, bubble-copy, station, and responsive-contract specs passed: 6 files / 23 tests.
+  `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 607-file Vitest run (5,033 passing; one file and nine tests
+  skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
