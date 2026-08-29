@@ -817,3 +817,12 @@ This plan is complete only when:
   and no configured accounts. Release and feasibility reports now preserve
   compile, artifact, total, cold-start, and per-role memory evidence. Source
   development remains the unchanged `pnpm dev` path.
+- 2026-08-30: Expanded the npm/Bun native package smoke from one install/remove
+  pass into two real manager-owned candidates. Each manager now upgrades and
+  removes with the Runtime stopped, then replaces a running prior candidate and
+  proves the new native command sees the old Guardian content as pending,
+  idempotent `up` preserves that result, CLI update/uninstall remain guidance
+  only, and `down` plus a fresh `up` activates the new content. Native macOS
+  arm64 passed through npm and pinned Bun 1.4.0; the PR matrix repeats the same
+  journey on Linux. Homebrew and AUR lifecycle expansion remains separate from
+  this npm/Bun increment.

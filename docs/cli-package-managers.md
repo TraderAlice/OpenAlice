@@ -132,8 +132,15 @@ builds plus installs the x64 `openalice-bin` in a pinned clean Arch container.
 The official `archlinux:base-devel` image currently has no arm64 manifest, so
 arm64 AUR metadata is generated and checksum-bound but still needs a native
 Arch Linux ARM acceptance host. Each smoke uses an isolated home, exercises
-`up`, Doctor, `down`, manager-owned uninstall guidance, and actual manager
-removal without broker credentials or live trading.
+an actual stopped upgrade and removal, then starts a synthetic prior candidate
+and replaces it through the manager while Guardian is active. The new command
+must report the older running content as pending activation, preserve that
+result through idempotent `up`, route Doctor/update/uninstall back to the
+manager, and activate only after `down` plus a fresh `up`. The fixture rewrites
+only an isolated copy of an already accepted native candidate, refreshes its
+version/content hashes, and uses ad-hoc signing on macOS; it is never a
+publication input. Every Runtime uses isolated state without broker credentials
+or live trading.
 
 The release job derives every channel only after all native candidates pass,
 attaches the generated publication inputs to the GitHub Release, and publishes
