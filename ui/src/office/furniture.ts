@@ -24,6 +24,7 @@ export const OFFICE_FURNITURE = {
     operationsBoard: '/office/furniture/operations-board-v1.png',
     workspaceSign: '/office/furniture/workspace-sign-v1.png',
     spawnCompass: '/office/furniture/spawn-compass-v1.png',
+    routeChevron: '/office/furniture/route-chevron-v1.png',
   },
 } as const
 

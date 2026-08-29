@@ -3524,6 +3524,52 @@
   transform: translate(-50%, -50%);
 }
 
+.oa-office-route-trail {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.oa-office-route-trail__step {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  opacity: 0.62;
+  transform: translate(-50%, -50%) rotate(var(--office-route-rotation));
+  animation: oa-office-route-step 720ms steps(2, end) infinite;
+}
+
+.oa-office-route-trail__step img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.oa-office-route-trail__step[data-destination="true"] {
+  opacity: 0.92;
+  filter:
+    brightness(1.14)
+    drop-shadow(0 0 3px color-mix(in srgb, var(--gba-alert) 72%, transparent));
+  animation-name: oa-office-route-destination;
+}
+
+@keyframes oa-office-route-step {
+  50% { opacity: 0.38; }
+}
+
+@keyframes oa-office-route-destination {
+  50% {
+    opacity: 0.72;
+    filter:
+      brightness(1.22)
+      drop-shadow(0 0 5px color-mix(in srgb, var(--gba-alert) 82%, transparent));
+  }
+}
+
 .oa-office-building[data-office-time="night"] .oa-office-map::before {
   background:
     radial-gradient(
@@ -4511,6 +4557,10 @@
   .oa-office-pause-menu {
     animation: none;
     transition: none;
+  }
+
+  .oa-office-route-trail__step {
+    animation: none;
   }
 
   .oa-office-pod__sign:is(:hover, :active) {

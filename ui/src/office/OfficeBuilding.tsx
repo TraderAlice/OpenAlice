@@ -16,9 +16,10 @@ import {
 import { useEffectivePreferenceSlot } from '../theme/useEffectiveTheme'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
-import { officeInteractionPath } from './interaction-path'
+import { officeInteractionPath, type OfficeInteractionPathStep } from './interaction-path'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
 import { OfficeMapPod } from './OfficeMapPod'
+import { OfficeRouteTrail } from './OfficeRouteTrail'
 import {
   nearestOfficeInteractionTarget,
   officeCameraFollowingAlice,
@@ -77,6 +78,7 @@ export function OfficeBuilding({
   const [panning, setPanning] = useState(false)
   const [controlsLearned, setControlsLearned] = useState(false)
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
+  const [routeTrail, setRouteTrail] = useState<readonly OfficeInteractionPathStep[]>([])
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const viewportRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -303,6 +305,7 @@ export function OfficeBuilding({
     if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
     routeTimerRef.current = null
     setRouteTargetId(null)
+    setRouteTrail([])
   }
   const requestTargetInteraction = (targetId: string, activate?: () => void) => {
     if (selected || interactionSuspended) return
@@ -317,6 +320,7 @@ export function OfficeBuilding({
     }
     setControlsLearned(true)
     setRouteTargetId(targetId)
+    setRouteTrail(path.steps)
     let stepIndex = 0
     const finish = () => {
       if (routeGenerationRef.current !== generation) return
@@ -326,6 +330,7 @@ export function OfficeBuilding({
       routeTimerRef.current = window.setTimeout(() => {
         if (routeGenerationRef.current !== generation) return
         routeTimerRef.current = null
+        setRouteTrail([])
         const action = activate ?? (() => activateTarget(target))
         action()
       }, reducedMotion ? 0 : 80)
@@ -339,6 +344,7 @@ export function OfficeBuilding({
       }
       moveAlice(OFFICE_MOVEMENTS[step.direction])
       stepIndex += 1
+      setRouteTrail(stepIndex < path.steps.length ? path.steps.slice(stepIndex) : [step])
       routeTimerRef.current = window.setTimeout(advance, reducedMotion ? 0 : 96)
     }
     advance()
@@ -635,6 +641,7 @@ export function OfficeBuilding({
                 top: mapLayout.alice.y,
               }}
             />
+            <OfficeRouteTrail steps={routeTrail} />
             <div
               className="oa-office-alice"
               role="img"

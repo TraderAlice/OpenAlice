@@ -47,6 +47,7 @@ theme preference, including system-resolved Auto mode.
 - `operations-board-v1.png` — floor landmark that opens the live occupancy log and replay
 - `workspace-sign-v1.png` — blank physical placard behind live Workspace, Harness, and agent text
 - `spawn-compass-v1.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
+- `route-chevron-v1.png` — generated 24px floor inlay for the remaining click-to-interact path
 
 `operations-board-v1.png` was generated from the locked style master as a freestanding, width-dominant
 mission console with an abstract teal status display and no baked words. The built-in image generator
@@ -61,3 +62,7 @@ to a dashboard card.
 glow. It was generated on a flat magenta key, processed with the ImageGen chroma-key helper, and packaged
 with real alpha. Empty slots remain disabled scenery, but no longer disappear into the rug as if their
 assets failed to load.
+
+`route-chevron-v1.png` is a compact diamond double-chevron generated on a flat magenta key, alpha-extracted,
+hard-matted, and nearest-neighbor packaged at the native 24px navigation grid. Runtime rotation supplies four
+directions; markers are decorative world feedback and never replace the named route status.

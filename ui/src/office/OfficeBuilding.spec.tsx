@@ -141,10 +141,28 @@ describe('OfficeBuilding', () => {
       expect(onOpenFiles).not.toHaveBeenCalled()
       expect(sign.dataset.route).toBe('true')
       expect(screen.getByText('Walking to chat')).toBeTruthy()
+      const trail = screen.getByTestId('office-route-trail')
+      expect(trail.querySelectorAll('.oa-office-route-trail__step').length).toBeGreaterThan(1)
+      expect(trail.querySelector('img')?.getAttribute('src'))
+        .toBe('/office/furniture/route-chevron-v1.png')
       expect(`${alice.style.left}:${alice.style.top}`).not.toBe('480px:336px')
       act(() => vi.advanceTimersByTime(5_000))
       expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'sign')
       expect(sign.dataset.route).toBe('false')
+      expect(screen.queryByTestId('office-route-trail')).toBeNull()
+
+      onOpenFiles.mockClear()
+      const quantSign = screen.getByRole('button', { name: 'Inspect quant files' })
+      fireEvent.click(quantSign)
+      expect(screen.getByTestId('office-route-trail')).toBeTruthy()
+      const map = screen.getByLabelText(
+        'Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.',
+      )
+      fireEvent.keyDown(map, { key: 'ArrowDown' })
+      expect(screen.queryByTestId('office-route-trail')).toBeNull()
+      expect(quantSign.dataset.route).toBe('false')
+      act(() => vi.advanceTimersByTime(5_000))
+      expect(onOpenFiles).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }

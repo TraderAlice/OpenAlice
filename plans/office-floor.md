@@ -898,6 +898,35 @@ Alice-overworld animation follow-up (2026-08-29):
   runners missed it. The interaction assertion now carries an explicit ten-second asynchronous-route budget;
   the focused Office page spec passes 1 file / 4 tests locally.
 
+Route-breadcrumb follow-up (2026-08-29):
+
+- Replayed the current generated floor after click-to-interact shipped. The target lock and screen-reader status
+  prove that a click registered, but the large shared floor still gives no visible preview of the route Alice will
+  take; the empty aisle reads as unused space during the most game-like interaction on the surface.
+- Compared adding ambient clutter, enclosing each Workspace with low partitions, and drawing the remaining route
+  on the floor. Ambient props would fill pixels without improving an action. Partitions conflict with the existing
+  open-neighborhood contract and would recreate room/card boundaries. Chose route breadcrumbs because they add
+  direct input feedback, navigation legibility, and useful motion while preserving one continuous Office floor.
+- Interaction model: a generated 24px floor inlay points in the direction of each remaining grid step; visited
+  markers disappear as Alice advances, the last marker receives a distinct destination treatment, and every
+  existing route-cancellation path removes the trail immediately. The trail is decorative and hidden from the
+  accessibility tree because the existing live status already announces the named destination.
+- Responsive behavior: markers live in world coordinates and therefore follow the same camera transform at every
+  viewport width. Reduced motion keeps the static inlays but removes their pulse; no new persistent HUD is added.
+- Generated `route-chevron-v1.png` with the built-in image generator after rejecting a first variant that looked
+  too much like the spawn compass. The accepted double-chevron was chroma-key extracted, hard-matted, and
+  nearest-neighbor packaged as a native 24x24 RGBA tile.
+- `OfficeRouteTrail` renders the remaining route in world coordinates, thins long straight runs while retaining
+  endpoints and turns, rotates the one generated tile for four directions, and gives the final tile a stronger
+  destination treatment. Each completed step disappears; cancellation clears both trail and target lock.
+- Browser-played routes to both Workspace signs at 1280x800 and 760x900 in Day and Night. Turn markers remained
+  readable on bare floor and rugs, the camera carried them with Alice, narrow width retained 0px horizontal
+  overflow, and clicking blank floor cleared 12 visible route markers plus the target lock immediately.
+- Focused trail, building, and furniture specs passed: 3 files / 9 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 602 files / 5013 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
