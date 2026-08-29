@@ -10,6 +10,7 @@ import {
   officeActivityFallbackLabel,
   type OfficeActivityActor,
 } from '../office/activity-actors'
+import { officeActivityBeats, officeActivityBeatSeq } from '../office/activity-beats'
 import { OfficeCoworkerSprite } from '../office/OfficeCoworkerSprite'
 import { officePixelImg } from '../office/furniture'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
@@ -181,23 +182,29 @@ export function OfficeRuntimeSection({
     return () => clearInterval(id)
   }, [load])
 
-  const channelCounts = useMemo(() => ({
-    all: entriesByChannel.all.length,
-    agent: entriesByChannel.agent.length,
-    inbox: entriesByChannel.inbox.length,
-    news: entriesByChannel.news.length,
+  const beatsByChannel = useMemo(() => ({
+    all: officeActivityBeats(entriesByChannel.all),
+    agent: officeActivityBeats(entriesByChannel.agent),
+    inbox: officeActivityBeats(entriesByChannel.inbox),
+    news: officeActivityBeats(entriesByChannel.news),
   }), [entriesByChannel])
-  const visibleEntries = entriesByChannel[channel]
+  const channelCounts = useMemo(() => ({
+    all: beatsByChannel.all.length,
+    agent: beatsByChannel.agent.length,
+    inbox: beatsByChannel.inbox.length,
+    news: beatsByChannel.news.length,
+  }), [beatsByChannel])
+  const visibleBeats = beatsByChannel[channel]
 
   useEffect(() => {
-    if (visibleEntries.length === 0) {
+    if (visibleBeats.length === 0) {
       setSelectedSeq(null)
       return
     }
-    setSelectedSeq((current) => visibleEntries.some((event) => event.seq === current)
+    setSelectedSeq((current) => visibleBeats.some((beat) => beat.event.seq === current)
       ? current
-      : visibleEntries[0].seq)
-  }, [visibleEntries])
+      : visibleBeats[0].event.seq)
+  }, [visibleBeats])
 
   if (loading && entriesByChannel.all.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
@@ -220,8 +227,8 @@ export function OfficeRuntimeSection({
   }
 
   const channelLabel = t(OFFICE_LOG_CHANNEL_LABEL_KEYS[channel])
-  const selectedEvent = visibleEntries.find((event) => event.seq === selectedSeq) ?? visibleEntries[0]
-  if (!selectedEvent) {
+  const selectedBeat = visibleBeats.find((beat) => beat.event.seq === selectedSeq) ?? visibleBeats[0]
+  if (!selectedBeat) {
     return (
       <div className="oa-office-runtime">
         <Tabs value={channel} onValueChange={(value) => setChannel(value as OfficeLogChannel)}>
@@ -242,6 +249,7 @@ export function OfficeRuntimeSection({
       </div>
     )
   }
+  const selectedEvent = selectedBeat.event
   const selectedPayload = selectedEvent.payload
   const selectedDetail = eventDetail(selectedEvent)
   const selectedKind = officeLogAssetKind(selectedEvent.type)
@@ -316,8 +324,8 @@ export function OfficeRuntimeSection({
         <TabsContent value={channel} className="oa-office-runtime__panel">
         <div data-testid="runtime-log" className="oa-office-runtime__journal">
         <ol className="oa-office-runtime__index" aria-label={`${t('office.timeline')} · ${channelLabel}`}>
-          {visibleEntries.map((event) => {
-            const payload = event.payload
+          {visibleBeats.map((beat) => {
+            const event = beat.event
             const kind = officeLogAssetKind(event.type)
             const active = event.seq === selectedEvent.seq
             return (
@@ -336,7 +344,17 @@ export function OfficeRuntimeSection({
                     <small>{eventActor(event, actors)}</small>
                   </span>
                   <span className="oa-office-runtime__index-meta">
-                    <b>#{String(event.seq).padStart(4, '0')}</b>
+                    <span className="oa-office-runtime__index-seq">
+                      {beat.count > 1 && (
+                        <span
+                          className="oa-office-runtime__beat-count"
+                          aria-label={t('office.logBeatUpdates', { count: beat.count })}
+                        >
+                          ×{beat.count}
+                        </span>
+                      )}
+                      <b>{officeActivityBeatSeq(beat)}</b>
+                    </span>
                     <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
                   </span>
                   <img
@@ -379,7 +397,7 @@ export function OfficeRuntimeSection({
           <div className="oa-office-runtime__content">
             <header className="oa-office-runtime__heading">
               <span className="oa-office-runtime__type">{eventLabel(selectedEvent, t)}</span>
-              <span className="oa-office-runtime__seq">#{String(selectedEvent.seq).padStart(4, '0')}</span>
+              <span className="oa-office-runtime__seq">{officeActivityBeatSeq(selectedBeat)}</span>
               <time dateTime={new Date(selectedEvent.ts).toISOString()}>{formatRelativeTime(selectedEvent.ts)}</time>
             </header>
             <div className="oa-office-runtime__identity">

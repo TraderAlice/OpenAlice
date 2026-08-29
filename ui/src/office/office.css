@@ -1058,6 +1058,25 @@
   text-transform: uppercase;
 }
 
+.oa-office-runtime__beat-count {
+  display: inline-flex;
+  min-width: 22px;
+  min-height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  line-height: 1;
+}
+
+.oa-office-runtime__index-seq {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .oa-office-runtime__index-copy small,
 .oa-office-runtime__index-meta {
   color: var(--gba-ink-soft);

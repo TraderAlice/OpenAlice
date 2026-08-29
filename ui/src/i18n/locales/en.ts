@@ -2003,6 +2003,8 @@ export const en = {
     logEventTest: 'Test signal',
     logEventInbox: 'Inbox received',
     logEventNews: 'News added',
+    logBeatUpdates_one: '{{count}} update',
+    logBeatUpdates_other: '{{count}} updates',
     logStatusDone: 'Complete',
     logStatusFailed: 'Failed',
     logStatusInterrupted: 'Interrupted',

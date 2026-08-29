@@ -1970,6 +1970,8 @@ export const zh: Resources = {
     logEventTest: '测试信号',
     logEventInbox: '收到 Inbox',
     logEventNews: '新闻入库',
+    logBeatUpdates_one: '{{count}} 次更新',
+    logBeatUpdates_other: '{{count}} 次更新',
     logStatusDone: '已完成',
     logStatusFailed: '失败',
     logStatusInterrupted: '已中断',

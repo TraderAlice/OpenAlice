@@ -2650,6 +2650,23 @@ Historical-event floor beacon follow-up (2026-08-30):
   files / 30 tests), together with root/UI TypeScript, the full 616-file Vitest run (5,106 passing; one file and nine
   tests skipped), and the production build; existing large-chunk and direct-eval advisories are unchanged.
 
+Activity-beat journal follow-up (2026-08-30):
+
+- Real play of the 50-row Operations journal found long uninterrupted runs of identical Grok reports: one completed
+  task occupied fifteen rows before the next lifecycle or product event. The game presented backend effort, but its
+  most important starts, finishes, Inbox deliveries, and News additions were buried like development telemetry.
+- Compared pagination, hiding progress reports, and folding adjacent same-task progress into story beats. Chose beats:
+  they preserve proof that work happened without letting repetitive updates dominate the player's event history.
+- Adjacent text or tool progress from the same actor, task, and Workspace now forms one newest-first beat within a
+  three-minute cadence. Lifecycle events, errors, Inbox, News, different actors, interleaving work, and longer pauses
+  always remain separate. Each folded row exposes its update count and exact sequence range; selection, arrow-key
+  navigation, detail, and floor replay target the newest concrete event in that beat.
+- The real Project's All view fell from 50 raw rows to 21 readable beats while retaining both Grok completions, both
+  task starts, both new-agent events, Inbox, and News. A five-report beat rendered as `×5 #1321–1325`, selected the
+  latest report detail, and Arrow Down moved to the next beat. Focused aggregation and journal specs passed (2 files /
+  11 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,110 passing; one file and nine tests
+  skipped), and the production build; existing large-chunk and direct-eval advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

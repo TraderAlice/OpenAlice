@@ -1971,6 +1971,8 @@ export const ja: Resources = {
     logEventTest: 'テスト信号',
     logEventInbox: 'Inbox 受信',
     logEventNews: 'ニュース追加',
+    logBeatUpdates_one: '更新 {{count}} 件',
+    logBeatUpdates_other: '更新 {{count}} 件',
     logStatusDone: '完了',
     logStatusFailed: '失敗',
     logStatusInterrupted: '中断',

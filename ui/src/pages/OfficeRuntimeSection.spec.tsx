@@ -176,7 +176,7 @@ describe('OfficeRuntimeSection', () => {
       .toBe('true')
   })
 
-  it('keeps granular events while switching between product activity channels', async () => {
+  it('keeps story events while switching between product activity channels', async () => {
     const now = Date.now()
     mockJournal([
         {
@@ -226,6 +226,57 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('list', { name: 'Activity log · Agent' }).children).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Tool action.*#0002/i })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /News added/i })).toBeNull()
+  })
+
+  it('folds adjacent reports from one task into a selectable activity beat', async () => {
+    const now = Date.now()
+    mockJournal([
+      {
+        seq: 5,
+        ts: now,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', taskId: 'task-a', status: 'done' },
+      },
+      {
+        seq: 4,
+        ts: now - 1_000,
+        type: 'runtime.turn.text',
+        payload: { resumeId: 'resume-a', taskId: 'task-a', text: 'Latest progress.' },
+      },
+      {
+        seq: 3,
+        ts: now - 2_000,
+        type: 'runtime.turn.text',
+        payload: { resumeId: 'resume-a', taskId: 'task-a', text: 'Earlier progress.' },
+      },
+      {
+        seq: 2,
+        ts: now - 3_000,
+        type: 'runtime.turn.text',
+        payload: { resumeId: 'resume-a', taskId: 'task-a', text: 'First progress.' },
+      },
+      {
+        seq: 1,
+        ts: now - 4_000,
+        type: 'runtime.started',
+        payload: { resumeId: 'resume-a', taskId: 'task-a' },
+      },
+    ])
+    render(<OfficeRuntimeSection />)
+
+    expect(await screen.findByRole('tab', { name: /All\s*3/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Agent\s*3/ })).toBeTruthy()
+    expect(screen.getByRole('list', { name: 'Activity log · All' }).children).toHaveLength(3)
+
+    const progress = screen.getByRole('button', { name: /Agent report.*3 updates.*#0002–0004/i })
+    expect(progress).toBeTruthy()
+    await userEvent.click(progress)
+    expect(screen.getByText('Latest progress.')).toBeTruthy()
+    expect(screen.queryByText('Earlier progress.')).toBeNull()
+
+    await userEvent.keyboard('{ArrowDown}')
+    expect(screen.getByRole('button', { name: /Task started.*#0001/i }).getAttribute('aria-pressed'))
+      .toBe('true')
   })
 
   it('presents runtime outcomes as player-facing activity language', async () => {

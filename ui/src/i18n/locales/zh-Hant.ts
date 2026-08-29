@@ -1978,6 +1978,8 @@ export const zhHant: Resources = {
     logEventTest: '測試訊號',
     logEventInbox: '收到 Inbox',
     logEventNews: '新聞入庫',
+    logBeatUpdates_one: '{{count}} 次更新',
+    logBeatUpdates_other: '{{count}} 次更新',
     logStatusDone: '已完成',
     logStatusFailed: '失敗',
     logStatusInterrupted: '已中斷',
