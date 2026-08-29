@@ -7,6 +7,7 @@ import {
   type AliceProjectIdentity,
 } from './alice-project.ts'
 import {
+  buildExternalAgentRuntimeEnvironment,
   isBunStandalone,
   resolveBunContentIdentity,
   resolveBunResourceRoot,
@@ -251,6 +252,9 @@ export function buildManagedPiEnv(
   context: ResolvedLaunchContext,
   baseEnv: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
+  if (context.runtimeProvider.kind === 'bun') {
+    return buildExternalAgentRuntimeEnvironment(baseEnv)
+  }
   return buildManagedPiEnvForHome(context.home, baseEnv)
 }
 

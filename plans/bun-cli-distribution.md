@@ -411,9 +411,9 @@ build harness when it improves the next investigation.
   that dispatch into `openalice`.
 - [x] Materialize only files that an external Agent process must open by path;
   verify lifecycle, permissions, content identity, and update replacement.
-- [ ] Remove CLI-only `OPENALICE_MANAGED_PI_*` selection and injection without
+- [x] Remove CLI-only `OPENALICE_MANAGED_PI_*` selection and injection without
   changing Electron's bundled-Agent behavior.
-- [ ] Verify existing user-installed Agent CLIs retain their native config,
+- [x] Verify existing user-installed Agent CLIs retain their native config,
   version, executable path, and credentials.
 - [x] Ship a release-owned Git sidecar and prepend only its `bin` directory to
   Runtime children; prove init, commit, local clone, and GitHub HTTPS with no
@@ -729,3 +729,15 @@ This plan is complete only when:
   restart. Native macOS arm64, OrbStack Linux arm64, and emulated Linux x64 all
   passed with an empty `PATH`; UTA Core and the Bun release artifact remain free
   of the fixture SDK and live broker dependencies.
+- 2026-08-29: External Agent Runtime ownership increment removed Electron-only
+  `OPENALICE_MANAGED_PI_PATH` and `OPENALICE_MANAGED_PI_NODE_PATH` before any
+  Bun CLI home-derived environment is calculated, while preserving native Pi
+  state, `HOME`, `PATH`, and the source/Electron managed-Pi paths. The release
+  gate now discovers a package-external OpenCode executable and starts it via
+  the real adapter as an independent Workspace PTY on macOS arm64, OrbStack
+  Linux arm64, and emulated Linux x64. An additional native macOS run launched
+  installed OpenCode 1.17.13 from `/opt/homebrew/bin/opencode`, received its
+  real TUI output, and left its synthetic user-owned native config
+  byte-for-byte unchanged. The Linux run also exposed and fixed missing Dugite
+  core symlinks and standard `git-upload-pack`, `git-receive-pack`, and
+  `git-shell` bin entries in the portable Git layout.

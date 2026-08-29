@@ -19,6 +19,7 @@ import {
 } from './server-control.mjs'
 import {
   buildBunRuntimeEnvironment,
+  buildExternalAgentRuntimeEnvironment,
   bunGuardianProcessSpec,
   isBunStandalone,
   resolveBunResourceRoot,
@@ -74,6 +75,9 @@ export async function startRuntime(options, dependencies = {}) {
   }
 
   const standalone = isBunStandalone()
+  const launchEnv = standalone
+    ? buildExternalAgentRuntimeEnvironment(env)
+    : env
   const requestedAppDir = options.appDir
     ?? env['OPENALICE_APP_HOME']?.trim()
     ?? env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
@@ -94,7 +98,7 @@ export async function startRuntime(options, dependencies = {}) {
   }
 
   const nodeBinary = dependencies.nodeBinary ?? process.execPath
-  let runtimeEnv = buildLocalRuntimeEnv(env, {
+  let runtimeEnv = buildLocalRuntimeEnv(launchEnv, {
     appDir,
     homeRoot,
     nodeBinary,

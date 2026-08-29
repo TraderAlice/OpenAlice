@@ -19,6 +19,13 @@ export function bunGuardianProcessSpec(executable = process.execPath) {
   }
 }
 
+export function buildExternalAgentRuntimeEnvironment(env) {
+  const externalEnv = { ...env }
+  delete externalEnv.OPENALICE_MANAGED_PI_PATH
+  delete externalEnv.OPENALICE_MANAGED_PI_NODE_PATH
+  return externalEnv
+}
+
 export function buildBunRuntimeEnvironment(
   env,
   resourceRoot,
@@ -26,13 +33,14 @@ export function buildBunRuntimeEnvironment(
 ) {
   const gitRoot = join(resourceRoot, 'runtime', 'git')
   const gitBin = join(gitRoot, 'bin')
+  const runtimeEnv = buildExternalAgentRuntimeEnvironment(env)
   return {
-    ...env,
+    ...runtimeEnv,
     OPENALICE_RUNTIME_EXECUTABLE: executable,
     LOCAL_GIT_DIRECTORY: gitRoot,
     GIT_EXEC_PATH: join(gitRoot, 'libexec', 'git-core'),
     GIT_TEMPLATE_DIR: join(gitRoot, 'share', 'git-core', 'templates'),
-    PATH: env.PATH ? `${gitBin}${delimiter}${env.PATH}` : gitBin,
+    PATH: runtimeEnv.PATH ? `${gitBin}${delimiter}${runtimeEnv.PATH}` : gitBin,
   }
 }
 

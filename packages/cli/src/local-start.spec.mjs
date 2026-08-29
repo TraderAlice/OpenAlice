@@ -227,6 +227,56 @@ describe('OpenAlice local Runtime launcher', () => {
     expect(launchBrowser).toHaveBeenCalledWith('http://127.0.0.1:41000')
   })
 
+  it('starts the Bun compatibility path without desktop-managed Pi state', async () => {
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const child = new FakeChild()
+      const spawnProcess = vi.fn(() => child)
+      const resolveRoot = vi.fn()
+      const prepareSource = vi.fn()
+
+      await expect(startLocal(parseLocalStartArgs([
+        '--home', '/tmp/alice-home',
+        '--port', '41000',
+      ]), {
+        env: {
+          OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice',
+          OPENALICE_RUNTIME_CONTENT_IDENTITY: 'release-content-1',
+          OPENALICE_MANAGED_PI_PATH: '/desktop/pi/cli.js',
+          OPENALICE_MANAGED_PI_NODE_PATH: '/desktop/node',
+          PI_CODING_AGENT_DIR: '/native/pi',
+        },
+        runtimeExecutable: '/opt/openalice/releases/v1/bin/openalice',
+        probeRuntime: async () => false,
+        readRuntimeStatus: async () => ({ class: 'absent', owner: null, endpoints: {} }),
+        resolveRoot,
+        prepareSource,
+        spawnProcess,
+        waitForRuntime: async () => ({ authed: true, tokenConfigured: false }),
+        launchBrowser: async () => child.finish(0),
+        stdout: { write: vi.fn() },
+      })).resolves.toBe(0)
+
+      expect(resolveRoot).not.toHaveBeenCalled()
+      expect(prepareSource).not.toHaveBeenCalled()
+      expect(spawnProcess).toHaveBeenCalledWith(
+        '/opt/openalice/releases/v1/bin/openalice',
+        ['--internal-role', 'guardian'],
+        expect.objectContaining({
+          env: expect.objectContaining({
+            OPENALICE_RUNTIME_PROVIDER: 'bun',
+            PI_CODING_AGENT_DIR: '/native/pi',
+          }),
+        }),
+      )
+      const spawnedEnv = spawnProcess.mock.calls[0][2].env
+      expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_PATH')
+      expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_NODE_PATH')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('uses Corepack when pnpm is not installed', async () => {
     const commands = []
     let artifactsReady = false
