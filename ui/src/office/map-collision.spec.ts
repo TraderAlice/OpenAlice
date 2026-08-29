@@ -148,14 +148,14 @@ describe('Office map collision', () => {
     expect(ids).toContain('landmark:news-service')
   })
 
-  it('keeps service landmarks out of complete multi-row floors', () => {
+  it('reserves collidable services after complete multi-row Workspace floors', () => {
     const completeLayout = layoutOfficeMap(Array.from({ length: 4 }, (_, index) => ({
       id: `workspace-${index}`,
       harness: 'chat' as const,
     })))
-    expect(completeLayout).toMatchObject({ columns: 2, rows: 2 })
+    expect(completeLayout).toMatchObject({ columns: 2, rows: 3 })
     const ids = officeCollisionRects(completeLayout).map((rect) => rect.id)
-    expect(ids).not.toContain('landmark:inbox-service')
-    expect(ids).not.toContain('landmark:news-service')
+    expect(ids).toContain('landmark:inbox-service')
+    expect(ids).toContain('landmark:news-service')
   })
 })

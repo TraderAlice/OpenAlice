@@ -7,6 +7,7 @@ import {
 } from './interaction-targets'
 import { officeCollisionRects } from './map-collision'
 import { layoutOfficeMap } from './map-layout'
+import { officeServiceLandmarks } from './map-landmarks'
 
 const employee: OfficeInteractionTarget = {
   id: 'employee:chat-1:resume-1',
@@ -86,5 +87,31 @@ describe('Office interaction path', () => {
     )
 
     expect(path).toBeNull()
+  })
+
+  it('keeps the reserved service cell reachable on a dense full floor', () => {
+    const layout = layoutOfficeMap(Array.from({ length: 18 }, (_, index) => ({
+      id: `workspace-${index}`,
+      harness: 'chat' as const,
+    })))
+    const inbox = officeServiceLandmarks(layout)[0]!
+    const target: OfficeInteractionTarget = {
+      id: 'inbox-service',
+      kind: 'inbox-service',
+      x: inbox.x + Math.round(inbox.width / 2),
+      y: inbox.y + inbox.collision.y + Math.round(inbox.collision.height / 2),
+    }
+    const path = officeInteractionPath(
+      layout.alice,
+      target,
+      layout,
+      officeCollisionRects(layout),
+    )
+
+    expect(path).not.toBeNull()
+    expect(path!.steps.length).toBeGreaterThan(20)
+    const destination = path!.steps.at(-1)!
+    expect(nearestOfficeInteractionTarget(destination, path!.facing, [target])?.id)
+      .toBe('inbox-service')
   })
 })

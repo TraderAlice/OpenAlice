@@ -2432,6 +2432,24 @@ Product-activity landmarks follow-up (2026-08-30):
   Focused Office specs passed (6 files / 37 tests), as did root/UI TypeScript and the full 613-file Vitest run (5,080
   passing; one file and nine tests skipped).
 
+Persistent service-zone follow-up (2026-08-30):
+
+- Dense-floor review found that the first activity-landmark increment reused only a partial final Workspace row. A
+  complete multi-row grid therefore dropped Inbox and News entirely when the maintainer switched to All groups.
+- Compared pinning the services to the HUD, appending a full-width bottom corridor, and making the service bay a real
+  map-packer cell. Chose the real cell: HUD pinning would return Office to dashboard composition, while a corridor adds
+  disproportionate travel and dead floor. One-row floors retain their established lower lobby, partial rows retain
+  their natural spare cell, and only complete multi-row floors add one bounded service cell.
+- `OfficeMapLayout` now owns the service-zone geometry. The zone participates in aspect scoring, bounds, collision,
+  interaction targets, route search, and camera travel, and uses the existing muted Workspace rug as a low-contrast
+  physical base. No extra floating title or permanent notification overlay was added.
+- Browser-played the real 18-Workspace All groups floor at 1776x1152. The service cell landed at the final grid slot;
+  clicking Inbox from the central spawn completed the long auto-route and opened `/inbox`. The ordinary three-group
+  floor kept its previous composition and gained the service rug without crowding Chat or the central aisle.
+- Added dense geometry, non-overlap, collision, and long-route contracts. Focused Office specs passed (6 files / 49
+  tests), root/UI TypeScript passed, and the full 613-file Vitest run passed (5,083 tests; one file and nine tests
+  skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

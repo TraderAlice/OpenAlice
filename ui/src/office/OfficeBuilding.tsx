@@ -1003,6 +1003,25 @@ export function OfficeBuilding({
                 style={officePixelImg}
               />
             </button>
+            <div
+              className="oa-office-service-zone"
+              data-testid="office-service-zone"
+              aria-hidden
+              style={{
+                left: mapLayout.serviceZone.x + 12,
+                top: mapLayout.serviceZone.y + 52,
+                width: mapLayout.serviceZone.width - 24,
+                height: 138,
+                zIndex: officeDepthAt(mapLayout.serviceZone.y + 50),
+              }}
+            >
+              <img
+                src={OFFICE_FURNITURE.generated.workspaceRug}
+                alt=""
+                aria-hidden
+                style={officePixelImg}
+              />
+            </div>
             {serviceLandmarks.map((landmark) => {
               const activity = landmark.kind === 'inbox'
                 ? productActivity.inbox

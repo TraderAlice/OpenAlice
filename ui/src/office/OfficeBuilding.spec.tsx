@@ -1060,6 +1060,9 @@ describe('OfficeBuilding', () => {
 
     const inbox = screen.getByRole('button', { name: 'Inbox station' })
     const news = screen.getByRole('button', { name: 'News terminal' })
+    const serviceZone = screen.getByTestId('office-service-zone')
+    expect(serviceZone.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/furniture/workspace-rug-v2.png')
     expect(inbox.dataset.hasActivity).toBe('true')
     expect(news.dataset.fresh).toBe('true')
     expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')

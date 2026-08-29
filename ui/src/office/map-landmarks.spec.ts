@@ -34,7 +34,14 @@ describe('Office service landmarks', () => {
     expect(services.every((service) => service.y + service.height < finalRowY + OFFICE_POD_HEIGHT)).toBe(true)
   })
 
-  it('adds nothing when the final row is complete', () => {
-    expect(officeServiceLandmarks(layout(4))).toEqual([])
+  it('reserves a service cell when Workspace rows would otherwise be complete', () => {
+    const floor = layout(4)
+    const services = officeServiceLandmarks(floor)
+
+    expect(floor).toMatchObject({ columns: 2, rows: 3 })
+    expect(services.map((service) => service.id)).toEqual(['inbox-service', 'news-service'])
+    expect(services.every((service) => service.x >= floor.serviceZone.x)).toBe(true)
+    expect(services.every((service) => service.x + service.width <= floor.serviceZone.x + floor.serviceZone.width)).toBe(true)
+    expect(services.every((service) => service.y + service.height < floor.serviceZone.y + floor.serviceZone.height)).toBe(true)
   })
 })

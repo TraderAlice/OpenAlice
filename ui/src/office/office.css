@@ -4583,6 +4583,20 @@
   transition: filter 120ms steps(2, end), transform 120ms steps(2, end);
 }
 
+.oa-office-service-zone {
+  position: absolute;
+  pointer-events: none;
+}
+
+.oa-office-service-zone img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  opacity: 0.72;
+  filter: saturate(0.72) brightness(0.88);
+}
+
 .oa-office-map-service img {
   display: block;
   width: 100%;
