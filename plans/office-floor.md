@@ -2184,6 +2184,21 @@ Overlay control-ownership follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 611-file Vitest run (5,055 passing; one file and nine tests skipped), and the UI production
   build all passed.
 
+Occupancy-journal composition follow-up (2026-08-29):
+
+- Played the floor, roster, Agent file, collapsed journal, and expanded Replay at desktop before choosing the next
+  increment. The first three surfaces already formed deliberate game windows; the journal alone retained a fixed
+  desktop bottom edge, leaving an empty grid shelf beneath its six-event index whenever Replay was closed.
+- Compared decorating the unused space, enlarging the selected event card to consume it, and letting the journal
+  shrink-wrap its actual records. Chose content-owned height: decoration would disguise a layout bug and an inflated
+  event card would imply detail that does not exist. The desktop window now grows from its header, Replay state, and
+  journal contents up to a floor-bounded maximum; overflow remains owned by the existing window body.
+- Kept the established full-height contract below the 760px stage breakpoint. Browser-played collapsed and expanded
+  Replay at 1280x900, 844x390, and 390x844: desktop ends directly after the event index, expanded Replay grows without
+  crossing the floor, and both narrow layouts retain one contained scroll region with no clipped controls.
+- Focused responsive-style specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file
+  Vitest run (5,056 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

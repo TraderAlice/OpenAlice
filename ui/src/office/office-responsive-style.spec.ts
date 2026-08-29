@@ -70,6 +70,11 @@ describe('Office responsive style contract', () => {
     expect(compactWindowCss).toContain('.oa-office-roster__summary small')
   })
 
+  it('shrink-wraps the desktop occupancy journal without weakening narrow-stage containment', () => {
+    expect(css).toMatch(/\.oa-office-window--log\s*\{[\s\S]*?bottom: auto;[\s\S]*?max-height: calc\(100% - 92px\)/)
+    expect(css).toMatch(/@container \(max-width: 760px\) \{\s*\.oa-office-window--log\s*\{[^}]*bottom: 8px;[^}]*max-height: none;/)
+  })
+
   it('lets input capability own touch controls independently of stage width', () => {
     expect(coarseTouchStart).toBeGreaterThan(touchLayoutStart)
     expect(coarseTouchEnd).toBeGreaterThan(coarseTouchStart)
