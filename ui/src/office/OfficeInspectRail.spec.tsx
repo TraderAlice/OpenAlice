@@ -54,7 +54,7 @@ describe('OfficeInspectRail', () => {
 
     expect(screen.getByText('Polishing the Office floor.')).toBeTruthy()
     expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
-      .toContain('/office/coworkers/codex-v1.webp')
+      .toContain('/office/coworkers/codex-portrait-v2.png')
     expect(screen.getByRole('button', { name: 'Close' }).querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/window-close-v1.png')
     expect(screen.getByRole('button', { name: 'Open session' }).querySelector('img')?.getAttribute('src'))

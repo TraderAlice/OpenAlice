@@ -1060,6 +1060,29 @@ Native environment-pack follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5018 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Native coworker-portrait follow-up (2026-08-29):
+
+- Audited the remaining Office asset graph after the environment pack. The desk poses, exceptional-state emotes,
+  HUD, log icons, and Alice atlas were already close to their rendered dimensions. The four standing coworker
+  portraits were the clear outlier: each 1024x1536 generated WebP was displayed at only 33x46 or 51x71, for a
+  combined 1.18 MiB and a visibly undersized silhouette inside the roster cards.
+- Compared repacking only the four portraits, repacking the complete coworker family, and replacing portraits with
+  head-only busts. Chose portrait-only native packaging because the two-frame desk family already has purposeful
+  generated motion and reasonable canvases, while busts would break the full-body NPC language shared with Alice.
+- Trimmed each alpha-checked generated portrait master to its real silhouette, nearest-neighbor fitted it onto a
+  shared 72x104 RGBA canvas, and hard-matted alpha. The four v2 portraits total about 30 KiB, a 97.5% reduction,
+  while their larger in-card silhouette makes runtime identity and clothing accents legible at GBA scale.
+- Runtime and tests now point only at `*-portrait-v2.png`; the four oversized WebPs were removed because Office has
+  no compatibility requirement. A registry spec locks the native canvas so future generated portraits cannot
+  silently reintroduce full-resolution masters.
+- Browser-checked the team roster and Agent file at 1280x720 and 760x900. Every image reports natural 72x104,
+  roster and detail cards preserve the full head-to-feet silhouette, no text or actions are occluded, no image is
+  broken, and both widths retain 0px horizontal overflow.
+- Focused coworker registry, roster, and Agent-file specs passed: 3 files / 8 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5019 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

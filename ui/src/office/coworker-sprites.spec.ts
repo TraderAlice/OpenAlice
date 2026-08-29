@@ -34,6 +34,16 @@ describe('Office coworker sprite registry', () => {
     expect(officeCoworkerSpriteForAgent('future-agent').deskWorkSrc).toContain('-desk-work-v1.png')
   })
 
+  it('ships every roster portrait on the native card canvas', () => {
+    for (const asset of Object.values(OFFICE_COWORKER_SPRITES)) {
+      expect(asset.portraitSrc).toContain('-portrait-v2.png')
+      const portrait = readFileSync(resolve(publicRoot, asset.portraitSrc.replace(/^\//, '')))
+      expect(portrait.subarray(1, 4).toString()).toBe('PNG')
+      expect(portrait.readUInt32BE(16)).toBe(72)
+      expect(portrait.readUInt32BE(20)).toBe(104)
+    }
+  })
+
   it('owns exceptional desk-state emotes as generated Office assets', () => {
     expect(OFFICE_COWORKER_EMOTES).toEqual({
       waiting: '/office/coworkers/waiting-emote-v1.png',

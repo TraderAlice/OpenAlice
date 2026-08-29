@@ -3,7 +3,7 @@
 These runtime-specific coworker sprites make Alice the unique player character
 instead of reusing her overworld sheet for every employee.
 
-The four `*-v1.webp` files were generated with the built-in image generator,
+The four full-resolution portrait masters were generated with the built-in image generator,
 using `docs/assets/office/style-master-v1.png` as the environment palette
 reference and Alice's canonical maid art only as the pixel-density and
 character-proportion reference.
@@ -19,8 +19,10 @@ Every prompt requested one centered late-GBA 16-bit human NPC, full body,
 slightly top-down and facing down-screen, with no text, logos, UI, furniture, or
 background. The initial generated checkerboard was baked into RGB, so each
 character went through a background-extraction edit that preserved the subject
-and produced genuine alpha. The final PNG outputs were losslessly packaged as
-WebP and alpha-checked before integration.
+and produced genuine alpha. The shipped `*-portrait-v2.png` files trim those
+transparent sources, fit each full silhouette into a native 72x104 canvas with
+nearest-neighbor sampling, and hard-mat alpha for crisp GBA-scale cards. The
+generated full-resolution masters are intentionally not shipped at runtime.
 
 Known runtimes map to the closest authored archetype. Unknown future runtime
 names receive a stable hash-selected archetype; they never fall back to Alice.
