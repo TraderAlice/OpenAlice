@@ -723,7 +723,7 @@ function connectorSectionId(id: string): string {
 function focusConnectorSection(id: string): void {
   const target = document.getElementById(connectorSectionId(id))
   if (!target) return
-  target.focus({ preventScroll: true })
+  document.getElementById(`${connectorSectionId(id)}-title`)?.focus({ preventScroll: true })
   target.scrollIntoView?.({ block: 'start' })
 }
 
@@ -764,11 +764,12 @@ function ConnectorAdapterSection({
     <section
       id={sectionId}
       aria-labelledby={titleId}
-      tabIndex={-1}
-      className="scroll-mt-4 rounded-xl outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-4 focus:ring-offset-background md:scroll-mt-[9.5rem] xl:scroll-mt-[7rem]"
+      className="scroll-mt-4 md:scroll-mt-[9.5rem] xl:scroll-mt-[7rem]"
     >
       <ConfigSection
-        title={<span id={titleId}>{definition.label}</span>}
+        title={definition.label}
+        titleId={titleId}
+        focusableTitle
         description={t('connectorSettings.adapterDescription', { name: definition.label })}
       >
         {children}

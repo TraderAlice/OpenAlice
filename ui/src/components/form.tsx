@@ -77,13 +77,30 @@ interface ConfigSectionProps {
   title: ReactNode
   description?: string
   children: ReactNode
+  titleId?: string
+  focusableTitle?: boolean
 }
 
-export function ConfigSection({ title, description, children }: ConfigSectionProps) {
+export function ConfigSection({
+  title,
+  description,
+  children,
+  titleId,
+  focusableTitle = false,
+}: ConfigSectionProps) {
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 border-b border-border/60 py-6 last:border-b-0 xl:grid-cols-[240px_minmax(0,1fr)] xl:gap-10">
       <div className="min-w-0 xl:pt-0.5">
-        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+        <h3
+          id={titleId}
+          tabIndex={focusableTitle ? -1 : undefined}
+          className={`text-[14px] font-semibold text-foreground ${focusableTitle
+            ? 'w-fit rounded-sm outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-4 focus:ring-offset-background'
+            : ''
+          }`}
+        >
+          {title}
+        </h3>
         {description && (
           <p className="text-[13px] text-muted-foreground/70 mt-1.5 leading-relaxed">{description}</p>
         )}

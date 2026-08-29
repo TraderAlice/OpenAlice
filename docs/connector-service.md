@@ -361,8 +361,10 @@ The surfaces deliberately have different jobs:
   replacement/removal and explains that sealed credentials remain available.
   The full Settings category keeps every adapter in one document and adds a
   responsive in-page channel navigator with the same lifecycle badges. Choosing
-  a channel moves keyboard focus to its labelled section without changing route,
-  hiding another adapter's draft, or adding browser history.
+  a channel moves keyboard focus to that section's semantic heading and scrolls
+  the labelled region without changing route, hiding another adapter's draft,
+  or adding browser history. The compact heading ring identifies the destination
+  without outlining the complete long form.
   On desktop the sticky navigator sits exactly on the Settings scrollport edge,
   so controls from the preceding channel cannot scroll through above it. Initial
   page breathing room comes from a normal-flow spacer that scrolls away; the

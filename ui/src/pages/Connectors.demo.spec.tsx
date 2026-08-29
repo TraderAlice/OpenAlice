@@ -423,13 +423,17 @@ describe('Connector demo routes', () => {
     expect(scrollArea.querySelector('[data-connector-settings-top-spacer]')?.className).toContain('h-5')
     expect(within(navigation).getAllByRole('button')).toHaveLength(4)
     const slackSection = screen.getByRole('region', { name: 'Slack' })
+    const slackHeading = within(slackSection).getByRole('heading', { name: 'Slack' })
     expect(slackSection.className).toContain('md:scroll-mt-[9.5rem]')
+    expect(slackSection.hasAttribute('tabindex')).toBe(false)
+    expect(slackHeading.getAttribute('tabindex')).toBe('-1')
+    expect(slackHeading.className).toContain('focus:ring-2')
     const scrollIntoView = vi.fn()
     slackSection.scrollIntoView = scrollIntoView
 
     fireEvent.click(within(navigation).getByRole('button', { name: 'Slack settings, Setup' }))
 
-    expect(document.activeElement).toBe(slackSection)
+    expect(document.activeElement).toBe(slackHeading)
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
   })
 

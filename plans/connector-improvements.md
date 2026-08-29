@@ -332,6 +332,19 @@ external adapters remain optional projections rather than sources of truth.
     the navigator exactly at the scrollport edge. Bottom/horizontal padding,
     mobile's static navigator, focus transfer, document order, and responsive
     section scroll margins remain unchanged.
+30. **Channel navigation focuses the semantic heading, not the entire form.**
+    Removing the current section focus ring while leaving focus on the region
+    would hide keyboard context; keeping focus on the navigator would fail to
+    announce the destination after scrolling. Real geometry shows the current
+    Feishu focus target is a 609 x 602 px section, so its persistent ring frames
+    most of the working view. The chosen model gives shared `ConfigSection` an
+    optional focusable semantic heading. Connector navigation focuses that
+    `<h3>` with `preventScroll`, then scrolls its labelled section as before.
+    The title owns a compact visible ring, while the section retains its id,
+    `aria-labelledby`, responsive scroll margin, and document structure without
+    becoming a tab stop. Dialog content does not enable the option. Screen-reader
+    destination context, keyboard focus, mobile/desktop positioning, and route
+    history are preserved with a much more precise visual affordance.
 
 ## Ordered Work
 
@@ -396,6 +409,8 @@ external adapters remain optional projections rather than sources of truth.
         preserving visible state labels and shared Toggle semantics.
   - [x] Let the desktop channel navigator cover the Settings scrollport edge so
         controls from preceding channels cannot show through above it.
+  - [x] Focus the destination channel heading instead of outlining the complete
+        Settings form after navigator jumps.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -661,6 +676,19 @@ still-scrolling control. At 390 x 844, computed navigation position remained
 the viewport after choosing Feishu, and the focused section began 16 px below
 the scrollport edge with no horizontal overflow. No field, Toggle, or Connector
 action was invoked, and the viewport was reset.
+
+The heading-focus increment passed 35 focused settings-navigation, overview,
+and Connector demo tests, UI and root typechecks, the production build, and all
+5,120 repository tests. The interaction contract asserts that the labelled
+channel region is no longer focusable, while its semantic heading has
+programmatic `tabindex=-1` and a compact focus ring, focus
+moves to that heading, and the region still receives the native scroll request.
+Real Default AliceProject measurements at 1,052 x 734 reduced the Feishu active
+element from a 609 x 602 px SECTION to a 44 x 21 px H3 while preserving section
+top 253 px below the sticky navigator. At 390 x 844, the same H3 began at y=191,
+the section at y=167, the static navigator had fully scrolled above the viewport,
+and the document width remained exactly 390 px. No form or Connector control was
+invoked, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
