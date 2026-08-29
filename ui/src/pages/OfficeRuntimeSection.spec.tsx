@@ -10,6 +10,7 @@ import { OFFICE_COWORKER_SPRITES } from '../office/coworker-sprites'
 import { OfficeRuntimeSection } from './OfficeRuntimeSection'
 
 const query = vi.fn()
+const scrollIntoView = vi.fn()
 
 function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>) {
   query.mockImplementation(async (opts: { family?: string; page?: number; pageSize?: number } = {}) => {
@@ -49,6 +50,11 @@ vi.mock('../tabs/store', () => ({
 
 beforeEach(async () => {
   query.mockReset()
+  scrollIntoView.mockReset()
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoView,
+  })
   useInboxSelection.getState().select(null)
   await i18n.changeLanguage('en')
 })
@@ -320,6 +326,11 @@ describe('OfficeRuntimeSection', () => {
       .toBe('true')
     expect(screen.getByText('Requested dispatch')).toBeTruthy()
     expect(screen.queryByText('Market headline')).toBeNull()
+
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' })
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(
+      screen.getByRole('button', { name: /Inbox received.*#0007/i }),
+    )
 
     await userEvent.click(screen.getByRole('button', { name: 'Open Inbox' }))
     expect(useInboxSelection.getState().selectedEntryId).toBe('inbox-7')

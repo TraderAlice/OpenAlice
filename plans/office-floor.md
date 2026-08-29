@@ -2938,6 +2938,23 @@ Replay-focus performance follow-up (2026-08-30):
   Building specs passed (3 files / 25 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,124
   passing; one file and nine tests skipped), and the production build; the existing large-chunk advisory is unchanged.
 
+Journal-cursor restoration follow-up (2026-08-30):
+
+- Reopened real #1837 from its replay floor after the Agent journal grew to 14 beats. The detail pane restored the exact
+  event, but the left chronological list remained at latest #2083, leaving the selected green row and pixel cursor below
+  the viewport. The player had correct content without a visible position in the game menu.
+- Compared moving the selected event to the top, adding a duplicate pinned breadcrumb, and scrolling the existing row
+  into view. Chose native nearest scrolling: it preserves chronology, avoids duplicate status chrome, and behaves like
+  a conventional RPG inventory cursor when restoring a prior selection.
+- The journal now retains its list element and, when channel or selected sequence changes, asks the selected row to
+  enter the nearest visible edge. Already visible clicks remain stable; keyboard navigation keeps its existing focus
+  behavior; four-second data refreshes do not retrigger scrolling when channel and sequence are unchanged.
+- Browser-replayed and reopened real Agent #1837. The list landed with #1837 visibly selected at its lower edge, the
+  pixel cursor was present, preceding #1838/#1839 context remained above it, and the fixed detail/action pane did not
+  move. The focused journal spec passed (1 file / 13 tests), together with root/UI TypeScript, the full 617-file Vitest
+  run (5,124 passing; one file and nine tests skipped), and the production build; the existing large-chunk advisory is
+  unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

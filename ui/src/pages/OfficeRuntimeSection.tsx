@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 
@@ -229,6 +237,7 @@ export function OfficeRuntimeSection({
   const [detailExpanded, setDetailExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const journalIndexRef = useRef<HTMLOListElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -291,6 +300,13 @@ export function OfficeRuntimeSection({
   useEffect(() => {
     setDetailExpanded(false)
   }, [selectedSeq])
+
+  useLayoutEffect(() => {
+    if (selectedSeq == null) return
+    const selectedRow = journalIndexRef.current
+      ?.querySelector<HTMLButtonElement>(`button[data-seq="${selectedSeq}"]`)
+    selectedRow?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [channel, selectedSeq])
 
   if (loading && entriesByChannel.all.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
@@ -423,7 +439,11 @@ export function OfficeRuntimeSection({
         </TabsList>
         <TabsContent value={channel} className="oa-office-runtime__panel">
         <div data-testid="runtime-log" className="oa-office-runtime__journal">
-        <ol className="oa-office-runtime__index" aria-label={`${t('office.timeline')} · ${channelLabel}`}>
+        <ol
+          ref={journalIndexRef}
+          className="oa-office-runtime__index"
+          aria-label={`${t('office.timeline')} · ${channelLabel}`}
+        >
           {visibleBeats.map((beat) => {
             const event = beat.event
             const kind = officeLogAssetKind(event.type)
