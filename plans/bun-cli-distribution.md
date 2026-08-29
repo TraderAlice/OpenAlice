@@ -183,18 +183,21 @@ preserve the old layout.
 
 ```text
 <install-root>/
-  releases/
-    <version>-<platform>-<content-id>/
-      bin/openalice[.exe]
-      share/openalice/
-        runtime/git/
-        ui/dist/
-        default/
-        src/workspaces/templates/
-        src/workspaces/cli/bin/
-      adapters/
-      release.json
-  current -> releases/<active-release>
+  cli/
+    releases/
+      <version>-<platform>-<arch>-<content-id>/
+        bin/openalice[.exe]
+        share/openalice/
+          runtime/git/
+          ui/dist/
+          default/
+          src/workspaces/templates/
+          src/workspaces/cli/bin/
+        adapters/
+        release.json
+    current -> releases/<active-release>
+    provenance/<release-name>.json
+    staging/
   bin/
     openalice
     alice
@@ -421,16 +424,16 @@ build harness when it improves the next investigation.
 
 ### 4. Native CLI installers
 
-- [ ] Define one platform-neutral install plan and transaction model shared by
-  the Bash and PowerShell presentations.
-- [ ] Make both installers manage only OpenAlice release artifacts, helper
+- [x] Define one platform-neutral install plan and transaction model; realize
+  it in Bash for the accepted macOS/Linux lane while PowerShell stays deferred.
+- [x] Make the Bash installer manage only OpenAlice release artifacts, helper
   shims, PATH, provenance, lock, activation, retention, and uninstall.
-- [ ] Remove Node/npm/Pi/build-tool preflight and managed-Pi consent from the
+- [x] Remove Node/npm/Pi/build-tool preflight and managed-Pi consent from the
   CLI install plan.
 - [ ] Deferred Windows lane: add the native PowerShell bootstrap with the same
   checksum, staging, lock, immutable-release, pointer, PATH, and data-preserving
   behavior as Bash.
-- [ ] Preserve explicit install consent and separate start consent; neither
+- [x] Preserve explicit install consent and separate start consent; neither
   installer silently starts or registers a long-running service.
 - [ ] Install from current `dev` artifacts and the matching dev selector before
   promotion.
@@ -461,26 +464,26 @@ build harness when it improves the next investigation.
 
 ### 6. Cutover and updates
 
-- [ ] Define the Bun-to-Bun update transaction first; do not let the released
+- [x] Define the Bun-to-Bun update transaction first; do not let the released
   Node layout shape the new Runtime or installed layout.
-- [ ] Keep installation bytes separate from `OPENALICE_HOME` product data so
+- [x] Keep installation bytes separate from `OPENALICE_HOME` product data so
   removing the old CLI and performing a clean Bun install is always a valid
   cutover.
-- [ ] Provide one bounded v0.90.1 cutover path when it is straightforward:
+- [x] Provide one bounded v0.90.1 cutover path when it is straightforward:
   validate the Bun command, replace only installer-owned launchers/releases,
   and preserve product data. A clean reinstall with explicit guidance is an
   acceptable fallback; seamless cross-generation activation is not a design
   requirement.
-- [ ] For Bun-to-Bun updates, preserve a running old Guardian until explicit
+- [x] For Bun-to-Bun updates, preserve a running old Guardian until explicit
   restart and report pending activation; do not replace a running executable
   in place.
 - [ ] Roll back the active pointer when new-runtime readiness fails.
-- [ ] Remove obsolete managed `pi` launchers only after the new OpenAlice
+- [x] Remove obsolete managed `pi` launchers only after the new OpenAlice
   command is validated; never remove a user-owned `pi` elsewhere on PATH.
-- [ ] Keep bounded prior OpenAlice releases for rollback and collect only
+- [x] Keep bounded prior OpenAlice releases for rollback and collect only
   inactive installer-owned releases.
-- [ ] Make `openalice update` hand off to the correct Bash or PowerShell
-  installer for its installation provenance.
+- [x] Make `openalice update` hand off to the exact-version Bash installer for
+  direct macOS/Linux provenance; PowerShell remains in the deferred lane.
 - [ ] Keep package-manager-owned installations manager-owned.
 
 Do not add a permanent dual runtime, compatibility resolver, or old-layout
@@ -490,28 +493,28 @@ artifacts.
 
 ### 7. Remote and server composition
 
-- [ ] Make managed SSH install select a Bun artifact for the remote platform
+- [x] Make managed SSH install select a Bun artifact for the remote platform
   and architecture without cloning source or installing Agent Runtimes.
-- [ ] Preserve loopback binding, Guardian ownership, tunnel behavior, and
+- [x] Preserve loopback binding, Guardian ownership, tunnel behavior, and
   remote content/provenance comparison.
-- [ ] Define an explicit unsupported-host result for targets outside the
+- [x] Define an explicit unsupported-host result for targets outside the
   accepted Bun build matrix.
-- [ ] Keep Docker on its current server image until a separately justified
+- [x] Keep Docker on its current server image until a separately justified
   change proves that consuming the Bun artifact improves that distribution.
 
 ### 8. Retire the expanded CLI Runtime
 
 - [ ] Delete the CLI release path that builds and publishes
   `openalice-runtime-*.tar.gz` dependency-closure archives.
-- [ ] Delete CLI installation and repair of managed Pi, including the public
+- [x] Delete CLI installation and repair of managed Pi, including the public
   `pi` launcher owned by OpenAlice.
-- [ ] Delete installed-CLI checks that require host Node, npm, native build
+- [x] Delete installed-CLI checks that require host Node, npm, native build
   tools, expanded `node_modules`, or repository-relative service entrypoints.
-- [ ] Remove `OPENALICE_MANAGED_RUNTIME_PATH` from the Bun install path while
+- [x] Remove `OPENALICE_MANAGED_RUNTIME_PATH` from the Bun install path while
   retaining explicit source-development and Electron resource providers.
-- [ ] Update owner guides in the same increment; do not preserve stale current
+- [x] Update owner guides in the same increment; do not preserve stale current
   behavior as a compatibility path.
-- [ ] Keep release history and old tagged installers available for diagnosis;
+- [x] Keep release history and old tagged installers available for diagnosis;
   do not rewrite published v0.90.1 assets.
 
 ### 9. Release acceptance
@@ -741,3 +744,23 @@ This plan is complete only when:
   byte-for-byte unchanged. The Linux run also exposed and fixed missing Dugite
   core symlinks and standard `git-upload-pack`, `git-receive-pack`, and
   `git-shell` bin entries in the portable Git layout.
+- 2026-08-29: Native Bash installer increment replaced the expanded Node/Pi
+  transaction with verified target-native archives under `cli/releases`, a
+  dynamic `cli/current` launcher, schema 3 artifact provenance, exact-version
+  update handoff, three-release retention, local atomic rollback, and
+  data-preserving uninstall. The validated v0.90.1 cutover removes only the old
+  installer-owned `cli-versions` tree and Pi/CMD launchers after the new native
+  command runs. A real macOS arm64 build installed and reported its provenance,
+  updated over a distinct retained build, and rolled back by pointer. OrbStack
+  Debian arm64 passed install/update with Node, npm, pnpm, Bun, and Agent
+  Runtimes absent. Native Windows PowerShell remains deferred; package-manager
+  channels and published dev/release assets remain open.
+- 2026-08-29: Managed SSH now installs and runs the matching native Bun release
+  without probing or installing Node, build tools, source, or Agent Runtimes in
+  its default path. Explicit `--app-dir` remains a separately validated source
+  development override, and unsupported targets fail instead of silently
+  changing distribution models. The OrbStack Linux arm64 SSH fixture passed
+  native install, distinct Guardian/Alice/UTA processes, real auth readiness,
+  tunnel disconnect/reconnect, aggregate AliceProject inventory, structured
+  stop, interrupted transfer retry, credential resealing, and startup of a
+  transferred second Home on the same immutable release.

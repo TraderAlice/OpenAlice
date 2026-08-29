@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
-import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
+import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,8 +12,6 @@ import { prepareCliReleaseInstaller } from './prepare-cli-release-installer.mjs'
 
 const execFileAsync = promisify(execFile)
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const fakeNpm = join(repositoryRoot, 'scripts/install-smoke/fake-npm.sh')
-const piAssets = join(repositoryRoot, 'scripts/install-smoke/pi-assets')
 const productVersion = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8')).version
 const temporaryPaths = []
 
@@ -25,30 +24,39 @@ describe.skipIf(process.platform === 'win32')('release-owned CLI installer', () 
     const root = await mkdtemp(join(tmpdir(), 'openalice-release-installer-'))
     temporaryPaths.push(root)
     const installer = join(root, 'install')
-    const runtimeArchive = join(root, 'runtime.tar.gz')
     await copyFile(join(repositoryRoot, 'install'), installer)
-    await writeFile(runtimeArchive, '')
 
     prepareCliReleaseInstaller(productVersion, installer)
     await expect(execFileAsync('bash', ['-n', installer])).resolves.toBeDefined()
+    const rewritten = await readFile(installer, 'utf8')
+    expect(rewritten).toContain(`OPENALICE_INSTALLER_RELEASE_VERSION="\${OPENALICE_INSTALLER_RELEASE_VERSION:-${productVersion}}"`)
+    expect(rewritten).toContain('OPENALICE_INSTALLER_UPDATE_CHANNEL="${OPENALICE_INSTALLER_UPDATE_CHANNEL:-stable}"')
 
-    const plan = await execFileAsync('bash', [installer,
-      '--source', repositoryRoot,
-      '--runtime-archive', runtimeArchive,
-      '--install-dir', join(root, '.openalice'),
-      '--no-modify-path',
-      '--plan',
-    ], {
-      env: {
-        ...process.env,
-        HOME: root,
-        OPENALICE_NPM_BIN: fakeNpm,
-        OPENALICE_PI_SOURCE_DIR: piAssets,
-      },
+    const server = createServer((_request, response) => {
+      response.end(`${'a'.repeat(64)}  openalice-cli.tar.gz\n`)
     })
-
-    expect(plan.stdout).toContain(`Version        v${productVersion}`)
-    expect(plan.stdout).toContain('Updates        stable')
+    await new Promise((resolvePromise, rejectPromise) => {
+      server.once('error', rejectPromise)
+      server.listen(0, '127.0.0.1', resolvePromise)
+    })
+    try {
+      const address = server.address()
+      const plan = await execFileAsync('bash', [installer,
+        '--install-dir', join(root, '.openalice'),
+        '--no-modify-path',
+        '--plan',
+      ], {
+        env: {
+          ...process.env,
+          HOME: root,
+          OPENALICE_RELEASE_ASSET_BASE_URL: `http://127.0.0.1:${address.port}`,
+        },
+      })
+      expect(plan.stdout).toContain(`Channel         release (${productVersion})`)
+      expect(plan.stdout).toContain(`/v${productVersion}/openalice-cli-${productVersion}-`)
+    } finally {
+      await new Promise((resolvePromise) => server.close(resolvePromise))
+    }
   })
 
   it('rejects malformed release versions before rewriting the installer', async () => {

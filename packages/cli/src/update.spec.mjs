@@ -152,7 +152,7 @@ describe('OpenAlice CLI updates', () => {
     expect(invocation).toMatchObject({
       command: 'bash',
       args: expect.arrayContaining([
-        '--install-dir', '/tmp/.openalice', '--no-modify-path', '--yes',
+        '--version', '0.88.0-beta', '--install-dir', '/tmp/.openalice', '--no-modify-path', '--yes',
       ]),
       options: {
         stdio: 'inherit',

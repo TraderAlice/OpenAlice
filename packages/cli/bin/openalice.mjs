@@ -22,6 +22,7 @@ import {
   runObservabilityCommand,
 } from '../src/observability-command.mjs'
 import { connectRemote, formatRemoteHelp, parseRemoteArgs } from '../src/remote.mjs'
+import { formatRollbackHelp, runRollbackCommand } from '../src/rollback.mjs'
 import { formatServerHelp, parseServerArgs, runServerCommand } from '../src/server.mjs'
 import { connectSsh, formatSshHelp, parseSshConnectArgs } from '../src/ssh-connect.mjs'
 import { formatUninstallHelp, runUninstallCommand } from '../src/uninstall.mjs'
@@ -134,6 +135,13 @@ Prints a completion script to stdout without modifying shell configuration.
     }
     return runUpdateCommand(args)
   }
+  if (command === 'rollback') {
+    if (args.includes('--help') || args.includes('-h')) {
+      process.stdout.write(formatRollbackHelp())
+      return 0
+    }
+    return runRollbackCommand(args)
+  }
   if (command === 'uninstall') {
     if (args.includes('--help') || args.includes('-h')) {
       process.stdout.write(formatUninstallHelp())
@@ -176,6 +184,17 @@ Prints a completion script to stdout without modifying shell configuration.
 }
 
 function installedRuntimeInfo(productVersion) {
+  const nativePath = process.env['OPENALICE_RELEASE_DIR']?.trim()
+  const nativeContentIdentity = process.env['OPENALICE_CONTENT_IDENTITY']?.trim()
+  if (nativePath && /^[a-f0-9]{16}$/.test(nativeContentIdentity ?? '')) {
+    return {
+      productVersion,
+      platform: process.platform,
+      arch: process.arch,
+      path: nativePath,
+      contentIdentity: nativeContentIdentity,
+    }
+  }
   const path = process.env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
   const contentIdentity = process.env[
     'OPENALICE_MANAGED_RUNTIME_CONTENT_IDENTITY'
