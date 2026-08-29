@@ -72,6 +72,37 @@ describe('OfficeRosterWindow', () => {
     expect(container.querySelectorAll('.oa-office-roster__status[data-mood="idle"]')).toHaveLength(4)
     const focusedMember = screen.getByRole('button', { name: /Research session 6.*c1/i })
     expect(document.activeElement).toBe(focusedMember)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(focusedMember)
+    const memberButtons = employees.map((employee) => screen.getByRole('button', {
+      name: new RegExp(employee.title, 'i'),
+    }))
+    memberButtons.forEach((button, index) => {
+      const row = Math.floor(index / 2)
+      const column = index % 2
+      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({
+        x: column * 220,
+        y: row * 80,
+        left: column * 220,
+        right: column * 220 + 200,
+        top: row * 80,
+        bottom: row * 80 + 64,
+        width: 200,
+        height: 64,
+        toJSON: () => ({}),
+      })
+    })
+    await userEvent.keyboard('{Home}{ArrowRight}{ArrowDown}')
+    expect(document.activeElement).toBe(memberButtons[3])
+    expect(memberButtons[3]?.tabIndex).toBe(0)
+    expect(memberButtons[5]?.tabIndex).toBe(-1)
+    await userEvent.keyboard('{End}')
+    expect(document.activeElement).toBe(memberButtons[5])
+    await userEvent.keyboard('{Enter}')
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))
+    onSelect.mockClear()
     await userEvent.click(focusedMember)
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ resumeId: 'resume-5' }))
     await userEvent.keyboard('{Escape}')

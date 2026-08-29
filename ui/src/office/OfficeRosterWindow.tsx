@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
@@ -6,6 +7,7 @@ import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeCoworkerLabel } from './label'
+import { nextOfficeRosterIndex } from './roster-navigation'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeRosterWindow({
@@ -24,6 +26,10 @@ export function OfficeRosterWindow({
   const { t } = useTranslation()
   const reducedMotion = useReducedMotion()
   const employees = employeesForOffice(group.employees)
+  const initialFocusResumeId = focusResumeId ?? employees[0]?.resumeId ?? null
+  const [focusedResumeId, setFocusedResumeId] = useState(initialFocusResumeId)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
 
   return (
     <section
@@ -45,7 +51,20 @@ export function OfficeRosterWindow({
             <span className="oa-office-window__title-kind">{t('office.roster')}</span>
           </span>
         </div>
-        <button type="button" autoFocus={!focusResumeId} aria-label={t('common.close')} onClick={onClose}>
+        <button
+          type="button"
+          ref={closeButtonRef}
+          autoFocus={employees.length === 0}
+          aria-label={t('common.close')}
+          onClick={onClose}
+          onKeyDown={(event) => {
+            if (event.key !== 'Tab' || employees.length === 0) return
+            event.preventDefault()
+            Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('button[data-resume-id]') ?? [])
+              .find((button) => button.dataset.resumeId === focusedResumeId)
+              ?.focus()
+          }}
+        >
           <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
         </button>
       </header>
@@ -54,13 +73,50 @@ export function OfficeRosterWindow({
           <span>{t('office.rosterCount', { count: employees.length })}</span>
           <small>{t('office.rosterSelectHint')}</small>
         </div>
-        <ul>
+        <ul
+          ref={listRef}
+          aria-label={t('office.roster')}
+          onKeyDown={(event) => {
+            if (event.key === 'Tab') {
+              event.preventDefault()
+              closeButtonRef.current?.focus()
+              return
+            }
+            const direction = ({
+              ArrowLeft: 'left',
+              ArrowRight: 'right',
+              ArrowUp: 'up',
+              ArrowDown: 'down',
+            } as const)[event.key]
+            const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-resume-id]'))
+            const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement)
+            if (currentIndex < 0) return
+            let nextIndex = currentIndex
+            if (direction) {
+              nextIndex = nextOfficeRosterIndex(
+                buttons.map((button) => button.getBoundingClientRect()),
+                currentIndex,
+                direction,
+              )
+            } else if (event.key === 'Home') {
+              nextIndex = 0
+            } else if (event.key === 'End') {
+              nextIndex = buttons.length - 1
+            } else {
+              return
+            }
+            event.preventDefault()
+            buttons[nextIndex]?.focus()
+          }}
+        >
           {employees.map((employee) => (
             <li key={employee.resumeId}>
               <button
                 type="button"
-                autoFocus={employee.resumeId === focusResumeId}
+                autoFocus={employee.resumeId === initialFocusResumeId}
                 data-resume-id={employee.resumeId}
+                tabIndex={employee.resumeId === focusedResumeId ? 0 : -1}
+                onFocus={() => setFocusedResumeId(employee.resumeId)}
                 onClick={() => onSelect(employee)}
               >
                 <span className="oa-office-roster__portrait" aria-hidden>

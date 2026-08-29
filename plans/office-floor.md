@@ -2033,6 +2033,24 @@ Responsive game-window identity follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 609-file Vitest run (5,043 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Roster party-menu navigation follow-up (2026-08-29):
+
+- Opened the six-member Team roster with the keyboard and found a browser form inside a GBA party-screen shell:
+  initial focus landed on Close, ArrowDown stayed on Close, and the player had to Tab through ordinary buttons even
+  though every card already carried a visible selection cursor.
+- Compared moving initial focus only, linear next/previous arrows, and geometry-aware party navigation. Chose the
+  spatial model: the first teammate (or the teammate returned from an Agent file) owns the single roving tab stop;
+  Left/Right and Up/Down select the nearest card in that physical direction, Home/End select the first/last member,
+  Enter preserves native Agent-file activation, and edge input stays put. Tab cycles only between the current member
+  and Close, keeping the modal keyboard-contained without turning all six cards into tab stops.
+- Browser-played the 1280px two-column roster from first -> Right second -> Down fourth -> Home first. At 390x844,
+  Down selected the next single-column member; opening that Agent file and returning restored the same member, and
+  the next Down continued to the third. At 844x390, Right moved from the third to fourth physical card. All states
+  retained their selection cursor, independently scrolling list, and zero page overflow.
+- Focused roster component and spatial-navigation specs passed: 2 files / 3 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 610-file Vitest run (5,045 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
