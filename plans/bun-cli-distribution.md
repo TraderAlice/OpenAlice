@@ -451,9 +451,8 @@ build harness when it improves the next investigation.
   checksums. The release gate covers native macOS arm64/x64 and Linuxbrew
   arm64/x64 installation.
 - [x] Generate the `openalice-bin` AUR `PKGBUILD` and `.SRCINFO` from the
-  accepted Linux archives and configure a pinned clean Arch x64 build/install
-  gate. Native Arch Linux ARM acceptance remains open because the official
-  base-devel container has no arm64 image.
+  accepted Linux archives and configure pinned clean Arch x64 and Arch Linux
+  ARM build/install gates.
 - [ ] Publish the generated formula to the TraderAlice tap and `openalice-bin`
   to AUR, then test the public `brew` and `paru` commands.
 - [x] Record channel provenance without rebuilding or modifying the native
@@ -865,3 +864,10 @@ This plan is complete only when:
   release-gating Linuxbrew matrix repeats stopped and active upgrades,
   ownership guidance, restart activation, and removal against the exact
   accepted Linux archives.
+- 2026-08-30: Closed native Arch Linux ARM package acceptance. The x64 lane
+  remains on the pinned official Arch base-devel image; the arm64 lane uses a
+  pinned Arch Linux ARM base-devel image whose audited build consumes
+  signature-checked upstream repositories. Both native runner lanes build the
+  generated `openalice-bin`, install it through `pacman`, and repeat stopped
+  and active upgrade, ownership, restart activation, and removal checks before
+  dev aliases or a stable release can publish.
