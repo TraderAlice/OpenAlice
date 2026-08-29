@@ -20,6 +20,7 @@ describe('OFFICE_FURNITURE', () => {
     expect(OFFICE_FURNITURE.generated.workspaceSign).toBe('/office/furniture/workspace-sign-v1.png')
     expect(OFFICE_FURNITURE.generated.spawnCompass).toBe('/office/furniture/spawn-compass-v1.png')
     expect(OFFICE_FURNITURE.generated.routeChevron).toBe('/office/furniture/route-chevron-v1.png')
+    expect(OFFICE_FURNITURE.generated.collisionImpact).toBe('/office/furniture/collision-impact-v1.png')
     expect(OFFICE_FURNITURE.generated.wallWindowNight).toBe('/office/furniture/wall-window-night-v1.png')
     for (const url of [
       OFFICE_FURNITURE.desk,
@@ -79,5 +80,13 @@ describe('OFFICE_FURNITURE', () => {
     expect(routeChevron[25]).toBe(6)
     expect(routeChevron.readUInt32BE(16)).toBe(24)
     expect(routeChevron.readUInt32BE(20)).toBe(24)
+
+    const collisionImpact = readFileSync(resolve(
+      publicRoot,
+      OFFICE_FURNITURE.generated.collisionImpact.replace(/^\//, ''),
+    ))
+    expect(collisionImpact[25]).toBe(6)
+    expect(collisionImpact.readUInt32BE(16)).toBe(96)
+    expect(collisionImpact.readUInt32BE(20)).toBe(24)
   })
 })

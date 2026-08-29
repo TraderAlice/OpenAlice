@@ -3557,6 +3557,30 @@
   animation-name: oa-office-route-destination;
 }
 
+.oa-office-collision-impact {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(var(--office-impact-rotation));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--gba-water) 66%, transparent));
+}
+
+.oa-office-collision-impact > span {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background-repeat: no-repeat;
+  background-size: 96px 24px;
+  image-rendering: pixelated;
+  animation: oa-office-collision-impact 360ms linear forwards;
+}
+
+.oa-office-collision-impact[data-reduced-motion="true"] > span {
+  background-position: -24px 0;
+  animation: none;
+}
+
 @keyframes oa-office-route-step {
   50% { opacity: 0.38; }
 }
@@ -3568,6 +3592,13 @@
       brightness(1.22)
       drop-shadow(0 0 5px color-mix(in srgb, var(--gba-alert) 82%, transparent));
   }
+}
+
+@keyframes oa-office-collision-impact {
+  0%, 14% { background-position: 0 0; }
+  15%, 44% { background-position: -24px 0; }
+  45%, 69% { background-position: -48px 0; }
+  70%, 100% { background-position: -72px 0; }
 }
 
 .oa-office-building[data-office-time="night"] .oa-office-map::before {
@@ -4560,6 +4591,11 @@
   }
 
   .oa-office-route-trail__step {
+    animation: none;
+  }
+
+  .oa-office-collision-impact > span {
+    background-position: -24px 0;
     animation: none;
   }
 

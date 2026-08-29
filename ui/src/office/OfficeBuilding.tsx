@@ -18,6 +18,11 @@ import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeInteractionPath, type OfficeInteractionPathStep } from './interaction-path'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
+import {
+  OfficeCollisionImpact,
+  officeCollisionImpactPosition,
+  type OfficeCollisionImpactState,
+} from './OfficeCollisionImpact'
 import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
 import {
@@ -75,6 +80,7 @@ export function OfficeBuilding({
   const [aliceDirection, setAliceDirection] = useState<OfficeAliceDirection>('down')
   const [aliceWalking, setAliceWalking] = useState(false)
   const [aliceBumped, setAliceBumped] = useState(false)
+  const [collisionImpact, setCollisionImpact] = useState<OfficeCollisionImpactState | null>(null)
   const [panning, setPanning] = useState(false)
   const [controlsLearned, setControlsLearned] = useState(false)
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
@@ -90,6 +96,8 @@ export function OfficeBuilding({
     cameraY: number
   } | null>(null)
   const bumpTimerRef = useRef<number | null>(null)
+  const impactTimerRef = useRef<number | null>(null)
+  const impactSerialRef = useRef(0)
   const bumpFrameRef = useRef<number | null>(null)
   const walkTimerRef = useRef<number | null>(null)
   const touchMoveDelayRef = useRef<number | null>(null)
@@ -245,12 +253,22 @@ export function OfficeBuilding({
     setAliceDirection('down')
     setAliceWalking(false)
   }
-  const showCollisionBump = () => {
+  const showCollisionBump = (movement: OfficeMovement = OFFICE_MOVEMENTS[aliceDirection]) => {
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
     setAliceWalking(false)
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
     setAliceBumped(false)
+    if (impactTimerRef.current != null) window.clearTimeout(impactTimerRef.current)
+    impactSerialRef.current += 1
+    setCollisionImpact({
+      serial: impactSerialRef.current,
+      ...officeCollisionImpactPosition(aliceRef.current, movement, mapLayout),
+    })
+    impactTimerRef.current = window.setTimeout(() => {
+      impactTimerRef.current = null
+      setCollisionImpact(null)
+    }, reducedMotion ? 220 : 380)
     bumpFrameRef.current = window.requestAnimationFrame(() => {
       setAliceBumped(true)
       bumpTimerRef.current = window.setTimeout(() => setAliceBumped(false), 140)
@@ -266,7 +284,7 @@ export function OfficeBuilding({
     setAliceDirection(movement.direction)
     const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
     if (move.bumped) {
-      showCollisionBump()
+      showCollisionBump(movement)
       return
     }
     const next = move.position
@@ -366,6 +384,7 @@ export function OfficeBuilding({
   useEffect(() => () => {
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
+    if (impactTimerRef.current != null) window.clearTimeout(impactTimerRef.current)
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
     routeGenerationRef.current += 1
     if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
@@ -662,6 +681,14 @@ export function OfficeBuilding({
               </span>
               <small>ALICE</small>
             </div>
+            {collisionImpact && (
+              <OfficeCollisionImpact
+                key={collisionImpact.serial}
+                impact={collisionImpact}
+                reducedMotion={reducedMotion}
+                zIndex={officeDepthAt(Math.max(alice.y, collisionImpact.y)) + 200}
+              />
+            )}
             {routeTargetName && (
               <span className="sr-only" role="status" aria-live="polite">
                 {t('office.walkingTo', { name: routeTargetName })}

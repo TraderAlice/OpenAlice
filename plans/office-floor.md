@@ -927,6 +927,35 @@ Route-breadcrumb follow-up (2026-08-29):
 - `pnpm test` passed: 602 files / 5013 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Collision-impact follow-up (2026-08-29):
+
+- Replayed manual movement into the Operations board. Runtime state correctly reported `bumped=true`, but the
+  current 140ms Alice-only shake was nearly invisible at map scale and overlapped the nearby REVIEW prompt; the
+  player could not reliably distinguish collision feedback from an interactable target.
+- Compared amplifying the CSS shake, adding a text toast, and generating a directional four-frame impact effect.
+  A stronger shake still does not identify the blocked edge, while a toast would reintroduce dashboard language.
+  Chose the world-space effect because it confirms the input and the collision direction without persistent HUD.
+- Interaction model: every blocked manual step restarts a short effect between Alice and the attempted tile. One
+  upward-authored atlas is rotated for all four directions; repeated bumps restart from frame one. The effect is
+  decorative, pointer-inert, and cleared independently from nearby interaction prompts. Reduced motion shows one
+  static impact frame for the same short lifetime instead of playing the sheet.
+- Generated `collision-impact-v1.png` with the built-in image generator as contact, star, arc, and fragment frames;
+  sliced the transparent source into four cells, normalized each frame, hard-matted alpha, and nearest-neighbor
+  packaged the result as a native 96x24 RGBA atlas.
+- Added a serial-keyed world-space effect that restarts on every blocked step, rotates for the attempted direction,
+  and clears after 380ms. The bright star frame receives the longest useful dwell; reduced motion holds that frame
+  statically for 220ms. Effects sit 30px beyond Alice's center so they clear her silhouette.
+- Browser QA found that a bottom-boundary effect initially landed outside the map and was clipped. Impact placement
+  now clamps to a 12px interior safe area, keeping furniture effects outside Alice while pinning map-edge effects
+  visibly against the boundary.
+- Browser-played repeated Operations-board collisions at desktop width, bottom-boundary collisions, and the same
+  board collision at 760x900. The effect remained directionally distinct from REVIEW, retriggered on repeated input,
+  the boundary frame stayed visible, and the narrow page retained 0px horizontal overflow.
+- Focused impact, building, and furniture specs passed: 3 files / 10 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5016 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

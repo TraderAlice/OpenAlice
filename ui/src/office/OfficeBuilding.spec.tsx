@@ -94,6 +94,64 @@ describe('OfficeBuilding', () => {
     }
   })
 
+  it('restarts and clears a directional impact when movement is blocked', () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <OfficeBuilding
+          building={{
+            config: {
+              workspaceSleepAfterMs: 1,
+              harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 0, other: 0 },
+            },
+            lastSeq: 1,
+            firstSeq: 1,
+            offices: [
+              {
+                workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
+                lastInteractionAt: 1,
+                sleeping: false,
+                employees: [],
+              },
+              {
+                workspace: { id: 'quant-1', tag: 'quant', harness: 'auto-quant' },
+                lastInteractionAt: 1,
+                sleeping: false,
+                employees: [],
+              },
+            ],
+          }}
+          onSelectEmployee={vi.fn()}
+          onOpenEmployee={vi.fn()}
+          onOpenFiles={vi.fn()}
+          onOpenRoster={vi.fn()}
+          onOpenLog={vi.fn()}
+        />,
+      )
+
+      const map = screen.getByLabelText(
+        'Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.',
+      )
+      for (let index = 0; index < 9; index += 1) fireEvent.keyDown(map, { key: 'w' })
+      const firstImpact = screen.getByTestId('office-collision-impact')
+      expect(firstImpact.dataset.direction).toBe('up')
+      const firstSerial = Number(firstImpact.dataset.serial)
+      expect(firstSerial).toBeGreaterThan(0)
+      expect(firstImpact.style.left).toBe('480px')
+      expect(firstImpact.style.top).toBe('234px')
+      expect(firstImpact.querySelector<HTMLElement>('span')?.style.backgroundImage)
+        .toContain('/office/furniture/collision-impact-v1.png')
+
+      fireEvent.keyDown(map, { key: 'w' })
+      expect(Number(screen.getByTestId('office-collision-impact').dataset.serial)).toBe(firstSerial + 1)
+      act(() => vi.advanceTimersByTime(400))
+      expect(screen.queryByTestId('office-collision-impact')).toBeNull()
+      expect(screen.getByRole('img', { name: 'Alice on the office map' }).dataset.bumped).toBe('false')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('walks Alice to a distant world object before activating it', () => {
     vi.useFakeTimers()
     vi.stubGlobal('matchMedia', vi.fn(() => ({

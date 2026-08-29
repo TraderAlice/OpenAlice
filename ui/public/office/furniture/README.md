@@ -48,6 +48,7 @@ theme preference, including system-resolved Auto mode.
 - `workspace-sign-v1.png` — blank physical placard behind live Workspace, Harness, and agent text
 - `spawn-compass-v1.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
 - `route-chevron-v1.png` — generated 24px floor inlay for the remaining click-to-interact path
+- `collision-impact-v1.png` — generated four-frame blocked-movement sparkle at native 24px cells
 
 `operations-board-v1.png` was generated from the locked style master as a freestanding, width-dominant
 mission console with an abstract teal status display and no baked words. The built-in image generator
@@ -66,3 +67,7 @@ assets failed to load.
 `route-chevron-v1.png` is a compact diamond double-chevron generated on a flat magenta key, alpha-extracted,
 hard-matted, and nearest-neighbor packaged at the native 24px navigation grid. Runtime rotation supplies four
 directions; markers are decorative world feedback and never replace the named route status.
+
+`collision-impact-v1.png` is a 96x24 transparent atlas with contact, star, arc, and fragment frames. Runtime
+rotation supplies four collision directions. Reduced-motion mode holds the bright second frame for the same short
+lifetime instead of animating the sheet; the effect is decorative and does not compete with interaction prompts.
