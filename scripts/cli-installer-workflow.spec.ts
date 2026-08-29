@@ -65,13 +65,24 @@ describe('CLI installer dev publication workflow', () => {
 
   it('validates candidates before uploading immutable assets and fixed aliases', () => {
     const publish = workflow.jobs['publish-dev-cli']
-    expect(publish.needs).toBe('build-dev-cli')
+    expect(publish.needs).toEqual(['build-dev-cli', 'accept-dev-linuxbrew'])
     expect(step(publish, 'Validate candidates and prepare channel aliases').run)
       .toContain('prepare-cli-dev-assets.mjs')
     const upload = step(publish, 'Publish immutable candidates and activate dev aliases').run ?? ''
     expect(upload.indexOf('cli/dev/releases/${GITHUB_SHA}')).toBeGreaterThanOrEqual(0)
     expect(upload.indexOf('aliases/*.tar.gz')).toBeLessThan(upload.indexOf('aliases/*.sha256'))
     expect(upload.indexOf('aliases/*.sha256')).toBeLessThan(upload.indexOf('manifest.json'))
+  })
+
+  it('accepts Linuxbrew on both native Linux architectures before publication', () => {
+    const linuxbrew = workflow.jobs['accept-dev-linuxbrew']
+    expect(linuxbrew.needs).toBe('build-dev-cli')
+    expect(linuxbrew.strategy?.matrix?.include).toEqual([
+      { os: 'ubuntu-24.04', arch: 'x64' },
+      { os: 'ubuntu-24.04-arm', arch: 'arm64' },
+    ])
+    expect(step(linuxbrew, 'Accept the dev archives through Linuxbrew').run)
+      .toContain('cli-linuxbrew-smoke.mjs')
   })
 
   it('runs the live network install only after a successful push publication', () => {

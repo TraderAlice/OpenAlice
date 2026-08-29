@@ -533,6 +533,71 @@ jobs:
             --previous-package dist/cli-package-homebrew-previous-channels/homebrew/openalice.rb \
             --current-package dist/cli-package-homebrew-current/homebrew/openalice.rb
 
+  accept-cli-linuxbrew:
+    name: Accept Linuxbrew CLI (${{ matrix.arch }})
+    needs: [release, build-cli-release]
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-release-*
+          path: dist/release-cli
+          merge-multiple: true
+
+      - name: Install and run the accepted archive through Linuxbrew
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/prepare-cli-previous-release.mjs \
+            --input-dir dist/release-cli \
+            --output-dir dist/cli-package-linuxbrew-previous \
+            --version "$VERSION"
+          PREVIOUS_VERSION=$(node -p "require('./dist/cli-package-linuxbrew-previous/fixture.json').previousVersion")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/release-cli \
+            --output-dir dist/cli-package-linuxbrew-current \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url file:///work/dist/release-cli \
+            --require-all
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/cli-package-linuxbrew-previous \
+            --output-dir dist/cli-package-linuxbrew-previous-channels \
+            --version "$PREVIOUS_VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url file:///work/dist/cli-package-linuxbrew-previous \
+            --require-all
+          CURRENT_ID=$(node -e "const f=require('./dist/cli-package-linuxbrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
+          PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-linuxbrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
+          node scripts/cli-linuxbrew-smoke.mjs \
+            --arch "${{ matrix.arch }}" \
+            --previous-version "$PREVIOUS_VERSION" \
+            --current-version "$VERSION" \
+            --previous-content-identity "$PREVIOUS_ID" \
+            --current-content-identity "$CURRENT_ID" \
+            --previous-package dist/cli-package-linuxbrew-previous-channels/homebrew/openalice.rb \
+            --current-package dist/cli-package-linuxbrew-current/homebrew/openalice.rb
+
   accept-cli-aur:
     name: Accept Arch/AUR CLI package
     needs: [release, build-cli-release]
@@ -667,8 +732,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-aur, build-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, build-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-linuxbrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read

@@ -108,6 +108,7 @@ describe('Release workflow critical path', () => {
     const nativeCli = workflow.jobs['build-cli-release']
     const channels = workflow.jobs['build-cli-package-channels']
     const homebrew = workflow.jobs['accept-cli-homebrew']
+    const linuxbrew = workflow.jobs['accept-cli-linuxbrew']
     const aur = workflow.jobs['accept-cli-aur']
 
     const npmAndBun = step(nativeCli, 'Accept npm and Bun installs from the native candidate').run ?? ''
@@ -124,6 +125,12 @@ describe('Release workflow critical path', () => {
       .toContain('--manager brew')
     expect(step(homebrew, 'Install and run the accepted archive through Homebrew').run)
       .toContain('prepare-cli-previous-release.mjs')
+    expect(linuxbrew.strategy?.matrix?.include).toEqual([
+      { os: 'ubuntu-24.04', arch: 'x64' },
+      { os: 'ubuntu-24.04-arm', arch: 'arm64' },
+    ])
+    expect(step(linuxbrew, 'Install and run the accepted archive through Linuxbrew').run)
+      .toContain('cli-linuxbrew-smoke.mjs')
     expect(step(aur, 'Build, install, and run the generated AUR package').run)
       .toContain('archlinux:base-devel')
     expect(step(aur, 'Build, install, and run the generated AUR package').run)

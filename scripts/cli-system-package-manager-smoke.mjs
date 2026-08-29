@@ -107,7 +107,9 @@ try {
 }
 
 function prepareBrewManager() {
-  if (process.platform !== 'darwin') fail('Homebrew lifecycle smoke requires native macOS')
+  if (!['darwin', 'linux'].includes(process.platform)) {
+    fail('Homebrew lifecycle smoke requires macOS or Linux')
+  }
   const tap = 'openalice-smoke/lifecycle'
   const source = join(root, 'tap-source')
   const formula = join(source, 'Formula/openalice.rb')

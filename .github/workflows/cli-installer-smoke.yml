@@ -32,6 +32,8 @@ on:
       - "scripts/cli-release-fixture.mjs"
       - "scripts/cli-release-fixture.spec.mjs"
       - "scripts/cli-system-package-manager-smoke.mjs"
+      - "scripts/cli-linuxbrew-smoke.mjs"
+      - "scripts/cli-linuxbrew-smoke.spec.mjs"
       - "scripts/prepare-cli-previous-release.mjs"
       - "scripts/prepare-cli-dev-assets.mjs"
       - "scripts/prepare-cli-dev-assets.spec.mjs"
@@ -222,10 +224,73 @@ jobs:
           compression-level: 0
           retention-days: 1
 
+  accept-dev-linuxbrew:
+    if: github.event_name == 'push'
+    name: Accept dev Linuxbrew CLI (${{ matrix.arch }})
+    needs: build-dev-cli
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dev-cli-*
+          path: dist/dev-cli-candidates
+          merge-multiple: true
+
+      - name: Accept the dev archives through Linuxbrew
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/prepare-cli-previous-release.mjs \
+            --input-dir dist/dev-cli-candidates \
+            --output-dir dist/dev-linuxbrew-previous \
+            --version "$VERSION"
+          PREVIOUS_VERSION=$(node -p "require('./dist/dev-linuxbrew-previous/fixture.json').previousVersion")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/dev-cli-candidates \
+            --output-dir dist/dev-linuxbrew-current \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url file:///work/dist/dev-cli-candidates \
+            --require-all
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/dev-linuxbrew-previous \
+            --output-dir dist/dev-linuxbrew-previous-channels \
+            --version "$PREVIOUS_VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url file:///work/dist/dev-linuxbrew-previous \
+            --require-all
+          CURRENT_ID=$(node -e "const f=require('./dist/dev-linuxbrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
+          PREVIOUS_ID=$(node -e "const f=require('./dist/dev-linuxbrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
+          node scripts/cli-linuxbrew-smoke.mjs \
+            --arch "${{ matrix.arch }}" \
+            --previous-version "$PREVIOUS_VERSION" \
+            --current-version "$VERSION" \
+            --previous-content-identity "$PREVIOUS_ID" \
+            --current-content-identity "$CURRENT_ID" \
+            --previous-package dist/dev-linuxbrew-previous-channels/homebrew/openalice.rb \
+            --current-package dist/dev-linuxbrew-current/homebrew/openalice.rb
+
   publish-dev-cli:
     if: github.event_name == 'push'
     name: Publish dev native CLI aliases
-    needs: build-dev-cli
+    needs: [build-dev-cli, accept-dev-linuxbrew]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
