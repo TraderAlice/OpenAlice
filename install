@@ -311,6 +311,7 @@ mkdir "$lock_dir"
 printf '%s\n' "$$" >"$lock_dir/pid"
 lock_owned=true
 mkdir -p "$releases_dir" "$provenance_dir" "$bin_dir" "$cli_root/staging"
+releases_dir="$(CDPATH= cd -- "$releases_dir" && pwd -P)"
 staging_dir="$(mktemp -d "$cli_root/staging/install.XXXXXX")"
 downloaded_archive="$staging_dir/release.tar.gz"
 

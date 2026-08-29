@@ -817,3 +817,20 @@ This plan is complete only when:
   and no configured accounts. Release and feasibility reports now preserve
   compile, artifact, total, cold-start, and per-role memory evidence. Source
   development remains the unchanged `pnpm dev` path.
+- 2026-08-30: Expanded the npm/Bun native package smoke from one install/remove
+  pass into two real manager-owned candidates. Each manager now upgrades and
+  removes with the Runtime stopped, then replaces a running prior candidate and
+  proves the new native command sees the old Guardian content as pending,
+  idempotent `up` preserves that result, CLI update/uninstall remain guidance
+  only, and `down` plus a fresh `up` activates the new content. Native macOS
+  arm64 passed through npm and pinned Bun 1.4.0; the PR matrix repeats the same
+  journey on Linux. Homebrew and AUR lifecycle expansion remains separate from
+  this npm/Bun increment.
+- 2026-08-30: Repaired cross-platform acceptance exposed by the package-manager
+  increment. The Bash installer now canonicalizes its release root before
+  retention comparisons, so macOS `/var` to `/private/var` resolution cannot
+  collect the active rollback release. npm package assembly selects `npm.cmd`
+  on Windows, path assertions use native separators, and the direct symlink
+  replacement rollback case is explicitly skipped on Windows while native
+  Windows activation remains a deferred distribution lane. Type checking, 335
+  CLI tests, 5,062 root tests, and the non-root Orb Linux installer smoke pass.

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { chmod, mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -108,7 +108,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
     expect((await readActivationReceipt(fixture.layout)).state).toBe('pending')
   })
 
-  it('restores the exact previous direct release when first readiness exits early', async () => {
+  it.skipIf(process.platform === 'win32')('restores the exact previous direct release when first readiness exits early', async () => {
     const fixture = await makeActivationLayout()
     await recordPendingActivation(fixture.layout, {
       activeRelease: fixture.currentName,
@@ -143,7 +143,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
         restoredRelease: fixture.previousName,
       },
     })
-    expect(await readlink(fixture.layout.currentPath)).toBe(`releases/${fixture.previousName}`)
+    expect(await readlink(fixture.layout.currentPath)).toBe(join('releases', fixture.previousName))
     expect(await readActivationReceipt(fixture.layout)).toMatchObject({
       state: 'rolled_back',
       failureCode: 'EEARLYEXIT',
@@ -180,7 +180,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
       readStatus: async () => absentStatus(),
       sleep: async () => new Promise(() => undefined),
     })).rejects.toMatchObject({ code: 'EEARLYEXIT' })
-    expect(await readlink(fixture.layout.currentPath)).toBe(`releases/${fixture.currentName}`)
+    expect(await readlink(fixture.layout.currentPath)).toBe(join('releases', fixture.currentName))
     expect((await readActivationReceipt(fixture.layout)).state).toBe('pending')
   })
 
