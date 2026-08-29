@@ -132,8 +132,10 @@ pnpm exec vitest run \
 The PR workflow samples native macOS arm64 and Linux x64 candidates through npm
 and Bun. Every `dev` push and the formal release matrix repeat npm/Bun acceptance
 on all four targets before preserving the candidate. Release acceptance also
-installs the formula on native arm64 and Intel macOS runners, and builds plus
-installs the x64 `openalice-bin` in a pinned clean Arch container.
+installs the formula on native arm64 and Intel macOS runners, repeats the full
+formula lifecycle on native Linux arm64/x64 runners inside pinned official
+Homebrew images, and builds plus installs the x64 `openalice-bin` in a pinned
+clean Arch container.
 The official `archlinux:base-devel` image currently has no arm64 manifest, so
 arm64 AUR metadata is generated and checksum-bound but still needs a native
 Arch Linux ARM acceptance host. Each smoke uses an isolated home, exercises

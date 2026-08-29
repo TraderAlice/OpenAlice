@@ -448,8 +448,8 @@ build harness when it improves the next investigation.
   platform; verify that the final command is the native executable and does
   not require the package manager at runtime.
 - [x] Generate the TraderAlice Homebrew formula from accepted archive URLs and
-  checksums. The release gate is configured for native macOS arm64/x64
-  installation; Linuxbrew remains a release acceptance gap.
+  checksums. The release gate covers native macOS arm64/x64 and Linuxbrew
+  arm64/x64 installation.
 - [x] Generate the `openalice-bin` AUR `PKGBUILD` and `.SRCINFO` from the
   accepted Linux archives and configure a pinned clean Arch x64 build/install
   gate. Native Arch Linux ARM acceptance remains open because the official
@@ -859,3 +859,9 @@ This plan is complete only when:
   absent from the Runtime `PATH`. Stable registry/tap/AUR publication and the
   tagged-release matrix remain release activation work; Windows remains
   deferred.
+- 2026-08-30: Closed the Linuxbrew acceptance gap with pinned official
+  Homebrew 6.0.15 images for native Linux arm64 and x64 runners. The shared
+  system-package lifecycle now accepts Homebrew on macOS or Linux, while a
+  release-gating Linuxbrew matrix repeats stopped and active upgrades,
+  ownership guidance, restart activation, and removal against the exact
+  accepted Linux archives.
