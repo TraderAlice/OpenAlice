@@ -147,8 +147,11 @@ interface LoggerLike {
 }
 
 export class ProductActivityJournal {
+  private static readonly FAMILY_BUFFER_SIZE = 500
   private readonly latestBySession = new Map<string, AgentRuntimeEvent>()
   private readonly registeredFamilies = new Map<string, ProductActivityFamily>()
+  private readonly recentByFamily = new Map<ProductActivityFamily, AgentRuntimeEvent[]>()
+  private readonly familyTotals = new Map<ProductActivityFamily, number>()
   private total = 0
   private first = 0
 
@@ -160,14 +163,14 @@ export class ProductActivityJournal {
   static async open(path: string, logger: LoggerLike): Promise<ProductActivityJournal> {
     const events = await createEventLog({ logPath: path, bufferSize: 2_000 })
     const log = new ProductActivityJournal(events, logger)
-    // EventLog restores only its bounded recent ring. Recover the compact live
-    // projection once here so Office polling never has to rescan the journal.
-    // The projection keeps one enriched event per Session, not the full log.
-    log.recoverProjection(await events.read())
     log.registerTypes('agent', AGENT_RUNTIME_EVENT_TYPES.filter((type) =>
       type === 'session.born' || type.startsWith('runtime.'),
     ))
     log.registerTypes('dev', ['dev.sonner_test'])
+    // EventLog restores only its bounded recent ring. Recover the compact live
+    // projection once here so Office polling never has to rescan the journal.
+    // The projection keeps one enriched event per Session, not the full log.
+    log.recoverProjection(await events.read())
     return log
   }
 
@@ -263,9 +266,36 @@ export class ProductActivityJournal {
     readonly page?: number
     readonly pageSize?: number
     readonly type?: AgentRuntimeEventType
+    readonly family?: ProductActivityFamily
   } = {}): Promise<EventLogQueryResult> {
     const page = Math.max(1, opts.page ?? 1)
     const pageSize = Math.max(1, opts.pageSize ?? 100)
+    if (opts.family) {
+      const total = this.familyTotals.get(opts.family) ?? 0
+      const recent = this.recentByFamily.get(opts.family) ?? []
+      if (page * pageSize <= ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+        const start = Math.max(0, recent.length - page * pageSize)
+        const end = recent.length - (page - 1) * pageSize
+        return {
+          entries: recent.slice(start, end).reverse(),
+          total,
+          page,
+          pageSize,
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        }
+      }
+      const matching = this.asAgentRuntimeEvents(await this.events.read())
+        .filter((event) => this.familyOf(event.type) === opts.family)
+      const start = Math.max(0, matching.length - page * pageSize)
+      const end = matching.length - (page - 1) * pageSize
+      return {
+        entries: matching.slice(start, end).reverse(),
+        total: matching.length,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(matching.length / pageSize)),
+      }
+    }
     if (page === 1 && !opts.type) {
       const recent = this.asAgentRuntimeEvents(this.events.recent())
         .slice(-pageSize)
@@ -284,6 +314,8 @@ export class ProductActivityJournal {
   async close(): Promise<void> {
     await this.events.close()
     this.latestBySession.clear()
+    this.recentByFamily.clear()
+    this.familyTotals.clear()
     this.total = 0
     this.first = 0
   }
@@ -295,6 +327,14 @@ export class ProductActivityJournal {
   private accept(event: AgentRuntimeEvent): void {
     this.total += 1
     if (this.first === 0 || event.seq < this.first) this.first = event.seq
+    const family = this.familyOf(event.type)
+    const familyEvents = this.recentByFamily.get(family) ?? []
+    familyEvents.push(event)
+    if (familyEvents.length > ProductActivityJournal.FAMILY_BUFFER_SIZE) {
+      familyEvents.splice(0, familyEvents.length - ProductActivityJournal.FAMILY_BUFFER_SIZE)
+    }
+    this.recentByFamily.set(family, familyEvents)
+    this.familyTotals.set(family, (this.familyTotals.get(family) ?? 0) + 1)
     // Dev-only notification probes belong to the append-only diagnostic stream
     // so they exercise the real UI projection, but never represent occupancy.
     if (event.type === 'dev.sonner_test') return

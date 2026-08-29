@@ -92,10 +92,12 @@ export function createAgentRuntimeLogRoutes(svc: WorkspaceService): Hono {
     }
     const page = positiveInteger(c.req.query('page'), 1)
     const pageSize = Math.min(100, positiveInteger(c.req.query('pageSize'), 50))
+    const family = c.req.query('family')?.trim() || undefined
     const result = await activityJournal.query({
       page,
       pageSize,
       ...(type ? { type } : {}),
+      ...(!type && family ? { family } : {}),
     })
     return c.json({
       ...result,

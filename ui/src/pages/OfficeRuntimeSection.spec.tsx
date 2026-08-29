@@ -9,6 +9,26 @@ import { OfficeRuntimeSection } from './OfficeRuntimeSection'
 
 const query = vi.fn()
 
+function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>) {
+  query.mockImplementation(async (opts: { family?: string } = {}) => {
+    const filtered = opts.family === 'inbox'
+      ? entries.filter((entry) => entry.type === 'inbox.received')
+      : opts.family === 'news'
+        ? entries.filter((entry) => entry.type === 'news.ingested')
+        : opts.family === 'agent'
+          ? entries.filter((entry) => entry.type !== 'inbox.received' && entry.type !== 'news.ingested')
+          : entries
+    return {
+      entries: filtered,
+      lastSeq: entries.length,
+      total: filtered.length,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
+    }
+  })
+}
+
 vi.mock('../api', () => ({
   api: {
     agentRuntime: {
@@ -146,13 +166,7 @@ describe('OfficeRuntimeSection', () => {
 
   it('keeps granular events while switching between product activity channels', async () => {
     const now = Date.now()
-    query.mockResolvedValue({
-      lastSeq: 4,
-      total: 4,
-      page: 1,
-      pageSize: 50,
-      totalPages: 1,
-      entries: [
+    mockJournal([
         {
           seq: 4,
           ts: now,
@@ -177,8 +191,7 @@ describe('OfficeRuntimeSection', () => {
           type: 'runtime.started',
           payload: { resumeId: 'resume-a', agent: 'pi', workspaceId: 'chat-a' },
         },
-      ],
-    })
+    ])
     render(<OfficeRuntimeSection />)
 
     const allTab = await screen.findByRole('tab', { name: /All\s*4/ })
@@ -204,19 +217,12 @@ describe('OfficeRuntimeSection', () => {
   })
 
   it('keeps channel navigation available when the selected channel is empty', async () => {
-    query.mockResolvedValue({
-      lastSeq: 1,
-      total: 1,
-      page: 1,
-      pageSize: 50,
-      totalPages: 1,
-      entries: [{
+    mockJournal([{
         seq: 1,
         ts: Date.now(),
         type: 'news.ingested',
         payload: { newsItemId: 1, source: 'Wire', title: 'Only headline' },
-      }],
-    })
+    }])
     render(<OfficeRuntimeSection />)
 
     await userEvent.click(await screen.findByRole('tab', { name: /Inbox\s*0/ }))

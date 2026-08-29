@@ -84,6 +84,7 @@ TraderAlice 可以注册全部三类；NanoAlice 或未来通用 Alice 可以省
 - [x] 全局活动 Hook 只消费统一 Journal，删除 Inbox 的并行轮询旁路
 - [x] Sonner 消费 Inbox / News 活动并提供到对应产品页的可达动作
 - [x] Office 日志为 Inbox / News 提供清晰标签、系统身份、详情和打开动作
+- [x] Journal 按 family 独立分页，Agent 工具噪声不会把稀疏 Inbox / News 事件挤出频道
 - [x] demo fixture 覆盖三类产品活动
 
 ### 4. Verification and delivery
@@ -96,6 +97,19 @@ TraderAlice 可以注册全部三类；NanoAlice 或未来通用 Alice 可以省
 - [x] `pnpm test`
 - [x] 真实 `/office`、`/inbox`、`/market/news` 路由验证
 - [x] 推送到现有 Office Draft PR，不合入 `dev`
+
+## Live Office follow-up (2026-08-30)
+
+- 用真实 Grok Issue 连续产生 155 次工具调用、Agent 里程碑、Inbox 送达和 News 入库后，
+  Operations Board 的 `All` 最新 50 条只剩 Agent 事件；原先在客户端对这 50 条再筛选，
+  导致 Inbox / News 标签错误显示为空。
+- 对比扩大统一页面、给产品事件提权重排序、按 family 独立分页后，采用 family 分页：扩大
+  页面仍会被长工具流耗尽，权重排序会破坏 Journal 顺序；family 页面既保留逐条事实，也不
+  改变 `All` 的精确时间线。
+- Journal 在恢复和追加时维护每个已注册 family 的有界近期页及准确总数；API 接受
+  `family`，Office 每轮并行刷新 `All / Agent / Inbox / News` 四个独立页面。真实 Project
+  复测为 `All 50 / Agent 50 / Inbox 4 / News 50`，Inbox #0823 在 1,295 条总日志与密集
+  Agent 工具流之后仍可直接打开。
 
 ## Completion
 

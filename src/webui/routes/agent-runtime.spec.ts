@@ -47,6 +47,19 @@ describe('GET /api/agent-runtime', () => {
     expect(body.lastSeq).toBe(3)
   })
 
+  it('passes a product family to paginated journal queries', async () => {
+    const query = vi.fn(async () => ({
+      entries: [], total: 0, page: 1, pageSize: 50, totalPages: 1,
+    }))
+    const app = new Hono().route('/', createAgentRuntimeLogRoutes({
+      activityJournal: { lastSeq: () => 3, query },
+    } as never))
+
+    const res = await app.request('/?page=1&pageSize=50&family=inbox')
+    expect(res.status).toBe(200)
+    expect(query).toHaveBeenCalledWith({ page: 1, pageSize: 50, family: 'inbox' })
+  })
+
   it('records a Sonner probe through the same runtime journal', async () => {
     const record = vi.fn(async (type, payload) => ({ seq: 7, ts: 1, type, payload }))
     const app = new Hono().route('/', createAgentRuntimeLogRoutes({

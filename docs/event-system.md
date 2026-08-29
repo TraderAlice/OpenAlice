@@ -52,6 +52,10 @@ per-item News facts. NanoAlice can omit product-specific families, and future
 Workspace products can register new families without rebuilding the journal or
 creating another notification polling path.
 
+Consumer pagination is family-aware. A dense Agent tool stream must not evict
+sparse Inbox, News, or future registered-family facts from that family's first
+page; `All` remains the exact newest-first journal page.
+
 For compatibility with the first shipped Agent-only projection, the physical
 file remains `state/agent-runtime.jsonl` and the read API remains
 `/api/agent-runtime` in this increment. Those names are compatibility details;

@@ -20,12 +20,6 @@ const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   news: 'office.logChannelNews',
 } as const satisfies Record<OfficeLogChannel, string>
 
-function eventChannel(event: AgentRuntimeEvent): Exclude<OfficeLogChannel, 'all'> {
-  if (event.type === 'inbox.received') return 'inbox'
-  if (event.type === 'news.ingested') return 'news'
-  return 'agent'
-}
-
 function eventLabel(type: AgentRuntimeEventType): string {
   if (type === 'runtime.turn.text') return 'text'
   if (type === 'runtime.turn.tool') return 'tool'
@@ -96,7 +90,12 @@ function causeLabel(event: AgentRuntimeEvent): string | null {
 export function OfficeRuntimeSection() {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
-  const [entries, setEntries] = useState<AgentRuntimeEvent[]>([])
+  const [entriesByChannel, setEntriesByChannel] = useState<Record<OfficeLogChannel, AgentRuntimeEvent[]>>({
+    all: [],
+    agent: [],
+    inbox: [],
+    news: [],
+  })
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null)
   const [channel, setChannel] = useState<OfficeLogChannel>('all')
   const [error, setError] = useState<string | null>(null)
@@ -105,8 +104,17 @@ export function OfficeRuntimeSection() {
   const load = useCallback(async () => {
     try {
       const activityApi = api.productActivity ?? api.agentRuntime
-      const page = await activityApi.query({ page: 1, pageSize: 50 })
-      setEntries(page.entries)
+      const pages = await Promise.all(OFFICE_LOG_CHANNELS.map((item) => activityApi.query({
+        page: 1,
+        pageSize: 50,
+        ...(item === 'all' ? {} : { family: item }),
+      })))
+      setEntriesByChannel({
+        all: pages[0].entries,
+        agent: pages[1].entries,
+        inbox: pages[2].entries,
+        news: pages[3].entries,
+      })
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -121,20 +129,13 @@ export function OfficeRuntimeSection() {
     return () => clearInterval(id)
   }, [load])
 
-  const channelCounts = useMemo(() => {
-    const counts: Record<OfficeLogChannel, number> = {
-      all: entries.length,
-      agent: 0,
-      inbox: 0,
-      news: 0,
-    }
-    for (const event of entries) counts[eventChannel(event)] += 1
-    return counts
-  }, [entries])
-  const visibleEntries = useMemo(
-    () => channel === 'all' ? entries : entries.filter((event) => eventChannel(event) === channel),
-    [channel, entries],
-  )
+  const channelCounts = useMemo(() => ({
+    all: entriesByChannel.all.length,
+    agent: entriesByChannel.agent.length,
+    inbox: entriesByChannel.inbox.length,
+    news: entriesByChannel.news.length,
+  }), [entriesByChannel])
+  const visibleEntries = entriesByChannel[channel]
 
   useEffect(() => {
     if (visibleEntries.length === 0) {
@@ -146,11 +147,11 @@ export function OfficeRuntimeSection() {
       : visibleEntries[0].seq)
   }, [visibleEntries])
 
-  if (loading && entries.length === 0) {
+  if (loading && entriesByChannel.all.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
   }
 
-  if (error && entries.length === 0) {
+  if (error && entriesByChannel.all.length === 0) {
     return (
       <div role="alert" className="oa-office-runtime__error">
         {t('office.loadFailed')}: {error}
@@ -158,7 +159,7 @@ export function OfficeRuntimeSection() {
     )
   }
 
-  if (entries.length === 0) {
+  if (entriesByChannel.all.length === 0) {
     return (
       <div className="oa-office-runtime__empty">
         {t('office.empty')}

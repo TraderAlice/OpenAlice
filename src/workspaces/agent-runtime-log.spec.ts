@@ -152,12 +152,24 @@ describe('AgentRuntimeLog', () => {
       publishedAt: 1_000,
       ingestSource: 'rss',
     })
+    for (let index = 0; index < 60; index += 1) {
+      await log.record('runtime.turn.tool', {
+        workspaceId: 'desk-a',
+        resumeId: 'resume-noisy',
+        agent: 'codex',
+        toolId: `tool-${index}`,
+        toolName: 'workspace_list',
+        toolStatus: 'completed',
+      })
+    }
 
-    expect((await log.read()).map((entry) => entry.type)).toEqual([
-      'inbox.received',
-      'news.ingested',
-    ])
-    expect(log.projectionEvents()).toEqual([])
+    expect((await log.query({ page: 1, pageSize: 50 })).entries.every((entry) =>
+      entry.type === 'runtime.turn.tool')).toBe(true)
+    expect((await log.query({ page: 1, pageSize: 50, family: 'inbox' })).entries)
+      .toEqual([expect.objectContaining({ type: 'inbox.received' })])
+    expect((await log.query({ page: 1, pageSize: 50, family: 'news' })).entries)
+      .toEqual([expect.objectContaining({ type: 'news.ingested' })])
+    expect(log.projectionEvents()).toHaveLength(1)
     expect(log.familyOf('news.ingested')).toBe('news')
   })
 
