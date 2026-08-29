@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../api'
-import type { AgentRuntimeEvent, AgentRuntimeEventType } from '../api/agentRuntimeLog'
+import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { formatRelativeTime } from '../lib/intl'
 import { officePixelImg } from '../office/furniture'
@@ -20,14 +21,33 @@ const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   news: 'office.logChannelNews',
 } as const satisfies Record<OfficeLogChannel, string>
 
-function eventLabel(type: AgentRuntimeEventType): string {
-  if (type === 'runtime.turn.text') return 'text'
-  if (type === 'runtime.turn.tool') return 'tool'
-  if (type === 'runtime.turn.error') return 'error'
-  if (type === 'dev.sonner_test') return 'Sonner test'
-  if (type === 'inbox.received') return 'Inbox received'
-  if (type === 'news.ingested') return 'News ingested'
-  return type.replace('runtime.', '').replace('session.', '')
+function eventLabel(event: AgentRuntimeEvent, t: TFunction): string {
+  if (event.type === 'session.born') return t('office.logEventBorn')
+  if (event.type === 'runtime.started') return t('office.logEventStarted')
+  if (event.type === 'runtime.spawn_failed') return t('office.logEventSpawnFailed')
+  if (event.type === 'runtime.stopped') {
+    if (event.payload.status === 'done') return t('office.logEventCompleted')
+    if (event.payload.status === 'failed') return t('office.logEventFailed')
+    if (event.payload.status === 'interrupted') return t('office.logEventInterrupted')
+    if (event.payload.status === 'paused') return t('office.logEventPaused')
+    return t('office.logEventStopped')
+  }
+  if (event.type === 'runtime.rejected') return t('office.logEventRejected')
+  if (event.type === 'runtime.turn.text') return t('office.logEventReport')
+  if (event.type === 'runtime.turn.tool') return t('office.logEventTool')
+  if (event.type === 'runtime.turn.error') return t('office.logEventError')
+  if (event.type === 'dev.sonner_test') return t('office.logEventTest')
+  if (event.type === 'inbox.received') return t('office.logEventInbox')
+  if (event.type === 'news.ingested') return t('office.logEventNews')
+  return event.type satisfies never
+}
+
+function eventStatusLabel(status: AgentRuntimeEvent['payload']['status'], t: TFunction): string | null {
+  if (status === 'done') return t('office.logStatusDone')
+  if (status === 'failed') return t('office.logStatusFailed')
+  if (status === 'interrupted') return t('office.logStatusInterrupted')
+  if (status === 'paused') return t('office.logStatusPaused')
+  return null
 }
 
 function eventDetail(event: AgentRuntimeEvent): string | null {
@@ -199,7 +219,7 @@ export function OfficeRuntimeSection() {
   }
   addMeta(t('office.surface'), selectedPayload.surface)
   addMeta(t('office.eventCause'), causeLabel(selectedEvent))
-  addMeta(t('office.status'), selectedPayload.status)
+  addMeta(t('office.status'), eventStatusLabel(selectedPayload.status, t))
   if (selectedPayload.metrics) {
     const metrics: string[] = [
       t('office.eventTextBlocks', { count: selectedPayload.metrics.textBlocks }),
@@ -213,11 +233,11 @@ export function OfficeRuntimeSection() {
   addMeta(t('office.eventReason'), selectedPayload.reason)
   addMeta(t('office.eventErrorCode'), selectedPayload.launchErrorCode)
   if (selectedEvent.type === 'inbox.received' && selectedPayload.documentCount) {
-    addMeta('Documents', String(selectedPayload.documentCount))
+    addMeta(t('office.eventDocuments'), String(selectedPayload.documentCount))
   }
   if (selectedEvent.type === 'news.ingested') {
-    addMeta('Source', selectedPayload.source)
-    addMeta('Published', selectedPayload.publishedAt
+    addMeta(t('office.eventSource'), selectedPayload.source)
+    addMeta(t('office.eventPublished'), selectedPayload.publishedAt
       ? new Date(selectedPayload.publishedAt).toLocaleString()
       : undefined)
   }
@@ -279,7 +299,7 @@ export function OfficeRuntimeSection() {
                 >
                   <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
                   <span className="oa-office-runtime__index-copy">
-                    <strong>{eventLabel(event.type)}</strong>
+                    <strong>{eventLabel(event, t)}</strong>
                     <small>{eventActor(event)}</small>
                   </span>
                   <span className="oa-office-runtime__index-meta">
@@ -305,7 +325,7 @@ export function OfficeRuntimeSection() {
           </div>
           <div className="oa-office-runtime__content">
             <header className="oa-office-runtime__heading">
-              <span className="oa-office-runtime__type">{eventLabel(selectedEvent.type)}</span>
+              <span className="oa-office-runtime__type">{eventLabel(selectedEvent, t)}</span>
               <span className="oa-office-runtime__seq">#{String(selectedEvent.seq).padStart(4, '0')}</span>
               <time dateTime={new Date(selectedEvent.ts).toISOString()}>{formatRelativeTime(selectedEvent.ts)}</time>
             </header>
@@ -344,7 +364,7 @@ export function OfficeRuntimeSection() {
               onClick={() => openOrFocus({ kind: 'inbox', params: {} })}
             >
               <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-              Open Inbox
+              {t('office.interactInbox')}
             </button>
           )}
           {selectedEvent.type === 'news.ingested' && (
@@ -354,7 +374,7 @@ export function OfficeRuntimeSection() {
               onClick={() => openOrFocus({ kind: 'news', params: {} })}
             >
               <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-              Open News
+              {t('office.interactNews')}
             </button>
           )}
         </article>

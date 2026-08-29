@@ -82,11 +82,11 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getAllByText('#0001').length).toBeGreaterThan(0)
     expect(screen.getByText(/webpi/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /started.*@resume-alice.*#0001/i }).getAttribute('aria-pressed'))
+    expect(screen.getByRole('button', { name: /Task started.*@resume-alice.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
     expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
       .toContain('/office/log/lifecycle-v1.png')
-    expect(screen.getByRole('button', { name: /started.*@resume-alice.*#0001/i })
+    expect(screen.getByRole('button', { name: /Task started.*@resume-alice.*#0001/i })
       .querySelector<HTMLImageElement>('.oa-office-runtime__cursor')?.src)
       .toContain('/office/hud/journal-cursor-v1.png')
     expect(container.textContent).not.toContain('▶')
@@ -139,7 +139,8 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByText('Output')).toBeTruthy()
     expect(screen.getByText('1 text block · 1 tool call')).toBeTruthy()
     expect(screen.queryByText('—')).toBeNull()
-    expect(screen.getByRole('button', { name: /stopped.*#0002/i }).getAttribute('aria-pressed'))
+    expect(screen.getByText('Complete')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Task complete.*#0002/i }).getAttribute('aria-pressed'))
       .toBe('true')
     expect(Array.from(container.querySelectorAll<HTMLImageElement>('.oa-office-runtime__index button > img:first-child'))
       .map((image) => image.src)).toEqual([
@@ -147,12 +148,12 @@ describe('OfficeRuntimeSection', () => {
       expect.stringContaining('/office/log/tool-action-v1.png'),
     ])
 
-    await userEvent.click(screen.getByRole('button', { name: /tool.*#0001/i }))
+    await userEvent.click(screen.getByRole('button', { name: /Tool action.*#0001/i }))
     expect(screen.getByText('workspace_list · completed')).toBeTruthy()
     expect(screen.queryByText('Desk is clear.')).toBeNull()
-    expect(screen.getByRole('button', { name: /tool.*#0001/i }).getAttribute('aria-pressed'))
+    expect(screen.getByRole('button', { name: /Tool action.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(screen.getByRole('button', { name: /tool.*#0001/i })
+    expect(screen.getByRole('button', { name: /Tool action.*#0001/i })
       .querySelector<HTMLImageElement>('.oa-office-runtime__cursor')?.src)
       .toContain('/office/hud/journal-cursor-v1.png')
     expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
@@ -160,7 +161,7 @@ describe('OfficeRuntimeSection', () => {
 
     await userEvent.keyboard('{ArrowUp}')
     expect(screen.getByText('Desk is clear.')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /stopped.*#0002/i }).getAttribute('aria-pressed'))
+    expect(screen.getByRole('button', { name: /Task complete.*#0002/i }).getAttribute('aria-pressed'))
       .toBe('true')
   })
 
@@ -212,8 +213,59 @@ describe('OfficeRuntimeSection', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: /Agent\s*2/ }))
     expect(screen.getByRole('list', { name: 'Activity log · Agent' }).children).toHaveLength(2)
-    expect(screen.getByRole('button', { name: /tool.*#0002/i })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /News ingested/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /Tool action.*#0002/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /News added/i })).toBeNull()
+  })
+
+  it('presents runtime outcomes as player-facing activity language', async () => {
+    const now = Date.now()
+    mockJournal([
+      {
+        seq: 6,
+        ts: now,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', status: 'failed' },
+      },
+      {
+        seq: 5,
+        ts: now - 1,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', status: 'interrupted' },
+      },
+      {
+        seq: 4,
+        ts: now - 2,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', status: 'paused' },
+      },
+      {
+        seq: 3,
+        ts: now - 3,
+        type: 'runtime.rejected',
+        payload: { resumeId: 'resume-a' },
+      },
+      {
+        seq: 2,
+        ts: now - 4,
+        type: 'runtime.spawn_failed',
+        payload: { resumeId: 'resume-a' },
+      },
+      {
+        seq: 1,
+        ts: now - 5,
+        type: 'runtime.turn.text',
+        payload: { resumeId: 'resume-a', text: 'A useful update.' },
+      },
+    ])
+    render(<OfficeRuntimeSection />)
+
+    expect(await screen.findByRole('button', { name: /Task failed.*#0006/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Task interrupted.*#0005/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Task paused.*#0004/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Needs attention.*#0003/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Launch failed.*#0002/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Agent report.*#0001/i })).toBeTruthy()
+    expect(screen.queryByText(/^stopped$|^text$|^rejected$/i)).toBeNull()
   })
 
   it('keeps channel navigation available when the selected channel is empty', async () => {

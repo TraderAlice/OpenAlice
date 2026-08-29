@@ -2536,6 +2536,22 @@ Spatial completion-cue follow-up (2026-08-30):
   disappeared with the review hold. Root/UI TypeScript, the full 613-file Vitest run (5,097 passing; one file and nine
   tests skipped), and the production build passed; existing large-chunk and direct-eval advisories are unchanged.
 
+Player-facing activity-language follow-up (2026-08-30):
+
+- A live Operations Board review found that the three physical `!` signals remained distinguishable by their terminal
+  silhouettes, but the journal itself still exposed backend nouns such as `stopped`, `text`, and `started`. The exact
+  runtime data was correct while the interaction read like a developer console instead of an in-world action record.
+- Compared collapsing a Session into one task card, appending explanations to raw event names, and translating only the
+  Office presentation layer. Chose presentation mapping so the requested event-by-event grain and replay sequence stay
+  intact while labels become `Task complete`, `Agent report`, `Task started`, `Needs attention`, and equivalent copy in
+  all four shipped locales. Raw completion statuses are likewise presented as player-facing states.
+- The desktop journal index now owns a measured 300px / 48% reading column so the new labels remain visible; below the
+  existing compact breakpoint the journal still stacks above the detail pane, preserving phone space and keyboard order.
+- Browser measurement confirmed that the six visible English labels have matching `clientWidth` and `scrollWidth` with
+  no overflow while the detail pane retains 310px. Arrow-key row navigation and the translated Inbox/News exits remained
+  operable. Focused Office specs, root/UI TypeScript, the full 613-file Vitest run (5,098 passing; one file and nine tests
+  skipped), and the production build passed; existing large-chunk and direct-eval advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

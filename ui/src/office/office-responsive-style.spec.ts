@@ -102,6 +102,9 @@ describe('Office responsive style contract', () => {
 
   it('shrink-wraps the desktop occupancy journal without weakening narrow-stage containment', () => {
     expect(css).toMatch(/\.oa-office-window--log\s*\{[\s\S]*?bottom: auto;[\s\S]*?max-height: calc\(100% - 92px\)/)
+    expect(css).toMatch(
+      /\.oa-office-runtime__journal\s*\{[\s\S]*?grid-template-columns: minmax\(300px, 48%\) minmax\(0, 1fr\)/,
+    )
     expect(css).toMatch(/@container \(max-width: 760px\) \{\s*\.oa-office-window--log\s*\{[^}]*bottom: 8px;[^}]*max-height: none;/)
   })
 

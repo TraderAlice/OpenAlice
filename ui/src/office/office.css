@@ -943,7 +943,7 @@
 
 .oa-office-runtime__journal {
   display: grid;
-  grid-template-columns: minmax(210px, 36%) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 48%) minmax(0, 1fr);
   align-items: start;
   gap: 10px;
 }
