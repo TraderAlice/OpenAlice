@@ -2143,6 +2143,26 @@ Workspace-destination prompt follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 611-file Vitest run (5,055 passing; one file and nine tests skipped), and the UI production
   build all passed.
 
+Manual-control teaching follow-up (2026-08-29):
+
+- Browser-measured the cross-floor Prediction and AutoQuant click routes before changing their feel. The 96ms tile pace,
+  remaining-step trail, target pointer, collision-aware turns, and mid-route retarget all stayed readable; changing speed
+  or adding arrival delay would have created friction without solving an observed problem.
+- The real teaching error was state ownership: requesting any auto-walk immediately marked the persistent
+  `MOVE · WASD / ARROWS` strip as learned, even when the player had never touched a direction control. After the first
+  click-and-return excursion, Office therefore removed the only manual-movement lesson on false evidence.
+- Compared treating all Alice motion as learning, keeping the lesson forever, and distinguishing navigation modes.
+  Chose mode-aware learning: route steps move and animate Alice without completing manual teaching; keyboard arrows,
+  WASD, the touch D-pad, and a real map drag retain their existing ownership of the learned state. Manual input during a
+  route still cancels it immediately and then records learning.
+- Browser-played Prediction auto-walk at 1280x900, 390x844, and 844x390. All three kept `learned=false`, displayed the
+  movement lesson beside the route without covering Alice, the path, or the target, and preserved the existing
+  contextual-action priority near arrival. A desktop ArrowRight takeover cleared the route/trail and changed the state
+  to `learned=true` in the same input.
+- Focused OfficeBuilding, interaction-path, and responsive-style specs passed: 3 files / 23 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 611-file Vitest run (5,055 passing; one file and nine tests skipped), and the UI production
+  build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -436,8 +436,12 @@ describe('OfficeBuilding', () => {
       )
 
       const alice = screen.getByRole('img', { name: 'Alice on the office map' })
+      const controls = screen.getByTestId('office-floor').parentElement
+        ?.querySelector<HTMLElement>('.oa-office-map-controls')
+      expect(controls?.dataset.learned).toBe('false')
       const sign = screen.getByRole('button', { name: 'Enter chat workspace' })
       fireEvent.click(sign)
+      expect(controls?.dataset.learned).toBe('false')
       expect(onOpenWorkspace).not.toHaveBeenCalled()
       expect(sign.dataset.route).toBe('true')
       expect(screen.getByText('Walking to chat')).toBeTruthy()
@@ -466,6 +470,7 @@ describe('OfficeBuilding', () => {
       expect(onOpenWorkspace).not.toHaveBeenCalled()
       act(() => vi.advanceTimersByTime(260))
       expect(onOpenWorkspace).toHaveBeenCalledWith('chat-1')
+      expect(controls?.dataset.learned).toBe('false')
       expect(sign.dataset.route).toBe('false')
       expect(screen.queryByTestId('office-route-trail')).toBeNull()
       expect(screen.queryByTestId('office-route-target-pointer')).toBeNull()
@@ -478,6 +483,7 @@ describe('OfficeBuilding', () => {
         'Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.',
       )
       fireEvent.keyDown(map, { key: 'ArrowDown' })
+      expect(controls?.dataset.learned).toBe('true')
       expect(screen.queryByTestId('office-route-trail')).toBeNull()
       expect(quantSign.dataset.route).toBe('false')
       act(() => vi.advanceTimersByTime(5_000))

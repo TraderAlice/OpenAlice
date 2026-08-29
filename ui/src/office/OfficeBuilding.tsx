@@ -359,8 +359,8 @@ export function OfficeBuilding({
     setAliceWalking(true)
     walkTimerRef.current = window.setTimeout(() => setAliceWalking(false), 150)
   }
-  const moveAlice = (movement: OfficeMovement) => {
-    setControlsLearned(true)
+  const moveAlice = (movement: OfficeMovement, learnsManualControls = true) => {
+    if (learnsManualControls) setControlsLearned(true)
     setAliceDirection(movement.direction)
     const move = moveAliceOnOfficeMap(aliceRef.current, movement, mapLayout, collisionRects)
     if (move.bumped) {
@@ -455,7 +455,6 @@ export function OfficeBuilding({
       showCollisionBump()
       return
     }
-    setControlsLearned(true)
     setRouteTargetId(targetId)
     setRouteTrail(path.steps)
     let stepIndex = 0
@@ -479,7 +478,7 @@ export function OfficeBuilding({
         finish()
         return
       }
-      moveAlice(OFFICE_MOVEMENTS[step.direction])
+      moveAlice(OFFICE_MOVEMENTS[step.direction], false)
       stepIndex += 1
       setRouteTrail(stepIndex < path.steps.length ? path.steps.slice(stepIndex) : [step])
       routeTimerRef.current = window.setTimeout(advance, reducedMotion ? 0 : 96)
