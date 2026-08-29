@@ -30,7 +30,7 @@ describe('OfficeRouteTrail', () => {
     ])).toHaveLength(3)
   })
 
-  it('renders generated directional floor inlays and marks the destination', () => {
+  it('renders generated low-profile footsteps and marks the destination', () => {
     render(<OfficeRouteTrail steps={steps} />)
 
     const trail = screen.getByTestId('office-route-trail')
@@ -41,6 +41,6 @@ describe('OfficeRouteTrail', () => {
     expect(markers[2].style.getPropertyValue('--office-route-rotation')).toBe('90deg')
     expect(markers[3].dataset.destination).toBe('true')
     expect(markers[3].querySelector('img')?.getAttribute('src'))
-      .toBe('/office/furniture/route-chevron-v1.png')
+      .toBe('/office/furniture/route-footsteps-v1.png')
   })
 })

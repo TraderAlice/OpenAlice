@@ -2983,7 +2983,7 @@
   width: max-content;
   max-width: min(330px, calc(100% - 58px));
   min-height: 36px;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   padding: 3px 6px 3px 3px;
@@ -3001,8 +3001,9 @@
 
 .oa-office-route-status > img {
   display: block;
-  width: 30px;
-  height: 30px;
+  width: 20px;
+  height: 20px;
+  justify-self: center;
   object-fit: contain;
 }
 
@@ -3471,11 +3472,10 @@
 
 .oa-office-route-trail__step {
   position: absolute;
-  width: 24px;
-  height: 24px;
-  opacity: 0.62;
-  transform: translate(-50%, -50%) rotate(var(--office-route-rotation));
-  animation: oa-office-route-step 720ms steps(2, end) infinite;
+  width: 12px;
+  height: 12px;
+  opacity: 0.42;
+  transform: translate(-50%, calc(-50% + 22px)) rotate(var(--office-route-rotation));
 }
 
 .oa-office-route-trail__step img {
@@ -3485,21 +3485,17 @@
 }
 
 .oa-office-route-trail__step[data-destination="true"] {
-  opacity: 0.92;
-  filter:
-    brightness(1.14)
-    drop-shadow(0 0 3px color-mix(in srgb, var(--gba-alert) 72%, transparent));
-  animation-name: oa-office-route-destination;
+  opacity: 0.58;
 }
 
 .oa-office-route-target-pointer {
   position: absolute;
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   pointer-events: none;
-  transform: translate(-50%, -100%);
-  filter: drop-shadow(0 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent));
-  animation: oa-office-route-target-pointer 640ms steps(2, end) infinite;
+  opacity: 0.78;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
 }
 
 .oa-office-route-target-pointer img {
@@ -3535,23 +3531,6 @@
 .oa-office-collision-impact[data-reduced-motion="true"] > span {
   background-position: -24px 0;
   animation: none;
-}
-
-@keyframes oa-office-route-step {
-  50% { opacity: 0.38; }
-}
-
-@keyframes oa-office-route-destination {
-  50% {
-    opacity: 0.72;
-    filter:
-      brightness(1.22)
-      drop-shadow(0 0 5px color-mix(in srgb, var(--gba-alert) 82%, transparent));
-  }
-}
-
-@keyframes oa-office-route-target-pointer {
-  50% { transform: translate(-50%, calc(-100% - 5px)); }
 }
 
 @keyframes oa-office-collision-impact {

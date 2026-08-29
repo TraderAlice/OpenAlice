@@ -57,8 +57,8 @@ machine light instead of dimming the whole Office scene.
 - `operations-board-v2.png` — floor landmark that opens the live occupancy log and replay
 - `workspace-sign-v2.png` — blank physical placard behind live Workspace, Harness, and agent text
 - `spawn-compass-v2.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
-- `route-chevron-v1.png` — generated 24px floor inlay for the remaining click-to-interact path
-- `route-target-pointer-v1.png` — generated 32px floating destination pointer for click-to-interact routes
+- `route-footsteps-v1.png` — generated 12px low-contrast floor breadcrumbs for click-to-interact paths
+- `route-destination-v1.png` — generated 20px quiet destination diamond for click-to-interact routes
 - `collision-impact-v1.png` — generated four-frame blocked-movement sparkle at native 24px cells
 - `mail-service-v1.png` — water cooler and mail-sorting landmark for the open service edge
 - `archive-service-v1.png` — copier and archive-trolley landmark for the open service edge
@@ -81,13 +81,13 @@ glow. It was generated on a flat magenta key, processed with the ImageGen chroma
 with real alpha. Empty slots remain disabled scenery, but no longer disappear into the rug as if their
 assets failed to load.
 
-`route-chevron-v1.png` is a compact diamond double-chevron generated on a flat magenta key, alpha-extracted,
-hard-matted, and nearest-neighbor packaged at the native 24px navigation grid. Runtime rotation supplies four
-directions; markers are decorative world feedback and never replace the named route status.
+`route-footsteps-v1.png` is a paired, offset footprint generated with muted teal-gray and cream clusters, then
+hard-alpha packaged on a native 12px canvas. Runtime rotation supplies four directions. The static markers sit on
+Alice's visual foot line and are thinned to every other 24px route cell, so they guide without flashing over the map.
 
-`route-target-pointer-v1.png` is a single generated cream-gold and teal downward cursor, hard-alpha packaged on a
-native 32px canvas. It floats above the active route destination while floor chevrons describe the path, replacing
-object-sized alert rectangles without changing target hit areas, accessible names, or arrival behavior.
+`route-destination-v1.png` is a symmetric hollow diamond generated in the same restrained palette and hard-alpha
+packaged on a native 20px canvas. It replaces the bouncing cream-gold cursor in both the world and route-status strip;
+the active object still retains its nameplate, target identity, accessible name, and unchanged hit area.
 
 `collision-impact-v1.png` is a 96x24 transparent atlas with contact, star, arc, and fragment frames. Runtime
 rotation supplies four collision directions. Reduced-motion mode holds the bright second frame for the same short

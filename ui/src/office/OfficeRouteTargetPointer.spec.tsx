@@ -35,7 +35,7 @@ describe('OfficeRouteTargetPointer', () => {
     expect(pointer.style.top).toBe('132px')
     expect(pointer.style.zIndex).toBe('1404')
     expect(pointer.querySelector('img')?.getAttribute('src'))
-      .toBe('/office/furniture/route-target-pointer-v1.png')
+      .toBe('/office/furniture/route-destination-v1.png')
     unmount()
   })
 

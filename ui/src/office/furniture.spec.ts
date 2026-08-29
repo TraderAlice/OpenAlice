@@ -31,8 +31,8 @@ describe('OFFICE_FURNITURE', () => {
       operationsBoard: [176, 132],
       workspaceSign: [264, 64],
       spawnCompass: [80, 80],
-      routeChevron: [24, 24],
-      routeTargetPointer: [32, 32],
+      routeFootsteps: [12, 12],
+      routeDestination: [20, 20],
       collisionImpact: [96, 24],
       mailService: [120, 104],
       archiveService: [120, 104],
@@ -45,7 +45,9 @@ describe('OFFICE_FURNITURE', () => {
       const file = resolve(publicRoot, url.replace(/^\//, ''))
       const bytes = readFileSync(file)
       expect([...bytes.subarray(0, 8)]).toEqual(PNG_MAGIC)
-      expect(bytes.byteLength).toBeGreaterThan(key === 'routeTargetPointer' ? 750 : 1000)
+      expect(bytes.byteLength).toBeGreaterThan(
+        key === 'routeFootsteps' || key === 'routeDestination' ? 100 : 1000,
+      )
       expect(bytes.readUInt32BE(16)).toBe(dimensions[key as keyof typeof dimensions][0])
       expect(bytes.readUInt32BE(20)).toBe(dimensions[key as keyof typeof dimensions][1])
       expect(bytes[25]).toBe(

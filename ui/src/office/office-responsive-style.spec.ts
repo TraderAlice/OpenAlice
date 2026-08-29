@@ -72,6 +72,13 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('grid-column: 2')
   })
 
+  it('keeps auto-route markers small, static, and anchored to Alice feet', () => {
+    expect(css).toMatch(/\.oa-office-route-trail__step\s*\{[\s\S]*?width: 12px;[\s\S]*?height: 12px;[\s\S]*?opacity: 0\.42;[\s\S]*?calc\(-50% \+ 22px\)/)
+    expect(css).toMatch(/\.oa-office-route-target-pointer\s*\{[\s\S]*?width: 20px;[\s\S]*?height: 20px;[\s\S]*?opacity: 0\.78;/)
+    expect(css).not.toContain('@keyframes oa-office-route-step')
+    expect(css).not.toContain('@keyframes oa-office-route-target-pointer')
+  })
+
   it('stacks window location and type as deliberate phone title lines', () => {
     expect(css).toMatch(/\.oa-office-window__title-copy\s*\{[\s\S]*?display: flex/)
     expect(css).toMatch(/\.oa-office-window__title-room\s*\{[\s\S]*?text-overflow: ellipsis/)

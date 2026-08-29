@@ -46,7 +46,7 @@ export function OfficeRouteTrail({
             top: step.y,
           } as CSSProperties}
         >
-          <img src={OFFICE_FURNITURE.generated.routeChevron} alt="" style={officePixelImg} />
+          <img src={OFFICE_FURNITURE.generated.routeFootsteps} alt="" style={officePixelImg} />
         </li>
       ))}
     </ol>

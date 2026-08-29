@@ -1180,7 +1180,7 @@ export function OfficeBuilding({
             data-testid="office-route-status"
           >
             <img
-              src={OFFICE_FURNITURE.generated.routeTargetPointer}
+              src={OFFICE_FURNITURE.generated.routeDestination}
               alt=""
               aria-hidden
               style={officePixelImg}

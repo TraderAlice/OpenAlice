@@ -49,7 +49,7 @@ export function OfficeRouteTargetPointer({
       style={{ left: position.x, top: position.y, zIndex }}
     >
       <img
-        src={OFFICE_FURNITURE.generated.routeTargetPointer}
+        src={OFFICE_FURNITURE.generated.routeDestination}
         alt=""
         aria-hidden
         style={officePixelImg}

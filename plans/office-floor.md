@@ -2357,6 +2357,30 @@ Coworker variety and control-legibility follow-up (2026-08-29):
 - `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,068 passing; one file and nine tests skipped),
   and the UI production build all passed. The build retains the existing large-chunk advisory only.
 
+Low-noise auto-route follow-up (2026-08-29):
+
+- Maintainer review found the generated 24px chevrons too luminous and visually busy, with the route appearing a few
+  pixels off Alice's movement line. Measurement confirmed the bitmap itself was centered; the larger mismatch came
+  from drawing markers at Alice's logical body center while her visible shadow/feet sit roughly 22px lower. Diagonal
+  17px movement also allowed the subsequent 24px route lattice to inherit an off-grid origin.
+- Compared small static footsteps, a continuous RPG navigation rail, and retaining only the destination marker. The
+  maintainer chose the footsteps: preserve spatial preview while reducing contrast, density, and animation.
+- Generated a muted paired-footprint source and hollow destination diamond with the built-in image generator, rejecting
+  one footprint draft that collapsed into an exclamation mark at native size. Packaged the accepted art as transparent
+  12x12 and 20x20 sprites; old luminous chevron and bouncing-pointer assets are removed from the runtime pack.
+- Route breadcrumbs now sit on Alice's 22px visual foot line, render statically at low opacity, and remain thinned to
+  every other 24px cell. Auto-routing from a diagonal/manual position samples a short collision-safe join to the nearest
+  walkable 24px grid coordinate before the ordinary breadth-first route continues. Already-interactable targets retain
+  their facing-only behavior without an unnecessary snap.
+- Browser-played a multi-turn route to Auto Prediction against the real Project. The six visible footprints stayed
+  readable without overpowering desks or floor tiles, the static diamond identified the destination, and measured CSS
+  confirmed 12px/20px native canvases, no pointer animation, and the corrected foot-line transform.
+- Focused route/path/furniture specs passed: 5 files / 23 tests, and the static foot-line style contract passed. The
+  large end-to-end Office-building unit spec now owns a 15-second budget because a safe grid-entry step pushed its
+  already multi-route interaction sequence beyond Vitest's five-second default under full-suite load.
+- `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,070 passing; one file and nine tests skipped),
+  and the UI production build all passed. The build retains the existing large-chunk advisory only.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

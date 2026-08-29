@@ -59,6 +59,23 @@ describe('Office interaction path', () => {
     expect(path).toEqual({ steps: [], facing: 'left' })
   })
 
+  it('joins a diagonal-movement position back onto the 24px route grid', () => {
+    const layout = layoutOfficeMap([
+      { id: 'chat-1', harness: 'chat' },
+      { id: 'quant-1', harness: 'auto-quant' },
+    ])
+    const path = officeInteractionPath(
+      { x: layout.alice.x + 17, y: layout.alice.y + 1 },
+      employee,
+      layout,
+      officeCollisionRects(layout),
+    )
+
+    expect(path).not.toBeNull()
+    expect(path!.steps[0]).toMatchObject({ x: 504, y: 360 })
+    expect(path!.steps.every(({ x, y }) => x % 24 === 0 && y % 24 === 0)).toBe(true)
+  })
+
   it('returns null when the target is sealed away', () => {
     const layout = layoutOfficeMap([{ id: 'chat-1', harness: 'chat' }])
     const path = officeInteractionPath(
