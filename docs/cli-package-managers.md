@@ -75,7 +75,9 @@ Stable npm publication is disabled unless the repository explicitly enables
 The generated Homebrew formula selects the accepted archive and SHA-256 for the
 current macOS or Linux architecture. It installs the executable, immutable
 resources, release metadata, notices, and Homebrew provenance without compiling
-the repository.
+the repository. The formula treats Homebrew's extracted build directory as the
+archive release root and copies release metadata to both the keg root and the
+Runtime resource tree; it does not guess at an extra directory level.
 
 The generated `openalice-bin` `PKGBUILD` and `.SRCINFO` select the accepted
 Linux archive for `aarch64` or `x86_64`, verify its checksum, and install the
@@ -120,8 +122,10 @@ For channel changes run:
 
 ```bash
 pnpm exec vitest run \
+  scripts/cli-release-fixture.spec.mjs \
   scripts/build-cli-package-channels.spec.mjs \
   scripts/pack-cli-npm-packages.spec.mjs \
+  scripts/release-workflow.spec.ts \
   packages/cli/src/package-manager.spec.mjs
 ```
 
@@ -141,6 +145,12 @@ only an isolated copy of an already accepted native candidate, refreshes its
 version/content hashes, and uses ad-hoc signing on macOS; it is never a
 publication input. Every Runtime uses isolated state without broker credentials
 or live trading.
+
+The npm/Bun smoke operates on generated platform packages. The Homebrew/AUR
+smoke first derives the same isolated prior archive set from the accepted
+candidate, then lets a local Git-backed tap or real `pacman -U` perform both
+version transitions. Lifecycle assertions stay shared while file mutation
+remains owned by the manager under test.
 
 The release job derives every channel only after all native candidates pass,
 attaches the generated publication inputs to the GitHub Release, and publishes

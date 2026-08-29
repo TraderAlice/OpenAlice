@@ -121,9 +121,13 @@ describe('Release workflow critical path', () => {
       { os: 'macos-15-intel', arch: 'x64' },
     ])
     expect(step(homebrew, 'Install and run the accepted archive through Homebrew').run)
-      .toContain('brew install --formula')
+      .toContain('--manager brew')
+    expect(step(homebrew, 'Install and run the accepted archive through Homebrew').run)
+      .toContain('prepare-cli-previous-release.mjs')
     expect(step(aur, 'Build, install, and run the generated AUR package').run)
       .toContain('archlinux:base-devel')
+    expect(step(aur, 'Build, install, and run the generated AUR package').run)
+      .toContain('--manager aur')
   })
 
   it('publishes npm platform packages before the stable meta package', () => {

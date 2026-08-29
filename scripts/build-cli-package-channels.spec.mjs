@@ -59,7 +59,7 @@ describe.skipIf(process.platform === 'win32')('CLI package-manager channel gener
     const formula = await readFile(join(output, 'homebrew/openalice.rb'), 'utf8')
     expect(formula.match(/releases\/download\/v0\.90\.1/g)).toHaveLength(4)
     expect(formula).toContain('method\\\":\\\"brew')
-    expect(formula).toContain('(share/"openalice").install "release.json"')
+    expect(formula).toContain('(share/"openalice/release.json").write(release_metadata)')
     expect(formula).toContain('(share/"openalice/install-source.json").write(content)')
     const pkgbuild = await readFile(join(output, 'aur/PKGBUILD'), 'utf8')
     await expect(execFileAsync('bash', ['-n', join(output, 'aur/PKGBUILD')])).resolves.toBeDefined()

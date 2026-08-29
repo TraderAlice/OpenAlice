@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import {
   cpSync,
   existsSync,
@@ -15,6 +14,11 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+
+import {
+  rewriteExpandedCliRelease,
+  syntheticPreviousVersion,
+} from './cli-release-fixture.mjs'
 
 const options = parseArgs(process.argv.slice(2))
 const root = mkdtempSync(join(tmpdir(), `openalice-${options.manager}-package-smoke-`))
@@ -257,37 +261,11 @@ function packPackageSet(packagesRoot, destination, nativePackageName) {
 
 function rewritePackageSetVersion({ packagesRoot, packageName, fromVersion, toVersion }) {
   const platformRoot = join(packagesRoot, packageName)
-  const executablePath = join(platformRoot, 'release', 'bin', 'openalice')
-  const executable = readFileSync(executablePath)
-  const from = Buffer.from(fromVersion)
-  const to = Buffer.from(toVersion)
-  if (from.length !== to.length) fail('synthetic package-manager versions must have equal byte length')
-  let replacements = 0
-  for (let offset = executable.indexOf(from); offset >= 0; offset = executable.indexOf(from, offset + to.length)) {
-    to.copy(executable, offset)
-    replacements += 1
-  }
-  if (replacements === 0) fail(`native executable did not contain embedded version ${fromVersion}`)
-  writeFileSync(executablePath, executable)
-  if (process.platform === 'darwin') {
-    run('/usr/bin/codesign', ['--force', '--sign', '-', executablePath], process.env)
-  }
-  const rewrittenExecutable = readFileSync(executablePath)
-  const executableSha256 = sha256(rewrittenExecutable)
-  const contentIdentity = executableSha256.slice(0, 16)
-
-  const resourcePackagePath = join(platformRoot, 'release', 'share', 'openalice', 'package.json')
-  const resourcePackage = JSON.parse(readFileSync(resourcePackagePath, 'utf8'))
-  resourcePackage.version = toVersion
-  writeFileSync(resourcePackagePath, `${JSON.stringify(resourcePackage, null, 2)}\n`)
-
-  const releasePath = join(platformRoot, 'release', 'release.json')
-  const release = JSON.parse(readFileSync(releasePath, 'utf8'))
-  release.version = toVersion
-  release.contentIdentity = contentIdentity
-  updateReleaseFile(release, 'bin/openalice', executablePath)
-  updateReleaseFile(release, 'share/openalice/package.json', resourcePackagePath)
-  writeFileSync(releasePath, `${JSON.stringify(release, null, 2)}\n`)
+  const { contentIdentity, executableSha256 } = rewriteExpandedCliRelease({
+    releaseRoot: join(platformRoot, 'release'),
+    fromVersion,
+    toVersion,
+  })
 
   const platformPackagePath = join(platformRoot, 'package.json')
   const platformPackage = JSON.parse(readFileSync(platformPackagePath, 'utf8'))
@@ -302,35 +280,6 @@ function rewritePackageSetVersion({ packagesRoot, packageName, fromVersion, toVe
   metaPackage.optionalDependencies = { [packageName]: toVersion }
   writeFileSync(metaPackagePath, `${JSON.stringify(metaPackage, null, 2)}\n`)
   return contentIdentity
-}
-
-function updateReleaseFile(release, relativePath, sourcePath) {
-  const entry = release.files?.find((candidate) => candidate.path === relativePath)
-  if (!entry || entry.type !== 'file') fail(`release metadata omitted ${relativePath}`)
-  const content = readFileSync(sourcePath)
-  entry.bytes = content.length
-  entry.sha256 = sha256(content)
-}
-
-function syntheticPreviousVersion(version) {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
-  if (!match) fail(`package-manager smoke requires a stable numeric version, got ${version}`)
-  const [, majorRaw, minorRaw, patchRaw] = match
-  const major = Number(majorRaw)
-  const minor = Number(minorRaw)
-  const patch = Number(patchRaw)
-  const candidates = [
-    ...(patch > 0 ? [`${majorRaw}.${minorRaw}.${patch - 1}`] : []),
-    ...(minor > 0 ? [`${majorRaw}.${minor - 1}.${'9'.repeat(patchRaw.length)}`] : []),
-    ...(major > 0 ? [`${major - 1}.${'9'.repeat(minorRaw.length)}.${'9'.repeat(patchRaw.length)}`] : []),
-  ]
-  const candidate = candidates.find((value) => value.length === version.length)
-  if (candidate) return candidate
-  fail(`cannot derive a prior package-manager fixture version from ${version}`)
-}
-
-function sha256(content) {
-  return createHash('sha256').update(content).digest('hex')
 }
 
 function pack(packageRoot, destination) {

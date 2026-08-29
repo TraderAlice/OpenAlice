@@ -459,7 +459,7 @@ build harness when it improves the next investigation.
   executable bytes.
 - [x] Detect manager-owned installs in update/Doctor output and route update
   and uninstall guidance back to the owning manager.
-- [ ] Exercise each manager's upgrade and removal while a Runtime is stopped,
+- [x] Exercise each manager's upgrade and removal while a Runtime is stopped,
   then exercise its documented behavior while Guardian is active.
 - [x] Record and enforce platform-first/meta-last npm publication after the
   GitHub Release succeeds. Stable publication remains explicitly disabled
@@ -834,3 +834,16 @@ This plan is complete only when:
   replacement rollback case is explicitly skipped on Windows while native
   Windows activation remains a deferred distribution lane. Type checking, 335
   CLI tests, 5,062 root tests, and the non-root Orb Linux installer smoke pass.
+- 2026-08-30: Completed local system-package-manager lifecycle acceptance.
+  Homebrew now consumes the archive's actual extracted release root and copies
+  `release.json` instead of trying to move one source twice. A shared fixture
+  derives a hash-refreshed N-1 archive set from accepted candidates, after
+  which a local Git-backed tap and an x64 Arch container perform real stopped
+  and active upgrades, restart activation, and removal. Native macOS arm64
+  Homebrew and Orb-emulated Linux x64 `makepkg`/`pacman` both passed with an
+  empty Runtime `PATH`; the formal release matrix repeats Homebrew on Intel and
+  arm64 runners and AUR on native x64. Windows distribution remains deferred.
+- 2026-08-30: Rebuilt the current macOS arm64 native candidate and repeated the
+  complete npm and Bun stopped/active lifecycle after the shared-fixture
+  refactor; both passed. `npx tsc --noEmit`, all 335 CLI tests, all 5,064 root
+  tests, and the non-root Orb Linux installer smoke also pass.
