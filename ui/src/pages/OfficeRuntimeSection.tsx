@@ -29,9 +29,9 @@ function eventDetail(event: AgentRuntimeEvent): string | null {
   return null
 }
 
-function causeLabel(event: AgentRuntimeEvent): string {
+function causeLabel(event: AgentRuntimeEvent): string | null {
   const cause = event.payload.cause
-  if (!cause) return '—'
+  if (!cause) return null
   if (cause.kind === 'issue') return `issue ${cause.issueId}`
   if (cause.kind === 'conversation') {
     const from = cause.from?.kind === 'session'
@@ -104,16 +104,25 @@ export function OfficeRuntimeSection() {
   const selectedPayload = selectedEvent.payload
   const selectedDetail = eventDetail(selectedEvent)
   const selectedKind = officeLogAssetKind(selectedEvent.type)
-  const selectedMeta = [
-    selectedPayload.surface,
-    causeLabel(selectedEvent),
-    selectedPayload.status,
-    selectedPayload.metrics
-      ? `${selectedPayload.metrics.textBlocks} text · ${selectedPayload.metrics.toolCalls} tools${selectedPayload.metrics.toolFailures > 0 ? ` · ${selectedPayload.metrics.toolFailures} failed` : ''}`
-      : null,
-    selectedPayload.reason,
-    selectedPayload.launchErrorCode,
-  ].filter((value): value is string => Boolean(value))
+  const selectedMeta: Array<{ label: string; value: string }> = []
+  const addMeta = (label: string, value: string | null | undefined) => {
+    if (value) selectedMeta.push({ label, value })
+  }
+  addMeta(t('office.surface'), selectedPayload.surface)
+  addMeta(t('office.eventCause'), causeLabel(selectedEvent))
+  addMeta(t('office.status'), selectedPayload.status)
+  if (selectedPayload.metrics) {
+    const metrics: string[] = [
+      t('office.eventTextBlocks', { count: selectedPayload.metrics.textBlocks }),
+      t('office.eventToolCalls', { count: selectedPayload.metrics.toolCalls }),
+    ]
+    if (selectedPayload.metrics.toolFailures > 0) {
+      metrics.push(t('office.eventToolFailures', { count: selectedPayload.metrics.toolFailures }))
+    }
+    addMeta(t('office.eventOutput'), metrics.join(' · '))
+  }
+  addMeta(t('office.eventReason'), selectedPayload.reason)
+  addMeta(t('office.eventErrorCode'), selectedPayload.launchErrorCode)
   const moveJournalSelection = (keyboardEvent: KeyboardEvent<HTMLButtonElement>) => {
     const buttons = Array.from(
       keyboardEvent.currentTarget.closest('ol')
@@ -199,7 +208,12 @@ export function OfficeRuntimeSection() {
               <p className="oa-office-runtime__detail">{selectedDetail}</p>
             )}
             <ul className="oa-office-runtime__meta" aria-label={t('office.eventDetails')}>
-              {selectedMeta.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+              {selectedMeta.map((item) => (
+                <li key={item.label}>
+                  <small>{item.label}</small>
+                  <span>{item.value}</span>
+                </li>
+              ))}
             </ul>
           </div>
           {selectedPayload.taskId && (

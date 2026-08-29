@@ -1543,9 +1543,27 @@
 }
 
 .oa-office-runtime__meta li {
-  padding: 2px 5px;
+  display: grid;
+  min-width: 70px;
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--gba-ink) 55%, transparent);
   background: var(--gba-cream);
+}
+
+.oa-office-runtime__meta small {
+  padding: 1px 5px;
+  color: var(--gba-paper);
+  background: var(--gba-ink-soft);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.oa-office-runtime__meta span {
+  padding: 2px 5px;
+  color: var(--gba-ink);
+  line-height: 1.15;
 }
 
 .oa-office-runtime__open {

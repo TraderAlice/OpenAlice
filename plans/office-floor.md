@@ -1734,6 +1734,25 @@ Single-view pause-menu follow-up (2026-08-29):
 - Focused OfficeBuilding specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
   Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Occupancy event-stat follow-up (2026-08-29):
+
+- Played the empty Auto Quant cabinet first. Its generated cabinet illustration, explicit zero-record copy, and single
+  portal exit already formed a coherent game empty state, so no change was made merely to create activity. Continuing
+  through Operations board exposed the real gap: event detail rendered `headless · — · done · 2 text · 1 tools` as
+  four unlabeled debug chips, including a meaningless missing-value placeholder and incorrect singular grammar.
+- Compared tooltips, prefixed flat chips, and labeled pixel stat cartridges. Chose cartridges because event metadata
+  should scan like an RPG status panel on mouse, keyboard, and touch. Each field now has a dark uppercase category
+  cap and a cream value cell; cartridges wrap as units instead of breaking label/value ownership.
+- Surface, cause, status, output, reason, and error code are now typed metadata entries. Missing values are omitted
+  rather than rendered as `—`. Text blocks, tool calls, and failures use localized plural-aware strings in English,
+  Simplified Chinese, Traditional Chinese, and Japanese; the demo now correctly reads `2 text blocks · 1 tool call`.
+- Browser-played the selected stopped event at 1280x720: Surface, Status, and Output formed three complete cartridges
+  across an 83.98px metadata area with no placeholder. At 390x844, the detail card measured 328x315.8, the 253x84
+  cartridge area kept the complete output value, the 628px log body required no additional scroll, and the page stayed
+  exactly 390px wide.
+- Focused OfficeRuntimeSection specs passed: 1 file / 3 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
+  606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
