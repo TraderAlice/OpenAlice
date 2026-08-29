@@ -434,7 +434,7 @@ build harness when it improves the next investigation.
   behavior as Bash.
 - [x] Preserve explicit install consent and separate start consent; neither
   installer silently starts or registers a long-running service.
-- [ ] Install from current `dev` artifacts and the matching dev selector before
+- [x] Install from current `dev` artifacts and the matching dev selector before
   promotion.
 
 ### 5. Package-manager publication
@@ -443,7 +443,7 @@ build harness when it improves the next investigation.
   command named `openalice`.
 - [x] Generate npm platform packages from accepted release archives and one
   meta package with platform `optionalDependencies`.
-- [ ] Install the meta package through both npm and Bun on every required
+- [x] Install the meta package through both npm and Bun on every required
   platform; verify that the final command is the native executable and does
   not require the package manager at runtime.
 - [x] Generate the TraderAlice Homebrew formula from accepted archive URLs and
@@ -537,7 +537,7 @@ artifacts.
   component restart, `down`, update activation, rollback, and uninstall.
 - [ ] Run the root TypeScript/tests, UI typecheck, Guardian recovery, CLI PTY,
   installer, managed remote, and relevant Electron regression lanes.
-- [ ] Publish `dev` preview artifacts and exercise their network path before a
+- [x] Publish `dev` preview artifacts and exercise their network path before a
   human-directed `dev` to `master` promotion.
 
 ## Verification Matrix
@@ -847,3 +847,14 @@ This plan is complete only when:
   complete npm and Bun stopped/active lifecycle after the shared-fixture
   refactor; both passed. `npx tsc --noEmit`, all 335 CLI tests, all 5,064 root
   tests, and the non-root Orb Linux installer smoke also pass.
+- 2026-08-30: Promoted the native CLI increments through `dev` and completed
+  preview acceptance. Dev run 33270375503 built darwin-arm64, darwin-x64,
+  linux-arm64, and linux-x64 candidates, verified each candidate through the
+  full npm and pinned Bun manager lifecycle before upload, validated checksums
+  and embedded target/version metadata, activated the four dev aliases, and
+  passed the clean raw `dev/install --branch dev` network journey. A separate
+  isolated macOS arm64 install from the public dev alias passed `version`,
+  `up`, `status`, `down`, and uninstall with Node, Bun, and Agent Runtimes
+  absent from the Runtime `PATH`. Stable registry/tap/AUR publication and the
+  tagged-release matrix remain release activation work; Windows remains
+  deferred.
