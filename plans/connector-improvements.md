@@ -58,6 +58,15 @@ external adapters remain optional projections rather than sources of truth.
    adapters present `Chat on <connector>` with an independent switch and a
    Workspace choice before first enable. The durable Issue remains the internal
    execution specimen; heartbeat cadence and prompt are advanced chat settings.
+8. **Configuration stays in context.** The Connector overview opens a shared
+   configuration dialog for one adapter instead of routing into the full
+   Settings category. A route-backed detail page would deep-link well but turns
+   a local edit into navigation; a side drawer preserves context but is too
+   narrow for credentials and chat setup. The chosen centered dialog reuses the
+   same adapter settings content as Settings, omits the Settings sidebar, and
+   becomes near-full-screen on narrow viewports. The shared dialog primitive
+   owns focus trap, Escape/backdrop dismissal, labelled header, scroll containment,
+   and focus restoration; adapter content continues to own fields and actions.
 
 ## Ordered Work
 
@@ -77,6 +86,8 @@ external adapters remain optional projections rather than sources of truth.
   - [x] Name newly created connector Issues `Chat on <label>` and use natural chat
         language in default What and domain/HTTP errors; conflict says
         `Chat on <Label> already exists`; do not rewrite existing Issues.
+  - [ ] Add a reusable configuration dialog and open one adapter's shared
+        settings content from its overview card without changing routes.
   - [ ] Revisit Connector status copy and owner-identifier disclosure as a
         separate accepted increment.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
