@@ -127,7 +127,7 @@ describe('OpenAlice Runtime lifecycle core', () => {
         '/opt/openalice/releases/v1/bin/openalice',
         ['--internal-role', 'guardian'],
         expect.objectContaining({
-          cwd: '/opt/openalice/releases/v1/share/openalice',
+          cwd: resolve('/opt/openalice/releases/v1/share/openalice'),
           env: expect.objectContaining({
             OPENALICE_RUNTIME_PROVIDER: 'bun',
             OPENALICE_RUNTIME_EXECUTABLE: '/opt/openalice/releases/v1/bin/openalice',

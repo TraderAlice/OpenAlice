@@ -18,6 +18,7 @@ import {
   stopRuntimeServer,
 } from './server-control.mjs'
 import {
+  buildBunRuntimeEnvironment,
   bunGuardianProcessSpec,
   isBunStandalone,
   resolveBunResourceRoot,
@@ -93,7 +94,7 @@ export async function startRuntime(options, dependencies = {}) {
   }
 
   const nodeBinary = dependencies.nodeBinary ?? process.execPath
-  const runtimeEnv = buildLocalRuntimeEnv(env, {
+  let runtimeEnv = buildLocalRuntimeEnv(env, {
     appDir,
     homeRoot,
     nodeBinary,
@@ -104,7 +105,11 @@ export async function startRuntime(options, dependencies = {}) {
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
   if (standalone) {
-    runtimeEnv.OPENALICE_RUNTIME_EXECUTABLE = dependencies.runtimeExecutable ?? process.execPath
+    runtimeEnv = buildBunRuntimeEnvironment(
+      runtimeEnv,
+      appDir,
+      dependencies.runtimeExecutable ?? process.execPath,
+    )
   }
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
   if (runtimeProvider.contentIdentity) {
