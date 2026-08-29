@@ -1,4 +1,5 @@
 import type { ReactNode, RefObject } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   Dialog,
@@ -33,12 +34,15 @@ export function ConfigurationDialog({
   headerAccessory,
   keepMounted = false,
 }: ConfigurationDialogProps) {
+  const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         keepMounted={keepMounted}
         initialFocus={false}
         finalFocus={restoreFocusRef}
+        closeLabel={t('common.close')}
+        closeButtonClassName="right-2.5 top-2.5 size-10 sm:right-2 sm:top-2 sm:size-8"
         className="flex h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-auto sm:max-h-[min(46rem,calc(100dvh-2rem))] sm:w-[calc(100%-2rem)] sm:max-w-3xl"
       >
         <DialogHeader className="shrink-0 border-b border-border/70 px-5 py-4 pr-12 sm:px-6">

@@ -245,6 +245,15 @@ external adapters remain optional projections rather than sources of truth.
     keeps the target heading below the sticky navigator, without changing the
     route or URL history. Badge text accompanies color, normal keyboard order is
     preserved, and the adapter-only dialog omits this redundant navigation.
+23. **The configuration shell owns a localized, touchable close control.**
+    Leaving the shared primitive's English `Close` fallback in a translated
+    Connector dialog makes the visible UI and accessible name disagree; changing
+    the primitive to import app i18n would invert ownership for every consumer.
+    The chosen API lets a product shell provide its close label and sizing while
+    the primitive retains its English default. ConfigurationDialog supplies
+    `common.close`, a 40 px mobile hit target, and a compact 32 px desktop target.
+    The title reserve already accommodates the larger button, and close semantics,
+    Escape/backdrop dismissal, focus restoration, and visual icon remain shared.
 
 ## Ordered Work
 
@@ -295,6 +304,8 @@ external adapters remain optional projections rather than sources of truth.
         the overview prioritizes state, evidence, and the next action.
   - [x] Add a responsive lifecycle-aware channel navigator to the full Settings
         document without hiding forms, drafts, or changing routes.
+  - [x] Localize the configuration-dialog close control and enlarge its mobile
+        touch target without changing shared dismissal behavior.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -462,6 +473,16 @@ overflow, then scrolled entirely away while focused Feishu settings began below
 the mobile header. Both paths retained `/settings/connectors`, added no URL
 history, and changed no Connector setting or external state. The viewport was
 reset.
+
+The localized-close increment passed the same 30 focused overview/demo tests,
+UI and root typechecks, the production build, and all 5,113 repository tests.
+The localized route test opens the ConfigurationDialog in Chinese and finds
+`关闭`; the shell contract also asserts its 40 px mobile and 32 px desktop size
+classes. Real Default AliceProject acceptance measured the rendered close
+control at exactly 32 x 32 px at 1,052 x 734 and 40 x 40 px at 390 x 844. The
+larger narrow target did not overlap the title or create horizontal overflow;
+click dismissal still closed the dialog and the viewport was reset. No
+Connector control or external action was triggered.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

@@ -139,6 +139,9 @@ describe('Connector demo routes', () => {
     expect(screen.queryByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeNull()
     expect(screen.getAllByText('需要设置')).toHaveLength(4)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '设置 Feishu' }))
+    expect(within(await screen.findByRole('dialog')).getByRole('button', { name: '关闭' })).toBeTruthy()
   })
 
   it('summarizes a linked connector without exposing its raw owner identifier', async () => {
@@ -281,6 +284,9 @@ describe('Connector demo routes', () => {
     fireEvent.click(trigger)
 
     const dialog = await screen.findByRole('dialog')
+    const close = within(dialog).getByRole('button', { name: 'Close' })
+    expect(close.className).toContain('size-10')
+    expect(close.className).toContain('sm:size-8')
     expect(dialog.className).toContain('h-[calc(100dvh-1rem)]')
     expect(dialog.className).toContain('sm:h-auto')
     expect(dialog.className).toContain('sm:max-h-[min(46rem,calc(100dvh-2rem))]')

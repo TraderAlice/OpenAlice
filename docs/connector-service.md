@@ -359,6 +359,9 @@ The surfaces deliberately have different jobs:
   responsive in-page channel navigator with the same lifecycle badges. Choosing
   a channel moves keyboard focus to its labelled section without changing route,
   hiding another adapter's draft, or adding browser history.
+  The adapter dialog localizes its close control and gives that control a larger
+  mobile touch target while retaining the shared primitive's focus restoration,
+  Escape, and backdrop behavior.
   A desk-capable adapter also binds that connector's chat Issue when its
   definition advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator
