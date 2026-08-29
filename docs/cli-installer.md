@@ -253,6 +253,23 @@ protection as an update. It does not alter user data or remove releases. The
 current process is not hot-reloaded; run `openalice` again after update or
 rollback.
 
+## v0.90.1 cutover
+
+The native installer recognizes the last expanded CLI layout under
+`cli-versions/`. It stages and validates the Bun release first, then removes
+only that installer-owned tree and its managed-Pi launchers. Product data,
+credentials, AliceProjects, and Agent Runtimes elsewhere on `PATH` remain
+untouched. Normal startup after activation knows only the native layout; there
+is no permanent dual-runtime resolver.
+
+Both `dev` alias publication and stable release publication replay this cutover
+from the published v0.90.1 installer on Linux x64. The acceptance fixture pins
+the historical Pi manifests by SHA-256 because the upstream Pi release assets
+are not part of OpenAlice's durable release surface. It then proves native
+`version`, detached `up`, `status`, `down`, and uninstall with Node and Agent
+Runtimes absent from the new Runtime path, while preserving a data marker and a
+user-owned external Pi executable.
+
 ## Uninstall
 
 Review first:

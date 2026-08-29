@@ -82,6 +82,7 @@ describe('Release workflow critical path', () => {
       'build-cli-package-channels',
       'accept-cli-homebrew',
       'accept-cli-aur',
+      'accept-cli-legacy-cutover',
       'cli-installer-acceptance',
     ]))
   })
@@ -137,6 +138,10 @@ describe('Release workflow critical path', () => {
     ])
     expect(step(aur, 'Build, install, and run the generated AUR package').run)
       .toContain('cli-aur-container-smoke.mjs')
+    const cutover = workflow.jobs['accept-cli-legacy-cutover']
+    expect(needs(cutover)).toEqual(['release', 'build-cli-release'])
+    expect(step(cutover, 'Replace the published legacy CLI with the accepted native candidate').run)
+      .toContain('cli-legacy-cutover-smoke.mjs')
   })
 
   it('publishes npm platform packages before the stable meta package', () => {
