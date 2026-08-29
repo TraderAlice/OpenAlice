@@ -20,7 +20,7 @@ vi.mock('../api', () => ({
 
 function event(
   seq: number,
-  type: 'inbox.received' | 'news.ingested',
+  type: AgentRuntimeEvent['type'],
   payload: AgentRuntimeEvent['payload'],
 ): AgentRuntimeEvent {
   return { seq, ts: seq * 1_000, type, payload }
@@ -49,6 +49,7 @@ describe('projectOfficeProductActivity', () => {
     ]
 
     expect(projectOfficeProductActivity(events)).toEqual({
+      agent: null,
       inbox: {
         seq: 9,
         occurredAt: 9_000,
@@ -64,6 +65,30 @@ describe('projectOfficeProductActivity', () => {
       },
     })
   })
+
+  it('projects only low-noise Agent milestones and compacts their detail', () => {
+    const events: AgentRuntimeEvent[] = [
+      event(12, 'runtime.turn.tool', { agent: 'grok', toolName: 'read_file' }),
+      event(13, 'runtime.started', { agent: 'grok', workspaceLabel: 'Office Lab' }),
+      event(14, 'runtime.turn.text', { agent: 'grok', text: 'still working' }),
+      event(15, 'runtime.turn.error', {
+        agent: 'grok',
+        error: `  Failed\n  after   ${'a'.repeat(190)}  `,
+      }),
+    ]
+
+    const projection = projectOfficeProductActivity(events)
+    expect(projection.agent).toMatchObject({
+      seq: 15,
+      occurredAt: 15_000,
+      source: 'grok',
+      eventType: 'runtime.turn.error',
+    })
+    expect(projection.agent?.detail).toHaveLength(180)
+    expect(projection.agent?.detail).toBe(`Failed after ${'a'.repeat(166)}…`)
+    expect(projection.inbox).toBeNull()
+    expect(projection.news).toBeNull()
+  })
 })
 
 describe('useOfficeProductActivity', () => {
@@ -71,7 +96,7 @@ describe('useOfficeProductActivity', () => {
     queryRuntime.mockResolvedValueOnce({ entries: [inboxNine, newsEleven], lastSeq: 11 })
     const firstVisit = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(firstVisit.result.current.news?.seq).toBe(11))
-    expect(firstVisit.result.current.attention).toEqual({ inbox: false, news: false })
+    expect(firstVisit.result.current.attention).toEqual({ agent: false, inbox: false, news: false })
     firstVisit.unmount()
 
     const newsTwelve = event(12, 'news.ingested', {
@@ -83,7 +108,7 @@ describe('useOfficeProductActivity', () => {
     })
     const returnVisit = renderHook(() => useOfficeProductActivity())
     await waitFor(() => expect(returnVisit.result.current.news?.seq).toBe(12))
-    expect(returnVisit.result.current.attention).toEqual({ inbox: false, news: true })
+    expect(returnVisit.result.current.attention).toEqual({ agent: false, inbox: false, news: true })
     expect(returnVisit.result.current.freshKind).toBeNull()
 
     act(() => returnVisit.result.current.acknowledge('news'))
@@ -119,6 +144,26 @@ describe('useOfficeProductActivity', () => {
 
     act(() => hook.result.current.acknowledge('inbox'))
     expect(hook.result.current.attention.inbox).toBe(false)
+    expect(hook.result.current.freshKind).toBeNull()
+    hook.unmount()
+  })
+
+  it('raises and acknowledges Operations Board attention for an Agent milestone', async () => {
+    queryRuntime.mockResolvedValueOnce({ entries: [inboxNine, newsEleven], lastSeq: 11 })
+    const hook = renderHook(() => useOfficeProductActivity())
+    await waitFor(() => expect(hook.result.current.news?.seq).toBe(11))
+
+    const started = event(12, 'runtime.started', {
+      agent: 'grok', workspaceLabel: 'Office Lab', surface: 'terminal',
+    })
+    queryRuntime.mockResolvedValueOnce({ entries: [started], lastSeq: 12 })
+    act(() => window.dispatchEvent(new Event(GLOBAL_ACTIVITY_REFRESH_EVENT)))
+    await waitFor(() => expect(hook.result.current.agent?.seq).toBe(12))
+    expect(hook.result.current.attention.agent).toBe(true)
+    expect(hook.result.current.freshKind).toBe('agent')
+
+    act(() => hook.result.current.acknowledge('agent'))
+    expect(hook.result.current.attention.agent).toBe(false)
     expect(hook.result.current.freshKind).toBeNull()
     hook.unmount()
   })

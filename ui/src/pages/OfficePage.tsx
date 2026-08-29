@@ -260,6 +260,7 @@ export function OfficePage() {
                   setLogOpen(false)
                 }}
                 onOpenLog={(origin) => {
+                  productActivity.acknowledge('agent')
                   logOriginRef.current = origin
                   setLogOpen(true)
                   setCabinetWorkspaceId(null)

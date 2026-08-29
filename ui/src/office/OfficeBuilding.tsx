@@ -102,9 +102,10 @@ export function OfficeBuilding({
   onOpenRoster,
   onOpenLog,
   productActivity = {
+    agent: null,
     inbox: null,
     news: null,
-    attention: { inbox: false, news: false },
+    attention: { agent: false, inbox: false, news: false },
     freshKind: null,
   },
   onOpenInbox,
@@ -284,6 +285,7 @@ export function OfficeBuilding({
   )
   const nearbyService = nearbyTarget?.kind === 'inbox-service'
     || nearbyTarget?.kind === 'news-service'
+    || nearbyTarget?.kind === 'operations'
   const promptPlacement = useMemo(
     () => nearbyTarget
       ? officeInteractionPromptPlacement(
@@ -379,11 +381,32 @@ export function OfficeBuilding({
         source: productActivity.news?.source,
       }
     }
+    const agentDetail = (() => {
+      if (productActivity.agent?.detail) return productActivity.agent.detail
+      switch (productActivity.agent?.eventType) {
+        case 'session.born': return t('office.agentMilestoneBorn')
+        case 'runtime.started': return t('office.agentMilestoneStarted')
+        case 'runtime.spawn_failed': return t('office.agentMilestoneSpawnFailed')
+        case 'runtime.rejected': return t('office.agentMilestoneRejected')
+        case 'runtime.turn.error': return t('office.agentMilestoneError')
+        case 'runtime.stopped':
+          return productActivity.agent.status === 'done'
+            ? t('office.agentMilestoneCompleted')
+            : productActivity.agent.status === 'paused'
+              ? t('office.agentMilestonePaused')
+              : productActivity.agent.status === 'interrupted'
+                ? t('office.agentMilestoneInterrupted')
+                : t('office.agentMilestoneStopped')
+        case 'dev.sonner_test': return t('office.agentMilestoneTest')
+        default: return null
+      }
+    })()
     return {
       icon: OFFICE_HUD_ASSETS.occupancyLog,
       action: t('office.interactActionOperations'),
       label: t('office.interactOperations'),
-      detail: null,
+      detail: agentDetail,
+      source: productActivity.agent?.source,
     }
   })()
   const sleepAfterDays = Math.max(
@@ -1107,9 +1130,14 @@ export function OfficeBuilding({
               type="button"
               className="oa-office-operations-board"
               data-live={stats.active > 0}
+              data-has-activity={Boolean(productActivity.agent) || undefined}
+              data-attention={productActivity.attention.agent || undefined}
+              data-fresh={productActivity.freshKind === 'agent' || undefined}
               data-nearby={nearbyTarget?.kind === 'operations'}
               data-route={routeTargetId === 'operations'}
-              aria-label={t('office.operationsBoard')}
+              aria-label={productActivity.attention.agent
+                ? t('office.serviceNeedsAttention', { name: t('office.operationsBoard') })
+                : t('office.operationsBoard')}
               title={t('office.operationsBoardHint')}
               onClick={() => requestTargetInteraction('operations')}
               style={{
@@ -1124,6 +1152,9 @@ export function OfficeBuilding({
                 aria-hidden
                 style={officePixelImg}
               />
+              {productActivity.attention.agent && (
+                <span className="oa-office-operations-board__signal" aria-hidden>!</span>
+              )}
             </button>
             <img
               src={OFFICE_FURNITURE.generated.spawnCompass}

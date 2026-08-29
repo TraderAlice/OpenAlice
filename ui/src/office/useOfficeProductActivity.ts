@@ -8,7 +8,18 @@ const POLL_MS = 4_000
 const EVENT_LIMIT = 100
 const FRESH_MS = 12_000
 const ACK_STORAGE_PREFIX = 'openalice:office-product-activity:ack:'
-type OfficeActivityKind = 'inbox' | 'news'
+const OFFICE_ACTIVITY_KINDS = ['agent', 'inbox', 'news'] as const
+type OfficeActivityKind = typeof OFFICE_ACTIVITY_KINDS[number]
+
+const OFFICE_AGENT_MILESTONE_TYPES = new Set<AgentRuntimeEvent['type']>([
+  'session.born',
+  'runtime.started',
+  'runtime.spawn_failed',
+  'runtime.stopped',
+  'runtime.rejected',
+  'runtime.turn.error',
+  'dev.sonner_test',
+])
 
 export interface OfficeActivityLandmark {
   readonly seq: number
@@ -16,13 +27,16 @@ export interface OfficeActivityLandmark {
   readonly detail?: string
   readonly source?: string
   readonly inboxEntryId?: string
+  readonly eventType?: AgentRuntimeEvent['type']
+  readonly status?: AgentRuntimeEvent['payload']['status']
 }
 
 export interface OfficeProductActivityState {
+  readonly agent: OfficeActivityLandmark | null
   readonly inbox: OfficeActivityLandmark | null
   readonly news: OfficeActivityLandmark | null
   readonly attention: Readonly<Record<OfficeActivityKind, boolean>>
-  readonly freshKind: 'inbox' | 'news' | null
+  readonly freshKind: OfficeActivityKind | null
 }
 
 export interface OfficeProductActivity extends OfficeProductActivityState {
@@ -31,12 +45,30 @@ export interface OfficeProductActivity extends OfficeProductActivityState {
 
 export function projectOfficeProductActivity(
   events: readonly AgentRuntimeEvent[],
-): Pick<OfficeProductActivityState, 'inbox' | 'news'> {
+): Pick<OfficeProductActivityState, 'agent' | 'inbox' | 'news'> {
   const ordered = [...events].sort((a, b) => b.seq - a.seq)
+  const agent = ordered.find((event) => OFFICE_AGENT_MILESTONE_TYPES.has(event.type))
   const inbox = ordered.find((event) => event.type === 'inbox.received')
   const news = ordered.find((event) => event.type === 'news.ingested')
 
   return {
+    agent: agent
+      ? {
+          seq: agent.seq,
+          occurredAt: agent.ts,
+          detail: activityExcerpt(
+            agent.payload.error
+              ?? agent.payload.message
+              ?? agent.payload.reason
+              ?? agent.payload.assistantText,
+          ),
+          source: agent.payload.agent
+            ?? agent.payload.workspaceLabel
+            ?? agent.payload.workspaceId,
+          eventType: agent.type,
+          status: agent.payload.status,
+        }
+      : null,
     inbox: inbox
       ? {
           seq: inbox.seq,
@@ -55,6 +87,18 @@ export function projectOfficeProductActivity(
         }
       : null,
   }
+}
+
+function activityExcerpt(value: string | undefined): string | undefined {
+  const normalized = value?.replace(/\s+/g, ' ').trim()
+  if (!normalized) return undefined
+  return normalized.length > 180 ? `${normalized.slice(0, 179)}…` : normalized
+}
+
+function activityKindForEvent(event: AgentRuntimeEvent): OfficeActivityKind | null {
+  if (event.type === 'inbox.received') return 'inbox'
+  if (event.type === 'news.ingested') return 'news'
+  return OFFICE_AGENT_MILESTONE_TYPES.has(event.type) ? 'agent' : null
 }
 
 function readAcknowledgedSeq(kind: OfficeActivityKind): number | null {
@@ -79,8 +123,9 @@ function writeAcknowledgedSeq(kind: OfficeActivityKind, seq: number) {
 /** Office-specific projection: persistent landmark copy, attention, and fresh-event motion. */
 export function useOfficeProductActivity(): OfficeProductActivity {
   const [events, setEvents] = useState<AgentRuntimeEvent[]>([])
-  const [freshKind, setFreshKind] = useState<'inbox' | 'news' | null>(null)
+  const [freshKind, setFreshKind] = useState<OfficeActivityKind | null>(null)
   const [attention, setAttention] = useState<Record<OfficeActivityKind, boolean>>({
+    agent: false,
     inbox: false,
     news: false,
   })
@@ -89,8 +134,8 @@ export function useOfficeProductActivity(): OfficeProductActivity {
   const freshTimerRef = useRef<number | null>(null)
   const freshKindRef = useRef<OfficeActivityKind | null>(null)
   const eventsRef = useRef<AgentRuntimeEvent[]>([])
-  const acknowledgedSeqRef = useRef<Record<OfficeActivityKind, number>>({ inbox: 0, news: 0 })
-  const latestSeqRef = useRef<Record<OfficeActivityKind, number>>({ inbox: 0, news: 0 })
+  const acknowledgedSeqRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
+  const latestSeqRef = useRef<Record<OfficeActivityKind, number>>({ agent: 0, inbox: 0, news: 0 })
 
   const refresh = useCallback(async () => {
     const activityApi = api.productActivity ?? api.agentRuntime
@@ -104,13 +149,14 @@ export function useOfficeProductActivity(): OfficeProductActivity {
     const nextEvents = [...bySeq.values()].sort((a, b) => a.seq - b.seq).slice(-EVENT_LIMIT)
     const nextProjected = projectOfficeProductActivity(nextEvents)
     latestSeqRef.current = {
+      agent: nextProjected.agent?.seq ?? 0,
       inbox: nextProjected.inbox?.seq ?? 0,
       news: nextProjected.news?.seq ?? 0,
     }
 
     if (!initializedRef.current) {
-      const nextAttention = { inbox: false, news: false }
-      for (const kind of ['inbox', 'news'] as const) {
+      const nextAttention = { agent: false, inbox: false, news: false }
+      for (const kind of OFFICE_ACTIVITY_KINDS) {
         const stored = readAcknowledgedSeq(kind)
         const latest = latestSeqRef.current[kind]
         const acknowledged = stored == null || stored > result.lastSeq ? latest : stored
@@ -121,6 +167,8 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       setAttention(nextAttention)
     } else {
       setAttention((current) => ({
+        agent: current.agent
+          || latestSeqRef.current.agent > acknowledgedSeqRef.current.agent,
         inbox: current.inbox
           || latestSeqRef.current.inbox > acknowledgedSeqRef.current.inbox,
         news: current.news
@@ -128,9 +176,9 @@ export function useOfficeProductActivity(): OfficeProductActivity {
       }))
       const notable = [...incoming]
         .reverse()
-        .find((event) => event.type === 'inbox.received' || event.type === 'news.ingested')
+        .find((event) => activityKindForEvent(event) != null)
       if (notable) {
-        const nextFreshKind = notable.type === 'inbox.received' ? 'inbox' : 'news'
+        const nextFreshKind = activityKindForEvent(notable) as OfficeActivityKind
         freshKindRef.current = nextFreshKind
         setFreshKind(nextFreshKind)
         if (freshTimerRef.current != null) window.clearTimeout(freshTimerRef.current)

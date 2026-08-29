@@ -1032,6 +1032,12 @@ describe('OfficeBuilding', () => {
           }],
         }}
         productActivity={{
+          agent: {
+            seq: 10,
+            occurredAt: 1_000,
+            source: 'grok',
+            eventType: 'runtime.started',
+          },
           inbox: {
             seq: 11,
             occurredAt: 1_100,
@@ -1045,7 +1051,7 @@ describe('OfficeBuilding', () => {
             detail: 'Markets move overnight',
             source: 'Wire',
           },
-          attention: { inbox: true, news: true },
+          attention: { agent: true, inbox: true, news: true },
           freshKind: 'news',
         }}
         initialPlayerState={{ position: { x: 340, y: 570 }, direction: 'down' }}
@@ -1071,6 +1077,10 @@ describe('OfficeBuilding', () => {
     expect(inbox.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
     expect(news.dataset.fresh).toBe('true')
     expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
+    const operations = screen.getByRole('button', { name: 'Operations board · New activity' })
+    expect(operations.dataset.hasActivity).toBe('true')
+    expect(operations.dataset.attention).toBe('true')
+    expect(operations.querySelector('.oa-office-operations-board__signal')?.textContent).toBe('!')
     const inboxPrompt = screen.getByRole('status', {
       name: 'Open Inbox · codex · Agent report delivered',
     })
