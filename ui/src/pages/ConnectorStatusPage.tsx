@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
 import { CircleAlert, Plug, RefreshCw, Settings2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ConnectorHealth, ConnectorSettingsSnapshot } from '../api'
+import { ConfigurationDialog } from '../components/ConfigurationDialog'
 import { PageHeader } from '../components/PageHeader'
 import { Spinner } from '../components/StateViews'
-import { useWorkspace } from '../tabs/store'
+import { ConnectorSettingsPanel } from './ConnectorsPage'
 import {
   reconnectConnector,
   refreshConnectorHealth,
@@ -16,7 +17,10 @@ export function ConnectorStatusPage() {
   const { snapshot, loading, refreshing, error, lastUpdatedAt } = useConnectorHealthState()
   const [reconnectingId, setReconnectingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const openOrFocus = useWorkspace((state) => state.openOrFocus)
+  const [configurationOpen, setConfigurationOpen] = useState(false)
+  const [configurationId, setConfigurationId] = useState<string | null>(null)
+  const configurationTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const configurationFlushRef = useRef<(() => void) | null>(null)
   const { t } = useTranslation()
 
   const reconnect = useCallback(async (id: string) => {
@@ -31,9 +35,13 @@ export function ConnectorStatusPage() {
     }
   }, [])
 
-  const configure = useCallback(() => {
-    openOrFocus({ kind: 'settings', params: { category: 'connectors' } })
-  }, [openOrFocus])
+  const configure = useCallback((id: string, trigger: HTMLButtonElement) => {
+    configurationTriggerRef.current = trigger
+    setConfigurationId(id)
+    setConfigurationOpen(true)
+  }, [])
+
+  const configuredDefinition = snapshot?.definitions.find((definition) => definition.id === configurationId)
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -57,14 +65,6 @@ export function ConnectorStatusPage() {
             >
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               {t('connectorStatus.refresh')}
-            </button>
-            <button
-              type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
-              onClick={configure}
-            >
-              <Settings2 size={14} />
-              {t('connectorStatus.configure')}
             </button>
           </div>
         )}
@@ -101,6 +101,23 @@ export function ConnectorStatusPage() {
           )}
         </div>
       </div>
+
+      {configuredDefinition && configurationId && (
+        <ConfigurationDialog
+          open={configurationOpen}
+          onOpenChange={(open) => {
+            if (!open) configurationFlushRef.current?.()
+            setConfigurationOpen(open)
+            if (!open) void refreshConnectorHealth()
+          }}
+          title={t('connectorStatus.configurationDialogTitle', { name: configuredDefinition.label })}
+          description={t('connectorStatus.configurationDialogDescription', { name: configuredDefinition.label })}
+          restoreFocusRef={configurationTriggerRef}
+          keepMounted
+        >
+          <ConnectorSettingsPanel connectorId={configurationId} flushRef={configurationFlushRef} />
+        </ConfigurationDialog>
+      )}
     </div>
   )
 }
@@ -113,7 +130,7 @@ function ConnectorOverview({
   t,
 }: {
   snapshot: ConnectorSettingsSnapshot
-  onConfigure: () => void
+  onConfigure: (id: string, trigger: HTMLButtonElement) => void
   onReconnect: (id: string) => Promise<void>
   reconnectingId: string | null
   t: TFunction
@@ -236,29 +253,32 @@ function ConnectorOverview({
                   </p>
                 )}
 
-                {!configured && (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-medium text-primary hover:underline"
-                    onClick={onConfigure}
+                    className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary/35 bg-primary/[0.04] px-3 py-2 text-[12px] font-medium text-primary hover:border-primary/60 hover:bg-primary/[0.07]"
+                    onClick={(event) => onConfigure(definition.id, event.currentTarget)}
                   >
-                    {t('connectorStatus.configureAdapter', { name: definition.label })}
+                    <Settings2 size={13} aria-hidden />
+                    {configured
+                      ? t('connectorStatus.manageAdapter', { name: definition.label })
+                      : t('connectorStatus.configureAdapter', { name: definition.label })}
                   </button>
-                )}
-                {configured && snapshot.config.serviceEnabled && config.enabled
-                  && runtime?.status !== 'healthy' && runtime?.status !== 'awaiting_link' && (
-                  <button
-                    type="button"
-                    className="oa-pressable mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-foreground hover:border-primary/50 disabled:opacity-50"
-                    disabled={reconnectingId === definition.id}
-                    onClick={() => void onReconnect(definition.id)}
-                  >
-                    <RefreshCw size={13} className={reconnectingId === definition.id ? 'animate-spin motion-reduce:animate-none' : ''} />
-                    {reconnectingId === definition.id
-                      ? t('connectorStatus.reconnecting')
-                      : t('connectorStatus.reconnect')}
-                  </button>
-                )}
+                  {configured && snapshot.config.serviceEnabled && config.enabled
+                    && runtime?.status !== 'healthy' && runtime?.status !== 'awaiting_link' && (
+                    <button
+                      type="button"
+                      className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-foreground hover:border-primary/50 disabled:opacity-50"
+                      disabled={reconnectingId === definition.id}
+                      onClick={() => void onReconnect(definition.id)}
+                    >
+                      <RefreshCw size={13} className={reconnectingId === definition.id ? 'animate-spin motion-reduce:animate-none' : ''} />
+                      {reconnectingId === definition.id
+                        ? t('connectorStatus.reconnecting')
+                        : t('connectorStatus.reconnect')}
+                    </button>
+                  )}
+                </div>
               </article>
             )
           })}

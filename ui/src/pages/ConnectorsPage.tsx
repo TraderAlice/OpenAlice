@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { Bot, CheckCircle2, ChevronDown, CircleAlert, Eye, EyeOff, KeyRound, Link2, Power, Send, ShieldCheck, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -35,6 +35,26 @@ interface PendingUnlink {
 }
 
 export function ConnectorsPage() {
+  return <ConnectorSettingsSurface />
+}
+
+export function ConnectorSettingsPanel({
+  connectorId,
+  flushRef,
+}: {
+  connectorId: string
+  flushRef?: MutableRefObject<(() => void) | null>
+}) {
+  return <ConnectorSettingsSurface connectorId={connectorId} flushRef={flushRef} />
+}
+
+function ConnectorSettingsSurface({
+  connectorId,
+  flushRef,
+}: {
+  connectorId?: string
+  flushRef?: MutableRefObject<(() => void) | null>
+}) {
   const { t } = useTranslation()
   const [definitions, setDefinitions] = useState<ConnectorDefinition[]>([])
   const [config, setConfig] = useState<PublicConnectorConfig | null>(null)
@@ -85,12 +105,20 @@ export function ConnectorsPage() {
     window.setTimeout(() => { void refreshRuntime() }, 2_400)
   }, [definitions, refreshRuntime])
 
-  const { status, retry } = useAutoSave({
+  const { status, flush, retry } = useAutoSave({
     data: config!,
     save,
     enabled: config !== null,
     delay: 700,
   })
+
+  useEffect(() => {
+    if (!flushRef) return
+    flushRef.current = flush
+    return () => {
+      if (flushRef.current === flush) flushRef.current = null
+    }
+  }, [flush, flushRef])
 
   const adapterHealth = useMemo(
     () => new Map(health?.service?.adapters.map((item) => [item.id, item]) ?? []),
@@ -249,40 +277,59 @@ export function ConnectorsPage() {
     }
   }, [refreshRuntime])
 
+  const adapterOnly = connectorId !== undefined
+  const visibleDefinitions = adapterOnly
+    ? definitions.filter((definition) => definition.id === connectorId)
+    : definitions
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <PageHeader
-        title={t('connectorSettings.title')}
-        description={t('connectorSettings.description')}
-        right={<SaveIndicator status={status} onRetry={retry} />}
-      />
+      {!adapterOnly && (
+        <PageHeader
+          title={t('connectorSettings.title')}
+          description={t('connectorSettings.description')}
+          right={<SaveIndicator status={status} onRetry={retry} />}
+        />
+      )}
 
-      <SettingsScrollArea className="px-4 py-5 md:px-8">
+      <SettingsScrollArea
+        scroll={!adapterOnly}
+        className={adapterOnly ? 'px-4 py-3 sm:px-6 sm:py-4' : 'px-4 py-5 md:px-8'}
+      >
         <div className="max-w-[920px] mx-auto">
+          {adapterOnly && status !== 'idle' && (
+            <div className="sticky top-2 z-10 flex h-0 justify-end pr-1">
+              <div className="rounded-full border border-border/70 bg-popover px-2.5 py-1 shadow-sm">
+                <SaveIndicator status={status} onRetry={retry} />
+              </div>
+            </div>
+          )}
           {config && (
             <>
-              <ConfigSection
-                title={t('connectorStatus.serviceTitle')}
-                description={t('connectorSettings.serviceDescription')}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3 border-l-2 border-border/80 bg-secondary/20 px-3 py-2.5">
-                  <label className="flex min-w-0 flex-1 items-start gap-3">
-                    <input
-                      className="mt-1"
-                      type="checkbox"
-                      checked={config.serviceEnabled}
-                      onChange={(event) => setConfig({ ...config, serviceEnabled: event.target.checked })}
-                    />
-                    <span>
-                      <span className="block text-[13px] font-medium text-foreground">{t('connectorSettings.runService')}</span>
-                      <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground/70">{t('connectorSettings.runServiceDescription')}</span>
-                    </span>
-                  </label>
-                  <HealthBadge health={health} t={t} />
-                </div>
-              </ConfigSection>
+              {!adapterOnly && (
+                <ConfigSection
+                  title={t('connectorStatus.serviceTitle')}
+                  description={t('connectorSettings.serviceDescription')}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-l-2 border-border/80 bg-secondary/20 px-3 py-2.5">
+                    <label className="flex min-w-0 flex-1 items-start gap-3">
+                      <input
+                        className="mt-1"
+                        type="checkbox"
+                        checked={config.serviceEnabled}
+                        onChange={(event) => setConfig({ ...config, serviceEnabled: event.target.checked })}
+                      />
+                      <span>
+                        <span className="block text-[13px] font-medium text-foreground">{t('connectorSettings.runService')}</span>
+                        <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground/70">{t('connectorSettings.runServiceDescription')}</span>
+                      </span>
+                    </label>
+                    <HealthBadge health={health} t={t} />
+                  </div>
+                </ConfigSection>
+              )}
 
-              {definitions.map((definition) => {
+              {visibleDefinitions.map((definition) => {
                 const adapter = config.adapters[definition.id] ?? emptyAdapter()
                 const runtime = adapterHealth.get(definition.id)
                 const setup = getConnectorSetupState({
@@ -294,10 +341,11 @@ export function ConnectorsPage() {
                 const credentialsOpen =
                   credentialEditors[definition.id] ?? setup.stage === 'needs_credentials'
                 return (
-                  <ConfigSection
+                  <ConnectorAdapterSection
                     key={definition.id}
-                    title={definition.label}
-                    description={t('connectorSettings.adapterDescription', { name: definition.label })}
+                    definition={definition}
+                    compact={adapterOnly}
+                    t={t}
                   >
                     <div className="space-y-4">
                       <SetupStatePanel
@@ -385,7 +433,7 @@ export function ConnectorsPage() {
                         </p>
                       )}
                     </div>
-                  </ConfigSection>
+                  </ConnectorAdapterSection>
                 )
               })}
             </>
@@ -469,6 +517,30 @@ export function ConnectorsPage() {
         />
       )}
     </div>
+  )
+}
+
+function ConnectorAdapterSection({
+  definition,
+  compact,
+  t,
+  children,
+}: {
+  definition: ConnectorDefinition
+  compact: boolean
+  t: TFunction
+  children: ReactNode
+}) {
+  if (compact) {
+    return <section className="py-3 sm:py-4">{children}</section>
+  }
+  return (
+    <ConfigSection
+      title={definition.label}
+      description={t('connectorSettings.adapterDescription', { name: definition.label })}
+    >
+      {children}
+    </ConfigSection>
   )
 }
 
@@ -748,7 +820,7 @@ function SetupStatePanel({
             )}
           </div>
         </div>
-        <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+        <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
           <div className="mr-1 flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/60 px-3">
             <span className="text-[12px] font-medium text-foreground">
               {t('connectorSettings.runConnector', { name: definition.label })}

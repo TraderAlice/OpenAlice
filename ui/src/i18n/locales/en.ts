@@ -2219,10 +2219,9 @@ export const en = {
   },
   connectorStatus: {
     title: 'Connectors',
-    description: 'External Inbox delivery status. Connector credentials and routing stay in Settings.',
+    description: 'External Inbox delivery status. Manage each connector without leaving this page.',
     updated: 'Updated {{time}}',
     refresh: 'Refresh',
-    configure: 'Configure',
     loadError: 'Could not read Connector status.',
     serviceTitle: 'Connector Service',
     checked: 'Checked {{time}}',
@@ -2241,7 +2240,10 @@ export const en = {
     disabled: 'Disabled',
     notLinked: 'Not linked',
     noDeliveryYet: 'No delivery yet',
-    configureAdapter: 'Configure {{name}}',
+    configureAdapter: 'Set up {{name}}',
+    manageAdapter: 'Manage {{name}}',
+    configurationDialogTitle: 'Configure {{name}}',
+    configurationDialogDescription: 'Connection, delivery, and chat settings for {{name}}.',
     reconnect: 'Reconnect',
     reconnecting: 'Reconnecting…',
     service: {

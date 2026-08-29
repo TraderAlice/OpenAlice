@@ -86,7 +86,7 @@ external adapters remain optional projections rather than sources of truth.
   - [x] Name newly created connector Issues `Chat on <label>` and use natural chat
         language in default What and domain/HTTP errors; conflict says
         `Chat on <Label> already exists`; do not rewrite existing Issues.
-  - [ ] Add a reusable configuration dialog and open one adapter's shared
+  - [x] Add a reusable configuration dialog and open one adapter's shared
         settings content from its overview card without changing routes.
   - [ ] Revisit Connector status copy and owner-identifier disclosure as a
         separate accepted increment.
@@ -103,6 +103,12 @@ relevant Connector lanes:
 - Settings browser verification on the real Default AliceProject
 - isolated Guardian enable/restart/disable recovery when lifecycle changes
 - Docker/package assertions when process layout or distributed resources change
+
+The configuration-dialog increment passed its focused UI suite (21 tests), UI
+typecheck/build, and real-route browser acceptance at desktop and 390 px widths.
+The browser check confirmed route retention, one-adapter content, narrow-screen
+action wrapping without horizontal overflow, close-button dismissal, and focus
+restoration. No live connector action or configuration control was exercised.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

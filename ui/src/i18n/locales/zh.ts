@@ -2186,10 +2186,9 @@ export const zh: Resources = {
   },
   connectorStatus: {
     title: '连接器',
-    description: '外部收件箱投递状态。连接器凭证与路由仍在“设置”中管理。',
+    description: '外部收件箱投递状态。无需离开当前页面即可管理每个连接器。',
     updated: '更新于 {{time}}',
     refresh: '刷新',
-    configure: '配置',
     loadError: '无法读取连接器状态。',
     serviceTitle: '连接器服务',
     checked: '检查于 {{time}}',
@@ -2208,7 +2207,10 @@ export const zh: Resources = {
     disabled: '已停用',
     notLinked: '未关联',
     noDeliveryYet: '尚无投递',
-    configureAdapter: '配置 {{name}}',
+    configureAdapter: '设置 {{name}}',
+    manageAdapter: '管理 {{name}}',
+    configurationDialogTitle: '配置 {{name}}',
+    configurationDialogDescription: '{{name}} 的连接、投递与聊天设置。',
     reconnect: '重新连接',
     reconnecting: '正在重新连接…',
     service: {

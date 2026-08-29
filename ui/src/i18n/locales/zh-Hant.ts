@@ -2194,10 +2194,9 @@ export const zhHant: Resources = {
   },
   connectorStatus: {
     title: '連接器',
-    description: '外部收件匣投遞狀態。連接器憑證與路由仍在「設定」中管理。',
+    description: '外部收件匣投遞狀態。無需離開目前頁面即可管理每個連接器。',
     updated: '更新於 {{time}}',
     refresh: '重新整理',
-    configure: '設定',
     loadError: '無法讀取連接器狀態。',
     serviceTitle: '連接器服務',
     checked: '檢查於 {{time}}',
@@ -2217,6 +2216,9 @@ export const zhHant: Resources = {
     notLinked: '未連結',
     noDeliveryYet: '尚無投遞',
     configureAdapter: '設定 {{name}}',
+    manageAdapter: '管理 {{name}}',
+    configurationDialogTitle: '設定 {{name}}',
+    configurationDialogDescription: '{{name}} 的連線、投遞與聊天設定。',
     reconnect: '重新連線',
     reconnecting: '正在重新連線…',
     service: {

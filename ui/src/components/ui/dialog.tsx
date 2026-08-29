@@ -42,14 +42,17 @@ function DialogContent({
   children,
   showCloseButton = true,
   overlayClassName,
+  keepMounted = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
   /** Raise or otherwise tune the backdrop when a shared dialog is nested above a legacy modal. */
   overlayClassName?: string
+  /** Keep stateful form content mounted while the dialog is closed. */
+  keepMounted?: boolean
 }) {
   return (
-    <DialogPortal>
+    <DialogPortal keepMounted={keepMounted}>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"

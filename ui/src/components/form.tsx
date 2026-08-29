@@ -10,6 +10,7 @@ export const inputClass =
 interface SettingsScrollAreaProps {
   children: ReactNode
   className?: string
+  scroll?: boolean
 }
 
 /**
@@ -18,11 +19,11 @@ interface SettingsScrollAreaProps {
  * must carry `min-h-0` before overflow can work. Keeping the contract here
  * prevents a long form from being clipped by the app-level `overflow-hidden`.
  */
-export function SettingsScrollArea({ children, className = '' }: SettingsScrollAreaProps) {
+export function SettingsScrollArea({ children, className = '', scroll = true }: SettingsScrollAreaProps) {
   return (
     <div
       data-settings-scroll-area
-      className={`min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] ${className}`}
+      className={`min-h-0 flex-1 ${scroll ? 'overflow-y-auto overscroll-contain [scrollbar-gutter:stable]' : ''} ${className}`}
     >
       {children}
     </div>

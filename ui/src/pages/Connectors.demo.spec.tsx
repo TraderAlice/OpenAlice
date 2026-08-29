@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PublicConnectorConfig } from '../api'
 import { createDemoConnectorSnapshot } from '../demo/fixtures/connectors'
@@ -103,12 +103,56 @@ describe('Connector demo routes', () => {
 
     expect(await screen.findByRole('heading', { name: '连接器' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '刷新' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '配置' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '配置' })).toBeNull()
+    expect(screen.getByRole('button', { name: '设置 Feishu' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '连接器服务' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '投递连接器' })).toBeTruthy()
     expect(screen.getByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeTruthy()
     expect(screen.getAllByText('需要设置')).toHaveLength(4)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
+  })
+
+  it('opens one connector configuration in place and restores focus on close', async () => {
+    render(<ConnectorStatusPage />)
+
+    const trigger = await screen.findByRole('button', { name: 'Set up Feishu' })
+    const before = window.location.pathname
+    fireEvent.click(trigger)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Configure Feishu' })).toBeTruthy()
+    expect(within(dialog).getByText('Connection, delivery, and chat settings for Feishu.')).toBeTruthy()
+    expect(within(dialog).getByRole('switch', { name: 'Start or stop the Feishu connector' })).toBeTruthy()
+    expect(within(dialog).queryByText('Discord')).toBeNull()
+    expect(window.location.pathname).toBe(before)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+  })
+
+  it('finishes a pending auto-save after the configuration dialog closes', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord = {
+      enabled: false,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    mocks.load.mockResolvedValue(snapshot)
+    render(<ConnectorStatusPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('switch', {
+      name: 'Start or stop the Discord connector',
+    }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
+    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
+    expect(saved.serviceEnabled).toBe(true)
+    expect(saved.adapters.discord.enabled).toBe(true)
   })
 
   it('renders the Connector configuration route from the demo snapshot', async () => {

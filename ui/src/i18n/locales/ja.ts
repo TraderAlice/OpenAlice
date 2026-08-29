@@ -2187,10 +2187,9 @@ export const ja: Resources = {
   },
   connectorStatus: {
     title: 'コネクター',
-    description: '外部受信箱への配信状況です。コネクターの認証情報とルーティングは「設定」で管理します。',
+    description: '外部受信箱への配信状況です。このページを離れずに各コネクターを管理できます。',
     updated: '{{time}} 更新',
     refresh: '更新',
-    configure: '設定',
     loadError: 'コネクターの状態を読み取れませんでした。',
     serviceTitle: 'コネクターサービス',
     checked: '{{time}} に確認',
@@ -2209,7 +2208,10 @@ export const ja: Resources = {
     disabled: '無効',
     notLinked: '未連携',
     noDeliveryYet: '配信履歴なし',
-    configureAdapter: '{{name}} を設定',
+    configureAdapter: '{{name}} をセットアップ',
+    manageAdapter: '{{name}} を管理',
+    configurationDialogTitle: '{{name}} を設定',
+    configurationDialogDescription: '{{name}} の接続、配信、チャット設定です。',
     reconnect: '再接続',
     reconnecting: '再接続中…',
     service: {
