@@ -14,4 +14,5 @@ export const OFFICE_HUD_ASSETS = {
   talkBubble: '/office/hud/talk-bubble-v2.png',
   windowBack: '/office/hud/window-back-v2.png',
   journalCursor: '/office/hud/journal-cursor-v1.png',
+  replayLatch: '/office/hud/replay-latch-v1.png',
 } as const

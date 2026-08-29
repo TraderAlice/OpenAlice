@@ -1930,16 +1930,17 @@
   display: none;
 }
 
-.oa-office-replay-panel summary::before {
-  width: 0;
-  height: 0;
-  border-top: 6px solid transparent;
-  border-bottom: 6px solid transparent;
-  border-left: 8px solid var(--gba-water);
-  content: "";
+.oa-office-replay-panel summary > img {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transform-origin: center;
+  transition: transform 100ms steps(2, end);
 }
 
-.oa-office-replay-panel[open] summary::before {
+.oa-office-replay-panel[open] summary > img {
   transform: rotate(90deg);
 }
 
@@ -2154,7 +2155,7 @@
   .oa-office-runtime__index li button,
   .oa-office-runtime__event,
   .oa-office-runtime__open,
-  .oa-office-replay-panel summary::before {
+  .oa-office-replay-panel summary > img {
     transition: none;
     animation: none;
   }

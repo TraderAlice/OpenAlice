@@ -103,6 +103,8 @@ describe('OfficePage localization', () => {
       .toContain('/office/hud/occupancy-log-v2.png')
     expect(screen.getByRole('button', { name: '关闭' }).querySelector<HTMLImageElement>('img')?.src)
       .toContain('/office/hud/window-close-v2.png')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-replay-panel summary img')?.src)
+      .toContain('/office/hud/replay-latch-v1.png')
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
     expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
     await userEvent.keyboard('{Escape}')

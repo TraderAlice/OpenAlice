@@ -1847,6 +1847,24 @@ Replay Live-exit ownership follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 608-file Vitest run (5,035 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Replay-deck material latch follow-up (2026-08-29):
+
+- Continued through the real Occupancy log at desktop and phone sizes. Its window, event icons, journal cursor,
+  transport buttons, and close latch were generated game materials, but the Replay deck still opened with an 8x12
+  CSS border triangle. The default disclosure silhouette was the remaining browser-control seam in the log header.
+- Compared keeping the generic triangle, borrowing the generated route chevron, and giving the replay deck its own
+  physical control. Chose a dedicated latch because route guidance and panel disclosure are different interaction
+  languages, while a small rotating part can communicate both closed and open states without adding copy.
+- Generated a transparent cyan-enamel log latch with a dark outline, cream highlight, and brass pivot. It was
+  alpha-cropped, hard-alpha packaged with nearest-neighbor sampling on a native 32x32 RGBA canvas, and registered as
+  `replay-latch-v1.png`. The DOM-owned summary keeps its complete text, keyboard behavior, 38px hit area, and native
+  details semantics; only the decorative part rotates downward when open. Reduced-motion removes its stepped turn.
+- Browser-played the collapsed and expanded deck at 390x844: the latch remained legible at 22x22, rotated to the
+  expected downward state, and did not change the 38px summary height or phone overflow. At 1280x900, the same part
+  aligned with the log title and transport deck without competing with the larger Occupancy log identity icon.
+- Focused OfficePage and HUD-asset specs passed: 2 files / 6 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
+  608-file Vitest run (5,035 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

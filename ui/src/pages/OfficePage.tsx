@@ -267,7 +267,10 @@ export function OfficePage() {
                 </header>
                 <div className="oa-office-window__body">
                   <details className="oa-office-replay-panel">
-                    <summary>{t('office.replay')}</summary>
+                    <summary>
+                      <img src={OFFICE_HUD_ASSETS.replayLatch} alt="" aria-hidden style={officePixelImg} />
+                      <span>{t('office.replay')}</span>
+                    </summary>
                     <OfficeReplayBar
                       firstSeq={building.firstSeq}
                       lastSeq={building.lastSeq}
