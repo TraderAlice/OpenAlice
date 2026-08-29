@@ -19,6 +19,7 @@
     "prebuild:server": "tsx scripts/build-migration-index.ts",
     "build:server": "turbo run build --filter=!@traderalice/desktop --filter=!./packages/uta-broker-* && tsup src/main.ts --format esm --dts",
     "build:headless-runtime": "tsx scripts/build-headless-runtime.ts",
+    "build:bun-cli:feasibility": "bun scripts/build-bun-cli-feasibility.ts",
     "build:migration-index": "tsx scripts/build-migration-index.ts",
     "broker-packs:build": "turbo run build --filter=./packages/uta-broker-* && tsx scripts/build-broker-packs.ts && pnpm broker-packs:verify",
     "broker-packs:upgrade-smoke": "tsx scripts/broker-pack-upgrade-smoke.ts",

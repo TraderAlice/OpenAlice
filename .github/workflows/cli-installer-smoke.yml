@@ -3,8 +3,9 @@ name: CLI Installer Smoke
 on:
   workflow_dispatch:
   pull_request:
-    branches: [dev, master]
+    branches: [dev, master, codex/usability-improvements]
     paths:
+      - ".bun-version"
       - ".github/workflows/cli-installer-smoke.yml"
       - ".github/workflows/release.yml"
       - "install"
@@ -14,6 +15,7 @@ on:
       - "scripts/install-channel-smoke.mjs"
       - "scripts/install-channel-smoke/**"
       - "scripts/install-smoke/**"
+      - "scripts/build-bun-cli-feasibility.ts"
       - "scripts/remote-ssh-smoke.mjs"
       - "scripts/remote-smoke/**"
   push:
@@ -35,6 +37,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  bun-cli-feasibility:
+    if: github.event_name != 'push'
+    name: Bun CLI feasibility (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - run: pnpm install --frozen-lockfile --filter=@traderalice/openalice-cli...
+
+      - run: pnpm build:bun-cli:feasibility
+
   checkout-install:
     if: github.event_name != 'push'
     name: Current checkout install

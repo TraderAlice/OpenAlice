@@ -4,7 +4,11 @@ import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const CLI_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+const compiledCliVersion = globalThis.__OPENALICE_BUILD_VERSION__
+
+export const CLI_VERSION = typeof compiledCliVersion === 'string' && compiledCliVersion.length > 0
+  ? compiledCliVersion
+  : JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
 export const DEFAULT_INSTALL_SOURCE = Object.freeze({
   schemaVersion: 2,
