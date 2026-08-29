@@ -426,6 +426,16 @@ export function OfficeBuilding({
         source: productActivity.news?.source,
       }
     }
+    if (replaySeq != null) {
+      const focusedReplay = replayFocus?.seq === replaySeq ? replayFocus : null
+      return {
+        icon: OFFICE_HUD_ASSETS.occupancyLog,
+        action: t('office.replayAt', { seq: replaySeq }),
+        label: `${t('office.replay')} · ${t('office.replayAt', { seq: replaySeq })}`,
+        detail: focusedReplay?.summary ?? null,
+        source: focusedReplay?.label,
+      }
+    }
     const agentDetail = (() => {
       if (productActivity.agent?.detail) return productActivity.agent.detail
       switch (productActivity.agent?.eventType) {

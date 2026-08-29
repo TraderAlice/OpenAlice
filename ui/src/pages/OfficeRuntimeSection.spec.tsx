@@ -526,6 +526,7 @@ describe('OfficeRuntimeSection', () => {
       seq: 7,
       targetIds: ['operations'],
       label: 'A',
+      summary: 'Earlier report.',
       channel: 'all',
     })
   })
@@ -547,6 +548,7 @@ describe('OfficeRuntimeSection', () => {
       seq: 9,
       targetIds: ['news-service'],
       label: 'Wire',
+      summary: 'Market opens',
       channel: 'news',
     })
   })

@@ -15,7 +15,7 @@ describe('Office replay focus', () => {
     expect(officeReplayFocusForEvent(event('runtime.stopped', {
       workspaceId: 'prediction-1',
       resumeId: 'resume-scout',
-    }), 'Scout', 'all')).toEqual({
+    }), 'Scout', 'Task complete', 'all')).toEqual({
       seq: 42,
       workspaceId: 'prediction-1',
       targetIds: [
@@ -24,19 +24,25 @@ describe('Office replay focus', () => {
         'sign:prediction-1',
       ],
       label: 'Scout',
+      summary: 'Task complete',
       channel: 'all',
     })
   })
 
   it('routes product activity to its physical service landmark', () => {
-    expect(officeReplayFocusForEvent(event('inbox.received', {}), 'Inbox', 'inbox').targetIds)
+    expect(officeReplayFocusForEvent(event('inbox.received', {}), 'Inbox', 'New mail', 'inbox').targetIds)
       .toEqual(['inbox-service'])
-    expect(officeReplayFocusForEvent(event('news.ingested', {}), 'Wire', 'news').targetIds)
+    expect(officeReplayFocusForEvent(event('news.ingested', {}), 'Wire', 'Market opens', 'news').targetIds)
       .toEqual(['news-service'])
   })
 
   it('keeps the source journal channel with the floor target', () => {
-    expect(officeReplayFocusForEvent(event('news.ingested', {}), 'Wire', 'news'))
-      .toMatchObject({ seq: 42, channel: 'news', targetIds: ['news-service'] })
+    expect(officeReplayFocusForEvent(event('news.ingested', {}), 'Wire', 'Market opens', 'news'))
+      .toMatchObject({
+        seq: 42,
+        channel: 'news',
+        targetIds: ['news-service'],
+        summary: 'Market opens',
+      })
   })
 })

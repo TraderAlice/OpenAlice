@@ -39,6 +39,7 @@ vi.mock('./OfficeRuntimeSection', () => ({
       seq: number
       targetIds: readonly string[]
       label: string
+      summary: string
       channel: 'news'
     }) => void
   }) => (
@@ -54,6 +55,7 @@ vi.mock('./OfficeRuntimeSection', () => ({
           seq: 12,
           targetIds: ['news-service'],
           label: 'Wire',
+          summary: 'Market opens',
           channel: 'news',
         })}
       >

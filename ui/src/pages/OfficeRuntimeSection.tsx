@@ -85,6 +85,12 @@ function officeRuntimeDialogue(value: string): string {
     .trim()
 }
 
+function officeReplaySummary(event: AgentRuntimeEvent, t: TFunction): string {
+  const value = eventDetail(event) ?? eventLabel(event, t)
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  return normalized.length > 180 ? `${normalized.slice(0, 179)}…` : normalized
+}
+
 function eventDetail(event: AgentRuntimeEvent): string | null {
   const payload = event.payload
   if (event.type === 'runtime.turn.text') {
@@ -534,6 +540,7 @@ export function OfficeRuntimeSection({
                 onClick={() => onReplay(officeReplayFocusForEvent(
                   selectedEvent,
                   selectedIdentity.primary,
+                  officeReplaySummary(selectedEvent, t),
                   channel,
                 ))}
               >

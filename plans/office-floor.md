@@ -2902,6 +2902,25 @@ Story-beat Agent window follow-up (2026-08-30):
   specs passed (2 files / 16 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,123 passing; one
   file and nine tests skipped), and the production build; the existing large-chunk advisory is unchanged.
 
+Replay-prompt provenance follow-up (2026-08-30):
+
+- Continued the real #1837 Chat replay and found its floor title and coworker beacon correctly targeted Grok Engineer,
+  while the nearby Operations prompt displayed the latest AutoQuant completion text. The historical floor was accurate,
+  but its primary interaction prompt still projected the live Agent landmark and therefore narrated a different task.
+- Compared hiding the prompt in replay, showing only generic replay copy, and carrying the selected event summary with
+  replay focus. Chose the event summary: a GBA-style nearby prompt should explain the highlighted story beat, while a
+  generic prompt discards useful context and hiding it weakens the board interaction.
+- Replay focus now owns a bounded, dialogue-normalized event summary as well as sequence, actor, channel, and spatial
+  targets. Near Operations, focused replay renders `Seq + actor + selected summary`; an unfocused slider snapshot uses
+  neutral Replay copy. Live landmark copy is never consulted while the floor is historical. Focus payloads are direct
+  current shapes with no compatibility path.
+- Browser-replayed real Chat completion #1837. Its Operations prompt read `Seq 1837 · Grok Engineer · The three
+  classics…`, matching the selected sleeping-NPC report, while the unrelated AutoQuant `Speech sits largest…` text no
+  longer appeared. The coworker beacon still targeted the Chat desk and the Operations board still reopened the exact
+  Agent event. Focused replay, journal, page, and building specs passed (4 files / 38 tests), together with root/UI
+  TypeScript, the full 617-file Vitest run (5,123 passing; one file and nine tests skipped), and the production build;
+  the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

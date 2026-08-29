@@ -63,6 +63,7 @@ describe('OfficeBuilding', () => {
             'sign:chat-replay',
           ],
           label: 'Session 6',
+          summary: 'Earlier Session completed its assignment.',
           channel: 'agent',
         }}
         onSelectEmployee={onSelectEmployee}
@@ -102,6 +103,13 @@ describe('OfficeBuilding', () => {
     expect(replayBeacon.dataset.kind).toBe('roster')
     expect(replayBeacon.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/route-destination-v1.png')
+    await userEvent.click(operations)
+    const replayPrompt = await screen.findByRole('status', {
+      name: 'Replay · Seq 2 · Session 6 · Earlier Session completed its assignment.',
+    })
+    expect(replayPrompt.textContent).toContain('Seq 2')
+    expect(replayPrompt.textContent).toContain('Session 6 · Earlier Session completed its assignment.')
+    expect(screen.queryByRole('status', { name: /Check live operations/ })).toBeNull()
     fireEvent.click(workspaceSign)
     fireEvent.click(occupiedDesks[0])
     fireEvent.click(cabinet)

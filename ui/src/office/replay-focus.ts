@@ -7,19 +7,21 @@ export interface OfficeReplayFocus {
   targetIds: readonly string[]
   workspaceId?: string
   label: string
+  summary: string
   channel: OfficeReplayChannel
 }
 
 export function officeReplayFocusForEvent(
   event: AgentRuntimeEvent,
   label: string,
+  summary: string,
   channel: OfficeReplayChannel,
 ): OfficeReplayFocus {
   if (event.type === 'inbox.received') {
-    return { seq: event.seq, targetIds: ['inbox-service'], label, channel }
+    return { seq: event.seq, targetIds: ['inbox-service'], label, summary, channel }
   }
   if (event.type === 'news.ingested') {
-    return { seq: event.seq, targetIds: ['news-service'], label, channel }
+    return { seq: event.seq, targetIds: ['news-service'], label, summary, channel }
   }
   const workspaceId = event.payload.workspaceId
   const resumeId = event.payload.resumeId
@@ -33,6 +35,7 @@ export function officeReplayFocusForEvent(
         `sign:${workspaceId}`,
       ],
       label,
+      summary,
       channel,
     }
   }
@@ -42,8 +45,9 @@ export function officeReplayFocusForEvent(
       workspaceId,
       targetIds: [`sign:${workspaceId}`],
       label,
+      summary,
       channel,
     }
   }
-  return { seq: event.seq, targetIds: ['operations'], label, channel }
+  return { seq: event.seq, targetIds: ['operations'], label, summary, channel }
 }
