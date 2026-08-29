@@ -599,11 +599,19 @@ jobs:
             --current-package dist/cli-package-linuxbrew-current/homebrew/openalice.rb
 
   accept-cli-aur:
-    name: Accept Arch/AUR CLI package
+    name: Accept Arch/AUR CLI package (${{ matrix.arch }})
     needs: [release, build-cli-release]
     if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     permissions:
       contents: read
 
@@ -644,37 +652,16 @@ jobs:
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/cli-package-aur-previous \
             --require-all
-          CURRENT_ID=$(node -e "const f=require('./dist/cli-package-aur-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='x64').contentIdentity)")
-          PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-aur-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='x64').previousContentIdentity)")
-          docker run --rm \
-            --platform linux/amd64 \
-            --env CURRENT_ID="$CURRENT_ID" \
-            --env CURRENT_VERSION="$VERSION" \
-            --env PREVIOUS_ID="$PREVIOUS_ID" \
-            --env PREVIOUS_VERSION="$PREVIOUS_VERSION" \
-            --volume "$GITHUB_WORKSPACE:/work" \
-            --workdir /work \
-            archlinux:base-devel@sha256:68bfc3b0d277b08a99101dc9b94aaa03e5ae70cf1b4fb965c03b2b87b915760d \
-            bash -euxo pipefail -c '
-              pacman -Syu --noconfirm nodejs
-              useradd --create-home builder
-              chown -R builder:builder \
-                /work/dist/cli-package-aur-current \
-                /work/dist/cli-package-aur-previous \
-                /work/dist/cli-package-aur-previous-channels
-              su builder -c "cd /work/dist/cli-package-aur-previous-channels/aur && makepkg --nodeps --noconfirm"
-              mv /work/dist/cli-package-aur-previous-channels/aur/openalice-bin-*.pkg.tar.zst /tmp/openalice-previous.pkg.tar.zst
-              su builder -c "cd /work/dist/cli-package-aur-current/aur && makepkg --nodeps --noconfirm"
-              mv /work/dist/cli-package-aur-current/aur/openalice-bin-*.pkg.tar.zst /tmp/openalice-current.pkg.tar.zst
-              /usr/bin/node /work/scripts/cli-system-package-manager-smoke.mjs \
-                --manager aur \
-                --previous-version "$PREVIOUS_VERSION" \
-                --current-version "$CURRENT_VERSION" \
-                --previous-content-identity "$PREVIOUS_ID" \
-                --current-content-identity "$CURRENT_ID" \
-                --previous-package /tmp/openalice-previous.pkg.tar.zst \
-                --current-package /tmp/openalice-current.pkg.tar.zst
-            '
+          CURRENT_ID=$(node -e "const f=require('./dist/cli-package-aur-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
+          PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-aur-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
+          node scripts/cli-aur-container-smoke.mjs \
+            --arch "${{ matrix.arch }}" \
+            --previous-version "$PREVIOUS_VERSION" \
+            --current-version "$VERSION" \
+            --previous-content-identity "$PREVIOUS_ID" \
+            --current-content-identity "$CURRENT_ID" \
+            --previous-package dist/cli-package-aur-previous-channels/aur/PKGBUILD \
+            --current-package dist/cli-package-aur-current/aur/PKGBUILD
 
   # Broker Packs are release artifacts, not inputs to the desktop package. Build
   # and validate them on their native platforms in parallel with desktop and

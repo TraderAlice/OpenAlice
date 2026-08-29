@@ -134,11 +134,11 @@ and Bun. Every `dev` push and the formal release matrix repeat npm/Bun acceptanc
 on all four targets before preserving the candidate. Release acceptance also
 installs the formula on native arm64 and Intel macOS runners, repeats the full
 formula lifecycle on native Linux arm64/x64 runners inside pinned official
-Homebrew images, and builds plus installs the x64 `openalice-bin` in a pinned
-clean Arch container.
-The official `archlinux:base-devel` image currently has no arm64 manifest, so
-arm64 AUR metadata is generated and checksum-bound but still needs a native
-Arch Linux ARM acceptance host. Each smoke uses an isolated home, exercises
+Homebrew images, and builds plus installs `openalice-bin` on native Linux x64
+and arm64 runners. The x64 AUR lane uses the pinned official Arch image; because
+that image has no arm64 manifest, the arm64 lane uses a pinned Arch Linux ARM
+image built from signature-checked upstream repositories. Each smoke uses an
+isolated home, exercises
 an actual stopped upgrade and removal, then starts a synthetic prior candidate
 and replaces it through the manager while Guardian is active. The new command
 must report the older running content as pending activation, preserve that

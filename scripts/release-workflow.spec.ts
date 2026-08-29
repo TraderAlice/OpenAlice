@@ -131,10 +131,12 @@ describe('Release workflow critical path', () => {
     ])
     expect(step(linuxbrew, 'Install and run the accepted archive through Linuxbrew').run)
       .toContain('cli-linuxbrew-smoke.mjs')
+    expect(aur.strategy?.matrix?.include).toEqual([
+      { os: 'ubuntu-24.04', arch: 'x64' },
+      { os: 'ubuntu-24.04-arm', arch: 'arm64' },
+    ])
     expect(step(aur, 'Build, install, and run the generated AUR package').run)
-      .toContain('archlinux:base-devel')
-    expect(step(aur, 'Build, install, and run the generated AUR package').run)
-      .toContain('--manager aur')
+      .toContain('cli-aur-container-smoke.mjs')
   })
 
   it('publishes npm platform packages before the stable meta package', () => {
