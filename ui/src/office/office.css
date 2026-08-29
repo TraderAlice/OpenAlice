@@ -4732,6 +4732,23 @@
   object-fit: contain;
 }
 
+.oa-office-pause-menu__option {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.oa-office-pause-menu__option small {
+  color: var(--gba-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.oa-office-pause-menu :is([role="menuitem"], [role="menuitemradio"]):is(:hover, :focus) .oa-office-pause-menu__option small {
+  color: var(--gba-paper);
+}
+
 .oa-office-pause-menu [role="menuitemradio"][aria-checked="true"] {
   border-color: var(--gba-ink);
   background: var(--gba-cream);

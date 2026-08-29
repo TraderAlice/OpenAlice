@@ -1830,6 +1830,8 @@ export const zh: Resources = {
     visibleGroupCount: '显示 {{visible}} · 清醒 {{awake}} · 共 {{total}}',
     allRooms: '所有房间',
     allGroups: '所有小组',
+    sleepingGroups_one: '{{count}} 个休眠小组',
+    sleepingGroups_other: '{{count}} 个休眠小组',
     floorQuiet: '所有小组都已休眠',
     floorQuietHint: '最近 {{days}} 天没有 Workspace 小组发生交互。打开所有小组可查看休眠中的 Workspace。',
     roomActive: '检测到活动',

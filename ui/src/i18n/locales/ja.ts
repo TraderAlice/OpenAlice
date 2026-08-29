@@ -1831,6 +1831,8 @@ export const ja: Resources = {
     visibleGroupCount: '{{visible}} 表示 · {{awake}} 起動中 · 全 {{total}}',
     allRooms: 'すべての部屋',
     allGroups: 'すべてのグループ',
+    sleepingGroups_one: 'スリープ中 {{count}} グループ',
+    sleepingGroups_other: 'スリープ中 {{count}} グループ',
     floorQuiet: 'すべてのグループがスリープ中です',
     floorQuietHint: '過去 {{days}} 日間に Workspace グループの操作はありません。すべてのグループを開くと、スリープ中の Workspace を確認できます。',
     roomActive: '活動を検出',

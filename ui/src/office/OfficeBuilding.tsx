@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type {
@@ -83,6 +83,7 @@ export function OfficeBuilding({
   onReturnLive?: () => void
 }) {
   const { t } = useTranslation()
+  const hiddenGroupCountId = useId()
   const officeTime = useEffectivePreferenceSlot()
   const reducedMotion = useReducedMotion()
   const [showAll, setShowAll] = useState(false)
@@ -142,7 +143,9 @@ export function OfficeBuilding({
     return building.offices.filter((office) =>
       !office.sleeping || minimumGroupIds.has(office.workspace.id))
   }, [building.config.harnessMinimumVisibleGroups, building.offices])
-  const groups = showAll ? building.offices : defaultGroups
+  const hiddenGroupCount = building.offices.length - defaultGroups.length
+  const showingAll = showAll && hiddenGroupCount > 0
+  const groups = showingAll ? building.offices : defaultGroups
   const stats = useMemo(() => {
     const employees = groups.flatMap((office) => office.employees)
     return {
@@ -606,7 +609,7 @@ export function OfficeBuilding({
                 <span>{t('office.floorView')}</span>
               </div>
               <DropdownMenuRadioGroup
-                value={showAll ? 'all' : 'live'}
+                value={showingAll ? 'all' : 'live'}
                 onValueChange={(value) => {
                   setShowAll(value === 'all')
                   setCamera({ x: 0, y: 0 })
@@ -617,10 +620,21 @@ export function OfficeBuilding({
                   <img src={OFFICE_HUD_ASSETS.resetCompass} alt="" aria-hidden style={officePixelImg} />
                   <span>{t('office.liveMap')}</span>
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="all">
-                  <img src={OFFICE_HUD_ASSETS.groupGrid} alt="" aria-hidden style={officePixelImg} />
-                  <span>{t('office.allGroups')}</span>
-                </DropdownMenuRadioItem>
+                {hiddenGroupCount > 0 && (
+                  <DropdownMenuRadioItem
+                    value="all"
+                    aria-label={t('office.allGroups')}
+                    aria-describedby={hiddenGroupCountId}
+                  >
+                    <img src={OFFICE_HUD_ASSETS.groupGrid} alt="" aria-hidden style={officePixelImg} />
+                    <span className="oa-office-pause-menu__option">
+                      <span>{t('office.allGroups')}</span>
+                      <small id={hiddenGroupCountId}>
+                        {t('office.sleepingGroups', { count: hiddenGroupCount })}
+                      </small>
+                    </span>
+                  </DropdownMenuRadioItem>
+                )}
               </DropdownMenuRadioGroup>
               <DropdownMenuItem
                 onClick={() => {

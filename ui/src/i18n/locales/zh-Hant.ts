@@ -1838,6 +1838,8 @@ export const zhHant: Resources = {
     visibleGroupCount: '顯示 {{visible}} · 清醒 {{awake}} · 共 {{total}}',
     allRooms: '所有房間',
     allGroups: '所有小組',
+    sleepingGroups_one: '{{count}} 個休眠小組',
+    sleepingGroups_other: '{{count}} 個休眠小組',
     floorQuiet: '所有小組都已休眠',
     floorQuietHint: '最近 {{days}} 天沒有 Workspace 小組發生互動。打開所有小組可查看休眠中的 Workspace。',
     roomActive: '偵測到活動',

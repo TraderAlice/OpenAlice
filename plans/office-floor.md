@@ -1635,6 +1635,27 @@ Cabinet record exit follow-up (2026-08-29):
 - Focused CabinetWindow specs passed: 1 file / 2 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
   Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Effective floor-view menu follow-up (2026-08-29):
+
+- Opened Floor view on the real three-pod demo and switched Live map -> All groups. Both modes rendered the same
+  Chat, AutoQuant, and Prediction pods, the same stats, and the same centered camera because each harness has only
+  its configured minimum group. The radio selection changed but the game world did not, leaving a prominent fake
+  choice in the primary map menu.
+- Compared adding a cosmetic camera transition, always disabling All groups, and making the option conditional on a
+  real hidden-group delta. Chose the conditional model: a game menu action should promise an observable state change,
+  not manufacture feedback for equivalent data. `showAll` is now effective only while at least one default-filtered
+  group exists, so changing live data cannot leave the menu in an impossible selected mode.
+- Floor view omits All groups when `building.offices` and `defaultGroups` have equal length. When sleeping groups are
+  hidden, the option appears with the generated group-grid bitmap plus a localized count such as `1 sleeping group`.
+  The radio item keeps the concise All groups accessible name and associates the count as its description. English,
+  Simplified Chinese, Traditional Chinese, and Japanese plural keys ship together.
+- Browser-played the no-delta demo at 1280x720 and 390x844. Both menus now contain one radio mode plus Occupancy log,
+  measure 224x148, and keep zero page overflow. The existing mixed-awake/sleeping component scenario proves the
+  complementary path: one hidden quant group exposes All groups, renders the count, and selecting it adds the hidden
+  pod to the continuous map.
+- Focused OfficeBuilding specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
+  Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

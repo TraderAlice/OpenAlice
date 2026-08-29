@@ -1863,6 +1863,8 @@ export const en = {
     visibleGroupCount: '{{visible}} shown · {{awake}} awake · {{total}} total',
     allRooms: 'All rooms',
     allGroups: 'All groups',
+    sleepingGroups_one: '{{count}} sleeping group',
+    sleepingGroups_other: '{{count}} sleeping groups',
     floorQuiet: 'All groups are asleep',
     floorQuietHint: 'No Workspace group has seen activity in the last {{days}} days. Open all groups to inspect sleeping Workspaces.',
     roomActive: 'Activity detected',
