@@ -86,6 +86,20 @@ after
     await expect(access(layout.versionsDir)).resolves.toBeUndefined()
   })
 
+  it('routes package-managed removal back to the owning manager', async () => {
+    const output = []
+    await expect(runUninstallCommand(['--yes'], {
+      layout: null,
+      readInstallSourceImpl: async () => ({
+        schemaVersion: 3,
+        method: 'aur',
+      }),
+      stdout: { write: (value) => output.push(value) },
+    })).resolves.toBe(0)
+    expect(output.join('')).toContain('paru -Rns openalice-bin')
+    expect(output.join('')).toContain('did not modify')
+  })
+
   it('refuses to race a live installer', async () => {
     const root = await makeTempDir()
     const layout = await makeInstalledLayout(root)

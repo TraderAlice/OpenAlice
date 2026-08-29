@@ -47,6 +47,14 @@ describe('CLI installer dev publication workflow', () => {
     )
   })
 
+  it('accepts native npm and Bun installs on PR macOS and Linux hosts', () => {
+    const build = workflow.jobs['bun-cli-feasibility']
+    const acceptance = step(build, 'Accept npm and Bun installs from the current native candidate').run ?? ''
+    expect(acceptance).toContain('--manager npm')
+    expect(acceptance).toContain('--manager bun')
+    expect(acceptance).toContain('--npm-only')
+  })
+
   it('validates candidates before uploading immutable assets and fixed aliases', () => {
     const publish = workflow.jobs['publish-dev-cli']
     expect(publish.needs).toBe('build-dev-cli')

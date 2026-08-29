@@ -24,6 +24,11 @@ on:
       - "scripts/bun-broker-pack-fixture.ts"
       - "scripts/build-bun-runtime-feasibility.ts"
       - "scripts/build-bun-release.ts"
+      - "scripts/build-cli-package-channels.mjs"
+      - "scripts/build-cli-package-channels.spec.mjs"
+      - "scripts/pack-cli-npm-packages.mjs"
+      - "scripts/pack-cli-npm-packages.spec.mjs"
+      - "scripts/cli-package-manager-smoke.mjs"
       - "scripts/prepare-cli-dev-assets.mjs"
       - "scripts/prepare-cli-dev-assets.spec.mjs"
       - "THIRD_PARTY_NOTICES.md"
@@ -75,6 +80,28 @@ jobs:
       - run: pnpm build:bun-runtime:feasibility
 
       - run: pnpm build:bun:release
+
+      - name: Accept npm and Bun installs from the current native candidate
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          CONTENT_IDENTITY=$(node -p "require('./dist/bun-release/report.json').contentIdentity")
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/bun-release \
+            --output-dir "$RUNNER_TEMP/cli-package-channels" \
+            --version "$VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --npm-only
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager npm \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+          node scripts/cli-package-manager-smoke.mjs \
+            --manager bun \
+            --packages-dir "$RUNNER_TEMP/cli-package-channels/npm" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
 
   checkout-install:
     if: github.event_name != 'push'

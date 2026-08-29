@@ -47,13 +47,19 @@ export function buildBunRuntimeEnvironment(
 export function resolveBunContentIdentity(resourceRoot, env = process.env, read = readFileSync) {
   const explicit = env.OPENALICE_RUNTIME_CONTENT_IDENTITY?.trim()
   if (explicit && /^[A-Za-z0-9._-]{1,128}$/.test(explicit)) return explicit
-  try {
-    const release = JSON.parse(read(resolve(resourceRoot, '..', '..', 'release.json'), 'utf8'))
-    return typeof release.contentIdentity === 'string'
-      && /^[A-Za-z0-9._-]{1,128}$/.test(release.contentIdentity)
-      ? release.contentIdentity
-      : null
-  } catch {
-    return null
+  for (const path of [
+    resolve(resourceRoot, '..', '..', 'release.json'),
+    resolve(resourceRoot, 'release.json'),
+  ]) {
+    try {
+      const release = JSON.parse(read(path, 'utf8'))
+      if (
+        typeof release.contentIdentity === 'string'
+        && /^[A-Za-z0-9._-]{1,128}$/.test(release.contentIdentity)
+      ) return release.contentIdentity
+    } catch {
+      // Try the package-manager layout before reporting no identity.
+    }
   }
+  return null
 }

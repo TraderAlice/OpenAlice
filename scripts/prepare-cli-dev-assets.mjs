@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { basename, join, parse, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const TARGETS = [
+export const CLI_RELEASE_TARGETS = [
   ['darwin', 'arm64'],
   ['darwin', 'x64'],
   ['linux', 'arm64'],
@@ -41,42 +41,16 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version }) {
 
   const expectedArchives = new Set()
   const targets = []
-  for (const [platform, arch] of TARGETS) {
+  for (const [platform, arch] of CLI_RELEASE_TARGETS) {
     const archiveName = `openalice-cli-${version}-${platform}-${arch}.tar.gz`
     expectedArchives.add(archiveName)
     const archivePath = join(inputRoot, archiveName)
-    const checksumPath = `${archivePath}.sha256`
-    const checksum = parseChecksum(readFileSync(checksumPath, 'utf8'), archiveName)
-    const bytes = readFileSync(archivePath)
-    const actualChecksum = createHash('sha256').update(bytes).digest('hex')
-    if (checksum !== actualChecksum) {
-      throw new Error(`${archiveName} does not match its SHA-256 sidecar`)
-    }
-
-    const releaseName = archiveName.slice(0, -'.tar.gz'.length)
-    const metadata = JSON.parse(execFileSync('tar', [
-      '-xOzf', archivePath, `${releaseName}/release.json`,
-    ], { encoding: 'utf8' }))
-    if (
-      metadata?.schemaVersion !== 1
-      || metadata?.product !== 'OpenAlice CLI'
-      || metadata?.version !== version
-      || metadata?.platform !== platform
-      || metadata?.arch !== arch
-      || metadata?.bunVersion !== PINNED_BUN_VERSION
-      || !/^[a-f0-9]{16}$/.test(metadata?.contentIdentity ?? '')
-    ) {
-      throw new Error(`${archiveName} contains invalid release metadata`)
-    }
-    const entries = execFileSync('tar', ['-tzf', archivePath], { encoding: 'utf8' })
-      .split('\n')
-      .filter(Boolean)
-    if (entries.some((entry) => !entry.startsWith(`${releaseName}/`) || entry.includes('/../'))) {
-      throw new Error(`${archiveName} contains entries outside its release root`)
-    }
-    if (!entries.includes(`${releaseName}/bin/openalice`)) {
-      throw new Error(`${archiveName} does not contain bin/openalice`)
-    }
+    const { checksum, checksumPath, metadata } = validateCliReleaseArchive({
+      archivePath,
+      version,
+      platform,
+      arch,
+    })
 
     copyFileSync(archivePath, join(immutableRoot, archiveName))
     copyFileSync(checksumPath, join(immutableRoot, `${archiveName}.sha256`))
@@ -103,6 +77,47 @@ export function prepareCliDevAssets({ inputDir, outputDir, commit, version }) {
   }
   writeFileSync(join(outputRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
   return manifest
+}
+
+export function validateCliReleaseArchive({ archivePath, version, platform, arch }) {
+  const archiveName = basename(archivePath)
+  const expectedName = `openalice-cli-${version}-${platform}-${arch}.tar.gz`
+  if (archiveName !== expectedName) {
+    throw new Error(`unexpected native CLI archive name: ${archiveName}`)
+  }
+  const checksumPath = `${archivePath}.sha256`
+  const checksum = parseChecksum(readFileSync(checksumPath, 'utf8'), archiveName)
+  const bytes = readFileSync(archivePath)
+  const actualChecksum = createHash('sha256').update(bytes).digest('hex')
+  if (checksum !== actualChecksum) {
+    throw new Error(`${archiveName} does not match its SHA-256 sidecar`)
+  }
+
+  const releaseName = archiveName.slice(0, -'.tar.gz'.length)
+  const metadata = JSON.parse(execFileSync('tar', [
+    '-xOzf', archivePath, `${releaseName}/release.json`,
+  ], { encoding: 'utf8' }))
+  if (
+    metadata?.schemaVersion !== 1
+    || metadata?.product !== 'OpenAlice CLI'
+    || metadata?.version !== version
+    || metadata?.platform !== platform
+    || metadata?.arch !== arch
+    || metadata?.bunVersion !== PINNED_BUN_VERSION
+    || !/^[a-f0-9]{16}$/.test(metadata?.contentIdentity ?? '')
+  ) {
+    throw new Error(`${archiveName} contains invalid release metadata`)
+  }
+  const entries = execFileSync('tar', ['-tzf', archivePath], { encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean)
+  if (entries.some((entry) => !entry.startsWith(`${releaseName}/`) || entry.includes('/../'))) {
+    throw new Error(`${archiveName} contains entries outside its release root`)
+  }
+  if (!entries.includes(`${releaseName}/bin/openalice`)) {
+    throw new Error(`${archiveName} does not contain bin/openalice`)
+  }
+  return { archiveName, releaseName, checksumPath, checksum, metadata, entries }
 }
 
 function parseChecksum(content, archiveName) {

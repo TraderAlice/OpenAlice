@@ -113,6 +113,41 @@ describe('OpenAlice Doctor', () => {
     })
     expect(doctor.checks.find((check) => check.id === 'runtime.node')).toBeUndefined()
   })
+
+  it('reports package-manager provenance and update ownership as installed', async () => {
+    const home = await makeTempDir()
+    const source = {
+      ...installSource(),
+      schemaVersion: 3,
+      selector: { kind: 'version', value: 'v0.90.1' },
+      updateChannel: 'stable',
+      method: 'brew',
+      artifact: { platform: 'darwin', arch: 'arm64', sha256: 'a'.repeat(64) },
+      installedAt: '2026-08-30T00:00:00Z',
+    }
+    const doctor = await diagnoseRuntime({ homeRoot: home }, {
+      layout: null,
+      bunStandalone: true,
+      bunVersion: '1.4.0',
+      readInstallSourceImpl: async () => source,
+      installedContentIdentityImpl: () => '0123456789abcdef',
+      inspectRuntime: async () => ({
+        ...runningStatus(home, null),
+        provider: { kind: 'bun', contentIdentity: '0123456789abcdef' },
+      }),
+      probeRuntime: async () => true,
+      discoverLogs: async () => [{ name: 'server.log' }],
+    })
+
+    expect(doctor.cli.installed).toBe(true)
+    expect(doctor.checks.find((check) => check.id === 'cli.provenance')?.summary)
+      .toContain('Homebrew-managed')
+    expect(doctor.checks.find((check) => check.id === 'update.metadata')).toMatchObject({
+      status: 'pass',
+      summary: 'Homebrew owns OpenAlice updates',
+      detail: 'Use: brew upgrade traderalice/tap/openalice',
+    })
+  })
 })
 
 function runningStatus(home, root) {

@@ -69,7 +69,14 @@ describe('Bun standalone launch boundary', () => {
   })
 
   it('reads content identity from release metadata with an environment override', () => {
-    const read = () => JSON.stringify({ contentIdentity: 'artifact-identity' })
+    const read = (path) => {
+      if (path === resolve('/opt/release/share/openalice/release.json')) {
+        return JSON.stringify({ contentIdentity: 'artifact-identity' })
+      }
+      const error = new Error('missing')
+      error.code = 'ENOENT'
+      throw error
+    }
     expect(resolveBunContentIdentity('/opt/release/share/openalice', {}, read))
       .toBe('artifact-identity')
     expect(resolveBunContentIdentity(

@@ -6,6 +6,10 @@ import { join } from 'node:path'
 
 import { resolveInstalledLayout } from './install-layout.mjs'
 import {
+  packageManagerForSource,
+  packageManagerUpdateMessage,
+} from './package-manager.mjs'
+import {
   CLI_VERSION,
   installSourceUpdateChannel,
   readInstallSource,
@@ -68,9 +72,18 @@ export async function checkForUpdate(options = {}, dependencies = {}) {
 export async function runUpdateCommand(argv, dependencies = {}) {
   const options = parseUpdateArgs(argv)
   const stdout = dependencies.stdout ?? process.stdout
+  const installSource = await (
+    dependencies.readInstallSourceImpl ?? readInstallSource
+  )({ env: dependencies.env ?? process.env })
+  const manager = packageManagerForSource(installSource)
+  if (manager && !options.checkOnly) {
+    stdout.write(`${packageManagerUpdateMessage(installSource)}\n`)
+    stdout.write('OpenAlice did not modify the package manager\'s files.\n')
+    return 0
+  }
   let result
   try {
-    result = await checkForUpdate({}, dependencies)
+    result = await checkForUpdate({ installSource }, dependencies)
   } catch (error) {
     throw new Error(`Could not check for OpenAlice updates: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -85,16 +98,18 @@ export async function runUpdateCommand(argv, dependencies = {}) {
   }
   if (result.status === 'current') {
     stdout.write(`OpenAlice ${result.currentVersion} is current.\n`)
+    if (manager) stdout.write(`${manager.label} owns future updates for this installation.\n`)
     return 0
   }
 
   stdout.write(`OpenAlice ${result.latestVersion} is available (current ${result.currentVersion}).\n`)
   if (result.releaseNotesUrl) stdout.write(`Release notes: ${result.releaseNotesUrl}\n`)
   if (options.checkOnly) {
-    stdout.write('Run "openalice update" to review and install it.\n')
+    stdout.write(manager
+      ? `Update with: ${manager.update}\n`
+      : 'Run "openalice update" to review and install it.\n')
     return 0
   }
-
   const layout = Object.hasOwn(dependencies, 'layout')
     ? dependencies.layout
     : resolveInstalledLayout(import.meta.url, { env: dependencies.env ?? process.env })
@@ -196,7 +211,8 @@ export function formatUpdateHelp() {
 
 Checks the stable release manifest. Applying an update downloads the
 release-owned installer, verifies its SHA-256, and runs the ordinary atomic
-installer transaction for this install root.
+installer transaction for a direct install. Package-manager installs report
+the owning manager's exact update command and do not overwrite its prefix.
 
 Options:
   --check    Check and report without changing files
