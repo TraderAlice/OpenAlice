@@ -534,7 +534,7 @@ artifacts.
   v0.90.1 CLI host; this is evidence for the guidance, not a cross-platform
   compatibility matrix. Keep the real published v0.90.1 replacement as a
   required Linux x64 `dev` and stable-release acceptance gate.
-- [ ] Prove `up`, detach, `status`, `open`, multiple independent Agent PTYs,
+- [x] Prove `up`, detach, `status`, `open`, multiple independent Agent PTYs,
   component restart, `down`, update activation, rollback, and uninstall.
 - [ ] Run the root TypeScript/tests, UI typecheck, Guardian recovery, CLI PTY,
   installer, managed remote, and relevant Electron regression lanes.
@@ -882,3 +882,14 @@ This plan is complete only when:
   manifests are fetched from the v0.90.1 OpenAlice tag and verified against the
   hashes embedded by that published installer, avoiding dependence on the
   upstream Pi asset URL that has since disappeared.
+- 2026-08-30: Consolidated the full Runtime lifecycle evidence into native
+  candidate gates. The compiled macOS arm64 artifact captured the exact URL
+  passed through `open`, created two external OpenCode-adapter Sessions with
+  distinct PIDs, delivered independent binary input after WebSocket resize,
+  stopped one Session, and kept the other interactive. The four-process
+  feasibility receipt forced Connector and UTA failures, recovered both with
+  new PIDs while Alice stayed ready, and released the Guardian lock after
+  shutdown. Existing direct and package-manager receipts cover update pending
+  state, restart activation, local rollback, uninstall, and data preservation;
+  every native dev and stable candidate now repeats the relevant artifact and
+  component gates.

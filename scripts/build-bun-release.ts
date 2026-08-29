@@ -398,6 +398,9 @@ async function smokeRelease(options: {
   const externalAgentBin = join(externalAgentRoot, 'bin')
   const nativePiRoot = join(externalAgentRoot, 'native-pi-state')
   const externalOpenCode = join(externalAgentBin, 'opencode')
+  const openReceipt = join(options.smokeHome, 'browser-open.txt')
+  const opener = join(externalAgentBin, process.platform === 'darwin' ? 'open' : 'xdg-open')
+  const stty = await exists('/bin/stty') ? '/bin/stty' : '/usr/bin/stty'
   const nativeOpenCodeTuiConfig = '{"theme":"system"}\n'
   await Promise.all([
     mkdir(externalAgentBin, { recursive: true }),
@@ -415,11 +418,15 @@ printf 'MANAGED_PI_PATH=%s\\n' "${'$'}{OPENALICE_MANAGED_PI_PATH-unset}"
 printf 'MANAGED_PI_NODE_PATH=%s\\n' "${'$'}{OPENALICE_MANAGED_PI_NODE_PATH-unset}"
 printf 'PI_CODING_AGENT_DIR=%s\\n' "${'$'}{PI_CODING_AGENT_DIR-unset}"
 printf 'PI_CODING_AGENT_SESSION_DIR=%s\\n' "${'$'}{PI_CODING_AGENT_SESSION_DIR-unset}"
+printf 'PID=%s\\n' "${'$'}${'$'}"
 while IFS= read -r line; do
-  printf 'INPUT=%s\\n' "${'$'}line"
+  printf 'INPUT=%s SIZE=%s\\n' "${'$'}line" "${'$'}(${stty} size)"
 done
 `)
-  await chmod(externalOpenCode, 0o755)
+  await writeFile(opener, `#!/bin/sh
+printf '%s\\n' "${'$'}1" > "${'$'}OPENALICE_SMOKE_OPEN_RECEIPT"
+`)
+  await Promise.all([chmod(externalOpenCode, 0o755), chmod(opener, 0o755)])
   const runtimeEnv = {
     HOME: userHome,
     PATH: externalAgentBin,
@@ -432,6 +439,7 @@ done
     OPENALICE_MCP_PORT: String(mcpPort),
     OPENALICE_UTA_PORT: String(utaPort),
     OPENALICE_CONNECTOR_PORT: String(connectorPort),
+    OPENALICE_SMOKE_OPEN_RECEIPT: openReceipt,
     OPENALICE_MANAGED_PI_PATH: '/stale/desktop/pi/cli.js',
     OPENALICE_MANAGED_PI_NODE_PATH: '/stale/desktop/node',
     PI_CODING_AGENT_DIR: nativePiRoot,
@@ -458,6 +466,14 @@ done
   const stderrPromise = new Response(runtime.stderr).text()
   let runtimeError: unknown = null
   let realOpenCodeReport: { path: string; version: string; ptyBytes: number } | null = null
+  let browserOpenUrl: string | null = null
+  let agentPtyReport: {
+    sessions: number
+    distinctPids: boolean
+    resize: boolean
+    input: boolean
+    stopIsolation: boolean
+  } | null = null
   let coldStartReadyMs = 0
   let idleMemoryBytes: {
     sampleCount: number
@@ -499,6 +515,14 @@ done
       total: guardian + alice,
     }
     const baseUrl = `http://127.0.0.1:${webPort}`
+    const openOutput = run([
+      options.executablePath,
+      'open', '--home', runtimeHome, '--wait', '3',
+    ], runtimeEnv)
+    browserOpenUrl = (await waitForFileText(openReceipt, 5_000)).trim()
+    if (browserOpenUrl !== baseUrl || !openOutput.includes(`Opened OpenAlice Web UI: ${baseUrl}`)) {
+      throw new Error(`compiled CLI did not open its verified Web endpoint: ${openOutput} / ${browserOpenUrl}`)
+    }
     const inventory = await fetchJson(`${baseUrl}/api/workspaces/agents`) as {
       agents?: Array<{ id?: string; installed?: boolean }>
     }
@@ -515,22 +539,44 @@ done
     if (!workspaceId || !workspaceDir) {
       throw new Error(`installed release Workspace response was incomplete: ${JSON.stringify(created)}`)
     }
-    const spawned = await fetchJson(`${baseUrl}/api/workspaces/${workspaceId}/sessions/spawn`, {
+    const spawnExternalAgent = () => fetchJson(`${baseUrl}/api/workspaces/${workspaceId}/sessions/spawn`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ agent: 'opencode' }),
-    }, 201) as { sessionId?: string }
-    if (!spawned.sessionId) {
-      throw new Error(`installed release external OpenCode spawn omitted sessionId: ${JSON.stringify(spawned)}`)
+    }, 201) as Promise<{ sessionId?: string; pid?: number }>
+    const spawned = await spawnExternalAgent()
+    const spawnedTwo = await spawnExternalAgent()
+    if (
+      !spawned.sessionId || !spawned.pid
+      || !spawnedTwo.sessionId || !spawnedTwo.pid
+      || spawned.sessionId === spawnedTwo.sessionId
+      || spawned.pid === spawnedTwo.pid
+    ) {
+      throw new Error(`installed release did not create two independent Agent PTYs: ${JSON.stringify([spawned, spawnedTwo])}`)
     }
     const marker = 'OPENALICE_EXTERNAL_OPENCODE_OK'
-    const terminal = await readPtyUntil(baseUrl, spawned.sessionId, {
-      client: 'bun-release-external-agent-smoke',
-      description: marker,
-      timeoutMs: 30_000,
-      complete: (output) => output.includes(marker),
-      settleDelayMs: 25,
-    })
+    const [terminal, terminalTwo] = await Promise.all([
+      readPtyUntil(baseUrl, spawned.sessionId, {
+        client: 'bun-release-external-agent-smoke-one',
+        description: 'first Agent input after resize',
+        timeoutMs: 30_000,
+        onOpen: (socket) => {
+          socket.send(JSON.stringify({ type: 'resize', cols: 91, rows: 31 }))
+          socket.send(new TextEncoder().encode('alpha\n'))
+        },
+        complete: (output) => output.includes(marker) && output.includes('INPUT=alpha SIZE=31 91'),
+      }),
+      readPtyUntil(baseUrl, spawnedTwo.sessionId, {
+        client: 'bun-release-external-agent-smoke-two',
+        description: 'second Agent input after resize',
+        timeoutMs: 30_000,
+        onOpen: (socket) => {
+          socket.send(JSON.stringify({ type: 'resize', cols: 103, rows: 37 }))
+          socket.send(new TextEncoder().encode('beta\n'))
+        },
+        complete: (output) => output.includes(marker) && output.includes('INPUT=beta SIZE=37 103'),
+      }),
+    ])
     for (const expected of [
       `CWD=${workspaceDir}`,
       'MANAGED_PI_PATH=unset',
@@ -541,6 +587,26 @@ done
       if (!terminal.includes(expected)) {
         throw new Error(`external OpenCode process did not preserve the CLI ownership boundary (${expected}):\n${terminal}`)
       }
+    }
+    if (terminal.includes('INPUT=beta') || terminalTwo.includes('INPUT=alpha')) {
+      throw new Error('independent Agent PTYs received each other\'s input')
+    }
+    await fetchJson(`${baseUrl}/api/workspaces/${workspaceId}/sessions/${spawned.sessionId}`, {
+      method: 'DELETE',
+    })
+    const survivingTerminal = await readPtyUntil(baseUrl, spawnedTwo.sessionId, {
+      client: 'bun-release-external-agent-smoke-survivor',
+      description: 'surviving Agent input after peer stop',
+      timeoutMs: 30_000,
+      onOpen: (socket) => socket.send(new TextEncoder().encode('still-alive\n')),
+      complete: (output) => output.includes('INPUT=still-alive'),
+    })
+    agentPtyReport = {
+      sessions: 2,
+      distinctPids: true,
+      resize: true,
+      input: true,
+      stopIsolation: survivingTerminal.includes('INPUT=still-alive'),
     }
     const realOpenCodePath = process.env['OPENALICE_BUN_REAL_OPENCODE_PATH']?.trim()
     if (realOpenCodePath) {
@@ -611,6 +677,8 @@ done
     externalAgentRuntime: 'opencode',
     externalAgentRuntimeProcess: true,
     externalAgentRuntimeManagedPi: false,
+    browserOpenUrl,
+    agentPtys: agentPtyReport,
     realExternalAgentRuntime: realOpenCodeReport,
     defaultResources: true,
     materializedPiAdapter: true,
@@ -700,6 +768,7 @@ function readPtyUntil(
     timeoutMs: number
     complete: (output: string) => boolean
     settleDelayMs?: number
+    onOpen?: (socket: WebSocket) => void
   },
 ): Promise<string> {
   const wsUrl = new URL('/api/workspaces/pty', baseUrl)
@@ -727,6 +796,7 @@ function readPtyUntil(
     const timeout = setTimeout(() => {
       finish(new Error(`external Agent Runtime PTY timed out waiting for ${options.description}:\n${output.slice(-4_000)}`))
     }, options.timeoutMs)
+    socket.addEventListener('open', () => options.onOpen?.(socket))
     socket.addEventListener('message', (event) => {
       const chunk = typeof event.data === 'string'
         ? event.data
@@ -743,6 +813,18 @@ function readPtyUntil(
       if (!settled) finish(new Error(`external Agent Runtime PTY closed before ${options.description}:\n${output}`))
     })
   })
+}
+
+async function waitForFileText(path: string, timeoutMs: number): Promise<string> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      return await readFile(path, 'utf8')
+    } catch {
+      await Bun.sleep(25)
+    }
+  }
+  throw new Error(`timed out waiting for file: ${path}`)
 }
 
 function run(command: string[], env: Record<string, string>): string {

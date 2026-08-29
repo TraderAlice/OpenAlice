@@ -163,3 +163,12 @@ The native Runtime acceptance must prove:
 
 Routine verification is non-trading and uses isolated homes. Live-paper broker
 acceptance remains a separate explicit lane under [[docs/uta-live-testing.md]].
+
+Every native `dev` and stable candidate runs the artifact acceptance itself:
+the compiled CLI opens a captured platform browser command, launches two
+external OpenCode-adapter PTYs with distinct PIDs, sends independent input and
+resize messages, stops one Session, and proves the other remains interactive.
+The same candidate lane also runs the four-process feasibility receipt, which
+forces Connector and UTA failures and proves they recover without restarting
+Alice. Installer and package-manager receipts separately cover stopped and
+active upgrades, activation on restart, rollback, and data-preserving removal.

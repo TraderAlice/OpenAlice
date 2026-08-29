@@ -186,6 +186,7 @@ jobs:
       - name: Build Alice and native CLI
         run: |
           pnpm build:server
+          pnpm build:bun-runtime:feasibility
           pnpm build:bun:release
 
       - name: Accept npm and Bun installs from the dev native candidate
