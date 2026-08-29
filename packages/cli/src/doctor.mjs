@@ -49,16 +49,28 @@ export async function diagnoseRuntime(options = {}, dependencies = {}) {
       : 'Self-update is intentionally unavailable from a source checkout',
   )
 
-  const nodeVersion = dependencies.nodeVersion ?? process.version
-  const nodeSupported = isNodeVersionSupported(nodeVersion)
-  add(
-    'runtime.node',
-    nodeSupported ? 'pass' : 'fail',
-    nodeSupported
-      ? `Node.js ${nodeVersion} satisfies >=${MINIMUM_NODE_VERSION.join('.')}`
-      : `Node.js ${nodeVersion} is too old`,
-    nodeSupported ? undefined : `Install Node.js ${MINIMUM_NODE_VERSION.join('.')} or newer`,
-  )
+  const bunStandalone = dependencies.bunStandalone
+    ?? globalThis.__OPENALICE_BUN_STANDALONE__ === true
+  if (bunStandalone) {
+    const bunVersion = dependencies.bunVersion ?? globalThis.Bun?.version ?? 'embedded'
+    add(
+      'runtime.engine',
+      'pass',
+      `Bun ${bunVersion} is embedded in the OpenAlice executable`,
+      'No system Node.js or Bun installation is required',
+    )
+  } else {
+    const nodeVersion = dependencies.nodeVersion ?? process.version
+    const nodeSupported = isNodeVersionSupported(nodeVersion)
+    add(
+      'runtime.node',
+      nodeSupported ? 'pass' : 'fail',
+      nodeSupported
+        ? `Node.js ${nodeVersion} satisfies >=${MINIMUM_NODE_VERSION.join('.')}`
+        : `Node.js ${nodeVersion} is too old`,
+      nodeSupported ? undefined : `Install Node.js ${MINIMUM_NODE_VERSION.join('.')} or newer`,
+    )
+  }
 
   const status = await (dependencies.inspectRuntime ?? inspectRuntime)(options, dependencies)
   addRuntimeOwnershipCheck(status, add)

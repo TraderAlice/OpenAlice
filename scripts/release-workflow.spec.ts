@@ -15,7 +15,7 @@ interface WorkflowJob {
   steps?: WorkflowStep[]
   strategy?: {
     matrix?: {
-      include?: Array<{ os?: string; arch?: string }>
+      include?: Array<{ os?: string; platform?: string; arch?: string }>
     }
   }
 }
@@ -40,6 +40,7 @@ describe('Release workflow critical path', () => {
   it('bounds native candidate jobs without weakening downstream gates', () => {
     expect(workflow.jobs['build-desktop']['timeout-minutes']).toBe(45)
     expect(workflow.jobs['build-broker-packs']['timeout-minutes']).toBe(30)
+    expect(workflow.jobs['build-cli-release']['timeout-minutes']).toBe(35)
   })
 
   it('builds native Broker Packs outside the desktop package jobs', () => {
@@ -76,8 +77,26 @@ describe('Release workflow critical path', () => {
       'build-desktop',
       'accept-desktop-upgrade',
       'build-broker-packs',
-      'build-headless-runtime',
+      'build-cli-release',
       'cli-installer-acceptance',
     ]))
+  })
+
+  it('publishes the four accepted native CLI archives and checksums', () => {
+    const nativeCli = workflow.jobs['build-cli-release']
+    const publication = workflow.jobs['publish-release']
+
+    expect(nativeCli.strategy?.matrix?.include).toEqual([
+      { os: 'macos-14', platform: 'darwin', arch: 'arm64' },
+      { os: 'macos-15-intel', platform: 'darwin', arch: 'x64' },
+      { os: 'ubuntu-24.04', platform: 'linux', arch: 'x64' },
+      { os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64' },
+    ])
+    expect(nativeCli.steps?.some((candidate) => candidate.uses === 'oven-sh/setup-bun@v2')).toBe(true)
+    expect(step(nativeCli, 'Preserve accepted native CLI').with?.name).toBe(
+      'cli-release-${{ matrix.platform }}-${{ matrix.arch }}',
+    )
+    expect(step(publication, 'Create tag and GitHub Release from accepted candidates').with?.files)
+      .toContain('dist/release-cli/*.tar.gz.sha256')
   })
 })

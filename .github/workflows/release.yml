@@ -304,8 +304,8 @@ jobs:
       - name: Exercise candidate installer through managed SSH remote
         run: node scripts/remote-ssh-smoke.mjs --skip-tui
 
-  build-headless-runtime:
-    name: Build headless Runtime (${{ matrix.platform }}-${{ matrix.arch }})
+  build-cli-release:
+    name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
     needs: release
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
     strategy:
@@ -339,22 +339,27 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
 
-      - name: Build platform headless Runtime
-        run: pnpm build:headless-runtime
+      - name: Build Alice and native CLI
+        run: |
+          pnpm build:server
+          pnpm build:bun:release
 
-      - name: Install and boot the candidate outside the checkout
+      - name: Install and boot the native candidate outside the checkout
         shell: bash
         run: |
-          metadata=$(find dist/headless -maxdepth 1 -name 'openalice-runtime-*.json' -print -quit)
-          archive=$(node -p "require('./${metadata}').archive.file")
-          sha256=$(node -p "require('./${metadata}').archive.sha256")
+          archive=$(find dist/bun-release -maxdepth 1 -name 'openalice-cli-*.tar.gz' -print -quit)
+          test -n "$archive"
+          sha256=$(cut -d ' ' -f 1 "${archive}.sha256")
           ./install \
-            --source "$GITHUB_WORKSPACE" \
-            --runtime-archive "$GITHUB_WORKSPACE/dist/headless/$archive" \
-            --runtime-sha256 "$sha256" \
+            --archive "$GITHUB_WORKSPACE/$archive" \
+            --sha256 "$sha256" \
             --install-dir "$RUNNER_TEMP/openalice-cli" \
             --no-modify-path \
             --yes
@@ -370,20 +375,27 @@ jobs:
             --home "$RUNNER_TEMP/openalice-home" \
             --json
 
-      - name: Preserve accepted headless Runtime
+      - name: Name the native acceptance report
+        shell: bash
+        run: >-
+          cp dist/bun-release/report.json
+          dist/bun-release/openalice-cli-${{ matrix.platform }}-${{ matrix.arch }}.report.json
+
+      - name: Preserve accepted native CLI
         uses: actions/upload-artifact@v4
         with:
-          name: headless-runtime-${{ matrix.platform }}-${{ matrix.arch }}
+          name: cli-release-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            dist/headless/*.json
-            dist/headless/*.tar.gz
+            dist/bun-release/*.tar.gz
+            dist/bun-release/*.tar.gz.sha256
+            dist/bun-release/openalice-cli-*.report.json
           if-no-files-found: error
           compression-level: 0
           retention-days: 1
 
   # Broker Packs are release artifacts, not inputs to the desktop package. Build
   # and validate them on their native platforms in parallel with desktop and
-  # headless Runtime candidates instead of serializing them in desktop jobs.
+  # native CLI candidates instead of serializing them in desktop jobs.
   build-broker-packs:
     name: Build Broker Packs (${{ matrix.os }}, ${{ matrix.arch }})
     needs: release
@@ -437,8 +449,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, accept-desktop-upgrade, build-headless-runtime, build-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-headless-runtime.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -464,8 +476,8 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: headless-runtime-*
-          path: dist/release-headless-runtime
+          pattern: cli-release-*
+          path: dist/release-cli
           merge-multiple: true
 
       - name: Create tag and GitHub Release from accepted candidates
@@ -486,8 +498,8 @@ jobs:
             dist/release-assets/*.exe
             dist/release-broker-packs/*.json
             dist/release-broker-packs/*.tgz
-            dist/release-headless-runtime/*.json
-            dist/release-headless-runtime/*.tar.gz
+            dist/release-cli/*.tar.gz
+            dist/release-cli/*.tar.gz.sha256
 
   mirror-release-assets:
     needs: [release, publish-release]
@@ -698,8 +710,8 @@ jobs:
           cmp /tmp/openalice-install /tmp/openalice-site-install
           bash -n /tmp/openalice-install
           bash /tmp/openalice-install --plan | tee /tmp/openalice-install-plan
-          grep -Fq "GitHub ref: TraderAlice/OpenAlice@${TAG}" /tmp/openalice-install-plan
-          grep -Fq "Updates        stable" /tmp/openalice-install-plan
+          grep -Fq "Channel         release (${VERSION})" /tmp/openalice-install-plan
+          grep -Fq "Artifact        https://github.com/TraderAlice/OpenAlice/releases/download/${TAG}/openalice-cli-${VERSION}-linux-x64.tar.gz" /tmp/openalice-install-plan
           INSTALLER_PATH=/tmp/openalice-install MANIFEST_URL="${BASE_URL}/manifest.json" node -e '
             const { createHash } = require("node:crypto");
             const { readFileSync } = require("node:fs");
@@ -708,6 +720,19 @@ jobs:
             if (manifest.installer?.url !== process.env.MANIFEST_URL.replace(/manifest\.json$/, "install")) process.exit(1);
             if (manifest.installer?.sha256 !== digest) process.exit(1);
           '
+
+          cli_asset_count=0
+          for archive in dist/r2-upload/openalice-cli-${VERSION}-*.tar.gz; do
+            cli_asset_count=$((cli_asset_count + 1))
+            checksum="${archive}.sha256"
+            test -f "$checksum"
+            expected=$(awk 'NR == 1 { print $1 }' "$checksum")
+            actual=$(sha256sum "$archive" | awk '{ print $1 }')
+            test "$actual" = "$expected"
+            curl -fsSI "${BASE_URL}/$(basename "$archive")"
+            curl -fsSI "${BASE_URL}/$(basename "$checksum")"
+          done
+          test "$cli_asset_count" = 4
 
           for catalog in dist/r2-upload/OpenAlice-Broker-Packs-${VERSION}-*.json; do
             curl -fsSI "${BASE_URL}/$(basename "$catalog")"

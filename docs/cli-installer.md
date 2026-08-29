@@ -72,6 +72,15 @@ https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz
 https://download.openalice.ai/cli/dev/openalice-cli-dev-<platform>-<arch>.tar.gz.sha256
 ```
 
+Every `dev` push builds all four native targets. Publication verifies each
+sidecar and the archive's target/version metadata, uploads an immutable copy
+under `cli/dev/releases/<commit>/`, then replaces the fixed archive aliases.
+Each checksum alias is written after its archive, so a reader racing a publish
+can fail verification but cannot activate mismatched bytes. The dev manifest is
+published last as the completed-set receipt. Stable releases publish the same
+four versioned archives and sidecars as GitHub Release assets and mirror them
+unchanged to the download CDN.
+
 ## Ownership boundary
 
 The direct installer owns only:

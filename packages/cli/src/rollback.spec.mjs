@@ -16,7 +16,7 @@ afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe('OpenAlice CLI rollback', () => {
+describe('OpenAlice CLI rollback arguments', () => {
   it('parses explicit release selection and confirmation options', () => {
     expect(parseRollbackArgs(['--to', '0.90.0-linux-x64-0123456789abcdef', '--plan', '--yes']))
       .toEqual({
@@ -26,7 +26,12 @@ describe('OpenAlice CLI rollback', () => {
       })
     expect(() => parseRollbackArgs(['--to', '../outside'])).toThrow('installed release name')
   })
+})
 
+// The native CLI installer and its symlink activation transaction currently
+// support macOS and Linux only. Windows acceptance belongs to the deferred
+// PowerShell/native distribution lane.
+describe.skipIf(process.platform === 'win32')('OpenAlice CLI rollback transaction', () => {
   it('selects a retained release and switches only the active pointer', async () => {
     const layout = await makeInstalledLayout()
     const plan = await inspectRollback(layout)

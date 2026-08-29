@@ -24,7 +24,6 @@
     "build": "turbo run build && tsup src/main.ts --format esm --dts",
     "prebuild:server": "tsx scripts/build-migration-index.ts",
     "build:server": "turbo run build --filter=!@traderalice/desktop --filter=!./packages/uta-broker-* && tsup src/main.ts --format esm --dts",
-    "build:headless-runtime": "tsx scripts/build-headless-runtime.ts",
     "build:bun-cli:feasibility": "bun scripts/build-bun-cli-feasibility.ts",
     "build:bun-alice:feasibility": "bun scripts/build-bun-alice-feasibility.ts",
     "build:bun-runtime:feasibility": "bun scripts/build-bun-runtime-feasibility.ts",
