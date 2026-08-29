@@ -113,6 +113,15 @@ describe('Office responsive style contract', () => {
     expect(css).toMatch(/@container \(max-width: 480px\) \{[\s\S]*?\.oa-office-runtime__channels\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
   })
 
+  it('keeps long journal reports summarized without losing the command row', () => {
+    expect(css).toMatch(
+      /\.oa-office-runtime__detail\s*\{[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 5/,
+    )
+    expect(css).toMatch(
+      /\.oa-office-runtime__actions\s*\{[\s\S]*?position: sticky;[\s\S]*?bottom: 0;/,
+    )
+  })
+
   it('lets input capability own touch controls independently of stage width', () => {
     expect(coarseTouchStart).toBeGreaterThan(touchLayoutStart)
     expect(coarseTouchEnd).toBeGreaterThan(coarseTouchStart)

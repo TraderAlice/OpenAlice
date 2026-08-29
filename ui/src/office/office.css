@@ -1242,14 +1242,40 @@
 }
 
 .oa-office-runtime__detail {
+  display: -webkit-box;
   margin: 7px 0 0;
   padding: 6px 8px;
   border-left: 3px solid var(--gba-water);
   color: var(--gba-ink);
   background: color-mix(in srgb, var(--gba-water) 9%, var(--gba-cream));
   line-height: 1.35;
+  overflow: hidden;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.oa-office-runtime__detail[data-expanded="true"] {
+  display: block;
+  overflow: visible;
+}
+
+.oa-office-runtime__detail-toggle {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  color: var(--gba-moss-dark);
+  background: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-xs);
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.oa-office-runtime__detail-toggle:is(:hover, :focus-visible) {
+  color: var(--gba-ink);
 }
 
 .oa-office-runtime__meta {
@@ -1288,11 +1314,17 @@
 }
 
 .oa-office-runtime__actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
   display: flex;
   grid-column: 1 / -1;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 7px;
+  padding-top: 6px;
+  background: var(--gba-paper);
+  box-shadow: 0 -3px 0 color-mix(in srgb, var(--gba-ink) 16%, transparent);
 }
 
 .oa-office-runtime__actions > .oa-office-runtime__open {

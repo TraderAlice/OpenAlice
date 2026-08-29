@@ -179,7 +179,7 @@ describe('OfficeRuntimeSection', () => {
       .toBe('true')
   })
 
-  it('presents agent Markdown as structured game dialogue', async () => {
+  it('presents long agent Markdown as expandable game dialogue', async () => {
     query.mockResolvedValue({
       lastSeq: 1,
       total: 1,
@@ -199,6 +199,7 @@ describe('OfficeRuntimeSection', () => {
             '- Use `Layout B` for the loop.',
             '- Keep [history visible](https://example.com/history).',
             '> ~~Discard~~ retire Layout C.',
+            ...Array.from({ length: 8 }, () => '- Preserve the action bar after a detailed report.'),
           ].join('\n'),
         },
       }],
@@ -207,13 +208,27 @@ describe('OfficeRuntimeSection', () => {
 
     await screen.findByRole('button', { name: /Task complete.*#0001/i })
     const detail = container.querySelector('.oa-office-runtime__detail')
-    expect(detail?.textContent).toBe([
+    expect(detail?.textContent).toContain([
       'Verdict',
       '• Use Layout B for the loop.',
       '• Keep history visible.',
       'Discard retire Layout C.',
     ].join('\n'))
+    expect(detail?.textContent).toContain('• Preserve the action bar after a detailed report.')
     expect(detail?.textContent).not.toMatch(/\*\*|`|\]\(|~~|^#/)
+    const toggle = screen.getByRole('button', { name: 'Show full report' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(detail?.getAttribute('data-expanded')).toBeNull()
+
+    await userEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Collapse report' }).getAttribute('aria-expanded'))
+      .toBe('true')
+    expect(detail?.getAttribute('data-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Collapse report' }).nextElementSibling).toBe(detail)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse report' }))
+    expect(screen.getByRole('button', { name: 'Show full report' }).getAttribute('aria-expanded'))
+      .toBe('false')
   })
 
   it('keeps story events while switching between product activity channels', async () => {

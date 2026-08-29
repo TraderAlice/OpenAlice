@@ -2743,6 +2743,24 @@ Player-facing runtime-dialogue follow-up (2026-08-30):
   together with root/UI TypeScript, the full 617-file Vitest run (5,113 passing; one file and nine tests skipped), and
   the production build; the existing large-chunk advisory is unchanged.
 
+Journal report-disclosure follow-up (2026-08-30):
+
+- The cleaned #1635 Grok report was much easier to read, but its full length still pushed `Find on floor` and
+  `Open Runs` below the 734px game window. The journal exposed the result while hiding the player's next commands.
+- Compared moving commands into the header, making only the commands sticky, and combining a bounded summary with an
+  explicit disclosure. Chose the combined model: five lines preserve enough report context for a game log, `Show full
+  report` makes the complete result intentional, and a bottom command rail keeps spatial replay and destination actions
+  visible even while the report is expanded.
+- Long Agent report/completion details now clamp with real overflow clipping, expose localized expand/collapse controls,
+  reset to summary when selection changes, and move `Collapse report` above expanded prose so neither direction requires
+  traversing the full result. The action rail owns an opaque sticky game-window footer; short Inbox/News details retain
+  their existing compact layout.
+- Browser-played both states on real Grok #1635. The collapsed first screen showed the Assignment, five-line report
+  preview, metadata, and both commands without overlap; the expanded state kept `Collapse report`, `Find on floor`, and
+  `Open Runs` visible simultaneously. Focused disclosure and responsive-style specs passed (2 files / 25 tests),
+  together with root/UI TypeScript, the full 617-file Vitest run (5,114 passing; one file and nine tests skipped), and
+  the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

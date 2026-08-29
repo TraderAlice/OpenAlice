@@ -1979,6 +1979,8 @@ export const en = {
     openSession: 'Open session',
     showFullTitle: 'Show full title',
     collapseTitle: 'Collapse title',
+    showFullReport: 'Show full report',
+    collapseReport: 'Collapse report',
     amenityCoffee: 'Coffee',
     amenityPlant: 'Plant',
     timeline: 'Activity log',

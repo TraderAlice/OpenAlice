@@ -186,6 +186,7 @@ export function OfficeRuntimeSection({
   })
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null)
   const [channel, setChannel] = useState<OfficeLogChannel>('all')
+  const [detailExpanded, setDetailExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -242,6 +243,10 @@ export function OfficeRuntimeSection({
       : visibleBeats[0].event.seq)
   }, [visibleBeats])
 
+  useEffect(() => {
+    setDetailExpanded(false)
+  }, [selectedSeq])
+
   if (loading && entriesByChannel.all.length === 0) {
     return <div className="oa-office-runtime__empty">{t('office.loading')}</div>
   }
@@ -288,6 +293,9 @@ export function OfficeRuntimeSection({
   const selectedEvent = selectedBeat.event
   const selectedPayload = selectedEvent.payload
   const selectedDetail = eventDetail(selectedEvent)
+  const selectedDetailId = `office-runtime-detail-${selectedEvent.seq}`
+  const detailCanExpand = selectedDetail != null
+    && (selectedDetail.length > 320 || selectedDetail.split('\n').length > 8)
   const selectedKind = officeLogAssetKind(selectedEvent.type)
   const selectedMeta: Array<{ label: string; value: string }> = []
   const addMeta = (label: string, value: string | null | undefined) => {
@@ -319,6 +327,17 @@ export function OfficeRuntimeSection({
   }
   const selectedActor = actorForEvent(selectedEvent, actors)
   const selectedIdentity = eventIdentity(selectedEvent, actors)
+  const reportToggle = detailCanExpand ? (
+    <button
+      type="button"
+      className="oa-office-runtime__detail-toggle"
+      aria-controls={selectedDetailId}
+      aria-expanded={detailExpanded}
+      onClick={() => setDetailExpanded((expanded) => !expanded)}
+    >
+      {detailExpanded ? t('office.collapseReport') : t('office.showFullReport')}
+    </button>
+  ) : null
   const moveJournalSelection = (keyboardEvent: KeyboardEvent<HTMLButtonElement>) => {
     const buttons = Array.from(
       keyboardEvent.currentTarget.closest('ol')
@@ -447,7 +466,17 @@ export function OfficeRuntimeSection({
               </div>
             )}
             {selectedDetail && (
-              <p className="oa-office-runtime__detail">{selectedDetail}</p>
+              <>
+                {detailExpanded && reportToggle}
+                <p
+                  id={selectedDetailId}
+                  className="oa-office-runtime__detail"
+                  data-expanded={detailExpanded || undefined}
+                >
+                  {selectedDetail}
+                </p>
+                {!detailExpanded && reportToggle}
+              </>
             )}
             <ul className="oa-office-runtime__meta" aria-label={t('office.eventDetails')}>
               {selectedMeta.map((item) => (

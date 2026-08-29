@@ -1946,6 +1946,8 @@ export const zh: Resources = {
     openSession: '打开 Session',
     showFullTitle: '展开完整标题',
     collapseTitle: '收起标题',
+    showFullReport: '展开完整报告',
+    collapseReport: '收起报告',
     amenityCoffee: '茶水车',
     amenityPlant: '盆栽',
     timeline: '活动日志',

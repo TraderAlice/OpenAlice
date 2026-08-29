@@ -1947,6 +1947,8 @@ export const ja: Resources = {
     openSession: 'Session を開く',
     showFullTitle: 'タイトルをすべて表示',
     collapseTitle: 'タイトルを折りたたむ',
+    showFullReport: 'レポートをすべて表示',
+    collapseReport: 'レポートを折りたたむ',
     amenityCoffee: 'ティーカート',
     amenityPlant: '観葉植物',
     timeline: 'アクティビティログ',

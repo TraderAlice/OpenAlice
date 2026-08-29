@@ -1954,6 +1954,8 @@ export const zhHant: Resources = {
     openSession: '打開 Session',
     showFullTitle: '展開完整標題',
     collapseTitle: '收起標題',
+    showFullReport: '展開完整報告',
+    collapseReport: '收起報告',
     amenityCoffee: '茶水車',
     amenityPlant: '盆栽',
     timeline: '活動日誌',
