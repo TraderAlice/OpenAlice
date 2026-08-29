@@ -1656,6 +1656,24 @@ Effective floor-view menu follow-up (2026-08-29):
 - Focused OfficeBuilding specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
   Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Agent-file record exit follow-up (2026-08-29):
+
+- Played the first desk's Agent file at 1280x720. Its archived record was still presented as a plain drawer icon and
+  filename even though activating it, like a cabinet record, immediately leaves Office for the Workspace file viewer.
+  This preserved the cross-scene ambiguity after the cabinet itself had adopted an explicit doorway language.
+- Compared embedding a viewer, adding confirmation, and reusing the cabinet's generated portal exit. Chose the shared
+  exit language because it keeps Workspace ownership intact, adds no redundant step, and lets every Office record
+  promise the same navigation outcome. The compact Agent-file rail uses a horizontal variant so the filename remains
+  primary inside its 206px desktop width.
+- Agent-file records now end in a divided destination plaque with the generated session portal and localized Open
+  action. Their accessible name explicitly says `Open <record> in Workspace`. The same generic translation keys now
+  serve cabinet and Agent-file records instead of leaking cabinet-specific naming into a shared interaction pattern.
+- Browser-played the new exit at 1280x720 and 390x844. Desktop preserved the full filename beside the portal plaque;
+  mobile deliberately ellipsized the long filename while keeping the portal and Open action complete, with no page
+  overflow. Activating the record reached the encoded `rotation/ai-chain-2026-06-02.md` Workspace route.
+- Focused InspectRail and CabinetWindow specs passed: 2 files / 4 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`,
+  the 606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

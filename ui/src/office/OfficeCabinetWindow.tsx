@@ -65,7 +65,7 @@ export function OfficeCabinetWindow({
               <li key={`${employee.resumeId}:${item.id}`}>
                 <button
                   type="button"
-                  aria-label={t('office.cabinetOpenRecord', { record: item.label })}
+                  aria-label={t('office.drawerOpenRecord', { record: item.label })}
                   onClick={() => onOpenRecord(employee, item)}
                 >
                   <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
@@ -75,7 +75,7 @@ export function OfficeCabinetWindow({
                   </span>
                   <span className="oa-office-cabinet-window__destination" aria-hidden>
                     <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />
-                    <small>{t('office.cabinetRecordAction')}</small>
+                    <small>{t('office.drawerRecordAction')}</small>
                   </span>
                 </button>
               </li>

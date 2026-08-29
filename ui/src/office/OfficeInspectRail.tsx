@@ -119,10 +119,15 @@ export function OfficeInspectRail({
                       <button
                         type="button"
                         className="oa-office-drawer"
+                        aria-label={t('office.drawerOpenRecord', { record: item.label })}
                         onClick={() => onOpenDrawer(item)}
                       >
                         <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
-                        <span>{item.label}</span>
+                        <span className="oa-office-drawer__label">{item.label}</span>
+                        <span className="oa-office-drawer__destination" aria-hidden>
+                          <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />
+                          <small>{t('office.drawerRecordAction')}</small>
+                        </span>
                       </button>
                     </li>
                   ))}
