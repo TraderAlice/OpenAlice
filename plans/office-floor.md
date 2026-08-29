@@ -1341,6 +1341,30 @@ Workspace-landmark semantics follow-up (2026-08-29):
 - Root/UI TypeScript, the 606-file Vitest run (5,028 passing; one file and nine tests skipped), and the UI production
   build passed after the landmark responsibility split.
 
+Workspace-entry transition follow-up (2026-08-29):
+
+- Replayed the new sign-owned Workspace entrance and found that Alice arrived at the physical sign, then the entire
+  Office vanished in a hard route cut. The destination was correct, but the last step still felt like ordinary web
+  navigation rather than leaving one room in a top-down game.
+- Compared retaining the hard cut, adding a confirmation dialog, and using a short map-only departure curtain. Chose
+  the curtain because the sign and `ENTER` prompt already express intent; another confirmation would add friction,
+  while a 260ms transition gives the action a visible consequence without delaying routine movement.
+- The floor now closes from its horizontal center in stepped dark-teal pixels while the persistent HUD remains in
+  place. A centered panel reuses the existing session-portal sprite and names the Workspace being entered. Movement,
+  pointer routing, keyboard interaction, and touch A are locked during departure so repeated input cannot dispatch a
+  second route. Callback cleanup also restores the floor when an embedding handles entry without navigating.
+- `prefers-reduced-motion: reduce` bypasses the curtain and enters immediately. The transition is scoped to the map
+  frame, uses `aria-busy` plus a concise live status, and keeps the destination name localized in English, Simplified
+  and Traditional Chinese, and Japanese.
+- Browser-played Auto Prediction entry at 1280x720 and captured the visible mid-transition state before reaching
+  `/prediction/workspaces/demo-ws-auto-prediction`. At 390x844 the curtain stayed inside the physical Office frame
+  (368px wide at x=11) with no page-level overflow. CDP-emulated reduced motion navigated directly with zero departure
+  overlays rendered.
+- Focused Building and OfficePage specs passed: 2 files / 14 tests.
+- `npx tsc --noEmit`, `cd ui && npx tsc -b`, and the UI production build passed. The 606-file Vitest run passed with
+  5,028 tests (one file and nine tests skipped); its first pass also caught and removed a literal shadow color so the
+  curtain continues to obey the shared semantic-color contract.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

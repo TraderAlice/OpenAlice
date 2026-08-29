@@ -1818,6 +1818,7 @@ export const zh: Resources = {
     moveAliceDown: '向下移动 Alice',
     moveAliceLeft: '向左移动 Alice',
     walkingTo: '正在前往 {{name}}',
+    enteringWorkspace: '正在进入 {{name}}…',
     resetMap: '重置地图视角',
     aliceAvatar: 'Office 地图上的 Alice',
     activeRooms: '活跃房间',

@@ -97,7 +97,8 @@ describe('OfficeBuilding', () => {
     expect(building.querySelector('svg')).toBeNull()
   })
 
-  it('gives the Prediction Workspace its own forecasting console', () => {
+  it('gives Prediction its own console and skips departure motion when reduced', async () => {
+    const onOpenWorkspace = vi.fn()
     render(
       <OfficeBuilding
         building={{
@@ -116,7 +117,7 @@ describe('OfficeBuilding', () => {
         }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
-        onOpenWorkspace={vi.fn()}
+        onOpenWorkspace={onOpenWorkspace}
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
         onOpenLog={vi.fn()}
@@ -127,6 +128,9 @@ describe('OfficeBuilding', () => {
       .querySelector<HTMLImageElement>('.oa-office-pod__harness-prop')
     expect(prop?.src).toContain('/office/furniture/prediction-console-v1.png')
     expect(screen.getByText('0/0 agents active')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Enter prediction workspace' }))
+    await waitFor(() => expect(onOpenWorkspace).toHaveBeenCalledWith('prediction-1'))
+    expect(screen.queryByTestId('office-departure')).toBeNull()
   })
 
   it('moves from the touch pad immediately and repeats while held', () => {
@@ -283,7 +287,16 @@ describe('OfficeBuilding', () => {
       expect(targetPointer.querySelector('img')?.getAttribute('src'))
         .toBe('/office/furniture/route-target-pointer-v1.png')
       expect(`${alice.style.left}:${alice.style.top}`).not.toBe('480px:336px')
-      act(() => vi.advanceTimersByTime(5_000))
+      for (let index = 0; index < 100 && !screen.queryByTestId('office-departure'); index += 1) {
+        act(() => vi.advanceTimersToNextTimer())
+      }
+      const departure = screen.getByTestId('office-departure')
+      expect(departure.textContent).toContain('Entering chat')
+      expect(departure.querySelector('img')?.getAttribute('src'))
+        .toBe('/office/hud/session-portal-v2.png')
+      expect(screen.getByTestId('office-floor').getAttribute('aria-busy')).toBe('true')
+      expect(onOpenWorkspace).not.toHaveBeenCalled()
+      act(() => vi.advanceTimersByTime(260))
       expect(onOpenWorkspace).toHaveBeenCalledWith('chat-1')
       expect(sign.dataset.route).toBe('false')
       expect(screen.queryByTestId('office-route-trail')).toBeNull()

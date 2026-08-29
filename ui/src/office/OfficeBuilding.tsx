@@ -48,6 +48,7 @@ const OFFICE_MOVEMENTS = {
 }
 
 type OfficeMovement = (typeof OFFICE_MOVEMENTS)[keyof typeof OFFICE_MOVEMENTS]
+const OFFICE_DEPARTURE_MS = 260
 
 export function OfficeBuilding({
   building,
@@ -92,6 +93,10 @@ export function OfficeBuilding({
   const [controlsLearned, setControlsLearned] = useState(false)
   const [routeTargetId, setRouteTargetId] = useState<string | null>(null)
   const [routeTrail, setRouteTrail] = useState<readonly OfficeInteractionPathStep[]>([])
+  const [departingWorkspace, setDepartingWorkspace] = useState<{
+    workspaceId: string
+    roomName: string
+  } | null>(null)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const viewportRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -110,6 +115,7 @@ export function OfficeBuilding({
   const touchMoveDelayRef = useRef<number | null>(null)
   const touchMoveRepeatRef = useRef<number | null>(null)
   const routeTimerRef = useRef<number | null>(null)
+  const departureTimerRef = useRef<number | null>(null)
   const routeGenerationRef = useRef(0)
   const awakeGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
@@ -185,10 +191,10 @@ export function OfficeBuilding({
     [mapLayout],
   )
   const nearbyTarget = useMemo(
-    () => interactionSuspended || selected
+    () => interactionSuspended || departingWorkspace || selected
       ? null
       : nearestOfficeInteractionTarget(alice, aliceDirection, interactionTargets),
-    [alice, aliceDirection, interactionSuspended, interactionTargets, selected],
+    [alice, aliceDirection, departingWorkspace, interactionSuspended, interactionTargets, selected],
   )
   const promptPlacement = useMemo(
     () => nearbyTarget
@@ -323,7 +329,7 @@ export function OfficeBuilding({
     if (target.kind === 'employee') {
       onSelectEmployee(target.workspaceId, target.employee)
     } else if (target.kind === 'sign') {
-      onOpenWorkspace(target.workspaceId)
+      enterWorkspace(target)
     } else if (target.kind === 'cabinet') {
       onOpenFiles(target.workspaceId)
     } else if (target.kind === 'roster') {
@@ -333,8 +339,26 @@ export function OfficeBuilding({
     }
   }
   const activateNearbyTarget = () => {
-    if (!nearbyTarget || selected || interactionSuspended) return
+    if (!nearbyTarget || selected || departingWorkspace || interactionSuspended) return
     activateTarget(nearbyTarget)
+  }
+  function enterWorkspace(target: Extract<OfficeInteractionTarget, { kind: 'sign' }>) {
+    if (departingWorkspace) return
+    if (reducedMotion) {
+      onOpenWorkspace(target.workspaceId)
+      return
+    }
+    stopTouchMove()
+    setPanning(false)
+    setDepartingWorkspace({ workspaceId: target.workspaceId, roomName: target.roomName })
+    departureTimerRef.current = window.setTimeout(() => {
+      departureTimerRef.current = null
+      try {
+        onOpenWorkspace(target.workspaceId)
+      } finally {
+        setDepartingWorkspace(null)
+      }
+    }, OFFICE_DEPARTURE_MS)
   }
   function cancelAutoWalk() {
     routeGenerationRef.current += 1
@@ -344,7 +368,7 @@ export function OfficeBuilding({
     setRouteTrail([])
   }
   const requestTargetInteraction = (targetId: string, activate?: () => void) => {
-    if (selected || interactionSuspended) return
+    if (selected || departingWorkspace || interactionSuspended) return
     const target = interactionTargetById.get(targetId)
     if (!target) return
     cancelAutoWalk()
@@ -406,6 +430,7 @@ export function OfficeBuilding({
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
     routeGenerationRef.current += 1
     if (routeTimerRef.current != null) window.clearTimeout(routeTimerRef.current)
+    if (departureTimerRef.current != null) window.clearTimeout(departureTimerRef.current)
     stopTouchMove()
   // Timer refs are stable for the component lifetime.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -569,8 +594,11 @@ export function OfficeBuilding({
         ref={viewportRef}
         tabIndex={0}
         data-panning={panning}
+        data-departing={Boolean(departingWorkspace) || undefined}
+        aria-busy={Boolean(departingWorkspace)}
         aria-label={t('office.mapLabel')}
         onKeyDown={(event) => {
+          if (departingWorkspace) return
           const key = event.key.toLowerCase()
           if ((key === 'enter' || key === ' ') && nearbyTarget && !selected) {
             event.preventDefault()
@@ -593,6 +621,7 @@ export function OfficeBuilding({
           moveAlice(movement)
         }}
         onPointerDown={(event) => {
+          if (departingWorkspace) return
           if ((event.target as HTMLElement).closest('button')) return
           cancelAutoWalk()
           event.currentTarget.setPointerCapture(event.pointerId)
@@ -856,6 +885,20 @@ export function OfficeBuilding({
           </div>
         </div>
 
+        {departingWorkspace && (
+          <div
+            className="oa-office-departure"
+            role="status"
+            aria-live="assertive"
+            data-testid="office-departure"
+          >
+            <span className="oa-office-departure__message">
+              <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+              <strong>{t('office.enteringWorkspace', { name: departingWorkspace.roomName })}</strong>
+            </span>
+          </div>
+        )}
+
         <div className="oa-office-map-controls" data-learned={controlsLearned}>
           <span className="oa-office-map-controls__move">
             <img src={OFFICE_HUD_ASSETS.movePad} alt="" aria-hidden style={officePixelImg} />
@@ -901,8 +944,8 @@ export function OfficeBuilding({
         <button
           type="button"
           className="oa-office-touch-action"
-          data-ready={Boolean(nearbyTarget) && !selected && !interactionSuspended}
-          disabled={!nearbyTarget || Boolean(selected) || interactionSuspended}
+          data-ready={Boolean(nearbyTarget) && !selected && !departingWorkspace && !interactionSuspended}
+          disabled={!nearbyTarget || Boolean(selected) || Boolean(departingWorkspace) || interactionSuspended}
           aria-label={nearbyTarget && promptPresentation
             ? promptPresentation.label
             : t('office.touchActionUnavailable')}

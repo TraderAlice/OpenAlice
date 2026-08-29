@@ -3198,6 +3198,7 @@
 
 /* Continuous overworld map and camera. */
 .oa-office-campus {
+  position: relative;
   overflow: hidden;
   padding: 0;
   cursor: grab;
@@ -3208,6 +3209,63 @@
 
 .oa-office-campus[data-panning="true"] {
   cursor: grabbing;
+}
+
+.oa-office-campus[data-departing="true"] {
+  cursor: wait;
+}
+
+.oa-office-departure {
+  position: absolute;
+  z-index: 40;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  inset: 0;
+  color: var(--office-gba-cream-seed);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--office-gba-water-seed) 24%, transparent) 0 8px,
+      transparent 8px 16px
+    ),
+    var(--office-gba-ink-seed);
+  clip-path: inset(50% 0 50% 0);
+  pointer-events: auto;
+  animation: oa-office-departure-curtain 260ms steps(5, end) forwards;
+}
+
+.oa-office-departure__message {
+  display: flex;
+  min-height: 58px;
+  max-width: calc(100% - 32px);
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 7px;
+  border: 3px solid var(--office-gba-cream-seed);
+  color: var(--office-gba-cream-seed);
+  background: var(--office-gba-moss-dark-seed);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--office-gba-water-seed) 48%, transparent),
+    4px 4px 0 color-mix(in srgb, var(--office-gba-ink-seed) 42%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.oa-office-departure__message img {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  object-fit: contain;
+}
+
+@keyframes oa-office-departure-curtain {
+  0% { clip-path: inset(50% 0 50% 0); }
+  40% { clip-path: inset(32% 0 32% 0); }
+  70% { clip-path: inset(14% 0 14% 0); }
+  100% { clip-path: inset(0); }
 }
 
 .oa-office-campus:focus-visible {
@@ -4939,6 +4997,11 @@
 
   .oa-office-alice {
     transition: none;
+  }
+
+  .oa-office-departure {
+    clip-path: inset(0);
+    animation: none;
   }
 
 }
