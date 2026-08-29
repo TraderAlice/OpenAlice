@@ -1411,6 +1411,25 @@ Player-preserving camera follow-up (2026-08-29):
 - `npx tsc --noEmit`, `cd ui && npx tsc -b`, and the UI production build passed. The 606-file Vitest run passed with
   5,029 tests (one file and nine tests skipped).
 
+Directional D-pad feedback follow-up (2026-08-29):
+
+- Replayed repeated phone movement after the camera fix. The native 96px D-pad still exposed its implementation when
+  a direction was hovered, pressed, or keyboard-focused: the transparent 32px hit cell became a translucent cyan
+  square with a cream rectangular inset, visibly cutting the generated controller into a web-style 3x3 grid.
+- Compared depressing the complete D-pad, generating four state-specific controller images, and lighting the inset
+  on the selected direction arm. Chose the arm highlight because it communicates the exact direction like a physical
+  rocker, reuses the authored v3 geometry, and avoids four redundant assets whose alignment could drift.
+- The four hit targets remain 32px and semantically unchanged, but no longer paint backgrounds, borders, or shadows.
+  Hard-edged pseudo-elements sit directly over the asset's existing slots: 8x16 for up/down and 16x8 for left/right,
+  with a cream face and two-pixel water inset. Focus-visible and active states illuminate the arm; hover is limited to
+  fine pointers so real touch input does not leave a sticky post-tap state.
+- Browser-checked all four directions at 390x844. Every button retained a transparent computed background and no box
+  shadow while only its correctly oriented slot reached full opacity. Programmatic keyboard focus visibly selected
+  the right arm without a rectangular DOM outline; moving the pointer away restored the down arm to zero opacity.
+  The 96x96 control stayed at x=21..117 and y=727..823, broken images remained zero, and horizontal overflow was zero.
+- Focused Building specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
+  run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

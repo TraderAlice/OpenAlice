@@ -3654,14 +3654,43 @@
   touch-action: none;
 }
 
+.oa-office-touch-dpad button::after {
+  position: absolute;
+  z-index: 2;
+  content: "";
+  background: var(--gba-cream);
+  box-shadow: inset 0 0 0 2px var(--gba-water);
+  opacity: 0;
+  pointer-events: none;
+}
+
 .oa-office-touch-dpad button[data-direction='up'] { grid-area: 1 / 2; }
 .oa-office-touch-dpad button[data-direction='left'] { grid-area: 2 / 1; }
 .oa-office-touch-dpad button[data-direction='right'] { grid-area: 2 / 3; }
 .oa-office-touch-dpad button[data-direction='down'] { grid-area: 3 / 2; }
 
-.oa-office-touch-dpad button:is(:hover, :focus-visible, :active) {
-  background: color-mix(in srgb, var(--gba-water) 32%, transparent);
-  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--gba-cream) 60%, transparent);
+.oa-office-touch-dpad button:is([data-direction='up'], [data-direction='down'])::after {
+  top: 8px;
+  left: 12px;
+  width: 8px;
+  height: 16px;
+}
+
+.oa-office-touch-dpad button:is([data-direction='left'], [data-direction='right'])::after {
+  top: 12px;
+  left: 8px;
+  width: 16px;
+  height: 8px;
+}
+
+.oa-office-touch-dpad button:is(:focus-visible, :active)::after {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oa-office-touch-dpad button:hover::after {
+    opacity: 1;
+  }
 }
 
 .oa-office-touch-action {
