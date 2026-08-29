@@ -35,6 +35,8 @@ Current runtime assets:
 - `plant-v2.png`
 - `wall-window-v2.png`
 - `wall-window-night-v2.png` — geometry-matched after-hours window variant
+- `wall-utility-v1.png` — archive shelving and network-control module centered behind Operations
+- `wall-utility-night-v1.png` — geometry-matched after-hours utility module
 - `floor-tile-v2.png`
 - `workspace-rug-v2.png`
 - `coffee-station-v2.png` — Chat neighborhood social prop
@@ -43,6 +45,11 @@ Current runtime assets:
 the daytime window module, followed by a background-extraction pass to restore
 real alpha. `OfficeBuilding` selects the day or night module from the effective
 theme preference, including system-resolved Auto mode.
+
+`wall-utility-v1.png` replaces one repeated window at the Operations axis with built-in archive shelves and a
+network console. It preserves the 204x102 wall-module canvas, so the fixture enriches the perimeter without adding
+floor collision or a new card-shaped region. Its Night sibling keeps the same silhouette and uses restrained cyan
+machine light instead of dimming the whole Office scene.
 - `server-rack-v2.png` — AutoQuant neighborhood operations prop
 - `personnel-board-v2.png` — interactive roster prop for groups with more than four Sessions
 - `operations-board-v2.png` — floor landmark that opens the live occupancy log and replay

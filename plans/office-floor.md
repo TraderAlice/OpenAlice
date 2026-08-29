@@ -1155,6 +1155,29 @@ Replay-floor mode follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5021 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Operations perimeter follow-up (2026-08-29):
+
+- Replayed the default Day, Night, desktop, and narrow floors after the Replay work. The generated furniture and
+  game windows were coherent, but five identical window modules dominated the upper boundary and made the room
+  read like a repeated test tile rather than a deliberately furnished workplace.
+- Compared adding loose floor clutter, replacing the floor texture again, and building a modular perimeter fixture.
+  Chose the perimeter fixture after reviewing classic GBA lab/office interiors: functional shelving and machines
+  belong against the boundary, where they create landmarks without narrowing the player route or competing with
+  click-to-walk breadcrumbs.
+- Used the built-in image generator with the locked Office style master and shipped wall geometry to author one
+  built-in archive-and-network utility module plus a geometry-matched after-hours state. Connected background
+  extraction, nearest-neighbor fitting, hard alpha, and 64-color packaging produced two native 204x102 RGBA PNGs.
+- Replaced the single repeated window nearest the Operations axis with this generated fixture. It remains decorative
+  and collision-free, but visually connects the wall to the Operations board below; every other wall segment keeps
+  the exterior-window rhythm and the map remains one continuous floor.
+- Browser-checked Day and Night at 1280x720 and Night at 760x900. Both assets loaded at exact natural/display size,
+  the utility module remained visible and centered behind Operations, the Night screen retained restrained cyan
+  light, no image broke, and horizontal overflow remained 0px. The saved theme was restored to Auto after QA.
+- Focused native-furniture and Building specs passed: 2 files / 9 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5021 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

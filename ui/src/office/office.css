@@ -4484,6 +4484,15 @@
   pointer-events: none;
 }
 
+.oa-office-map-wall > img {
+  position: absolute;
+  top: 0;
+  display: block;
+  width: 204px;
+  height: 102px;
+  object-fit: contain;
+}
+
 .oa-office-building[data-office-time="night"] .oa-office-map-wall {
   background-image: var(--office-wall-night);
   box-shadow:

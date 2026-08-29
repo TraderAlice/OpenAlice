@@ -635,7 +635,19 @@ export function OfficeBuilding({
                 '--office-wall-night': `url(${OFFICE_FURNITURE.generated.wallWindowNight})`,
                 zIndex: officeDepthAt(112),
               } as CSSProperties}
-            />
+            >
+              <img
+                src={officeTime === 'night'
+                  ? OFFICE_FURNITURE.generated.wallUtilityNight
+                  : OFFICE_FURNITURE.generated.wallUtility}
+                alt=""
+                data-kind="operations-utility"
+                style={{
+                  ...officePixelImg,
+                  left: Math.round((operationsBoard.x - 102) / 204) * 204,
+                }}
+              />
+            </div>
             <div
               className="oa-office-map-landmark oa-office-map-landmark--plant"
               aria-hidden

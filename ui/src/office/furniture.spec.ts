@@ -19,6 +19,8 @@ describe('OFFICE_FURNITURE', () => {
       plant: [64, 64],
       wallWindow: [204, 102],
       wallWindowNight: [204, 102],
+      wallUtility: [204, 102],
+      wallUtilityNight: [204, 102],
       floorTile: [96, 96],
       workspaceRug: [264, 138],
       coffeeStation: [72, 72],
