@@ -1811,6 +1811,25 @@ Coworker interaction-dialogue follow-up (2026-08-29):
   `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 607-file Vitest run (5,033 passing; one file and nine tests
   skipped), and the UI production build all passed.
 
+Agent-file command hierarchy follow-up (2026-08-29):
+
+- Continued the Talk flow into the real Agent file. Its phone layout already read like a coherent RPG character card,
+  but the desktop four-column grid stretched Open session into a 138px-tall right rail. The navigation command carried
+  more visual weight than portrait, Session identity, live quote, status, Office, Surface, and the filed record.
+- Compared keeping the large right command, squeezing it beside the long Session title, and sharing the phone card's
+  vertical reading order. Chose the shared order: desktop keeps portrait/dialogue/facts in one information row, then
+  presents Open session as a 38px full-width command bar, followed by desk records as the inventory/exit row.
+- The desktop Agent file now uses three information columns and a full-width action grid row. Its content-driven
+  window ceiling increased from 220px to 270px so the extra row expands upward over the map rather than clipping or
+  introducing an internal scroll. The 760px phone rule continues to own its independent stacked layout and height.
+- Browser-played the final card at 1280x720: the rendered window settled at 817.9x260px, the command measured
+  751.9x38px, the record ended 14px above the window bottom, scrollHeight equaled clientHeight, and page overflow was
+  zero. At 390x844, the existing 344x362px character card, 278x36px command, record row, and zero-overflow behavior
+  were unchanged. A focused CSS contract protects the information columns, command span, and desktop height ceiling.
+- Focused Agent-file component and style-contract specs passed: 2 files / 3 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 608-file Vitest run (5,034 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

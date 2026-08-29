@@ -3033,7 +3033,7 @@
   bottom: 10px;
   left: 12px;
   width: auto;
-  max-height: 220px;
+  max-height: 270px;
   overflow: auto;
   color: var(--gba-ink);
 }
@@ -3046,7 +3046,7 @@
 
 .oa-office-inspect__profile {
   display: grid;
-  grid-template-columns: 76px minmax(180px, 1fr) minmax(250px, 1.35fr) minmax(120px, 0.65fr);
+  grid-template-columns: 76px minmax(180px, 1fr) minmax(250px, 1.35fr);
   align-items: center;
   gap: 7px 12px;
   padding: 10px 46px 10px 12px;
@@ -3162,6 +3162,7 @@
 }
 
 .oa-office-inspect__actions {
+  grid-column: 1 / -1;
   align-self: stretch;
   display: grid;
 }
