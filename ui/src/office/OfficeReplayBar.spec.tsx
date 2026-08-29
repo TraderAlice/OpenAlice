@@ -52,6 +52,8 @@ describe('OfficeReplayBar', () => {
     )
     expect(slider.style.getPropertyValue('--office-replay-progress')).toBe('100%')
     expect(slider.getAttribute('data-live')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'Live' })).toBeNull()
+    expect(screen.getByText('Live').closest('label')?.getAttribute('data-live')).toBe('true')
   })
 
   it('hides when the journal is empty', () => {

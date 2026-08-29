@@ -1572,6 +1572,27 @@ Pixel replay scrubber follow-up (2026-08-29):
 - Focused ReplayBar specs passed: 1 file / 3 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
   run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Handheld replay transport follow-up (2026-08-29):
+
+- Replayed the expanded Occupancy log at 390x844 in both Live and Seq 5. The historical state forced Previous,
+  the two-line `REPLAY / Seq 5` label, Next, `View replay floor`, and Live into one row; the floor action wrapped to
+  three lines and the status copy collided visually with the transport buttons. Live repeated its state in both the
+  central label and a disabled action.
+- Compared reducing the floor action to an unlabeled icon, merging floor navigation into the range, and using a
+  handheld-console layout. Chose the console layout because time selection and entering the replay map remain two
+  distinct actions: Previous / current state / Next form one stable control row, the range owns the second row, and
+  historical actions share a third row only when they can do something.
+- The status label is now a bordered one-line display rather than another Replay heading. Live uses the moss display
+  and animated signal dot; historical values use the floor display and exact Seq text. The disabled duplicate Live
+  action and its dead styles were removed. At the 480px container breakpoint, the transport spans the window and the
+  two historical actions become equal-width controls below the slider.
+- Browser-played Seq 5 and Live at 390x844, then repeated both at 1280x720. The mobile historical controls no longer
+  overlap or wrap; Live removes the empty action row and produces an 86px-high panel with a 304x36 transport. The
+  desktop Live label expands to 492.9x36, while desktop history keeps a 296.6px transport beside 264.4px of actions.
+  Both viewports kept zero page overflow and the journal remained independently scrollable.
+- Focused ReplayBar specs passed: 1 file / 3 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
+  run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

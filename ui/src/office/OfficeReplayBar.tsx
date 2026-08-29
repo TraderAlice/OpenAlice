@@ -37,8 +37,8 @@ export function OfficeReplayBar({
         >
           <img src={OFFICE_HUD_ASSETS.windowBack} alt="" aria-hidden style={officePixelImg} />
         </button>
-        <label htmlFor="office-replay" className="oa-office-replay__label">
-          <span>{t('office.replay')}</span>
+        <label htmlFor="office-replay" className="oa-office-replay__label" data-live={live}>
+          {live && <span className="oa-office-live-dot" aria-hidden />}
           <strong>{live ? t('office.replayLive') : t('office.replayAt', { seq: value })}</strong>
         </label>
         <button
@@ -79,15 +79,16 @@ export function OfficeReplayBar({
             {t('office.replayViewFloor')}
           </button>
         )}
-        <button
-          type="button"
-          className="oa-office-replay__live"
-          disabled={live}
-          onClick={() => onAsOfSeq(null)}
-        >
-          <span className="oa-office-live-dot" aria-hidden />
-          {t('office.replayLive')}
-        </button>
+        {!live && (
+          <button
+            type="button"
+            className="oa-office-replay__live"
+            onClick={() => onAsOfSeq(null)}
+          >
+            <span className="oa-office-live-dot" aria-hidden />
+            {t('office.replayLive')}
+          </button>
+        )}
       </div>
     </div>
   )
