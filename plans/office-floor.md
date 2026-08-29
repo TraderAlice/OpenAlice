@@ -1593,6 +1593,26 @@ Handheld replay transport follow-up (2026-08-29):
 - Focused ReplayBar specs passed: 1 file / 3 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
   run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Mobile roster status follow-up (2026-08-29):
+
+- Played the complete Team roster -> Agent file -> Team roster loop at 1280x720 and 390x844. Return provenance was
+  already correct: Back restored focus to the exact `demo-resume-chat` teammate. The apparent data loss on return was
+  instead a responsive rule that hid every `.oa-office-roster__status` below 760px, turning the party-status menu into
+  a plain contact list precisely where the touch UI needs fast state recognition.
+- Compared hiding portraits, encoding mood only through card color, and reflowing mobile cards into a compact party
+  layout. Chose reflow: character art, identity, and explicit working/idle/failed text are all primary RPG roster
+  information. Color-only state would weaken accessibility, while dropping portraits would undo the generated
+  coworker material work.
+- At the 760px container breakpoint, roster cards now use a portrait spanning two rows, identity on row one, a status
+  badge on row two, and the action arrow spanning both rows. Status is no longer suppressed. Across sizes, the badge
+  now uses a bordered mono label and square shadowed pixel lamp instead of a floating modern circular dot.
+- Browser verification found six of six statuses visible at both widths with zero page overflow. Desktop cards remain
+  340x72 with an 83x19 working badge. Mobile cards are 306x85; the first 83x19 badge sits below `pi · p1` without
+  stealing the title line. Entering the first Agent file and returning restored its focus and kept all six statuses
+  visible in the independently scrolling 344x380 roster window.
+- Focused RosterWindow specs passed: 1 file / 1 test. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
+  run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
