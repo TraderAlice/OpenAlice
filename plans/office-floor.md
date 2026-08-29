@@ -1552,6 +1552,26 @@ Floor-terminal return provenance follow-up (2026-08-29):
 - Focused Building/Page specs passed: 2 files / 14 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
   Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Pixel replay scrubber follow-up (2026-08-29):
+
+- Opened Occupancy log and expanded Replay on the real frontend. The disclosure and transport buttons already used
+  the Office game-window language, but the 569x20 timeline still reported `appearance: auto`: a browser-native cyan
+  pill track with a smooth circular thumb surrounded by hard pixel borders and generated controls.
+- Compared one button per journal event, a generated fixed-width slider image, and restyling the native range. Chose
+  the native range because it retains drag, arrow, Home/End, and screen-reader value behavior while allowing the one
+  mismatched visual primitive to join the 16-bit vocabulary. Event-button layouts would not scale and bitmap tracks
+  would couple authored pixels to viewport width and theme.
+- `OfficeReplayBar` now derives an exact progress percentage from retained `firstSeq`, current value, and `lastSeq`.
+  The range exposes that percentage as a CSS custom property while keeping its numeric min/max/value and ARIA text.
+  WebKit and Firefox tracks use a zero-radius three-pixel ink frame, hard water/floor progress split, stepped inset
+  shade, and square cream mechanical thumb. Keyboard focus adds a two-pixel water contour without a DOM rectangle.
+- Browser-played Live and Seq 5 at 1280x720. The range changed from `appearance: auto` at 568.9x20 to `none` at
+  568.9x24; Live rendered 100-percent water progress, Previous entered Replay floor and moved both semantic value and
+  hard split to 80 percent. At 390x844 the same Seq 5 track fit at 313.4x24 inside the 352px log window, with zero
+  page overflow.
+- Focused ReplayBar specs passed: 1 file / 3 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
+  run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { officePixelImg } from './furniture'
@@ -21,6 +22,7 @@ export function OfficeReplayBar({
   const minSeq = Math.min(Math.max(0, firstSeq), lastSeq)
   const value = Math.min(lastSeq, Math.max(minSeq, asOfSeq ?? lastSeq))
   if (lastSeq <= 0) return null
+  const progress = lastSeq === minSeq ? 100 : ((value - minSeq) / (lastSeq - minSeq)) * 100
   const setReplaySeq = (next: number) => onAsOfSeq(next >= lastSeq ? null : Math.max(minSeq, next))
 
   return (
@@ -60,6 +62,8 @@ export function OfficeReplayBar({
         aria-valuenow={value}
         aria-label={t('office.replay')}
         aria-valuetext={live ? String(t('office.replayLive')) : String(t('office.replayAt', { seq: value }))}
+        data-live={live}
+        style={{ '--office-replay-progress': `${progress}%` } as CSSProperties}
         onChange={(event) => {
           setReplaySeq(Number(event.target.value))
         }}

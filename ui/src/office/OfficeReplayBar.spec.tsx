@@ -17,7 +17,7 @@ describe('OfficeReplayBar', () => {
   it('scrubs seq and returns to live', async () => {
     const onAsOfSeq = vi.fn()
     const onViewFloor = vi.fn()
-    render(
+    const { rerender } = render(
       <OfficeReplayBar
         firstSeq={1}
         lastSeq={6}
@@ -26,17 +26,32 @@ describe('OfficeReplayBar', () => {
         onViewFloor={onViewFloor}
       />,
     )
+    const slider = screen.getByRole('slider', { name: 'Replay' })
+    expect(slider.style.getPropertyValue('--office-replay-progress')).toBe('20%')
+    expect(slider.getAttribute('data-live')).toBe('false')
     expect(screen.getByText('Seq 2')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Previous replay event' }))
     expect(onAsOfSeq).toHaveBeenCalledWith(1)
     await userEvent.click(screen.getByRole('button', { name: 'Next replay event' }))
     expect(onAsOfSeq).toHaveBeenCalledWith(3)
-    fireEvent.change(screen.getByRole('slider', { name: 'Replay' }), { target: { value: '3' } })
+    fireEvent.change(slider, { target: { value: '3' } })
     expect(onAsOfSeq).toHaveBeenCalledWith(3)
     await userEvent.click(screen.getByRole('button', { name: 'View replay floor' }))
     expect(onViewFloor).toHaveBeenCalledTimes(1)
     await userEvent.click(screen.getByRole('button', { name: 'Live' }))
     expect(onAsOfSeq).toHaveBeenCalledWith(null)
+
+    rerender(
+      <OfficeReplayBar
+        firstSeq={1}
+        lastSeq={6}
+        asOfSeq={null}
+        onAsOfSeq={onAsOfSeq}
+        onViewFloor={onViewFloor}
+      />,
+    )
+    expect(slider.style.getPropertyValue('--office-replay-progress')).toBe('100%')
+    expect(slider.getAttribute('data-live')).toBe('true')
   })
 
   it('hides when the journal is empty', () => {
@@ -65,5 +80,6 @@ describe('OfficeReplayBar', () => {
     const slider = screen.getByLabelText('Replay')
     expect(slider.getAttribute('min')).toBe('4')
     expect(slider.getAttribute('value')).toBe('4')
+    expect(slider.style.getPropertyValue('--office-replay-progress')).toBe('0%')
   })
 })
