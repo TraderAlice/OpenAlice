@@ -4519,6 +4519,19 @@
   height: 78px;
 }
 
+.oa-office-map-service {
+  position: absolute;
+  pointer-events: none;
+}
+
+.oa-office-map-service img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
+}
+
 .oa-office-operations-board {
   position: absolute;
   width: 176px;

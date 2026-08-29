@@ -21,6 +21,8 @@ describe('OFFICE_FURNITURE', () => {
     expect(OFFICE_FURNITURE.generated.spawnCompass).toBe('/office/furniture/spawn-compass-v1.png')
     expect(OFFICE_FURNITURE.generated.routeChevron).toBe('/office/furniture/route-chevron-v1.png')
     expect(OFFICE_FURNITURE.generated.collisionImpact).toBe('/office/furniture/collision-impact-v1.png')
+    expect(OFFICE_FURNITURE.generated.mailService).toBe('/office/furniture/mail-service-v1.png')
+    expect(OFFICE_FURNITURE.generated.archiveService).toBe('/office/furniture/archive-service-v1.png')
     expect(OFFICE_FURNITURE.generated.wallWindowNight).toBe('/office/furniture/wall-window-night-v1.png')
     for (const url of [
       OFFICE_FURNITURE.desk,
@@ -88,5 +90,15 @@ describe('OFFICE_FURNITURE', () => {
     expect(collisionImpact[25]).toBe(6)
     expect(collisionImpact.readUInt32BE(16)).toBe(96)
     expect(collisionImpact.readUInt32BE(20)).toBe(24)
+
+    for (const serviceUrl of [
+      OFFICE_FURNITURE.generated.mailService,
+      OFFICE_FURNITURE.generated.archiveService,
+    ]) {
+      const service = readFileSync(resolve(publicRoot, serviceUrl.replace(/^\//, '')))
+      expect(service[25]).toBe(6)
+      expect(service.readUInt32BE(16)).toBe(120)
+      expect(service.readUInt32BE(20)).toBe(104)
+    }
   })
 })

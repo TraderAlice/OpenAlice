@@ -1,5 +1,5 @@
 import type { OfficeMapLayout } from './map-layout'
-import { officeOperationsBoardPosition } from './map-landmarks'
+import { officeOperationsBoardPosition, officeServiceLandmarks } from './map-landmarks'
 import {
   OFFICE_CABINET_CENTER,
   OFFICE_DESK_CENTERS,
@@ -42,6 +42,16 @@ export function officeCollisionRects(
       height: 69,
     },
   ]
+
+  for (const landmark of officeServiceLandmarks(layout)) {
+    rects.push({
+      id: `landmark:${landmark.id}`,
+      x: landmark.x + landmark.collision.x,
+      y: landmark.y + landmark.collision.y,
+      width: landmark.collision.width,
+      height: landmark.collision.height,
+    })
+  }
 
   for (const pod of layout.pods) {
     rects.push({

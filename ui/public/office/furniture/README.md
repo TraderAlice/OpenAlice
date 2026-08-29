@@ -49,6 +49,8 @@ theme preference, including system-resolved Auto mode.
 - `spawn-compass-v1.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
 - `route-chevron-v1.png` — generated 24px floor inlay for the remaining click-to-interact path
 - `collision-impact-v1.png` — generated four-frame blocked-movement sparkle at native 24px cells
+- `mail-service-v1.png` — water cooler and mail-sorting landmark for the open service edge
+- `archive-service-v1.png` — copier and archive-trolley landmark for the open service edge
 
 `operations-board-v1.png` was generated from the locked style master as a freestanding, width-dominant
 mission console with an abstract teal status display and no baked words. The built-in image generator
@@ -71,3 +73,8 @@ directions; markers are decorative world feedback and never replace the named ro
 `collision-impact-v1.png` is a 96x24 transparent atlas with contact, star, arc, and fragment frames. Runtime
 rotation supplies four collision directions. Reduced-motion mode holds the bright second frame for the same short
 lifetime instead of animating the sheet; the effect is decorative and does not compete with interaction prompts.
+
+`mail-service-v1.png` and `archive-service-v1.png` were generated together from the locked style master, extracted
+from a chroma-key sheet, baseline-aligned, nearest-neighbor reduced to 120x104, and quantized against one 64-color
+palette. They appear only when the map has one Workspace row, turning its otherwise empty lower margin into two
+recognizable service landmarks without crowding denser floors.

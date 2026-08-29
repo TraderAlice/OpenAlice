@@ -26,6 +26,8 @@ export const OFFICE_FURNITURE = {
     spawnCompass: '/office/furniture/spawn-compass-v1.png',
     routeChevron: '/office/furniture/route-chevron-v1.png',
     collisionImpact: '/office/furniture/collision-impact-v1.png',
+    mailService: '/office/furniture/mail-service-v1.png',
+    archiveService: '/office/furniture/archive-service-v1.png',
   },
 } as const
 

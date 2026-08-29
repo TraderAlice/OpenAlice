@@ -978,6 +978,34 @@ World-object identity follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5016 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Service-landmark asset follow-up (2026-08-29):
+
+- Replayed the default two-Workspace floor after the interaction fixes. The functional neighborhood is concentrated
+  in the middle while the guaranteed lower margin is an undifferentiated checkerboard, making the most common map
+  read as a finished interaction prototype placed inside an unfinished room.
+- Compared adding more route-like floor decals, scattering decorative clutter, and building a small office service
+  edge. Decals would compete with route breadcrumbs and arbitrary clutter would add pixels without structure.
+  Chose two service landmarks because water/mail and copy/archive functions create recognizable wayfinding anchors
+  without inventing new product actions.
+- Used the built-in image generator with the locked Office style master to author a water-cooler/mail-sorting nook
+  and a copier/archive-trolley nook as one matched source sheet. Chroma-key removal, baseline alignment,
+  nearest-neighbor reduction, binary alpha, and a shared 64-color palette produced two 120x104 RGBA runtime PNGs
+  at roughly 10KB each; no full-resolution generated image ships at runtime.
+- `officeServiceLandmarks` places the pair symmetrically around the map center only when the layout has exactly one
+  Workspace row. Empty and dense multi-row maps receive no extra objects. This uses the otherwise guaranteed lower
+  service margin without blocking active pods or increasing clutter as the floor grows.
+- Both landmarks are pointer-inert scenery with lower-footprint collision rectangles and world-depth sorting. Alice
+  can walk behind their upper silhouettes but stops at the cabinet, cooler, copier, and trolley base; the existing
+  collision effect confirms the blocked direction.
+- Desktop QA initially found the archive trolley underneath the fixed movement HUD. Re-centering both landmarks as
+  a service corridor removed the overlap without raising scenery over controls. At 760x900, camera follow reveals
+  both landmarks together, the D-pad remains clear, horizontal overflow is 0px, and Alice stops at y=576 with a
+  visible impact instead of crossing the mail nook.
+- Focused building, collision, and furniture specs passed: 3 files / 15 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5017 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

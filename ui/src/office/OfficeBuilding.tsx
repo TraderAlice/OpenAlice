@@ -34,7 +34,7 @@ import {
 import { officeInteractionPromptPlacement } from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
 import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
-import { officeOperationsBoardPosition } from './map-landmarks'
+import { officeOperationsBoardPosition, officeServiceLandmarks } from './map-landmarks'
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
@@ -172,6 +172,10 @@ export function OfficeBuilding({
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
     [mapLayout.width],
+  )
+  const serviceLandmarks = useMemo(
+    () => officeServiceLandmarks(mapLayout),
+    [mapLayout],
   )
   const nearbyTarget = useMemo(
     () => interactionSuspended || selected
@@ -625,6 +629,29 @@ export function OfficeBuilding({
             >
               <img src={OFFICE_FURNITURE.generated.terminal} alt="" style={officePixelImg} />
             </div>
+            {serviceLandmarks.map((landmark) => (
+              <div
+                key={landmark.id}
+                className="oa-office-map-service"
+                data-kind={landmark.kind}
+                aria-hidden
+                style={{
+                  left: landmark.x,
+                  top: landmark.y,
+                  width: landmark.width,
+                  height: landmark.height,
+                  zIndex: officeDepthAt(landmark.y + landmark.collision.y + landmark.collision.height),
+                }}
+              >
+                <img
+                  src={landmark.kind === 'mail'
+                    ? OFFICE_FURNITURE.generated.mailService
+                    : OFFICE_FURNITURE.generated.archiveService}
+                  alt=""
+                  style={officePixelImg}
+                />
+              </div>
+            ))}
             <button
               id="office-operations-board"
               type="button"

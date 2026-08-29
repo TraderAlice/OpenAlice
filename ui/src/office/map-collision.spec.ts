@@ -20,6 +20,8 @@ describe('Office map collision', () => {
     expect(ids).toContain('harness-prop:chat-1')
     expect(ids).toContain('landmark:plant')
     expect(ids).toContain('landmark:terminal')
+    expect(ids).toContain('landmark:mail-service')
+    expect(ids).toContain('landmark:archive-service')
     expect(ids).toContain('operations')
   })
 
@@ -104,5 +106,16 @@ describe('Office map collision', () => {
     expect(officeCollisionRects(layout).map((rect) => rect.id)).not.toContain('roster:chat-1')
     expect(officeCollisionRects(layout, new Set(['chat-1'])).map((rect) => rect.id))
       .toContain('roster:chat-1')
+  })
+
+  it('keeps service landmarks out of dense multi-row floors', () => {
+    const denseLayout = layoutOfficeMap(Array.from({ length: 5 }, (_, index) => ({
+      id: `workspace-${index}`,
+      harness: 'chat' as const,
+    })))
+    expect(denseLayout.rows).toBeGreaterThan(1)
+    const ids = officeCollisionRects(denseLayout).map((rect) => rect.id)
+    expect(ids).not.toContain('landmark:mail-service')
+    expect(ids).not.toContain('landmark:archive-service')
   })
 })
