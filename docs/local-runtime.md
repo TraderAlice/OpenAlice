@@ -225,10 +225,34 @@ Both command families operate the same `cli-server` Guardian owner. The legacy
 `server status --json` keeps its raw payload while top-level JSON uses a
 versioned command envelope.
 
-The detached path is still source-backed: a user-owned or remote-managed
-checkout supplies the built Runtime while the installed CLI supplies lifecycle
-and transport control. A future standalone bundle changes preparation, not
-these ownership semantics.
+The source-development path remains checkout-backed: a user-owned or
+remote-managed checkout supplies the built Runtime while the CLI supplies
+lifecycle and transport control. The target-native Bun release uses the same
+commands and ownership semantics but resolves its immutable sidecar resources
+from the executable's release directory and skips source preparation.
+
+## Standalone Bun Agent Runtime boundary
+
+The Bun CLI release owns OpenAlice, its release Git, and its Workspace helper
+launchers. It does not own an Agent Runtime. Agent executables are discovered
+from the user's `PATH` and each Session starts through the existing adapter as
+an independent PTY process.
+
+Before any home-derived Pi environment is calculated, Bun launch paths remove
+only `OPENALICE_MANAGED_PI_PATH` and
+`OPENALICE_MANAGED_PI_NODE_PATH`. Those variables select Electron's packaged
+Pi and are not a CLI contract. The Bun path preserves `HOME`,
+`PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, and every other native
+Agent Runtime configuration value. Electron and source/package development
+retain their current managed-Pi behavior.
+
+`pnpm build:bun:release` verifies this boundary with an Agent executable that
+lives outside both the release and `OPENALICE_HOME`. It must be discovered as
+OpenCode, start through the real adapter in a Workspace PTY, receive the
+Workspace cwd, omit both managed-Pi selectors, and retain native Pi state. A
+local maintainer can additionally set `OPENALICE_BUN_REAL_OPENCODE_PATH` to an
+installed OpenCode executable; that optional gate launches the real TUI and
+checks that its user-owned TUI configuration remains unchanged.
 
 ## Dependency Bootstrap Direction
 
@@ -246,9 +270,10 @@ Keep bootstrap observable and layered:
 3. A later guided setup layer may present additional native Agent CLIs,
    installing only the user's selections with explicit commands, versions,
    and retry status.
-4. A future release asset can replace the source/build requirement with a
-   downloadable headless Runtime while retaining the same CLI and localhost
-   contract.
+4. The target-native Bun release asset replaces the source/build requirement
+   while retaining the same CLI and localhost contract. Installer activation
+   and package-manager distribution are specified in
+   [[docs/cli-installer.md]] and [[plans/bun-cli-distribution.md]].
 
 The same lifecycle contract survives that transition. Source-backed and
 standalone-bundle Runtime providers differ in preparation, not in ownership,

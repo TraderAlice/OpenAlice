@@ -110,7 +110,12 @@ describe('OpenAlice Runtime lifecycle core', () => {
         runtimeProvider: { kind: 'bun', contentIdentity: 'release-content-1' },
       }, {
         detached: true,
-        env: { OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice' },
+        env: {
+          OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice',
+          OPENALICE_MANAGED_PI_PATH: '/desktop/pi/cli.js',
+          OPENALICE_MANAGED_PI_NODE_PATH: '/desktop/node',
+          PI_CODING_AGENT_DIR: '/native/pi',
+        },
         runtimeExecutable: '/opt/openalice/releases/v1/bin/openalice',
         prepareSource,
         resolveRoot,
@@ -131,9 +136,13 @@ describe('OpenAlice Runtime lifecycle core', () => {
           env: expect.objectContaining({
             OPENALICE_RUNTIME_PROVIDER: 'bun',
             OPENALICE_RUNTIME_EXECUTABLE: '/opt/openalice/releases/v1/bin/openalice',
+            PI_CODING_AGENT_DIR: '/native/pi',
           }),
         }),
       )
+      const spawnedEnv = spawnProcess.mock.calls[0][2].env
+      expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_PATH')
+      expect(spawnedEnv).not.toHaveProperty('OPENALICE_MANAGED_PI_NODE_PATH')
     } finally {
       vi.unstubAllGlobals()
     }

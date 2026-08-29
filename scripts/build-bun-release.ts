@@ -211,7 +211,8 @@ async function buildPortableGit(source: string, destination: string): Promise<{
   const destinationCore = join(destination, 'libexec/git-core')
   const canonicalByHash = new Map<string, string>()
   canonicalByHash.set(await sha256File(join(destination, 'bin/git')), join(destination, 'bin/git'))
-  let symlinks = 0
+  await symlink(join('..', '..', 'bin', 'git'), join(destinationCore, 'git'))
+  let symlinks = 1
   for (const entry of await readdir(sourceCore, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (entry.name === 'mergetools') {
@@ -219,10 +220,21 @@ async function buildPortableGit(source: string, destination: string): Promise<{
       }
       continue
     }
-    if (!entry.isFile() || !entry.name.startsWith('git-')) continue
+    if (!entry.name.startsWith('git-')) continue
     if (entry.name === 'git-lfs' || entry.name.startsWith('git-credential-manager')) continue
     const sourceFile = join(sourceCore, entry.name)
     const destinationFile = join(destinationCore, entry.name)
+    if (entry.isSymbolicLink()) {
+      const target = await readlink(sourceFile)
+      const resolvedTarget = resolve(sourceCore, target)
+      if (resolvedTarget !== sourceCore && !resolvedTarget.startsWith(`${sourceCore}/`)) {
+        throw new Error(`release-owned Git contains an escaping symlink: ${entry.name} -> ${target}`)
+      }
+      await symlink(target, destinationFile)
+      symlinks += 1
+      continue
+    }
+    if (!entry.isFile()) continue
     const hash = await sha256File(sourceFile)
     const canonical = canonicalByHash.get(hash)
     if (canonical) {
@@ -232,6 +244,13 @@ async function buildPortableGit(source: string, destination: string): Promise<{
       await cp(sourceFile, destinationFile)
       canonicalByHash.set(hash, destinationFile)
     }
+  }
+  // Git's local and SSH transports ask a shell to resolve these server-side
+  // programs by name. GIT_EXEC_PATH covers Git's own subcommand dispatch but
+  // does not replace the conventional bin entries on Linux.
+  for (const program of ['git-upload-pack', 'git-receive-pack', 'git-shell']) {
+    await symlink(join('..', 'libexec', 'git-core', program), join(destination, 'bin', program))
+    symlinks += 1
   }
   const entries = await releaseFiles(destination)
   const bytes = await directoryBytes(destination)
@@ -363,17 +382,52 @@ async function smokeRelease(options: {
 
   const [webPort, mcpPort, utaPort, connectorPort] = await allocatePorts(4)
   const runtimeHome = join(options.smokeHome, 'runtime-home')
+  const userHome = join(options.smokeHome, 'user-home')
+  const externalAgentRoot = join(options.smokeHome, 'external-agent')
+  const externalAgentBin = join(externalAgentRoot, 'bin')
+  const nativePiRoot = join(externalAgentRoot, 'native-pi-state')
+  const externalOpenCode = join(externalAgentBin, 'opencode')
+  const nativeOpenCodeTuiConfig = '{"theme":"system"}\n'
+  await Promise.all([
+    mkdir(externalAgentBin, { recursive: true }),
+    mkdir(join(userHome, '.config', 'opencode'), { recursive: true }),
+  ])
+  await writeFile(join(userHome, '.config', 'opencode', 'tui.json'), nativeOpenCodeTuiConfig)
+  await writeFile(externalOpenCode, `#!/bin/sh
+if [ "${'$'}{1-}" = "session" ] && [ "${'$'}{2-}" = "list" ]; then
+  printf '[]\\n'
+  exit 0
+fi
+printf 'OPENALICE_EXTERNAL_OPENCODE_OK\\n'
+printf 'CWD=%s\\n' "${'$'}PWD"
+printf 'MANAGED_PI_PATH=%s\\n' "${'$'}{OPENALICE_MANAGED_PI_PATH-unset}"
+printf 'MANAGED_PI_NODE_PATH=%s\\n' "${'$'}{OPENALICE_MANAGED_PI_NODE_PATH-unset}"
+printf 'PI_CODING_AGENT_DIR=%s\\n' "${'$'}{PI_CODING_AGENT_DIR-unset}"
+printf 'PI_CODING_AGENT_SESSION_DIR=%s\\n' "${'$'}{PI_CODING_AGENT_SESSION_DIR-unset}"
+while IFS= read -r line; do
+  printf 'INPUT=%s\\n' "${'$'}line"
+done
+`)
+  await chmod(externalOpenCode, 0o755)
   const runtimeEnv = {
-    HOME: runtimeHome,
-    PATH: '',
+    HOME: userHome,
+    PATH: externalAgentBin,
     TMPDIR: process.env['TMPDIR'] ?? '/tmp',
     OPENALICE_HOME: runtimeHome,
     OPENALICE_TRADING_MODE: 'lite',
+    OPENALICE_DISABLE_AUTH: '1',
     OPENALICE_BIND_HOST: '127.0.0.1',
     OPENALICE_WEB_PORT: String(webPort),
     OPENALICE_MCP_PORT: String(mcpPort),
     OPENALICE_UTA_PORT: String(utaPort),
     OPENALICE_CONNECTOR_PORT: String(connectorPort),
+    OPENALICE_MANAGED_PI_PATH: '/stale/desktop/pi/cli.js',
+    OPENALICE_MANAGED_PI_NODE_PATH: '/stale/desktop/node',
+    PI_CODING_AGENT_DIR: nativePiRoot,
+    PI_CODING_AGENT_SESSION_DIR: join(nativePiRoot, 'sessions'),
+    OPENALICE_TEMPLATE_SOURCE_REPOSITORY: sourceRepository,
+    OPENALICE_TEMPLATE_SOURCE_VERSION: 'HEAD',
+    OPENALICE_TEMPLATE_SOURCE_COMMIT: sourceCommit,
   }
   const runtime = Bun.spawn([
     options.executablePath,
@@ -391,6 +445,7 @@ async function smokeRelease(options: {
   const stdoutPromise = new Response(runtime.stdout).text()
   const stderrPromise = new Response(runtime.stderr).text()
   let runtimeError: unknown = null
+  let realOpenCodeReport: { path: string; version: string; ptyBytes: number } | null = null
   try {
     const root = await waitForHttp(`http://127.0.0.1:${webPort}/`, 90_000)
     if (!root.includes('<div id="root">')) throw new Error('installed release did not serve the real Web UI')
@@ -403,6 +458,94 @@ async function smokeRelease(options: {
       || status.result.status.provider.contentIdentity !== options.contentIdentity
     ) {
       throw new Error(`installed release status lost Bun provenance: ${JSON.stringify(status)}`)
+    }
+    const baseUrl = `http://127.0.0.1:${webPort}`
+    const inventory = await fetchJson(`${baseUrl}/api/workspaces/agents`) as {
+      agents?: Array<{ id?: string; installed?: boolean }>
+    }
+    if (!inventory.agents?.some((agent) => agent.id === 'opencode' && agent.installed === true)) {
+      throw new Error(`installed release did not discover the external OpenCode executable: ${JSON.stringify(inventory)}`)
+    }
+    const created = await fetchJson(`${baseUrl}/api/workspaces`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tag: 'bun-external-opencode', template: 'chat' }),
+    }, 201) as { workspace?: { id?: string; dir?: string } }
+    const workspaceId = created.workspace?.id
+    const workspaceDir = created.workspace?.dir
+    if (!workspaceId || !workspaceDir) {
+      throw new Error(`installed release Workspace response was incomplete: ${JSON.stringify(created)}`)
+    }
+    const spawned = await fetchJson(`${baseUrl}/api/workspaces/${workspaceId}/sessions/spawn`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agent: 'opencode' }),
+    }, 201) as { sessionId?: string }
+    if (!spawned.sessionId) {
+      throw new Error(`installed release external OpenCode spawn omitted sessionId: ${JSON.stringify(spawned)}`)
+    }
+    const marker = 'OPENALICE_EXTERNAL_OPENCODE_OK'
+    const terminal = await readPtyUntil(baseUrl, spawned.sessionId, {
+      client: 'bun-release-external-agent-smoke',
+      description: marker,
+      timeoutMs: 30_000,
+      complete: (output) => output.includes(marker),
+      settleDelayMs: 25,
+    })
+    for (const expected of [
+      `CWD=${workspaceDir}`,
+      'MANAGED_PI_PATH=unset',
+      'MANAGED_PI_NODE_PATH=unset',
+      `PI_CODING_AGENT_DIR=${nativePiRoot}`,
+      `PI_CODING_AGENT_SESSION_DIR=${join(nativePiRoot, 'sessions')}`,
+    ]) {
+      if (!terminal.includes(expected)) {
+        throw new Error(`external OpenCode process did not preserve the CLI ownership boundary (${expected}):\n${terminal}`)
+      }
+    }
+    const realOpenCodePath = process.env['OPENALICE_BUN_REAL_OPENCODE_PATH']?.trim()
+    if (realOpenCodePath) {
+      const realVersion = run([realOpenCodePath, '--version'], {
+        HOME: userHome,
+        PATH: dirname(realOpenCodePath),
+        OPENCODE_DISABLE_MODELS_FETCH: '1',
+        OPENCODE_DISABLE_AUTOUPDATE: '1',
+        OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
+      }).trim()
+      await rm(externalOpenCode)
+      await symlink(realOpenCodePath, externalOpenCode)
+      const realCreated = await fetchJson(`${baseUrl}/api/workspaces`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tag: 'bun-real-opencode', template: 'chat' }),
+      }, 201) as { workspace?: { id?: string } }
+      const realWorkspaceId = realCreated.workspace?.id
+      if (!realWorkspaceId) {
+        throw new Error(`installed release real OpenCode Workspace response was incomplete: ${JSON.stringify(realCreated)}`)
+      }
+      const realSpawned = await fetchJson(`${baseUrl}/api/workspaces/${realWorkspaceId}/sessions/spawn`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ agent: 'opencode' }),
+      }, 201) as { sessionId?: string }
+      if (!realSpawned.sessionId) {
+        throw new Error(`installed release real OpenCode spawn omitted sessionId: ${JSON.stringify(realSpawned)}`)
+      }
+      const realTerminal = await readPtyUntil(baseUrl, realSpawned.sessionId, {
+        client: 'bun-release-real-agent-smoke',
+        description: '64 bytes of TUI output',
+        timeoutMs: 30_000,
+        complete: (output) => Buffer.byteLength(output) >= 64,
+      })
+      const retainedConfig = await readFile(join(userHome, '.config', 'opencode', 'tui.json'), 'utf8')
+      if (retainedConfig !== nativeOpenCodeTuiConfig) {
+        throw new Error('real external OpenCode launch changed the user-owned native TUI config')
+      }
+      realOpenCodeReport = {
+        path: realOpenCodePath,
+        version: realVersion,
+        ptyBytes: Buffer.byteLength(realTerminal),
+      }
     }
     // Let the foreground presenter observe the same ready status before the
     // smoke sends its ownership signal; otherwise the signal guard correctly
@@ -426,11 +569,86 @@ async function smokeRelease(options: {
     templates: ['chat', 'auto-quant-v2', 'auto-prediction'],
     workspaceCli: 'alice-workspace',
     workspaceCliInvoke: true,
+    externalAgentRuntime: 'opencode',
+    externalAgentRuntimeProcess: true,
+    externalAgentRuntimeManagedPi: false,
+    realExternalAgentRuntime: realOpenCodeReport,
     defaultResources: true,
     materializedPiAdapter: true,
     uiStatus: 200,
     contentIdentity: options.contentIdentity,
   }
+}
+
+async function fetchJson(
+  url: string,
+  init?: RequestInit,
+  expectedStatus = 200,
+): Promise<unknown> {
+  const response = await fetch(url, init)
+  const text = await response.text()
+  if (response.status !== expectedStatus) {
+    throw new Error(`${init?.method ?? 'GET'} ${url} returned ${response.status}: ${text}`)
+  }
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`${init?.method ?? 'GET'} ${url} returned invalid JSON: ${text}`)
+  }
+}
+
+function readPtyUntil(
+  baseUrl: string,
+  sessionId: string,
+  options: {
+    client: string
+    description: string
+    timeoutMs: number
+    complete: (output: string) => boolean
+    settleDelayMs?: number
+  },
+): Promise<string> {
+  const wsUrl = new URL('/api/workspaces/pty', baseUrl)
+  wsUrl.protocol = 'ws:'
+  wsUrl.searchParams.set('session', sessionId)
+  wsUrl.searchParams.set('cols', '120')
+  wsUrl.searchParams.set('rows', '32')
+  wsUrl.searchParams.set('client', options.client)
+  wsUrl.searchParams.set('kind', 'smoke')
+  wsUrl.searchParams.set('takeover', '1')
+
+  return new Promise((resolvePromise, rejectPromise) => {
+    const socket = new WebSocket(wsUrl)
+    socket.binaryType = 'arraybuffer'
+    let output = ''
+    let settled = false
+    const finish = (error?: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      socket.close()
+      if (error) rejectPromise(error)
+      else resolvePromise(output)
+    }
+    const timeout = setTimeout(() => {
+      finish(new Error(`external Agent Runtime PTY timed out waiting for ${options.description}:\n${output.slice(-4_000)}`))
+    }, options.timeoutMs)
+    socket.addEventListener('message', (event) => {
+      const chunk = typeof event.data === 'string'
+        ? event.data
+        : event.data instanceof ArrayBuffer
+          ? Buffer.from(event.data).toString('utf8')
+          : String(event.data)
+      output += chunk
+      if (!options.complete(output)) return
+      if (options.settleDelayMs) setTimeout(() => finish(), options.settleDelayMs)
+      else finish()
+    })
+    socket.addEventListener('error', () => finish(new Error('external Agent Runtime PTY WebSocket failed')))
+    socket.addEventListener('close', () => {
+      if (!settled) finish(new Error(`external Agent Runtime PTY closed before ${options.description}:\n${output}`))
+    })
+  })
 }
 
 function run(command: string[], env: Record<string, string>): string {

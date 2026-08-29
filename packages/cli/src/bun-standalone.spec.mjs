@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 import {
   buildBunRuntimeEnvironment,
+  buildExternalAgentRuntimeEnvironment,
   bunGuardianProcessSpec,
   resolveBunContentIdentity,
   resolveBunResourceRoot,
@@ -42,6 +43,29 @@ describe('Bun standalone launch boundary', () => {
       GIT_TEMPLATE_DIR: resolve(resourceRoot, 'runtime/git/share/git-core/templates'),
       PATH: `${resolve(resourceRoot, 'runtime/git/bin')}${process.platform === 'win32' ? ';' : ':'}/usr/local/bin`,
     }))
+  })
+
+  it('removes desktop-managed Pi selection without replacing native Pi state', () => {
+    const env = {
+      OPENALICE_MANAGED_PI_PATH: '/desktop/pi/cli.js',
+      OPENALICE_MANAGED_PI_NODE_PATH: '/desktop/node',
+      PI_CODING_AGENT_DIR: '/user/pi',
+      PI_CODING_AGENT_SESSION_DIR: '/user/pi/sessions',
+      PATH: '/user/bin',
+    }
+
+    expect(buildExternalAgentRuntimeEnvironment(env)).toEqual({
+      PI_CODING_AGENT_DIR: '/user/pi',
+      PI_CODING_AGENT_SESSION_DIR: '/user/pi/sessions',
+      PATH: '/user/bin',
+    })
+    expect(env).toHaveProperty('OPENALICE_MANAGED_PI_PATH')
+
+    expect(buildBunRuntimeEnvironment(
+      env,
+      resolve('/opt/openalice/share/openalice'),
+      '/opt/openalice/bin/openalice',
+    )).not.toHaveProperty('OPENALICE_MANAGED_PI_PATH')
   })
 
   it('reads content identity from release metadata with an environment override', () => {
