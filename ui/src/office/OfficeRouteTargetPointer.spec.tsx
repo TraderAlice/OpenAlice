@@ -60,5 +60,12 @@ describe('OfficeRouteTargetPointer', () => {
       workspaceId: 'office-1',
       roomName: 'Office 1',
     })).toEqual({ x: 952, y: 450 })
+
+    expect(officeRouteTargetPointerPosition({
+      id: 'floor-terminal',
+      kind: 'floor-terminal',
+      x: 880,
+      y: 164,
+    })).toEqual({ x: 880, y: 102 })
   })
 })

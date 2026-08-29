@@ -1,6 +1,7 @@
 import type { OfficeMapLayout } from './map-layout'
 
 export const OFFICE_OPERATIONS_BOARD_Y = 204
+export const OFFICE_FLOOR_TERMINAL_Y = 164
 
 export interface OfficeServiceLandmark {
   id: 'mail-service' | 'archive-service'
@@ -16,6 +17,13 @@ export function officeOperationsBoardPosition(mapWidth: number): { x: number; y:
   return {
     x: Math.round(mapWidth / 2),
     y: OFFICE_OPERATIONS_BOARD_Y,
+  }
+}
+
+export function officeFloorTerminalPosition(mapWidth: number): { x: number; y: number } {
+  return {
+    x: mapWidth - 80,
+    y: OFFICE_FLOOR_TERMINAL_Y,
   }
 }
 

@@ -1505,6 +1505,32 @@ Coworker map-label follow-up (2026-08-29):
 - Focused OfficeDesk specs passed: 1 file / 4 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
   Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+In-world floor terminal follow-up (2026-08-29):
+
+- Audited the remaining high-salience floor props and found the generated 52x78 glowing terminal on the right wall
+  was a dead object: a `div` with no name, no role, and `pointer-events: none`. Its screen, pedestal, night glow, and
+  shared HUD icon language promised a stronger interaction than several objects that already supported pathfinding.
+- Compared leaving it decorative, duplicating the central Operations log action, and making it the world entrance to
+  the existing Floor view menu. Chose the Floor terminal because it fulfils the prop's visual promise without adding
+  a parallel workflow: Live map, All groups, and Occupancy log remain owned by the one existing menu.
+- The terminal is now a named world button and interaction target with shared collision-aware pathfinding, route
+  trail, generated destination pointer, nearby facing-cone selection, Enter/Space, and touch A support. Hover,
+  proximity, and keyboard focus lift and light the generated bitmap without a rectangular DOM outline. Its stable
+  map center and route-pointer lift live with the other landmark geometry instead of being inferred from the DOM.
+- Opening from the terminal records a world-menu origin, focuses `Live map` after the controlled popup mounts, and
+  returns focus to the terminal on Escape. HUD-origin menus still return to the HUD trigger, while choosing Occupancy
+  log leaves focus ownership to its modal window. This preserves the existing menu as the single UI primitive while
+  giving the in-world route a complete keyboard lifecycle.
+- Browser-played the 1280x720 route: after 260ms Alice had advanced from x=480 to x=624 with nine trail steps left,
+  the pointer identified `floor-terminal`, and arrival ended at x=816/y=192 facing right. The menu focused Live map;
+  Escape restored `office-floor-terminal`. At 390x844 the nearby prompt read `Menu / Enter / A`, touch A opened the
+  same focused menu, the terminal retained its image-only focus glow, and page overflow remained zero.
+- The first full-suite pass caught the menu's delayed focus restoration stealing focus from a newly opened Occupancy
+  log. Menu restoration now aborts whenever an Office modal already owns focus; the focused OfficePage coverage and
+  the subsequent full run confirm that Escape closes the log again without weakening terminal focus return.
+- Focused Office interaction specs passed: 4 files / 23 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
+  606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

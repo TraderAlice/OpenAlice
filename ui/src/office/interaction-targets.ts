@@ -1,7 +1,7 @@
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import type { OfficeMapLayout } from './map-layout'
 import { visibleEmployeesForOffice } from './desk-slots'
-import { officeOperationsBoardPosition } from './map-landmarks'
+import { officeFloorTerminalPosition, officeOperationsBoardPosition } from './map-landmarks'
 import {
   OFFICE_CABINET_CENTER,
   OFFICE_DESK_CENTERS,
@@ -53,6 +53,12 @@ export type OfficeInteractionTarget =
   | {
     id: 'operations'
     kind: 'operations'
+    x: number
+    y: number
+  }
+  | {
+    id: 'floor-terminal'
+    kind: 'floor-terminal'
     x: number
     y: number
   }
@@ -115,6 +121,11 @@ export function officeInteractionTargets(
     id: 'operations',
     kind: 'operations',
     ...officeOperationsBoardPosition(layout.width),
+  })
+  targets.push({
+    id: 'floor-terminal',
+    kind: 'floor-terminal',
+    ...officeFloorTerminalPosition(layout.width),
   })
 
   return targets

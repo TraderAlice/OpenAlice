@@ -35,7 +35,11 @@ import {
 import { officeInteractionPromptPlacement } from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
 import { moveAliceOnOfficeMap, officeCollisionRects } from './map-collision'
-import { officeOperationsBoardPosition, officeServiceLandmarks } from './map-landmarks'
+import {
+  officeFloorTerminalPosition,
+  officeOperationsBoardPosition,
+  officeServiceLandmarks,
+} from './map-landmarks'
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
@@ -117,6 +121,8 @@ export function OfficeBuilding({
   const routeTimerRef = useRef<number | null>(null)
   const departureTimerRef = useRef<number | null>(null)
   const routeGenerationRef = useRef(0)
+  const menuOriginRef = useRef<'hud' | 'floor-terminal'>('hud')
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const awakeGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
@@ -180,10 +186,16 @@ export function OfficeBuilding({
       ? officeCoworkerLabel(routeTarget.employee)
       : routeTarget.kind === 'operations'
         ? t('office.operationsBoard')
-        : routeTarget.roomName
+        : routeTarget.kind === 'floor-terminal'
+          ? t('office.floorTerminal')
+          : routeTarget.roomName
     : null
   const operationsBoard = useMemo(
     () => officeOperationsBoardPosition(mapLayout.width),
+    [mapLayout.width],
+  )
+  const floorTerminal = useMemo(
+    () => officeFloorTerminalPosition(mapLayout.width),
     [mapLayout.width],
   )
   const serviceLandmarks = useMemo(
@@ -239,6 +251,13 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.rosterBadge,
         action: t('office.interactActionRoster'),
         label: t('office.interactRoster', { name: nearbyTarget.roomName }),
+      }
+    }
+    if (nearbyTarget.kind === 'floor-terminal') {
+      return {
+        icon: OFFICE_HUD_ASSETS.menuTerminal,
+        action: t('office.interactActionTerminal'),
+        label: t('office.interactTerminal'),
       }
     }
     return {
@@ -334,9 +353,29 @@ export function OfficeBuilding({
       onOpenFiles(target.workspaceId)
     } else if (target.kind === 'roster') {
       onOpenRoster(target.workspaceId)
+    } else if (target.kind === 'floor-terminal') {
+      menuOriginRef.current = 'floor-terminal'
+      setMenuOpen(true)
+      window.setTimeout(() => {
+        document.querySelector<HTMLElement>(
+          '.oa-office-pause-menu [role="menuitemradio"]',
+        )?.focus()
+      }, 0)
     } else {
       onOpenLog('operations')
     }
+  }
+  const closeFloorMenu = (restoreFocus = true) => {
+    setMenuOpen(false)
+    if (!restoreFocus) return
+    requestAnimationFrame(() => {
+      if (document.querySelector('.oa-office-window[aria-modal="true"]')) return
+      if (menuOriginRef.current === 'floor-terminal') {
+        document.getElementById('office-floor-terminal')?.focus()
+      } else {
+        menuTriggerRef.current?.focus()
+      }
+    })
   }
   const activateNearbyTarget = () => {
     if (!nearbyTarget || selected || departingWorkspace || interactionSuspended) return
@@ -528,15 +567,23 @@ export function OfficeBuilding({
             open={menuOpen}
             onOpenChange={(open) => {
               if (open) cancelAutoWalk()
-              setMenuOpen(open)
+              if (open) {
+                setMenuOpen(true)
+              } else {
+                closeFloorMenu()
+              }
             }}
           >
             <DropdownMenuTrigger
               render={<button
                 type="button"
+                ref={menuTriggerRef}
                 className="oa-office-pause-trigger"
                 aria-label={t('office.pauseMenu')}
                 data-open={menuOpen}
+                onFocus={() => {
+                  if (!menuOpen) menuOriginRef.current = 'hud'
+                }}
               />}
             >
               <img
@@ -562,7 +609,7 @@ export function OfficeBuilding({
                 onValueChange={(value) => {
                   setShowAll(value === 'all')
                   setCamera({ x: 0, y: 0 })
-                  setMenuOpen(false)
+                  closeFloorMenu()
                 }}
               >
                 <DropdownMenuRadioItem value="live">
@@ -576,7 +623,7 @@ export function OfficeBuilding({
               </DropdownMenuRadioGroup>
               <DropdownMenuItem
                 onClick={() => {
-                  setMenuOpen(false)
+                  closeFloorMenu(false)
                   onOpenLog('menu')
                 }}
               >
@@ -695,13 +742,24 @@ export function OfficeBuilding({
             >
               <img src={OFFICE_FURNITURE.generated.plant} alt="" style={officePixelImg} />
             </div>
-            <div
+            <button
+              id="office-floor-terminal"
+              type="button"
               className="oa-office-map-landmark oa-office-map-landmark--terminal"
-              aria-hidden
-              style={{ zIndex: officeDepthAt(183) }}
+              aria-label={t('office.floorTerminal')}
+              title={t('office.floorTerminalHint')}
+              data-nearby={nearbyTarget?.kind === 'floor-terminal'}
+              data-route={routeTargetId === 'floor-terminal'}
+              onClick={() => requestTargetInteraction('floor-terminal')}
+              style={{ zIndex: officeDepthAt(floorTerminal.y + 19) }}
             >
-              <img src={OFFICE_FURNITURE.generated.terminal} alt="" style={officePixelImg} />
-            </div>
+              <img
+                src={OFFICE_FURNITURE.generated.terminal}
+                alt=""
+                aria-hidden
+                style={officePixelImg}
+              />
+            </button>
             {serviceLandmarks.map((landmark) => (
               <div
                 key={landmark.id}

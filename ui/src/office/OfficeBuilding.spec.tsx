@@ -450,6 +450,9 @@ describe('OfficeBuilding', () => {
     const operations = screen.getByRole('button', { name: 'Operations board' })
     expect(operations.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/operations-board-v2.png')
+    const floorTerminal = screen.getByRole('button', { name: 'Floor terminal' })
+    expect(floorTerminal.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/furniture/terminal-kiosk-v2.png')
     Object.defineProperties(map, {
       setPointerCapture: { value: vi.fn() },
       releasePointerCapture: { value: vi.fn() },
@@ -596,6 +599,11 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-pod-chat-1')).toBeTruthy()
     expect(screen.getByTestId('office-pod-quant-1')).toBeTruthy()
     expect(screen.getByTestId('office-pod-quant-old')).toBeTruthy()
+    await userEvent.click(floorTerminal)
+    await waitFor(() => expect(screen.getByRole('menu', { name: 'Menu' })).toBeTruthy())
+    expect(document.activeElement).toBe(screen.getByRole('menuitemradio', { name: 'Live map' }))
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(document.activeElement).toBe(floorTerminal))
     await userEvent.click(screen.getByRole('button', { name: 'Filing cabinet · chat' }))
     await waitFor(() => expect(onOpenFiles).toHaveBeenCalledWith('chat-1'))
     await userEvent.click(operations)

@@ -4844,6 +4844,22 @@
   right: 54px;
   width: 52px;
   height: 78px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.oa-office-map-landmark--terminal:is(:hover, :focus-visible) img,
+.oa-office-map-landmark--terminal[data-nearby="true"] img {
+  transform: translateY(-2px) scale(1.28);
+  filter:
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gba-water) 72%, transparent))
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gba-water) 72%, transparent))
+    drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent))
+    brightness(1.12);
 }
 
 .oa-office-map-service {

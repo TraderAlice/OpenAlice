@@ -34,6 +34,7 @@ describe('Office interaction targets', () => {
     const employee = targets.find((target) => target.kind === 'employee')
     const cabinet = targets.find((target) => target.kind === 'cabinet')
     const operations = targets.find((target) => target.kind === 'operations')
+    const floorTerminal = targets.find((target) => target.kind === 'floor-terminal')
 
     expect(sign).toMatchObject({
       id: 'sign:chat-1',
@@ -55,6 +56,12 @@ describe('Office interaction targets', () => {
       kind: 'operations',
       x: layout.width / 2,
       y: 204,
+    })
+    expect(floorTerminal).toEqual({
+      id: 'floor-terminal',
+      kind: 'floor-terminal',
+      x: layout.width - 80,
+      y: 164,
     })
     expect(nearestOfficeInteractionTarget(
       { x: employee!.x + 24, y: employee!.y },
@@ -158,6 +165,10 @@ describe('Office interaction targets', () => {
       {
         id: 'operations',
         target: { id: 'operations' as const, kind: 'operations' as const, x: 0, y: 0 },
+      },
+      {
+        id: 'floor-terminal',
+        target: { id: 'floor-terminal' as const, kind: 'floor-terminal' as const, x: 0, y: 0 },
       },
     ]
 
