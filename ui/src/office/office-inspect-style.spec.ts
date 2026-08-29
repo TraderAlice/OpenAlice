@@ -15,7 +15,7 @@ const compactCss = css.slice(compactStart, phoneStart)
 describe('Office Agent-file style contract', () => {
   it('keeps character information ahead of the full-width command row', () => {
     expect(css).toMatch(
-      /\.oa-office-inspect\s*\{[\s\S]*?max-height: min\(320px, calc\(100% - 84px\)\);[\s\S]*?overflow: hidden/,
+      /\.oa-office-inspect\s*\{[\s\S]*?max-height: min\(356px, calc\(100% - 84px\)\);[\s\S]*?overflow: hidden/,
     )
     expect(css).toMatch(
       /\.oa-office-inspect__profile\s*\{[\s\S]*?min-height: 0;[\s\S]*?grid-template-columns: 76px minmax\(180px, 1fr\) minmax\(250px, 1\.35fr\)[\s\S]*?overflow-y: auto/,

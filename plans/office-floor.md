@@ -2568,6 +2568,29 @@ Event-to-floor replay follow-up (2026-08-30):
   specs, root/UI TypeScript, the full 613-file Vitest run (5,099 passing; one file and nine tests skipped), and the
   production build passed; existing large-chunk and direct-eval advisories are unchanged.
 
+Unique-artifact cabinet follow-up (2026-08-30):
+
+- Real play opened the Prediction filing cabinet after one Grok-backed Office exercise. Six cards represented only
+  four artifacts: one Issue appeared three times for `updated / commented / updated`, while two Inbox deliveries used
+  raw UUIDs as their visible titles. Repeated Open labels were also indistinguishable to assistive navigation.
+- Compared presenting the provenance history as a stack, labeling every mutation, and making the cabinet a unique
+  artifact collection. Chose unique artifacts because Activity Log already owns the event-by-event story; an RPG filing
+  cabinet should behave like a key-item inventory. The newest provenance edge now represents each report path, Issue,
+  Inbox delivery, or trade decision, and the six-item cap applies after deduplication.
+- Added one Office-owned presentation helper shared by Agent File and the cabinet. Result cards now lead with a
+  player-facing artifact title, followed by a compact type badge and relative acquisition time. Inbox UUIDs remain the
+  navigation identity but are no longer exposed as copy; accessible action names include title, type, and time.
+- Three stepped cabinet heights accommodate one, two, or three desktop result rows while retaining bounded scrolling
+  on smaller stages. The Agent File gained enough desktop height for two metadata-bearing reward rows; its established
+  two-column compact and one-column phone layouts remain unchanged.
+- Browser-replayed the live Prediction cabinet: six provenance rows became four artifact cards, both Inbox entries read
+  `Inbox delivery`, no UUID remained visible, and the two-by-two grid had identical client/scroll heights with no
+  overflow. Arrow Right moved Issue → current Inbox and Arrow Down moved to the older Inbox. The originating Agent File
+  likewise displayed all four cards across two rows with no profile overflow.
+- Focused projection, cabinet, Agent File, and responsive-style specs passed (4 files / 22 tests), as did root/UI
+  TypeScript, the full 613-file Vitest run (5,100 passing; one file and nine tests skipped), and the production build;
+  existing large-chunk and direct-eval advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

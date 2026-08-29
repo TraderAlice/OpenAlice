@@ -77,17 +77,18 @@ describe('OfficeCabinetWindow', () => {
     expect(dialog.getAttribute('data-record-count')).toBe('2')
     expect(dialog.hasAttribute('data-empty')).toBe(false)
     expect(screen.getByText('2 filed records')).toBeTruthy()
-    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'Review queueFiled by c1Open',
-      'Thesis memoFiled by x1Open',
-    ])
+    const recordText = screen.getAllByRole('listitem').map((item) => item.textContent ?? '')
+    expect(recordText[0]).toContain('Review queueIssue')
+    expect(recordText[0]).toContain('Filed by c1Open')
+    expect(recordText[1]).toContain('Thesis memoReport')
+    expect(recordText[1]).toContain('Filed by x1Open')
     expect(container.querySelector<HTMLImageElement>('header img')?.src)
       .toContain('/office/hud/drawer-record-v2.png')
     expect(container.querySelector('.oa-office-window__title-room')?.textContent).toBe('Semis')
     expect(container.querySelector('.oa-office-window__title-kind')?.textContent).toBe('Filing cabinet')
     expect(container.querySelector('.oa-office-window__title-separator')?.textContent).toBe('·')
 
-    const recordButtons = screen.getAllByRole('button', { name: /Open .* in Workspace/ })
+    const recordButtons = screen.getAllByRole('button', { name: /Open .*, (Issue|Report), .* in Workspace/ })
     expect(document.activeElement).toBe(recordButtons[0])
     vi.spyOn(recordButtons[0]!, 'getBoundingClientRect').mockReturnValue({
       left: 0, right: 100, top: 0, bottom: 60,
@@ -111,7 +112,7 @@ describe('OfficeCabinetWindow', () => {
     await userEvent.keyboard('{Tab}')
     expect(document.activeElement).toBe(recordButtons[1])
 
-    const recordExit = screen.getByRole('button', { name: 'Open Review queue in Workspace' })
+    const recordExit = screen.getByRole('button', { name: /Open Review queue, Issue, .* in Workspace/ })
     expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__destination img')?.src)
       .toContain('/office/hud/session-portal-v2.png')
     await userEvent.click(recordExit)
@@ -123,6 +124,37 @@ describe('OfficeCabinetWindow', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('presents Inbox artifacts as deliveries instead of raw record ids', () => {
+    const inboxId = 'a74b15cc-c443-4137-960e-fca08fe0c0a4'
+    const inboxGroup: OfficeRoomSnapshot = {
+      ...group,
+      employees: [{
+        ...group.employees[0],
+        drawers: [{
+          id: 'inbox-record',
+          kind: 'inbox',
+          action: 'sent',
+          at: Date.now(),
+          label: inboxId,
+          inboxEntryId: inboxId,
+        }],
+      }],
+    }
+    render(
+      <OfficeCabinetWindow
+        group={inboxGroup}
+        roomName="Semis"
+        onOpenWorkspaceFiles={vi.fn()}
+        onOpenRecord={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Inbox delivery')).toBeTruthy()
+    expect(screen.queryByText(inboxId)).toBeNull()
+    expect(screen.getByRole('button', { name: /Open Inbox delivery, Inbox, .* in Workspace/ })).toBeTruthy()
   })
 
   it('uses the generated open drawer and focuses the empty cabinet exit', async () => {

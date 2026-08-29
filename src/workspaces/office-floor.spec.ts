@@ -197,7 +197,7 @@ describe('projectOfficeFloor', () => {
     expect(officeProjectionNow(events, 2, 3, 90_000)).toBe(20_000)
   })
 
-  it('lists this employee\'s office artifacts as drawers', () => {
+  it('lists each of this employee\'s office artifacts once using its latest activity', () => {
     const drawers = projectOfficeDrawers('office-1', 'resume-alice', [
       {
         id: 'p1',
@@ -220,8 +220,23 @@ describe('projectOfficeFloor', () => {
         origin: { kind: 'session', workspaceId: 'office-1', resumeId: 'resume-bob', agent: 'pi' },
         artifact: { kind: 'issue', workspaceId: 'office-1', issueId: 'iss-1' },
       },
+      {
+        id: 'p4',
+        action: 'created',
+        at: 4,
+        origin: { kind: 'session', workspaceId: 'office-1', resumeId: 'resume-alice', agent: 'codex' },
+        artifact: { kind: 'issue', workspaceId: 'office-1', issueId: 'iss-own' },
+      },
+      {
+        id: 'p5',
+        action: 'commented',
+        at: 5,
+        origin: { kind: 'session', workspaceId: 'office-1', resumeId: 'resume-alice', agent: 'codex' },
+        artifact: { kind: 'issue', workspaceId: 'office-1', issueId: 'iss-own' },
+      },
     ])
     expect(drawers).toEqual([
+      expect.objectContaining({ id: 'p5', kind: 'issue', action: 'commented', label: 'iss-own' }),
       expect.objectContaining({ id: 'p1', kind: 'report', label: 'note.md', path: 'docs/note.md' }),
     ])
   })

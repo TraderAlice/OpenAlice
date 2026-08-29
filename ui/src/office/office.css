@@ -782,6 +782,40 @@
   white-space: nowrap;
 }
 
+.oa-office-drawer__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.oa-office-drawer__copy > small,
+.oa-office-cabinet-window__record-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: var(--gba-ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.oa-office-drawer__copy > small b,
+.oa-office-cabinet-window__record-meta b {
+  padding: 1px 4px;
+  color: var(--gba-paper);
+  background: var(--gba-ink-soft);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-drawer__copy time,
+.oa-office-cabinet-window__record-meta time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .oa-office-drawer__destination {
   display: inline-grid;
   grid-template-columns: 18px auto;
@@ -2363,7 +2397,7 @@
   right: max(24px, calc(50% - 340px));
   bottom: auto;
   left: max(24px, calc(50% - 340px));
-  height: min(390px, calc(100% - 102px));
+  height: min(438px, calc(100% - 102px));
   overflow: hidden;
   color: var(--gba-ink);
 }
@@ -2374,12 +2408,12 @@
 
 .oa-office-cabinet-window[data-record-count="1"],
 .oa-office-cabinet-window[data-record-count="2"] {
-  height: min(246px, calc(100% - 102px));
+  height: min(258px, calc(100% - 102px));
 }
 
 .oa-office-cabinet-window[data-record-count="3"],
 .oa-office-cabinet-window[data-record-count="4"] {
-  height: min(320px, calc(100% - 102px));
+  height: min(358px, calc(100% - 102px));
 }
 
 .oa-office-cabinet-window__body {
@@ -2429,7 +2463,7 @@
 .oa-office-cabinet-window__records li button {
   display: grid;
   width: 100%;
-  min-height: 66px;
+  min-height: 78px;
   grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
@@ -2461,6 +2495,10 @@
   display: grid;
   min-width: 0;
   gap: 3px;
+}
+
+.oa-office-cabinet-window__record-copy > small:last-child {
+  color: var(--gba-ink-soft);
 }
 
 .oa-office-cabinet-window__records strong,
@@ -2556,7 +2594,7 @@
   bottom: 10px;
   left: 12px;
   width: auto;
-  max-height: min(320px, calc(100% - 84px));
+  max-height: min(356px, calc(100% - 84px));
   overflow: hidden;
   color: var(--gba-ink);
 }

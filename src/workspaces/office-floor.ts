@@ -306,6 +306,14 @@ function drawerLabel(record: ProvenanceRecord): string {
   return artifact.decisionId
 }
 
+function drawerArtifactKey(record: ProvenanceRecord): string {
+  const { artifact } = record
+  if (artifact.kind === 'report') return `report:${artifact.workspaceId}:${artifact.path}`
+  if (artifact.kind === 'issue') return `issue:${artifact.workspaceId}:${artifact.issueId}`
+  if (artifact.kind === 'inbox') return `inbox:${artifact.inboxEntryId}`
+  return `trade-decision:${artifact.accountId}:${artifact.decisionId}`
+}
+
 export function projectOfficeDrawers(
   workspaceId: string,
   resumeId: string,
@@ -313,11 +321,15 @@ export function projectOfficeDrawers(
   limit = OFFICE_DRAWER_LIMIT,
 ): OfficeDrawerItem[] {
   const items: OfficeDrawerItem[] = []
-  for (const record of records) {
+  const seenArtifacts = new Set<string>()
+  for (const record of [...records].sort((a, b) => b.at - a.at)) {
     if (items.length >= limit) break
     if (!drawerBelongsToOffice(record, workspaceId)) continue
     if (record.origin.kind === 'session' && record.origin.resumeId !== resumeId) continue
     if (record.origin.kind !== 'session') continue
+    const artifactKey = drawerArtifactKey(record)
+    if (seenArtifacts.has(artifactKey)) continue
+    seenArtifacts.add(artifactKey)
     const { artifact } = record
     items.push({
       id: record.id,

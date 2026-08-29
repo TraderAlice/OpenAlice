@@ -2,7 +2,9 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
+import { formatRelativeTime } from '../lib/intl'
 import { employeesForOffice } from './desk-slots'
+import { officeDrawerKindLabel, officeDrawerTitle } from './drawer-presentation'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
@@ -130,6 +132,9 @@ export function OfficeCabinetWindow({
             {records.map((record: CabinetRecord) => {
               const { employee, item } = record
               const key = recordKey(record)
+              const title = officeDrawerTitle(item, t)
+              const kind = officeDrawerKindLabel(item, t)
+              const relativeTime = formatRelativeTime(item.at)
               return (
                 <li key={key}>
                   <button
@@ -137,13 +142,17 @@ export function OfficeCabinetWindow({
                     autoFocus={key === initialFocusKey}
                     data-record-key={key}
                     tabIndex={key === focusedRecordKey ? 0 : -1}
-                    aria-label={t('office.drawerOpenRecord', { record: item.label })}
+                    aria-label={t('office.drawerOpenRecord', { record: title, kind, time: relativeTime })}
                     onFocus={() => setFocusedRecordKey(key)}
                     onClick={() => onOpenRecord(employee, item)}
                   >
                     <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
-                    <span>
-                      <strong>{item.label}</strong>
+                    <span className="oa-office-cabinet-window__record-copy">
+                      <strong>{title}</strong>
+                      <small className="oa-office-cabinet-window__record-meta">
+                        <b>{kind}</b>
+                        <time dateTime={new Date(item.at).toISOString()}>{relativeTime}</time>
+                      </small>
                       <small>{t('office.cabinetRecordOwner', { name: officeCoworkerLabel(employee) })}</small>
                     </span>
                     <span className="oa-office-cabinet-window__destination" aria-hidden>

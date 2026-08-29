@@ -2,6 +2,8 @@ import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } f
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee } from '../api/office'
+import { formatRelativeTime } from '../lib/intl'
+import { officeDrawerKindLabel, officeDrawerTitle } from './drawer-presentation'
 import { officeBubbleText } from './bubble-text'
 import { officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
@@ -192,26 +194,37 @@ export function OfficeInspectRail({
                     buttons[nextIndex]?.focus()
                   }}
                 >
-                  {employee.drawers.map((item, index) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        data-drawer-id={item.id}
-                        tabIndex={item.id === focusedDrawerId || (focusedDrawerId == null && index === 0) ? 0 : -1}
-                        className="oa-office-drawer"
-                        aria-label={t('office.drawerOpenRecord', { record: item.label })}
-                        onFocus={() => setFocusedDrawerId(item.id)}
-                        onClick={() => onOpenDrawer(item)}
-                      >
-                        <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
-                        <span className="oa-office-drawer__label">{item.label}</span>
-                        <span className="oa-office-drawer__destination" aria-hidden>
-                          <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />
-                          <small>{t('office.drawerRecordAction')}</small>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                  {employee.drawers.map((item, index) => {
+                    const title = officeDrawerTitle(item, t)
+                    const kind = officeDrawerKindLabel(item, t)
+                    const relativeTime = formatRelativeTime(item.at)
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          data-drawer-id={item.id}
+                          tabIndex={item.id === focusedDrawerId || (focusedDrawerId == null && index === 0) ? 0 : -1}
+                          className="oa-office-drawer"
+                          aria-label={t('office.drawerOpenRecord', { record: title, kind, time: relativeTime })}
+                          onFocus={() => setFocusedDrawerId(item.id)}
+                          onClick={() => onOpenDrawer(item)}
+                        >
+                          <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
+                          <span className="oa-office-drawer__copy">
+                            <span className="oa-office-drawer__label">{title}</span>
+                            <small>
+                              <b>{kind}</b>
+                              <time dateTime={new Date(item.at).toISOString()}>{relativeTime}</time>
+                            </small>
+                          </span>
+                          <span className="oa-office-drawer__destination" aria-hidden>
+                            <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />
+                            <small>{t('office.drawerRecordAction')}</small>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             )}
