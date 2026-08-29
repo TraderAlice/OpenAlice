@@ -259,7 +259,7 @@ export function OfficeBuilding({
       y: Math.min(0, Math.max(viewport.height - mapLayout.height, y)),
     }
   }
-  const centeredCamera = () => {
+  const initialCamera = () => {
     const viewport = viewportRef.current?.getBoundingClientRect()
     if (!viewport || viewport.width <= 0 || viewport.height <= 0) return { x: 0, y: 0 }
     return clampCamera(
@@ -269,13 +269,13 @@ export function OfficeBuilding({
         : 0,
     )
   }
-  const resetMap = () => {
-    cancelAutoWalk()
-    setCamera(centeredCamera())
-    aliceRef.current = mapLayout.alice
-    setAlice(mapLayout.alice)
-    setAliceDirection('down')
-    setAliceWalking(false)
+  const centerCameraOnAlice = () => {
+    const viewport = viewportRef.current?.getBoundingClientRect()
+    if (!viewport || viewport.width <= 0 || viewport.height <= 0) return
+    setCamera(clampCamera(
+      Math.round(viewport.width / 2 - aliceRef.current.x),
+      Math.round(viewport.height / 2 - aliceRef.current.y),
+    ))
   }
   const showCollisionBump = (movement: OfficeMovement = OFFICE_MOVEMENTS[aliceDirection]) => {
     if (walkTimerRef.current != null) window.clearTimeout(walkTimerRef.current)
@@ -467,7 +467,7 @@ export function OfficeBuilding({
     setAlice(mapLayout.alice)
     setAliceDirection('down')
     setAliceWalking(false)
-    setCamera(centeredCamera())
+    setCamera(initialCamera())
   // Reframe only when the visible map geometry changes, not on every live poll.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapLayout.width, mapLayout.height])
@@ -905,7 +905,7 @@ export function OfficeBuilding({
             <img src={OFFICE_HUD_ASSETS.movePad} alt="" aria-hidden style={officePixelImg} />
             <span>{t('office.mapHint')}</span>
           </span>
-          <button type="button" onClick={resetMap} aria-label={t('office.resetMap')}>
+          <button type="button" onClick={centerCameraOnAlice} aria-label={t('office.centerMapOnAlice')}>
             <img
               src={OFFICE_HUD_ASSETS.resetCompass}
               alt=""

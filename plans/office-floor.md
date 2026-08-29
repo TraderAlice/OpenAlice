@@ -1390,6 +1390,27 @@ World-object hit ownership follow-up (2026-08-29):
 - `npx tsc --noEmit`, `cd ui && npx tsc -b`, and the UI production build passed. The 606-file Vitest run passed with
   5,029 tests (one file and nine tests skipped).
 
+Player-preserving camera follow-up (2026-08-29):
+
+- Continued the world-object ownership audit across every visible desktop target, then replayed the phone controller.
+  The lower-right compass was labelled `Reset map view`, but it also reset Alice's world position, facing, walking
+  state, and active route. Three left steps moved Alice from x=480 to x=408; pressing the view control silently
+  teleported her back to the spawn compass at x=480.
+- Compared renaming the control to `Return to spawn`, retaining the combined player-and-camera reset, and making it a
+  true camera recenter. Chose camera recenter because a permanent one-tap teleport needs explicit game-world framing
+  and confirmation, while the compass already occupies the conventional “find my character” control position.
+- The compass now computes a clamped camera centered on `aliceRef.current`. It does not mutate Alice's position,
+  direction, walking cycle, nearby interaction, or click-to-walk route. The old `resetMap` locale contract was
+  replaced directly with `Center map on Alice` copy in English, Simplified and Traditional Chinese, and Japanese.
+- Browser-played the 390x844 controller: after three real D-pad moves Alice remained at x=408 while the compass moved
+  the map transform from -296px to -224px and retained focus. At 1280x720, pressing the compass during the Auto
+  Prediction route still completed the route, departure curtain, and navigation to the Prediction Workspace.
+- The Building integration spec now asserts that recentering during a route preserves both Alice's exact coordinates
+  and the route trail, and it no longer uses the old teleport side effect as setup for unrelated interaction tests.
+  Focused Building specs passed: 1 file / 9 tests.
+- `npx tsc --noEmit`, `cd ui && npx tsc -b`, and the UI production build passed. The 606-file Vitest run passed with
+  5,029 tests (one file and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

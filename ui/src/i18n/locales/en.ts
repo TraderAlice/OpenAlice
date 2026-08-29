@@ -1852,7 +1852,7 @@ export const en = {
     moveAliceLeft: 'Move Alice left',
     walkingTo: 'Walking to {{name}}',
     enteringWorkspace: 'Entering {{name}}…',
-    resetMap: 'Reset map view',
+    centerMapOnAlice: 'Center map on Alice',
     aliceAvatar: 'Alice on the office map',
     activeRooms: 'Active rooms',
     awakeRooms: 'Awake rooms',

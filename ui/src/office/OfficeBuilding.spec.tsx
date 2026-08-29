@@ -287,6 +287,11 @@ describe('OfficeBuilding', () => {
       expect(targetPointer.querySelector('img')?.getAttribute('src'))
         .toBe('/office/furniture/route-target-pointer-v1.png')
       expect(`${alice.style.left}:${alice.style.top}`).not.toBe('480px:336px')
+      const routePosition = `${alice.style.left}:${alice.style.top}`
+      fireEvent.click(screen.getByRole('button', { name: 'Center map on Alice' }))
+      expect(`${alice.style.left}:${alice.style.top}`).toBe(routePosition)
+      expect(sign.dataset.route).toBe('true')
+      expect(screen.getByTestId('office-route-trail')).toBeTruthy()
       for (let index = 0; index < 100 && !screen.queryByTestId('office-departure'); index += 1) {
         act(() => vi.advanceTimersToNextTimer())
       }
@@ -434,7 +439,7 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-building').querySelector<HTMLImageElement>('.oa-office-hud__signal img')?.src)
       .toContain('/office/hud/signal-receiver-v2.png')
     expect(screen.getByTestId('office-building').querySelector('svg')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Reset map view' }).querySelector('img')?.src)
+    expect(screen.getByRole('button', { name: 'Center map on Alice' }).querySelector('img')?.src)
       .toContain('/office/hud/reset-compass-v2.png')
     const alice = screen.getByRole('img', { name: 'Alice on the office map' })
     expect(alice.style.left).toBe('480px')
@@ -516,9 +521,14 @@ describe('OfficeBuilding', () => {
     await userEvent.click(map)
     await userEvent.keyboard('{Enter}')
     expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
-    await userEvent.click(screen.getByRole('button', { name: 'Reset map view' }))
+    const cabinetPosition = `${alice.style.left}:${alice.style.top}`
+    await userEvent.click(screen.getByRole('button', { name: 'Center map on Alice' }))
+    expect(`${alice.style.left}:${alice.style.top}`).toBe(cabinetPosition)
     expect(controls?.dataset.learned).toBe('true')
     await userEvent.click(map)
+    await userEvent.keyboard('wwd')
+    expect(alice.style.left).toBe('480px')
+    expect(alice.style.top).toBe('336px')
     await userEvent.keyboard('wwww')
     expect(alice.style.top).toBe('264px')
     expect(screen.getByRole('status', { name: 'Check live operations' }).querySelector('img')?.getAttribute('src'))
@@ -526,16 +536,21 @@ describe('OfficeBuilding', () => {
     expect(operations.dataset.nearby).toBe('true')
     await userEvent.keyboard('{Enter}')
     expect(onOpenLog).toHaveBeenCalledWith('operations')
-    await userEvent.click(screen.getByRole('button', { name: 'Reset map view' }))
-    await userEvent.click(map)
-    await userEvent.keyboard('sssssaaaaaaawwwwa')
-    expect(alice.style.left).toBe('312px')
-    expect(alice.style.top).toBe('384px')
+    await userEvent.click(screen.getByRole('button', { name: 'Center map on Alice' }))
+    expect(alice.style.left).toBe('480px')
+    expect(alice.style.top).toBe('264px')
+    await userEvent.click(screen.getByTestId('office-desk-resume-alice'))
+    await waitFor(() => expect(onSelectEmployee).toHaveBeenCalledWith(
+      'chat-1',
+      expect.objectContaining({ resumeId: 'resume-alice' }),
+    ))
     const talkPrompt = screen.getByRole('status', { name: 'Talk to Desk mate' })
     expect(talkPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/talk-bubble-v2.png')
     expect(talkPrompt.textContent).toContain('Talk')
     expect(screen.getByTestId('office-desk-resume-alice').dataset.nearby).toBe('true')
+    onSelectEmployee.mockClear()
+    await userEvent.click(map)
     await userEvent.keyboard('{Enter}')
     expect(onSelectEmployee).toHaveBeenCalledWith(
       'chat-1',
