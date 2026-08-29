@@ -81,6 +81,9 @@ describe('OfficeCabinetWindow', () => {
     ])
     expect(container.querySelector<HTMLImageElement>('header img')?.src)
       .toContain('/office/hud/drawer-record-v2.png')
+    expect(container.querySelector('.oa-office-window__title-room')?.textContent).toBe('Semis')
+    expect(container.querySelector('.oa-office-window__title-kind')?.textContent).toBe('Filing cabinet')
+    expect(container.querySelector('.oa-office-window__title-separator')?.textContent).toBe('·')
 
     const recordExit = screen.getByRole('button', { name: 'Open Review queue in Workspace' })
     expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__destination img')?.src)

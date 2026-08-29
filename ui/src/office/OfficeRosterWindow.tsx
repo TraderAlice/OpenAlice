@@ -37,9 +37,13 @@ export function OfficeRosterWindow({
       }}
     >
       <header className="oa-office-window__header">
-        <div>
+        <div className="oa-office-window__title">
           <img src={OFFICE_HUD_ASSETS.rosterBadge} alt="" aria-hidden style={officePixelImg} />
-          <span>{roomName} · {t('office.roster')}</span>
+          <span className="oa-office-window__title-copy">
+            <span className="oa-office-window__title-room">{roomName}</span>
+            <span className="oa-office-window__title-separator" aria-hidden>·</span>
+            <span className="oa-office-window__title-kind">{t('office.roster')}</span>
+          </span>
         </div>
         <button type="button" autoFocus={!focusResumeId} aria-label={t('common.close')} onClick={onClose}>
           <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />

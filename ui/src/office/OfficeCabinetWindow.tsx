@@ -44,9 +44,13 @@ export function OfficeCabinetWindow({
       }}
     >
       <header className="oa-office-window__header">
-        <div>
+        <div className="oa-office-window__title">
           <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
-          <span>{roomName} · {t('office.cabinet')}</span>
+          <span className="oa-office-window__title-copy">
+            <span className="oa-office-window__title-room">{roomName}</span>
+            <span className="oa-office-window__title-separator" aria-hidden>·</span>
+            <span className="oa-office-window__title-kind">{t('office.cabinet')}</span>
+          </span>
         </div>
         <button type="button" autoFocus aria-label={t('common.close')} onClick={onClose}>
           <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />

@@ -37,6 +37,15 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('grid-template-columns: 30px minmax(0, 1fr) 32px')
   })
 
+  it('stacks window location and type as deliberate phone title lines', () => {
+    expect(css).toMatch(/\.oa-office-window__title-copy\s*\{[\s\S]*?display: flex/)
+    expect(css).toMatch(/\.oa-office-window__title-room\s*\{[\s\S]*?text-overflow: ellipsis/)
+    expect(narrowLiveCss).toContain('.oa-office-window__title-copy')
+    expect(narrowLiveCss).toContain('display: grid')
+    expect(narrowLiveCss).toContain('.oa-office-window__title-separator')
+    expect(narrowLiveCss).toContain('display: none')
+  })
+
   it('keeps landscape windows dense until the stage is genuinely narrow', () => {
     expect(touchLayoutStart).toBeGreaterThan(-1)
     expect(compactWindowStart).toBeGreaterThan(touchLayoutStart)

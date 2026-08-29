@@ -2015,6 +2015,24 @@ In-world focus re-entry follow-up (2026-08-29):
 - The focused OfficeBuilding suite passed: 1 file / 10 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 609-file
   Vitest run (5,042 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Responsive game-window identity follow-up (2026-08-29):
+
+- Walked to the empty Auto Prediction cabinet at desktop and phone sizes. Its generated open-drawer material, empty
+  copy, and Workspace-files exit were already complete, but the 344px window broke `AUTO PREDICTION · FILING
+  CABINET` after FILING, leaving CABINET as an accidental orphan in the green title bar. The long Team roster title
+  inherited the same browser-wrap behavior.
+- Compared shrinking the title type, forcing one-line ellipsis, and giving game windows a structured location/type
+  identity. Chose the shared structured title: shrinking would violate Office readability, while ellipsis would hide
+  the exact window the player entered. Cabinet and roster now expose separate room, separator, and window-type nodes;
+  wide stages align them in one line, and the 520px container rule deliberately stacks room over type.
+- Browser-played the empty Auto Prediction cabinet and six-person Semis roster. At 390x844 both titles resolved into
+  two balanced 14px lines inside the unchanged 38px header; at 844x390 and 1280x900 they returned to one line. The
+  cabinet remained 344x286 on phone, the roster retained its scrolling party list, and every measured state kept zero
+  page overflow.
+- Focused cabinet, roster, and responsive-style specs passed: 3 files / 10 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 609-file Vitest run (5,043 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
