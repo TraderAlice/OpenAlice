@@ -496,9 +496,13 @@ export function OfficeBuilding({
         || departingWorkspace
         || selected
       ) return
-      if (event.target !== document.body && event.target !== viewportRef.current) return
+      const viewport = viewportRef.current
+      const target = event.target
+      const fromIdlePage = target === document.body
+      const fromFloor = target instanceof Node && Boolean(viewport?.contains(target))
+      if (!fromIdlePage && !fromFloor) return
       const key = event.key.toLowerCase()
-      if ((key === 'enter' || key === ' ') && nearbyTarget) {
+      if ((key === 'enter' || key === ' ') && nearbyTarget && (fromIdlePage || target === viewport)) {
         event.preventDefault()
         activateNearbyTarget()
         return
@@ -515,6 +519,7 @@ export function OfficeBuilding({
       }[key]
       if (!movement) return
       event.preventDefault()
+      if (fromFloor && target !== viewport) viewport?.focus({ preventScroll: true })
       cancelAutoWalk()
       moveAlice(movement)
     }

@@ -1999,6 +1999,22 @@ Play-ready keyboard focus follow-up (2026-08-29):
 - The focused OfficeBuilding suite passed: 1 file / 10 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 609-file
   Vitest run (5,042 passing; one file and nine tests skipped), and the UI production build all passed.
 
+In-world focus re-entry follow-up (2026-08-29):
+
+- Continued the keyboard route through W x4 -> Enter -> Occupancy log -> Close. The dialog correctly returned focus
+  to Operations board for accessibility, but S then left Alice at `480,264`: the ambient-key boundary treated an
+  in-world object exactly like the HUD Menu and silently stranded the player after every inspected object.
+- Compared discarding focus restoration, allowing movement from every button, and distinguishing world objects from
+  shell controls. Chose spatial ownership: movement keys from any campus descendant explicitly return focus to the
+  campus and resume Alice, while Enter/Space remain with the focused object's native action. Menu, activity rail, and
+  other controls outside the campus still ignore movement keys; modifier and paused-state guards remain unchanged.
+- Browser-played the complete loop at 1280x900, 844x390, and 390x844. Close restored Operations board focus at
+  `480,264`; the next S moved Alice to `480,288` and moved focus to `office-floor` in all three viewports, with zero
+  page overflow. The focused component test also proves Menu + D leaves Alice still while Operations board + D moves
+  her and hands focus back to the map.
+- The focused OfficeBuilding suite passed: 1 file / 10 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 609-file
+  Vitest run (5,042 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
