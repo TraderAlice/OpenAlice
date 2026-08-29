@@ -61,6 +61,8 @@ describe('OfficeInspectRail', () => {
     )
 
     expect(screen.getByText('Polishing the Office floor.')).toBeTruthy()
+    expect(screen.getByText('codex')).toBeTruthy()
+    expect(container.textContent).not.toContain('demo-resume-chat')
     expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
       .toContain('/office/coworkers/codex-')
     expect(screen.getByRole('button', { name: 'Close' }).querySelector('.oa-office-window__close-mark'))

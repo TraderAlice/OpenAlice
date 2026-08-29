@@ -2611,6 +2611,26 @@ Collision-free coworker casting follow-up (2026-08-30):
   613-file Vitest run (5,101 passing; one file and nine tests skipped), and the production build; existing large-chunk
   and direct-eval advisories are unchanged.
 
+Player-facing coworker identity follow-up (2026-08-30):
+
+- Real Activity Log play exposed raw internal identities in both panes: rows read `@resume-crisp-sla...` and the event
+  detail printed the complete resume ID. Agent File repeated the same implementation identifier below its otherwise
+  player-facing title, breaking the character continuity established by the map and Team roster.
+- Compared hiding the identifier, shortening it into another opaque code, and resolving journal actors through the
+  current Office cast. Chose cast resolution: a current teammate keeps the exact portrait, task-facing name, runtime,
+  short Session name, and Office used elsewhere. Retained events for departed teammates derive a stable title-cased
+  call sign from their Session slug instead of exposing the raw ID; no persisted identity is added.
+- The event detail now combines the teammate portrait with a small event-kind marker, preserving both who acted and
+  what happened. Journal rows keep their event badge and existing keyboard order. Agent File uses the same
+  `runtime · short name` byline as the roster. Existing desktop two-column and narrow stacked log layouts are unchanged.
+- Browser-played the live Grok journal: the newest event resolved to `grok-analyst`, Arrow Down selected sequence 1326
+  and changed the detail portrait to `grok-oracle`, and the matching map-opened Agent File returned to
+  `grok-analyst · grok · g5`. No `resume-*` text remained visible. Focused actor-directory, journal, Agent File, and
+  OfficePage specs passed (4 files / 18 tests), together with root/UI TypeScript, the full 614-file Vitest run (5,103
+  passing; one file and nine tests skipped), and the production build. One Office menu-focus test flickered during the
+  first full run, then passed both in isolation and in the complete rerun; existing large-chunk and direct-eval
+  advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

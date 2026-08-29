@@ -1118,6 +1118,7 @@
 }
 
 .oa-office-runtime__badge {
+  position: relative;
   display: grid;
   width: 58px;
   height: 58px;
@@ -1137,6 +1138,26 @@
   height: 54px;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+.oa-office-runtime__badge[data-actor] > .oa-office-coworker {
+  align-self: end;
+}
+
+.oa-office-runtime__badge[data-actor] .oa-office-coworker img {
+  width: 100%;
+  height: 100%;
+}
+
+.oa-office-runtime__badge[data-actor] > .oa-office-runtime__event-mark {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--gba-ink);
+  background: var(--gba-paper);
+  box-shadow: 1px 1px 0 color-mix(in srgb, var(--gba-ink) 32%, transparent);
 }
 
 .oa-office-runtime__content {

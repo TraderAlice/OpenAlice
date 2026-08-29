@@ -10,6 +10,7 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding, type OfficeLogOrigin } from '../office/OfficeBuilding'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
+import { officeActivityActors } from '../office/activity-actors'
 import { officeCoworkerCast } from '../office/coworker-sprites'
 import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
@@ -85,6 +86,12 @@ export function OfficePage() {
   const selectedCoworkerAsset = useMemo(() => selectedSeat
     ? officeCoworkerCast(selectedSeat.office.employees).get(selectedSeat.employee.resumeId)
     : undefined, [selectedSeat])
+  const activityActors = useMemo(() => building
+    ? officeActivityActors(building.offices, (workspaceId, tag) => {
+        const workspace = workspaces.find((item) => item.id === workspaceId)
+        return workspace ? workspaceDisplayName(workspace) : tag
+      })
+    : new Map(), [building, workspaces])
   const cabinetOffice = useMemo(() => {
     if (!building || !cabinetWorkspaceId) return null
     const office = building.offices.find((item) => item.workspace.id === cabinetWorkspaceId)
@@ -319,6 +326,7 @@ export function OfficePage() {
                     />
                   </details>
                   <OfficeRuntimeSection
+                    actors={activityActors}
                     onReplay={(seq) => {
                       setAsOfSeq(seq)
                       closeLog()

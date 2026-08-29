@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { i18n } from '../i18n'
+import { OFFICE_COWORKER_SPRITES } from '../office/coworker-sprites'
 import { OfficeRuntimeSection } from './OfficeRuntimeSection'
 
 const query = vi.fn()
@@ -77,16 +78,26 @@ describe('OfficeRuntimeSection', () => {
         },
       }],
     })
-    const { container } = render(<OfficeRuntimeSection />)
-    expect((await screen.findAllByText('@resume-alice')).length).toBeGreaterThan(0)
+    const actors = new Map([['resume-alice', {
+      resumeId: 'resume-alice',
+      agent: 'pi',
+      label: 'Market Scout',
+      secondary: 'pi · g1 · Chat Lab',
+      asset: OFFICE_COWORKER_SPRITES.pi,
+    }]])
+    const { container } = render(<OfficeRuntimeSection actors={actors} />)
+    expect((await screen.findAllByText('Market Scout')).length).toBeGreaterThan(0)
+    expect(container.textContent).not.toContain('resume-alice')
     expect(screen.getAllByText('#0001').length).toBeGreaterThan(0)
     expect(screen.getByText(/webpi/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Task started.*@resume-alice.*#0001/i }).getAttribute('aria-pressed'))
+    expect(screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
+    expect(container.querySelector<HTMLElement>('.oa-office-runtime__badge .oa-office-coworker')?.dataset.agent)
+      .toBe('pi')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__event-mark')?.src)
       .toContain('/office/log/lifecycle-v1.png')
-    expect(screen.getByRole('button', { name: /Task started.*@resume-alice.*#0001/i })
+    expect(screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i })
       .querySelector<HTMLImageElement>('.oa-office-runtime__cursor')?.src)
       .toContain('/office/hud/journal-cursor-v1.png')
     expect(container.textContent).not.toContain('▶')

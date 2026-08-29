@@ -62,6 +62,9 @@ export function OfficeInspectRail({
   }, [titleExpanded])
 
   const employeeLabel = employee ? officeCoworkerLabel(employee) : ''
+  const employeeByline = employee
+    ? [employee.agent, employee.name !== employeeLabel ? employee.name : null].filter(Boolean).join(' · ')
+    : ''
   const titleCanExpand = employeeLabel.length > 72
 
   return (
@@ -134,7 +137,7 @@ export function OfficeInspectRail({
                     {titleExpanded ? t('office.collapseTitle') : t('office.showFullTitle')}
                   </button>
                 )}
-                <span>@{employee.resumeId}</span>
+                <span>{employeeByline}</span>
               </div>
               <blockquote>
                 {employee.bubble

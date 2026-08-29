@@ -6,6 +6,11 @@ import { api } from '../api'
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { formatRelativeTime } from '../lib/intl'
+import {
+  officeActivityFallbackLabel,
+  type OfficeActivityActor,
+} from '../office/activity-actors'
+import { OfficeCoworkerSprite } from '../office/OfficeCoworkerSprite'
 import { officePixelImg } from '../office/furniture'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
@@ -64,15 +69,29 @@ function eventDetail(event: AgentRuntimeEvent): string | null {
   return null
 }
 
-function eventActor(event: AgentRuntimeEvent): string {
+function actorForEvent(
+  event: AgentRuntimeEvent,
+  actors: ReadonlyMap<string, OfficeActivityActor>,
+): OfficeActivityActor | undefined {
+  return event.payload.resumeId ? actors.get(event.payload.resumeId) : undefined
+}
+
+function eventActor(
+  event: AgentRuntimeEvent,
+  actors: ReadonlyMap<string, OfficeActivityActor>,
+): string {
   if (event.type === 'inbox.received') {
     return event.payload.workspaceLabel ?? event.payload.workspaceId ?? 'Inbox'
   }
   if (event.type === 'news.ingested') return event.payload.source ?? 'News collector'
-  return `@${event.payload.resumeId || '—'}`
+  return actorForEvent(event, actors)?.label
+    ?? officeActivityFallbackLabel(event.payload.resumeId, event.payload.agent)
 }
 
-function eventIdentity(event: AgentRuntimeEvent): { primary: string; secondary: string } {
+function eventIdentity(
+  event: AgentRuntimeEvent,
+  actors: ReadonlyMap<string, OfficeActivityActor>,
+): { primary: string; secondary: string } {
   if (event.type === 'inbox.received') {
     return {
       primary: 'Inbox',
@@ -86,19 +105,25 @@ function eventIdentity(event: AgentRuntimeEvent): { primary: string; secondary: 
       secondary: 'Market · News',
     }
   }
+  const actor = actorForEvent(event, actors)
   return {
-    primary: `@${event.payload.resumeId || '—'}`,
-    secondary: `${event.payload.agent || '—'} · ${event.payload.workspaceId || '—'}`,
+    primary: actor?.label ?? officeActivityFallbackLabel(event.payload.resumeId, event.payload.agent),
+    secondary: actor?.secondary
+      ?? ([event.payload.agent, event.payload.workspaceId].filter(Boolean).join(' · ') || 'OpenAlice'),
   }
 }
 
-function causeLabel(event: AgentRuntimeEvent): string | null {
+function causeLabel(
+  event: AgentRuntimeEvent,
+  actors: ReadonlyMap<string, OfficeActivityActor>,
+): string | null {
   const cause = event.payload.cause
   if (!cause) return null
   if (cause.kind === 'issue') return `issue ${cause.issueId}`
   if (cause.kind === 'conversation') {
     const from = cause.from?.kind === 'session'
-      ? `@${cause.from.resumeId}`
+      ? actors.get(cause.from.resumeId ?? '')?.label
+        ?? officeActivityFallbackLabel(cause.from.resumeId, cause.from.agent)
       : cause.from?.kind === 'workspace'
         ? cause.from.workspaceId
         : cause.from?.kind ?? 'human'
@@ -108,8 +133,10 @@ function causeLabel(event: AgentRuntimeEvent): string | null {
 }
 
 export function OfficeRuntimeSection({
+  actors = new Map(),
   onReplay,
 }: {
+  actors?: ReadonlyMap<string, OfficeActivityActor>
   onReplay?: (seq: number) => void
 } = {}) {
   const { t } = useTranslation()
@@ -222,7 +249,7 @@ export function OfficeRuntimeSection({
     if (value) selectedMeta.push({ label, value })
   }
   addMeta(t('office.surface'), selectedPayload.surface)
-  addMeta(t('office.eventCause'), causeLabel(selectedEvent))
+  addMeta(t('office.eventCause'), causeLabel(selectedEvent, actors))
   addMeta(t('office.status'), eventStatusLabel(selectedPayload.status, t))
   if (selectedPayload.metrics) {
     const metrics: string[] = [
@@ -245,7 +272,8 @@ export function OfficeRuntimeSection({
       ? new Date(selectedPayload.publishedAt).toLocaleString()
       : undefined)
   }
-  const selectedIdentity = eventIdentity(selectedEvent)
+  const selectedActor = actorForEvent(selectedEvent, actors)
+  const selectedIdentity = eventIdentity(selectedEvent, actors)
   const moveJournalSelection = (keyboardEvent: KeyboardEvent<HTMLButtonElement>) => {
     const buttons = Array.from(
       keyboardEvent.currentTarget.closest('ol')
@@ -304,7 +332,7 @@ export function OfficeRuntimeSection({
                   <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
                   <span className="oa-office-runtime__index-copy">
                     <strong>{eventLabel(event, t)}</strong>
-                    <small>{eventActor(event)}</small>
+                    <small>{eventActor(event, actors)}</small>
                   </span>
                   <span className="oa-office-runtime__index-meta">
                     <b>#{String(event.seq).padStart(4, '0')}</b>
@@ -324,8 +352,28 @@ export function OfficeRuntimeSection({
         </ol>
 
         <article className="oa-office-runtime__event" data-kind={selectedKind}>
-          <div className="oa-office-runtime__badge" aria-hidden>
-            <img src={OFFICE_LOG_ASSETS[selectedKind]} alt="" style={officePixelImg} />
+          <div className="oa-office-runtime__badge" data-actor={selectedActor ? '' : undefined} aria-hidden>
+            {selectedActor ? (
+              <>
+                <OfficeCoworkerSprite
+                  agent={selectedActor.agent}
+                  identity={selectedActor.resumeId}
+                  asset={selectedActor.asset}
+                  mood="idle"
+                  reducedMotion
+                  label={selectedActor.label}
+                  scale={0.25}
+                />
+                <img
+                  className="oa-office-runtime__event-mark"
+                  src={OFFICE_LOG_ASSETS[selectedKind]}
+                  alt=""
+                  style={officePixelImg}
+                />
+              </>
+            ) : (
+              <img src={OFFICE_LOG_ASSETS[selectedKind]} alt="" style={officePixelImg} />
+            )}
           </div>
           <div className="oa-office-runtime__content">
             <header className="oa-office-runtime__heading">
