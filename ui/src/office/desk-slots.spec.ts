@@ -7,6 +7,7 @@ const employee = {
   resumeId: 'resume-alice',
   agent: 'codex',
   name: 'c1',
+  awake: true,
   mood: 'idle',
   bubble: null,
   lastSeq: 0,

@@ -9,6 +9,7 @@ import type {
 } from './agent-runtime-log.js'
 
 export const OFFICE_REVIEW_HOLD_MS = 30_000
+export const OFFICE_INTERACTIVE_ACTIVITY_HOLD_MS = 30_000
 export const OFFICE_DRAWER_LIMIT = 6
 export type OfficeHarness = 'chat' | 'auto-quant' | 'prediction' | 'other'
 
@@ -45,6 +46,7 @@ export interface OfficeRosterPerson {
   readonly sessionRecordId?: string
   readonly presence?: 'active' | 'archived' | 'deleted'
   readonly lifecycle?: 'active' | 'retired'
+  readonly active: boolean
   readonly lastInteractionAt: number
 }
 
@@ -69,6 +71,7 @@ export interface OfficeFloorEmployee {
   readonly displayName?: string
   readonly sessionRecordId?: string
   readonly mood: OfficeEmployeeMood
+  readonly awake: boolean
   readonly surface?: AgentRuntimeSurface
   readonly bubble: OfficeBubble | null
   readonly lastSeq: number
@@ -119,7 +122,7 @@ function applyEvent(state: MutableEmployee, event: AgentRuntimeEvent, now: numbe
       if (state.lastSeq === event.seq && state.mood === 'idle' && !state.bubble) return
       break
     case 'runtime.started':
-      state.mood = 'working'
+      state.mood = payload.surface === 'headless' ? 'working' : 'idle'
       state.bubble = null
       break
     case 'runtime.turn.tool': {
@@ -163,6 +166,14 @@ function applyEvent(state: MutableEmployee, event: AgentRuntimeEvent, now: numbe
     default:
       break
   }
+}
+
+function settleInteractiveActivity(state: MutableEmployee, now: number): void {
+  if (state.surface === 'headless') return
+  if (state.mood !== 'working' && state.mood !== 'talking') return
+  if (now - state.lastTs < OFFICE_INTERACTIVE_ACTIVITY_HOLD_MS) return
+  state.mood = 'idle'
+  state.bubble = null
 }
 
 export function isOnOfficeFloor(person: OfficeRosterPerson): boolean {
@@ -223,6 +234,7 @@ export function projectOfficeFloor(
     applyEvent(current, event, now)
     byResume.set(resumeId, current)
   }
+  for (const state of byResume.values()) settleInteractiveActivity(state, now)
 
   const employees = present.map((person) => {
       const live = byResume.get(person.resumeId)
@@ -235,6 +247,7 @@ export function projectOfficeFloor(
         ...(person.displayName ? { displayName: person.displayName } : {}),
         ...(person.sessionRecordId ? { sessionRecordId: person.sessionRecordId } : {}),
         mood: live?.mood ?? 'idle',
+        awake: person.active,
         ...(live?.surface ? { surface: live.surface } : {}),
         bubble: live?.bubble ?? null,
         lastSeq: live?.lastSeq ?? 0,

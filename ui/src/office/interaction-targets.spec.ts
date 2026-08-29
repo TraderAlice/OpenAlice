@@ -20,6 +20,7 @@ const group: OfficeRoomSnapshot = {
     resumeId: 'resume-1',
     agent: 'codex',
     name: 'c1',
+    awake: true,
     mood: 'working',
     bubble: null,
     lastSeq: 1,

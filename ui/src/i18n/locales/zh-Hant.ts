@@ -1819,6 +1819,7 @@ export const zhHant: Resources = {
     liveFloor: 'Agent 即時樓層',
     pauseMenu: '選單',
     activeAgentRatio: '{{active}}/{{total}} 名 Agent 活躍',
+    liveAgentSummary: '{{working}} 工作中 · {{awake}} 已喚醒',
     rooms: '房間',
     groups: '小組',
     floorView: '樓層檢視',

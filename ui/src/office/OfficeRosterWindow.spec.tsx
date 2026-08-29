@@ -25,6 +25,7 @@ describe('OfficeRosterWindow', () => {
       agent: index === 5 ? 'claude' : 'codex',
       name: index === 5 ? 'c1' : `x${index + 1}`,
       title: `Research session ${index + 1}`,
+      awake: index < 2,
       mood: index < 2 ? 'working' as const : 'idle' as const,
       bubble: null,
       lastSeq: 1,

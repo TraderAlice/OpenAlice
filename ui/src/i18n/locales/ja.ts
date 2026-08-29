@@ -1812,6 +1812,7 @@ export const ja: Resources = {
     liveFloor: 'Agent ライブフロア',
     pauseMenu: 'メニュー',
     activeAgentRatio: '{{active}}/{{total}} Agent 稼働中',
+    liveAgentSummary: '{{working}} 作業中 · {{awake}} 起動中',
     rooms: '部屋',
     groups: 'グループ',
     floorView: 'フロア表示',

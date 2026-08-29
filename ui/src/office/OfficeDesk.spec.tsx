@@ -13,6 +13,7 @@ const employee: OfficeFloorEmployee = {
   agent: 'claude',
   name: 'c1',
   title: 'Open issue scan',
+  awake: true,
   mood: 'working',
   bubble: { kind: 'tool', name: 'research' },
   lastSeq: 1,

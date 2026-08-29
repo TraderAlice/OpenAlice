@@ -20,6 +20,7 @@ const person: OfficeRosterPerson = {
   name: 'c1',
   title: 'Desk mate',
   sessionRecordId: 'codex-1',
+  active: true,
   lastInteractionAt: 1_000,
 }
 
@@ -42,11 +43,11 @@ describe('projectOfficeFloor', () => {
   it('keeps only active roster people on the floor', () => {
     const floor = projectOfficeFloor('office-1', [
       person,
-      { resumeId: 'resume-gone', agent: 'pi', name: 'p1', presence: 'archived', lastInteractionAt: 1_000 },
-      { resumeId: 'resume-dead', agent: 'pi', name: 'p2', lifecycle: 'retired', lastInteractionAt: 1_000 },
+      { resumeId: 'resume-gone', agent: 'pi', name: 'p1', presence: 'archived', active: false, lastInteractionAt: 1_000 },
+      { resumeId: 'resume-dead', agent: 'pi', name: 'p2', lifecycle: 'retired', active: false, lastInteractionAt: 1_000 },
     ], [])
     expect(floor.employees.map((row) => row.resumeId)).toEqual(['resume-alice'])
-    expect(floor.employees[0]).toMatchObject({ mood: 'idle', bubble: null, lastSeq: 0 })
+    expect(floor.employees[0]).toMatchObject({ mood: 'idle', awake: true, bubble: null, lastSeq: 0 })
   })
 
   it('projects a coworker nametag without replacing the sticky name', () => {
@@ -80,7 +81,7 @@ describe('projectOfficeFloor', () => {
     const talking = projectOfficeFloor('office-1', [person], [
       event(3, 'runtime.turn.tool', { ...subject, toolId: 't1', toolName: 'workspace_list', toolStatus: 'completed' }),
       event(4, 'runtime.turn.text', { ...subject, text: 'Desk is clear.' }),
-    ])
+    ], 4_001)
     expect(talking.employees[0]).toMatchObject({
       mood: 'talking',
       bubble: { kind: 'text', text: 'Desk is clear.' },
@@ -98,6 +99,40 @@ describe('projectOfficeFloor', () => {
       mood: 'failed',
       bubble: { kind: 'error', text: 'missing binary' },
     })
+  })
+
+  it('keeps an awake interactive Session idle until it produces recent turn activity', () => {
+    const startedAt = 40_000
+    const started = projectOfficeFloor('office-1', [person], [
+      event(1, 'session.born', subject, startedAt - 1),
+      event(2, 'runtime.started', { ...subject, surface: 'terminal' }, startedAt),
+    ], startedAt + 1)
+    expect(started.employees[0]).toMatchObject({ mood: 'idle', awake: true, surface: 'terminal' })
+
+    const recent = projectOfficeFloor('office-1', [person], [
+      event(2, 'runtime.started', { ...subject, surface: 'terminal' }, startedAt),
+      event(3, 'runtime.turn.tool', {
+        ...subject,
+        toolId: 't1',
+        toolName: 'workspace_list',
+        toolStatus: 'running',
+      }, startedAt + 10_000),
+    ], startedAt + 10_001)
+    expect(recent.employees[0]).toMatchObject({ mood: 'working', awake: true })
+
+    const settled = projectOfficeFloor('office-1', [person], [
+      event(2, 'runtime.started', { ...subject, surface: 'terminal' }, startedAt),
+      event(3, 'runtime.turn.text', { ...subject, text: 'Finished that turn.' }, startedAt + 10_000),
+    ], startedAt + 40_001)
+    expect(settled.employees[0]).toMatchObject({ mood: 'idle', awake: true, bubble: null })
+  })
+
+  it('keeps Headless working across quiet model time until its runtime stops', () => {
+    const startedAt = 50_000
+    const floor = projectOfficeFloor('office-1', [person], [
+      event(1, 'runtime.started', { ...subject, surface: 'headless' }, startedAt),
+    ], startedAt + 10 * 60_000)
+    expect(floor.employees[0]).toMatchObject({ mood: 'working', awake: true, surface: 'headless' })
   })
 
   it('holds review after a successful stop, then returns to idle', () => {

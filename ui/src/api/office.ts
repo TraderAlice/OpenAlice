@@ -38,6 +38,7 @@ export interface OfficeFloorEmployee {
   displayName?: string
   sessionRecordId?: string
   mood: OfficeEmployeeMood
+  awake: boolean
   surface?: AgentRuntimeSurface
   bubble: OfficeBubble | null
   lastSeq: number

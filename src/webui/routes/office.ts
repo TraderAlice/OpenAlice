@@ -54,6 +54,7 @@ async function projectRoom(
       ...(record ? { sessionRecordId: record.id } : {}),
       ...(entry.presence ? { presence: entry.presence } : {}),
       lifecycle: entry.lifecycle === 'retired' ? 'retired' : 'active',
+      active: entry.active,
       lastInteractionAt: sessionLastInteractionAt(entry),
     }
   })

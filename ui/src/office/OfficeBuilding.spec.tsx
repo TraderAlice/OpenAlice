@@ -44,6 +44,7 @@ describe('OfficeBuilding', () => {
               agent: 'codex',
               name: `x${index + 1}`,
               title: `Session ${index + 1}`,
+              awake: index < 2,
               mood: index < 2 ? 'working' as const : 'idle' as const,
               bubble: null,
               lastSeq: 2,
@@ -279,7 +280,7 @@ describe('OfficeBuilding', () => {
     const prop = screen.getByTestId('office-pod-prediction-1')
       .querySelector<HTMLImageElement>('.oa-office-pod__harness-prop')
     expect(prop?.src).toContain('/office/furniture/prediction-console-v1.png')
-    expect(screen.getByText('0/0 agents active')).toBeTruthy()
+    expect(screen.getByText('0 working · 0 awake')).toBeTruthy()
     screen.getByRole('button', { name: 'Menu' }).focus()
     await userEvent.keyboard('{ArrowDown}')
     expect(screen.queryByRole('menuitemradio', { name: 'Live map' })).toBeNull()
@@ -622,6 +623,7 @@ describe('OfficeBuilding', () => {
                 agent: 'codex',
                 name: 'c1',
                 title: 'Desk mate',
+                awake: true,
                 mood: 'working',
                 bubble: { kind: 'tool', name: 'research' },
                 lastSeq: 1,
@@ -942,6 +944,7 @@ describe('OfficeBuilding', () => {
           agent: 'codex',
           name: `x${index + 1}`,
           title: `Session ${index + 1}`,
+          awake: index < 2,
           mood: index < 2 ? 'working' as const : 'idle' as const,
           bubble: null,
           lastSeq: 1,

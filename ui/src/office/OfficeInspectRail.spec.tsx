@@ -12,6 +12,7 @@ const employee: OfficeFloorEmployee = {
   resumeId: 'demo-resume-chat',
   agent: 'codex',
   name: 'Desk mate',
+  awake: true,
   mood: 'working',
   bubble: { kind: 'text', text: 'Polishing the Office floor.' },
   lastSeq: 7,

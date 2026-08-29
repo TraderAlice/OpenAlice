@@ -208,7 +208,10 @@ export function OfficeBuilding({
     const employees = groups.flatMap((office) => office.employees)
     return {
       occupied: employees.length,
+      awake: employees.filter((employee) => employee.awake).length,
       active: employees.filter((employee) => employee.mood !== 'idle').length,
+      working: employees.filter((employee) =>
+        employee.mood === 'working' || employee.mood === 'talking').length,
     }
   }, [groups])
   const mapLayout = useMemo(
@@ -802,8 +805,10 @@ export function OfficeBuilding({
             total: building.offices.length,
           })}
         >
-          <span data-live={stats.active > 0}>
-            {t('office.activeAgentRatio', { active: stats.active, total: stats.occupied })}
+          <span data-live={(replaySeq == null ? stats.working : stats.active) > 0}>
+            {replaySeq == null
+              ? t('office.liveAgentSummary', { working: stats.working, awake: stats.awake })
+              : t('office.activeAgentRatio', { active: stats.active, total: stats.occupied })}
           </span>
           <span>{groups.length}/{building.offices.length} {t('office.groups')}</span>
         </div>
@@ -1129,7 +1134,7 @@ export function OfficeBuilding({
               id="office-operations-board"
               type="button"
               className="oa-office-operations-board"
-              data-live={stats.active > 0}
+              data-live={(replaySeq == null ? stats.working : stats.active) > 0}
               data-has-activity={Boolean(productActivity.agent) || undefined}
               data-attention={productActivity.attention.agent || undefined}
               data-fresh={productActivity.freshKind === 'agent' || undefined}

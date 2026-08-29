@@ -1844,6 +1844,7 @@ export const en = {
     liveFloor: 'Live agent floor',
     pauseMenu: 'Menu',
     activeAgentRatio: '{{active}}/{{total}} agents active',
+    liveAgentSummary: '{{working}} working · {{awake}} awake',
     rooms: 'Rooms',
     groups: 'Groups',
     floorView: 'Floor view',

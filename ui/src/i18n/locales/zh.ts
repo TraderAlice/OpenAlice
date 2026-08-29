@@ -1811,6 +1811,7 @@ export const zh: Resources = {
     liveFloor: 'Agent 实时楼层',
     pauseMenu: '菜单',
     activeAgentRatio: '{{active}}/{{total}} 名 Agent 活跃',
+    liveAgentSummary: '{{working}} 工作中 · {{awake}} 已唤醒',
     rooms: '房间',
     groups: '小组',
     floorView: '楼层视图',
