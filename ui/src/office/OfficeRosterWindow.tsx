@@ -68,15 +68,19 @@ export function OfficeRosterWindow({
                     scale={0.22}
                   />
                 </span>
-                <span className="oa-office-roster__identity">
-                  <strong>{officeCoworkerLabel(employee)}</strong>
-                  <small>{employee.agent} · {employee.name}</small>
-                </span>
+                <strong className="oa-office-roster__title">{officeCoworkerLabel(employee)}</strong>
+                <small className="oa-office-roster__meta">{employee.agent} · {employee.name}</small>
                 <span className="oa-office-roster__status" data-mood={employee.mood}>
                   <i aria-hidden />
                   {t(`office.mood.${employee.mood}`)}
                 </span>
-                <span className="oa-office-roster__arrow" aria-hidden>▶</span>
+                <img
+                  className="oa-office-roster__cursor"
+                  src={OFFICE_HUD_ASSETS.journalCursor}
+                  alt=""
+                  aria-hidden
+                  style={officePixelImg}
+                />
               </button>
             </li>
           ))}

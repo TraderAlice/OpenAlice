@@ -1694,6 +1694,26 @@ Occupancy-log menu cursor follow-up (2026-08-29):
   `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest run (5,029 passing; one file and nine tests skipped),
   and the UI production build all passed.
 
+Roster-card hierarchy follow-up (2026-08-29):
+
+- Played Team roster at 1280x720. Its two-column party overview was useful, but each status badge and Unicode `▶`
+  occupied the title row: the first 284px session title received only 151px and rendered as `What's moving in s…`,
+  while even the 157px NVDA title was clipped. The Agent-file entry hid its primary identity on a wide desktop.
+- Compared changing the roster to one column, keeping one-line truncation with a tooltip, and reflowing each two-column
+  card. Chose reflow because six teammates should remain scannable as a party while their session identity remains
+  readable without hover. Titles now span the metadata and status columns with a two-line cap; agent/seat and explicit
+  mood share the second row beneath it.
+- Replaced the final roster Unicode arrow with the generated journal cursor. It remains at 42-percent opacity as a
+  touch-discoverable Agent-file affordance, then becomes fully opaque and shifts three pixels on hover or keyboard
+  focus. Reduced-motion keeps the state change but removes its transition.
+- Browser-played the six-person roster at 1280x720: the first title received 234px and rendered completely in two
+  lines, the second rendered completely in one, all three rows fit the 334px body with no scroll, and cards measured
+  82px high. At 390x844, cards measured 306x82 with 200px titles, the roster scrolled independently, and the page
+  remained exactly 390px wide. Agent file -> Back restored focus to the original teammate, raising its cursor from
+  0.42 to 1 opacity and applying the interaction step.
+- Focused RosterWindow specs passed: 1 file / 1 test. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
+  Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
