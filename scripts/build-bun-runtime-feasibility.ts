@@ -3,6 +3,8 @@ import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { prepareBunBrokerPackFixture } from './bun-broker-pack-fixture.js'
+
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
 if (Bun.version !== pinnedBunVersion) {
@@ -31,6 +33,11 @@ await mkdir(join(smokeHome, 'data/config'), { recursive: true })
 await writeFile(
   join(smokeHome, 'data/config/connector-service.json'),
   `${JSON.stringify({ enabled: true, adapters: {} }, null, 2)}\n`,
+)
+const brokerPackFixture = await prepareBunBrokerPackFixture(
+  smokeHome,
+  product.version,
+  repositoryRoot,
 )
 
 const buildStartedAt = performance.now()
@@ -87,6 +94,7 @@ const stderrPromise = new Response(runtime.stderr).text()
 let acceptanceError: unknown = null
 let initialStatus: RuntimeStatus | null = null
 let recoveredStatus: RuntimeStatus | null = null
+let externalBrokerPack: Awaited<ReturnType<typeof waitForBrokerPackFixture>> | null = null
 let readyDurationMs = 0
 try {
   await Promise.all([
@@ -94,6 +102,7 @@ try {
     waitForHttp(`http://127.0.0.1:${utaPort}/__uta/health`, 90_000),
     waitForHttp(`http://127.0.0.1:${connectorPort}/__connector/health`, 90_000),
   ])
+  externalBrokerPack = await waitForBrokerPackFixture(utaPort, brokerPackFixture)
   initialStatus = await waitForRuntimeStatus(smokeEnvironment, (status) => (
     status.class === 'running'
       && status.provider?.kind === 'bun'
@@ -135,6 +144,7 @@ try {
       && typeof status.componentDetail?.uta?.pid === 'number'
       && status.componentDetail.uta.pid !== utaPid
   ), 30_000)
+  await waitForBrokerPackFixture(utaPort, brokerPackFixture)
 } catch (error) {
   acceptanceError = error
 } finally {
@@ -180,6 +190,7 @@ const report = {
     utaRestartedOnControlFlag: true,
     runtimeLockReleasedAfterSignal: true,
   },
+  externalBrokerPack,
   nodeOrBunOnPath: false,
 }
 await writeFile(join(outputRoot, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)
@@ -267,6 +278,53 @@ async function waitForHttp(url: string, timeoutMs: number): Promise<void> {
   throw new Error(`Timed out waiting for ${url}: ${String(lastError)}`)
 }
 
+async function waitForBrokerPackFixture(
+  utaPort: number,
+  fixture: {
+    engine: string
+    release: string
+    accountId: string
+    sdkMarker: string
+    expectedLabel: string
+  },
+  timeoutMs = 30_000,
+): Promise<{
+  engine: string
+  release: string
+  accountId: string
+  sdkMarker: string
+  loadedFromOpenAliceHome: true
+}> {
+  const url = `http://127.0.0.1:${utaPort}/api/trading/uta`
+  const deadline = Date.now() + timeoutMs
+  let last = ''
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url)
+      last = await response.text()
+      if (response.ok) {
+        const body = JSON.parse(last) as {
+          utas?: Array<{ id?: string; label?: string; health?: { reach?: string } }>
+        }
+        const account = body.utas?.find((candidate) => candidate.id === fixture.accountId)
+        if (account?.label === fixture.expectedLabel && account.health?.reach === 'connected') {
+          return {
+            engine: fixture.engine,
+            release: fixture.release,
+            accountId: fixture.accountId,
+            sdkMarker: fixture.sdkMarker,
+            loadedFromOpenAliceHome: true,
+          }
+        }
+      }
+    } catch (error) {
+      last = String(error)
+    }
+    await Bun.sleep(100)
+  }
+  throw new Error(`Timed out waiting for compiled UTA to load external Broker Pack: ${last}`)
+}
+
 function minimalSmokeEnvironment(options: {
   home: string
   executable: string
@@ -290,6 +348,8 @@ function minimalSmokeEnvironment(options: {
     OPENALICE_MCP_PORT: String(options.mcpPort),
     OPENALICE_UTA_PORT: String(options.utaPort),
     OPENALICE_CONNECTOR_PORT: String(options.connectorPort),
+    OPENALICE_BROKER_PACK_ALLOW_WORKSPACE: '0',
+    OPENALICE_BROKER_PACK_AUTO_UPDATE: '0',
     ELECTRON_RUN_AS_NODE: '1',
     ...(process.env['SystemRoot'] ? { SystemRoot: process.env['SystemRoot'] } : {}),
   }

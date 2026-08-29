@@ -21,6 +21,7 @@ on:
       - "scripts/install-smoke/**"
       - "scripts/build-bun-cli-feasibility.ts"
       - "scripts/build-bun-alice-feasibility.ts"
+      - "scripts/bun-broker-pack-fixture.ts"
       - "scripts/build-bun-runtime-feasibility.ts"
       - "scripts/build-bun-release.ts"
       - "THIRD_PARTY_NOTICES.md"

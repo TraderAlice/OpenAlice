@@ -371,7 +371,7 @@ Checkboxes reflect repository truth, not intent.
   high-output backpressure stops the whole PTY process group at the producer
   boundary and resumes below the existing low watermark. Do not add a Node
   sidecar as the default answer.
-- [ ] Prove an installed broker pack can still be dynamically loaded from
+- [x] Prove an installed broker pack can still be dynamically loaded from
   `OPENALICE_HOME` without bundling its SDK into UTA Core.
 - [x] Prove embedded UI/default/template reads and one materialized external
   adapter file.
@@ -588,11 +588,9 @@ These may change implementation details but not the fixed product boundaries:
 1. Can the current `@hono/node-server` paths run unchanged under Bun, or should
    the CLI build use a small runtime-neutral server adapter while Electron and
    source development retain Node?
-2. Can installed broker-pack ESM and native SDKs load dynamically from disk in
-   the compiled UTA role without broadening the base artifact?
-3. Which current filesystem callers work directly against Bun embedded assets,
+2. Which current filesystem callers work directly against Bun embedded assets,
    and which externally consumed adapter files require materialization?
-4. What signing, notarization, and malware-scanning gates are required for the
+3. What signing, notarization, and malware-scanning gates are required for the
    standalone macOS CLI binary independently of Electron?
 
 ## Explicit Non-goals
@@ -722,3 +720,12 @@ This plan is complete only when:
   This keeps pressure at the producer/kernel PTY boundary and covers Agent
   Runtime helper processes without an unbounded Bun heap queue. Native Windows
   remains part of the deferred Windows distribution lane.
+- 2026-08-29: External Broker Pack acceptance materialized a production-shaped
+  active CCXT fixture under an isolated `OPENALICE_HOME`. Its ESM entry imports
+  a private SDK from the Pack's own `node_modules`, and that SDK must load and
+  expose a real platform N-API `.node` binary before it returns its marker. The
+  separately re-executed compiled UTA role created a healthy keyless account
+  carrying that marker, then loaded the Pack again after forced UTA failure and
+  restart. Native macOS arm64, OrbStack Linux arm64, and emulated Linux x64 all
+  passed with an empty `PATH`; UTA Core and the Bun release artifact remain free
+  of the fixture SDK and live broker dependencies.

@@ -92,6 +92,13 @@ unbounded JavaScript queue; graceful Session shutdown resumes a stopped group
 before terminating it. Electron and source-backed Node execution retain
 `node-pty` and its native stream pause/resume behavior.
 
+Optional Broker Packs keep the existing external runtime boundary. The
+compiled UTA role resolves an activated Pack under
+`OPENALICE_HOME/runtime/broker-packs`, imports its ESM entry, and lets that entry
+resolve both JavaScript and N-API dependencies from the Pack's own
+`node_modules`. The Bun artifact does not absorb live broker SDKs; Pack API
+validation and immutable activation continue to follow [[docs/broker-packs.md]].
+
 Source development continues to use `pnpm dev`, and the currently released
 installer continues to use the bundle provider until the Bun release and
 installation acceptance matrix is complete. Electron remains independent.
