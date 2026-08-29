@@ -670,3 +670,16 @@ This plan is complete only when:
   sidecar. Bun's current Terminal API has no output pause/resume equivalent,
   and its 1.4 type contract still describes PTY support as POSIX-only, so
   high-output backpressure and native Windows x64 remain explicit gates.
+- 2026-08-29: A real isolated `Bun Grok Live` AliceProject exposed that the
+  standalone executable could boot and serve the UI but could not initialize
+  its first Chat Workspace: `process.execPath` re-launched Alice instead of
+  interpreting `bootstrap.mjs`, then an external dynamic import could not
+  resolve `dugite`. The Bun build now re-enters the same executable through an
+  internal bootstrap role and supplies the bundled git executor to the plain
+  ESM template helper. The compiled build gate materializes a real Chat
+  Workspace with an empty `PATH`. After rebuilding, the browser created the
+  Workspace, launched installed Grok Build 1.0.13 as an independent Bun-native
+  PTY process, received `BUN_PTY_GROK_OK` plus the correct Workspace cwd,
+  stopped it without stopping Alice, restarted Alice under the same named
+  project identity, resumed the native Grok session, and received
+  `REATTACH_OK`.

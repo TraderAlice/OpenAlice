@@ -3,6 +3,8 @@ import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { INTERNAL_BOOTSTRAP_ROLE } from '../src/workspaces/bootstrap-runtime.js'
+
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 const pinnedBunVersion = (await readFile(join(repositoryRoot, '.bun-version'), 'utf8')).trim()
 if (Bun.version !== pinnedBunVersion) {
@@ -18,6 +20,7 @@ const executablePath = join(outputRoot, executableName)
 const ptySmokeName = process.platform === 'win32' ? 'pty-smoke.exe' : 'pty-smoke'
 const ptySmokePath = join(outputRoot, ptySmokeName)
 const smokeHome = join(outputRoot, 'smoke-home')
+const bootstrapWorkspace = join(outputRoot, 'bootstrap-workspace')
 
 await rm(outputRoot, { recursive: true, force: true })
 await mkdir(outputRoot, { recursive: true })
@@ -31,12 +34,58 @@ const result = await Bun.build({
     autoloadBunfig: false,
     autoloadDotenv: false,
   },
+  define: {
+    'globalThis.__OPENALICE_BUN_STANDALONE__': 'true',
+  },
   minify: true,
 })
 const buildDurationMs = performance.now() - buildStartedAt
 if (!result.success) {
   for (const log of result.logs) console.error(log)
   throw new Error('Bun Alice feasibility build failed')
+}
+
+const bootstrapProbe = Bun.spawn([
+  executablePath,
+  INTERNAL_BOOTSTRAP_ROLE,
+  join(repositoryRoot, 'src/workspaces/templates/chat/bootstrap.mjs'),
+  'bun-feasibility',
+  bootstrapWorkspace,
+], {
+  cwd: outputRoot,
+  env: {
+    HOME: smokeHome,
+    PATH: '',
+    TMPDIR: process.env['TMPDIR'] ?? '/tmp',
+    ELECTRON_RUN_AS_NODE: '1',
+    AQ_TEMPLATE_ROOT: join(repositoryRoot, 'src/workspaces/templates/chat'),
+    ...(process.env['LOCAL_GIT_DIRECTORY']
+      ? { LOCAL_GIT_DIRECTORY: process.env['LOCAL_GIT_DIRECTORY'] }
+      : {}),
+    ...(process.env['GIT_EXEC_PATH']
+      ? { GIT_EXEC_PATH: process.env['GIT_EXEC_PATH'] }
+      : {}),
+    ...(process.env['SystemRoot'] ? { SystemRoot: process.env['SystemRoot'] } : {}),
+  },
+  stdout: 'pipe',
+  stderr: 'pipe',
+})
+const [bootstrapExitCode, bootstrapStdout, bootstrapStderr] = await Promise.all([
+  bootstrapProbe.exited,
+  new Response(bootstrapProbe.stdout).text(),
+  new Response(bootstrapProbe.stderr).text(),
+])
+if (bootstrapExitCode !== 0) {
+  throw new Error(
+    `compiled Bun workspace bootstrap exited with ${bootstrapExitCode}: ${bootstrapStderr || bootstrapStdout}`,
+  )
+}
+const [bootstrapHead, bootstrapReadme] = await Promise.all([
+  readFile(join(bootstrapWorkspace, '.git/HEAD'), 'utf8'),
+  readFile(join(bootstrapWorkspace, 'README.md'), 'utf8'),
+])
+if (!bootstrapHead.startsWith('ref: refs/heads/') || bootstrapReadme.trim().length === 0) {
+  throw new Error('compiled Bun workspace bootstrap did not materialize the Chat template')
 }
 
 const ptyBuild = await Bun.build({
@@ -151,6 +200,11 @@ const report = {
   authStatus,
   rootStatus,
   pty: ptyReport,
+  workspaceBootstrap: {
+    status: 'pass',
+    template: 'chat',
+    nodeOrBunOnPath: false,
+  },
   smokePath: '',
 }
 await writeFile(join(outputRoot, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)
