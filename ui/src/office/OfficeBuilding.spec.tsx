@@ -123,6 +123,7 @@ describe('OfficeBuilding', () => {
     const prop = screen.getByTestId('office-pod-prediction-1')
       .querySelector<HTMLImageElement>('.oa-office-pod__harness-prop')
     expect(prop?.src).toContain('/office/furniture/prediction-console-v1.png')
+    expect(screen.getByText('0/0 agents active')).toBeTruthy()
   })
 
   it('moves from the touch pad immediately and repeats while held', () => {

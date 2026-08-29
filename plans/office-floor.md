@@ -1308,6 +1308,19 @@ RPG route-target follow-up (2026-08-29):
 - `pnpm test` passed: 605 files / 5026 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+HUD status-semantics follow-up (2026-08-29):
+
+- The three-pod Demo made the HUD's terse `3 ACTIVE · 6 AGENTS · 3/3 GROUPS` easy to misread: the active count was
+  correctly derived from non-idle employees, but the unit appeared only on the adjacent total and the repeated
+  threes looked like the empty AutoQuant and Prediction pods were being counted as active.
+- Compared spelling out `ACTIVE AGENTS` while retaining three metrics, exposing every mood count, and combining the
+  employee counts into one ratio. Chose `3/6 AGENTS ACTIVE · 3/3 GROUPS`: it names the numerator and denominator,
+  removes one repeated HUD item, and remains self-explanatory when the narrow layout keeps only its first metric.
+- The ratio continues to use the existing employee mood projection, keeps the green live indicator when any employee
+  is non-idle, and adds localized copy plus a zero-occupancy regression assertion.
+- Browser-confirmed `3/6 AGENTS ACTIVE · 3/3 GROUPS` at desktop and the standalone `3/6 AGENTS ACTIVE` metric at
+  390x844. Both stayed inside the HUD, and the narrow page retained zero horizontal overflow.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

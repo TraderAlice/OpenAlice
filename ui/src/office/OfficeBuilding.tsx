@@ -473,8 +473,9 @@ export function OfficeBuilding({
             total: building.offices.length,
           })}
         >
-          <span data-live={stats.active > 0}>{stats.active} {t('office.active')}</span>
-          <span>{stats.occupied} {t('office.occupied')}</span>
+          <span data-live={stats.active > 0}>
+            {t('office.activeAgentRatio', { active: stats.active, total: stats.occupied })}
+          </span>
           <span>{groups.length}/{building.offices.length} {t('office.groups')}</span>
         </div>
 
