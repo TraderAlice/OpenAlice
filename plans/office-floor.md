@@ -122,7 +122,7 @@ atlas 后再替换静态 coworker，不把 mood atlas 行误当成方向行。
 - [x] OfficeBuilding 直接渲染 shared map objects，不再渲染 Harness-owned room scene
 - [x] Workspace pod 使用统一尺寸和 tile-aligned object slots
 - [x] Harness 标识降为地图标牌/环境语义，不形成矩形区域
-- [ ] 删除 superseded room/group/window/partition CSS，而不是继续追加 override
+- [x] 删除 superseded room/group/window/partition CSS，而不是继续追加 override
 - [x] 为 1、2、5、17 个 Workspace 写布局 specs：无重叠、二维展开、边界确定
 
 ### 2. Establish top-down visual grammar
@@ -2212,6 +2212,21 @@ Responsive camera-safety follow-up (2026-08-29):
   visible after both transitions, the map stayed bounded, and the camera preserved the surrounding pod context.
 - Focused OfficeBuilding and camera-helper specs passed: 2 files / 20 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`,
   the 611-file Vitest run (5,056 passing; one file and nine tests skipped), and the UI production build all passed.
+
+Superseded scene-graph removal follow-up (2026-08-29):
+
+- Proved the current runtime source has no room, group, nested map-zone, legacy cabinet, or amenity scene consumers;
+  the only remaining hit was a neutral map wrapper still named `room-grid`. The stylesheet nevertheless retained five
+  generations of card rooms, Harness scenes, group grids, CSS windows, and their later de-nesting overrides.
+- Renamed the live wrapper to `oa-office-map-stage`, removed 776 lines of superseded scene CSS instead of preserving a
+  compatibility layer, and added source/style contracts that reject the old room/group selector vocabulary. Current
+  pod, desk, cabinet-window, roster, Agent-file, log, camera, and map-object classes remain independently owned.
+- Browser-compared the night floor before and after deletion, then replayed Menu -> Occupancy Log, the six-member Team
+  roster, and its 390x844 layout. The continuous floor, generated environment, modal pause ownership, responsive
+  camera, roster navigation, and all visible geometry remained unchanged.
+- Focused OfficeBuilding and responsive-style specs passed: 2 files / 22 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 611-file Vitest run (5,057 passing; one file and nine tests skipped), and the UI
+  production build passed; the built CSS fell from 372.87 kB to 357.96 kB.
 
 ## Completion
 

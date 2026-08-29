@@ -148,6 +148,8 @@ describe('OfficeBuilding', () => {
 
     const building = screen.getByTestId('office-building')
     const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
+    expect(map.querySelector('.oa-office-map-stage')).toBeTruthy()
+    expect(map.querySelector('.oa-office-room-grid')).toBeNull()
     const alice = screen.getByRole('img', { name: 'Alice on the office map' })
     const spawnCompass = screen.getByTestId('office-spawn-compass')
     const quietNotice = screen.getByRole('status')

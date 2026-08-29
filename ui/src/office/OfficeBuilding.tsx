@@ -838,7 +838,7 @@ export function OfficeBuilding({
           setPanning(false)
         }}
       >
-        <div className="oa-office-room-grid">
+        <div className="oa-office-map-stage">
           <div
             ref={mapRef}
             className="oa-office-map"

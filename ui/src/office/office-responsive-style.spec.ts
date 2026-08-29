@@ -22,6 +22,13 @@ const narrowLayoutCss = css.slice(touchLayoutStart, coarseTouchStart)
 const coarseTouchCss = css.slice(coarseTouchStart, coarseTouchEnd)
 
 describe('Office responsive style contract', () => {
+  it('owns one map stage without the superseded room and group scene graph', () => {
+    expect(css).toMatch(/\.oa-office-map-stage\s*\{[\s\S]*?overflow: hidden/)
+    expect(css).not.toMatch(/\.oa-office-room(?:\b|--|__|\[|:)/)
+    expect(css).not.toMatch(/\.oa-office-group(?:s)?(?:\b|__|\[|:)/)
+    expect(css).not.toContain('.oa-office-room-grid')
+  })
+
   it('uses the available stage instead of forcing the viewport into 4:3', () => {
     expect(stageStart).toBeGreaterThan(-1)
     expect(stageEnd).toBeGreaterThan(stageStart)
