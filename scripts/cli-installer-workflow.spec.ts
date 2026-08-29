@@ -42,6 +42,7 @@ describe('CLI installer dev publication workflow', () => {
       { os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64' },
     ])
     expect(build.steps?.some((candidate) => candidate.uses === 'oven-sh/setup-bun@v2')).toBe(true)
+    expect(step(build, 'Build Alice and native CLI').run).toContain('build:bun-runtime:feasibility')
     expect(step(build, 'Preserve accepted dev candidate').with?.name).toBe(
       'dev-cli-${{ matrix.platform }}-${{ matrix.arch }}',
     )
