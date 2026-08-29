@@ -65,7 +65,12 @@ describe('CLI installer dev publication workflow', () => {
 
   it('validates candidates before uploading immutable assets and fixed aliases', () => {
     const publish = workflow.jobs['publish-dev-cli']
-    expect(publish.needs).toEqual(['build-dev-cli', 'accept-dev-linuxbrew', 'accept-dev-aur'])
+    expect(publish.needs).toEqual([
+      'build-dev-cli',
+      'accept-dev-linuxbrew',
+      'accept-dev-aur',
+      'accept-dev-legacy-cutover',
+    ])
     expect(step(publish, 'Validate candidates and prepare channel aliases').run)
       .toContain('prepare-cli-dev-assets.mjs')
     const upload = step(publish, 'Publish immutable candidates and activate dev aliases').run ?? ''
@@ -94,6 +99,13 @@ describe('CLI installer dev publication workflow', () => {
     ])
     expect(step(aur, 'Accept the dev archives through Arch/AUR').run)
       .toContain('cli-aur-container-smoke.mjs')
+  })
+
+  it('replaces the published v0.90.1 layout before dev publication', () => {
+    const cutover = workflow.jobs['accept-dev-legacy-cutover']
+    expect(cutover.needs).toBe('build-dev-cli')
+    expect(step(cutover, 'Replace the published legacy CLI with the accepted native candidate').run)
+      .toContain('cli-legacy-cutover-smoke.mjs')
   })
 
   it('runs the live network install only after a successful push publication', () => {

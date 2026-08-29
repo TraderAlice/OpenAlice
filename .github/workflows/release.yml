@@ -663,6 +663,41 @@ jobs:
             --previous-package dist/cli-package-aur-previous-channels/aur/PKGBUILD \
             --current-package dist/cli-package-aur-current/aur/PKGBUILD
 
+  accept-cli-legacy-cutover:
+    name: Accept published v0.90.1 CLI cutover
+    needs: [release, build-cli-release]
+    if: needs.release.outputs.created == 'true' && needs.build-cli-release.result == 'success' && !github.event.inputs.mirror_tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-release-linux-x64
+          path: dist/release-cli-linux-x64
+
+      - name: Replace the published legacy CLI with the accepted native candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          ARCHIVE=$(find dist/release-cli-linux-x64 -maxdepth 1 -name '*.tar.gz' -print -quit)
+          SHA256=$(awk 'NR == 1 { print $1 }' "$ARCHIVE.sha256")
+          CONTENT_IDENTITY=$(node -e "const fs=require('fs');const p=fs.readdirSync('dist/release-cli-linux-x64').find(v=>v.endsWith('.report.json'));process.stdout.write(require('./dist/release-cli-linux-x64/'+p).contentIdentity)")
+          node scripts/cli-legacy-cutover-smoke.mjs \
+            --archive "$ARCHIVE" \
+            --sha256 "$SHA256" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+
   # Broker Packs are release artifacts, not inputs to the desktop package. Build
   # and validate them on their native platforms in parallel with desktop and
   # native CLI candidates instead of serializing them in desktop jobs.
@@ -719,8 +754,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, build-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-linuxbrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-linuxbrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.accept-cli-legacy-cutover.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read

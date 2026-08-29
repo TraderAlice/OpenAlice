@@ -36,6 +36,8 @@ on:
       - "scripts/cli-aur-container-smoke.spec.mjs"
       - "scripts/cli-linuxbrew-smoke.mjs"
       - "scripts/cli-linuxbrew-smoke.spec.mjs"
+      - "scripts/cli-legacy-cutover-smoke.mjs"
+      - "scripts/cli-legacy-cutover-smoke.spec.mjs"
       - "scripts/prepare-cli-previous-release.mjs"
       - "scripts/prepare-cli-dev-assets.mjs"
       - "scripts/prepare-cli-dev-assets.spec.mjs"
@@ -352,10 +354,43 @@ jobs:
             --previous-package dist/dev-aur-previous-channels/aur/PKGBUILD \
             --current-package dist/dev-aur-current/aur/PKGBUILD
 
+  accept-dev-legacy-cutover:
+    if: github.event_name == 'push'
+    name: Accept published v0.90.1 CLI cutover
+    needs: build-dev-cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dev-cli-linux-x64
+          path: dist/dev-cli-linux-x64
+
+      - name: Replace the published legacy CLI with the accepted native candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          ARCHIVE=$(find dist/dev-cli-linux-x64 -maxdepth 1 -name '*.tar.gz' -print -quit)
+          SHA256=$(awk 'NR == 1 { print $1 }' "$ARCHIVE.sha256")
+          CONTENT_IDENTITY=$(node -e "const fs=require('fs');const p=fs.readdirSync('dist/dev-cli-linux-x64').find(v=>v.endsWith('.report.json'));process.stdout.write(require('./dist/dev-cli-linux-x64/'+p).contentIdentity)")
+          node scripts/cli-legacy-cutover-smoke.mjs \
+            --archive "$ARCHIVE" \
+            --sha256 "$SHA256" \
+            --expected-version "$VERSION" \
+            --expected-content-identity "$CONTENT_IDENTITY"
+
   publish-dev-cli:
     if: github.event_name == 'push'
     name: Publish dev native CLI aliases
-    needs: [build-dev-cli, accept-dev-linuxbrew, accept-dev-aur]
+    needs: [build-dev-cli, accept-dev-linuxbrew, accept-dev-aur, accept-dev-legacy-cutover]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
