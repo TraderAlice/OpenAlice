@@ -2085,10 +2085,11 @@ export const en = {
   },
   connectorSettings: {
     title: 'Connectors',
-    description: 'Create a private bot, link its owner, then forward durable Inbox notifications. Delivery never blocks OpenAlice work.',
-    serviceDescription: 'Independent, Guardian-managed process. Starting a bot below turns this on automatically; this switch is the global kill switch.',
-    runService: 'Run external notification connectors',
-    runServiceDescription: 'Turning this off stops every bot. Local Inbox remains the source of truth.',
+    description: 'Connect your private channels for Inbox delivery and Agent chat. External delivery never blocks OpenAlice work.',
+    serviceDescription: 'Each Connector starts delivery automatically. Use this control only when you want to pause or resume every channel together.',
+    runService: 'Allow external delivery',
+    runServiceDescription: 'Connector switches turn this on automatically. Turn it off to pause every channel without removing connection or chat settings.',
+    runServiceAria: 'Allow external delivery for all Connectors',
     adapterDescription: 'Send Inbox notifications to your private {{name}} chat.',
     serviceStopped: 'Stopped',
     serviceOnline: 'Online',
@@ -2141,7 +2142,7 @@ export const en = {
     unlinkMessage: 'Inbox notifications will stop going to the current {{name}} account. The bot token stays saved, so you can send /link from another private chat immediately.',
     linkStepOpen: 'Open your private chat with the {{name}} bot.',
     linkStepSendBefore: 'Send',
-    linkStepWait: 'Keep this page open; it will detect the linked owner automatically.',
+    linkStepWait: 'Keep this page open; it will detect the linked private chat automatically.',
     probeSentBefore: 'Sent probe',
     probeSentAfter: 'Confirm this ID in the private chat.',
     loadError: 'Failed to load connector settings.',
@@ -2197,7 +2198,7 @@ export const en = {
       awaitingLink: {
         title: 'Bot online — finish linking',
         badge: 'Waiting for /link',
-        description: 'The {{name}} bot is running, but no owner is linked yet. Complete the three steps below.',
+        description: 'The {{name}} bot is running, but no private chat is linked yet. Complete the three steps below.',
       },
       linked: {
         title: 'Ready for delivery',
@@ -2207,7 +2208,7 @@ export const en = {
       linkedOffline: {
         title: 'Connector stopped',
         badge: 'Offline',
-        description: 'The saved {{name}} owner remains linked. Start the connector when you want external Inbox delivery.',
+        description: 'The private {{name}} chat remains linked. Start the connector when you want external Inbox delivery.',
       },
       error: {
         title: 'Needs attention',
@@ -2237,7 +2238,7 @@ export const en = {
     lastDelivered: 'Delivered {{time}}',
     configuration: 'Configuration',
     delivery: 'Delivery',
-    owner: 'Owner',
+    owner: 'Linked account',
     lastSuccess: 'Last success',
     nextRetry: 'Next retry',
     nextRetryAt: '{{time}} · attempt {{count}}',

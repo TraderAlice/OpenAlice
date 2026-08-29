@@ -2053,10 +2053,11 @@ export const ja: Resources = {
   },
   connectorSettings: {
     title: 'コネクター',
-    description: 'プライベート Bot を作成して所有者をリンクし、永続的な受信トレイ通知を転送します。外部配信が OpenAlice の処理を妨げることはありません。',
-    serviceDescription: 'Guardian が独立して管理するプロセスです。下の Bot を起動すると自動的に有効になり、このスイッチが全体の停止スイッチになります。',
-    runService: '外部通知コネクターを実行',
-    runServiceDescription: 'オフにするとすべての Bot が停止します。ローカル受信トレイは引き続き信頼できる情報源です。',
+    description: 'プライベートチャンネルを受信トレイ配信と Agent チャットに接続します。外部配信が OpenAlice の処理を妨げることはありません。',
+    serviceDescription: '各コネクターを起動すると配信も自動的に有効になります。すべてのチャンネルをまとめて一時停止または再開するときだけ、この設定を使います。',
+    runService: '外部配信を許可',
+    runServiceDescription: 'コネクターのスイッチで自動的に有効になります。オフにすると接続情報やチャット設定を残したまま、すべてのチャンネルを一時停止します。',
+    runServiceAria: 'すべてのコネクターの外部配信を許可',
     adapterDescription: '受信トレイ通知をプライベートな {{name}} チャットへ配信します。',
     serviceStopped: '停止中',
     serviceOnline: 'オンライン',
@@ -2109,7 +2110,7 @@ export const ja: Resources = {
     unlinkMessage: '受信トレイ通知は現在の {{name}} アカウントへ送られなくなります。Bot トークンは残るので、別のプライベートチャットからすぐに /link を送れます。',
     linkStepOpen: '{{name}} Bot とのプライベートチャットを開きます。',
     linkStepSendBefore: '送信:',
-    linkStepWait: 'このページを開いたままにしてください。リンクされた所有者を自動検出します。',
+    linkStepWait: 'このページを開いたままにしてください。リンクされたプライベートチャットを自動検出します。',
     probeSentBefore: 'プローブを送信しました',
     probeSentAfter: 'プライベートチャットでこの ID を確認してください。',
     loadError: 'コネクター設定を読み込めませんでした。',
@@ -2165,7 +2166,7 @@ export const ja: Resources = {
       awaitingLink: {
         title: 'Bot はオンライン — リンクを完了',
         badge: '/link を待機中',
-        description: '{{name}} Bot は動作中ですが、所有者がまだリンクされていません。次の 3 手順を完了してください。',
+        description: '{{name}} Bot は動作中ですが、プライベートチャットがまだリンクされていません。次の 3 手順を完了してください。',
       },
       linked: {
         title: '配信準備完了',
@@ -2175,7 +2176,7 @@ export const ja: Resources = {
       linkedOffline: {
         title: 'コネクター停止中',
         badge: 'オフライン',
-        description: '保存済みの {{name}} 所有者リンクは保持されています。外部配信が必要なときにコネクターを起動してください。',
+        description: '{{name}} のプライベートチャットはリンクされたままです。外部配信が必要なときにコネクターを起動してください。',
       },
       error: {
         title: '確認が必要です',
@@ -2205,7 +2206,7 @@ export const ja: Resources = {
     lastDelivered: '{{time}}に配信',
     configuration: '設定状態',
     delivery: '配信',
-    owner: 'オーナー',
+    owner: 'リンク済みアカウント',
     lastSuccess: '最終成功',
     nextRetry: '次の再試行',
     nextRetryAt: '{{time}} · {{count}} 回目',

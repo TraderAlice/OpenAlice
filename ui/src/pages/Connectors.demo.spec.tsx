@@ -234,7 +234,8 @@ describe('Connector demo routes', () => {
   it('renders the Connector configuration route from the demo snapshot', async () => {
     render(<ConnectorsPage />)
 
-    expect(await screen.findByText('Run external notification connectors')).toBeTruthy()
+    expect(await screen.findByText('Allow external delivery')).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Allow external delivery for all Connectors' })).toBeTruthy()
     expect(screen.getByText('Discord')).toBeTruthy()
     expect(screen.getByText('Telegram')).toBeTruthy()
     expect(screen.getByText('Slack')).toBeTruthy()
@@ -252,7 +253,8 @@ describe('Connector demo routes', () => {
     render(<ConnectorsPage />)
 
     expect(await screen.findByRole('heading', { name: '连接器' })).toBeTruthy()
-    expect(await screen.findByText('运行外部通知连接器')).toBeTruthy()
+    expect(await screen.findByText('允许外部投递')).toBeTruthy()
+    expect(screen.getByRole('switch', { name: '允许所有连接器进行外部投递' })).toBeTruthy()
     expect(screen.getAllByText('需要凭据')).toHaveLength(3)
     expect(screen.getByRole('textbox', { name: 'Discord 应用 ID' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '管理 Telegram 连接信息' })).toBeTruthy()
@@ -372,7 +374,7 @@ describe('Connector demo routes', () => {
   it('keeps a secret as a local draft until the user saves a plausible token', async () => {
     render(<ConnectorsPage />)
 
-    await screen.findByText('Run external notification connectors')
+    await screen.findByText('Allow external delivery')
     const input = screen.getAllByPlaceholderText('Stored locally and sealed')[0] as HTMLInputElement
 
     fireEvent.change(input, { target: { value: 'a' } })
@@ -407,7 +409,7 @@ describe('Connector demo routes', () => {
     mocks.save.mockRejectedValueOnce(new Error('Connector settings unavailable'))
     render(<ConnectorsPage />)
 
-    await screen.findByText('Run external notification connectors')
+    await screen.findByText('Allow external delivery')
     const input = screen.getAllByPlaceholderText('Stored locally and sealed')[0] as HTMLInputElement
     fireEvent.change(input, { target: { value: '123456789:AAHstill-here-bot-token' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
@@ -462,7 +464,7 @@ describe('Connector demo routes', () => {
     mocks.load.mockResolvedValue(snapshot)
     render(<ConnectorsPage />)
 
-    await screen.findByText('Run external notification connectors')
+    await screen.findByText('Allow external delivery')
     const input = screen.getByLabelText('Discord Bot token') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'qweqw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Replace token' }))
@@ -478,7 +480,7 @@ describe('Connector demo routes', () => {
     mocks.load.mockResolvedValue(snapshot)
     render(<ConnectorsPage />)
 
-    await screen.findByText('Run external notification connectors')
+    await screen.findByText('Allow external delivery')
     fireEvent.click(screen.getByRole('button', { name: 'Remove token' }))
 
     expect(screen.getByRole('heading', { name: 'Remove Discord token?' })).toBeTruthy()

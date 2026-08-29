@@ -92,6 +92,17 @@ external adapters remain optional projections rather than sources of truth.
     selection and its switch. Saved connection details and heartbeat/prompt
     controls remain progressively disclosed. Runtime and linked copy never expose
     raw external owner identifiers.
+11. **The global service control is a pause-all affordance, not a setup step.**
+    Keeping the raw checkbox would preserve the implementation model but continue
+    to imply that every configured Connector needs a second manual enable. Removing
+    the control entirely would simplify first use but lose a useful recovery and
+    quiet-hours escape hatch. The chosen Settings card keeps the service control
+    secondary, labels it as allowing or pausing all delivery, and explicitly says
+    that an individual Connector switch starts it automatically. It uses the shared
+    Toggle primitive, keeps health visible beside the control, and removes Guardian,
+    kill-switch, and external-owner terminology from user-facing setup copy. The
+    row wraps into a vertical layout on narrow screens; its switch has a localized
+    accessible name and state is not conveyed by color alone.
 
 ## Ordered Work
 
@@ -118,8 +129,8 @@ external adapters remain optional projections rather than sources of truth.
         disclose diagnostics.
   - [x] Reorder each Connector dialog into dependency-led Connection, Inbox
         delivery, and capability-gated Chat sections with first-use disclosure.
-  - [ ] Revisit Connector status copy and owner-identifier disclosure as a
-        separate accepted increment.
+  - [x] Present the global Delivery service as a secondary pause-all control and
+        remove implementation-oriented owner/Guardian/kill-switch setup copy.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -156,6 +167,14 @@ unavailable controls are omitted, Chat stays compact until linking, errors offer
 in-context reconnect, and neither overview nor configuration copy renders raw
 owner identifiers. No live reconnect, test delivery, credential, or toggle
 action was exercised.
+
+The Delivery-service control increment passed the same 24 focused UI tests,
+UI typecheck/build, and real-route acceptance on the full Settings surface at
+desktop and 390 px widths, followed by a regression check of `/connectors`.
+The card explains automatic service startup, retains pause-all and health state
+as secondary controls, uses a localized accessible switch, removes setup-facing
+owner/Guardian/kill-switch language, and introduces no horizontal overflow.
+No live service or adapter control was exercised.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

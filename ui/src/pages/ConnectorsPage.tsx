@@ -325,20 +325,26 @@ function ConnectorSettingsSurface({
                   title={t('connectorStatus.serviceTitle')}
                   description={t('connectorSettings.serviceDescription')}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3 border-l-2 border-border/80 bg-secondary/20 px-3 py-2.5">
-                    <label className="flex min-w-0 flex-1 items-start gap-3">
-                      <input
-                        className="mt-1"
-                        type="checkbox"
-                        checked={config.serviceEnabled}
-                        onChange={(event) => setConfig({ ...config, serviceEnabled: event.target.checked })}
-                      />
-                      <span>
-                        <span className="block text-[13px] font-medium text-foreground">{t('connectorSettings.runService')}</span>
-                        <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground/70">{t('connectorSettings.runServiceDescription')}</span>
+                  <div className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card/70 px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Power className="size-4" aria-hidden="true" />
                       </span>
-                    </label>
-                    <HealthBadge health={health} t={t} />
+                      <div className="min-w-0">
+                        <h4 className="text-[13px] font-medium text-foreground">{t('connectorSettings.runService')}</h4>
+                        <p className="mt-0.5 max-w-2xl text-[12px] leading-5 text-muted-foreground">
+                          {t('connectorSettings.runServiceDescription')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center justify-between gap-3 pl-11 sm:justify-end sm:pl-0">
+                      <HealthBadge health={health} t={t} />
+                      <Toggle
+                        checked={config.serviceEnabled}
+                        onChange={(checked) => setConfig({ ...config, serviceEnabled: checked })}
+                        ariaLabel={t('connectorSettings.runServiceAria')}
+                      />
+                    </div>
                   </div>
                 </ConfigSection>
               )}

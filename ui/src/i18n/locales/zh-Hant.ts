@@ -2060,10 +2060,11 @@ export const zhHant: Resources = {
   },
   connectorSettings: {
     title: '連接器',
-    description: '建立私人機器人、連結擁有者，並轉送持久化的收件匣通知。外部投遞絕不會阻塞 OpenAlice 的工作。',
-    serviceDescription: '由 Guardian 獨立管理的程序。啟動下方機器人時會自動開啟；此開關是全域停止開關。',
-    runService: '執行外部通知連接器',
-    runServiceDescription: '關閉後會停止所有機器人，本機收件匣仍是唯一事實來源。',
+    description: '連接你的私人頻道，用於收件匣投遞與 Agent 聊天。外部投遞絕不會阻塞 OpenAlice 的工作。',
+    serviceDescription: '啟動任一連接器時會自動開啟投遞。只有需要統一暫停或恢復所有頻道時，才使用這裡的控制。',
+    runService: '允許外部投遞',
+    runServiceDescription: '連接器開關會自動開啟此服務。關閉後會暫停所有頻道，但不會移除連線資訊或聊天設定。',
+    runServiceAria: '允許所有連接器進行外部投遞',
     adapterDescription: '將收件匣通知投遞到你的私人 {{name}} 對話。',
     serviceStopped: '已停止',
     serviceOnline: '在線',
@@ -2116,7 +2117,7 @@ export const zhHant: Resources = {
     unlinkMessage: '收件匣通知將不再發到目前的 {{name}} 帳號。機器人權杖會保留，你可以立刻在另一個私人對話中傳送 /link。',
     linkStepOpen: '開啟你與 {{name}} 機器人的私人對話。',
     linkStepSendBefore: '傳送',
-    linkStepWait: '保持此頁面開啟；OpenAlice 會自動偵測已連結的擁有者。',
+    linkStepWait: '保持此頁面開啟；OpenAlice 會自動偵測已連結的私人對話。',
     probeSentBefore: '已傳送探針',
     probeSentAfter: '請在私人對話中確認此 ID。',
     loadError: '無法載入連接器設定。',
@@ -2172,7 +2173,7 @@ export const zhHant: Resources = {
       awaitingLink: {
         title: '機器人在線——完成連結',
         badge: '等待 /link',
-        description: '{{name}} 機器人正在執行，但尚未連結擁有者。請完成以下三個步驟。',
+        description: '{{name}} 機器人正在執行，但尚未連結私人對話。請完成以下三個步驟。',
       },
       linked: {
         title: '可以投遞',
@@ -2182,7 +2183,7 @@ export const zhHant: Resources = {
       linkedOffline: {
         title: '連接器已停止',
         badge: '離線',
-        description: '已儲存的 {{name}} 擁有者連結仍然保留。需要外部投遞時再啟動連接器。',
+        description: '{{name}} 私人對話仍保持連結。需要外部投遞時再啟動連接器。',
       },
       error: {
         title: '需要處理',
@@ -2212,7 +2213,7 @@ export const zhHant: Resources = {
     lastDelivered: '{{time}}投遞',
     configuration: '設定狀態',
     delivery: '投遞',
-    owner: '擁有者',
+    owner: '已連結帳號',
     lastSuccess: '最近成功',
     nextRetry: '下次重試',
     nextRetryAt: '{{time}} · 第 {{count}} 次',

@@ -2052,10 +2052,11 @@ export const zh: Resources = {
   },
   connectorSettings: {
     title: '连接器',
-    description: '创建私有机器人、关联所有者，并转发持久化的收件箱通知。外部投递绝不会阻塞 OpenAlice 的工作。',
-    serviceDescription: '由 Guardian 独立管理的进程。启动下方机器人时会自动开启；此开关是全局停止开关。',
-    runService: '运行外部通知连接器',
-    runServiceDescription: '关闭后会停止所有机器人，本地收件箱仍是唯一事实来源。',
+    description: '连接你的私有频道，用于收件箱投递和 Agent 聊天。外部投递绝不会阻塞 OpenAlice 的工作。',
+    serviceDescription: '启动任一连接器时会自动开启投递。只有需要统一暂停或恢复所有频道时，才使用这里的控制。',
+    runService: '允许外部投递',
+    runServiceDescription: '连接器开关会自动开启此服务。关闭后会暂停所有频道，但不会移除连接信息或聊天设置。',
+    runServiceAria: '允许所有连接器进行外部投递',
     adapterDescription: '将收件箱通知投递到你的私有 {{name}} 会话。',
     serviceStopped: '已停止',
     serviceOnline: '在线',
@@ -2108,7 +2109,7 @@ export const zh: Resources = {
     unlinkMessage: '收件箱通知将不再发到当前 {{name}} 账号。机器人令牌会保留，你可以立刻在另一个私聊里发送 /link。',
     linkStepOpen: '打开你与 {{name}} 机器人的私聊。',
     linkStepSendBefore: '发送',
-    linkStepWait: '保持此页面打开；OpenAlice 会自动检测已关联的所有者。',
+    linkStepWait: '保持此页面打开；OpenAlice 会自动检测已关联的私聊。',
     probeSentBefore: '已发送探针',
     probeSentAfter: '请在私聊中确认该 ID。',
     loadError: '无法加载连接器设置。',
@@ -2164,7 +2165,7 @@ export const zh: Resources = {
       awaitingLink: {
         title: '机器人在线——完成关联',
         badge: '等待 /link',
-        description: '{{name}} 机器人正在运行，但尚未关联所有者。请完成以下三步。',
+        description: '{{name}} 机器人正在运行，但尚未关联私聊。请完成以下三步。',
       },
       linked: {
         title: '可以投递',
@@ -2174,7 +2175,7 @@ export const zh: Resources = {
       linkedOffline: {
         title: '连接器已停止',
         badge: '离线',
-        description: '已保存的 {{name}} 所有者关联仍然保留。需要外部投递时再启动连接器。',
+        description: '{{name}} 私聊仍然保持关联。需要外部投递时再启动连接器。',
       },
       error: {
         title: '需要处理',
@@ -2204,7 +2205,7 @@ export const zh: Resources = {
     lastDelivered: '{{time}}投递',
     configuration: '配置',
     delivery: '投递',
-    owner: '所有者',
+    owner: '已关联账号',
     lastSuccess: '最近成功',
     nextRetry: '下次重试',
     nextRetryAt: '{{time}} · 第 {{count}} 次',
