@@ -1251,6 +1251,29 @@ Touch-action follow-up (2026-08-29):
 - `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Native movement-pad follow-up (2026-08-29):
+
+- Replayed the complete 390x844 touch controller after adding A. The four movement targets occupied the intended
+  96x96 area, but their v2 art was a thin 48px command icon enlarged at runtime. Its narrow charcoal-and-teal cross
+  merged visually with the generated mail machine directly underneath, while the new A button read immediately.
+- Compared adding a CSS controller plate, cropping and enlarging the existing glyph, and generating a native movement
+  control. Chose native generation because the plate would return to web decoration around pixel art and cropping
+  would retain the equipment-panel silhouette that caused the ambiguity.
+- Used the built-in image generator with the v2 pad, companion A button, and locked Office style master as references.
+  The prompt required one centered orthographic four-arm D-pad, a bold GBA-era silhouette, cream stepped bevels,
+  charcoal molded plastic, restrained teal face accents, genuine transparency, no text/arrows/controller body, and
+  enough visual separation for the existing 3x3 DOM hit grid.
+- Hard-alpha thresholding, nearest-neighbor fitting, and 64-color packaging produced `move-pad-v3.png` on its exact
+  96x96 touch canvas, with an 87x88 visible silhouette and 56 RGBA colors. Runtime no longer scales the touch asset;
+  the same source remains legible at the desktop tutorial's 24x24 display. The superseded v2 PNG was removed.
+- Browser-played v3 at 390x844: its natural and displayed dimensions both measured 96x96, all four DOM directions
+  moved Alice to the Semis cabinet, the `FILES A` prompt appeared, and A opened the cabinet. At 1280x720 the 24px
+  movement hint remained crisp, touch controls stayed hidden, broken images and horizontal overflow were both zero.
+- Focused HUD and Building specs passed: 2 files / 9 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

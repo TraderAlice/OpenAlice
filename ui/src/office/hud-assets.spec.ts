@@ -11,7 +11,7 @@ const publicRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../publi
 describe('OFFICE_HUD_ASSETS', () => {
   it('ships generated RGBA pixel controls', () => {
     expect(OFFICE_HUD_ASSETS.menuTerminal).toBe('/office/hud/menu-terminal-v2.png')
-    expect(OFFICE_HUD_ASSETS.movePad).toBe('/office/hud/move-pad-v2.png')
+    expect(OFFICE_HUD_ASSETS.movePad).toBe('/office/hud/move-pad-v3.png')
     expect(OFFICE_HUD_ASSETS.actionButton).toBe('/office/hud/action-button-v1.png')
     expect(OFFICE_HUD_ASSETS.resetCompass).toBe('/office/hud/reset-compass-v2.png')
     expect(OFFICE_HUD_ASSETS.groupGrid).toBe('/office/hud/group-grid-v2.png')
@@ -29,7 +29,7 @@ describe('OFFICE_HUD_ASSETS', () => {
       expect([...bytes.subarray(0, 8)]).toEqual(PNG_MAGIC)
       expect(bytes[25]).toBe(6) // PNG color type 6: RGBA.
       expect(bytes.byteLength).toBeGreaterThan(1000)
-      const expectedSize = name === 'actionButton' ? 72 : 48
+      const expectedSize = name === 'movePad' ? 96 : name === 'actionButton' ? 72 : 48
       expect(bytes.readUInt32BE(16)).toBe(expectedSize)
       expect(bytes.readUInt32BE(20)).toBe(expectedSize)
     }
