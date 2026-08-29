@@ -467,6 +467,8 @@ build harness when it improves the next investigation.
 - [x] Preflight every opted-in public channel before expensive release builds:
   prove npm package maintainership, Homebrew Tap push access, and pinned-host
   AUR Git access without logging or weakening the external credentials.
+- [x] Expose the authority preflight as a bounded manual, read-only rehearsal
+  that cannot publish packages, push metadata, or create a release.
 - [ ] Publish Brew/AUR metadata only after the referenced release assets are
   public and verified. The opt-in automation and public-byte receipt are ready;
   external repository creation, credentials, activation, and first public
