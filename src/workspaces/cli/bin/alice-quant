@@ -1,0 +1,65 @@
+#!/bin/sh
+set -eu
+
+# Resolve the payload beside this launcher without dirname/readlink so the
+# packaged path still works with an intentionally empty host PATH.
+launcher=$0
+case "$launcher" in
+  *\\*)
+    # A managed Git Bash receives Windows-native PATH entries from Electron.
+    # Normalize a `D:\...\alice` argv[0] before deriving the sibling payload.
+    if command -v cygpath >/dev/null 2>&1; then
+      converted=$(cygpath -u "$launcher" 2>/dev/null || true)
+      if [ -n "$converted" ]; then launcher=$converted; fi
+    fi
+    ;;
+esac
+case "$launcher" in
+  */*) ;;
+  *)
+    resolved=$(command -v "$launcher" 2>/dev/null || true)
+    if [ -n "$resolved" ]; then launcher=$resolved; fi
+    ;;
+esac
+
+# Public command name drives the gateway export in the shared JS payload.
+OPENALICE_CLI_BIN=${launcher##*/}
+export OPENALICE_CLI_BIN
+case "$launcher" in
+  */*) launcher_dir=${launcher%/*} ;;
+  *) launcher_dir=. ;;
+esac
+
+# Packaged Electron exposes its Node-capable executable through the managed Pi
+# runtime. Source/dev keeps the ordinary host-node fallback.
+if [ -n "${OPENALICE_MANAGED_PI_NODE_PATH:-}" ]; then
+  managed_node=$OPENALICE_MANAGED_PI_NODE_PATH
+  case "$managed_node" in
+    *\\*|[A-Za-z]:*)
+      if command -v cygpath >/dev/null 2>&1; then
+        converted=$(cygpath -u "$managed_node" 2>/dev/null || true)
+        if [ -n "$converted" ]; then managed_node=$converted; fi
+      fi
+      ;;
+  esac
+  ELECTRON_RUN_AS_NODE=1
+  export ELECTRON_RUN_AS_NODE
+  payload=$launcher_dir/openalice-cli.cjs
+  if command -v cygpath >/dev/null 2>&1; then
+    # Electron is a native Windows process. Give it a native payload path
+    # explicitly instead of relying on MSYS' executable-name heuristics to
+    # translate the first argument for a renamed OpenAlice.exe.
+    converted=$(cygpath -w "$payload" 2>/dev/null || true)
+    if [ -n "$converted" ]; then payload=$converted; fi
+    # `/cli` is an application route, not a POSIX filesystem path. Preserve
+    # both transport values when MSYS prepares the native Electron child env.
+    case "${MSYS2_ENV_CONV_EXCL:-}" in
+      '') MSYS2_ENV_CONV_EXCL='OPENALICE_TOOL_URL;OPENALICE_TOOL_SOCKET' ;;
+      *) MSYS2_ENV_CONV_EXCL="$MSYS2_ENV_CONV_EXCL;OPENALICE_TOOL_URL;OPENALICE_TOOL_SOCKET" ;;
+    esac
+    export MSYS2_ENV_CONV_EXCL
+  fi
+  exec "$managed_node" "$payload" "$@"
+fi
+
+exec node "$launcher_dir/openalice-cli.cjs" "$@"
