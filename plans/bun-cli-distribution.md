@@ -28,6 +28,8 @@ Research references:
 - [Bun standalone executables](https://bun.sh/docs/bundler/executables)
 - [Bun Node.js compatibility](https://bun.sh/docs/runtime/nodejs-compat)
 - [OpenCode build script](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/script/build.ts)
+- [OpenCode publish script](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/script/publish.ts)
+- [OpenCode download matrix](https://opencode.ai/zh/download)
 - [[docs/reference/install-script/README.md]]
 
 ## Motivation
@@ -55,8 +57,8 @@ Publish a native OpenAlice command for macOS, Linux, and Windows that:
 - starts the existing Guardian-owned multi-process Runtime from any directory;
 - embeds or ships only OpenAlice-owned code and resources;
 - launches user-owned Agent Runtime executables as independent PTY processes;
-- supports Bash and native PowerShell installation with the same release and
-  update contract;
+- supports direct Bash/PowerShell installation plus npm, Bun, Homebrew, and
+  Arch/AUR installation from the same accepted release artifacts;
 - keeps installation bytes separate from `OPENALICE_HOME` product data so a
   clean reinstall or bounded cutover never rewrites that data; and
 - leaves Electron as a complete, independent packaging and update lane.
@@ -217,6 +219,114 @@ Linux musl and Windows arm64 are follow-up targets only after there is a
 supported-user or deployment requirement. Do not multiply release variants
 before the required matrix is proven.
 
+## Installation and Package-manager Topology
+
+The build produces one accepted set of versioned platform artifacts. Every
+installation channel consumes those exact bytes and checksums; npm, Homebrew,
+and AUR do not rebuild OpenAlice from source or carry independent patches.
+
+```text
+Bun compile matrix
+  -> signed/checksummed platform archives + release.json
+       -> Bash installer (`curl ... | bash`)
+       -> PowerShell installer
+       -> npm platform packages -> npm meta package
+                                -> Bun global install of the same meta package
+       -> Homebrew formula
+       -> AUR `-bin` package, installable with paru
+```
+
+The intended stable user surfaces are:
+
+```bash
+curl -fsSL https://openalice.ai/install | bash
+# native Windows uses the matching PowerShell entry
+npm install -g openalice
+bun add -g openalice
+brew install traderalice/tap/openalice
+paru -S openalice-bin
+```
+
+The unscoped npm name is a desired product surface, not yet repository truth;
+reserve and verify the final package names before implementation. A scoped
+fallback must keep the installed command named `openalice`.
+
+### Direct installers
+
+The Bash and PowerShell installers own immutable release directories, the
+`current` pointer, helper shims, install provenance, atomic activation,
+rollback, retention, PATH integration, and uninstall. They are the
+authoritative channel for `dev`, exact-version testing, and native Windows
+installation.
+
+### npm and Bun
+
+npm and Bun consume one registry topology rather than separate packages:
+
+```text
+openalice                       # small meta package, exposes `openalice`
+  optionalDependencies:
+    @traderalice/openalice-darwin-arm64
+    @traderalice/openalice-darwin-x64
+    @traderalice/openalice-linux-arm64
+    @traderalice/openalice-linux-x64
+    @traderalice/openalice-windows-x64
+```
+
+Each platform package contains the already accepted native release payload.
+The meta package selects and validates the installed platform package, then
+materializes or links its native command and required sidecars. Running
+`openalice` after installation must execute the native Bun-built binary, not a
+persistent JavaScript wrapper that requires Node or Bun.
+
+Publish every platform package before publishing the meta package and its
+dist-tag. A partial platform publication must not expose a meta version that
+cannot install successfully.
+
+### Homebrew and Arch/AUR
+
+The initial Homebrew formula lives in the TraderAlice tap and selects the
+accepted macOS/Linux archive and SHA-256 by OS and architecture. Promotion to
+Homebrew core is optional later work, not an initial launch dependency.
+
+The AUR package is `openalice-bin`; `paru` is one client for that AUR package,
+not an OpenAlice-specific installer. Its `PKGBUILD` downloads the accepted
+Linux archive, verifies the release checksum, installs the native command and
+sidecars, and declares conflicts/provides without compiling the repository.
+
+### Update and uninstall ownership
+
+The channel that installs the visible command owns its update and uninstall:
+
+| Provenance | Update owner |
+|---|---|
+| Bash / PowerShell | OpenAlice installer transaction |
+| npm | npm |
+| Bun | Bun package manager |
+| Homebrew | Homebrew |
+| AUR / paru | pacman-compatible package manager |
+
+`openalice update` may discover and explain a newer version for every channel,
+but it invokes self-update only for direct installs. Package-manager installs
+show or execute the correct manager-owned command after explicit consent; they
+must never copy over their own managed prefix behind the package manager's
+back.
+
+The same binary bytes may arrive through different channels, so provenance is
+recorded beside the executable or in package metadata rather than compiled
+into a channel-specific binary. npm/Bun postinstall, the Homebrew formula, the
+AUR recipe, and direct installers each record their own source.
+
+Long-running processes make manager-owned replacement a real acceptance case.
+Test npm, Bun, Brew, and AUR upgrades while a Guardian tree is active. If a
+manager or Windows refuses to replace a locked executable, require and explain
+`openalice down` before that manager's upgrade; do not solve it by introducing
+a second hidden self-update or permanent runtime copy without measured need.
+
+Package-manager channels initially publish stable releases only. Mutable `dev`
+and exact-ref testing stay on the direct installers until a real need justifies
+additional registry tags or formulas.
+
 ## Alternatives Considered
 
 | Shape | Decision | Reason |
@@ -309,7 +419,31 @@ build harness when it improves the next investigation.
 - [ ] Install from current `dev` artifacts and the matching dev selector before
   promotion.
 
-### 5. Cutover and updates
+### 5. Package-manager publication
+
+- [ ] Reserve the npm meta and platform package names; keep the resulting
+  command named `openalice`.
+- [ ] Generate npm platform packages from accepted release archives and one
+  meta package with platform `optionalDependencies`.
+- [ ] Install the meta package through both npm and Bun on every required
+  platform; verify that the final command is the native executable and does
+  not require the package manager at runtime.
+- [ ] Generate the TraderAlice Homebrew formula from accepted archive URLs and
+  checksums; test macOS arm64/x64 and supported Linux targets.
+- [ ] Generate and publish the `openalice-bin` AUR `PKGBUILD` and `.SRCINFO`
+  from the accepted Linux archives; test installation through `paru` in a clean
+  Arch fixture.
+- [ ] Record channel provenance without rebuilding or modifying the native
+  executable bytes.
+- [ ] Detect manager-owned installs in update/Doctor output and route update
+  and uninstall guidance back to the owning manager.
+- [ ] Exercise each manager's upgrade and removal while a Runtime is stopped,
+  then exercise its documented behavior while Guardian is active.
+- [ ] Publish platform npm packages first, the npm meta package second, and
+  Brew/AUR metadata only after the referenced release assets are public and
+  verified.
+
+### 6. Cutover and updates
 
 - [ ] Define the Bun-to-Bun update transaction first; do not let the released
   Node layout shape the new Runtime or installed layout.
@@ -338,7 +472,7 @@ repair path. Once the Bun release activates, normal startup knows only the Bun
 layout. Published old installers and tags remain available as historical
 artifacts.
 
-### 6. Remote and server composition
+### 7. Remote and server composition
 
 - [ ] Make managed SSH install select a Bun artifact for the remote platform
   and architecture without cloning source or installing Agent Runtimes.
@@ -349,7 +483,7 @@ artifacts.
 - [ ] Keep Docker on its current server image until a separately justified
   change proves that consuming the Bun artifact improves that distribution.
 
-### 7. Retire the expanded CLI Runtime
+### 8. Retire the expanded CLI Runtime
 
 - [ ] Delete the CLI release path that builds and publishes
   `openalice-runtime-*.tar.gz` dependency-closure archives.
@@ -364,12 +498,14 @@ artifacts.
 - [ ] Keep release history and old tagged installers available for diagnosis;
   do not rewrite published v0.90.1 assets.
 
-### 8. Release acceptance
+### 9. Release acceptance
 
 - [ ] Build every required target from the accepted tagged tree.
 - [ ] Verify archive checksum and internal release metadata before upload.
 - [ ] Run clean non-admin Bash installs on macOS and Linux.
 - [ ] Run a clean standard-user PowerShell install on Windows.
+- [ ] Install and run the accepted release through npm, Bun, Homebrew, and
+  `paru`, then verify manager-owned update and uninstall guidance.
 - [ ] Exercise the documented old-to-new cutover once on a currently supported
   v0.90.1 CLI host; this is evidence for the guidance, not a cross-platform
   compatibility matrix or a release blocker for the Bun architecture.
@@ -413,6 +549,9 @@ The Bun-specific acceptance harness must additionally prove:
   loading work outside a checkout;
 - Windows paths, spaces, junction activation, PowerShell execution policy, and
   locked-running-executable updates are exercised on Windows; and
+- npm, Bun, Homebrew, and AUR installations resolve to the same accepted native
+  release content for their platform, report correct provenance, and do not
+  self-update across package-manager ownership; and
 - failed staging, verification, activation, readiness, or interruption leaves
   the prior release runnable and user data unchanged.
 
@@ -464,11 +603,13 @@ This plan is complete only when:
    components, and fixture broker pack work outside a checkout;
 5. Bash and native PowerShell installers perform verified, atomic,
    data-preserving install, update, rollback, and uninstall transactions;
-6. the old CLI has a documented, data-preserving cutover; a clean reinstall is
+6. npm, Bun, Homebrew, and AUR/paru install the same accepted native release,
+   and updates/uninstalls remain owned by the selected manager;
+7. the old CLI has a documented, data-preserving cutover; a clean reinstall is
    acceptable and no old Runtime compatibility path remains in normal startup;
-7. Electron remains independently packaged and its required regression smokes
+8. Electron remains independently packaged and its required regression smokes
    pass; and
-8. the old expanded headless Runtime and managed-Pi CLI distribution paths are
+9. the old expanded headless Runtime and managed-Pi CLI distribution paths are
    deleted from current source and the durable owner guides describe the Bun
    architecture.
 
@@ -480,3 +621,7 @@ This plan is complete only when:
   existing multi-process Runtime; Agent Runtime installation and Electron
   packaging are outside its ownership boundary. Plan created; no feasibility
   or implementation checkbox is complete.
+- 2026-08-29: Added the initial acquisition matrix: direct Bash/PowerShell,
+  npm, Bun, Homebrew, and AUR/paru. All channels consume the same accepted
+  platform artifacts; the installing channel retains update/uninstall
+  ownership, and package-manager variants do not rebuild OpenAlice.
