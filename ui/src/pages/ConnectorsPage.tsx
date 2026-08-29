@@ -134,11 +134,12 @@ function ConnectorSettingsSurface({
         definition,
         adapter,
         serviceEnabled: config.serviceEnabled,
+        serviceStatus: health?.status,
         runtime: adapterHealth.get(definition.id),
       })
       return setup.stage === 'starting' || setup.stage === 'awaiting_link'
     })
-  }, [adapterHealth, config, definitions])
+  }, [adapterHealth, config, definitions, health?.status])
 
   useEffect(() => {
     if (!waitingForLink) return
@@ -356,6 +357,7 @@ function ConnectorSettingsSurface({
                   definition,
                   adapter,
                   serviceEnabled: config.serviceEnabled,
+                  serviceStatus: health?.status,
                   runtime,
                 })
                 const credentialsOpen =

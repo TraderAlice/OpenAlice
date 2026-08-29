@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import {
+  ArrowRight,
   CircleAlert,
   Clock3,
   Hash,
@@ -24,6 +25,10 @@ import {
   refreshConnectorHealth,
   useConnectorHealthState,
 } from '../live/connector-health'
+import {
+  getConnectorSetupState,
+  type ConnectorSetupState,
+} from './connector-setup-state'
 
 export function ConnectorStatusPage() {
   const { snapshot, loading, refreshing, error, lastUpdatedAt } = useConnectorHealthState()
@@ -164,27 +169,24 @@ function ConnectorOverview({
       configuredSecrets: [],
     }
     const runtime = runtimeById.get(definition.id)
-    const configured = definition.fields
-      .filter((field) => field.required)
-      .every((field) => field.kind === 'secret'
-        ? config.configuredSecrets.includes(field.key)
-        : hasValue(config.settings[field.key]))
+    const setup = getConnectorSetupState({
+      definition,
+      adapter: config,
+      serviceEnabled: snapshot.config.serviceEnabled,
+      serviceStatus: snapshot.health.status,
+      runtime,
+    })
     return {
       definition,
       config,
       runtime,
-      configured,
-      presentation: adapterPresentation({
-        serviceEnabled: snapshot.config.serviceEnabled,
-        adapterEnabled: config.enabled,
-        configured,
-        runtimeStatus: runtime?.status,
-      }, t, definition.label),
+      setup,
+      presentation: adapterPresentation(setup, t, definition.label),
     }
   })
   const activeCount = adapters.filter(({ config }) => snapshot.config.serviceEnabled && config.enabled).length
   const attentionCount = adapters.filter(({ presentation }) => presentation.tone === 'danger').length
-  const configuredCount = adapters.filter(({ configured }) => configured).length
+  const configuredCount = adapters.filter(({ setup }) => setup.ready).length
 
   return (
     <>
@@ -237,8 +239,12 @@ function ConnectorOverview({
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {adapters.map(({ definition, config, runtime, configured, presentation }) => {
-            const linked = Boolean(runtime?.owner)
+          {adapters.map(({ definition, runtime, setup, presentation }) => {
+            const supportsLinking = definition.fields.some((field) => Boolean(field.learnedBy))
+            const setupAction = setup.stage === 'needs_credentials'
+              || setup.stage === 'ready_to_link'
+              || setup.stage === 'awaiting_link'
+            const ActionIcon = setupAction ? ArrowRight : Settings2
             return (
               <article key={definition.id} className="oa-status-surface group flex flex-col rounded-2xl border border-border bg-secondary/20 p-5 transition-colors hover:border-border/90 hover:bg-secondary/30 lg:min-h-[250px]">
                 <div className="flex items-start justify-between gap-3">
@@ -258,12 +264,14 @@ function ConnectorOverview({
                   <p className="text-[12.5px] font-medium leading-5 text-foreground">{presentation.description}</p>
                 </div>
 
-                {configured && (
+                {setup.ready && (
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11.5px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Link2 size={13} aria-hidden />
-                      {linked ? t('connectorStatus.privateChatLinked') : t('connectorStatus.privateChatNotLinked')}
-                    </span>
+                    {supportsLinking && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Link2 size={13} aria-hidden />
+                        {setup.linked ? t('connectorStatus.privateChatLinked') : t('connectorStatus.privateChatNotLinked')}
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1.5" title={runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : undefined}>
                       <Clock3 size={13} aria-hidden />
                       {runtime?.lastSuccessAt
@@ -288,24 +296,10 @@ function ConnectorOverview({
                 )}
 
                 <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border/60 pt-4">
-                  <button
-                    type="button"
-                    className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${configured
-                      ? 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
-                      : 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-                    }`}
-                    onClick={(event) => onConfigure(definition.id, event.currentTarget)}
-                  >
-                    <Settings2 size={13} aria-hidden />
-                    {configured
-                      ? t('connectorStatus.manageAdapter', { name: definition.label })
-                      : t('connectorStatus.configureAdapter', { name: definition.label })}
-                  </button>
-                  {configured && snapshot.config.serviceEnabled && config.enabled
-                    && runtime?.status !== 'healthy' && runtime?.status !== 'awaiting_link' && (
+                  {setup.stage === 'error' && (
                     <button
                       type="button"
-                      className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-foreground hover:border-primary/50 disabled:opacity-50"
+                      className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
                       disabled={reconnectingId === definition.id}
                       onClick={() => void onReconnect(definition.id)}
                     >
@@ -315,6 +309,17 @@ function ConnectorOverview({
                         : t('connectorStatus.reconnect')}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
+                      ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                      : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
+                    }`}
+                    onClick={(event) => onConfigure(definition.id, event.currentTarget)}
+                  >
+                    <ActionIcon size={13} aria-hidden />
+                    {adapterActionLabel(setup.stage, definition.label, t)}
+                  </button>
                 </div>
               </article>
             )
@@ -351,55 +356,67 @@ function servicePresentation(health: ConnectorHealth, t: TFunction): {
   }
 }
 
-type AdapterStatus = NonNullable<ConnectorHealth['service']>['adapters'][number]['status']
 type StatusTone = 'healthy' | 'warning' | 'danger' | 'neutral'
 
-function adapterPresentation(input: {
-  serviceEnabled: boolean
-  adapterEnabled: boolean
-  configured: boolean
-  runtimeStatus?: AdapterStatus
-}, t: TFunction, name: string): { label: string; tone: StatusTone; description: string } {
-  if (!input.configured) {
-    return {
-      label: t('connectorStatus.adapter.needsSetup'),
-      tone: 'warning',
-      description: t('connectorStatus.adapter.needsSetupDescription', { name }),
-    }
+function adapterPresentation(
+  setup: ConnectorSetupState,
+  t: TFunction,
+  name: string,
+): { label: string; tone: StatusTone; description: string } {
+  switch (setup.stage) {
+    case 'needs_credentials':
+      return {
+        label: t('connectorStatus.adapter.needsSetup'),
+        tone: 'warning',
+        description: t('connectorStatus.adapter.needsSetupDescription', { name }),
+      }
+    case 'ready_to_link':
+      return {
+        label: t('connectorStatus.adapter.readyToLink'),
+        tone: 'warning',
+        description: t('connectorStatus.adapter.readyToLinkDescription', { name }),
+      }
+    case 'starting':
+      return {
+        label: t('connectorStatus.adapter.starting'),
+        tone: 'warning',
+        description: t(setup.linked
+          ? 'connectorStatus.adapter.startingLinkedDescription'
+          : 'connectorStatus.adapter.startingDescription', { name }),
+      }
+    case 'awaiting_link':
+      return {
+        label: t('connectorStatus.adapter.awaitingLink'),
+        tone: 'warning',
+        description: t('connectorStatus.adapter.awaitingLinkDescription', { name }),
+      }
+    case 'linked':
+      return {
+        label: t('connectorStatus.adapter.connected'),
+        tone: 'healthy',
+        description: t('connectorStatus.adapter.connectedDescription'),
+      }
+    case 'linked_offline':
+      return {
+        label: t('connectorStatus.adapter.off'),
+        tone: 'neutral',
+        description: t('connectorStatus.adapter.offDescription'),
+      }
+    case 'error':
+      return {
+        label: t('connectorStatus.adapter.needsAttention'),
+        tone: 'danger',
+        description: t('connectorStatus.adapter.needsAttentionDescription'),
+      }
   }
-  if (!input.serviceEnabled || !input.adapterEnabled) {
-    return {
-      label: t('connectorStatus.adapter.off'),
-      tone: 'neutral',
-      description: t('connectorStatus.adapter.offDescription'),
-    }
-  }
-  if (input.runtimeStatus === 'healthy') {
-    return {
-      label: t('connectorStatus.adapter.connected'),
-      tone: 'healthy',
-      description: t('connectorStatus.adapter.connectedDescription'),
-    }
-  }
-  if (input.runtimeStatus === 'awaiting_link') {
-    return {
-      label: t('connectorStatus.adapter.awaitingLink'),
-      tone: 'warning',
-      description: t('connectorStatus.adapter.awaitingLinkDescription', { name }),
-    }
-  }
-  if (input.runtimeStatus === 'degraded' || input.runtimeStatus === 'stopped') {
-    return {
-      label: t('connectorStatus.adapter.needsAttention'),
-      tone: 'danger',
-      description: t('connectorStatus.adapter.needsAttentionDescription'),
-    }
-  }
-  return {
-    label: t('connectorStatus.adapter.starting'),
-    tone: 'warning',
-    description: t('connectorStatus.adapter.startingDescription', { name }),
-  }
+}
+
+function adapterActionLabel(stage: ConnectorSetupState['stage'], name: string, t: TFunction): string {
+  if (stage === 'needs_credentials') return t('connectorStatus.configureAdapter', { name })
+  if (stage === 'ready_to_link' || stage === 'awaiting_link') return t('connectorStatus.finishSetup', { name })
+  if (stage === 'starting') return t('connectorStatus.viewProgress', { name })
+  if (stage === 'error') return t('connectorStatus.reviewAdapter', { name })
+  return t('connectorStatus.manageAdapter', { name })
 }
 
 function StatusBadge({ tone, children }: { tone: StatusTone; children: string }) {
@@ -461,10 +478,6 @@ function DiagnosticDetails({ summary, children }: { summary: string; children: R
       </div>
     </details>
   )
-}
-
-function hasValue(value: string | number | boolean | undefined): boolean {
-  return typeof value === 'boolean' || typeof value === 'number' || (typeof value === 'string' && value.trim().length > 0)
 }
 
 function formatDate(value: string): string {

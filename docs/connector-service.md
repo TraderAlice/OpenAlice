@@ -351,9 +351,11 @@ The surfaces deliberately have different jobs:
   ships sealed mid-turn `text` blocks (the last consecutive text before a
   tool or error) and skips tool/error blocks. A text already sent this way
   is not sent again as the final comment.
-- **Beta → Connectors** is the operations view: service health, adapter status,
-  linked owner, last delivery evidence, and an explicit reconnect action for an
-  unhealthy configured adapter. The reconnect is adapter-scoped while the
+- **Beta → Connectors** is the operations view: service health, the same
+  seven-stage setup lifecycle used by Settings, durable private-chat linkage,
+  last delivery evidence, and an explicit reconnect action only for an actual
+  error. Runtime owner presence is supporting health evidence, not the source of
+  truth for a saved link. The reconnect is adapter-scoped while the
   service answers; if the process is unreachable, Alice asks Guardian to restart
   the optional service instead.
 - **Activity Bar → Connectors** shows a warning count for enabled, configured

@@ -173,6 +173,103 @@ describe('Connector demo routes', () => {
     expect(screen.queryByText('ou_private_identifier')).toBeNull()
   })
 
+  it('keeps durable linking visible while a connector is paused', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.discord = {
+      enabled: false,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-08-23T00:00:00.000Z',
+        adapters: [{ id: 'discord', enabled: false, status: 'disabled' }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorStatusPage />)
+
+    const card = (await screen.findByRole('heading', { name: 'Discord' })).closest('article') as HTMLElement
+    expect(within(card).getByText('Paused')).toBeTruthy()
+    expect(within(card).getByText('Private chat linked')).toBeTruthy()
+    expect(within(card).getByText(/private chat remains linked/)).toBeTruthy()
+    expect(within(card).getByRole('button', { name: 'Manage Discord' })).toBeTruthy()
+  })
+
+  it('distinguishes saved credentials from a completed private-chat link', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord = {
+      enabled: false,
+      settings: { applicationId: 'discord-app' },
+      configuredSecrets: ['botToken'],
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorStatusPage />)
+
+    const card = (await screen.findByRole('heading', { name: 'Discord' })).closest('article') as HTMLElement
+    expect(within(card).getByText('Ready to link')).toBeTruthy()
+    expect(within(card).getByText('Private chat not linked')).toBeTruthy()
+    expect(within(card).getByRole('button', { name: 'Finish setting up Discord' })).toBeTruthy()
+  })
+
+  it('shows linked startup progress without offering a premature reconnect', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.telegram = {
+      enabled: true,
+      settings: { ownerUserId: 'owner-1', chatId: 'chat-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-08-23T00:00:00.000Z',
+        adapters: [{ id: 'telegram', enabled: true, status: 'starting' }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorStatusPage />)
+
+    const card = (await screen.findByRole('heading', { name: 'Telegram' })).closest('article') as HTMLElement
+    expect(within(card).getByText('Private chat linked')).toBeTruthy()
+    expect(within(card).getByText(/reconnecting to your linked private chat/)).toBeTruthy()
+    expect(within(card).getByRole('button', { name: 'View Telegram progress' })).toBeTruthy()
+    expect(within(card).queryByRole('button', { name: 'Reconnect' })).toBeNull()
+  })
+
+  it('offers recovery when an enabled linked connector has no reachable runtime', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.telegram = {
+      enabled: true,
+      settings: { ownerUserId: 'owner-1', chatId: 'chat-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'degraded',
+      lastError: 'Connector Service is unreachable',
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorStatusPage />)
+
+    const card = (await screen.findByRole('heading', { name: 'Telegram' })).closest('article') as HTMLElement
+    expect(within(card).getByText('Needs attention')).toBeTruthy()
+    expect(within(card).getByText('Private chat linked')).toBeTruthy()
+    expect(within(card).getByRole('button', { name: 'Reconnect' })).toBeTruthy()
+    expect(within(card).getByRole('button', { name: 'Review Telegram' })).toBeTruthy()
+  })
+
   it('opens one connector configuration in place and restores focus on close', async () => {
     render(<ConnectorStatusPage />)
 

@@ -114,6 +114,20 @@ external adapters remain optional projections rather than sources of truth.
     UI branching; built-in translations add concise platform-specific steps.
     Links have explicit accessible names and an external-link cue, and the card
     remains a single vertical reading order at narrow widths.
+13. **Overview and configuration share one lifecycle truth.** Deriving overview
+    state from runtime owner presence alone makes an intentionally stopped or
+    reconnecting Connector look unlinked even when its learned account fields are
+    durably saved; treating every credentialed-but-off adapter as merely paused
+    also hides the required `/link` step. Patching those labels independently was
+    rejected because the two surfaces would drift again. The chosen model feeds
+    the shared seven-stage setup state into each overview card: credentials needed,
+    ready to link, starting, awaiting link, linked, linked offline, or error.
+    Durable learned fields remain authoritative while runtime health adds live
+    progress; an enabled adapter with no runtime during a degraded service is an
+    error rather than an endless starting state. Card copy and its primary action
+    are stage-specific, and Reconnect appears only for an actual error. On narrow
+    screens actions continue to wrap in document order; linked state is stated in
+    text and never inferred from color or a runtime-only identifier.
 
 ## Ordered Work
 
@@ -144,6 +158,8 @@ external adapters remain optional projections rather than sources of truth.
         remove implementation-oriented owner/Guardian/kill-switch setup copy.
   - [x] Add a data-driven, localized platform preparation guide to first-time
         credential setup without replacing the existing lifecycle.
+  - [x] Unify overview and configuration lifecycle derivation, including durable
+        linking, service-unreachable errors, stage-specific actions, and recovery.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -199,6 +215,16 @@ definition contract, official-link target, new-tab behavior, and the same deskto
 and narrow layouts. The already-running real Connector process predates the new
 link metadata and was deliberately not restarted, so no active adapter or external
 account was disturbed.
+
+The shared-lifecycle increment passed 32 focused setup/UI tests, UI and root
+typechecks, the production build, all 5,101 repository tests, and real-route
+acceptance against the same Default AliceProject. That project previously
+exposed the contradiction: a paused Discord card now retains its
+durable linked-chat state; the degraded Telegram card also remains linked and
+presents Reconnect as the primary recovery action followed by Review. Desktop
+and 390 px checks confirmed the new action hierarchy, exact one-error Reconnect
+count, same-row narrow actions, and no horizontal overflow. No recovery or
+configuration action was clicked.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

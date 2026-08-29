@@ -68,4 +68,17 @@ describe('Connector setup lifecycle', () => {
       runtime: { id: 'telegram', enabled: true, status: 'healthy', owner: 'owner-1' },
     })).toMatchObject({ stage: 'awaiting_link', linked: false })
   })
+
+  it('reports an enabled adapter as an error when the service is unreachable', () => {
+    expect(getConnectorSetupState({
+      definition,
+      adapter: adapter({
+        enabled: true,
+        configuredSecrets: ['botToken'],
+        settings: { ownerUserId: 'owner-1', chatId: 'chat-1' },
+      }),
+      serviceEnabled: true,
+      serviceStatus: 'degraded',
+    })).toMatchObject({ stage: 'error', linked: true })
+  })
 })
