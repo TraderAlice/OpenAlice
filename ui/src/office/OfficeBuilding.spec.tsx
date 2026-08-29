@@ -1047,6 +1047,7 @@ describe('OfficeBuilding', () => {
           },
           freshKind: 'news',
         }}
+        initialPlayerState={{ position: { x: 340, y: 570 }, direction: 'down' }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
         onOpenWorkspace={vi.fn()}
@@ -1066,6 +1067,13 @@ describe('OfficeBuilding', () => {
     expect(inbox.dataset.hasActivity).toBe('true')
     expect(news.dataset.fresh).toBe('true')
     expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
+    const inboxPrompt = screen.getByRole('status', {
+      name: 'Open Inbox · codex · Agent report delivered',
+    })
+    expect(inboxPrompt.dataset.kind).toBe('inbox-service')
+    expect(inboxPrompt.style.width).toBe('280px')
+    expect(inboxPrompt.textContent).toContain('Check mail')
+    expect(inboxPrompt.textContent).toContain('codex · Agent report delivered')
 
     await userEvent.click(inbox)
     await waitFor(() => expect(onOpenInbox).toHaveBeenCalledWith('inbox-11'))

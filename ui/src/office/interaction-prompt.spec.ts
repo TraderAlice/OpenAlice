@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   OFFICE_PROMPT_DETAIL_MAX_WIDTH,
+  OFFICE_PROMPT_SERVICE_MAX_HEIGHT,
+  OFFICE_PROMPT_SERVICE_MAX_WIDTH,
   officeInteractionPromptPlacement,
 } from './interaction-prompt'
 
@@ -82,6 +84,23 @@ describe('officeInteractionPromptPlacement', () => {
       { width: 960, height: 120 },
       { x: 0, y: -300 },
     ).side).toBe('right')
+  })
+
+  it('accounts for the taller two-line service terminal callout', () => {
+    expect(officeInteractionPromptPlacement(
+      { x: 576, y: 432 },
+      { x: 574, y: 510 },
+      { width: 760, height: 530 },
+      { x: 0, y: 0 },
+      OFFICE_PROMPT_SERVICE_MAX_WIDTH,
+      OFFICE_PROMPT_SERVICE_MAX_HEIGHT,
+    )).toEqual({
+      side: 'left',
+      x: 540,
+      y: 480,
+      width: 280,
+      tailShift: 30,
+    })
   })
 
   it('slides a perpendicular prompt along the camera edge and keeps its tail on the target', () => {

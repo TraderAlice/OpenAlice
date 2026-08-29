@@ -2450,6 +2450,24 @@ Persistent service-zone follow-up (2026-08-30):
   tests), root/UI TypeScript passed, and the full 613-file Vitest run passed (5,083 tests; one file and nine tests
   skipped).
 
+Service-terminal prompt follow-up (2026-08-30):
+
+- Manual play found that the new Inbox and News facilities inherited the 176px cabinet prompt. Both the verb and the
+  Product Activity detail collapsed to fragments (`CHECK… / Product…`), so the journal data was technically present
+  but not useful to a player standing at the machine.
+- Compared a modal reader, a permanent ticker attached to each prop, and a wider version of the existing contextual
+  RPG prompt. Chose the contextual prompt: it preserves one interaction grammar and keeps information absent until
+  Alice deliberately approaches a terminal. The placement solver now accepts terminal-specific width and height, so
+  edge avoidance accounts for the real two-line card instead of the old 56px cabinet bounds.
+- Inbox and News prompts use 280px desktop / 240px narrow cards, a larger device portrait, full action verb, emphasized
+  source, and a two-line clamped summary. Ordinary coworker, cabinet, roster, sign, and Operations prompts keep their
+  established compact measurements.
+- Browser-walked Alice to both terminals. Inbox clearly rendered `CHECK MAIL`, source, and a two-line journal summary;
+  News rendered `READ NEWS`, `TECHCRUNCH`, and the current headline. Facing-cone target switching worked between the
+  adjacent props, and Enter on News opened `/market/news`. Focused prompt/responsive/OfficeBuilding specs passed (3
+  files / 34 tests), root/UI TypeScript passed, and the full 613-file Vitest run passed (5,084 tests; one file and nine
+  tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -3265,6 +3265,63 @@
   white-space: nowrap;
 }
 
+.oa-office-interact-prompt:is(
+  [data-kind="inbox-service"],
+  [data-kind="news-service"]
+) {
+  min-height: 58px;
+  max-width: 280px;
+}
+
+.oa-office-interact-prompt:is(
+  [data-kind="inbox-service"],
+  [data-kind="news-service"]
+) .oa-office-interact-prompt__action {
+  min-height: 58px;
+  align-items: center;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 5px 6px 5px 4px;
+}
+
+.oa-office-interact-prompt:is(
+  [data-kind="inbox-service"],
+  [data-kind="news-service"]
+) .oa-office-interact-prompt__action > img {
+  width: 42px;
+  height: 42px;
+}
+
+.oa-office-interact-prompt:is(
+  [data-kind="inbox-service"],
+  [data-kind="news-service"]
+) .oa-office-interact-prompt__copy {
+  gap: 2px;
+}
+
+.oa-office-interact-prompt:is(
+  [data-kind="inbox-service"],
+  [data-kind="news-service"]
+) .oa-office-interact-prompt__copy small {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.25;
+  text-overflow: clip;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.oa-office-interact-prompt:is(
+  [data-kind="inbox-service"],
+  [data-kind="news-service"]
+) .oa-office-interact-prompt__copy small b {
+  color: var(--office-gba-water-seed);
+  font-size: 0.9em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .oa-office-touch-dpad {
   position: absolute;
   bottom: 10px;
@@ -4876,8 +4933,17 @@
     display: none;
   }
 
-  .oa-office-interact-prompt[data-has-detail="true"] {
+  .oa-office-interact-prompt[data-has-detail="true"]:not(
+    [data-kind="inbox-service"]
+  ):not([data-kind="news-service"]) {
     max-width: 168px;
+  }
+
+  .oa-office-interact-prompt:is(
+    [data-kind="inbox-service"],
+    [data-kind="news-service"]
+  ) {
+    max-width: 240px;
   }
 
   .oa-office-interact-prompt[data-has-detail="true"] .oa-office-interact-prompt__action {

@@ -59,9 +59,12 @@ describe('Office responsive style contract', () => {
   })
 
   it('keeps detailed interaction prompts inside the phone map', () => {
-    expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]')
+    expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]:not(')
     expect(narrowLiveCss).toContain('max-width: 168px')
     expect(narrowLiveCss).toContain('grid-template-columns: 30px minmax(0, 1fr) 32px')
+    expect(narrowLiveCss).toContain('[data-kind="inbox-service"]')
+    expect(narrowLiveCss).toContain('max-width: 240px')
+    expect(css).toContain('-webkit-line-clamp: 2')
     expect(css.match(/var\(--office-prompt-tail-shift, 0px\)/g)).toHaveLength(4)
   })
 

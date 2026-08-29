@@ -17,6 +17,9 @@ const OFFICE_PROMPT_ALICE_HALF_HEIGHT = 30
 export const OFFICE_PROMPT_DETAIL_MAX_WIDTH = 216
 export const OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH = 168
 export const OFFICE_PROMPT_DESTINATION_MAX_WIDTH = 200
+export const OFFICE_PROMPT_SERVICE_MAX_WIDTH = 280
+export const OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH = 240
+export const OFFICE_PROMPT_SERVICE_MAX_HEIGHT = 76
 
 interface OfficePromptBounds {
   left: number
@@ -29,27 +32,28 @@ function promptBounds(
   side: OfficeInteractionPromptSide,
   target: { x: number; y: number },
   maxWidth: number,
+  maxHeight: number,
 ): OfficePromptBounds {
   if (side === 'left') {
     return {
       left: target.x - OFFICE_PROMPT_GAP - maxWidth,
-      top: target.y - OFFICE_PROMPT_MAX_HEIGHT / 2,
+      top: target.y - maxHeight / 2,
       right: target.x - OFFICE_PROMPT_GAP,
-      bottom: target.y + OFFICE_PROMPT_MAX_HEIGHT / 2,
+      bottom: target.y + maxHeight / 2,
     }
   }
   if (side === 'right') {
     return {
       left: target.x + OFFICE_PROMPT_GAP,
-      top: target.y - OFFICE_PROMPT_MAX_HEIGHT / 2,
+      top: target.y - maxHeight / 2,
       right: target.x + OFFICE_PROMPT_GAP + maxWidth,
-      bottom: target.y + OFFICE_PROMPT_MAX_HEIGHT / 2,
+      bottom: target.y + maxHeight / 2,
     }
   }
   if (side === 'above') {
     return {
       left: target.x - maxWidth / 2,
-      top: target.y - OFFICE_PROMPT_GAP - OFFICE_PROMPT_MAX_HEIGHT,
+      top: target.y - OFFICE_PROMPT_GAP - maxHeight,
       right: target.x + maxWidth / 2,
       bottom: target.y - OFFICE_PROMPT_GAP,
     }
@@ -58,7 +62,7 @@ function promptBounds(
     left: target.x - maxWidth / 2,
     top: target.y + OFFICE_PROMPT_GAP,
     right: target.x + maxWidth / 2,
-    bottom: target.y + OFFICE_PROMPT_GAP + OFFICE_PROMPT_MAX_HEIGHT,
+    bottom: target.y + OFFICE_PROMPT_GAP + maxHeight,
   }
 }
 
@@ -147,6 +151,7 @@ export function officeInteractionPromptPlacement(
   viewport: { width: number; height: number },
   camera: { x: number; y: number },
   maxWidth = OFFICE_PROMPT_MAX_WIDTH,
+  maxHeight = OFFICE_PROMPT_MAX_HEIGHT,
 ): OfficeInteractionPromptPlacement {
   const dx = target.x - alice.x
   const dy = target.y - alice.y
@@ -177,7 +182,7 @@ export function officeInteractionPromptPlacement(
   ].map((candidateSide) => {
     const fitted = fitPromptCrossAxis(
       candidateSide,
-      promptBounds(candidateSide, screenTarget, promptWidth),
+      promptBounds(candidateSide, screenTarget, promptWidth, maxHeight),
       viewport,
     )
     return { side: candidateSide, ...fitted }

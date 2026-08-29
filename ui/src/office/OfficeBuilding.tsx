@@ -39,6 +39,9 @@ import {
   OFFICE_PROMPT_DESTINATION_MAX_WIDTH,
   OFFICE_PROMPT_DETAIL_MAX_WIDTH,
   OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH,
+  OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH,
+  OFFICE_PROMPT_SERVICE_MAX_HEIGHT,
+  OFFICE_PROMPT_SERVICE_MAX_WIDTH,
   officeInteractionPromptPlacement,
 } from './interaction-prompt'
 import { officeCoworkerLabel } from './label'
@@ -274,6 +277,8 @@ export function OfficeBuilding({
       : nearestOfficeInteractionTarget(alice, aliceDirection, availableInteractionTargets),
     [alice, aliceDirection, availableInteractionTargets, departingWorkspace, floorInteractionSuspended, selected],
   )
+  const nearbyService = nearbyTarget?.kind === 'inbox-service'
+    || nearbyTarget?.kind === 'news-service'
   const promptPlacement = useMemo(
     () => nearbyTarget
       ? officeInteractionPromptPlacement(
@@ -284,18 +289,29 @@ export function OfficeBuilding({
             height: viewportSize.height || mapLayout.height,
           },
           camera,
-          nearbyTarget.kind === 'sign'
+          nearbyService
+            ? viewportSize.width > 0 && viewportSize.width <= 520
+              ? OFFICE_PROMPT_NARROW_SERVICE_MAX_WIDTH
+              : OFFICE_PROMPT_SERVICE_MAX_WIDTH
+            : nearbyTarget.kind === 'sign'
             ? OFFICE_PROMPT_DESTINATION_MAX_WIDTH
             : nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
               ? viewportSize.width > 0 && viewportSize.width <= 520
                 ? OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH
                 : OFFICE_PROMPT_DETAIL_MAX_WIDTH
               : undefined,
+          nearbyService ? OFFICE_PROMPT_SERVICE_MAX_HEIGHT : undefined,
         )
       : null,
-    [alice, camera, mapLayout.height, mapLayout.width, nearbyTarget, viewportSize],
+    [alice, camera, mapLayout.height, mapLayout.width, nearbyService, nearbyTarget, viewportSize],
   )
-  const promptPresentation = (() => {
+  const promptPresentation: {
+    icon: string
+    action: string
+    label: string
+    detail: string | null
+    source?: string | null
+  } | null = (() => {
     if (!nearbyTarget) return null
     if (nearbyTarget.kind === 'employee') {
       const target = officeCoworkerLabel(nearbyTarget.employee)
@@ -346,6 +362,7 @@ export function OfficeBuilding({
         action: t('office.interactActionInbox'),
         label: t('office.interactInbox'),
         detail: productActivity.inbox?.detail ?? productActivity.inbox?.source ?? null,
+        source: productActivity.inbox?.source,
       }
     }
     if (nearbyTarget.kind === 'news-service') {
@@ -354,6 +371,7 @@ export function OfficeBuilding({
         action: t('office.interactActionNews'),
         label: t('office.interactNews'),
         detail: productActivity.news?.detail ?? productActivity.news?.source ?? null,
+        source: productActivity.news?.source,
       }
     }
     return {
@@ -1203,7 +1221,9 @@ export function OfficeBuilding({
               className="oa-office-interact-prompt"
               role="status"
               aria-label={promptPresentation.detail
-                ? `${promptPresentation.label} · ${promptPresentation.detail}`
+                ? `${promptPresentation.label} · ${promptPresentation.source
+                  ? `${promptPresentation.source} · `
+                  : ''}${promptPresentation.detail}`
                 : promptPresentation.label}
               data-kind={nearbyTarget.kind}
               data-side={promptPlacement.side}
@@ -1223,7 +1243,18 @@ export function OfficeBuilding({
                 <img src={promptPresentation.icon} alt="" aria-hidden style={officePixelImg} />
                 <span className="oa-office-interact-prompt__copy" aria-hidden>
                   <strong>{promptPresentation.action}</strong>
-                  {promptPresentation.detail && <small>{promptPresentation.detail}</small>}
+                  {promptPresentation.detail && (
+                    <small>
+                      {promptPresentation.source && (
+                        <b>{promptPresentation.source}</b>
+                      )}
+                      {promptPresentation.source
+                        && promptPresentation.detail !== promptPresentation.source
+                        && <span aria-hidden> · </span>}
+                      {promptPresentation.detail !== promptPresentation.source
+                        && promptPresentation.detail}
+                    </small>
+                  )}
                 </span>
                 <kbd aria-hidden>
                   <span data-input="keyboard">{t('office.interactKey')}</span>
