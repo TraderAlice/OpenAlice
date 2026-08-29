@@ -24,7 +24,7 @@ function desk(every = '4h'): ConnectorDesk {
     connectorId: 'telegram',
     issue: {
       id: 'telegram-phone-desk',
-      title: 'Telegram phone desk',
+      title: 'Chat on Telegram',
       status: 'todo',
       priority: 'none',
       assignee: '@new-then-resume',
@@ -82,7 +82,10 @@ describe('Telegram phone-desk connector routes', () => {
     })
 
     expect(response.status).toBe(409)
-    expect(await response.json()).toMatchObject({ error: 'not_linked' })
+    expect(await response.json()).toEqual({
+      error: 'not_linked',
+      message: 'Link this connector to its private owner chat before enabling connector chat',
+    })
     expect(createConnectorDesk).not.toHaveBeenCalled()
   })
 
@@ -107,6 +110,10 @@ describe('Telegram phone-desk connector routes', () => {
     })
 
     expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: 'invalid',
+      message: 'when must use a supported connector chat cadence',
+    })
     expect(updateConnectorDesk).not.toHaveBeenCalled()
   })
 
