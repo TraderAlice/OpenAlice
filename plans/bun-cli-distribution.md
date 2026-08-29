@@ -1,6 +1,7 @@
 # Bun-native CLI Distribution
 
-Status: Active — macOS/Linux implementation in progress; Windows deferred
+Status: Active — macOS/Linux dev preview accepted; stable channels pending;
+Windows deferred
 
 Delivery mode: Serial / interactive on the dedicated
 `codex/usability-improvements` integration branch. This changes a released
