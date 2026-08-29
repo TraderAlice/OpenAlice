@@ -118,12 +118,15 @@ export async function ingestTelegramOwnerMessages(
   })
 
   const conversation = host.conversation()
+  const provenanceStore = host.provenanceStore()
   const dispatched = await dispatchIssueCommentReply({
     conversation,
     issueWorkspaceId: desk.wsId,
     issue: appended.issue,
     comment: appended.comment,
     source: { kind: 'human' },
+    issueWorkspaceDir: workspace.dir,
+    ...(provenanceStore ? { provenanceStore } : {}),
   })
   if (dispatched.status !== 'not_requested') {
     await updateIssueCommentDelivery(workspace.dir, desk.issue.id, appended.comment.id, dispatched.delivery)

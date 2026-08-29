@@ -156,9 +156,10 @@ plain tracked item; add a `when` and it starts firing.
 - **`assignee`** *(optional)* — the single owner and
   scheduled-dispatch policy:
   - `@new-each-run` recruits a new product Session for each scheduled fire;
-  - `@new-then-resume` asks the Workspace to recruit once; the first successful dispatch
-    rewrites the Issue to that concrete `@resumeId`, so every later fire returns
-    to the same accountable coworker;
+  - `@new-then-resume` asks the Workspace to recruit once; the first successful
+    scheduled fire or human comment reply rewrites the Issue to that concrete
+    `@resumeId`, so every later fire and comment returns to the same
+    accountable coworker;
   - an exact `@resumeId` continues that accountable Session, even when its
     signed Workspace differs from the Issue's Workspace;
   - `@human` and `@unassigned` are valid only for unscheduled work.

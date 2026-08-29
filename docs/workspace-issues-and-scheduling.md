@@ -170,13 +170,18 @@ structured run log remain durable. Inbox inquiries expose the same shape on the 
 Issue Activity and Inbox reply threads render that same field as a compact
 live timeline: semantic text, tool name/status, and errors. They do not fetch
 `/output` or show tool payloads. The Telegram phone desk
-already projects sealed `text` blocks from that same field. A human comment without a fixed owner
-uses the same provenance-aware fallback as Inbox: OpenAlice asks the
+already projects sealed `text` blocks from that same field. Current `assignee`
+is the only comment-dispatch contract. An exact `@resumeId` continues that
+Session. `@new-then-resume` is a pending owner claim: the next human comment or
+scheduled fire recruits a fresh Session and rewrites `assignee` to that
+`@resumeId`. Creator or prior-reconstruction provenance must not win after an
+operator rebinds to this policy. A human comment on `@new-each-run`,
+`@unassigned`, or `@human` still uses the Inbox fallback: OpenAlice asks the
 attributable creator, or recruits a reconstruction Agent in the Issue
-Workspace when no creator Session exists. The answer is recorded in Activity
-without changing `assignee`; a temporary answerer never becomes the scheduling
-owner. Agent-authored comments without a fixed owner remain timeline notes, and
-an owner commenting on their own Issue is not echoed back to the same Session.
+Workspace when no creator Session exists. That answering Session is a
+collaborator; `assignee` stays unchanged. Agent-authored comments without a
+fixed owner remain timeline notes, and an owner commenting on their own Issue
+is not echoed back to the same Session.
 
 `done` and `canceled` are terminal and stop scheduled firing. There is no
 separate `enabled` flag. A successful one-shot `at` issue is automatically
@@ -434,12 +439,12 @@ manufacture shell sleep loops. Add `--reconstruct` only when an unattributed
 artifact explicitly needs reconstruction guidance.
 
 The Issue detail UI treats scheduling as an intrinsic Work item capability.
-`assignee: "@new-then-resume"` recruits one fresh Session on the first fire and then
-rewrites itself to that concrete `@resumeId`; `assignee: "@new-each-run"`
-recruits a new Session on every fire; `assignee: "@resumeId"` keeps one already
-known responsible Session. The first and third modes produce a stable owner to
-ask; `@new-each-run` execution exposes the creator and each concrete run as
-separate follow-up targets.
+`assignee: "@new-then-resume"` recruits one fresh Session on the first fire or
+human comment reply and then rewrites itself to that concrete `@resumeId`;
+`assignee: "@new-each-run"` recruits a new Session on every fire; `assignee:
+"@resumeId"` keeps one already known responsible Session. The first and third
+modes produce a stable owner to ask; `@new-each-run` execution exposes the
+creator and each concrete run as separate follow-up targets.
 
 Issue mutation has two complementary histories. Activity records attributable
 field-level changes (and marks the canonical What document as edited without

@@ -2,9 +2,10 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectorClient } from '@traderalice/connector-protocol'
 
+import { readWorkspaceIssues } from './declaration.js'
 import { createTelegramConnectorDesk } from './telegram-connector.js'
 import {
   containsTelegramNoReply,
@@ -78,6 +79,47 @@ describe('telegram desk ingest and stamp', () => {
       text: 'Anybody home?',
     })
     expect(result).toEqual({ ok: false, reason: 'desk_disabled' })
+  })
+
+  it('recruits and claims a first Session for an inbound DM on @new-then-resume', async () => {
+    const created = await createTelegramConnectorDesk(
+      { id: 'ws-a', dir: wsDir },
+      [{ id: 'ws-a', dir: wsDir }],
+    )
+    expect(created.ok).toBe(true)
+    const ask = vi.fn(async () => ({
+      status: 'dispatched' as const,
+      taskId: 'run-desk-owner',
+      resumeId: 'resume-desk-owner',
+      workspaceId: 'ws-a',
+      workspace: 'ws-a',
+      agent: 'pi',
+      resolution: {
+        mode: 'reconstructed' as const,
+        workspaceId: 'ws-a',
+        reason: 'explicit-workspace' as const,
+      },
+    }))
+    const append = vi.fn(async (input: unknown) => ({ id: 'p-1', ...(input as object) }))
+    const result = await ingestTelegramOwnerMessage(host({
+      provenanceStore: () => ({
+        append,
+        list: () => [],
+        latest: () => undefined,
+      } as unknown as NonNullable<ReturnType<TelegramDeskChatHost['provenanceStore']>>),
+      conversation: () => ({ ask, read: vi.fn() } as unknown as NonNullable<ReturnType<TelegramDeskChatHost['conversation']>>),
+    }), {
+      connectorId: 'telegram',
+      userId: '42',
+      text: 'Switch to a new coworker.',
+    })
+    expect(result.ok).toBe(true)
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'workspace', workspaceId: 'ws-a' },
+      subject: expect.objectContaining({ relation: 'owner' }),
+    }))
+    const live = await readWorkspaceIssues(wsDir)
+    expect(live.ok && live.issues[0]?.assignee).toBe('@resume-desk-owner')
   })
 
   it('records an inbound owner DM as a human comment that does not echo', async () => {

@@ -147,7 +147,7 @@ export function issueAssigneeResumeId(assignee: string): string | null {
   return resumeIdFromSignature(assignee)
 }
 
-/** Transitional ownership: the first dispatch claims one durable Session. */
+/** Transitional ownership: the first fire or human comment claims one durable Session. */
 export function issueAssigneeClaimsFirstSession(assignee: string): boolean {
   return assignee === NEW_THEN_RESUME_ASSIGNEE
 }

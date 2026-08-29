@@ -16,7 +16,6 @@ import { basename, delimiter, join } from 'node:path';
 import { cliBinPath } from '@/core/paths.js';
 import { readIssueDefaultAgent, readWorkspaceDefaultAgent } from '@/core/config.js';
 import {
-  ACTIVITY_UPDATE_COALESCE_MS,
   ArtifactProvenanceStore,
   type ArtifactOrigin,
 } from '@/core/provenance-store.js';
@@ -101,6 +100,7 @@ import {
   type WorkspaceSessionDirectory,
 } from './session-directory.js';
 import { completeOneShotIssueAfterRun } from './issues/auto-complete.js';
+import { claimIssueFirstSession } from './issues/claim-session.js';
 import { readIssueComments, updateIssueCommentProgress } from './issues/comments.js';
 import { recordIssueCommentReply } from './issues/comment-delivery.js';
 import {
@@ -112,18 +112,12 @@ import {
   deskProgressScope,
   projectWorkspaceDeskTurnProgress,
 } from './issues/telegram-desk-project.js';
-import {
-  IssueChangeTracker,
-  issueMutation,
-  issueMutationFingerprint,
-} from './issues/change-tracker.js';
-import { updateIssueFields } from './issues/mutate.js';
+import { IssueChangeTracker } from './issues/change-tracker.js';
 import {
   issueAutomationHealth,
   type IssueAutomationOwnerState,
 } from './issues/automation-health.js';
 import {
-  issueAssigneeClaimsFirstSession,
   issueAssigneeResumeId,
   isTelegramConnectorIssue,
   type IssueRecord,
@@ -136,7 +130,6 @@ import {
   type TelegramConnectorCadence,
   type TelegramConnectorDesk,
 } from './issues/telegram-connector.js';
-import { sessionSignature } from './session-signature.js';
 import { issueRunFailure } from './issues/run-failure.js';
 import type { IInboxStore } from '@/core/inbox-store.js';
 import { toSafeInboxOrigin } from '@/core/workspace-tool-center.js';
@@ -2156,52 +2149,15 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     },
     dispatch: dispatchHeadlessTaskMethod,
     claimFreshSession: async ({ issueWorkspace, issueId, taskId, resumeId, agent }) => {
-      const live = await readWorkspaceIssues(issueWorkspace.dir);
-      const candidate = live.ok ? live.issues.find((issue) => issue.id === issueId) : undefined;
-      if (!candidate || !issueAssigneeClaimsFirstSession(candidate.assignee)) {
-        launcherLogger.info('issue.first_session_claim_skipped', {
-          wsId: issueWorkspace.id,
-          issueId,
-          taskId,
-          resumeId,
-          reason: candidate ? 'assignee_changed' : 'issue_unavailable',
-        });
-        return;
-      }
-      const claimed = await updateIssueFields(issueWorkspace.dir, issueId, {
-        assignee: sessionSignature(resumeId),
-      });
-      if (!claimed.ok) {
-        throw new Error(
-          claimed.reason === 'invalid'
-            ? claimed.error
-            : `Issue disappeared before its first Session could claim it: ${issueId}`,
-        );
-      }
-      const mutation = issueMutation(claimed.previous, claimed.issue);
-      const origin: ArtifactOrigin = {
-        kind: 'session',
-        workspaceId: issueWorkspace.id,
-        resumeId,
-        agent,
-        execution: { kind: 'headless', taskId },
-      };
-      await provenanceStore.append({
-        artifact: { kind: 'issue', workspaceId: issueWorkspace.id, issueId },
-        action: 'updated',
-        origin,
-        at: Date.now(),
-        ...(mutation ? { mutation } : {}),
-        fingerprint: issueMutationFingerprint(issueWorkspace.id, issueId, claimed.issue),
-      }, { coalesceWithinMs: ACTIVITY_UPDATE_COALESCE_MS });
-      const reread = await readWorkspaceIssues(issueWorkspace.dir);
-      if (reread.ok) await observeIssueRecords(issueWorkspace, reread.issues, origin);
-      launcherLogger.info('issue.first_session_claimed', {
-        wsId: issueWorkspace.id,
+      await claimIssueFirstSession({
+        issueWorkspace,
         issueId,
         taskId,
         resumeId,
         agent,
+        provenanceStore,
+        observeIssues: (workspace, issues, origin) =>
+          observeIssueRecords(workspace as WorkspaceMeta, issues, origin),
       });
     },
     observeIssues: (workspace, issues) => observeIssueRecords(workspace, issues),

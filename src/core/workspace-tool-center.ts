@@ -36,6 +36,7 @@ import type { IssuesSnapshot, IssueDetail, WikilinkIssueRef } from '../workspace
 import type { WorkspaceSessionDirectory } from '../workspaces/session-directory.js'
 import type { HeadlessStructuredOutput } from '../workspaces/headless-output.js'
 import type { HeadlessInquirySubject, HeadlessTaskStatus } from '../workspaces/headless-task-registry.js'
+import type { SessionRuntimeSelection } from '../workspaces/session-runtime-binding.js'
 import type {
   ApplyTemplateUpgradeInput,
   TemplateUpgradePlan,
@@ -147,6 +148,8 @@ export interface WorkspaceConversationControl {
      * required. Provenance may still resolve as reconstructed when this is
      * false; prompt semantics and attribution are deliberately independent. */
     readonly reconstruct?: boolean
+    /** Fresh-Session credential/model/effort freeze. Ignored when continuing. */
+    readonly selection?: SessionRuntimeSelection
     /** Authoritative caller identity for the independent conversation log. */
     readonly source?: WorkspaceConversationCaller
     /** Optional business reverse link persisted with the dispatched task. */

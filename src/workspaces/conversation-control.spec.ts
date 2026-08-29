@@ -258,6 +258,28 @@ describe('Workspace conversation control', () => {
     }))
   })
 
+  it('forwards a fresh-Session runtime selection when recruiting', async () => {
+    const { svc, dispatchHeadlessTask } = fakeService()
+    await createWorkspaceConversationControl(svc).ask({
+      target: { kind: 'workspace', workspaceId: 'ws-peer' },
+      prompt: 'Hello from a new owner.',
+      timeoutMs: 300_000,
+      selection: { credentialSlug: 'openai-primary', model: 'gpt-5.6-sol', reasoningEffort: 'high' },
+    })
+    expect(dispatchHeadlessTask).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'Hello from a new owner.',
+      300_000,
+      undefined,
+      undefined,
+      undefined,
+      { credentialSlug: 'openai-primary', model: 'gpt-5.6-sol', reasoningEffort: 'high' },
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
   it('continues the exact Session behind Issue provenance', async () => {
     const identity = { ...origin, wsId: origin.workspaceId, agentSessionId: 'native-private' }
     const { svc, adapter, workspace, dispatchHeadlessTask } = fakeService({

@@ -275,7 +275,7 @@ export const zh: Resources = {
       askAboutIssue: '询问这个议题…',
       assignedSessionPrefix: '负责人会话',
       assignedSessionSuffix: '会在这里回复。',
-      replyBeforeFirstRun: '首次运行确定负责人前，创建者或负责重建上下文的工作区 Agent 会在这里回复。',
+      replyBeforeFirstRun: '下一条评论或下一次运行会新建一个 Session，并把它固定为负责人。',
       replyWithoutOwner: '创建者或负责重建上下文的工作区 Agent 会在这里回复；负责人保持不变。',
       sending: '正在发送…',
       commentNotify: '评论并通知',

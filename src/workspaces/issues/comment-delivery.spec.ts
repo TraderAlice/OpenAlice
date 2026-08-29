@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceConversationControl } from '../../core/workspace-tool-center.js'
 import { dispatchIssueCommentReply, issueCommentReplyPrompt, recordIssueCommentReply } from './comment-delivery.js'
 import { appendIssueComment, readIssueComments, type IssueComment } from './comments.js'
-import type { IssueRecord } from './declaration.js'
+import { readWorkspaceIssues, type IssueRecord } from './declaration.js'
 import { createIssue } from './mutate.js'
 
 let dir: string
@@ -76,6 +76,63 @@ describe('dispatchIssueCommentReply', () => {
       comment,
       source: { kind: 'workspace', workspaceId: 'ws-home' },
     })).toEqual({ status: 'not_requested', reason: 'non_human_note' })
+  })
+
+  it('recruits and claims a first Session when assignee is @new-then-resume', async () => {
+    await createIssue(dir, {
+      id: 'audit',
+      title: 'Audit',
+      assignee: '@new-then-resume',
+      agent: 'pi',
+      when: { kind: 'every', every: '4h' },
+    })
+    const live = await readWorkspaceIssues(dir)
+    const pending = live.ok ? live.issues[0] : issue('@new-then-resume')
+    const append = vi.fn(async (input) => ({ id: 'p-1', ...input }))
+    const control = conversation({
+      status: 'dispatched',
+      taskId: 'run-new-owner',
+      resumeId: 'resume-new-owner',
+      workspaceId: 'ws-home',
+      workspace: 'home-desk',
+      agent: 'pi',
+      resolution: {
+        mode: 'reconstructed',
+        workspaceId: 'ws-home',
+        reason: 'explicit-workspace',
+      },
+    })
+    expect(await dispatchIssueCommentReply({
+      conversation: control,
+      issueWorkspaceId: 'ws-home',
+      issueWorkspaceDir: dir,
+      issue: pending ?? issue('@new-then-resume'),
+      comment,
+      source: { kind: 'human' },
+      provenanceStore: { append, list: vi.fn(), latest: vi.fn() },
+    })).toEqual({
+      status: 'scheduled',
+      delivery: {
+        state: 'pending',
+        targetResumeId: 'resume-new-owner',
+        taskId: 'run-new-owner',
+      },
+    })
+    expect(control.ask).toHaveBeenCalledWith(expect.objectContaining({
+      target: { kind: 'workspace', workspaceId: 'ws-home' },
+      agent: 'pi',
+      source: { kind: 'human' },
+      subject: {
+        kind: 'issue',
+        workspaceId: 'ws-home',
+        issueId: 'audit',
+        relation: 'owner',
+        commentId: 'comment-1',
+      },
+    }))
+    expect(control.ask).toHaveBeenCalledWith(expect.not.objectContaining({ reconstruct: true }))
+    const after = await readWorkspaceIssues(dir)
+    expect(after.ok && after.issues[0]?.assignee).toBe('@resume-new-owner')
   })
 
   it('asks the creator or reconstructs for a human comment without a fixed owner', async () => {

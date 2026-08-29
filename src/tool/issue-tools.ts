@@ -410,8 +410,9 @@ export const issueCommentFactory: WorkspaceToolFactory = {
         'signed by the current product Session when available. It never mutates',
         'the canonical What or changes the next scheduled prompt. If the Issue',
         'has a different fixed @resumeId owner, OpenAlice asks that Session in',
-        'the background and records its final reply in Activity. Human comments',
-        'without a fixed owner ask the creator or a reconstructed Workspace Agent.',
+        'the background and records its final reply in Activity. `@new-then-resume`',
+        'recruits a fresh Session and claims it as owner. Other Issues without a',
+        'fixed owner ask the creator or a reconstructed Workspace Agent.',
         'Agent-authored comments without a fixed owner remain durable notes.',
       ].join('\n'),
       inputSchema: z.object({
@@ -432,6 +433,8 @@ export const issueCommentFactory: WorkspaceToolFactory = {
             comment: res.comment,
             ...(origin ? { authorResumeId: origin.resumeId } : {}),
             source: origin ?? { kind: 'workspace', workspaceId: ctx.workspaceId },
+            issueWorkspaceDir: dir.dir,
+            ...(ctx.provenanceStore ? { provenanceStore: ctx.provenanceStore } : {}),
           })
           await projectDeskComment(res.issue, res.comment).catch(() => undefined)
           if (dispatched.status !== 'not_requested') {
