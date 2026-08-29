@@ -32,6 +32,7 @@ export const ROOT_COMMANDS = Object.freeze([
   { name: 'ssh', description: 'Open a tunnel to an existing remote Runtime' },
   { name: 'remote', description: 'Plan, prepare, and connect to a remote Runtime' },
   { name: 'update', description: 'Check for or install a stable OpenAlice update' },
+  { name: 'rollback', description: 'Switch a direct install to a retained release' },
   { name: 'uninstall', description: 'Remove installer-owned CLI files and preserve data' },
   { name: 'completion', description: 'Generate shell completion' },
 ])
@@ -442,6 +443,9 @@ function formatExistingRuntime(status) {
   const lines = [`OpenAlice Runtime is already running at ${status.endpoints.web ?? 'an unknown endpoint'}`]
   lines.push(`Home: ${status.home}`)
   if (status.owner) lines.push(`Owner: ${status.owner.surface} (pid ${status.owner.pid})`)
+  if (status.pendingActivation?.productVersion) {
+    lines.push(`Pending activation: ${status.pendingActivation.productVersion}${status.pendingActivation.restartRequired ? ' (restart required)' : ''}`)
+  }
   return `${lines.join('\n')}\n`
 }
 

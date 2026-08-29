@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import {
   dirname,
   join,
@@ -45,7 +44,7 @@ import {
   type TuiLaunchFlags,
 } from './launch-context.ts'
 import { resolveInstalledLayout } from './install-layout.mjs'
-import { readInstallSource } from './install-source.mjs'
+import { CLI_VERSION, readInstallSource } from './install-source.mjs'
 import { findOpenAliceRoot } from './local-start.mjs'
 import { readRuntimeLogs } from './logs.mjs'
 import {
@@ -3178,7 +3177,5 @@ function truncate(value: string, width: number): string {
 }
 
 function readCliVersion(): string {
-  const packageUrl = new URL('../package.json', import.meta.url)
-  const manifest = JSON.parse(readFileSync(packageUrl, 'utf8')) as { version?: unknown }
-  return typeof manifest.version === 'string' ? manifest.version : 'unknown'
+  return CLI_VERSION
 }

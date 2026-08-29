@@ -53,6 +53,7 @@ import { createInboxStore } from './core/inbox-store.js'
 import { startInboxConnectorBridge } from './services/connector-client/index.js'
 import { startConnectorActionBridge } from './services/connector-client/action-bridge.js'
 import { createWorkspaceConversationControl } from './workspaces/conversation-control.js'
+import { runInternalBootstrapRole } from './workspaces/bootstrap-runtime.js'
 import { startTelegramDeskInboundPoll, telegramDeskHasRunningWork } from './workspaces/issues/telegram-desk-chat.js'
 import { ToolCenter } from './core/tool-center.js'
 import { WorkspaceToolCenter } from './core/workspace-tool-center.js'
@@ -446,7 +447,7 @@ async function main() {
   }
 }
 
-async function start(): Promise<void> {
+export async function startAliceRuntime(): Promise<void> {
   const guardianPid = positiveInteger(process.env['OPENALICE_GUARDIAN_PID'])
   const guardianStartedAt = positiveInteger(process.env['OPENALICE_GUARDIAN_STARTED_AT'])
   runtimeLock = await acquireOpenAliceRuntimeLocks({
@@ -477,7 +478,14 @@ function positiveInteger(raw: string | undefined): number | undefined {
   return Number.isInteger(value) && value > 0 ? value : undefined
 }
 
-start().catch((err) => {
-  console.error('fatal:', err)
-  process.exit(1)
-})
+export async function runAliceEntrypoint(): Promise<void> {
+  if (await runInternalBootstrapRole()) return
+  await startAliceRuntime()
+}
+
+if (!(globalThis as { __OPENALICE_INTERNAL_ROLE_DISPATCH__?: boolean }).__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  runAliceEntrypoint().catch((err) => {
+    console.error('fatal:', err)
+    process.exit(1)
+  })
+}

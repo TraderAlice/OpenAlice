@@ -843,12 +843,12 @@ This plan is complete only when:
   component health, while deliberately omitting `runtime.stop`. The real dev
   smoke proves CLI discovery, rejected stop, duplicate-writer refusal, and
   survival of the original owner in one isolated journey.
-- 2026-08-13: Plan-index audit against current `dev`. Increment 7's
-  platform/arch archives and hashed `runtime-manifest.json` already ship
-  through `pnpm build:headless-runtime` and the release matrix
-  (darwin/linux × arm64/x64), including an outside-checkout install/boot/
-  Doctor/`down` gate. Remaining increment 7 proof is still clean-host
-  Workspace PTY, optional components, and Pi. Increment 3 is still a hybrid
+- 2026-08-13: Plan-index audit against then-current `dev`. Increment 7's
+  expanded platform/arch archives and hashed `runtime-manifest.json` shipped
+  through the former headless release matrix. That distribution was retired
+  by [[plans/bun-cli-distribution.md]] in favor of one target-native Bun
+  executable plus immutable resources. Remaining Supervisor interaction work
+  is tracked here without preserving the old packaging contract. Increment 3 is still a hybrid
   TypeScript/`mjs` CLI without `@xterm/headless`. Increment 4 still lacks a
   dedicated component panel. Increment 5 still lacks log
   filter/follow/pause, copyable Doctor remediation, update plan/progress

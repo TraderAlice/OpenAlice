@@ -1,19 +1,17 @@
-import { readFileSync } from 'node:fs'
 import { access, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { inspectRuntime } from './lifecycle.mjs'
 import { discoverRuntimeLogs } from './logs.mjs'
 import { resolveInstalledLayout } from './install-layout.mjs'
+import { packageManagerForSource } from './package-manager.mjs'
 import {
+  CLI_VERSION,
   installedContentIdentity,
   readInstallSource,
 } from './install-source.mjs'
 import { probeOpenAlice } from './runtime-client.mjs'
 
-const CLI_VERSION = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-).version
 const MINIMUM_NODE_VERSION = [22, 19, 0]
 const SOURCE_ARTIFACTS = Object.freeze([
   'dist/main.js',
@@ -41,34 +39,50 @@ export async function diagnoseRuntime(options = {}, dependencies = {}) {
   const contentIdentity = (
     dependencies.installedContentIdentityImpl ?? installedContentIdentity
   )(import.meta.url)
+  const manager = packageManagerForSource(installSource)
+  const installed = Boolean(layout || manager)
   add(
     'cli.provenance',
-    layout ? 'pass' : 'warn',
+    installed ? 'pass' : 'warn',
     layout
       ? `Installed OpenAlice ${CLI_VERSION} metadata is readable`
+      : manager
+        ? `${manager.label}-managed OpenAlice ${CLI_VERSION} metadata is readable`
       : `OpenAlice ${CLI_VERSION} is running from a source checkout`,
-    layout
+    installed
       ? `${installSource.selector.kind} ${installSource.selector.value}; content ${contentIdentity ?? 'unknown'}`
       : 'Self-update is intentionally unavailable from a source checkout',
   )
 
-  const nodeVersion = dependencies.nodeVersion ?? process.version
-  const nodeSupported = isNodeVersionSupported(nodeVersion)
-  add(
-    'runtime.node',
-    nodeSupported ? 'pass' : 'fail',
-    nodeSupported
-      ? `Node.js ${nodeVersion} satisfies >=${MINIMUM_NODE_VERSION.join('.')}`
-      : `Node.js ${nodeVersion} is too old`,
-    nodeSupported ? undefined : `Install Node.js ${MINIMUM_NODE_VERSION.join('.')} or newer`,
-  )
+  const bunStandalone = dependencies.bunStandalone
+    ?? globalThis.__OPENALICE_BUN_STANDALONE__ === true
+  if (bunStandalone) {
+    const bunVersion = dependencies.bunVersion ?? globalThis.Bun?.version ?? 'embedded'
+    add(
+      'runtime.engine',
+      'pass',
+      `Bun ${bunVersion} is embedded in the OpenAlice executable`,
+      'No system Node.js or Bun installation is required',
+    )
+  } else {
+    const nodeVersion = dependencies.nodeVersion ?? process.version
+    const nodeSupported = isNodeVersionSupported(nodeVersion)
+    add(
+      'runtime.node',
+      nodeSupported ? 'pass' : 'fail',
+      nodeSupported
+        ? `Node.js ${nodeVersion} satisfies >=${MINIMUM_NODE_VERSION.join('.')}`
+        : `Node.js ${nodeVersion} is too old`,
+      nodeSupported ? undefined : `Install Node.js ${MINIMUM_NODE_VERSION.join('.')} or newer`,
+    )
+  }
 
   const status = await (dependencies.inspectRuntime ?? inspectRuntime)(options, dependencies)
   addRuntimeOwnershipCheck(status, add)
   await addEndpointCheck(status, add, dependencies)
   addComponentChecks(status, add)
   await addProviderCheck(status, add, dependencies)
-  await addUpdateCheck(layout, add, dependencies)
+  await addUpdateCheck(layout, installSource, add, dependencies)
   await addLogCheck(status, add, dependencies)
 
   const failures = checks.filter((check) => check.status === 'fail').length
@@ -83,7 +97,7 @@ export async function diagnoseRuntime(options = {}, dependencies = {}) {
     },
     cli: {
       productVersion: CLI_VERSION,
-      installed: Boolean(layout),
+      installed,
       contentIdentity,
       installSource,
     },
@@ -217,7 +231,17 @@ async function addProviderCheck(status, add, dependencies) {
   )
 }
 
-async function addUpdateCheck(layout, add, dependencies) {
+async function addUpdateCheck(layout, installSource, add, dependencies) {
+  const manager = packageManagerForSource(installSource)
+  if (manager) {
+    add(
+      'update.metadata',
+      'pass',
+      `${manager.label} owns OpenAlice updates`,
+      `Use: ${manager.update}`,
+    )
+    return
+  }
   if (!layout) {
     add('update.metadata', 'pass', 'Source checkout update ownership is explicit')
     return

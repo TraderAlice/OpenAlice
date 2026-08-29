@@ -1,7 +1,7 @@
-FROM node:22-bookworm-slim
+FROM debian:bookworm-slim
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl \
+  && apt-get install -y --no-install-recommends bash ca-certificates coreutils curl jq tar \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --home-dir /home/smoke --no-create-home --shell /bin/bash --uid 10001 smoke \
   && mkdir -p /home/smoke \
