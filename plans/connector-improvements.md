@@ -193,6 +193,20 @@ external adapters remain optional projections rather than sources of truth.
     conversation wording. The shared Markdown editor accepts contextual
     accessible labels/placeholders so this surface does not announce a generic
     Issue description.
+19. **The overview separates owned work from untouched availability.** Keeping
+    definition order is predictable but places a never-started adapter between
+    the user's linked channels; sorting every card by transient runtime state
+    would move targets around during reconnects. A filter control is useful for
+    a large marketplace but adds work to the current four-adapter surface. The
+    chosen model keeps stable definition order inside two semantic groups:
+    `Your channels` contains linked, credentialed, enabled, or partially entered
+    platform setup, while `Available channels` contains only pristine adapters.
+    This follows the per-platform configuration/status model documented by the
+    Hermes Channels surface while fitting OpenAlice's deeper setup lifecycle.
+    Empty groups are omitted, so a new user sees one available catalog and an
+    established user reaches owned channels first. Both groups reuse the same
+    card component and responsive one/two-column grid; headings establish screen
+    reader structure without changing any action, credential, or runtime state.
 
 ## Ordered Work
 
@@ -235,6 +249,8 @@ external adapters remain optional projections rather than sources of truth.
         Connector credential-save boundaries.
   - [x] Replace remaining Connector chat setup jargon with conversation and
         scheduled-check-in language while preserving Issue semantics.
+  - [x] Separate owned/in-progress channels from pristine available adapters on
+        the Connector overview without state-driven card reordering.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -355,6 +371,16 @@ files. A readback returned the original default state: service disabled, every
 adapter unconfigured, and no saved credentials. No external message was sent;
 the temporary demo credential produced only a platform 404. Subsequent browser
 acceptance used visible read-only UI interaction only.
+
+The channel-grouping increment passed 29 focused overview/demo tests, UI and
+root typechecks, the production build, and all 5,112 repository tests. The
+grouping spec covers a mixed state where a partially credentialed Slack adapter
+remains owned/in-progress while a pristine Telegram adapter stays available.
+Real Default AliceProject acceptance at desktop and 390 px showed Discord,
+Telegram, and Feishu in stable definition order under Your channels, followed
+by pristine Slack under Available channels. Both headings and their descriptions
+remained in document order, no group was represented by color alone, and no
+Connector action was triggered. The temporary viewport override was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

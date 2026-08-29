@@ -15,7 +15,12 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ConnectorHealth, ConnectorSettingsSnapshot } from '../api'
+import type {
+  ConnectorDefinition,
+  ConnectorHealth,
+  ConnectorSettingsSnapshot,
+  PublicConnectorConfig,
+} from '../api'
 import { ConfigurationDialog } from '../components/ConfigurationDialog'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
@@ -29,6 +34,7 @@ import {
 } from '../live/connector-health'
 import {
   getConnectorSetupState,
+  type ConnectorRuntime,
   type ConnectorSetupState,
 } from './connector-setup-state'
 
@@ -257,6 +263,8 @@ function ConnectorOverview({
   const activeCount = adapters.filter(({ config }) => snapshot.config.serviceEnabled && config.enabled).length
   const attentionCount = adapters.filter(({ presentation }) => presentation.tone === 'danger').length
   const configuredCount = adapters.filter(({ setup }) => setup.ready).length
+  const ownedAdapters = adapters.filter(hasStartedConnectorSetup)
+  const availableAdapters = adapters.filter((adapter) => !hasStartedConnectorSetup(adapter))
 
   return (
     <>
@@ -299,104 +307,185 @@ function ConnectorOverview({
         )}
       </section>
 
-      <section>
-        <div className="mb-3.5 flex items-end justify-between gap-3 px-0.5">
-          <div>
-            <h3 className="text-[14px] font-semibold text-foreground">
-              {t('connectorStatus.deliveryTitle')}
-            </h3>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">{t('connectorStatus.deliveryDescription')}</p>
+      {ownedAdapters.length > 0 && (
+        <ConnectorGroup
+          title={t('connectorStatus.deliveryTitle')}
+          description={t('connectorStatus.deliveryDescription')}
+          adapters={ownedAdapters}
+          onConfigure={onConfigure}
+          onReconnect={onReconnect}
+          reconnectingId={reconnectingId}
+          t={t}
+        />
+      )}
+
+      {availableAdapters.length > 0 && (
+        <ConnectorGroup
+          title={t('connectorStatus.availableTitle')}
+          description={t('connectorStatus.availableDescription')}
+          adapters={availableAdapters}
+          onConfigure={onConfigure}
+          onReconnect={onReconnect}
+          reconnectingId={reconnectingId}
+          t={t}
+        />
+      )}
+    </>
+  )
+}
+
+interface AdapterOverviewItem {
+  definition: ConnectorDefinition
+  config: PublicConnectorConfig['adapters'][string]
+  runtime?: ConnectorRuntime
+  setup: ConnectorSetupState
+  presentation: { label: string; tone: StatusTone; description: string }
+}
+
+function hasStartedConnectorSetup({ definition, config, setup }: AdapterOverviewItem): boolean {
+  if (setup.stage !== 'needs_credentials' || config.enabled || config.configuredSecrets.length > 0) return true
+  return definition.fields.some((field) => field.kind !== 'secret' && hasSettingValue(config.settings[field.key]))
+}
+
+function hasSettingValue(value: string | number | boolean | undefined): boolean {
+  return typeof value === 'boolean'
+    || typeof value === 'number'
+    || (typeof value === 'string' && value.trim().length > 0)
+}
+
+function ConnectorGroup({
+  title,
+  description,
+  adapters,
+  onConfigure,
+  onReconnect,
+  reconnectingId,
+  t,
+}: {
+  title: string
+  description: string
+  adapters: AdapterOverviewItem[]
+  onConfigure: (id: string, trigger: HTMLButtonElement) => void
+  onReconnect: (id: string) => Promise<void>
+  reconnectingId: string | null
+  t: TFunction
+}) {
+  return (
+    <section>
+      <div className="mb-3.5 px-0.5">
+        <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {adapters.map((adapter) => (
+          <ConnectorOverviewCard
+            key={adapter.definition.id}
+            adapter={adapter}
+            onConfigure={onConfigure}
+            onReconnect={onReconnect}
+            reconnecting={reconnectingId === adapter.definition.id}
+            t={t}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ConnectorOverviewCard({
+  adapter: { definition, runtime, setup, presentation },
+  onConfigure,
+  onReconnect,
+  reconnecting,
+  t,
+}: {
+  adapter: AdapterOverviewItem
+  onConfigure: (id: string, trigger: HTMLButtonElement) => void
+  onReconnect: (id: string) => Promise<void>
+  reconnecting: boolean
+  t: TFunction
+}) {
+  const supportsLinking = definition.fields.some((field) => Boolean(field.learnedBy))
+  const setupAction = setup.stage === 'needs_credentials'
+    || setup.stage === 'ready_to_link'
+    || setup.stage === 'awaiting_link'
+  const ActionIcon = setupAction ? ArrowRight : Settings2
+
+  return (
+    <article className="oa-status-surface group flex flex-col rounded-2xl border border-border bg-secondary/20 p-5 transition-colors hover:border-border/90 hover:bg-secondary/30 lg:min-h-[250px]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <ConnectorGlyph id={definition.id} />
+          <div className="min-w-0">
+            <h4 className="text-[15px] font-semibold text-foreground">{definition.label}</h4>
+            <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+              {t('connectorStatus.adapterDescription', { name: definition.label })}
+            </p>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {adapters.map(({ definition, runtime, setup, presentation }) => {
-            const supportsLinking = definition.fields.some((field) => Boolean(field.learnedBy))
-            const setupAction = setup.stage === 'needs_credentials'
-              || setup.stage === 'ready_to_link'
-              || setup.stage === 'awaiting_link'
-            const ActionIcon = setupAction ? ArrowRight : Settings2
-            return (
-              <article key={definition.id} className="oa-status-surface group flex flex-col rounded-2xl border border-border bg-secondary/20 p-5 transition-colors hover:border-border/90 hover:bg-secondary/30 lg:min-h-[250px]">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <ConnectorGlyph id={definition.id} />
-                    <div className="min-w-0">
-                      <h4 className="text-[15px] font-semibold text-foreground">{definition.label}</h4>
-                      <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                        {t('connectorStatus.adapterDescription', { name: definition.label })}
-                      </p>
-                    </div>
-                  </div>
-                  <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
-                </div>
+        <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
+      </div>
 
-                <div className={`mt-4 rounded-xl border px-3.5 py-3 ${statusSurfaceClass(presentation.tone)}`}>
-                  <p className="text-[12.5px] font-medium leading-5 text-foreground">{presentation.description}</p>
-                </div>
+      <div className={`mt-4 rounded-xl border px-3.5 py-3 ${statusSurfaceClass(presentation.tone)}`}>
+        <p className="text-[12.5px] font-medium leading-5 text-foreground">{presentation.description}</p>
+      </div>
 
-                {setup.ready && (
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11.5px] text-muted-foreground">
-                    {supportsLinking && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Link2 size={13} aria-hidden />
-                        {setup.linked ? t('connectorStatus.privateChatLinked') : t('connectorStatus.privateChatNotLinked')}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1.5" title={runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : undefined}>
-                      <Clock3 size={13} aria-hidden />
-                      {runtime?.lastSuccessAt
-                        ? t('connectorStatus.lastDelivered', { time: formatTimeAgo(runtime.lastSuccessAt, t) })
-                        : t('connectorStatus.noDeliveryYet')}
-                    </span>
-                  </div>
-                )}
-
-                {(runtime?.detail || runtime?.lastError) && (
-                  <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
-                    <span>{runtime.lastError ?? runtime.detail}</span>
-                    {runtime.nextAttemptAt && (
-                      <span className="mt-1 block text-muted-foreground">
-                        {t('connectorStatus.nextRetryAt', {
-                          time: formatDate(runtime.nextAttemptAt),
-                          count: runtime.consecutiveFailures ?? 1,
-                        })}
-                      </span>
-                    )}
-                  </DiagnosticDetails>
-                )}
-
-                <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border/60 pt-4">
-                  {setup.stage === 'error' && (
-                    <button
-                      type="button"
-                      className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
-                      disabled={reconnectingId === definition.id}
-                      onClick={() => void onReconnect(definition.id)}
-                    >
-                      <RefreshCw size={13} className={reconnectingId === definition.id ? 'animate-spin motion-reduce:animate-none' : ''} />
-                      {reconnectingId === definition.id
-                        ? t('connectorStatus.reconnecting')
-                        : t('connectorStatus.reconnect')}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
-                      ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-                      : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
-                    }`}
-                    onClick={(event) => onConfigure(definition.id, event.currentTarget)}
-                  >
-                    <ActionIcon size={13} aria-hidden />
-                    {adapterActionLabel(setup.stage, definition.label, t)}
-                  </button>
-                </div>
-              </article>
-            )
-          })}
+      {setup.ready && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11.5px] text-muted-foreground">
+          {supportsLinking && (
+            <span className="inline-flex items-center gap-1.5">
+              <Link2 size={13} aria-hidden />
+              {setup.linked ? t('connectorStatus.privateChatLinked') : t('connectorStatus.privateChatNotLinked')}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5" title={runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : undefined}>
+            <Clock3 size={13} aria-hidden />
+            {runtime?.lastSuccessAt
+              ? t('connectorStatus.lastDelivered', { time: formatTimeAgo(runtime.lastSuccessAt, t) })
+              : t('connectorStatus.noDeliveryYet')}
+          </span>
         </div>
-      </section>
-    </>
+      )}
+
+      {(runtime?.detail || runtime?.lastError) && (
+        <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
+          <span>{runtime.lastError ?? runtime.detail}</span>
+          {runtime.nextAttemptAt && (
+            <span className="mt-1 block text-muted-foreground">
+              {t('connectorStatus.nextRetryAt', {
+                time: formatDate(runtime.nextAttemptAt),
+                count: runtime.consecutiveFailures ?? 1,
+              })}
+            </span>
+          )}
+        </DiagnosticDetails>
+      )}
+
+      <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border/60 pt-4">
+        {setup.stage === 'error' && (
+          <button
+            type="button"
+            className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            disabled={reconnecting}
+            onClick={() => void onReconnect(definition.id)}
+          >
+            <RefreshCw size={13} className={reconnecting ? 'animate-spin motion-reduce:animate-none' : ''} />
+            {reconnecting ? t('connectorStatus.reconnecting') : t('connectorStatus.reconnect')}
+          </button>
+        )}
+        <button
+          type="button"
+          className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
+            ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+            : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
+          }`}
+          onClick={(event) => onConfigure(definition.id, event.currentTarget)}
+        >
+          <ActionIcon size={13} aria-hidden />
+          {adapterActionLabel(setup.stage, definition.label, t)}
+        </button>
+      </div>
+    </article>
   )
 }
 

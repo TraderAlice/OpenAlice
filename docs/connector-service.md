@@ -375,7 +375,11 @@ The surfaces deliberately have different jobs:
   error. Runtime owner presence is supporting health evidence, not the source of
   truth for a saved link. The reconnect is adapter-scoped while the
   service answers; if the process is unreachable, Alice asks Guardian to restart
-  the optional service instead.
+  the optional service instead. The overview keeps linked, credentialed,
+  enabled, and partially configured adapters in stable definition order under
+  Your channels. Only pristine adapters appear under Available channels, so
+  transient runtime changes never reorder established targets and empty groups
+  do not add headings.
 - **Activity Bar → Connectors** shows a warning count for enabled, configured
   adapters that are degraded, stopped, unreachable, or stuck in `starting`
   beyond the grace window. `awaiting_link` remains setup state and does not

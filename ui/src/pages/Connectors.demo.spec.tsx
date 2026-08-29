@@ -135,7 +135,7 @@ describe('Connector demo routes', () => {
     expect(screen.queryByRole('button', { name: '配置' })).toBeNull()
     expect(screen.getByRole('button', { name: '设置 Feishu' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '投递服务' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '你的聊天渠道' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '可用渠道' })).toBeTruthy()
     expect(screen.getByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeTruthy()
     expect(screen.getAllByText('需要设置')).toHaveLength(4)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
@@ -194,6 +194,7 @@ describe('Connector demo routes', () => {
 
     render(<ConnectorStatusPage />)
 
+    await screen.findByRole('button', { name: 'Manage Discord' })
     const card = (await screen.findByRole('heading', { name: 'Discord' })).closest('article') as HTMLElement
     expect(within(card).getByText('Paused')).toBeTruthy()
     expect(within(card).getByText('Private chat linked')).toBeTruthy()
@@ -212,6 +213,7 @@ describe('Connector demo routes', () => {
 
     render(<ConnectorStatusPage />)
 
+    await screen.findByRole('button', { name: 'Finish setting up Discord' })
     const card = (await screen.findByRole('heading', { name: 'Discord' })).closest('article') as HTMLElement
     expect(within(card).getByText('Ready to link')).toBeTruthy()
     expect(within(card).getByText('Private chat not linked')).toBeTruthy()
@@ -239,6 +241,7 @@ describe('Connector demo routes', () => {
 
     render(<ConnectorStatusPage />)
 
+    await screen.findByRole('button', { name: 'View Telegram progress' })
     const card = (await screen.findByRole('heading', { name: 'Telegram' })).closest('article') as HTMLElement
     expect(within(card).getByText('Private chat linked')).toBeTruthy()
     expect(within(card).getByText(/reconnecting to your linked private chat/)).toBeTruthy()

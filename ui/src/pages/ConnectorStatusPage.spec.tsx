@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDemoConnectorSnapshot } from '../demo/fixtures/connectors'
 import { i18n } from '../i18n'
@@ -79,10 +79,45 @@ describe('Connector overview state hierarchy', () => {
     }
     render(<ConnectorStatusPage />)
 
-    expect(screen.getByRole('heading', { name: 'Your channels' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Available channels' })).toBeTruthy()
     expect(screen.getByRole('status').textContent).toContain('Showing the last known state')
     expect(screen.queryByRole('heading', { name: 'Couldn’t load your channels' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(mocks.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('separates owned or in-progress channels from pristine availability', () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord = {
+      enabled: false,
+      settings: { ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.config.adapters.slack = {
+      enabled: false,
+      settings: {},
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.config.adapters.feishu = {
+      enabled: false,
+      settings: { appId: 'demo-app', ownerUserId: 'owner-2' },
+      configuredSecrets: ['appSecret'],
+    }
+    mocks.state.current = {
+      snapshot,
+      loading: false,
+      refreshing: false,
+      error: null,
+      lastUpdatedAt: null,
+    }
+    render(<ConnectorStatusPage />)
+
+    const owned = screen.getByRole('heading', { name: 'Your channels' }).closest('section') as HTMLElement
+    const available = screen.getByRole('heading', { name: 'Available channels' }).closest('section') as HTMLElement
+    const headings = (section: HTMLElement) => within(section).getAllByRole('article').map((article) =>
+      within(article).getByRole('heading', { level: 4 }).textContent)
+
+    expect(headings(owned)).toEqual(['Discord', 'Slack', 'Feishu'])
+    expect(headings(available)).toEqual(['Telegram'])
   })
 })
