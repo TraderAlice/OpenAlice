@@ -5370,6 +5370,33 @@
   }
 }
 
+@container (max-width: 520px) {
+  .oa-office-building:not([data-replay="true"]) .oa-office-hud {
+    grid-template-areas:
+      "identity actions"
+      "status status";
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 8px;
+    min-height: 68px;
+  }
+
+  .oa-office-building:not([data-replay="true"]) .oa-office-hud__identity {
+    grid-area: identity;
+  }
+
+  .oa-office-building:not([data-replay="true"]) .oa-office-hud__status {
+    width: 100%;
+    min-width: 0;
+    grid-area: status;
+    padding-top: 3px;
+    border-top: 1px solid color-mix(in srgb, var(--office-gba-ink-seed) 22%, transparent);
+  }
+
+  .oa-office-building:not([data-replay="true"]) .oa-office-hud__actions {
+    grid-area: actions;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .oa-office-window,
   .oa-office-touch-action,

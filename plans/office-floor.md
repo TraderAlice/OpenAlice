@@ -1774,6 +1774,23 @@ Replay-floor interaction boundary follow-up (2026-08-29):
 - Focused OfficeBuilding and OfficeDesk specs passed: 2 files / 13 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`,
   the 606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Phone live-HUD hierarchy follow-up (2026-08-29):
+
+- Continued playing from an Agent file back onto the 390px live floor and found the Menu squeezed past the HUD's
+  right edge. Only its generated terminal icon remained visible; the Menu label and most of its hit area were clipped
+  because floor identity, live Agent status, and actions still occupied three desktop columns.
+- Compared reducing Menu to an unexplained icon, removing the live status, and reflowing the phone HUD. Chose a
+  two-row game status bar below 520px: floor identity and the complete Menu share the first row, while the live Agent
+  ratio remains visible on a ruled second row. This retains both orientation and current-state information instead of
+  solving responsive pressure by deleting one of them.
+- Browser-played the updated HUD at 390x844. The 66.7px Live-floor Menu button became a complete 78.7px control ending
+  eight pixels inside the HUD; its 224x148 Floor view menu opened fully on-screen, status occupied the complete 352px
+  second row, and the page kept zero overflow. At a 523px Office container the existing single-row HUD still fit, and
+  the 1280px desktop HUD retained its original 52px height and three-column hierarchy.
+- A focused CSS contract now protects the phone grid areas and full-width status row. The contract plus existing
+  OfficeBuilding coverage passed: 2 files / 11 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 607-file Vitest
+  run (5,031 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
