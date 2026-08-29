@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
-import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, KeyRound, Link2, ListChecks, Power, RefreshCw, Send, ShieldCheck, Unlink } from 'lucide-react'
+import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, KeyRound, Link2, ListChecks, Power, RefreshCw, Send, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -390,10 +390,6 @@ function ConnectorSettingsSurface({
                         reconnecting={reconnecting}
                         onStart={() => startAdapter(definition.id)}
                         onStop={() => updateAdapter(definition.id, { enabled: false })}
-                        onUnlink={() => setPendingUnlink({
-                          connectorId: definition.id,
-                          connectorLabel: definition.label,
-                        })}
                         onTest={() => void test(definition.id)}
                         onReconnect={() => void reconnect(definition.id)}
                         t={t}
@@ -403,6 +399,7 @@ function ConnectorSettingsSurface({
                         definition={definition}
                         adapter={adapter}
                         ready={setup.ready}
+                        linked={setup.linked}
                         open={credentialsOpen}
                         savingSecret={savingSecret}
                         secretDrafts={secretDrafts}
@@ -440,6 +437,10 @@ function ConnectorSettingsSurface({
                           connectorLabel: definition.label,
                           fieldKey,
                           fieldLabel,
+                        })}
+                        onUnlink={() => setPendingUnlink({
+                          connectorId: definition.id,
+                          connectorLabel: definition.label,
                         })}
                         t={t}
                       />
@@ -629,6 +630,7 @@ function ConnectorCredentialsEditor({
   definition,
   adapter,
   ready,
+  linked,
   open,
   savingSecret,
   secretDrafts,
@@ -639,11 +641,13 @@ function ConnectorCredentialsEditor({
   onSaveConnection,
   onReplaceSecret,
   onRemoveSecret,
+  onUnlink,
   t,
 }: {
   definition: ConnectorDefinition
   adapter: PublicConnectorConfig['adapters'][string]
   ready: boolean
+  linked: boolean
   open: boolean
   savingSecret: string | null
   secretDrafts: Record<string, string>
@@ -654,6 +658,7 @@ function ConnectorCredentialsEditor({
   onSaveConnection: (keys: string[]) => void
   onReplaceSecret: (key: string, fieldLabel: string) => void
   onRemoveSecret: (fieldKey: string, fieldLabel: string) => void
+  onUnlink: () => void
   t: TFunction
 }) {
   const credentialsId = `connector-${definition.id}-credentials`
@@ -844,6 +849,28 @@ function ConnectorCredentialsEditor({
             )}
           </div>
         )}
+        {linked && (
+          <div className="mt-4 border-t border-border/60 pt-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[12px] font-medium text-foreground">
+                  {t('connectorSettings.linkedAccount')}
+                </p>
+                <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
+                  {t('connectorSettings.linkedAccountHint')}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="oa-pressable w-full shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:border-destructive/40 hover:text-destructive disabled:opacity-50 sm:w-auto"
+                disabled={savingSecret !== null}
+                onClick={onUnlink}
+              >
+                {t('connectorSettings.unlink')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -918,7 +945,6 @@ function SetupStatePanel({
   reconnecting,
   onStart,
   onStop,
-  onUnlink,
   onTest,
   onReconnect,
   t,
@@ -931,7 +957,6 @@ function SetupStatePanel({
   reconnecting: string | null
   onStart: () => void
   onStop: () => void
-  onUnlink: () => void
   onTest: () => void
   onReconnect: () => void
   t: TFunction
@@ -968,13 +993,13 @@ function SetupStatePanel({
           <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
             <div className="mr-1 flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/60 px-3">
               <span className="text-[12px] font-medium text-foreground">
-                {t('connectorSettings.runConnector', { name: definition.label })}
+                {t('connectorSettings.useConnector', { name: definition.label })}
               </span>
               <Toggle
                 size="sm"
                 checked={running}
                 disabled={saving}
-                ariaLabel={t('connectorSettings.runConnectorAria', { name: definition.label })}
+                ariaLabel={t('connectorSettings.useConnectorAria', { name: definition.label })}
                 onChange={(checked) => checked ? onStart() : onStop()}
               />
             </div>
@@ -1002,17 +1027,6 @@ function SetupStatePanel({
               {testing === definition.id
                 ? t('connectorSettings.sending')
                 : t('connectorSettings.sendTest')}
-            </button>
-            )}
-            {setup.linked && (
-            <button
-              type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50"
-              disabled={saving}
-              onClick={onUnlink}
-            >
-              <Unlink size={14} />
-              {t('connectorSettings.unlink')}
             </button>
             )}
           </div>

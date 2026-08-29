@@ -340,7 +340,10 @@ The surfaces deliberately have different jobs:
   unlink, linking instructions, and explicit test sends. While credentials are
   missing, it keeps a short platform checklist and official console links beside
   the fields; those links open without dismissing the configuration dialog or
-  losing its drafts. The Telegram card also
+  losing its drafts. Once linked, the lifecycle panel keeps routine availability
+  and test controls visible; Unlink lives inside Connection details beside token
+  replacement/removal and explains that sealed credentials remain available.
+  The Telegram card also
   binds that connector's phone-desk Issue when the adapter advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator
   can edit What and heartbeat cadence, then open the ordinary Issue detail

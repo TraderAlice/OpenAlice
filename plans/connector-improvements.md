@@ -143,6 +143,18 @@ external adapters remain optional projections rather than sources of truth.
     The action is right-aligned on wider dialogs and expands to the available width
     on narrow screens. Native fields keep their labels, password reveal controls,
     and keyboard order; the shared credentials editor owns grouping and feedback.
+15. **Routine controls stay visible; account separation lives with connection
+    maintenance.** Keeping Unlink beside Send test makes a destructive identity
+    change look like an ordinary runtime action, while hiding it in a generic
+    overflow menu would reduce comprehension and disconnect it from token
+    maintenance. The chosen model keeps only adapter availability and a healthy
+    test send in the lifecycle panel. Unlink moves into the disclosed Connection
+    details beside credential replacement/removal, with explicit copy that the
+    sealed credentials remain available for a different private chat. The runtime
+    control also uses `Use <platform>` language instead of the implementation term
+    `Run connector`; its localized switch name describes turning that platform on
+    or off. The maintenance row stacks naturally at narrow widths, and confirmation
+    remains the final guard before the learned account identity is cleared.
 
 ## Ordered Work
 
@@ -177,6 +189,8 @@ external adapters remain optional projections rather than sources of truth.
         linking, service-unreachable errors, stage-specific actions, and recovery.
   - [x] Save missing credentials as one connection while preserving confirmed
         per-token replacement and removal for configured credentials.
+  - [x] Separate routine runtime controls from destructive linked-account
+        maintenance and remove remaining runtime-facing Connector jargon.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -250,6 +264,14 @@ two missing tokens share one disabled-until-complete Save connection action, the
 narrow action expands to the available width, and the document has no horizontal
 overflow. No field was edited and no credential or external Connector action was
 submitted on the real AliceProject.
+
+The linked-account maintenance increment passed the same 27 focused tests, UI
+typecheck/build, root typecheck, and all 5,102 repository tests. Real-route acceptance used
+the linked Feishu dialog at desktop and 390 px: the lifecycle panel now exposes
+only `Use Feishu` and Send test, while Unlink appears with preservation copy inside
+Connection details beside credential maintenance. The maintenance row becomes a
+full-width action on narrow screens and the page remains exactly 390 px wide. No
+test, toggle, credential, removal, or unlink action was triggered.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

@@ -280,7 +280,7 @@ describe('Connector demo routes', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Configure Feishu' })).toBeTruthy()
     expect(within(dialog).getByText('Connection, delivery, and chat settings for Feishu.')).toBeTruthy()
-    expect(within(dialog).queryByRole('switch', { name: 'Start or stop the Feishu connector' })).toBeNull()
+    expect(within(dialog).queryByRole('switch', { name: 'Turn Feishu on or off' })).toBeNull()
     const connection = within(dialog).getByRole('button', { name: 'Hide Feishu connection details' })
     const delivery = within(dialog).getByRole('switch', { name: 'Push Inbox notifications' })
     expect(connection.getAttribute('aria-expanded')).toBe('true')
@@ -345,7 +345,7 @@ describe('Connector demo routes', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('switch', {
-      name: 'Start or stop the Discord connector',
+      name: 'Turn Discord on or off',
     }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
 
@@ -444,7 +444,7 @@ describe('Connector demo routes', () => {
     render(<ConnectorsPage />)
 
     const runtimeSwitch = await screen.findByRole('switch', {
-      name: 'Start or stop the Discord connector',
+      name: 'Turn Discord on or off',
     })
     expect(runtimeSwitch.getAttribute('aria-checked')).toBe('false')
     fireEvent.click(runtimeSwitch)
@@ -480,6 +480,7 @@ describe('Connector demo routes', () => {
     mocks.load.mockResolvedValue(snapshot)
     render(<ConnectorsPage />)
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord connection details' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Unlink' }))
     expect(screen.getByRole('heading', { name: 'Unlink Discord?' })).toBeTruthy()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
