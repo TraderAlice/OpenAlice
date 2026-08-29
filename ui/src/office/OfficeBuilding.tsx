@@ -64,7 +64,7 @@ const OFFICE_MOVEMENTS = {
 }
 
 type OfficeMovement = (typeof OFFICE_MOVEMENTS)[keyof typeof OFFICE_MOVEMENTS]
-const OFFICE_DEPARTURE_MS = 260
+const OFFICE_DEPARTURE_MS = 520
 export type OfficeLogOrigin = 'menu' | 'operations' | 'floor-terminal'
 export interface OfficePlayerState {
   position: { x: number; y: number }

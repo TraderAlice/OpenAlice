@@ -2791,9 +2791,10 @@
       transparent 8px 16px
     ),
     var(--office-gba-ink-seed);
+  box-shadow: inset 0 0 0 4px var(--office-gba-cream-seed);
   clip-path: inset(50% 0 50% 0);
   pointer-events: auto;
-  animation: oa-office-departure-curtain 260ms steps(5, end) forwards;
+  animation: oa-office-departure-curtain 320ms steps(6, end) forwards;
 }
 
 .oa-office-departure__message {
@@ -2813,6 +2814,8 @@
   font-size: var(--text-sm);
   text-align: center;
   text-transform: uppercase;
+  opacity: 0;
+  animation: oa-office-departure-message 320ms steps(2, end) forwards;
 }
 
 .oa-office-departure__message img {
@@ -2824,9 +2827,14 @@
 
 @keyframes oa-office-departure-curtain {
   0% { clip-path: inset(50% 0 50% 0); }
-  40% { clip-path: inset(32% 0 32% 0); }
-  70% { clip-path: inset(14% 0 14% 0); }
+  34% { clip-path: inset(38% 0 38% 0); }
+  67% { clip-path: inset(20% 0 20% 0); }
   100% { clip-path: inset(0); }
+}
+
+@keyframes oa-office-departure-message {
+  0%, 49% { opacity: 0; }
+  50%, 100% { opacity: 1; }
 }
 
 .oa-office-campus:focus-visible {

@@ -2305,6 +2305,26 @@ Partial-row service-bay follow-up (2026-08-29):
   specs passed: 4 files / 25 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,062 passing;
   one file and nine tests skipped), and the UI production build all passed.
 
+Workspace-departure transition follow-up (2026-08-29):
+
+- Browser-played Auto Prediction entry at 1280x900 and 390x844. The existing center-out pixel curtain has the right
+  visual vocabulary, but its 260ms animation and navigation timer end together: desktop can switch before the
+  destination plaque becomes perceptible, while the phone only exposes a fleeting half-closed frame.
+- Compared recoloring the existing fast curtain, replacing it with a conventional full-screen fade, and splitting the
+  pixel curtain into a stepped close plus a short fully-closed hold. Chose the two-phase pixel curtain because it keeps
+  the Office game language, gives the destination a readable beat, and does not delay or visually cover app navigation.
+- Interaction contract: the map remains busy and input-blocked during departure; the shutter closes in discrete steps,
+  then holds the complete stage with the generated portal plaque before the existing Workspace navigation runs.
+  Reduced-motion users retain the current immediate navigation path rather than receiving a newly prolonged effect.
+- Implemented a 320ms six-step close, delayed two-step plaque reveal, a framed fully-closed stage, and a 200ms readable
+  hold before navigation. The timer contract now proves that navigation cannot fire at 519ms and must fire at 520ms;
+  the style contract pins the stepped shutter and delayed message instead of allowing a smooth fade regression.
+- Browser-played Auto Prediction departure and arrival at 1280x900 and 390x844. Both viewports retain the surrounding
+  application chrome, show the complete generated portal plaque during the hold, and land on the correct Workspace;
+  a long-route Semis and supply-chain entry also reached its correct Workspace. Focused OfficeBuilding/responsive-style
+  specs passed: 2 files / 24 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 612-file Vitest run (5,063 passing;
+  one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

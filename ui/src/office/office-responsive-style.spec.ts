@@ -52,6 +52,12 @@ describe('Office responsive style contract', () => {
     expect(mapBlocks.some((block) => block.includes('0 0 0 4px var(--gba-ink)'))).toBe(true)
   })
 
+  it('closes the pixel departure shutter before holding the readable destination', () => {
+    expect(css).toMatch(/\.oa-office-departure\s*\{[\s\S]*?animation: oa-office-departure-curtain 320ms steps\(6, end\) forwards/)
+    expect(css).toMatch(/\.oa-office-departure__message\s*\{[\s\S]*?animation: oa-office-departure-message 320ms steps\(2, end\) forwards/)
+    expect(css).toMatch(/@keyframes oa-office-departure-curtain\s*\{[\s\S]*?100% \{ clip-path: inset\(0\); \}/)
+  })
+
   it('keeps detailed interaction prompts inside the phone map', () => {
     expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]')
     expect(narrowLiveCss).toContain('max-width: 168px')
