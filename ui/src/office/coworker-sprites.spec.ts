@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -5,6 +8,8 @@ import {
   OFFICE_COWORKER_SPRITES,
   officeCoworkerSpriteForAgent,
 } from './coworker-sprites'
+
+const publicRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../public')
 
 describe('Office coworker sprite registry', () => {
   it('maps authored runtimes to distinct generated coworkers', () => {
@@ -14,6 +19,8 @@ describe('Office coworker sprite registry', () => {
     expect(officeCoworkerSpriteForAgent('opencode')).toBe(OFFICE_COWORKER_SPRITES.opencode)
     expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(4)
     expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(4)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskWorkSrc)).size).toBe(4)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.typingPhaseMs)).size).toBe(4)
   })
 
   it('keeps aliases intentional and unknown runtimes stable without returning Alice', () => {
@@ -24,6 +31,7 @@ describe('Office coworker sprite registry', () => {
     )
     expect(officeCoworkerSpriteForAgent('future-agent').portraitSrc).not.toContain('alice-maid')
     expect(officeCoworkerSpriteForAgent('future-agent').deskSrc).toContain('-desk-v1.png')
+    expect(officeCoworkerSpriteForAgent('future-agent').deskWorkSrc).toContain('-desk-work-v1.png')
   })
 
   it('owns exceptional desk-state emotes as generated Office assets', () => {
@@ -31,5 +39,16 @@ describe('Office coworker sprite registry', () => {
       waiting: '/office/coworkers/waiting-emote-v1.png',
       failed: '/office/coworkers/failed-emote-v1.png',
     })
+  })
+
+  it('ships each generated typing frame on the exact canvas of its identity frame', () => {
+    for (const asset of Object.values(OFFICE_COWORKER_SPRITES)) {
+      const idle = readFileSync(resolve(publicRoot, asset.deskSrc.replace(/^\//, '')))
+      const work = readFileSync(resolve(publicRoot, asset.deskWorkSrc.replace(/^\//, '')))
+      expect(work.subarray(0, 8)).toEqual(idle.subarray(0, 8))
+      expect(work[25]).toBe(6)
+      expect(work.readUInt32BE(16)).toBe(idle.readUInt32BE(16))
+      expect(work.readUInt32BE(20)).toBe(idle.readUInt32BE(20))
+    }
   })
 })

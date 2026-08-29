@@ -4,6 +4,8 @@ export interface OfficeCoworkerSpriteAsset {
   id: OfficeCoworkerArchetype
   portraitSrc: string
   deskSrc: string
+  deskWorkSrc: string
+  typingPhaseMs: number
   accent: string
 }
 
@@ -12,24 +14,32 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerArchetype, OfficeCowo
     id: 'codex',
     portraitSrc: '/office/coworkers/codex-v1.webp',
     deskSrc: '/office/coworkers/codex-desk-v1.png',
+    deskWorkSrc: '/office/coworkers/codex-desk-work-v1.png',
+    typingPhaseMs: 0,
     accent: 'var(--terminal-yellow)',
   },
   claude: {
     id: 'claude',
     portraitSrc: '/office/coworkers/claude-v1.webp',
     deskSrc: '/office/coworkers/claude-desk-v1.png',
+    deskWorkSrc: '/office/coworkers/claude-desk-work-v1.png',
+    typingPhaseMs: -170,
     accent: 'var(--terminal-red)',
   },
   pi: {
     id: 'pi',
     portraitSrc: '/office/coworkers/pi-v1.webp',
     deskSrc: '/office/coworkers/pi-desk-v1.png',
+    deskWorkSrc: '/office/coworkers/pi-desk-work-v1.png',
+    typingPhaseMs: -310,
     accent: 'var(--terminal-cyan)',
   },
   opencode: {
     id: 'opencode',
     portraitSrc: '/office/coworkers/opencode-v1.webp',
     deskSrc: '/office/coworkers/opencode-desk-v1.png',
+    deskWorkSrc: '/office/coworkers/opencode-desk-work-v1.png',
+    typingPhaseMs: -470,
     accent: 'var(--terminal-magenta)',
   },
 }

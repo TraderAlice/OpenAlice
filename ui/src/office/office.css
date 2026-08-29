@@ -850,8 +850,24 @@
   transform-origin: center bottom;
 }
 
-.oa-office-coworker[data-mood="working"] img {
+.oa-office-coworker__frame--work {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.oa-office-coworker[data-pose="portrait"][data-mood="working"] img {
   animation: oa-office-coworker-working 900ms steps(2, end) infinite;
+}
+
+.oa-office-coworker[data-pose="desk"][data-mood="working"] .oa-office-coworker__frame--base {
+  animation: oa-office-coworker-typing-base 760ms steps(1, end) infinite;
+  animation-delay: var(--oa-coworker-typing-phase);
+}
+
+.oa-office-coworker[data-pose="desk"][data-mood="working"] .oa-office-coworker__frame--work {
+  animation: oa-office-coworker-typing-work 760ms steps(1, end) infinite;
+  animation-delay: var(--oa-coworker-typing-phase);
 }
 
 .oa-office-coworker[data-mood="talking"] img {
@@ -880,6 +896,10 @@
 }
 
 .oa-office-coworker[data-reduced-motion="true"] img {
+  animation: none;
+}
+
+.oa-office-coworker[data-pose="desk"][data-mood="working"][data-reduced-motion="true"] .oa-office-coworker__frame {
   animation: none;
 }
 
@@ -1638,6 +1658,16 @@
 
 @keyframes oa-office-coworker-working {
   50% { transform: translateY(-2px); filter: brightness(1.08); }
+}
+
+@keyframes oa-office-coworker-typing-base {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0; }
+}
+
+@keyframes oa-office-coworker-typing-work {
+  0%, 48% { opacity: 0; }
+  49%, 100% { opacity: 1; }
 }
 
 @keyframes oa-office-coworker-talking {

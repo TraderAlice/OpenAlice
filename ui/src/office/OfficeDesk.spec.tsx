@@ -65,6 +65,8 @@ describe('OfficeDesk', () => {
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-reduced-motion')).toBe('true')
     expect(container.querySelector<HTMLImageElement>('.oa-office-coworker img')?.src)
       .toContain('/office/coworkers/claude-desk-v1.png')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-coworker__frame--work')?.src)
+      .toContain('/office/coworkers/claude-desk-work-v1.png')
 
     rerender(<OfficeDesk {...props} nearby />)
     expect(screen.getByText('research')).toBeTruthy()

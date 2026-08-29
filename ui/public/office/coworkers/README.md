@@ -34,6 +34,12 @@ outerwear, and accent colors. Checkerboard outputs went through background
 extraction before the transparent sources were cropped and packaged for the
 runtime. Portrait sprites remain the identity view in roster and Agent windows.
 
+The four `*-desk-work-v1.png` files add the alternate keyboard phase for working coworkers. They were generated as
+identity-constrained rear-view poses, then packaged non-destructively beside the original frame. To prevent whole-body
+generation shimmer, each runtime frame composites the original head and central torso pixel-for-pixel over the new
+shoulder and forearm movement. Runtime animation swaps the two frames with discrete timing and a different phase per
+archetype; reduced motion keeps the original frame, and portrait views never use the typing family.
+
 `waiting-emote-v1.png` and `failed-emote-v1.png` are exceptional-state map
 signals. The waiting desk gets a quiet three-dot parchment bubble; a failed desk
 gets a jagged warning bubble. Normal work stays unlabelled, and an actual tool

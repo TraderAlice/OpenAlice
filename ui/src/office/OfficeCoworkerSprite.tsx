@@ -32,11 +32,23 @@ export function OfficeCoworkerSprite({
       data-reduced-motion={reducedMotion || undefined}
       style={{
         '--oa-coworker-accent': asset.accent,
+        '--oa-coworker-typing-phase': `${asset.typingPhaseMs}ms`,
         width: pose === 'desk' ? height : height * 0.72,
         height,
       } as CSSProperties}
     >
-      <img src={pose === 'desk' ? asset.deskSrc : asset.portraitSrc} alt="" />
+      <img
+        className="oa-office-coworker__frame oa-office-coworker__frame--base"
+        src={pose === 'desk' ? asset.deskSrc : asset.portraitSrc}
+        alt=""
+      />
+      {pose === 'desk' && mood === 'working' && (
+        <img
+          className="oa-office-coworker__frame oa-office-coworker__frame--work"
+          src={asset.deskWorkSrc}
+          alt=""
+        />
+      )}
     </span>
   )
 }

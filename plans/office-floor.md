@@ -1006,6 +1006,33 @@ Service-landmark asset follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5017 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Coworker work-animation follow-up (2026-08-29):
+
+- Replayed the settled cabinet, roster, Agent file, and occupancy-log menus before choosing the next change. Their
+  opaque GBA window stack, focus return, and portrait hierarchy are already coherent; the larger remaining break in
+  the `Live agent floor` promise is that every seated coworker remains a still image while only Alice moves.
+- Compared stronger CSS bobbing, a generic keyboard sparkle overlay, and authored second work poses. CSS motion
+  moves the whole body without describing work, while a generic effect would float above four different silhouettes.
+  Chose second poses because visible shoulder and forearm movement turns `working` into a game action rather than a
+  status label. Idle, waiting, failed, and portrait states intentionally keep their existing visual semantics.
+- Used the built-in image generator with all four generated desk poses plus the locked Office style master to author
+  alternate keyboard phases for Codex, Claude, Pi, and OpenCode. A first OpenCode result weakened its purple headset,
+  so that cell was rejected and regenerated from the exact OpenCode source with stricter identity constraints.
+- Chroma-key extraction, exact-canvas resizing, binary alpha, and palette reduction produced four sibling
+  `*-desk-work-v1.png` assets. To prevent generated hair or clothing texture from flickering, packaging composites
+  each original head and central torso pixel-for-pixel over the generated shoulder and forearm movement; only the
+  intended action regions change between frames.
+- Working desk poses now alternate original/work frames with discrete 760ms timing. Each runtime has a different
+  negative phase so a room of active agents does not move in lockstep. Portraits continue to render exactly one
+  standing WebP, and reduced motion leaves the original desk frame visible with the work layer at zero opacity.
+- Browser sampling proved all three active demo coworkers load their authored work asset and swap complementary
+  base/work opacity across a 410ms interval while occupying different phases. At 760x900 the animation stays legible,
+  horizontal overflow remains 0px, and opening Pi's Agent file yields one portrait image with no work frame.
+- Focused desk, sprite-registry, and building specs passed: 3 files / 15 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5018 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
