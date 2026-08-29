@@ -24,9 +24,8 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import * as pty from 'node-pty';
-
 import type { Logger } from './logger.js';
+import { loadNodePty } from './pty-runtime.js';
 import { resolveLaunchCommand } from './win-command.js';
 
 export interface HeadlessProbeArgs {
@@ -40,6 +39,8 @@ export interface HeadlessProbeArgs {
   readonly logger: Logger;
   /** Closes directory-operation start races once the PTY actually exists. */
   readonly onSpawned?: () => void;
+  /** Test seam; production loads the platform module only when probing. */
+  readonly pty?: Pick<typeof import('node-pty'), 'spawn'>;
 }
 
 export interface JsonlFileDelta {
@@ -87,7 +88,7 @@ export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<Headles
   let signal: number | null = null;
   let killed = false;
 
-  const child = pty.spawn(argv0, argv1, {
+  const child = (args.pty ?? loadNodePty()).spawn(argv0, argv1, {
     cwd,
     env: env as { [key: string]: string },
     cols: 80,

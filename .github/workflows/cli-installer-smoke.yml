@@ -11,11 +11,16 @@ on:
       - "install"
       - "package.json"
       - "packages/cli/**"
+      - "packages/guardian-runtime/**"
+      - "packages/uta-protocol/**"
+      - "src/**"
+      - "ui/**"
       - "scripts/install-docker-smoke.mjs"
       - "scripts/install-channel-smoke.mjs"
       - "scripts/install-channel-smoke/**"
       - "scripts/install-smoke/**"
       - "scripts/build-bun-cli-feasibility.ts"
+      - "scripts/build-bun-alice-feasibility.ts"
       - "scripts/remote-ssh-smoke.mjs"
       - "scripts/remote-smoke/**"
   push:
@@ -39,13 +44,13 @@ concurrency:
 jobs:
   bun-cli-feasibility:
     if: github.event_name != 'push'
-    name: Bun CLI feasibility (${{ matrix.os }})
+    name: Bun feasibility (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-14]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v7
@@ -61,9 +66,13 @@ jobs:
         with:
           bun-version-file: ".bun-version"
 
-      - run: pnpm install --frozen-lockfile --filter=@traderalice/openalice-cli...
+      - run: pnpm install --frozen-lockfile --filter='!@traderalice/desktop'
+
+      - run: pnpm build:server
 
       - run: pnpm build:bun-cli:feasibility
+
+      - run: pnpm build:bun-alice:feasibility
 
   checkout-install:
     if: github.event_name != 'push'
