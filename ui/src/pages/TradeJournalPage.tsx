@@ -30,7 +30,7 @@ interface TradeJournalPageProps {
 }
 
 export function TradeJournalPage({ spec }: TradeJournalPageProps) {
-  const { openOrFocus } = useWorkspace()
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const [entries, setEntries] = useState<TradeJournalEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)

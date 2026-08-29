@@ -24,8 +24,8 @@ interface QuantLabSidebarProps {
 }
 
 export function QuantLabSidebar({ onNavigate }: QuantLabSidebarProps) {
-  const { openOrFocus, state } = useWorkspace()
-  const focused = getFocusedTab(state)
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
+  const focusedTab = useWorkspace((s) => getFocusedTab(s))
   const [status, setStatus] = useState<LeanStatus | null>(null)
   const [strategies, setStrategies] = useState<StrategyMetadata[]>([])
   const [backtests, setBacktests] = useState<BacktestSummary[]>([])
@@ -56,11 +56,11 @@ export function QuantLabSidebar({ onNavigate }: QuantLabSidebarProps) {
     onNavigate?.()
   }
 
-  const isMainActive = focused?.spec.kind === 'quant-lab'
-  const isJournalActive = focused?.spec.kind === 'quant-lab-journal'
-  const activeStrategyId = focused?.spec.kind === 'quant-lab-strategy' ? focused.spec.params.id : null
-  const activeBacktestId = focused?.spec.kind === 'quant-lab-results' ? focused.spec.params.id : null
-  const isIntegrityActive = focused?.spec.kind === 'quant-lab-integrity'
+  const isMainActive = focusedTab?.spec.kind === 'quant-lab'
+  const isJournalActive = focusedTab?.spec.kind === 'quant-lab-journal'
+  const activeStrategyId = focusedTab?.spec.kind === 'quant-lab-strategy' ? focusedTab.spec.params.id : null
+  const activeBacktestId = focusedTab?.spec.kind === 'quant-lab-results' ? focusedTab.spec.params.id : null
+  const isIntegrityActive = focusedTab?.spec.kind === 'quant-lab-integrity'
 
   return (
     <div className="flex h-full flex-col select-none overflow-y-auto p-2 gap-4">

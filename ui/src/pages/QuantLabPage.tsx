@@ -35,7 +35,7 @@ interface QuantLabPageProps {
 }
 
 export function QuantLabPage({ spec }: QuantLabPageProps) {
-  const { openOrFocus } = useWorkspace()
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const [status, setStatus] = useState<LeanStatus | null>(null)
   const [templates, setTemplates] = useState<StrategyTemplate[]>([])
   const [strategies, setStrategies] = useState<StrategyMetadata[]>([])

@@ -28,7 +28,7 @@ interface ResearchIntegrityPageProps {
 }
 
 export function ResearchIntegrityPage({ spec }: ResearchIntegrityPageProps) {
-  const { openOrFocus } = useWorkspace()
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const initialExpId = spec.params.experimentId
 
   const [experiments, setExperiments] = useState<Experiment[]>([])

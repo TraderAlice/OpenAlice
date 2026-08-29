@@ -28,7 +28,7 @@ interface BacktestResultsPageProps {
 }
 
 export function BacktestResultsPage({ spec }: BacktestResultsPageProps) {
-  const { openOrFocus } = useWorkspace()
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const backtestId = spec.params.id
 
   const [result, setResult] = useState<BacktestResult | null>(null)

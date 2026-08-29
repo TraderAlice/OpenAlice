@@ -26,7 +26,7 @@ interface StrategyDetailPageProps {
 export const FOREX_PAIRS = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCHF', 'USDCAD', 'NZDUSD'] as const
 
 export function StrategyDetailPage({ spec }: StrategyDetailPageProps) {
-  const { openOrFocus } = useWorkspace()
+  const openOrFocus = useWorkspace((s) => s.openOrFocus)
   const strategyId = spec.params.id
 
   const [strategy, setStrategy] = useState<LeanStrategy | null>(null)
