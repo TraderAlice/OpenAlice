@@ -280,6 +280,20 @@ external adapters remain optional projections rather than sources of truth.
     switch name keep state independent of color. The Connector health domain
     owns the read-modify-save-refresh transaction so presentation code does not
     invent a parallel snapshot lifecycle.
+26. **A channel card is the container; its information is not more cards.**
+    Restyling the existing nested status and diagnostic boxes would retain a
+    strong boundary around every sentence, while replacing the whole overview
+    with a flat list would reduce visual noise at the cost of channel identity
+    and the current responsive grouping. The chosen model keeps one bordered
+    article per channel, then uses typography, spacing, the textual lifecycle
+    badge, evidence rows, and thin separators inside it. The state description
+    becomes ordinary primary copy, and Technical details remains a native
+    disclosure without its own rounded panel. The service summary follows the
+    same diagnostic treatment. Non-clickable card backgrounds no longer change
+    on hover, so hover feedback belongs only to real buttons, switches, and
+    disclosures. Document order, keyboard semantics, status text/icons, error
+    coloring, responsive one/two-column grouping, and every action remain
+    unchanged; this is a hierarchy correction rather than a new interaction.
 
 ## Ordered Work
 
@@ -336,6 +350,8 @@ external adapters remain optional projections rather than sources of truth.
         lifecycle panel with localized accessible progress and errors.
   - [x] Add per-channel runtime switches to credential-ready overview cards and
         keep their save/reconnect feedback local to the affected card.
+  - [x] Flatten informational boxes inside overview cards and remove hover cues
+        from non-clickable channel surfaces.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -541,6 +557,19 @@ all labels, switches, reconnect/review buttons, state evidence, and diagnostics
 remained in document order with a page width exactly matching the viewport. No
 control was clicked, no external message was sent, no Connector state changed,
 and the viewport was reset.
+
+The single-container-card increment passed 35 focused overview and Connector
+demo tests, UI and root typechecks, the production build, and all 5,120
+repository tests. Real Default AliceProject acceptance at 1,052 x 734 confirmed
+that the service summary and four channel
+articles retained their status, evidence, diagnostic disclosure, runtime switch,
+and task actions after the nested informational panels were removed. At 390 x
+844, Discord, Telegram, and Feishu preserved the same reading and touch order;
+the Telegram diagnostic remained a native disclosure between evidence and
+runtime controls, and the page width exactly matched the viewport. Card-level
+hover classes are absent, while buttons, switches, and disclosure summaries keep
+their own affordances. No control was clicked, no external message was sent, no
+Connector state changed, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

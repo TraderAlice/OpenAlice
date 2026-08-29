@@ -231,7 +231,10 @@ function ConnectorOverviewSkeleton({ label }: { label: string }) {
                 </div>
                 <Skeleton className="h-5 w-20 rounded-full" />
               </div>
-              <Skeleton className="mt-4 h-16 w-full rounded-xl" />
+              <div className="mt-5 space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+              </div>
               <div className="mt-4 flex gap-2">
                 <Skeleton className="h-3 w-24" />
                 <Skeleton className="h-3 w-20" />
@@ -471,7 +474,7 @@ function ConnectorOverviewCard({
   const ActionIcon = setupAction ? ArrowRight : Settings2
 
   return (
-    <article className="oa-status-surface group flex flex-col rounded-2xl border border-border bg-secondary/20 p-5 transition-colors hover:border-border/90 hover:bg-secondary/30">
+    <article className="oa-status-surface flex flex-col rounded-2xl border border-border/80 bg-secondary/15 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <ConnectorGlyph id={definition.id} />
@@ -480,9 +483,7 @@ function ConnectorOverviewCard({
         <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
       </div>
 
-      <div className={`mt-4 rounded-xl border px-3.5 py-3 ${statusSurfaceClass(presentation.tone)}`}>
-        <p className="text-[12.5px] font-medium leading-5 text-foreground">{presentation.description}</p>
-      </div>
+      <p className="mt-4 text-[12.5px] font-medium leading-5 text-foreground">{presentation.description}</p>
 
       {setup.ready && (
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11.5px] text-muted-foreground">
@@ -704,21 +705,14 @@ function ConnectorGlyph({ id }: { id: string }) {
   )
 }
 
-function statusSurfaceClass(tone: StatusTone): string {
-  if (tone === 'healthy') return 'border-success/15 bg-success/[0.035]'
-  if (tone === 'warning') return 'border-warning/15 bg-warning/[0.035]'
-  if (tone === 'danger') return 'border-destructive/15 bg-destructive/[0.035]'
-  return 'border-border/60 bg-background/35'
-}
-
 function DiagnosticDetails({ summary, children }: { summary: string; children: ReactNode }) {
   return (
-    <details className="group/details mt-3 rounded-lg border border-border/60 bg-background/30 px-3 py-2 text-[11.5px]">
-      <summary className="oa-pressable flex cursor-pointer list-none items-center gap-2 font-medium text-muted-foreground hover:text-foreground">
+    <details className="group/details mt-3 border-t border-border/60 pt-3 text-[11.5px]">
+      <summary className="oa-pressable flex w-fit cursor-pointer list-none items-center gap-2 font-medium text-muted-foreground hover:text-foreground">
         <CircleAlert size={13} aria-hidden />
         {summary}
       </summary>
-      <div className="mt-2 break-words border-t border-border/50 pt-2 leading-5 text-destructive">
+      <div className="mt-2 break-words pl-5 leading-5 text-destructive">
         {children}
       </div>
     </details>

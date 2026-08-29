@@ -394,7 +394,10 @@ The surfaces deliberately have different jobs:
   transient runtime changes never reorder established targets and empty groups
   do not add headings. Cards omit the repeated generic delivery subtitle and do
   not impose a fixed minimum height: the state explanation is the primary body,
-  while evidence and the next action remain in stable document order. Every
+  while evidence and the next action remain in stable document order. A channel
+  article is the single visual container; state copy is not wrapped in a nested
+  status card, diagnostics use a thin native disclosure, and the non-clickable
+  article has no hover treatment. Every
   credential-ready card also exposes the same `Use <platform>` runtime switch as
   Settings. Turning it on enables the shared service when needed; turning it off
   preserves credentials, linkage, delivery preference, and Chat configuration.
