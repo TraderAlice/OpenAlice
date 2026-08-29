@@ -34,7 +34,11 @@ export function OfficeDesk({
 }) {
   const { t } = useTranslation()
   const station = officeStationComposition()
-  const emote = employee && (employee.mood === 'waiting' || employee.mood === 'failed')
+  const emote = employee && (
+    employee.mood === 'working'
+    || employee.mood === 'waiting'
+    || employee.mood === 'failed'
+  )
     ? { mood: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
     : null
   const label = employee

@@ -63,6 +63,7 @@ describe('Office coworker sprite registry', () => {
 
   it('owns exceptional desk-state emotes as generated Office assets', () => {
     expect(OFFICE_COWORKER_EMOTES).toEqual({
+      working: '/office/hud/talk-bubble-v2.png',
       waiting: '/office/coworkers/waiting-emote-v1.png',
       failed: '/office/coworkers/failed-emote-v1.png',
     })

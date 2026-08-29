@@ -4140,6 +4140,11 @@
   filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
+.oa-office-mood-emote[data-mood="working"] {
+  opacity: 0.9;
+  animation: oa-office-emote-working 1.1s steps(2, end) infinite;
+}
+
 .oa-office-mood-emote[data-mood="waiting"] {
   animation: oa-office-emote-waiting 1.4s steps(2, end) infinite;
 }
@@ -4150,6 +4155,10 @@
 
 .oa-office-mood-emote[data-reduced-motion="true"] {
   animation: none;
+}
+
+@keyframes oa-office-emote-working {
+  50% { transform: translate(-50%, -2px); }
 }
 
 @keyframes oa-office-emote-waiting {
