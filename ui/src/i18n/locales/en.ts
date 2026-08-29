@@ -1874,7 +1874,7 @@ export const en = {
     liveMap: 'Live map',
     currentView: 'Current',
     currentFloorView: 'Current floor view: {{view}}',
-    visibleGroupCount: '{{visible}} shown · {{awake}} awake · {{total}} total',
+    visibleGroupSummary: '{{visible}} on floor · {{recent}} recent · {{total}} total',
     allRooms: 'All rooms',
     allGroups: 'All groups',
     sleepingGroups_one: '{{count}} sleeping group',

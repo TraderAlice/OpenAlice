@@ -675,6 +675,8 @@ describe('OfficeBuilding', () => {
     )
     expect(screen.getByTestId('office-building').dataset.officeTime).toBe('night')
     expect(screen.getByTestId('office-wall')).toBeTruthy()
+    expect(screen.getByTestId('office-wall').querySelector('.oa-office-hud__status')?.getAttribute('title'))
+      .toBe('2 on floor · 1 recent · 3 total')
     const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
     expect(map).toBeTruthy()
     expect(map.querySelector<HTMLImageElement>('.oa-office-map-service[data-kind="inbox"] img')?.src)

@@ -192,7 +192,7 @@ export function OfficeBuilding({
   const replayFocusKeyRef = useRef<string | null>(null)
   const menuOriginRef = useRef<'hud' | 'floor-terminal'>('hud')
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
-  const awakeGroups = useMemo(
+  const recentGroups = useMemo(
     () => building.offices.filter((office) => !office.sleeping),
     [building.offices],
   )
@@ -855,9 +855,9 @@ export function OfficeBuilding({
 
         <div
           className="oa-office-hud__status"
-          title={t('office.visibleGroupCount', {
+          title={t('office.visibleGroupSummary', {
             visible: defaultGroups.length,
-            awake: awakeGroups.length,
+            recent: recentGroups.length,
             total: building.offices.length,
           })}
         >

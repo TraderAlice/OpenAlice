@@ -2870,6 +2870,21 @@ Coworker-emote slot follow-up (2026-08-30):
   (3 files / 30 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,122 passing; one file and nine
   tests skipped), and the production build; the existing large-chunk advisory is unchanged.
 
+HUD state-vocabulary follow-up (2026-08-30):
+
+- Continued playing the fully dormant Office Lab and inspected the HUD semantics. Its visible line correctly read
+  `0 working · 0 awake`, but the same status area's tooltip/accessibility name read `3 shown · 3 awake · 3 total`.
+  That second `awake` counted Workspaces with interaction inside the three-day sleep threshold, not awake Agents.
+- Compared removing the group summary, duplicating Agent counts, and naming the Workspace recency rule explicitly.
+  Chose explicit state layers: the visible game counter remains about coworkers, while the supplementary group summary
+  now reports groups on the floor, recently used groups, and the total inventory.
+- Renamed the projection variable from `awakeGroups` to `recentGroups` and replaced the ambiguous localized copy in
+  English, Simplified Chinese, Traditional Chinese, and Japanese. No compatibility key or dual vocabulary remains.
+- The real Office HUD now exposes `3 on floor · 3 recent · 3 total` around a visible `0 working · 0 awake`, so recent
+  rooms and sleeping people no longer contradict each other. The focused Building spec passed (1 file / 14 tests),
+  together with root/UI TypeScript, the full 617-file Vitest run (5,122 passing; one file and nine tests skipped), and
+  the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

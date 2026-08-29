@@ -1849,7 +1849,7 @@ export const zhHant: Resources = {
     liveMap: '目前地圖',
     currentView: '目前',
     currentFloorView: '目前樓層檢視：{{view}}',
-    visibleGroupCount: '顯示 {{visible}} · 清醒 {{awake}} · 共 {{total}}',
+    visibleGroupSummary: '樓層 {{visible}} · 近期 {{recent}} · 共 {{total}}',
     allRooms: '所有房間',
     allGroups: '所有小組',
     sleepingGroups_one: '{{count}} 個休眠小組',
