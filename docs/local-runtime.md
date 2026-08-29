@@ -83,6 +83,15 @@ minimal Git runtime. The Bun provider prepends only that release-owned Git to
 the inherited PATH and records the archive's content identity from
 `release.json`; it does not require or replace a user's system Git.
 
+On supported POSIX targets, Bun's native `Terminal` remains behind the same PTY
+contract as `node-pty`. Since Bun 1.4 does not expose a read-side pause method,
+the Bun backend implements the existing WebSocket high/low-watermark flow
+control by stopping and continuing the PTY process group. Pressure therefore
+stays at the producer and kernel PTY boundary instead of accumulating in an
+unbounded JavaScript queue; graceful Session shutdown resumes a stopped group
+before terminating it. Electron and source-backed Node execution retain
+`node-pty` and its native stream pause/resume behavior.
+
 Source development continues to use `pnpm dev`, and the currently released
 installer continues to use the bundle provider until the Bun release and
 installation acceptance matrix is complete. Electron remains independent.

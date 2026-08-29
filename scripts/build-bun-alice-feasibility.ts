@@ -126,8 +126,23 @@ const ptyReport = JSON.parse(ptyStdout.trim()) as {
   backend: string
   supportsFlowControl: boolean
   pids: number[]
+  flowControl?: {
+    pid: number
+    bytesBeforePause: number
+    bytesWhilePaused: number
+    bytesAfterResume: number
+    gracefulKillWhilePaused: boolean
+  }
 }
-if (ptyReport.status !== 'pass' || ptyReport.backend !== 'bun-native') {
+if (
+  ptyReport.status !== 'pass'
+  || ptyReport.backend !== 'bun-native'
+  || !ptyReport.supportsFlowControl
+  || !ptyReport.flowControl
+  || ptyReport.flowControl.bytesWhilePaused !== ptyReport.flowControl.bytesBeforePause
+  || ptyReport.flowControl.bytesAfterResume <= ptyReport.flowControl.bytesWhilePaused
+  || !ptyReport.flowControl.gracefulKillWhilePaused
+) {
   throw new Error(`compiled Bun PTY smoke returned an invalid report: ${ptyStdout}`)
 }
 
