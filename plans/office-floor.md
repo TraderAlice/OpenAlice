@@ -2691,6 +2691,25 @@ Coworker identity and Assignment follow-up (2026-08-30):
   with root/UI TypeScript, the full 617-file Vitest run (5,111 passing; one file and nine tests skipped), and the
   production build; the existing large-chunk advisory is unchanged.
 
+Eight-person Grok party follow-up (2026-08-30):
+
+- Reopened the real six-person Prediction roster after introducing callsigns and found `Grok Engineer` visibly
+  repeated inside one party. The identity model was now clear, but the five-person asset pool still made a normal
+  six-Session Workspace feel procedurally duplicated instead of authored.
+- Compared accepting repeats after five, deriving palette swaps, and expanding the authored Grok party. Chose the
+  authored party: palette swaps would preserve the same face and silhouette, while three genuinely distinct women add
+  durable character memory without changing responsive layout, keyboard semantics, or runtime data contracts.
+- Generated a silver-blue Navigator, rose-gold Synthesist, and emerald-black Sentinel as identity-locked three-pose
+  sheets using the built-in image generator and the existing Office palette/camera references. The standard packager
+  hard-matted their alpha, normalized each portrait to 72x104, and shared the seated scale and bottom-center anchor
+  across the 176x176 idle/work frames.
+- The shared coworker registry now owns eight Grok identities. Workspace casting exhausts all eight before a portrait
+  or callsign repeats. Browser-played the real six-person roster, Sentinel Agent File, Synthesist completion pose, and
+  an eight-person party produced by two additional Grok runs (`run-bROQI9-K`, `run-lmsKn-on`); all eight callsigns and
+  portraits remained unique. Focused coworker, label, roster, desk, and floor specs passed (5 files / 30 tests), together
+  with root/UI TypeScript, the full 617-file Vitest run (5,111 passing; one file and nine tests skipped), and the
+  production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

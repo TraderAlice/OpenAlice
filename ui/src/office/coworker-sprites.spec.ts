@@ -19,10 +19,10 @@ describe('Office coworker sprite registry', () => {
     expect(officeCoworkerSpriteForAgent('pi')).toBe(OFFICE_COWORKER_SPRITES.pi)
     expect(officeCoworkerSpriteForAgent('opencode')).toBe(OFFICE_COWORKER_SPRITES.opencode)
     expect(officeCoworkerSpriteForAgent('grok')).toBe(OFFICE_COWORKER_SPRITES['grok-oracle'])
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(15)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(15)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskWorkSrc)).size).toBe(15)
-    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.typingPhaseMs)).size).toBe(15)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.portraitSrc)).size).toBe(18)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskSrc)).size).toBe(18)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.deskWorkSrc)).size).toBe(18)
+    expect(new Set(Object.values(OFFICE_COWORKER_SPRITES).map((asset) => asset.typingPhaseMs)).size).toBe(18)
   })
 
   it('assigns a stable identity-led coworker from each runtime family pool', () => {
@@ -36,7 +36,7 @@ describe('Office coworker sprite registry', () => {
     expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('opencode', identity).id)).size)
       .toBe(3)
     expect(new Set(samples.map((identity) => officeCoworkerSpriteForAgent('grok', identity).id)).size)
-      .toBe(5)
+      .toBe(8)
     expect(officeCoworkerSpriteForAgent('codex', 'resume-7'))
       .toBe(officeCoworkerSpriteForAgent('codex', 'resume-7'))
   })
@@ -48,11 +48,14 @@ describe('Office coworker sprite registry', () => {
       'resume-nimble-birch-valley-un7631',
       'resume-stable-cedar-terrace-vkvnyi',
       'resume-light-maple-pencil-udz3zv',
+      'resume-crisp-marble-valley-qumctp',
+      'resume-quiet-spruce-canyon-vrg12a',
+      'resume-warm-cedar-field-zmb88n',
     ].map((resumeId) => ({ resumeId, agent: 'grok' }))
     const cast = officeCoworkerCast(members)
     const reversed = officeCoworkerCast([...members].reverse())
 
-    expect(new Set(members.map((member) => cast.get(member.resumeId)?.id)).size).toBe(5)
+    expect(new Set(members.map((member) => cast.get(member.resumeId)?.id)).size).toBe(8)
     expect(members.map((member) => cast.get(member.resumeId)?.id)).toEqual(
       members.map((member) => reversed.get(member.resumeId)?.id),
     )

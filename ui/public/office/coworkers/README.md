@@ -39,16 +39,18 @@ never changes appearance after refresh. The original four coworkers remain veter
 the default population feminine-led without deleting the original cast. Unknown future runtime names receive a stable
 hash-selected family; they never fall back to Alice.
 
-Grok Build owns a separate five-woman runtime family instead of borrowing the
+Grok Build owns a separate eight-woman runtime family instead of borrowing the
 Codex pool: a night-sky systems oracle, copper signal engineer, violet inference
-analyst, teal star-network researcher, and ivory lattice architect. Each was
+analyst, teal star-network researcher, ivory lattice architect, silver-blue
+navigator, rose-gold synthesist, and emerald-black operations sentinel. Each was
 generated with the built-in image generator as one identity-locked three-pose
 sheet against the same style master and Codex scout pose references. When a
 generation baked its preview background into RGB, a background-extraction edit
 removed only that background before the standard packager applied hard alpha,
 native card/map canvases, shared seated scale, and bottom-center anchoring.
-Grok uses its own deterministic identity hash, so repeated Grok Sessions spread
-across this larger feminine cast while retaining their appearance after refresh.
+Grok uses its own deterministic identity hash, so an ordinary eight-person party
+exhausts the authored feminine cast before any appearance repeats while retaining
+each Session's appearance after refresh.
 
 The four `*-desk-v1.png` files are a separate generated map-scale pose family.
 Each employee is seated, seen from a top-down three-quarter rear view, and faces

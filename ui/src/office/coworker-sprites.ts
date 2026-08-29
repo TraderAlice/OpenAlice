@@ -12,6 +12,9 @@ export type OfficeCoworkerIdentity =
   | 'grok-analyst'
   | 'grok-researcher'
   | 'grok-architect'
+  | 'grok-navigator'
+  | 'grok-synthesist'
+  | 'grok-sentinel'
 
 export interface OfficeCoworkerSpriteAsset {
   id: OfficeCoworkerIdentity
@@ -58,6 +61,9 @@ export const OFFICE_COWORKER_SPRITES: Record<OfficeCoworkerIdentity, OfficeCowor
   'grok-analyst': coworkerAsset('grok-analyst', 'var(--terminal-cyan)', -850),
   'grok-researcher': coworkerAsset('grok-researcher', 'var(--terminal-cyan)', -910),
   'grok-architect': coworkerAsset('grok-architect', 'var(--terminal-cyan)', -970),
+  'grok-navigator': coworkerAsset('grok-navigator', 'var(--terminal-cyan)', -1_030),
+  'grok-synthesist': coworkerAsset('grok-synthesist', 'var(--terminal-cyan)', -1_090),
+  'grok-sentinel': coworkerAsset('grok-sentinel', 'var(--terminal-cyan)', -1_150),
 }
 
 export const OFFICE_COWORKER_EMOTES = {
@@ -84,7 +90,16 @@ const ARCHETYPE_POOL: Record<OfficeCoworkerArchetype, readonly OfficeCoworkerIde
   claude: ['claude-botanist', 'claude'],
   pi: ['pi-mathematician', 'pi'],
   opencode: ['opencode-hacker', 'opencode-analyst', 'opencode'],
-  grok: ['grok-oracle', 'grok-engineer', 'grok-analyst', 'grok-researcher', 'grok-architect'],
+  grok: [
+    'grok-oracle',
+    'grok-engineer',
+    'grok-analyst',
+    'grok-researcher',
+    'grok-architect',
+    'grok-navigator',
+    'grok-synthesist',
+    'grok-sentinel',
+  ],
 }
 
 const ARCHETYPE_DEFAULT: Record<OfficeCoworkerArchetype, OfficeCoworkerIdentity> = {
