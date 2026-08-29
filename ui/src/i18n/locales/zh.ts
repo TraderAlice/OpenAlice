@@ -2054,6 +2054,9 @@ export const zh: Resources = {
   connectorSettings: {
     title: '连接器',
     description: '连接你的私有频道，用于收件箱投递和工作区对话。外部投递绝不会阻塞 OpenAlice 的工作。',
+    channelNavigation: '频道设置',
+    channelNavigationDescription: '直接前往对应频道。',
+    channelNavigationAction: '{{name}} 设置，{{status}}',
     serviceDescription: '启动任一连接器时会自动开启投递。只有需要统一暂停或恢复所有频道时，才使用这里的控制。',
     runService: '允许外部投递',
     runServiceDescription: '连接器开关会自动开启此服务。关闭后会暂停所有频道，但不会移除连接信息或聊天设置。',

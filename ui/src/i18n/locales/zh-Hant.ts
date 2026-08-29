@@ -2062,6 +2062,9 @@ export const zhHant: Resources = {
   connectorSettings: {
     title: '連接器',
     description: '連接你的私人頻道，用於收件匣投遞與工作區對話。外部投遞絕不會阻塞 OpenAlice 的工作。',
+    channelNavigation: '頻道設定',
+    channelNavigationDescription: '直接前往對應頻道。',
+    channelNavigationAction: '{{name}} 設定，{{status}}',
     serviceDescription: '啟動任一連接器時會自動開啟投遞。只有需要統一暫停或恢復所有頻道時，才使用這裡的控制。',
     runService: '允許外部投遞',
     runServiceDescription: '連接器開關會自動開啟此服務。關閉後會暫停所有頻道，但不會移除連線資訊或聊天設定。',

@@ -386,6 +386,16 @@ function ConnectorSettingsSurface({
           {config && (
             <>
               {!adapterOnly && (
+                <ConnectorSectionNav
+                  definitions={visibleDefinitions}
+                  config={config}
+                  health={health}
+                  adapterHealth={adapterHealth}
+                  t={t}
+                />
+              )}
+
+              {!adapterOnly && (
                 <ConfigSection
                   title={t('connectorStatus.serviceTitle')}
                   description={t('connectorSettings.serviceDescription')}
@@ -631,6 +641,100 @@ function ConnectorSettingsSkeleton({ compact, label }: { compact: boolean; label
   )
 }
 
+function ConnectorSectionNav({
+  definitions,
+  config,
+  health,
+  adapterHealth,
+  t,
+}: {
+  definitions: ConnectorDefinition[]
+  config: PublicConnectorConfig
+  health: ConnectorHealth | null
+  adapterHealth: Map<string, ConnectorRuntime>
+  t: TFunction
+}) {
+  return (
+    <nav
+      aria-label={t('connectorSettings.channelNavigation')}
+      className="mb-2 rounded-xl border border-border/70 bg-background/95 p-3 shadow-sm backdrop-blur-sm md:sticky md:top-0 md:z-20"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <ListChecks size={14} className="shrink-0 text-muted-foreground" aria-hidden />
+        <p className="text-[12px] font-semibold text-foreground">{t('connectorSettings.channelNavigation')}</p>
+        <p className="hidden text-[11.5px] text-muted-foreground sm:block">
+          {t('connectorSettings.channelNavigationDescription')}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {definitions.map((definition) => {
+          const adapter = config.adapters[definition.id] ?? emptyAdapter()
+          const runtime = adapterHealth.get(definition.id)
+          const setup = getConnectorSetupState({
+            definition,
+            adapter,
+            serviceEnabled: config.serviceEnabled,
+            serviceStatus: health?.status,
+            runtime,
+          })
+          const badge = setupPresentation(
+            setup.stage,
+            definition.label,
+            `/${setup.linkCommand ?? 'link'}`,
+            runtime,
+            t,
+          ).badge
+          return (
+            <button
+              key={definition.id}
+              type="button"
+              aria-label={t('connectorSettings.channelNavigationAction', {
+                name: definition.label,
+                status: badge,
+              })}
+              className="oa-pressable flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border/70 bg-secondary/20 px-3 py-2 text-left hover:border-primary/35 hover:bg-primary/[0.035]"
+              onClick={() => focusConnectorSection(definition.id)}
+            >
+              <span className="truncate text-[12px] font-medium text-foreground">{definition.label}</span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide ${connectorNavBadgeClass(setup.stage)}`}>
+                {badge}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
+function connectorSectionId(id: string): string {
+  return `connector-settings-${id}`
+}
+
+function focusConnectorSection(id: string): void {
+  const target = document.getElementById(connectorSectionId(id))
+  if (!target) return
+  target.focus({ preventScroll: true })
+  target.scrollIntoView?.({ block: 'start' })
+}
+
+function connectorNavBadgeClass(stage: ConnectorSetupState['stage']): string {
+  switch (stage) {
+    case 'linked':
+      return 'bg-success/10 text-success'
+    case 'error':
+      return 'bg-destructive/10 text-destructive'
+    case 'ready_to_link':
+    case 'starting':
+    case 'awaiting_link':
+      return 'bg-warning/12 text-warning'
+    case 'needs_credentials':
+      return 'bg-warning/10 text-warning'
+    case 'linked_offline':
+      return 'bg-muted text-muted-foreground'
+  }
+}
+
 function ConnectorAdapterSection({
   definition,
   compact,
@@ -645,13 +749,22 @@ function ConnectorAdapterSection({
   if (compact) {
     return <section className="py-3 sm:py-4">{children}</section>
   }
+  const sectionId = connectorSectionId(definition.id)
+  const titleId = `${sectionId}-title`
   return (
-    <ConfigSection
-      title={definition.label}
-      description={t('connectorSettings.adapterDescription', { name: definition.label })}
+    <section
+      id={sectionId}
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      className="scroll-mt-4 rounded-xl outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-4 focus:ring-offset-background md:scroll-mt-[9.5rem] xl:scroll-mt-[7rem]"
     >
-      {children}
-    </ConfigSection>
+      <ConfigSection
+        title={<span id={titleId}>{definition.label}</span>}
+        description={t('connectorSettings.adapterDescription', { name: definition.label })}
+      >
+        {children}
+      </ConfigSection>
+    </section>
   )
 }
 

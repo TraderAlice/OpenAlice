@@ -74,7 +74,7 @@ export function Section({ id, title, description, children }: SectionProps) {
 
 /** Two-column settings layout once the whole app shell has genuine room. */
 interface ConfigSectionProps {
-  title: string
+  title: ReactNode
   description?: string
   children: ReactNode
 }

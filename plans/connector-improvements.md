@@ -230,6 +230,21 @@ external adapters remain optional projections rather than sources of truth.
     minimum lets single-card rows fit their actual content; CSS Grid still keeps
     cards equal within a row, so action alignment and scan order remain stable.
     No accessible name, focus behavior, state copy, or action semantics change.
+22. **The full Settings document gains navigation without becoming tabs.** The
+    current all-adapter page preserves every form and unsaved draft, but its real
+    content is 2,701 px tall and offers no direct way to reach Slack or Feishu.
+    Platform tabs would shorten the page but hide state and drafts behind a view
+    switch; top-level accordions would add an expansion step to every edit. The
+    chosen in-page navigator keeps one complete document and shows all four
+    platforms with their localized lifecycle badges. It is sticky only at
+    desktop widths, where it remains a useful switcher. The grid uses one column
+    on narrow screens, two once both platform and lifecycle labels fit, and four
+    only on genuinely wide viewports; the narrow navigator is static so it does
+    not keep consuming the mobile viewport. Buttons move focus to labelled
+    region targets and invoke native scrolling with a responsive margin that
+    keeps the target heading below the sticky navigator, without changing the
+    route or URL history. Badge text accompanies color, normal keyboard order is
+    preserved, and the adapter-only dialog omits this redundant navigation.
 
 ## Ordered Work
 
@@ -278,6 +293,8 @@ external adapters remain optional projections rather than sources of truth.
         bounded scrolling for long forms and near-full-height narrow layouts.
   - [x] Remove repeated truncated card subtitles and fixed minimum heights so
         the overview prioritizes state, evidence, and the next action.
+  - [x] Add a responsive lifecycle-aware channel navigator to the full Settings
+        document without hiding forms, drafts, or changing routes.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -431,6 +448,20 @@ diagnostics, and actions in document order; the page width remained exactly
 Slack assertion treated the open loading skeleton as loaded settings. The test
 now waits for Save connection, its targeted rerun passed, and the full suite
 then passed. No Connector action was triggered and the viewport was reset.
+
+The full-settings navigator increment passed 30 focused overview/demo tests,
+UI and root typechecks, the production build, and all 5,113 repository tests.
+The interaction spec verifies four lifecycle-labelled buttons, a semantic Slack
+region, focus transfer, scrolling, and the responsive sticky offset. Real
+Default AliceProject acceptance at 1,052 x 734 first caught a four-column
+Telegram truncation and then a sticky-overlay defect; the final two-column
+layout rendered every platform/status in full, and the Slack heading sat
+directly below the 133 px sticky navigator with focus visibly transferred. At
+390 x 844 the static one-column navigator rendered all four labels without
+overflow, then scrolled entirely away while focused Feishu settings began below
+the mobile header. Both paths retained `/settings/connectors`, added no URL
+history, and changed no Connector setting or external state. The viewport was
+reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

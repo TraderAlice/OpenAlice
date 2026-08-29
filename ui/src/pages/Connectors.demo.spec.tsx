@@ -390,10 +390,10 @@ describe('Connector demo routes', () => {
 
     expect(await screen.findByText('Allow external delivery')).toBeTruthy()
     expect(screen.getByRole('switch', { name: 'Allow external delivery for all Connectors' })).toBeTruthy()
-    expect(screen.getByText('Discord')).toBeTruthy()
-    expect(screen.getByText('Telegram')).toBeTruthy()
-    expect(screen.getByText('Slack')).toBeTruthy()
-    expect(screen.getByText('Feishu')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Discord' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Telegram' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Slack' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Feishu' })).toBeTruthy()
     expect(screen.getByText('Application ID')).toBeTruthy()
     expect(screen.getAllByText('Bot token')).toHaveLength(3)
     expect(screen.getByText('Prepare Slack first')).toBeTruthy()
@@ -401,6 +401,23 @@ describe('Connector demo routes', () => {
     expect(slackSetup.getAttribute('href')).toBe('https://api.slack.com/apps')
     expect(slackSetup.getAttribute('target')).toBe('_blank')
     expect(screen.queryByRole('button', { name: 'Send test' })).toBeNull()
+  })
+
+  it('jumps from the channel navigator to a focused settings section', async () => {
+    render(<ConnectorsPage />)
+
+    const navigation = await screen.findByRole('navigation', { name: 'Channel settings' })
+    expect(navigation.querySelector('.grid')?.className).toContain('grid-cols-1')
+    expect(within(navigation).getAllByRole('button')).toHaveLength(4)
+    const slackSection = screen.getByRole('region', { name: 'Slack' })
+    expect(slackSection.className).toContain('md:scroll-mt-[9.5rem]')
+    const scrollIntoView = vi.fn()
+    slackSection.scrollIntoView = scrollIntoView
+
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Slack settings, Setup' }))
+
+    expect(document.activeElement).toBe(slackSection)
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
   })
 
   it('recovers when connection settings fail to load', async () => {

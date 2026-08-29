@@ -355,6 +355,10 @@ The surfaces deliberately have different jobs:
   the lifecycle panel keeps routine availability
   and test controls visible; Unlink lives inside Connection details beside token
   replacement/removal and explains that sealed credentials remain available.
+  The full Settings category keeps every adapter in one document and adds a
+  responsive in-page channel navigator with the same lifecycle badges. Choosing
+  a channel moves keyboard focus to its labelled section without changing route,
+  hiding another adapter's draft, or adding browser history.
   A desk-capable adapter also binds that connector's chat Issue when its
   definition advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator

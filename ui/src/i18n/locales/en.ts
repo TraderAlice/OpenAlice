@@ -2087,6 +2087,9 @@ export const en = {
   connectorSettings: {
     title: 'Connectors',
     description: 'Connect your private channels for Inbox delivery and Workspace conversations. External delivery never blocks OpenAlice work.',
+    channelNavigation: 'Channel settings',
+    channelNavigationDescription: 'Jump directly to a channel.',
+    channelNavigationAction: '{{name}} settings, {{status}}',
     serviceDescription: 'Each Connector starts delivery automatically. Use this control only when you want to pause or resume every channel together.',
     runService: 'Allow external delivery',
     runServiceDescription: 'Connector switches turn this on automatically. Turn it off to pause every channel without removing connection or chat settings.',

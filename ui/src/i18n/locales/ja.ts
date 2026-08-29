@@ -2055,6 +2055,9 @@ export const ja: Resources = {
   connectorSettings: {
     title: 'コネクター',
     description: 'プライベートチャンネルを受信トレイ配信とワークスペースでの会話に接続します。外部配信が OpenAlice の処理を妨げることはありません。',
+    channelNavigation: 'チャネル設定',
+    channelNavigationDescription: '目的のチャネルへ直接移動します。',
+    channelNavigationAction: '{{name}} の設定、{{status}}',
     serviceDescription: '各コネクターを起動すると配信も自動的に有効になります。すべてのチャンネルをまとめて一時停止または再開するときだけ、この設定を使います。',
     runService: '外部配信を許可',
     runServiceDescription: 'コネクターのスイッチで自動的に有効になります。オフにすると接続情報やチャット設定を残したまま、すべてのチャンネルを一時停止します。',
