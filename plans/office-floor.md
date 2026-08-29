@@ -1947,6 +1947,24 @@ Landscape Agent-file hierarchy follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 608-file Vitest run (5,040 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Floor-menu pause ownership follow-up (2026-08-29):
+
+- Played Menu and Floor terminal together on the real desktop floor and reproduced a broken layer contract: opening
+  Menu cancelled an existing route, but the still-live map could immediately start another one. Alice walked behind
+  the translucent menu, and the terminal interaction prompt competed with its Floor view choices.
+- Compared event-handler guards alone, replacing the compact menu with a full-screen pause page, and making the
+  existing menu own a true gameplay pause. Chose the last option: the compact route selector remains fast, while its
+  open state now suspends target discovery, keyboard movement, panning, auto-walk requests, touch movement, and the
+  action button. The campus becomes `inert` and `aria-hidden`, and a 4px pixel-grid veil visibly freezes and recedes
+  the world without obscuring the menu or inventing another navigation layer.
+- Browser-played 1280x900, 844x390, and 390x844. The 224x148 menu stayed entirely in view at every size; landscape's
+  750x272 floor and phone's 368x662 floor both kept zero page overflow. While paused, all four D-pad directions were
+  disabled, direct map interaction was rejected, and Alice remained at `480,336`. Closing Menu removed the inert
+  state, returned focus to its origin, and the next right input moved Alice to `504,336` immediately.
+- Focused OfficeBuilding and pause-style specs passed: 2 files / 11 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 609-file Vitest run (5,041 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

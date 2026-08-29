@@ -3402,6 +3402,29 @@
   cursor: wait;
 }
 
+.oa-office-campus[data-menu-open="true"] {
+  cursor: default;
+}
+
+.oa-office-campus[data-menu-open="true"]::after {
+  position: absolute;
+  z-index: 50;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--office-gba-ink-seed) 18%, transparent) 50%,
+      transparent 50%
+    ) 0 0 / 4px 4px,
+    linear-gradient(
+      color-mix(in srgb, var(--office-gba-ink-seed) 12%, transparent) 50%,
+      transparent 50%
+    ) 0 0 / 4px 4px,
+    color-mix(in srgb, var(--office-gba-ink-seed) 10%, transparent);
+}
+
 .oa-office-departure {
   position: absolute;
   z-index: 40;
