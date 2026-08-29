@@ -2973,6 +2973,25 @@ Replay-time journal synchronization follow-up (2026-08-30):
   the full test run (5,125 passing; one file and nine tests skipped), and the production build also passed; the
   existing large-chunk advisory remains unchanged.
 
+Contextual rest-state follow-up (2026-08-30):
+
+- Returned to the fully dormant live Office Lab after the replay work. Ten visible coworkers each carried the same
+  animated Zzz bubble, repeating information already conveyed by powered-down workstations and `0/N awake` signs and
+  turning the three-pod floor into a field of identical moving marks. A real Grok report in the journal independently
+  identified persistent Zzz as the noisiest classic-RPG sleep treatment.
+- Compared authoring a unique slumped bitmap for every current coworker, merely shrinking every persistent bubble, and
+  moving rest state into the character silhouette while revealing the bubble only for interaction context. Chose the
+  contextual treatment: dormant desk sprites now sit six pixels lower behind the work surface with restrained color
+  and status light, while Zzz appears only for the selected, nearby, route-targeted, or replay-focused employee.
+- The contextual sleep animation plays three cycles and then rests instead of looping forever. Replay-focused working,
+  waiting, failed, and review states retain priority and are exempt from the dormant silhouette treatment, so a
+  historical performer still acts out the selected event rather than appearing asleep.
+- Browser-played the live 14-agent Office Lab from the quiet overview into a real Grok Engineer click-route. The
+  overview showed no repeated bubbles; the chosen desk alone gained its sleep cue during the route, Alice arrived,
+  and the same Agent file opened with the correct identity and Assignment. Focused Desk and responsive-style specs
+  passed (2 files / 27 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,128 passing; one file
+  and nine tests skipped), and the production build; the existing direct-eval and large-chunk advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -85,7 +85,7 @@ describe('OfficeDesk', () => {
     expect(screen.queryByText('Researching…')).toBeNull()
   })
 
-  it('powers down a sleeping Session desk without removing its coworker', () => {
+  it('powers down and lowers a sleeping Session without filling the room with cues', () => {
     const sleepingEmployee = { ...employee, awake: false, mood: 'idle' as const, bubble: null }
     const { container } = render(
       <OfficeDesk
@@ -104,18 +104,39 @@ describe('OfficeDesk', () => {
     expect(container.querySelector<HTMLImageElement>('.oa-office-topdown-station__asset')?.src)
       .toContain('/office/furniture/vacant-workstation-v2.png')
     expect(container.querySelector('.oa-office-coworker')).toBeTruthy()
-    const sleepEmote = screen.getByTestId('office-emote-sleeping')
-    expect(sleepEmote.querySelector('img')?.getAttribute('src'))
-      .toBe('/office/coworkers/sleep-emote-v1.png')
-    expect(sleepEmote.dataset.reducedMotion).toBeUndefined()
+    expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
   })
+
+  it.each(['selected', 'nearby', 'targeted'] as const)(
+    'reveals a restrained sleep cue for a %s Session',
+    (context) => {
+      const sleepingEmployee = { ...employee, awake: false, mood: 'idle' as const, bubble: null }
+      render(
+        <OfficeDesk
+          employee={sleepingEmployee}
+          roomName="Chat"
+          selected={context === 'selected'}
+          nearby={context === 'nearby'}
+          targeted={context === 'targeted'}
+          depth={107}
+          reducedMotion={false}
+          onSelect={() => undefined}
+        />,
+      )
+
+      const sleepEmote = screen.getByTestId('office-emote-sleeping')
+      expect(sleepEmote.querySelector('img')?.getAttribute('src'))
+        .toBe('/office/coworkers/sleep-emote-v1.png')
+      expect(sleepEmote.dataset.reducedMotion).toBeUndefined()
+    },
+  )
 
   it('removes the sleep cue as soon as the Session wakes', () => {
     const { rerender } = render(
       <OfficeDesk
         employee={{ ...employee, awake: false, mood: 'idle', bubble: null }}
         roomName="Chat"
-        selected={false}
+        selected
         depth={107}
         reducedMotion
         onSelect={() => undefined}
@@ -127,7 +148,7 @@ describe('OfficeDesk', () => {
       <OfficeDesk
         employee={{ ...employee, awake: true, mood: 'idle', bubble: null }}
         roomName="Chat"
-        selected={false}
+        selected
         depth={107}
         reducedMotion
         onSelect={() => undefined}
@@ -154,7 +175,7 @@ describe('OfficeDesk', () => {
     expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
 
     rerender(<OfficeDesk {...props} />)
-    expect(screen.getByTestId('office-emote-sleeping')).toBeTruthy()
+    expect(screen.queryByTestId('office-emote-sleeping')).toBeNull()
     expect(screen.queryByTestId('office-emote-review')).toBeNull()
   })
 

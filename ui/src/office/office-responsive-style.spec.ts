@@ -92,7 +92,10 @@ describe('Office responsive style contract', () => {
       /\.oa-office-mood-emote\[data-kind="working"\]\s*\{[^}]*width:\s*32px;[^}]*height:\s*32px;/s,
     )
     expect(css).toMatch(
-      /\.oa-office-mood-emote\[data-kind="sleeping"\]\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;/s,
+      /\.oa-office-mood-emote\[data-kind="sleeping"\]\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;[^}]*steps\(3, end\) 3;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-desk\[data-awake="false"\]:not\(\[data-replay-focus="true"\]\) \.oa-office-coworker\s*\{[^}]*translateY\(6px\)/s,
     )
   })
 
