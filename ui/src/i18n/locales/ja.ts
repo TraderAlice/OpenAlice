@@ -1910,6 +1910,7 @@ export const ja: Resources = {
     inboxStationHint: '近づいてAgentから届いたレポートを確認します。',
     newsStation: 'ニュース端末',
     newsStationHint: '近づいて新しく取り込まれたニュースを確認します。',
+    serviceNeedsAttention: '{{name}} · 新しいアクティビティ',
     roster: 'チーム名簿',
     rosterHint: 'この Workspace グループに所属するすべての Session を表示します。',
     rosterCount_one: '{{count}} 人のメンバー',

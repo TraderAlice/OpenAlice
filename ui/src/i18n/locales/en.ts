@@ -1942,6 +1942,7 @@ export const en = {
     inboxStationHint: 'Walk over to review delivered Agent reports.',
     newsStation: 'News terminal',
     newsStationHint: 'Walk over to review newly ingested news.',
+    serviceNeedsAttention: '{{name}} · New activity',
     roster: 'Team roster',
     rosterHint: 'View every Session assigned to this Workspace group.',
     rosterCount_one: '{{count}} team member',

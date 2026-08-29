@@ -1909,6 +1909,7 @@ export const zh: Resources = {
     inboxStationHint: '走过去查看 Agent 送达的报告。',
     newsStation: '新闻终端',
     newsStationHint: '走过去查看刚刚入库的新闻。',
+    serviceNeedsAttention: '{{name}} · 有新动态',
     roster: '小组名册',
     rosterHint: '查看分配到这个 Workspace 小组的全部 Session。',
     rosterCount_one: '{{count}} 名成员',

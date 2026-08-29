@@ -1045,6 +1045,7 @@ describe('OfficeBuilding', () => {
             detail: 'Markets move overnight',
             source: 'Wire',
           },
+          attention: { inbox: true, news: true },
           freshKind: 'news',
         }}
         initialPlayerState={{ position: { x: 340, y: 570 }, direction: 'down' }}
@@ -1059,12 +1060,15 @@ describe('OfficeBuilding', () => {
       />,
     )
 
-    const inbox = screen.getByRole('button', { name: 'Inbox station' })
-    const news = screen.getByRole('button', { name: 'News terminal' })
+    const inbox = screen.getByRole('button', { name: 'Inbox station · New activity' })
+    const news = screen.getByRole('button', { name: 'News terminal · New activity' })
     const serviceZone = screen.getByTestId('office-service-zone')
     expect(serviceZone.querySelector('img')?.getAttribute('src'))
       .toBe('/office/furniture/workspace-rug-v2.png')
     expect(inbox.dataset.hasActivity).toBe('true')
+    expect(inbox.dataset.attention).toBe('true')
+    expect(inbox.dataset.fresh).toBeUndefined()
+    expect(inbox.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
     expect(news.dataset.fresh).toBe('true')
     expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
     const inboxPrompt = screen.getByRole('status', {

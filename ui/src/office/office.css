@@ -4694,6 +4694,10 @@
   font-size: 17px;
   line-height: 1;
   box-shadow: 2px 3px 0 color-mix(in srgb, var(--gba-ink) 34%, transparent);
+  animation: none;
+}
+
+.oa-office-map-service[data-fresh="true"] .oa-office-map-service__signal {
   animation: oa-office-service-signal 920ms steps(2, end) infinite;
 }
 

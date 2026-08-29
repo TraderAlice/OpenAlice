@@ -1917,6 +1917,7 @@ export const zhHant: Resources = {
     inboxStationHint: '走過去查看 Agent 送達的報告。',
     newsStation: '新聞終端',
     newsStationHint: '走過去查看剛剛入庫的新聞。',
+    serviceNeedsAttention: '{{name}} · 有新動態',
     roster: '小組名冊',
     rosterHint: '查看分配到這個 Workspace 小組的全部 Session。',
     rosterCount_one: '{{count}} 名成員',

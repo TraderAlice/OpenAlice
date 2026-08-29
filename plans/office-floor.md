@@ -2468,6 +2468,25 @@ Service-terminal prompt follow-up (2026-08-30):
   files / 34 tests), root/UI TypeScript passed, and the full 613-file Vitest run passed (5,084 tests; one file and nine
   tests skipped).
 
+Persistent terminal-attention follow-up (2026-08-30):
+
+- The first journal integration only animated a new terminal signal for twelve seconds. That made live arrivals feel
+  lively, but activity received while the player was elsewhere could disappear before the Office was revisited.
+- Compared unread counters in the HUD, a permanent animated alarm, and a per-terminal acknowledgement watermark.
+  Chose the watermark: the physical fixture remains the source of truth, the calm floor avoids dashboard chrome, and
+  motion is reserved for the genuinely fresh moment rather than becoming ambient visual noise.
+- A first Office visit baselines the latest Inbox and News entries instead of presenting the entire journal as unread.
+  Later entries survive route changes as a static `!`; arrivals while Office is open animate briefly and then settle
+  into the same pending state. Opening the corresponding terminal acknowledges only that activity family. The state is
+  session-scoped so it does not create another backend persistence contract.
+- Attention is exposed in each terminal's accessible name as well as its pixel signal. Hook coverage now owns initial
+  baselining, leave-and-return persistence, live arrival, and acknowledgement; the Office integration spec distinguishes
+  static pending attention from fresh animated attention.
+- Browser-tested the complete loop against the real Project: acknowledged an existing News signal, triggered an Inbox
+  fact from Dev Frontend while Office was unmounted, returned to find only Inbox persistently marked while the same fact
+  appeared in Sonner, auto-walked to Inbox, and returned again with both terminals calm. Root/UI TypeScript passed, as
+  did the full 613-file Vitest run (5,086 tests; one file and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

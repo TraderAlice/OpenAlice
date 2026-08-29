@@ -58,7 +58,7 @@ import {
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
-import type { OfficeProductActivity } from './useOfficeProductActivity'
+import type { OfficeProductActivityState } from './useOfficeProductActivity'
 
 const OFFICE_MOVEMENTS = {
   left: { x: -24, y: 0, direction: 'left' as const },
@@ -101,7 +101,12 @@ export function OfficeBuilding({
   onOpenFiles,
   onOpenRoster,
   onOpenLog,
-  productActivity = { inbox: null, news: null, freshKind: null },
+  productActivity = {
+    inbox: null,
+    news: null,
+    attention: { inbox: false, news: false },
+    freshKind: null,
+  },
   onOpenInbox,
   onOpenNews,
   onReturnLive,
@@ -119,7 +124,7 @@ export function OfficeBuilding({
   onOpenFiles: (workspaceId: string) => void
   onOpenRoster: (workspaceId: string) => void
   onOpenLog: (origin: OfficeLogOrigin) => void
-  productActivity?: OfficeProductActivity
+  productActivity?: OfficeProductActivityState
   onOpenInbox?: (entryId?: string) => void
   onOpenNews?: () => void
   onReturnLive?: () => void
@@ -1048,6 +1053,10 @@ export function OfficeBuilding({
                 ? 'inbox-service'
                 : 'news-service'
               const fresh = productActivity.freshKind === landmark.kind
+              const needsAttention = productActivity.attention[landmark.kind]
+              const serviceName = landmark.kind === 'inbox'
+                ? t('office.inboxStation')
+                : t('office.newsStation')
               return (
               <button
                 key={landmark.id}
@@ -1056,13 +1065,14 @@ export function OfficeBuilding({
                 className="oa-office-map-service"
                 data-kind={landmark.kind}
                 data-fresh={fresh || undefined}
+                data-attention={needsAttention || undefined}
                 data-has-activity={Boolean(activity) || undefined}
                 data-nearby={nearbyTarget?.kind === interactionKind || undefined}
                 data-route={routeTargetId === landmark.id || undefined}
                 data-replay-locked={replaySeq != null || undefined}
-                aria-label={landmark.kind === 'inbox'
-                  ? t('office.inboxStation')
-                  : t('office.newsStation')}
+                aria-label={needsAttention
+                  ? t('office.serviceNeedsAttention', { name: serviceName })
+                  : serviceName}
                 title={replaySeq == null
                   ? landmark.kind === 'inbox'
                     ? t('office.inboxStationHint')
@@ -1086,7 +1096,9 @@ export function OfficeBuilding({
                   aria-hidden
                   style={officePixelImg}
                 />
-                {fresh && <span className="oa-office-map-service__signal" aria-hidden>!</span>}
+                {needsAttention && (
+                  <span className="oa-office-map-service__signal" aria-hidden>!</span>
+                )}
               </button>
               )
             })}

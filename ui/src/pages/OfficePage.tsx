@@ -266,11 +266,13 @@ export function OfficePage() {
                 }}
                 productActivity={productActivity}
                 onOpenInbox={(entryId) => {
+                  productActivity.acknowledge('inbox')
                   if (entryId) useInboxSelection.getState().select(entryId)
                   markExcursion()
                   openOrFocus({ kind: 'inbox', params: {} })
                 }}
                 onOpenNews={() => {
+                  productActivity.acknowledge('news')
                   markExcursion()
                   openOrFocus({ kind: 'news', params: {} })
                 }}
