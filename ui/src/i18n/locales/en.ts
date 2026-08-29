@@ -2021,6 +2021,7 @@ export const en = {
     replayAt: 'Seq {{seq}}',
     replayFloor: 'Replay floor · Seq {{seq}}',
     replayViewFloor: 'View replay floor',
+    replayEvent: 'View floor at this event',
     replayPrevious: 'Previous replay event',
     replayNext: 'Next replay event',
     bubbleToolWorkspace: 'Checking the office…',

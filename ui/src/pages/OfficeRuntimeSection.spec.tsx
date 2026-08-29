@@ -268,6 +268,30 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.queryByText(/^stopped$|^text$|^rejected$/i)).toBeNull()
   })
 
+  it('opens the floor snapshot for the selected journal event', async () => {
+    const onReplay = vi.fn()
+    mockJournal([
+      {
+        seq: 8,
+        ts: Date.now(),
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', status: 'done' },
+      },
+      {
+        seq: 7,
+        ts: Date.now() - 1,
+        type: 'runtime.turn.text',
+        payload: { resumeId: 'resume-a', text: 'Earlier report.' },
+      },
+    ])
+    render(<OfficeRuntimeSection onReplay={onReplay} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Agent report.*#0007/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'View floor at this event' }))
+
+    expect(onReplay).toHaveBeenCalledWith(7)
+  })
+
   it('keeps channel navigation available when the selected channel is empty', async () => {
     mockJournal([{
         seq: 1,

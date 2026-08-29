@@ -1996,6 +1996,7 @@ export const zhHant: Resources = {
     replayAt: '序號 {{seq}}',
     replayFloor: '重放樓層 · 序號 {{seq}}',
     replayViewFloor: '查看重放樓層',
+    replayEvent: '從此事件查看樓層',
     replayPrevious: '上一個重放事件',
     replayNext: '下一個重放事件',
     bubbleToolWorkspace: '查看辦公室…',

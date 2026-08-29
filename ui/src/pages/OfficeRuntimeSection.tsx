@@ -107,7 +107,11 @@ function causeLabel(event: AgentRuntimeEvent): string | null {
   return cause.kind
 }
 
-export function OfficeRuntimeSection() {
+export function OfficeRuntimeSection({
+  onReplay,
+}: {
+  onReplay?: (seq: number) => void
+} = {}) {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const [entriesByChannel, setEntriesByChannel] = useState<Record<OfficeLogChannel, AgentRuntimeEvent[]>>({
@@ -345,38 +349,50 @@ export function OfficeRuntimeSection() {
               ))}
             </ul>
           </div>
-          {selectedPayload.taskId
-            && selectedEvent.type !== 'inbox.received'
-            && selectedEvent.type !== 'news.ingested' && (
-            <button
-              type="button"
-              className="oa-office-runtime__open"
-              onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
-            >
-              <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-              {t('office.openRun')}
-            </button>
-          )}
-          {selectedEvent.type === 'inbox.received' && (
-            <button
-              type="button"
-              className="oa-office-runtime__open"
-              onClick={() => openOrFocus({ kind: 'inbox', params: {} })}
-            >
-              <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-              {t('office.interactInbox')}
-            </button>
-          )}
-          {selectedEvent.type === 'news.ingested' && (
-            <button
-              type="button"
-              className="oa-office-runtime__open"
-              onClick={() => openOrFocus({ kind: 'news', params: {} })}
-            >
-              <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
-              {t('office.interactNews')}
-            </button>
-          )}
+          <div className="oa-office-runtime__actions">
+            {onReplay && (
+              <button
+                type="button"
+                className="oa-office-runtime__open oa-office-runtime__open--replay"
+                onClick={() => onReplay(selectedEvent.seq)}
+              >
+                <img src={OFFICE_HUD_ASSETS.replayLatch} alt="" aria-hidden style={officePixelImg} />
+                {t('office.replayEvent')}
+              </button>
+            )}
+            {selectedPayload.taskId
+              && selectedEvent.type !== 'inbox.received'
+              && selectedEvent.type !== 'news.ingested' && (
+              <button
+                type="button"
+                className="oa-office-runtime__open"
+                onClick={() => openOrFocus({ kind: 'automation', params: { section: 'runs' } })}
+              >
+                <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+                {t('office.openRun')}
+              </button>
+            )}
+            {selectedEvent.type === 'inbox.received' && (
+              <button
+                type="button"
+                className="oa-office-runtime__open"
+                onClick={() => openOrFocus({ kind: 'inbox', params: {} })}
+              >
+                <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+                {t('office.interactInbox')}
+              </button>
+            )}
+            {selectedEvent.type === 'news.ingested' && (
+              <button
+                type="button"
+                className="oa-office-runtime__open"
+                onClick={() => openOrFocus({ kind: 'news', params: {} })}
+              >
+                <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+                {t('office.interactNews')}
+              </button>
+            )}
+          </div>
         </article>
       </div>
         </TabsContent>

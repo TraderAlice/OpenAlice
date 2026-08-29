@@ -1989,6 +1989,7 @@ export const ja: Resources = {
     replayAt: 'Seq {{seq}}',
     replayFloor: '再生フロア · Seq {{seq}}',
     replayViewFloor: '再生フロアを見る',
+    replayEvent: 'このイベント時点のフロアを見る',
     replayPrevious: '前の再生イベント',
     replayNext: '次の再生イベント',
     bubbleToolWorkspace: 'オフィスを確認中…',

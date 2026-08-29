@@ -314,7 +314,12 @@ export function OfficePage() {
                       onViewFloor={closeLog}
                     />
                   </details>
-                  <OfficeRuntimeSection />
+                  <OfficeRuntimeSection
+                    onReplay={(seq) => {
+                      setAsOfSeq(seq)
+                      closeLog()
+                    }}
+                  />
                 </div>
               </section>
             )}

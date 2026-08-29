@@ -2552,6 +2552,22 @@ Player-facing activity-language follow-up (2026-08-30):
   operable. Focused Office specs, root/UI TypeScript, the full 613-file Vitest run (5,098 passing; one file and nine tests
   skipped), and the production build passed; existing large-chunk and direct-eval advisories are unchanged.
 
+Event-to-floor replay follow-up (2026-08-30):
+
+- Real journal play showed a semantic break between the readable event cards and Replay: selecting an older event only
+  changed the detail pane, while entering its historical floor required separately guessing the same raw sequence on a
+  slider. The log explained the event and the Replay control moved through history, but the two systems did not meet.
+- Compared adding slider tick hints, a hover-only preview, and a direct event action. Chose an explicit
+  `View floor at this event` action because it preserves deliberate browsing, works with mouse, touch, and keyboard,
+  and turns the journal detail into the game's natural doorway to the historical floor without background refreshes.
+- The selected event now owns a Replay action beside its existing destination action. Desktop actions wrap in one
+  compact row; phone-sized containers stack full-width controls. The action uses the existing Replay asset and closes
+  the journal before loading the exact `asOfSeq` snapshot.
+- Browser-played the real Grok journal from Agent Report `#1309` into `Replay floor · Seq 1309`; the dialog closed,
+  every Workspace sign switched to `Snapshot`, and the HUD's Live action returned to the current floor. Focused Office
+  specs, root/UI TypeScript, the full 613-file Vitest run (5,099 passing; one file and nine tests skipped), and the
+  production build passed; existing large-chunk and direct-eval advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
