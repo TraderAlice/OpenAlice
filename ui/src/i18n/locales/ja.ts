@@ -1854,6 +1854,8 @@ export const ja: Resources = {
     roomSleeping: 'スリープ中',
     agentCount_one: '{{count}} Agent',
     agentCount_other: '{{count}} Agent',
+    roomAwakeCount: '稼働 {{awake}}/{{total}}',
+    roomActiveCount: '活動 {{active}}/{{total}}',
     groupCount_one: '{{count}} グループ',
     groupCount_other: '{{count}} グループ',
     moreAgents: 'ほか {{count}} Agent',

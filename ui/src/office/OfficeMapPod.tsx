@@ -43,7 +43,11 @@ export function OfficeMapPod({
   const { t } = useTranslation()
   const visibleEmployees = visibleEmployeesForOffice(group.employees)
   const slots = deskSlotsForOffice(visibleEmployees, 4)
-  const active = group.employees.some((employee) => employee.mood !== 'idle')
+  const activeCount = group.employees.filter((employee) => employee.mood !== 'idle').length
+  const awakeCount = group.employees.filter((employee) => employee.awake).length
+  const statusLabel = interactionDisabled
+    ? t('office.roomActiveCount', { active: activeCount, total: group.employees.length })
+    : t('office.roomAwakeCount', { awake: awakeCount, total: group.employees.length })
   const rosterCenter = officeRosterCenter(layout, mapWidth)
   const harnessProp = group.workspace.harness === 'chat'
     ? OFFICE_FURNITURE.generated.coffeeStation
@@ -64,7 +68,7 @@ export function OfficeMapPod({
         height: layout.height,
       }}
       data-harness={group.workspace.harness}
-      data-active={active}
+      data-active={activeCount > 0}
       data-sleeping={group.sleeping}
       data-replay-locked={interactionDisabled || undefined}
     >
@@ -77,7 +81,7 @@ export function OfficeMapPod({
         data-replay-label={interactionDisabled ? t('office.replaySnapshot') : undefined}
         disabled={interactionDisabled}
         onClick={() => onOpenWorkspace(group.workspace.id)}
-        aria-label={t('office.interactWorkspace', { name: title })}
+        aria-label={`${t('office.interactWorkspace', { name: title })}. ${statusLabel}`}
         title={interactionDisabled ? t('office.replayLockedHint') : t('office.workspaceSignHint')}
       >
         <img
@@ -91,7 +95,7 @@ export function OfficeMapPod({
           <div className="oa-office-pod__sign-meta">
             <span>{harnessTitle}</span>
             <span className="oa-office-pod__count">
-              {t('office.agentCount', { count: group.employees.length })}
+              {statusLabel}
             </span>
           </div>
           <h3>{title}</h3>

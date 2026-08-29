@@ -163,7 +163,7 @@ describe('OfficePage localization', () => {
   it('enters from the Workspace sign while keeping filed records on the cabinet', async () => {
     const { container } = render(<OfficePage />)
 
-    const sign = screen.getByRole('button', { name: '进入 chat Workspace' })
+    const sign = screen.getByRole('button', { name: /进入 chat Workspace/ })
     await userEvent.click(sign)
     await vi.waitFor(() => expect(openOrFocusMock).toHaveBeenCalledWith({
       kind: 'workspace',
@@ -218,7 +218,7 @@ describe('OfficePage localization', () => {
     })
 
     render(<OfficePage />)
-    await userEvent.click(screen.getByRole('button', { name: '进入 prediction Workspace' }))
+    await userEvent.click(screen.getByRole('button', { name: /进入 prediction Workspace/ }))
 
     await vi.waitFor(() => expect(openOrFocusMock).toHaveBeenCalledWith({
       kind: 'workspace',

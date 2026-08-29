@@ -1853,6 +1853,8 @@ export const zh: Resources = {
     roomSleeping: '休眠中',
     agentCount_one: '{{count}} 名 Agent',
     agentCount_other: '{{count}} 名 Agent',
+    roomAwakeCount: '唤醒 {{awake}}/{{total}}',
+    roomActiveCount: '活跃 {{active}}/{{total}}',
     groupCount_one: '{{count}} 个小组',
     groupCount_other: '{{count}} 个小组',
     moreAgents: '另外 {{count}} 名 Agent',

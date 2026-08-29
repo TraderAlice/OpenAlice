@@ -70,7 +70,7 @@ describe('OfficeBuilding', () => {
       .toContain('/office/hud/occupancy-log-v2.png')
     expect(screen.getByLabelText('Replay floor. Move Alice to inspect the snapshot; use Operations board to review it or Live to return.')).toBeTruthy()
 
-    const workspaceSign = screen.getByRole('button', { name: 'Enter chat workspace' }) as HTMLButtonElement
+    const workspaceSign = screen.getByRole('button', { name: /Enter chat workspace/ }) as HTMLButtonElement
     const occupiedDesks = screen.getAllByTestId(/^office-desk-/) as HTMLButtonElement[]
     const cabinet = screen.getByRole('button', { name: 'Filing cabinet · chat' }) as HTMLButtonElement
     const roster = screen.getByRole('button', { name: 'Team roster · chat' }) as HTMLButtonElement
@@ -78,6 +78,7 @@ describe('OfficeBuilding', () => {
     const operations = screen.getByRole('button', { name: 'Operations board' }) as HTMLButtonElement
 
     expect(workspaceSign.disabled).toBe(true)
+    expect(workspaceSign.textContent).toContain('2/6 active')
     expect(workspaceSign.dataset.replayLabel).toBe('Snapshot')
     expect(occupiedDesks.every((desk) => desk.disabled)).toBe(true)
     expect(cabinet.disabled).toBe(true)
@@ -288,7 +289,9 @@ describe('OfficeBuilding', () => {
     expect(screen.getByLabelText('Current floor view: Live map').textContent).toContain('Current')
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Activity log' }))
     await userEvent.keyboard('{Escape}')
-    await userEvent.click(screen.getByRole('button', { name: 'Enter prediction workspace' }))
+    const predictionSign = screen.getByRole('button', { name: /Enter prediction workspace/ })
+    expect(predictionSign.textContent).toContain('0/0 awake')
+    await userEvent.click(predictionSign)
     await waitFor(() => expect(onOpenWorkspace).toHaveBeenCalledWith('prediction-1'))
     expect(screen.queryByTestId('office-departure')).toBeNull()
   })
@@ -489,7 +492,7 @@ describe('OfficeBuilding', () => {
       const controls = screen.getByTestId('office-floor').parentElement
         ?.querySelector<HTMLElement>('.oa-office-map-controls')
       expect(controls?.dataset.learned).toBe('false')
-      const sign = screen.getByRole('button', { name: 'Enter chat workspace' })
+      const sign = screen.getByRole('button', { name: /Enter chat workspace/ })
       fireEvent.click(sign)
       expect(controls?.dataset.learned).toBe('false')
       expect(onOpenWorkspace).not.toHaveBeenCalled()
@@ -538,7 +541,7 @@ describe('OfficeBuilding', () => {
       expect(controls?.dataset.routing).toBeUndefined()
 
       onOpenWorkspace.mockClear()
-      const quantSign = screen.getByRole('button', { name: 'Enter quant workspace' })
+      const quantSign = screen.getByRole('button', { name: /Enter quant workspace/ })
       fireEvent.click(quantSign)
       expect(screen.getByTestId('office-route-trail')).toBeTruthy()
       const map = screen.getByLabelText(
@@ -853,7 +856,7 @@ describe('OfficeBuilding', () => {
       .toContain('/office/furniture/coffee-station-v2.png')
     expect(screen.getByTestId('office-pod-quant-1').querySelector<HTMLImageElement>('.oa-office-pod__harness-prop')?.src)
       .toContain('/office/furniture/server-rack-v2.png')
-    const workspaceSign = screen.getByRole('button', { name: 'Enter chat workspace' })
+    const workspaceSign = screen.getByRole('button', { name: /Enter chat workspace/ })
     await userEvent.click(workspaceSign)
     await waitFor(() => expect(onOpenWorkspace).toHaveBeenCalledWith('chat-1'))
     const menuTrigger = screen.getByRole('button', { name: 'Menu' })

@@ -1886,6 +1886,8 @@ export const en = {
     roomSleeping: 'Sleeping',
     agentCount_one: '{{count}} agent',
     agentCount_other: '{{count}} agents',
+    roomAwakeCount: '{{awake}}/{{total}} awake',
+    roomActiveCount: '{{active}}/{{total}} active',
     groupCount_one: '{{count}} group',
     groupCount_other: '{{count}} groups',
     moreAgents: '{{count}} more agents',
