@@ -14,7 +14,9 @@ const compactCss = css.slice(compactStart, phoneStart)
 
 describe('Office Agent-file style contract', () => {
   it('keeps character information ahead of the full-width command row', () => {
-    expect(css).toMatch(/\.oa-office-inspect\s*\{[\s\S]*?max-height: 270px;[\s\S]*?overflow: hidden/)
+    expect(css).toMatch(
+      /\.oa-office-inspect\s*\{[\s\S]*?max-height: min\(320px, calc\(100% - 84px\)\);[\s\S]*?overflow: hidden/,
+    )
     expect(css).toMatch(
       /\.oa-office-inspect__profile\s*\{[\s\S]*?min-height: 0;[\s\S]*?grid-template-columns: 76px minmax\(180px, 1fr\) minmax\(250px, 1\.35fr\)[\s\S]*?overflow-y: auto/,
     )
@@ -37,5 +39,17 @@ describe('Office Agent-file style contract', () => {
     expect(compactCss).toContain('grid-template-columns: 64px minmax(0, 1fr)')
     expect(compactCss).toContain('.oa-office-inspect__facts,')
     expect(compactCss).toContain('grid-column: 1 / -1')
+  })
+
+  it('keeps completed records legible as a responsive reward grid', () => {
+    expect(css).toMatch(
+      /\.oa-office-drawers ul\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/,
+    )
+    expect(compactCss).toMatch(
+      /\.oa-office-drawers ul\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+    )
+    expect(css.slice(phoneStart)).toMatch(
+      /\.oa-office-drawers ul\s*\{[\s\S]*?grid-template-columns: 1fr/,
+    )
   })
 })

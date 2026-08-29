@@ -2535,7 +2535,7 @@
   bottom: 10px;
   left: 12px;
   width: auto;
-  max-height: 270px;
+  max-height: min(320px, calc(100% - 84px));
   overflow: hidden;
   color: var(--gba-ink);
 }
@@ -2712,12 +2712,14 @@
 }
 
 .oa-office-drawers ul {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
-  overflow-x: auto;
 }
 
 .oa-office-drawer {
+  min-width: 0;
+  height: 100%;
   border: 2px solid var(--gba-ink);
   border-radius: 2px;
   color: var(--gba-ink);
@@ -2771,6 +2773,10 @@
   .oa-office-inspect__open {
     min-height: 30px;
   }
+
+  .oa-office-drawers ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 580px) {
@@ -2785,6 +2791,10 @@
   .oa-office-inspect {
     top: auto;
     max-height: calc(100% - 16px);
+  }
+
+  .oa-office-drawers ul {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -2503,6 +2503,23 @@ Activity-log channel follow-up (2026-08-30):
   individual headlines plus the Open News action. Root/UI TypeScript passed, as did the full 613-file Vitest run (5,089
   tests; one file and nine tests skipped).
 
+Completed-result legibility follow-up (2026-08-30):
+
+- A completed real Grok Issue left six useful records in its Agent File, but the one-row flex strip compressed every
+  record until its title disappeared. The completion path therefore exposed that work existed without telling the
+  player what had been produced.
+- Compared a horizontally scrolling reward strip, a three-item summary with a More action, and a responsive record
+  grid. Chose the grid because it keeps every result visible in the existing keyboard loop and makes the artifact name
+  the primary differentiator instead of six repeated icons and Open labels.
+- Agent File now presents records in three columns on the full floor, two columns in the compact container, and one
+  column on phone-sized viewports. Cards retain a stable height and min-width contract so long result names ellipsize
+  inside their own record instead of collapsing neighboring results. The bounded Agent File height also grows from the
+  old single-row 270px treatment to 320px, enough for two result rows without covering the whole floor on short screens.
+- Browser-replayed the completed six-record Grok Issue: all titles and both rows were visible with no profile overflow,
+  the close control stayed fixed, and Tab plus arrow-key navigation traversed the responsive result grid. Focused Office
+  specs, root/UI TypeScript, the full 613-file Vitest run (5,096 passing; one file and nine tests skipped), and the full
+  production build passed; the existing large-chunk and direct-eval advisories remain unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
