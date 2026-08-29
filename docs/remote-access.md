@@ -878,13 +878,13 @@ from roughly 24 seconds and many SSH sessions to roughly 2 seconds and one SSH
 session.
 
 The redeploy also confirmed the cross-machine safety boundary. The reattached
-volume still named the removed container as Guardian and Alice owner; ordinary
-start refused it, and explicit `--takeover` still refused to signal or reclaim
-an owner from another machine. After Railway independently reported the old
-deployment as removed, the operator quarantined all three foreign lock records
-before starting the new owner. This is an operational recovery observation,
-not automatic cross-machine failover: heartbeat expiry alone must never grant
-permission to reclaim a shared volume.
+volume still named the removed container as Guardian and Alice owner. Ordinary
+desktop/CLI start still refuses that foreign owner, and no path may signal a
+PID recorded on another machine. After the operator confirms the previous
+instance is gone, `--takeover` now quarantines those foreign lock records
+without signaling. Docker's single-writer image also reclaims a foreign lock
+whose heartbeat is already stale. Heartbeat expiry alone must never grant
+desktop or CLI permission to reclaim a copied or NFS-shared volume.
 
 ### Stage 3 — terminal transport optimization
 
@@ -924,7 +924,7 @@ permission to reclaim a shared volume.
 | graceful stop | Guardian stops children, releases owned lease/socket, exits in bound |
 | hung child | TERM precedes process-tree KILL; no orphan survives |
 | stale endpoint | recovered only with lease/ownership evidence |
-| cross-root or foreign owner | no normal-start kill; explicit takeover only |
+| cross-root or foreign owner | no normal-start kill; explicit takeover quarantines a foreign lock without signaling |
 | optional UTA absent | Server and browser Chat remain ready |
 | Electron running | `server start/stop` do not silently replace or terminate it |
 | packaged Electron smoke | local app, PTY, IPC, and shutdown remain healthy |

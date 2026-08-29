@@ -24,6 +24,9 @@ services:
       # only consumed by the CLIs running inside this container.
       - "47331:47331"
     volumes:
+      # Complete home. Guardian persists /data/state/machine-id so a
+      # replacement container can reclaim leftover locks from this volume.
+      # Do not mount this directory on two live containers.
       - openalice-data:/data
       # Optional: reuse host auth instead of authenticating inside the
       # container. Bind-mount your local credentials read-only.

@@ -42,6 +42,9 @@ import {
   normalizeProcessExitCode,
   RestartBackoff,
   takeoverRequested,
+  reclaimStaleForeignRequested,
+  ensureHomeMachineIdentity,
+  RuntimeAlreadyRunningError,
 } from '@traderalice/guardian-runtime'
 import {
   planProdPorts,
@@ -59,6 +62,8 @@ const NODE_BINARY = process.env.OPENALICE_NODE_BINARY?.trim() || process.execPat
 const BIND_HOST = process.env.OPENALICE_BIND_HOST?.trim() || '127.0.0.1'
 const GUARDIAN_STARTED_AT = currentProcessStartedAt()
 const TAKEOVER = takeoverRequested()
+const RECLAIM_STALE_FOREIGN = LAUNCHER === 'docker' || reclaimStaleForeignRequested()
+if (RECLAIM_STALE_FOREIGN) process.env.OPENALICE_RECLAIM_STALE_FOREIGN = '1'
 const SERVER_MODE = process.env.OPENALICE_SERVER_MODE?.trim() || 'foreground'
 const GUARDIAN_INSTANCE_ID = randomUUID()
 const RUNTIME_PROVIDER = resolveRuntimeProvider()
@@ -589,11 +594,16 @@ async function startFlagWatcher() {
 }
 
 async function main() {
+  if (LAUNCHER === 'docker') {
+    const machineId = await ensureHomeMachineIdentity(DATA_HOME)
+    console.log(`[guardian/prod] home machine identity → ${machineId}`)
+  }
   guardianRuntimeLock = await acquireGuardianRuntime({
     userDataHome: DATA_HOME,
     launcherRoot: LAUNCHER_ROOT,
     launcher: GUARDIAN_LAUNCHER,
     takeover: TAKEOVER,
+    reclaimStaleForeign: RECLAIM_STALE_FOREIGN,
     processStartedAt: GUARDIAN_STARTED_AT,
     onOwnershipLost: (err) => {
       console.error('[guardian/prod] runtime ownership lost:', err)
@@ -652,6 +662,23 @@ async function main() {
 }
 
 main().catch((err) => {
+  if (err instanceof RuntimeAlreadyRunningError) {
+    const owner = err.inspection.owner
+    console.error(`[guardian/prod] ${err.message}`)
+    if (owner) {
+      console.error(
+        `[guardian/prod] owner → ${owner.launcher} pid=${owner.pid} host=${owner.hostname} machine=${owner.machineId ?? 'unknown'} heartbeat=${owner.heartbeatAt}`,
+      )
+    }
+    if (err.inspection.foreign) {
+      console.error('[guardian/prod] this home still names a Guardian from another container or host.')
+      console.error('[guardian/prod] stop every replica that shares this volume, then start with --takeover or OPENALICE_TAKEOVER=1')
+      console.error('[guardian/prod] if that previous process is already gone, quarantine state/guardian.lock, state/runtime.lock, and workspaces/state/runtime.lock')
+    } else {
+      console.error('[guardian/prod] another OpenAlice runtime already owns this home; stop it or rerun with --takeover')
+    }
+    process.exit(2)
+  }
   console.error('[guardian/prod] fatal:', err)
   shutdown(1)
 })

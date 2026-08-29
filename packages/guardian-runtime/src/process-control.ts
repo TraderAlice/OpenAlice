@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
+import { dirname, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
@@ -146,6 +148,58 @@ async function readProcessStartedAt(pid: number): Promise<number | null> {
   } catch {
     return null
   }
+}
+
+export function homeMachineIdPath(userDataHome: string): string {
+  return resolve(userDataHome, 'state', 'machine-id')
+}
+
+/**
+ * Persist a volume-stable identity for single-writer Docker/server homes.
+ *
+ * Container `/etc/machine-id` changes on recreate, so a leftover lock looks
+ * foreign even though the previous process is gone. Writing the id into the
+ * home keeps replacement containers on the same identity. Desktop and CLI
+ * launchers must not call this: they keep host hardware identity so a copied
+ * home still looks foreign.
+ */
+export async function ensureHomeMachineIdentity(
+  userDataHome: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  const path = homeMachineIdPath(userDataHome)
+  await mkdir(dirname(path), { recursive: true })
+  const existingEnv = env['OPENALICE_MACHINE_ID']?.trim()
+  let persisted = ''
+  try {
+    persisted = (await readFile(path, 'utf8')).trim()
+  } catch (err) {
+    if (!isNodeErrno(err, 'ENOENT')) throw err
+  }
+  if (existingEnv) {
+    if (!persisted) await writeFile(path, `${existingEnv}\n`, 'utf8')
+    return existingEnv
+  }
+  if (persisted) {
+    env['OPENALICE_MACHINE_ID'] = persisted
+    return persisted
+  }
+  const created = randomUUID()
+  try {
+    await writeFile(path, `${created}\n`, { encoding: 'utf8', flag: 'wx' })
+    env['OPENALICE_MACHINE_ID'] = created
+    return created
+  } catch (err) {
+    if (!isNodeErrno(err, 'EEXIST')) throw err
+    const raced = (await readFile(path, 'utf8')).trim()
+    if (!raced) throw new Error(`OpenAlice home machine identity at ${path} is empty`)
+    env['OPENALICE_MACHINE_ID'] = raced
+    return raced
+  }
+}
+
+function isNodeErrno(err: unknown, code: string): boolean {
+  return err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === code
 }
 
 async function readMachineId(): Promise<string> {

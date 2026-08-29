@@ -12,6 +12,7 @@ import {
   acquireRuntimeLock,
   inspectRuntimeLock,
   prepareOpenAliceRuntime,
+  reclaimStaleForeignRequested,
   runtimeLockDir,
 } from './runtime-lock.js'
 
@@ -153,7 +154,7 @@ describe('runtime lock ownership', () => {
     await lock.release()
   })
 
-  it('never signals or reclaims an owner recorded on another machine', async () => {
+  it('reclaims a foreign owner on explicit takeover without signaling it', async () => {
     controller.add(101, 10_000)
     controller.add(202, 20_000)
     const lockDir = join(home, 'runtime.lock')
@@ -180,8 +181,156 @@ describe('runtime lock ownership', () => {
       takeover: true,
       heartbeatMs: 0,
       processController: controller,
-    })).rejects.toThrow(/another machine/)
+    })).resolves.toMatchObject({ owner: { pid: 202 } })
     expect(controller.signals).toEqual([])
+    await expect(inspectRuntimeLock(lockDir, { processController: controller })).resolves.toMatchObject({
+      state: 'active',
+      owner: { pid: 202 },
+      foreign: false,
+    })
+  })
+
+  it('does not reclaim a fresh foreign owner even when reclaimStaleForeign is set', async () => {
+    controller.add(101, 10_000)
+    controller.add(202, 20_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.currentMachineId = 'machine-b'
+
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      reclaimStaleForeign: true,
+    })).resolves.toMatchObject({
+      state: 'active',
+      foreign: true,
+      heartbeatStale: false,
+    })
+    await expect(acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      reclaimStaleForeign: true,
+      heartbeatMs: 0,
+      processController: controller,
+    })).rejects.toBeInstanceOf(RuntimeAlreadyRunningError)
+    expect(controller.signals).toEqual([])
+  })
+
+  it('reclaims a stale Docker-replacement lock without signaling the recorded pid', async () => {
+    controller.add(101, 10_000)
+    controller.add(202, 20_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+    controller.currentMachineId = 'machine-b'
+
+    await expect(inspectRuntimeLock(lockDir, {
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).resolves.toMatchObject({
+      state: 'active',
+      foreign: true,
+      heartbeatStale: true,
+      reason: expect.stringContaining('refusing automatic takeover'),
+    })
+    await expect(acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).rejects.toBeInstanceOf(RuntimeAlreadyRunningError)
+
+    const fresh = await acquireRuntimeLock(lockDir, {
+      pid: 202,
+      processStartedAt: 20_000,
+      reclaimStaleForeign: true,
+      heartbeatMs: 0,
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })
+    expect(controller.signals).toEqual([])
+    await expect(inspectRuntimeLock(lockDir, { processController: controller })).resolves.toMatchObject({
+      state: 'active',
+      owner: { pid: 202 },
+      foreign: false,
+    })
+    await fresh.release()
+  })
+
+  it('Guardian preflight skips signaling a stale foreign runtime owner when reclaim is allowed', async () => {
+    controller.add(101, 10_000)
+    const lockDir = runtimeLockDir(home)
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+    controller.currentMachineId = 'machine-b'
+
+    await expect(prepareOpenAliceRuntime({
+      userDataHome: home,
+      launcherRoot: join(home, 'workspaces'),
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).rejects.toBeInstanceOf(RuntimeAlreadyRunningError)
+    expect(controller.signals).toEqual([])
+
+    await expect(prepareOpenAliceRuntime({
+      userDataHome: home,
+      launcherRoot: join(home, 'workspaces'),
+      processController: controller,
+      staleHeartbeatMs: -1,
+      reclaimStaleForeign: true,
+    })).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ lockDir, state: 'stale', foreign: true }),
+    ]))
+    expect(controller.signals).toEqual([])
+  })
+
+  it('reads reclaimStaleForeign from env and argv', async () => {
+    expect(reclaimStaleForeignRequested({}, [])).toBe(false)
+    expect(reclaimStaleForeignRequested({ OPENALICE_RECLAIM_STALE_FOREIGN: '1' }, [])).toBe(true)
+    expect(reclaimStaleForeignRequested({}, ['--reclaim-stale-foreign'])).toBe(true)
+
+    controller.add(101, 10_000)
+    controller.add(202, 20_000)
+    const lockDir = join(home, 'runtime.lock')
+    await acquireRuntimeLock(lockDir, {
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+    controller.currentMachineId = 'machine-b'
+    const previous = process.env['OPENALICE_RECLAIM_STALE_FOREIGN']
+    process.env['OPENALICE_RECLAIM_STALE_FOREIGN'] = '1'
+    try {
+      const fresh = await acquireRuntimeLock(lockDir, {
+        pid: 202,
+        processStartedAt: 20_000,
+        heartbeatMs: 0,
+        processController: controller,
+        staleHeartbeatMs: -1,
+      })
+      expect(controller.signals).toEqual([])
+      await fresh.release()
+    } finally {
+      if (previous === undefined) delete process.env['OPENALICE_RECLAIM_STALE_FOREIGN']
+      else process.env['OPENALICE_RECLAIM_STALE_FOREIGN'] = previous
+    }
   })
 
   it('performs a controlled takeover before acquiring the lock', async () => {
@@ -356,6 +505,71 @@ describe('OpenAlice global + legacy lock composition', () => {
       owner: { pid: 202 },
     })
     await second.release()
+  })
+
+  it('reclaims leftover Docker guardian and runtime locks after container replacement', async () => {
+    controller.add(101, 10_000)
+    controller.add(202, 20_000)
+    const launcherRoot = join(home, 'workspaces')
+    const guardian = await acquireGuardianRuntime({
+      userDataHome: home,
+      launcherRoot,
+      launcher: 'guardian-docker',
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    const alice = await acquireOpenAliceRuntimeLocks({
+      userDataHome: home,
+      launcherRoot,
+      launcher: 'docker',
+      pid: 101,
+      processStartedAt: 10_000,
+      heartbeatMs: 0,
+      processController: controller,
+    })
+    controller.alive.set(101, false)
+    controller.currentMachineId = 'replacement-container'
+
+    await expect(acquireGuardianRuntime({
+      userDataHome: home,
+      launcherRoot,
+      launcher: 'guardian-docker',
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      processController: controller,
+      staleHeartbeatMs: -1,
+    })).rejects.toBeInstanceOf(RuntimeAlreadyRunningError)
+
+    const recovered = await acquireGuardianRuntime({
+      userDataHome: home,
+      launcherRoot,
+      launcher: 'guardian-docker',
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      processController: controller,
+      staleHeartbeatMs: -1,
+      reclaimStaleForeign: true,
+    })
+    const recoveredAlice = await acquireOpenAliceRuntimeLocks({
+      userDataHome: home,
+      launcherRoot,
+      launcher: 'docker',
+      pid: 202,
+      processStartedAt: 20_000,
+      heartbeatMs: 0,
+      processController: controller,
+      staleHeartbeatMs: -1,
+      reclaimStaleForeign: true,
+    })
+    expect(controller.signals).toEqual([])
+    await guardian.release()
+    await alice.release()
+    await recovered.release()
+    await recoveredAlice.release()
   })
 
   it('prevents two launcher roots from writing the same OPENALICE_HOME', async () => {
