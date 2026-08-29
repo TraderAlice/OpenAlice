@@ -1871,6 +1871,8 @@ export const zhHant: Resources = {
     cabinetRecords_other: '{{count}} 份歸檔記錄',
     cabinetInspectHint: '工位記錄會留在 Office，直到你選擇繼續前往。',
     cabinetRecordOwner: '{{name}} 歸檔',
+    cabinetOpenRecord: '在 Workspace 中開啟 {{record}}',
+    cabinetRecordAction: '開啟',
     cabinetEmpty: '這裡還沒有歸檔任何工位記錄。',
     openWorkspaceFiles: '進入 Workspace 檔案',
     interactKey: 'Enter',

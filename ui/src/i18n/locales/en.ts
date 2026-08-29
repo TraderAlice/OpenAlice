@@ -1896,6 +1896,8 @@ export const en = {
     cabinetRecords_other: '{{count}} filed records',
     cabinetInspectHint: 'Desk records stay in Office until you choose where to go.',
     cabinetRecordOwner: 'Filed by {{name}}',
+    cabinetOpenRecord: 'Open {{record}} in Workspace',
+    cabinetRecordAction: 'Open',
     cabinetEmpty: 'No desk records have been filed here yet.',
     openWorkspaceFiles: 'Enter Workspace files',
     interactKey: 'Enter',

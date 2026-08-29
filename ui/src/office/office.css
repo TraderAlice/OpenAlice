@@ -2862,7 +2862,7 @@
   display: grid;
   width: 100%;
   min-height: 66px;
-  grid-template-columns: 42px minmax(0, 1fr) 12px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
@@ -2906,9 +2906,32 @@
   color: var(--gba-ink-soft);
 }
 
-.oa-office-cabinet-window__records i {
+.oa-office-cabinet-window__destination {
+  display: grid;
+  min-width: 54px;
+  place-items: center;
+  gap: 1px;
+  padding-left: 7px;
+  border-left: 2px solid color-mix(in srgb, var(--gba-ink) 32%, transparent);
   color: var(--gba-water);
-  font-style: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-cabinet-window__destination img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.oa-office-cabinet-window__destination small {
+  max-width: 62px;
+  color: currentColor;
+  text-align: center;
 }
 
 .oa-office-cabinet-window__empty {

@@ -1613,6 +1613,28 @@ Mobile roster status follow-up (2026-08-29):
 - Focused RosterWindow specs passed: 1 file / 1 test. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
   run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Cabinet record exit follow-up (2026-08-29):
+
+- Played Filing cabinet -> `ai-chain-2026-06-02.md` at 1280x720. The record card ended in the same cyan `▶` used by
+  in-window roster disclosure, but activated a different class of action: it immediately left Office for the
+  Workspace file viewer. The card's visual promise and navigation outcome disagreed even though the destination URL
+  and file rendering were correct.
+- Compared copying the file reader into Office, adding a confirmation window, and marking the record itself as a
+  cross-scene exit. Chose the explicit exit because Office should not duplicate Workspace file ownership or add a
+  redundant click. The existing bottom `Enter Workspace files` control already established the generated session
+  portal as this window's doorway symbol.
+- Record buttons now use a localized accessible name that states `Open <record> in Workspace`. Their generic arrow is
+  replaced by a divided destination plaque containing the same generated session-portal bitmap and localized Open
+  action. The first `Workspace` plaque copy was rejected during browser QA because the global readable 14px minimum
+  truncated it; keeping that font size and shortening the visible verb produced a complete label while the semantic
+  name retains the exact destination.
+- Browser-played the updated exit at 1280x720 and 390x844. Desktop produced a 318.5x66 card with a complete 36px Open
+  label; mobile produced a 309x66 card and the same complete label inside the 344x246 cabinet. Both layouts retained
+  zero page overflow. Activating the explicitly named record still reached the encoded Workspace file URL, proving
+  that only the Office affordance changed.
+- Focused CabinetWindow specs passed: 1 file / 2 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
+  Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

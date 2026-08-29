@@ -63,13 +63,20 @@ export function OfficeCabinetWindow({
           <ul className="oa-office-cabinet-window__records">
             {records.map(({ employee, item }: CabinetRecord) => (
               <li key={`${employee.resumeId}:${item.id}`}>
-                <button type="button" onClick={() => onOpenRecord(employee, item)}>
+                <button
+                  type="button"
+                  aria-label={t('office.cabinetOpenRecord', { record: item.label })}
+                  onClick={() => onOpenRecord(employee, item)}
+                >
                   <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
                   <span>
                     <strong>{item.label}</strong>
                     <small>{t('office.cabinetRecordOwner', { name: officeCoworkerLabel(employee) })}</small>
                   </span>
-                  <i aria-hidden>▶</i>
+                  <span className="oa-office-cabinet-window__destination" aria-hidden>
+                    <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />
+                    <small>{t('office.cabinetRecordAction')}</small>
+                  </span>
                 </button>
               </li>
             ))}

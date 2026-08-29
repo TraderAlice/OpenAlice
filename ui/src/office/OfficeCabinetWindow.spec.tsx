@@ -76,13 +76,16 @@ describe('OfficeCabinetWindow', () => {
     expect(dialog.hasAttribute('data-empty')).toBe(false)
     expect(screen.getByText('2 filed records')).toBeTruthy()
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'Review queueFiled by c1▶',
-      'Thesis memoFiled by x1▶',
+      'Review queueFiled by c1Open',
+      'Thesis memoFiled by x1Open',
     ])
     expect(container.querySelector<HTMLImageElement>('header img')?.src)
       .toContain('/office/hud/drawer-record-v2.png')
 
-    await userEvent.click(screen.getByRole('button', { name: /Review queue/ }))
+    const recordExit = screen.getByRole('button', { name: 'Open Review queue in Workspace' })
+    expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__destination img')?.src)
+      .toContain('/office/hud/session-portal-v2.png')
+    await userEvent.click(recordExit)
     expect(onOpenRecord).toHaveBeenCalledWith(group.employees[1], group.employees[1].drawers[0])
     expect(onOpenWorkspaceFiles).not.toHaveBeenCalled()
 
