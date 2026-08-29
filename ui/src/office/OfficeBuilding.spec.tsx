@@ -79,6 +79,7 @@ describe('OfficeBuilding', () => {
     expect(map).toBeTruthy()
     expect(alice.style.left).toBe('480px')
     expect(alice.style.top).toBe('336px')
+    expect(alice.textContent).toBe('')
     expect(spawnCompass.style.left).toBe(alice.style.left)
     expect(spawnCompass.style.top).toBe(alice.style.top)
     expect(quietNotice.dataset.kind).toBe('empty')

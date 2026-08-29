@@ -1904,7 +1904,12 @@ export const ja: Resources = {
     replayViewFloor: '再生フロアを見る',
     replayPrevious: '前の再生イベント',
     replayNext: '次の再生イベント',
-    bubbleTool: '{{name}}',
+    bubbleToolWorkspace: 'オフィスを確認中…',
+    bubbleToolResearch: 'リサーチ中…',
+    bubbleToolRead: '記録を確認中…',
+    bubbleToolWrite: '成果を整理中…',
+    bubbleToolRun: 'タスクを実行中…',
+    bubbleTool: '{{name}} を使用中…',
     bubbleRejected: '派遣できませんでした',
     employeeLabel: '{{name}} @{{resumeId}}、{{mood}}',
     mood: {

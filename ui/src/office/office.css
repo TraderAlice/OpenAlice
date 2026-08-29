@@ -3344,15 +3344,6 @@
   box-shadow: none;
 }
 
-.oa-office-alice small {
-  padding: 1px 4px;
-  color: var(--gba-paper);
-  background: var(--gba-ink);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 6px;
-  line-height: 1.2;
-}
-
 .oa-office-map-controls {
   position: absolute;
   right: 8px;
@@ -4794,7 +4785,6 @@
 .oa-office-pod__sign-meta > span,
 .oa-office-pod__count,
 .oa-office-nameplate,
-.oa-office-alice small,
 .oa-office-map-controls__move,
 .oa-office-window__header span,
 .oa-office-inspect__kicker {

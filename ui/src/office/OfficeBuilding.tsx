@@ -739,7 +739,6 @@ export function OfficeBuilding({
                   scale={1}
                 />
               </span>
-              <small>ALICE</small>
             </div>
             {collisionImpact && (
               <OfficeCollisionImpact

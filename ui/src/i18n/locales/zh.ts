@@ -1903,7 +1903,12 @@ export const zh: Resources = {
     replayViewFloor: '查看重放楼层',
     replayPrevious: '上一个重放事件',
     replayNext: '下一个重放事件',
-    bubbleTool: '{{name}}',
+    bubbleToolWorkspace: '查看办公室…',
+    bubbleToolResearch: '调研中…',
+    bubbleToolRead: '查看档案…',
+    bubbleToolWrite: '整理成果…',
+    bubbleToolRun: '执行任务…',
+    bubbleTool: '使用 {{name}}…',
     bubbleRejected: '没派成',
     employeeLabel: '{{name}} @{{resumeId}}，{{mood}}',
     mood: {

@@ -1936,7 +1936,12 @@ export const en = {
     replayViewFloor: 'View replay floor',
     replayPrevious: 'Previous replay event',
     replayNext: 'Next replay event',
-    bubbleTool: '{{name}}',
+    bubbleToolWorkspace: 'Checking the office…',
+    bubbleToolResearch: 'Researching…',
+    bubbleToolRead: 'Reading records…',
+    bubbleToolWrite: 'Filing work…',
+    bubbleToolRun: 'Running a task…',
+    bubbleTool: 'Using {{name}}…',
     bubbleRejected: 'Could not dispatch',
     employeeLabel: '{{name}} @{{resumeId}}, {{mood}}',
     mood: {

@@ -1178,6 +1178,29 @@ Operations perimeter follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5021 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+First-minute diegesis follow-up (2026-08-29):
+
+- Replayed first movement, click-to-walk, employee inspection, roster, and return-to-floor as one new-player loop.
+  The windows settled into opaque game surfaces correctly; the persistent break was smaller but always visible:
+  Alice carried an HTML `ALICE` badge while moving, and coworker bubbles exposed raw tool identifiers such as
+  `workspace_list` and `research`.
+- Compared shrinking the player badge, replacing it with a permanent cursor, and removing it. Chose removal because
+  Alice already has a unique four-direction sprite, camera follow, accessible map label, and generated spawn compass;
+  another marker only adds HUD noise. Employee nameplates remain transient because they identify real selectable NPCs.
+- Compared preserving raw tool names, collapsing every tool to generic `Working`, and translating stable tool families
+  into in-world actions. Chose localized action families because they retain useful activity distinctions without
+  leaking transport vocabulary. Workspace/session, research/search, read/list, write/edit, and shell/run tools now
+  resolve to compact verbs; unknown names are humanized rather than showing snake case.
+- The exact tool identifier remains on the action bubble tooltip for inspection. Text/error bubbles remain verbatim,
+  and Alice keeps `role=img` plus the localized accessible name even though her visible debug badge is gone.
+- Browser-played click-to-walk into the Pi coworker at 1280x720 and inspected the settled Agent file, then rechecked
+  the same selected state at 760x900. `workspace_list` rendered as `Checking the office…` both overhead and in the
+  file, Alice had no visible text node, the route and dialogue still completed, no image broke, and overflow was 0px.
+- Focused bubble, Desk, and Building specs passed: 3 files / 14 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

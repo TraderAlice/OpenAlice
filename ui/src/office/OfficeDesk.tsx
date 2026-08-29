@@ -76,6 +76,7 @@ export function OfficeDesk({
         {employee?.bubble && showBubble && (
           <span
             className="oa-office-bubble"
+            title={employee.bubble.kind === 'tool' ? employee.bubble.name : undefined}
             style={{ top: station.bubble.topPx, zIndex: station.bubble.zIndex }}
           >
             {officeBubbleText(employee.bubble, t)}

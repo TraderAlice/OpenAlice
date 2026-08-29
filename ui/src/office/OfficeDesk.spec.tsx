@@ -59,7 +59,7 @@ describe('OfficeDesk', () => {
     const { container, rerender } = render(<OfficeDesk {...props} />)
 
     expect(screen.getByRole('button').style.zIndex).toBe('107')
-    expect(screen.queryByText('research')).toBeNull()
+    expect(screen.queryByText('Researching…')).toBeNull()
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-agent')).toBe('claude')
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-pose')).toBe('desk')
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-reduced-motion')).toBe('true')
@@ -71,7 +71,7 @@ describe('OfficeDesk', () => {
       .toContain('/office/coworkers/claude-desk-work-v1.png')
 
     rerender(<OfficeDesk {...props} nearby />)
-    expect(screen.getByText('research')).toBeTruthy()
+    expect(screen.getByText('Researching…').getAttribute('title')).toBe('research')
   })
 
   it.each([
@@ -96,6 +96,6 @@ describe('OfficeDesk', () => {
 
     rerender(<OfficeDesk {...props} nearby />)
     expect(screen.queryByTestId(`office-emote-${mood}`)).toBeNull()
-    expect(screen.getByText('research')).toBeTruthy()
+    expect(screen.getByText('Researching…')).toBeTruthy()
   })
 })
