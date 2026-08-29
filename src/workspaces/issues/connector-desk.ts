@@ -130,7 +130,7 @@ export async function createConnectorDesk(
     if (!revived.ok) {
       return revived.reason === 'invalid'
         ? revived
-        : { ok: false, reason: 'invalid', error: `${label} connector chat could not be re-enabled` }
+        : { ok: false, reason: 'invalid', error: `Chat on ${label} could not be turned back on` }
     }
     return { ok: true, issue: revived.issue }
   }
@@ -170,7 +170,7 @@ export async function updateConnectorDesk(
     return {
       ok: false,
       reason: 'invalid',
-      error: `Unsupported connector chat cadence: ${patch.when.every}`,
+      error: `Unsupported heartbeat: ${patch.when.every}`,
     }
   }
   return updateIssueFields(wsDir, id, patch)

@@ -74,8 +74,9 @@ external adapters remain optional projections rather than sources of truth.
   - [x] Replace Start/Stop buttons with one per-adapter runtime switch.
   - [x] Replace visible phone-desk setup with `Chat on <connector>`, a Workspace
         choice, an independent switch, and collapsed heartbeat/prompt settings.
-  - [x] Name newly created connector Issues `Chat on <label>` and use connector-chat
-        copy in default What and domain/HTTP validation errors; do not rewrite existing Issues.
+  - [x] Name newly created connector Issues `Chat on <label>` and use natural chat
+        language in default What and domain/HTTP errors; conflict says
+        `Chat on <Label> already exists`; do not rewrite existing Issues.
   - [ ] Revisit Connector status copy and owner-identifier disclosure as a
         separate accepted increment.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,

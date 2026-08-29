@@ -167,7 +167,7 @@ You are the Telegram phone desk for this Workspace.
     expect(updated).toMatchObject({
       ok: false,
       reason: 'invalid',
-      error: 'Unsupported connector chat cadence: 3h',
+      error: 'Unsupported heartbeat: 3h',
     })
   })
 

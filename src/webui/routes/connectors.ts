@@ -68,7 +68,7 @@ export function createConnectorRoutes(deps: {
       if (!isConnectorOwnerLinked(await readConnectorConfig(), connectorId)) {
         return c.json({
           error: 'not_linked',
-          message: 'Link this connector to its private owner chat before enabling connector chat',
+          message: 'Link this connector to its private owner chat before turning on chat',
         }, 409)
       }
       const desk = await service.createConnectorDesk(connectorId, wsId)
@@ -102,7 +102,7 @@ export function createConnectorRoutes(deps: {
       if (candidate?.kind !== 'every'
         || typeof candidate.every !== 'string'
         || !isConnectorDeskCadence(candidate.every)) {
-        return c.json({ error: 'invalid', message: 'when must use a supported connector chat cadence' }, 400)
+        return c.json({ error: 'invalid', message: 'when must use a supported heartbeat' }, 400)
       }
       patch.when = { kind: 'every', every: candidate.every }
     }

@@ -84,7 +84,7 @@ describe('Telegram phone-desk connector routes', () => {
     expect(response.status).toBe(409)
     expect(await response.json()).toEqual({
       error: 'not_linked',
-      message: 'Link this connector to its private owner chat before enabling connector chat',
+      message: 'Link this connector to its private owner chat before turning on chat',
     })
     expect(createConnectorDesk).not.toHaveBeenCalled()
   })
@@ -112,7 +112,7 @@ describe('Telegram phone-desk connector routes', () => {
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({
       error: 'invalid',
-      message: 'when must use a supported connector chat cadence',
+      message: 'when must use a supported heartbeat',
     })
     expect(updateConnectorDesk).not.toHaveBeenCalled()
   })
