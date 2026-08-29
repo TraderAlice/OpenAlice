@@ -45,6 +45,12 @@ const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   news: 'office.logChannelNews',
 } as const satisfies Record<OfficeLogChannel, string>
 
+function officeLogFamilyForEvent(event: AgentRuntimeEvent): Exclude<OfficeLogChannel, 'all'> {
+  if (event.type === 'inbox.received') return 'inbox'
+  if (event.type === 'news.ingested') return 'news'
+  return 'agent'
+}
+
 function eventLabel(event: AgentRuntimeEvent, t: TFunction): string {
   if (event.type === 'session.born') return t('office.logEventBorn')
   if (event.type === 'runtime.started') return t('office.logEventStarted')
@@ -217,11 +223,13 @@ export function OfficeRuntimeSection({
   actors = new Map(),
   initialChannel = 'all',
   initialSelectedSeq = null,
+  replaySeq = null,
   onReplay,
 }: {
   actors?: ReadonlyMap<string, OfficeActivityActor>
   initialChannel?: OfficeLogChannel
   initialSelectedSeq?: number | null
+  replaySeq?: number | null
   onReplay?: (focus: OfficeReplayFocus) => void
 } = {}) {
   const { t } = useTranslation()
@@ -238,6 +246,7 @@ export function OfficeRuntimeSection({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const journalIndexRef = useRef<HTMLOListElement>(null)
+  const appliedReplaySeqRef = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -296,6 +305,26 @@ export function OfficeRuntimeSection({
       return visibleBeats[0].event.seq
     })
   }, [initialSelectedSeq, visibleBeats])
+
+  useEffect(() => {
+    if (replaySeq == null) {
+      appliedReplaySeqRef.current = null
+      return
+    }
+    if (appliedReplaySeqRef.current === replaySeq) return
+    const replayEvent = entriesByChannel.all.find((event) => event.seq === replaySeq)
+    if (!replayEvent) return
+    const replayChannel = channel === 'all' ? 'all' : officeLogFamilyForEvent(replayEvent)
+    const replayBeat = beatsByChannel[replayChannel].find((beat) => {
+      const lower = Math.min(beat.oldestSeq, beat.event.seq)
+      const upper = Math.max(beat.oldestSeq, beat.event.seq)
+      return replaySeq >= lower && replaySeq <= upper
+    })
+    if (!replayBeat) return
+    appliedReplaySeqRef.current = replaySeq
+    setChannel(replayChannel)
+    setSelectedSeq(replayBeat.event.seq)
+  }, [beatsByChannel, channel, entriesByChannel.all, replaySeq])
 
   useEffect(() => {
     setDetailExpanded(false)

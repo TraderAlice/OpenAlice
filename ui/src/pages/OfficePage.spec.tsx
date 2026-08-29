@@ -31,10 +31,12 @@ vi.mock('./OfficeRuntimeSection', () => ({
   OfficeRuntimeSection: ({
     initialChannel,
     initialSelectedSeq,
+    replaySeq,
     onReplay,
   }: {
     initialChannel?: string
     initialSelectedSeq?: number | null
+    replaySeq?: number | null
     onReplay?: (focus: {
       seq: number
       targetIds: readonly string[]
@@ -47,6 +49,7 @@ vi.mock('./OfficeRuntimeSection', () => ({
       data-testid="office-runtime-section"
       data-channel={initialChannel}
       data-selected-seq={initialSelectedSeq ?? undefined}
+      data-replay-seq={replaySeq ?? undefined}
     >
       Office occupancy
       <button

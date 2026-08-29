@@ -461,6 +461,52 @@ describe('OfficeRuntimeSection', () => {
       .toBe('true')
   })
 
+  it('follows raw replay steps through their readable story beat', async () => {
+    const now = Date.now()
+    mockJournal([
+      {
+        seq: 6,
+        ts: now,
+        type: 'runtime.stopped',
+        payload: { resumeId: 'resume-a', taskId: 'task-a', status: 'done' },
+      },
+      ...[5, 4, 3].map((seq) => ({
+        seq,
+        ts: now - (6 - seq) * 1_000,
+        type: 'runtime.turn.text',
+        payload: { resumeId: 'resume-a', taskId: 'task-a', text: `Progress ${seq}` },
+      })),
+      {
+        seq: 2,
+        ts: now - 4_000,
+        type: 'news.ingested',
+        payload: { newsItemId: 2, source: 'Wire', title: 'Market opens' },
+      },
+    ])
+    const { rerender } = render(
+      <OfficeRuntimeSection initialChannel="agent" initialSelectedSeq={6} replaySeq={6} />,
+    )
+
+    expect((await screen.findByRole('button', { name: /Task complete.*#0006/i }))
+      .getAttribute('aria-pressed')).toBe('true')
+
+    rerender(<OfficeRuntimeSection initialChannel="agent" initialSelectedSeq={6} replaySeq={5} />)
+
+    const progress = await screen.findByRole('button', {
+      name: /Agent report.*3 updates.*#0003–0005/i,
+    })
+    expect(progress.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('Progress 5')).toBeTruthy()
+
+    rerender(<OfficeRuntimeSection initialChannel="agent" initialSelectedSeq={6} replaySeq={2} />)
+
+    expect((await screen.findByRole('tab', { name: /News\s*1/ })).getAttribute('data-active'))
+      .not.toBeNull()
+    expect(screen.getByRole('button', { name: /News added.*#0002/i }).getAttribute('aria-pressed'))
+      .toBe('true')
+    expect(screen.getByText('Market opens')).toBeTruthy()
+  })
+
   it('presents runtime outcomes as player-facing activity language', async () => {
     const now = Date.now()
     mockJournal([

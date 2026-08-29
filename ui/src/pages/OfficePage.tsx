@@ -347,6 +347,7 @@ export function OfficePage() {
                     actors={activityActors}
                     initialChannel={logView.channel}
                     initialSelectedSeq={logView.focusSeq}
+                    replaySeq={asOfSeq}
                     onReplay={(focus) => {
                       setReplayFocus(focus)
                       setAsOfSeq(focus.seq)

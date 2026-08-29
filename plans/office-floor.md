@@ -2955,6 +2955,24 @@ Journal-cursor restoration follow-up (2026-08-30):
   run (5,124 passing; one file and nine tests skipped), and the production build; the existing large-chunk advisory is
   unchanged.
 
+Replay-time journal synchronization follow-up (2026-08-30):
+
+- Opened Replay controls on real Agent #1837 and stepped once backward. The floor header and timeline changed to
+  `Seq 1836`, while the journal cursor and detail remained on `#1837 Task complete`: one modal exposed two conflicting
+  historical positions.
+- Compared keeping detail pinned with stronger dual labels, replacing raw sequence navigation with folded beat jumps,
+  and projecting each raw replay sequence into its containing readable beat. Chose projection: raw snapshots retain
+  their precision, while the journal behaves as the story index for the exact floor currently shown.
+- OfficeRuntimeSection now receives the active replay sequence. On a new replay step it resolves the exact raw event,
+  retains All when already in All or switches to that event's Agent/Inbox/News family, selects the beat whose sequence
+  range contains it, and lets the existing cursor-restoration behavior reveal the row. A manual journal selection is
+  not reset by polling because each replay sequence is applied only once.
+- Browser-stepped real #1837 back to #1836. Floor title, slider, Agent tab, selected `#1639–1836` 198-update beat, and
+  right-side Agent report all synchronized in one frame. Focused Replay-bar, Office-page, and journal specs passed
+  (3 files / 25 tests), including folded raw-step and cross-family channel coverage. Root and UI TypeScript checks,
+  the full test run (5,125 passing; one file and nine tests skipped), and the production build also passed; the
+  existing large-chunk advisory remains unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
