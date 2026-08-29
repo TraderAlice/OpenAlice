@@ -23,6 +23,7 @@ export const OFFICE_FURNITURE = {
     workspaceSign: '/office/furniture/workspace-sign-v2.png',
     spawnCompass: '/office/furniture/spawn-compass-v2.png',
     routeChevron: '/office/furniture/route-chevron-v1.png',
+    routeTargetPointer: '/office/furniture/route-target-pointer-v1.png',
     collisionImpact: '/office/furniture/collision-impact-v1.png',
     mailService: '/office/furniture/mail-service-v1.png',
     archiveService: '/office/furniture/archive-service-v1.png',

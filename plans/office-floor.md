@@ -1274,6 +1274,33 @@ Native movement-pad follow-up (2026-08-29):
 - `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+RPG route-target follow-up (2026-08-29):
+
+- Replayed the desktop movement, click-to-route, arrival, Agent-file, and return-to-floor loop. The generated floor
+  chevrons communicated the path, but every destination still received an object-sized coral highlight. On desks it
+  appeared as a literal 92x70 rectangle, reading like a collision/debug overlay rather than an authored game state.
+- Compared restyling the rectangle, reusing the destination floor diamond, and introducing a separate floating target
+  cursor. Chose the cursor so route chevrons describe where Alice will walk, one world pointer names what she is
+  approaching, and the existing blue nearby treatment remains reserved for actions available now.
+- Used the built-in image generator with the route chevron, A button, and locked Office style master as references to
+  create one downward GBA-style cursor. The prompt required a cream-gold leading edge, restrained teal inset, charcoal
+  outline, hard pixels, one exact downward silhouette, genuine transparency, and no box, floor tile, path, text,
+  character, object, detached shadow, halo, or additional arrows.
+- Hard-alpha thresholding, nearest-neighbor fitting, and 48-color packaging produced
+  `route-target-pointer-v1.png` on a native 32x32 RGBA canvas. A shared `OfficeRouteTargetPointer` now owns its DOM,
+  reduced-motion behavior, depth, and kind-specific anchors; the sign, desk, cabinet, roster, and Operations route
+  selectors no longer draw alert backgrounds, inset borders, glow boxes, or target pulses. Desk hover likewise uses
+  only the existing brightness and one-pixel lift instead of leaving a pale rectangular field under the cursor.
+- Browser-played distant employee, Workspace sign, AutoQuant cabinet, and Operations routes at 1280x720. The cursor
+  landed over each physical object, the first-row employee anchor was adjusted below the sign text, and arrival
+  removed both pointer and trail before opening the correct Agent file. At 390x844 the rightmost cabinet pointer was
+  nudged 8px inward to retain a 3px frame margin; touch movement cancelled pointer and trail together. Broken images
+  and horizontal overflow remained zero.
+- Focused pointer, route-trail, furniture, and Building specs passed: 4 files / 14 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 605 files / 5026 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

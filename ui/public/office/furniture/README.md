@@ -56,6 +56,7 @@ machine light instead of dimming the whole Office scene.
 - `workspace-sign-v2.png` — blank physical placard behind live Workspace, Harness, and agent text
 - `spawn-compass-v2.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
 - `route-chevron-v1.png` — generated 24px floor inlay for the remaining click-to-interact path
+- `route-target-pointer-v1.png` — generated 32px floating destination pointer for click-to-interact routes
 - `collision-impact-v1.png` — generated four-frame blocked-movement sparkle at native 24px cells
 - `mail-service-v1.png` — water cooler and mail-sorting landmark for the open service edge
 - `archive-service-v1.png` — copier and archive-trolley landmark for the open service edge
@@ -81,6 +82,10 @@ assets failed to load.
 `route-chevron-v1.png` is a compact diamond double-chevron generated on a flat magenta key, alpha-extracted,
 hard-matted, and nearest-neighbor packaged at the native 24px navigation grid. Runtime rotation supplies four
 directions; markers are decorative world feedback and never replace the named route status.
+
+`route-target-pointer-v1.png` is a single generated cream-gold and teal downward cursor, hard-alpha packaged on a
+native 32px canvas. It floats above the active route destination while floor chevrons describe the path, replacing
+object-sized alert rectangles without changing target hit areas, accessible names, or arrival behavior.
 
 `collision-impact-v1.png` is a 96x24 transparent atlas with contact, star, arc, and fragment frames. Runtime
 rotation supplies four collision directions. Reduced-motion mode holds the bright second frame for the same short

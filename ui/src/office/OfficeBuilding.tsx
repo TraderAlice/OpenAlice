@@ -25,6 +25,7 @@ import {
 } from './OfficeCollisionImpact'
 import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
+import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
 import {
   nearestOfficeInteractionTarget,
   officeCameraFollowingAlice,
@@ -721,6 +722,13 @@ export function OfficeBuilding({
               }}
             />
             <OfficeRouteTrail steps={routeTrail} />
+            {routeTarget && (
+              <OfficeRouteTargetPointer
+                target={routeTarget}
+                reducedMotion={reducedMotion}
+                zIndex={officeDepthAt(routeTarget.y) + 1200}
+              />
+            )}
             <div
               className="oa-office-alice"
               role="img"
