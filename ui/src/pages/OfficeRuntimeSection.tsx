@@ -19,8 +19,10 @@ import { officeReplayFocusForEvent, type OfficeReplayFocus } from '../office/rep
 import { useWorkspace } from '../tabs/store'
 
 type OfficeLogChannel = 'all' | 'agent' | 'inbox' | 'news'
+type OfficeLogFamily = Exclude<OfficeLogChannel, 'all'>
 
 const OFFICE_LOG_CHANNELS: readonly OfficeLogChannel[] = ['all', 'agent', 'inbox', 'news']
+const OFFICE_LOG_FAMILIES: readonly OfficeLogFamily[] = ['agent', 'inbox', 'news']
 const OFFICE_LOG_CHANNEL_LABEL_KEYS = {
   all: 'office.logChannelAll',
   agent: 'office.logChannelAgent',
@@ -134,6 +136,16 @@ function causeLabel(
   return cause.kind
 }
 
+function mergeOfficeLogFamilies(
+  families: readonly (readonly AgentRuntimeEvent[])[],
+): AgentRuntimeEvent[] {
+  const bySequence = new Map<number, AgentRuntimeEvent>()
+  for (const entries of families) {
+    for (const event of entries) bySequence.set(event.seq, event)
+  }
+  return [...bySequence.values()].sort((a, b) => b.seq - a.seq)
+}
+
 export function OfficeRuntimeSection({
   actors = new Map(),
   onReplay,
@@ -157,16 +169,17 @@ export function OfficeRuntimeSection({
   const load = useCallback(async () => {
     try {
       const activityApi = api.productActivity ?? api.agentRuntime
-      const pages = await Promise.all(OFFICE_LOG_CHANNELS.map((item) => activityApi.query({
+      const pages = await Promise.all(OFFICE_LOG_FAMILIES.map((family) => activityApi.query({
         page: 1,
         pageSize: 50,
-        ...(item === 'all' ? {} : { family: item }),
+        family,
       })))
+      const [agent, inbox, news] = pages.map((page) => page.entries)
       setEntriesByChannel({
-        all: pages[0].entries,
-        agent: pages[1].entries,
-        inbox: pages[2].entries,
-        news: pages[3].entries,
+        all: mergeOfficeLogFamilies([agent, inbox, news]),
+        agent,
+        inbox,
+        news,
       })
       setError(null)
     } catch (err) {

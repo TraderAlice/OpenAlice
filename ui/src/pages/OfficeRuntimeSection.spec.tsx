@@ -11,7 +11,7 @@ import { OfficeRuntimeSection } from './OfficeRuntimeSection'
 const query = vi.fn()
 
 function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>) {
-  query.mockImplementation(async (opts: { family?: string } = {}) => {
+  query.mockImplementation(async (opts: { family?: string; pageSize?: number } = {}) => {
     const filtered = opts.family === 'inbox'
       ? entries.filter((entry) => entry.type === 'inbox.received')
       : opts.family === 'news'
@@ -20,7 +20,7 @@ function mockJournal(entries: Array<{ type: string } & Record<string, unknown>>)
           ? entries.filter((entry) => entry.type !== 'inbox.received' && entry.type !== 'news.ingested')
           : entries
     return {
-      entries: filtered,
+      entries: filtered.slice(0, opts.pageSize ?? filtered.length),
       lastSeq: entries.length,
       total: filtered.length,
       page: 1,
@@ -229,6 +229,45 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByRole('list', { name: 'Activity log · Agent' }).children).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Tool action.*#0002/i })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /News added/i })).toBeNull()
+  })
+
+  it('keeps product events in All when agent activity fills its own page', async () => {
+    const now = Date.now()
+    const agentEvents = Array.from({ length: 50 }, (_, index) => ({
+      seq: 200 - index,
+      ts: now - index,
+      type: 'runtime.turn.text',
+      payload: {
+        resumeId: 'resume-busy',
+        taskId: 'task-busy',
+        text: `Progress ${index + 1}`,
+      },
+    }))
+    mockJournal([
+      ...agentEvents,
+      {
+        seq: 100,
+        ts: now - 1_000,
+        type: 'inbox.received',
+        payload: { inboxEntryId: 'inbox-100', summary: 'Durable handoff arrived' },
+      },
+      {
+        seq: 99,
+        ts: now - 2_000,
+        type: 'news.ingested',
+        payload: { newsItemId: 99, source: 'Wire', title: 'Important market headline' },
+      },
+    ])
+    render(<OfficeRuntimeSection />)
+
+    expect(await screen.findByRole('tab', { name: /All\s*3/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Agent\s*1/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Inbox\s*1/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /News\s*1/ })).toBeTruthy()
+    const allLog = screen.getByRole('list', { name: 'Activity log · All' })
+    expect(allLog.children).toHaveLength(3)
+    expect(screen.getByRole('button', { name: /Inbox received.*#0100/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /News added.*#0099/i })).toBeTruthy()
   })
 
   it('folds adjacent reports from one task into a selectable activity beat', async () => {

@@ -2710,6 +2710,24 @@ Eight-person Grok party follow-up (2026-08-30):
   with root/UI TypeScript, the full 617-file Vitest run (5,111 passing; one file and nine tests skipped), and the
   production build; the existing large-chunk advisory is unchanged.
 
+Balanced activity-journal follow-up (2026-08-30):
+
+- Opened Activity Log after the real Grok timing run emitted 49 progress entries. Although the channel tabs still
+  reported `Inbox 5` and `News 50`, `All` contained only two folded Agent beats: the global 50-event page had been
+  completely consumed by one chatty runtime before folding happened. Product work still existed, but the unified
+  Office story had silently lost it.
+- Compared increasing the global page size, assigning display quotas after one global fetch, and independently loading
+  each registered activity family before merging by sequence. Chose independent family windows: a larger global cap
+  only postpones starvation, while post-fetch quotas cannot recover events the backend page never returned.
+- Activity Log now requests the latest 50 Agent, Inbox, and News events separately, de-duplicates by sequence, and
+  sorts the union into one truthful newest-first timeline. Tabs retain their own complete family window, keyboard
+  selection is unchanged, and no new compatibility or persistence layer is introduced.
+- Browser replay changed the same live journal from `All 2` to `All 57`: the two Grok beats remained first, followed
+  immediately by recent News and Inbox events, while the independent `Agent 2`, `Inbox 5`, and `News 50` channels stayed
+  intact. The focused journal spec passed (1 file / 9 tests), together with root/UI TypeScript, the full 617-file
+  Vitest run (5,112 passing; one file and nine tests skipped), and the production build; the existing large-chunk
+  advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
