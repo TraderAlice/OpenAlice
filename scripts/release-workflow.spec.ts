@@ -98,6 +98,7 @@ describe('Release workflow critical path', () => {
       { os: 'ubuntu-24.04-arm', platform: 'linux', arch: 'arm64' },
     ])
     expect(nativeCli.steps?.some((candidate) => candidate.uses === 'oven-sh/setup-bun@v2')).toBe(true)
+    expect(step(nativeCli, 'Build Alice and native CLI').run).toContain('build:bun-runtime:feasibility')
     expect(step(nativeCli, 'Preserve accepted native CLI').with?.name).toBe(
       'cli-release-${{ matrix.platform }}-${{ matrix.arch }}',
     )
