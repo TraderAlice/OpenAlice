@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -45,6 +45,12 @@ describe.skipIf(process.platform === 'win32')('OpenAlice CLI rollback transactio
       stdin: { isTTY: false },
     })).resolves.toBe(0)
     expect(await readlink(layout.currentPath)).toBe('releases/0.90.0-linux-x64-aaaaaaaaaaaaaaaa')
+    expect(JSON.parse(await readFile(layout.activationPath, 'utf8'))).toMatchObject({
+      activeRelease: '0.90.0-linux-x64-aaaaaaaaaaaaaaaa',
+      previousRelease: '0.91.0-linux-x64-bbbbbbbbbbbbbbbb',
+      productVersion: '0.90.0',
+      state: 'pending',
+    })
     expect(output.join('')).toContain('User data was not changed')
   })
 
@@ -98,6 +104,7 @@ async function makeInstalledLayout(options = {}) {
     releaseDir: join(releasesDir, currentName),
     currentPath: join(cliDir, 'current'),
     provenanceDir,
+    activationPath: join(cliDir, 'activation.json'),
     binDir: join(installRoot, 'bin'),
     lockDir: join(installRoot, '.cli-install.lock'),
     updateCachePath: join(installRoot, '.cli-update-check.json'),

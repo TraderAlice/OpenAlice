@@ -3,6 +3,12 @@ import { mkdir, open } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
 import {
+  reconcileActivation,
+  resolveActivationContext,
+  rollbackFailedActivation,
+} from './activation-runtime.mjs'
+
+import {
   buildLocalRuntimeEnv,
   findOpenAliceRoot,
   prepareSourceCheckout,
@@ -29,10 +35,12 @@ const NULL_OUTPUT = Object.freeze({ write: () => undefined })
 
 export async function inspectRuntime(options = {}, dependencies = {}) {
   const readStatus = dependencies.readStatus ?? readRuntimeStatus
-  return readStatus({
+  const status = await readStatus({
     homeRoot: options.homeRoot,
     timeoutMs: options.waitMs,
   }, dependencies)
+  const activation = await resolveActivationContext(dependencies.env ?? process.env, dependencies)
+  return reconcileActivation(status, activation, dependencies, { confirm: false })
 }
 
 export async function startRuntime(options, dependencies = {}) {
@@ -44,9 +52,11 @@ export async function startRuntime(options, dependencies = {}) {
     homeDir: dependencies.homeDir,
   })
   const readStatus = dependencies.readStatus ?? readRuntimeStatus
+  const activation = await resolveActivationContext(env, dependencies)
   let status = await readStatus({ homeRoot, timeoutMs: 1_000 }, dependencies)
 
   if (status.owner?.surface === 'cli-server' && status.class === 'running') {
+    status = await reconcileActivation(status, activation, dependencies)
     return {
       outcome: 'already-running',
       mode: status.owner.mode ?? (detached ? 'detached' : 'foreground'),
@@ -61,6 +71,7 @@ export async function startRuntime(options, dependencies = {}) {
       ...dependencies,
       readStatus,
     })
+    status = await reconcileActivation(status, activation, dependencies)
     return {
       outcome: 'already-running',
       mode: status.owner?.mode ?? (detached ? 'detached' : 'foreground'),
@@ -189,6 +200,7 @@ export async function startRuntime(options, dependencies = {}) {
       startupSignals.promise,
     ])
     ready = true
+    status = await reconcileActivation(status, activation, dependencies)
     const launch = {
       outcome: 'started',
       mode: detached ? 'detached' : 'foreground',
@@ -211,13 +223,27 @@ export async function startRuntime(options, dependencies = {}) {
     readinessAbort.abort()
     startupSignals.release()
     runtime.kill('SIGTERM')
+    const rollback = await rollbackFailedActivation(activation, error, dependencies)
+    const rollbackMessage = rollback
+      ? ` The failed direct-install activation was rolled back to ${rollback.restoredRelease}. Run openalice again to start the restored release. User data was not changed.`
+      : ''
     if (detached) {
       const wrapped = lifecycleError(
         error?.code ?? 'ESTART',
-        `${error instanceof Error ? error.message : String(error)}. See the Runtime log at ${logPath}`,
+        `${error instanceof Error ? error.message : String(error)}.${rollbackMessage} See the Runtime log at ${logPath}`,
       )
       wrapped.cause = error
       wrapped.logPath = logPath
+      if (rollback) wrapped.rollback = rollback
+      throw wrapped
+    }
+    if (rollback) {
+      const wrapped = lifecycleError(
+        error?.code ?? 'ESTART',
+        `${error instanceof Error ? error.message : String(error)}.${rollbackMessage}`,
+      )
+      wrapped.cause = error
+      wrapped.rollback = rollback
       throw wrapped
     }
     throw error

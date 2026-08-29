@@ -13,6 +13,7 @@ import {
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
+import { recordPendingActivation } from './activation.mjs'
 import { resolveInstalledLayout } from './install-layout.mjs'
 import { requireInstallSource } from './install-source.mjs'
 
@@ -62,6 +63,11 @@ export async function runRollbackCommand(argv, dependencies = {}) {
   }
 
   await assertNoLiveInstaller(layout.lockDir, dependencies.processKill ?? process.kill)
+  await (dependencies.recordPendingActivationImpl ?? recordPendingActivation)(layout, {
+    activeRelease: plan.target.name,
+    previousRelease: plan.current.name,
+    productVersion: plan.target.source.cliVersion,
+  }, dependencies)
   await activateRelease(layout, plan.target.name, dependencies)
   stdout.write(`\nOpenAlice rollback complete: ${plan.target.name}\n`)
   stdout.write('Run openalice again to use the activated release. User data was not changed.\n')
@@ -160,7 +166,7 @@ async function confirmRollback({ stdin, stdout }) {
   }
 }
 
-async function assertNoLiveInstaller(lockDir, processKill) {
+export async function assertNoLiveInstaller(lockDir, processKill) {
   let pid
   try {
     pid = Number((await readFile(join(lockDir, 'pid'), 'utf8')).trim())

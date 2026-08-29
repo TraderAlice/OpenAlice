@@ -83,12 +83,29 @@ for helper in openalice alice alice-workspace alice-uta traderhub; do
   [[ -x "$install_root/bin/$helper" ]] || fail "missing launcher $helper"
 done
 
-bash /fixture/install --archive "$archive_v2" --sha256 "$sha_v2" --install-dir "$install_root" --yes
+mkdir -p "$install_root/data"
+printf 'preserved\n' >"$install_root/data/state"
+rm "$install_root/bin/openalice"
+mkdir "$install_root/bin/openalice"
+if bash /fixture/install --archive "$archive_v2" --sha256 "$sha_v2" --install-dir "$install_root" --yes >/tmp/failed-update.log 2>&1; then
+  fail "post-activation launcher failure unexpectedly succeeded"
+fi
+[[ "$(readlink "$install_root/cli/current")" == "releases/0.91.0-${platform}-${architecture}-aaaaaaaaaaaaaaaa" ]] \
+  || fail "failed install did not restore the exact previous pointer"
+grep -Fq '"state": "rolled_back"' "$install_root/cli/activation.json" \
+  || fail "failed install did not record rolled-back activation"
+[[ "$(cat "$install_root/data/state")" == preserved ]] || fail "failed install changed user data"
+rm -rf "$install_root/bin/openalice"
+
+OPENALICE_INSTALL_KEEP_RELEASES=1 bash /fixture/install \
+  --archive "$archive_v2" --sha256 "$sha_v2" --install-dir "$install_root" --yes
 [[ "$("$install_root/bin/openalice" --version)" == 0.92.0 ]] || fail "updated native release is not runnable"
 [[ "$(readlink "$install_root/cli/current")" == "releases/0.92.0-${platform}-${architecture}-bbbbbbbbbbbbbbbb" ]] \
   || fail "update did not atomically switch the active pointer"
 [[ -d "$install_root/cli/releases/0.91.0-${platform}-${architecture}-aaaaaaaaaaaaaaaa" ]] \
-  || fail "update removed the rollback release"
+  || fail "retention removed the pending rollback release"
+grep -Fq '"state": "pending"' "$install_root/cli/activation.json" \
+  || fail "update did not record pending activation"
 grep -Fq '# >>> OpenAlice CLI >>>' "$HOME/.bashrc" || fail "installer did not add its managed PATH block"
 [[ ! -e "$install_root/.cli-install.lock" ]] || fail "installer lock was not released"
 

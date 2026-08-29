@@ -482,7 +482,7 @@ build harness when it improves the next investigation.
 - [x] For Bun-to-Bun updates, preserve a running old Guardian until explicit
   restart and report pending activation; do not replace a running executable
   in place.
-- [ ] Roll back the active pointer when new-runtime readiness fails.
+- [x] Roll back the active pointer when new-runtime readiness fails.
 - [x] Remove obsolete managed `pi` launchers only after the new OpenAlice
   command is validated; never remove a user-owned `pi` elsewhere on PATH.
 - [x] Keep bounded prior OpenAlice releases for rollback and collect only
@@ -795,3 +795,11 @@ This plan is complete only when:
   Arch base-devel image currently lacks arm64, so native Arch Linux ARM remains
   an explicit acceptance gap. Public registry name reservation and external
   tap/AUR publication remain activation work rather than hidden fallbacks.
+- 2026-08-30: Direct installs now record an atomic pending activation receipt
+  with the exact previous immutable release. Matching first readiness confirms
+  it; early exit, timeout, or executable failure restores the validated pointer
+  without starting the prior Runtime or touching user data. Installer failure
+  after pointer activation performs the same exact rollback, and retention
+  cannot collect the pending target. Package-manager upgrades remain
+  manager-owned: CLI/TUI status compares content identities and reports restart
+  activation without modifying npm, Bun, Homebrew, or AUR files.

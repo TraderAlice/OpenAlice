@@ -42,6 +42,7 @@ describe('OpenAlice installed layout', () => {
       releaseDir,
       currentPath: join(installRoot, 'cli', 'current'),
       provenanceDir: join(installRoot, 'cli', 'provenance'),
+      activationPath: join(installRoot, 'cli', 'activation.json'),
       binDir: join(installRoot, 'bin'),
       lockDir: join(installRoot, '.cli-install.lock'),
       updateCachePath: join(installRoot, '.cli-update-check.json'),
