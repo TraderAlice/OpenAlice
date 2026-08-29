@@ -210,6 +210,11 @@ hard-coded adapter branches in the renderer; built-in localized checklists may
 enrich them, while an external adapter still receives the generic guide. The
 Settings draft field is masked by default to keep tokens out of screenshots and
 screenshares; an explicit reveal control lets the operator verify a paste.
+Missing secret fields belong to one first-time connection save: the UI sends all
+entered missing credentials together only after every required connection field
+is present. This gives multi-token adapters such as Slack one completion point.
+Once a secret is sealed, replacement and removal remain separate confirmed
+credential actions rather than joining the first-time group save.
 Saving an empty secret keeps the stored value; explicitly removing its presence clears it.
 A non-empty secret body is accepted only when it is a plausible token (at
 least 20 non-whitespace characters); a short draft cannot replace a sealed

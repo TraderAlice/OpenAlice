@@ -206,35 +206,45 @@ function ConnectorSettingsSurface({
     })
   }, [])
 
-  const saveSecret = useCallback(async (id: string, key: string) => {
+  const saveSecrets = useCallback(async (id: string, keys: string[], grouped = false) => {
     if (!config) return
-    const draftKey = connectorFieldKey(id, key)
-    const value = secretDrafts[draftKey] ?? ''
-    if (!value) return
+    const drafts = keys.map((key) => ({
+      key,
+      draftKey: connectorFieldKey(id, key),
+      value: secretDrafts[connectorFieldKey(id, key)] ?? '',
+    })).filter((draft) => draft.value.length > 0)
+    if (drafts.length === 0) return
 
-    if (!isPlausibleConnectorSecret(value)) {
+    const invalidDrafts = drafts.filter((draft) => !isPlausibleConnectorSecret(draft.value))
+    if (invalidDrafts.length > 0) {
       setSecretErrors((current) => ({
         ...current,
-        [draftKey]: t('connectorSettings.tokenTooShort'),
+        ...Object.fromEntries(invalidDrafts.map((draft) => [
+          draft.draftKey,
+          t('connectorSettings.tokenTooShort'),
+        ])),
       }))
       return
     }
 
     const existing = config.adapters[id] ?? emptyAdapter()
+    const draftSettings = Object.fromEntries(drafts.map((draft) => [draft.key, draft.value]))
     const next: PublicConnectorConfig = {
       ...config,
       adapters: {
         ...config.adapters,
         [id]: {
           ...existing,
-          settings: { ...existing.settings, [key]: value },
-          configuredSecrets: [...new Set([...existing.configuredSecrets, key])],
+          settings: { ...existing.settings, ...draftSettings },
+          configuredSecrets: [...new Set([...existing.configuredSecrets, ...drafts.map((draft) => draft.key)])],
         },
       },
     }
 
-    setSavingSecret(draftKey)
-    setSecretErrors((current) => omitRecordKey(current, draftKey))
+    const savingKey = grouped ? connectorFieldKey(id, '__connection__') : drafts[0].draftKey
+    const errorKeys = [...drafts.map((draft) => draft.draftKey), connectorFieldKey(id, '__connection__')]
+    setSavingSecret(savingKey)
+    setSecretErrors((current) => omitRecordKeys(current, errorKeys))
     try {
       const response = await api.connectors.save(next)
       setConfig((current) => {
@@ -252,16 +262,17 @@ function ConnectorSettingsSurface({
           },
         }
       })
-      setSecretDrafts((current) => omitRecordKey(current, draftKey))
+      setSecretDrafts((current) => omitRecordKeys(current, drafts.map((draft) => draft.draftKey)))
       window.setTimeout(() => { void refreshRuntime() }, 900)
       window.setTimeout(() => { void refreshRuntime() }, 2_400)
     } catch (error) {
+      const errorKey = grouped ? connectorFieldKey(id, '__connection__') : drafts[0].draftKey
       setSecretErrors((current) => ({
         ...current,
-        [draftKey]: error instanceof Error ? error.message : String(error),
+        [errorKey]: error instanceof Error ? error.message : String(error),
       }))
     } finally {
-      setSavingSecret((current) => current === draftKey ? null : current)
+      setSavingSecret((current) => current === savingKey ? null : current)
     }
   }, [config, refreshRuntime, secretDrafts, t])
 
@@ -405,7 +416,10 @@ function ConnectorSettingsSurface({
                           setSecretDrafts((current) => ({ ...current, [draftKey]: value }))
                           setSecretErrors((current) => omitRecordKey(current, draftKey))
                         }}
-                        onSaveSecret={(key, fieldLabel, configured) => {
+                        onSaveConnection={(keys) => {
+                          void saveSecrets(definition.id, keys, true)
+                        }}
+                        onReplaceSecret={(key, fieldLabel) => {
                           const draftKey = connectorFieldKey(definition.id, key)
                           if (!isPlausibleConnectorSecret(secretDrafts[draftKey] ?? '')) {
                             setSecretErrors((current) => ({
@@ -414,16 +428,12 @@ function ConnectorSettingsSurface({
                             }))
                             return
                           }
-                          if (configured) {
-                            setPendingSecretReplace({
-                              connectorId: definition.id,
-                              connectorLabel: definition.label,
-                              fieldKey: key,
-                              fieldLabel,
-                            })
-                            return
-                          }
-                          void saveSecret(definition.id, key)
+                          setPendingSecretReplace({
+                            connectorId: definition.id,
+                            connectorLabel: definition.label,
+                            fieldKey: key,
+                            fieldLabel,
+                          })
                         }}
                         onRemoveSecret={(fieldKey, fieldLabel) => setPendingSecretRemoval({
                           connectorId: definition.id,
@@ -475,7 +485,7 @@ function ConnectorSettingsSurface({
           workingLabel={t('connectorSettings.saving')}
           variant="primary"
           onConfirm={async () => {
-            await saveSecret(pendingSecretReplace.connectorId, pendingSecretReplace.fieldKey)
+            await saveSecrets(pendingSecretReplace.connectorId, [pendingSecretReplace.fieldKey])
             setPendingSecretReplace(null)
           }}
           onClose={() => setPendingSecretReplace(null)}
@@ -626,7 +636,8 @@ function ConnectorCredentialsEditor({
   onToggle,
   onSettingChange,
   onSecretDraftChange,
-  onSaveSecret,
+  onSaveConnection,
+  onReplaceSecret,
   onRemoveSecret,
   t,
 }: {
@@ -640,12 +651,31 @@ function ConnectorCredentialsEditor({
   onToggle: () => void
   onSettingChange: (key: string, value: string | number | boolean) => void
   onSecretDraftChange: (draftKey: string, value: string) => void
-  onSaveSecret: (key: string, fieldLabel: string, configured: boolean) => void
+  onSaveConnection: (keys: string[]) => void
+  onReplaceSecret: (key: string, fieldLabel: string) => void
   onRemoveSecret: (fieldKey: string, fieldLabel: string) => void
   t: TFunction
 }) {
   const credentialsId = `connector-${definition.id}-credentials`
   const [maskedSecrets, setMaskedSecrets] = useState<Record<string, boolean>>({})
+  const credentialFields = definition.fields.filter((field) => !field.learnedBy && field.group !== 'preferences')
+  const missingSecretFields = credentialFields.filter(
+    (field) => field.kind === 'secret' && !adapter.configuredSecrets.includes(field.key),
+  )
+  const enteredMissingSecretKeys = missingSecretFields
+    .filter((field) => (secretDrafts[connectorFieldKey(definition.id, field.key)] ?? '').length > 0)
+    .map((field) => field.key)
+  const requiredConnectionComplete = credentialFields.every((field) => {
+    if (!field.required) return true
+    if (field.kind === 'secret') {
+      return adapter.configuredSecrets.includes(field.key)
+        || (secretDrafts[connectorFieldKey(definition.id, field.key)] ?? '').length > 0
+    }
+    return isConnectorSettingPresent(adapter.settings[field.key])
+  })
+  const connectionSavingKey = connectorFieldKey(definition.id, '__connection__')
+  const connectionSaving = savingSecret === connectionSavingKey
+  const connectionError = secretErrors[connectionSavingKey]
   return (
     <section className="overflow-hidden rounded-xl border border-border/70 bg-secondary/10">
       <button
@@ -685,7 +715,7 @@ function ConnectorCredentialsEditor({
         <p className="mb-4 text-[11.5px] leading-5 text-muted-foreground">
           {t('connectorSettings.secretsNote')}
         </p>
-        {definition.fields.filter((field) => !field.learnedBy && field.group !== 'preferences').map((field) => {
+        {credentialFields.map((field) => {
           const configured = adapter.configuredSecrets.includes(field.key)
           const value = adapter.settings[field.key]
           const draftKey = connectorFieldKey(definition.id, field.key)
@@ -745,27 +775,25 @@ function ConnectorCredentialsEditor({
                           : <EyeOff size={15} aria-hidden />}
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
-                      disabled={!secretDraft || secretSaving}
-                      onClick={() => onSaveSecret(field.key, fieldLabel, configured)}
-                    >
-                      {secretSaving
-                        ? t('connectorSettings.saving')
-                        : configured
-                          ? t('connectorSettings.replaceToken')
-                          : t('connectorSettings.saveToken')}
-                    </button>
                     {configured && (
-                      <button
-                        type="button"
-                        className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-destructive"
-                        disabled={secretSaving}
-                        onClick={() => onRemoveSecret(field.key, fieldLabel)}
-                      >
-                        {t('connectorSettings.removeToken')}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
+                          disabled={!secretDraft || savingSecret !== null}
+                          onClick={() => onReplaceSecret(field.key, fieldLabel)}
+                        >
+                          {secretSaving ? t('connectorSettings.saving') : t('connectorSettings.replaceToken')}
+                        </button>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-destructive"
+                          disabled={savingSecret !== null}
+                          onClick={() => onRemoveSecret(field.key, fieldLabel)}
+                        >
+                          {t('connectorSettings.removeToken')}
+                        </button>
+                      </>
                     )}
                   </div>
                   {secretErrors[draftKey] && (
@@ -792,6 +820,30 @@ function ConnectorCredentialsEditor({
             </Field>
           )
         })}
+        {missingSecretFields.length > 0 && (
+          <div className="mt-4 border-t border-border/60 pt-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[11.5px] leading-5 text-muted-foreground">
+                {t('connectorSettings.saveConnectionHint')}
+              </p>
+              <button
+                type="button"
+                className="oa-pressable w-full shrink-0 rounded-lg bg-primary px-4 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                disabled={!requiredConnectionComplete || enteredMissingSecretKeys.length === 0 || savingSecret !== null}
+                onClick={() => onSaveConnection(enteredMissingSecretKeys)}
+              >
+                {connectionSaving
+                  ? t('connectorSettings.savingConnection')
+                  : t('connectorSettings.saveConnection')}
+              </button>
+            </div>
+            {connectionError && (
+              <p className="mt-2 text-[12px] text-destructive" role="alert">
+                {t('connectorSettings.connectionSaveError', { error: connectionError })}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </section>
   )
@@ -1132,6 +1184,14 @@ function omitRecordKey(record: Record<string, string>, key: string): Record<stri
   const next = { ...record }
   delete next[key]
   return next
+}
+
+function omitRecordKeys(record: Record<string, string>, keys: string[]): Record<string, string> {
+  return keys.reduce((current, key) => omitRecordKey(current, key), record)
+}
+
+function isConnectorSettingPresent(value: string | number | boolean | undefined): boolean {
+  return typeof value === 'string' ? value.trim().length > 0 : value !== undefined
 }
 
 function sameStrings(left: string[], right: string[]): boolean {

@@ -307,6 +307,31 @@ describe('Connector demo routes', () => {
     expect(within(dialog).queryByText('Connection, delivery, and chat settings for Slack.')).toBeNull()
   })
 
+  it('saves all missing Slack credentials as one connection', async () => {
+    render(<ConnectorStatusPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up Slack' }))
+    const dialog = await screen.findByRole('dialog')
+    const saveConnection = within(dialog).getByRole('button', { name: 'Save connection' }) as HTMLButtonElement
+    const botToken = within(dialog).getByLabelText('Slack Bot token') as HTMLInputElement
+    const appToken = within(dialog).getByLabelText('Slack App-level token') as HTMLInputElement
+
+    expect(saveConnection.disabled).toBe(true)
+    expect(within(dialog).queryByRole('button', { name: 'Save token' })).toBeNull()
+    fireEvent.change(botToken, { target: { value: 'xoxb-plausible-slack-bot-token' } })
+    expect(saveConnection.disabled).toBe(true)
+    fireEvent.change(appToken, { target: { value: 'xapp-plausible-slack-app-token' } })
+    expect(saveConnection.disabled).toBe(false)
+    fireEvent.click(saveConnection)
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1))
+    const saved = mocks.save.mock.calls[0][0] as PublicConnectorConfig
+    expect(saved.adapters.slack.settings.botToken).toBe('xoxb-plausible-slack-bot-token')
+    expect(saved.adapters.slack.settings.appToken).toBe('xapp-plausible-slack-app-token')
+    expect(saved.adapters.slack.configuredSecrets).toEqual(['botToken', 'appToken'])
+    await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Save connection' })).toBeNull())
+  })
+
   it('finishes a pending auto-save after the configuration dialog closes', async () => {
     const snapshot = createDemoConnectorSnapshot()
     snapshot.config.adapters.discord = {
@@ -476,6 +501,9 @@ describe('Connector demo routes', () => {
   })
 
   it('keeps a secret as a local draft until the user saves a plausible token', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord.settings.applicationId = 'discord-app'
+    mocks.load.mockResolvedValue(snapshot)
     render(<ConnectorsPage />)
 
     await screen.findByText('Allow external delivery')
@@ -488,7 +516,7 @@ describe('Connector demo routes', () => {
     expect(input.value).toBe('a')
 
     fireEvent.change(input, { target: { value: 'qweqw' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save connection' })[0])
     expect((await screen.findByRole('alert')).textContent).toContain('too short to be a bot token')
     expect(mocks.save).not.toHaveBeenCalled()
 
@@ -499,27 +527,31 @@ describe('Connector demo routes', () => {
     expect(input.type).toBe('password')
 
     fireEvent.change(input, { target: { value: '123456789:AAHplausible-bot-token' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save connection' })[0])
 
     await waitFor(() => expect(mocks.save).toHaveBeenCalled())
     const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
     expect(saved.adapters.discord.settings.botToken).toBe('123456789:AAHplausible-bot-token')
     await waitFor(() => expect(input.value).toBe(''))
     expect(input.placeholder).toBe('Configured — enter a new value to replace')
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Discord connection details' }))
     expect((screen.getAllByRole('button', { name: 'Replace token' })[0] as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('retains a secret draft when saving fails', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord.settings.applicationId = 'discord-app'
+    mocks.load.mockResolvedValue(snapshot)
     mocks.save.mockRejectedValueOnce(new Error('Connector settings unavailable'))
     render(<ConnectorsPage />)
 
     await screen.findByText('Allow external delivery')
     const input = screen.getAllByPlaceholderText('Stored locally and sealed')[0] as HTMLInputElement
     fireEvent.change(input, { target: { value: '123456789:AAHstill-here-bot-token' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Save token' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save connection' })[0])
 
     expect((await screen.findByRole('alert')).textContent).toContain(
-      'Token was not saved: Connector settings unavailable',
+      'Connection was not saved: Connector settings unavailable',
     )
     expect(input.value).toBe('123456789:AAHstill-here-bot-token')
   })

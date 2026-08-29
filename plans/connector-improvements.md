@@ -128,6 +128,21 @@ external adapters remain optional projections rather than sources of truth.
     are stage-specific, and Reconnect appears only for an actual error. On narrow
     screens actions continue to wrap in document order; linked state is stated in
     text and never inferred from color or a runtime-only identifier.
+14. **First-time credentials save as one connection; maintenance stays
+    credential-specific.** Keeping one Save button beside every missing token is
+    technically precise but makes Slack look like two unrelated setup operations
+    and gives no clear completion point. Staging every connection and delivery
+    preference behind one Apply action would create a coherent transaction, but
+    it would also make routine preference edits needlessly heavy and complicate
+    confirmed token replacement. The chosen hybrid saves all currently entered,
+    missing credentials through one `Save connection` action after required
+    connection fields are complete. Already sealed credentials retain individual
+    Replace and Remove actions with confirmation because each is a distinct
+    destructive maintenance operation. Validation stays beside the affected field;
+    a transport failure for the grouped save appears once beside the group action.
+    The action is right-aligned on wider dialogs and expands to the available width
+    on narrow screens. Native fields keep their labels, password reveal controls,
+    and keyboard order; the shared credentials editor owns grouping and feedback.
 
 ## Ordered Work
 
@@ -160,6 +175,8 @@ external adapters remain optional projections rather than sources of truth.
         credential setup without replacing the existing lifecycle.
   - [x] Unify overview and configuration lifecycle derivation, including durable
         linking, service-unreachable errors, stage-specific actions, and recovery.
+  - [x] Save missing credentials as one connection while preserving confirmed
+        per-token replacement and removal for configured credentials.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -225,6 +242,14 @@ presents Reconnect as the primary recovery action followed by Review. Desktop
 and 390 px checks confirmed the new action hierarchy, exact one-error Reconnect
 count, same-row narrow actions, and no horizontal overflow. No recovery or
 configuration action was clicked.
+
+The grouped-credential increment passed 27 focused Connector UI/lifecycle tests,
+UI typecheck/build, root typecheck, and the 5,102-test monorepo suite. Real-route
+browser acceptance covered the unconfigured Slack dialog at desktop and 390 px:
+two missing tokens share one disabled-until-complete Save connection action, the
+narrow action expands to the available width, and the document has no horizontal
+overflow. No field was edited and no credential or external Connector action was
+submitted on the real AliceProject.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
