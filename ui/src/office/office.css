@@ -3387,6 +3387,22 @@
   animation: oa-office-collision-bump 140ms steps(2, end);
 }
 
+.oa-office-alice::before {
+  --oa-office-alice-shadow: color-mix(in srgb, var(--gba-ink) 42%, transparent);
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  z-index: 0;
+  width: 22px;
+  height: 6px;
+  content: "";
+  background:
+    linear-gradient(var(--oa-office-alice-shadow), var(--oa-office-alice-shadow)) center / 22px 2px no-repeat,
+    linear-gradient(var(--oa-office-alice-shadow), var(--oa-office-alice-shadow)) center / 14px 6px no-repeat;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 @keyframes oa-office-collision-bump {
   50% {
     transform: translate(
@@ -3398,6 +3414,8 @@
 }
 
 .oa-office-alice > .oa-office-alice__sprite {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 48px;
   height: 48px;

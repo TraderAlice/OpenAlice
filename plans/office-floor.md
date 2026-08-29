@@ -1430,6 +1430,24 @@ Directional D-pad feedback follow-up (2026-08-29):
 - Focused Building specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
   run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Alice ground-contact follow-up (2026-08-29):
+
+- Replayed Alice away from the spawn compass at desktop and phone widths. Generated furniture, coworkers, service
+  machines, and world landmarks all carried contact shadows, but Alice's 48px sprite ended directly on the floor.
+  Once separated from the compass, she read like a flat overlay rather than a character standing in the room.
+- Compared movement-only footstep dust, baking a shadow into every authored pose, and giving the shared Alice wrapper
+  one ground-contact layer. Chose the wrapper because it grounds idle and moving poses alike, follows every direction
+  and collision bump automatically, and does not duplicate pixels across the sixteen pose/frame slots.
+- Alice now owns a static 22x6 stepped shadow built from a 22x2 horizontal bar and a 14x6 center bar. Both use a
+  42-percent theme-ink mix, remain behind the sprite through explicit local depth, and contain no blur, radius,
+  continuous animation, semantic DOM, or pointer surface.
+- Browser-played Alice at 390x844 while idle, in the right-facing walk frame, and during a blocked upward movement.
+  The shadow kept the same baseline and dimensions in all three states while the player sprite and collision bump
+  remained above it; horizontal overflow stayed zero. At 1280x720 the shadow remained subtle at native scale,
+  broken images were zero, and emulated reduced motion reported the shadow present with `animation: none`.
+- Focused Building and Alice-sprite specs passed: 2 files / 11 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
+  606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
