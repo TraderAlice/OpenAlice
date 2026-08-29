@@ -447,7 +447,7 @@ async function main() {
   }
 }
 
-async function start(): Promise<void> {
+export async function startAliceRuntime(): Promise<void> {
   const guardianPid = positiveInteger(process.env['OPENALICE_GUARDIAN_PID'])
   const guardianStartedAt = positiveInteger(process.env['OPENALICE_GUARDIAN_STARTED_AT'])
   runtimeLock = await acquireOpenAliceRuntimeLocks({
@@ -478,12 +478,14 @@ function positiveInteger(raw: string | undefined): number | undefined {
   return Number.isInteger(value) && value > 0 ? value : undefined
 }
 
-async function runEntrypoint(): Promise<void> {
+export async function runAliceEntrypoint(): Promise<void> {
   if (await runInternalBootstrapRole()) return
-  await start()
+  await startAliceRuntime()
 }
 
-runEntrypoint().catch((err) => {
-  console.error('fatal:', err)
-  process.exit(1)
-})
+if (!(globalThis as { __OPENALICE_INTERNAL_ROLE_DISPATCH__?: boolean }).__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  runAliceEntrypoint().catch((err) => {
+    console.error('fatal:', err)
+    process.exit(1)
+  })
+}

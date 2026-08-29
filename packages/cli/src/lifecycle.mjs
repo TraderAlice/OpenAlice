@@ -17,6 +17,11 @@ import {
   resolveOpenAliceHome,
   stopRuntimeServer,
 } from './server-control.mjs'
+import {
+  bunGuardianProcessSpec,
+  isBunStandalone,
+  resolveBunResourceRoot,
+} from './bun-standalone.mjs'
 
 const NULL_OUTPUT = Object.freeze({ write: () => undefined })
 
@@ -67,20 +72,25 @@ export async function startRuntime(options, dependencies = {}) {
     throw lifecycleError('EOWNED', formatOwnershipRefusal(status))
   }
 
+  const standalone = isBunStandalone()
   const requestedAppDir = options.appDir
     ?? env['OPENALICE_APP_HOME']?.trim()
     ?? env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
     ?? dependencies.cwd
     ?? process.cwd()
   const resolveRoot = dependencies.resolveRoot ?? findOpenAliceRoot
-  const appDir = await resolveRoot(requestedAppDir)
+  const appDir = standalone
+    ? resolveBunResourceRoot(env, dependencies.runtimeExecutable ?? process.execPath)
+    : await resolveRoot(requestedAppDir)
   const runtimeProvider = resolveRuntimeProvider(options.runtimeProvider, appDir, env)
   const prepareSource = dependencies.prepareSource ?? prepareSourceCheckout
   emit({ type: 'preparing', appDir, homeRoot })
-  await prepareSource(appDir, options, {
-    stdout: dependencies.progressOutput ?? NULL_OUTPUT,
-    env,
-  })
+  if (!standalone) {
+    await prepareSource(appDir, options, {
+      stdout: dependencies.progressOutput ?? NULL_OUTPUT,
+      env,
+    })
+  }
 
   const nodeBinary = dependencies.nodeBinary ?? process.execPath
   const runtimeEnv = buildLocalRuntimeEnv(env, {
@@ -93,6 +103,9 @@ export async function startRuntime(options, dependencies = {}) {
   runtimeEnv.OPENALICE_LAUNCHER = 'cli-server'
   runtimeEnv.OPENALICE_SERVER_MODE = detached ? 'detached' : 'foreground'
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
+  if (standalone) {
+    runtimeEnv.OPENALICE_RUNTIME_EXECUTABLE = dependencies.runtimeExecutable ?? process.execPath
+  }
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
   if (runtimeProvider.contentIdentity) {
     runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY = runtimeProvider.contentIdentity
@@ -101,6 +114,9 @@ export async function startRuntime(options, dependencies = {}) {
   const logPath = resolve(options.logFile ?? resolve(homeRoot, 'logs', 'server.log'))
   runtimeEnv.OPENALICE_SERVER_LOG = logPath
   const spawnProcess = dependencies.spawnProcess ?? spawn
+  const guardianSpec = standalone
+    ? bunGuardianProcessSpec(dependencies.runtimeExecutable ?? process.execPath)
+    : { cmd: nodeBinary, args: ['scripts/guardian/prod.mjs'] }
   let runtime
   if (detached) {
     const makeDir = dependencies.mkdirImpl ?? mkdir
@@ -108,7 +124,7 @@ export async function startRuntime(options, dependencies = {}) {
     await makeDir(dirname(logPath), { recursive: true })
     const logHandle = await openFile(logPath, 'a', 0o600)
     try {
-      runtime = spawnProcess(nodeBinary, ['scripts/guardian/prod.mjs'], {
+      runtime = spawnProcess(guardianSpec.cmd, guardianSpec.args, {
         cwd: appDir,
         env: runtimeEnv,
         detached: true,
@@ -120,7 +136,7 @@ export async function startRuntime(options, dependencies = {}) {
       await logHandle.close()
     }
   } else {
-    runtime = spawnProcess(nodeBinary, ['scripts/guardian/prod.mjs'], {
+    runtime = spawnProcess(guardianSpec.cmd, guardianSpec.args, {
       cwd: appDir,
       env: runtimeEnv,
       stdio: 'inherit',
@@ -200,6 +216,14 @@ export async function startRuntime(options, dependencies = {}) {
 }
 
 function resolveRuntimeProvider(explicit, appDir, env) {
+  if (explicit?.kind === 'bun' || isBunStandalone()) {
+    return {
+      kind: 'bun',
+      contentIdentity: explicit?.contentIdentity
+        ?? env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim()
+        ?? null,
+    }
+  }
   if (explicit?.kind === 'bundle') {
     return {
       kind: 'bundle',

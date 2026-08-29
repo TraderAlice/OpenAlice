@@ -1,6 +1,6 @@
 import { join, resolve } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildManagedPiEnv,
@@ -135,6 +135,30 @@ describe('ResolvedLaunchContext', () => {
       kind: 'source',
       contentIdentity: null,
     })
+  })
+
+  it('selects the Bun executable provider and its sidecar resource root', () => {
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const context = resolveLaunchContext({
+        homeDir: '/home/alice',
+        cwd: '/outside/repository',
+        platform: 'linux',
+        env: {
+          OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice',
+          OPENALICE_RUNTIME_CONTENT_IDENTITY: 'release-content-1',
+        },
+      })
+
+      expect(context.appDir).toBe('/opt/openalice/releases/v1/share/openalice')
+      expect(context.aliceProject.appRoot).toBe('/opt/openalice/releases/v1/share/openalice')
+      expect(context.runtimeProvider).toEqual({
+        kind: 'bun',
+        contentIdentity: 'release-content-1',
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('refuses an installed Runtime without its paired content identity', () => {

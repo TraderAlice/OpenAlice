@@ -21,6 +21,11 @@ import {
   runtimeBuildToolsError,
 } from './runtime-deps.mjs'
 import { readRuntimeStatus as readGuardianRuntimeStatus } from './server-control.mjs'
+import {
+  bunGuardianProcessSpec,
+  isBunStandalone,
+  resolveBunResourceRoot,
+} from './bun-standalone.mjs'
 
 const RUNTIME_ARTIFACTS = [
   'dist/main.js',
@@ -124,16 +129,19 @@ export async function startLocal(options, dependencies = {}) {
     return 0
   }
 
+  const standalone = isBunStandalone()
   const requestedAppDir = options.appDir
     ?? env['OPENALICE_APP_HOME']?.trim()
     ?? env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
     ?? dependencies.cwd
     ?? process.cwd()
   const resolveRoot = dependencies.resolveRoot ?? findOpenAliceRoot
-  const appDir = await resolveRoot(requestedAppDir)
+  const appDir = standalone
+    ? resolveBunResourceRoot(env, dependencies.runtimeExecutable ?? process.execPath)
+    : await resolveRoot(requestedAppDir)
   const runtimeProvider = resolveLocalRuntimeProvider(appDir, env)
   const prepareSource = dependencies.prepareSource ?? prepareSourceCheckout
-  await prepareSource(appDir, options, { stdout, env })
+  if (!standalone) await prepareSource(appDir, options, { stdout, env })
 
   const spawnProcess = dependencies.spawnProcess ?? spawn
   const waitForRuntime = dependencies.waitForRuntime ?? waitForOpenAlice
@@ -146,11 +154,17 @@ export async function startLocal(options, dependencies = {}) {
     takeover: options.takeover,
   })
   runtimeEnv.OPENALICE_RUNTIME_PROVIDER = runtimeProvider.kind
+  if (standalone) {
+    runtimeEnv.OPENALICE_RUNTIME_EXECUTABLE = dependencies.runtimeExecutable ?? process.execPath
+  }
   delete runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY
   if (runtimeProvider.contentIdentity) {
     runtimeEnv.OPENALICE_RUNTIME_CONTENT_IDENTITY = runtimeProvider.contentIdentity
   }
-  const runtime = spawnProcess(nodeBinary, ['scripts/guardian/prod.mjs'], {
+  const guardianSpec = standalone
+    ? bunGuardianProcessSpec(dependencies.runtimeExecutable ?? process.execPath)
+    : { cmd: nodeBinary, args: ['scripts/guardian/prod.mjs'] }
+  const runtime = spawnProcess(guardianSpec.cmd, guardianSpec.args, {
     cwd: appDir,
     env: runtimeEnv,
     stdio: 'inherit',
@@ -193,6 +207,12 @@ export async function startLocal(options, dependencies = {}) {
 }
 
 function resolveLocalRuntimeProvider(appDir, env) {
+  if (isBunStandalone()) {
+    return {
+      kind: 'bun',
+      contentIdentity: env['OPENALICE_RUNTIME_CONTENT_IDENTITY']?.trim() || null,
+    }
+  }
   const managedPath = env['OPENALICE_MANAGED_RUNTIME_PATH']?.trim()
   if (!managedPath || resolve(managedPath) !== resolve(appDir)) {
     return { kind: 'source', contentIdentity: null }

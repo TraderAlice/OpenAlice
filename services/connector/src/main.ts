@@ -29,7 +29,7 @@ import { installConnectorProxyTransport } from './core/proxy.js'
 
 const CONNECTOR_PORT = Number(process.env['OPENALICE_CONNECTOR_PORT'] ?? 47334)
 
-async function main(): Promise<void> {
+export async function startConnectorService(): Promise<void> {
   const startedAt = new Date().toISOString()
   console.log(`[connector] bootstrap @ ${startedAt}`)
 
@@ -137,7 +137,9 @@ async function main(): Promise<void> {
   await manager.start()
 }
 
-main().catch((error) => {
-  console.error('[connector] fatal:', error)
-  process.exit(1)
-})
+if (!(globalThis as { __OPENALICE_INTERNAL_ROLE_DISPATCH__?: boolean }).__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  startConnectorService().catch((error) => {
+    console.error('[connector] fatal:', error)
+    process.exit(1)
+  })
+}

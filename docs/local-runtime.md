@@ -64,6 +64,22 @@ Installer flags, non-interactive consent, development seams, the clean Docker
 fixture, and the manual prompt playground are documented only in
 [[docs/cli-installer.md]].
 
+## Bun Standalone Provider Under Development
+
+The accepted Bun cutover is tracked in
+[[plans/bun-cli-distribution.md]] and is not yet the stable installer payload.
+Its compiled `openalice` command uses a `bun` Runtime provider: `up`, `run`, and
+the compatibility foreground launcher skip source preparation, resolve
+immutable resources beside the installed executable, and start Guardian by
+re-entering that executable under a private role. Guardian then starts Alice,
+UTA, and Connector by re-entering the same bytes under separate private roles.
+Every component remains an independent OS process; the provider changes launch
+artifacts, not ownership, health, restart, signal, or lock semantics.
+
+Source development continues to use `pnpm dev`, and the currently released
+installer continues to use the bundle provider until the Bun release and
+installation acceptance matrix is complete. Electron remains independent.
+
 After installation, startup is independent of the current directory:
 
 ```bash
