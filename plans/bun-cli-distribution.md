@@ -826,3 +826,11 @@ This plan is complete only when:
   arm64 passed through npm and pinned Bun 1.4.0; the PR matrix repeats the same
   journey on Linux. Homebrew and AUR lifecycle expansion remains separate from
   this npm/Bun increment.
+- 2026-08-30: Repaired cross-platform acceptance exposed by the package-manager
+  increment. The Bash installer now canonicalizes its release root before
+  retention comparisons, so macOS `/var` to `/private/var` resolution cannot
+  collect the active rollback release. npm package assembly selects `npm.cmd`
+  on Windows, path assertions use native separators, and the direct symlink
+  replacement rollback case is explicitly skipped on Windows while native
+  Windows activation remains a deferred distribution lane. Type checking, 335
+  CLI tests, 5,062 root tests, and the non-root Orb Linux installer smoke pass.

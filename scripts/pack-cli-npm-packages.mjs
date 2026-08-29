@@ -14,7 +14,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 
-export function packCliNpmPackages({ inputDir, outputDir, npm = 'npm' }) {
+export function packCliNpmPackages({
+  inputDir,
+  outputDir,
+  npm = process.platform === 'win32' ? 'npm.cmd' : 'npm',
+}) {
   const inputRoot = resolve(inputDir)
   const outputRoot = resolve(outputDir)
   assertSafeOutputRoot(outputRoot, inputRoot)
@@ -103,7 +107,7 @@ function assertSafeOutputRoot(outputRoot, inputRoot) {
 }
 
 function parseArgs(argv) {
-  const options = { npm: 'npm' }
+  const options = { npm: process.platform === 'win32' ? 'npm.cmd' : 'npm' }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (['--input-dir', '--output-dir', '--npm'].includes(arg)) {
