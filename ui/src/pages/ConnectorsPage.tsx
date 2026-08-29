@@ -35,6 +35,10 @@ interface PendingUnlink {
   connectorLabel: string
 }
 
+type ConnectorActionFeedback =
+  | { connectorId: string; action: 'test'; status: 'success'; probeId: string }
+  | { connectorId: string; action: 'test' | 'reconnect'; status: 'error'; message: string }
+
 export function ConnectorsPage() {
   return <ConnectorSettingsSurface />
 }
@@ -81,8 +85,7 @@ function ConnectorSettingsSurface({
   const [pendingUnlink, setPendingUnlink] = useState<PendingUnlink | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [reconnecting, setReconnecting] = useState<string | null>(null)
-  const [testError, setTestError] = useState<string | null>(null)
-  const [lastProbe, setLastProbe] = useState<{ connectorId: string; probeId: string } | null>(null)
+  const [actionFeedback, setActionFeedback] = useState<ConnectorActionFeedback | null>(null)
   const [credentialEditors, setCredentialEditors] = useState<Record<string, boolean>>({})
 
   const load = useCallback(async () => {
@@ -314,13 +317,18 @@ function ConnectorSettingsSurface({
 
   const test = useCallback(async (id: string) => {
     setTesting(id)
-    setTestError(null)
+    setActionFeedback(null)
     try {
       const result = await api.connectors.test(id)
-      setLastProbe({ connectorId: id, probeId: result.probeId })
+      setActionFeedback({ connectorId: id, action: 'test', status: 'success', probeId: result.probeId })
       await refreshRuntime()
     } catch (error) {
-      setTestError(error instanceof Error ? error.message : String(error))
+      setActionFeedback({
+        connectorId: id,
+        action: 'test',
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      })
     } finally {
       setTesting(null)
     }
@@ -328,12 +336,17 @@ function ConnectorSettingsSurface({
 
   const reconnect = useCallback(async (id: string) => {
     setReconnecting(id)
-    setTestError(null)
+    setActionFeedback(null)
     try {
       await api.connectors.reconnect(id)
       await refreshRuntime()
     } catch (error) {
-      setTestError(error instanceof Error ? error.message : String(error))
+      setActionFeedback({
+        connectorId: id,
+        action: 'reconnect',
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      })
     } finally {
       setReconnecting(null)
     }
@@ -451,6 +464,7 @@ function ConnectorSettingsSurface({
                         saving={status === 'saving'}
                         testing={testing}
                         reconnecting={reconnecting}
+                        actionFeedback={actionFeedback?.connectorId === definition.id ? actionFeedback : null}
                         onStart={() => startAdapter(definition.id)}
                         onStop={() => updateAdapter(definition.id, { enabled: false })}
                         onTest={() => void test(definition.id)}
@@ -523,20 +537,12 @@ function ConnectorSettingsSurface({
                         />
                       )}
 
-                      {lastProbe?.connectorId === definition.id && (
-                        <p className="text-[12px] text-success">
-                          {t('connectorSettings.probeSentBefore')}{' '}
-                          <code>{lastProbe.probeId}</code>.{' '}
-                          {t('connectorSettings.probeSentAfter')}
-                        </p>
-                      )}
                     </div>
                   </ConnectorAdapterSection>
                 )
               })}
             </>
           )}
-          {testError && <p className="mt-4 text-[13px] text-destructive">{testError}</p>}
         </div>
       </SettingsScrollArea>
 
@@ -1132,6 +1138,7 @@ function SetupStatePanel({
   saving,
   testing,
   reconnecting,
+  actionFeedback,
   onStart,
   onStop,
   onTest,
@@ -1144,6 +1151,7 @@ function SetupStatePanel({
   saving: boolean
   testing: string | null
   reconnecting: string | null
+  actionFeedback: ConnectorActionFeedback | null
   onStart: () => void
   onStop: () => void
   onTest: () => void
@@ -1157,11 +1165,11 @@ function SetupStatePanel({
   const canRun = setup.stage !== 'needs_credentials'
 
   return (
-    <section className={`oa-status-surface rounded-xl border border-l-2 px-3.5 py-3 ${presentation.container}`} aria-live="polite">
+    <section className={`oa-status-surface rounded-xl border border-l-2 px-3.5 py-3 ${presentation.container}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 gap-2.5">
           <Icon size={17} className={`mt-0.5 shrink-0 ${presentation.iconClass}`} />
-          <div>
+          <div aria-live="polite" aria-atomic="true">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[13px] font-semibold text-foreground">{presentation.title}</p>
               <span className="rounded-full border border-current/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
@@ -1221,6 +1229,45 @@ function SetupStatePanel({
           </div>
         )}
       </div>
+      {testing === definition.id && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-[12px] text-muted-foreground"
+        >
+          <RefreshCw size={14} className="mt-0.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+          <span>{t('connectorSettings.testSendingFeedback', { name: definition.label })}</span>
+        </div>
+      )}
+      {testing !== definition.id && actionFeedback?.status === 'success' && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-[12px] text-success"
+        >
+          <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden />
+          <span>
+            {t('connectorSettings.probeSentBefore')}{' '}
+            <code className="font-mono font-medium">{actionFeedback.probeId}</code>.{' '}
+            {t('connectorSettings.probeSentAfter')}
+          </span>
+        </div>
+      )}
+      {testing !== definition.id && actionFeedback?.status === 'error' && (
+        <div
+          role="alert"
+          className="mt-3 flex items-start gap-2 border-t border-current/10 pt-3 text-[12px] text-destructive"
+        >
+          <CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
+          <span>
+            {actionFeedback.action === 'test'
+              ? t('connectorSettings.testFailed', { error: actionFeedback.message })
+              : t('connectorSettings.reconnectFailed', { name: definition.label, error: actionFeedback.message })}
+          </span>
+        </div>
+      )}
     </section>
   )
 }

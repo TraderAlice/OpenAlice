@@ -483,7 +483,9 @@ describe('Connector demo routes', () => {
     const manage = await screen.findByRole('button', { name: 'Manage Discord connection details' })
     expect(manage.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('textbox', { name: 'Discord Application ID' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Send test' })).toBeTruthy()
+    const sendTest = screen.getByRole('button', { name: 'Send test' })
+    const lifecycle = sendTest.closest('section') as HTMLElement
+    expect(sendTest).toBeTruthy()
     expect(screen.queryByText('owner-1')).toBeNull()
 
     fireEvent.click(manage)
@@ -491,9 +493,46 @@ describe('Connector demo routes', () => {
       .toBe('true')
     expect(screen.getByRole('textbox', { name: 'Discord Application ID' })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send test' }))
+    fireEvent.click(sendTest)
     await waitFor(() => expect(mocks.test).toHaveBeenCalledWith('discord'))
-    expect(await screen.findByText('connector-probe-demo')).toBeTruthy()
+    await waitFor(() => expect(within(lifecycle).getByRole('status').textContent).toContain('connector-probe-demo'))
+    expect(within(lifecycle).getByText('connector-probe-demo')).toBeTruthy()
+  })
+
+  it('keeps a failed test delivery beside the connector action', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.discord = {
+      enabled: true,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-07-31T00:00:00.000Z',
+        adapters: [{
+          id: 'discord',
+          enabled: true,
+          status: 'healthy',
+          owner: 'owner-1',
+        }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+    mocks.test.mockRejectedValueOnce(new Error('delivery offline'))
+
+    render(<ConnectorsPage />)
+
+    const sendTest = await screen.findByRole('button', { name: 'Send test' })
+    const lifecycle = sendTest.closest('section') as HTMLElement
+    fireEvent.click(sendTest)
+
+    const alert = await within(lifecycle).findByRole('alert')
+    expect(alert.textContent).toBe('Test message wasn’t sent: delivery offline')
+    expect(screen.getAllByText(/delivery offline/)).toHaveLength(1)
   })
 
   it('starts and stops a configured connector from its runtime switch', async () => {

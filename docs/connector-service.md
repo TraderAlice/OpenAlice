@@ -362,6 +362,9 @@ The surfaces deliberately have different jobs:
   The adapter dialog localizes its close control and gives that control a larger
   mobile touch target while retaining the shared primitive's focus restoration,
   Escape, and backdrop behavior.
+  Test-delivery progress, probe confirmation, and test/reconnect failures remain
+  inside the same lifecycle panel as their action; feedback is adapter-scoped and
+  announced without making the operator search below unrelated settings.
   A desk-capable adapter also binds that connector's chat Issue when its
   definition advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator

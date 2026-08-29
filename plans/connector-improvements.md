@@ -254,6 +254,17 @@ external adapters remain optional projections rather than sources of truth.
     `common.close`, a 40 px mobile hit target, and a compact 32 px desktop target.
     The title reserve already accommodates the larger button, and close semantics,
     Escape/backdrop dismissal, focus restoration, and visual icon remain shared.
+24. **Connector actions report results where they are invoked.** A global toast
+    would stay visible but detach a probe from the channel that sent it; the old
+    bottom-of-form message preserves document flow yet lands below Connection,
+    Delivery, and Chat settings, often outside the viewport. The chosen model
+    stores one adapter-scoped action result and renders pending test delivery,
+    probe success, and test/reconnect failures inside that adapter's lifecycle
+    panel. Progress and success use polite atomic status regions; failures use an
+    alert, and icons accompany color. The lifecycle copy keeps its own polite
+    update boundary instead of making the entire panel live, preventing action
+    feedback from re-announcing every control. Starting another action clears the
+    stale result; API behavior and external delivery semantics do not change.
 
 ## Ordered Work
 
@@ -306,6 +317,8 @@ external adapters remain optional projections rather than sources of truth.
         document without hiding forms, drafts, or changing routes.
   - [x] Localize the configuration-dialog close control and enlarge its mobile
         touch target without changing shared dismissal behavior.
+  - [x] Keep test-delivery and reconnect feedback inside the triggering channel's
+        lifecycle panel with localized accessible progress and errors.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -483,6 +496,18 @@ control at exactly 32 x 32 px at 1,052 x 734 and 40 x 40 px at 390 x 844. The
 larger narrow target did not overlap the title or create horizontal overflow;
 click dismissal still closed the dialog and the viewport was reset. No
 Connector control or external action was triggered.
+
+The contextual-action-feedback increment passed 31 focused Connector tests,
+UI and root typechecks, the production build, and all 5,114 repository tests.
+The interaction specs verify that successful and failed test-delivery feedback
+appears exactly once inside the same lifecycle region as Send test, using a
+polite status for progress/success and an alert for failure. Real Default
+AliceProject acceptance at 1,052 x 734 and 390 x 844 confirmed that the Feishu
+lifecycle panel retained its readable action layout without horizontal
+overflow. The isolated demo's pristine fixtures expose no Send test action, so
+dynamic visual states were accepted through the semantic interaction specs
+rather than hidden state injection or a real Connector API call. No external
+message was sent, no Connector state changed, and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
