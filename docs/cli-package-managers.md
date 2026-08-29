@@ -116,6 +116,12 @@ repository. Disabled channels perform no external authority checks. This makes
 missing setup a release-planning failure instead of discovering it after the
 accepted assets are already public.
 
+The `Public CLI Channel Authority` workflow exposes the same checks as a manual
+read-only rehearsal. Select npm, Homebrew, AUR, or any combination before a
+stable promotion; the run uses repository secrets but cannot publish packages,
+push metadata, or create a GitHub Release. Use it after reserving names and
+installing credentials, before enabling the corresponding release switch.
+
 The Tap and AUR writers are idempotent: if the verified metadata is already
 active, they make no commit. AUR never learns its SSH host key from the same
 untrusted connection used to publish; the maintainer supplies the verified
