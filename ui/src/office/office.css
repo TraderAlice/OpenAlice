@@ -5302,20 +5302,16 @@
     display: none;
   }
 
-  .oa-office-roster {
-    right: 12px;
-    left: 12px;
-  }
+}
 
+@container (max-width: 680px) {
+  .oa-office-roster,
   .oa-office-cabinet-window {
     right: 12px;
     left: 12px;
   }
 
-  .oa-office-roster ul {
-    grid-template-columns: 1fr;
-  }
-
+  .oa-office-roster ul,
   .oa-office-cabinet-window__records {
     grid-template-columns: 1fr;
   }

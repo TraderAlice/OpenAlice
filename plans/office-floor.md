@@ -1909,6 +1909,25 @@ Adaptive game-stage follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 608-file Vitest run (5,038 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Landscape party-window density follow-up (2026-08-29):
+
+- Followed a real auto-walk into the six-member Team roster at 844x390. The route trail, arrival, modal focus, and
+  independent scrolling were correct, but the 718px roster body inherited the same one-column rule as a 368px phone
+  because touch controls and window reflow shared one `max-width: 760px` container query. Its 176px viewport showed
+  only one complete 688px-wide card despite having room for a game-like two-column party grid.
+- Compared shrinking cards, using orientation queries, and separating input-density from content-density breakpoints.
+  Chose separate container thresholds: touch HUD remains available through 760px, while roster/cabinet windows keep
+  their desktop grid until the Office stage is genuinely narrower than 680px. This follows the actual component width
+  and avoids coupling window information architecture to whether touch controls are present.
+- Browser-played the updated roster at 844x390. It now renders two 328px columns, shows both first-row teammates in
+  full plus the next row's entry edge, and restores the selection hint; the body scroll height fell from 604px to
+  334px. At 390x844 it still renders one 306px column, hides the optional hint, shows three complete members before
+  scrolling, and keeps zero page overflow. The landscape Filing cabinet likewise retained two 315.5px columns, its
+  record, hint, and Workspace-files exit inside a 680x222 window.
+- Focused responsive-style, roster, and cabinet specs passed: 3 files / 8 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 608-file Vitest run (5,039 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

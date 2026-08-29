@@ -12,6 +12,10 @@ const stageCss = css.slice(stageStart, stageEnd)
 const narrowLiveStart = css.indexOf('@container (max-width: 520px)')
 const narrowLiveEnd = css.indexOf('@media (prefers-reduced-motion: reduce)', narrowLiveStart)
 const narrowLiveCss = css.slice(narrowLiveStart, narrowLiveEnd)
+const touchLayoutStart = css.lastIndexOf('@container (max-width: 760px)', narrowLiveStart)
+const compactWindowStart = css.indexOf('@container (max-width: 680px)', touchLayoutStart)
+const touchLayoutCss = css.slice(touchLayoutStart, compactWindowStart)
+const compactWindowCss = css.slice(compactWindowStart, narrowLiveStart)
 
 describe('Office responsive style contract', () => {
   it('uses the available stage instead of forcing the viewport into 4:3', () => {
@@ -27,6 +31,15 @@ describe('Office responsive style contract', () => {
     expect(narrowLiveCss).toContain('.oa-office-interact-prompt[data-has-detail="true"]')
     expect(narrowLiveCss).toContain('max-width: 168px')
     expect(narrowLiveCss).toContain('grid-template-columns: 30px minmax(0, 1fr) 32px')
+  })
+
+  it('keeps landscape windows dense until the stage is genuinely narrow', () => {
+    expect(touchLayoutStart).toBeGreaterThan(-1)
+    expect(compactWindowStart).toBeGreaterThan(touchLayoutStart)
+    expect(touchLayoutCss).not.toContain('.oa-office-roster ul')
+    expect(compactWindowCss).toContain('.oa-office-roster ul,')
+    expect(compactWindowCss).toContain('grid-template-columns: 1fr')
+    expect(compactWindowCss).toContain('.oa-office-roster__summary small')
   })
 
   it('keeps the live-floor identity and Menu on the first phone HUD row', () => {
