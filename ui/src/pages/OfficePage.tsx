@@ -22,6 +22,7 @@ import { OfficeRuntimeSection } from './OfficeRuntimeSection'
 function sourceForTag(tag: string): WorkspaceSource | undefined {
   if (tag === 'chat') return 'chat'
   if (tag === 'auto-quant') return 'auto-quant'
+  if (tag === 'prediction') return 'prediction'
   return undefined
 }
 
@@ -43,7 +44,6 @@ export function OfficePage() {
     | { kind: 'roster'; workspaceId: string; resumeId: string }
   >({ kind: 'map' })
   const [cabinetWorkspaceId, setCabinetWorkspaceId] = useState<string | null>(null)
-  const cabinetOriginRef = useRef<'sign' | 'cabinet'>('cabinet')
   const { building, loading, error } = useOfficeFloor(asOfSeq)
 
   const selectedSeat = useMemo(() => {
@@ -112,10 +112,9 @@ export function OfficePage() {
   }
   const closeCabinet = () => {
     const workspaceId = cabinetWorkspaceId
-    const origin = cabinetOriginRef.current
     setCabinetWorkspaceId(null)
     requestAnimationFrame(() => {
-      document.getElementById(`office-${origin}-${workspaceId}`)?.focus()
+      document.getElementById(`office-cabinet-${workspaceId}`)?.focus()
     })
   }
 
@@ -136,6 +135,16 @@ export function OfficePage() {
     const workspace = workspaces.find((item) => item.id === workspaceId)
     const source = workspace ? sourceForTag(workspace.tag) : undefined
     useWorkspaceSidePanels.getState().setFiles(true)
+    openOrFocus({
+      kind: 'workspace',
+      params: { wsId: workspaceId, ...(source ? { source } : {}) },
+    })
+  }
+
+  const openWorkspace = (workspaceId: string) => {
+    const workspace = workspaces.find((item) => item.id === workspaceId)
+    const source = workspace ? sourceForTag(workspace.tag) : undefined
+    useWorkspaceSidePanels.getState().setFiles(false)
     openOrFocus({
       kind: 'workspace',
       params: { wsId: workspaceId, ...(source ? { source } : {}) },
@@ -219,8 +228,8 @@ export function OfficePage() {
                   setCabinetWorkspaceId(null)
                 }}
                 onOpenEmployee={openEmployee}
-                onOpenFiles={(workspaceId, origin) => {
-                  cabinetOriginRef.current = origin
+                onOpenWorkspace={openWorkspace}
+                onOpenFiles={(workspaceId) => {
                   setCabinetWorkspaceId(workspaceId)
                   setSelected(null)
                   setRosterWorkspaceId(null)

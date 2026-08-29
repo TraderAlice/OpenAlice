@@ -36,6 +36,7 @@ describe('OfficeBuilding', () => {
         replaySeq={2}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
         onOpenLog={vi.fn()}
@@ -65,6 +66,7 @@ describe('OfficeBuilding', () => {
         }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
         onOpenLog={vi.fn()}
@@ -114,6 +116,7 @@ describe('OfficeBuilding', () => {
         }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
         onOpenLog={vi.fn()}
@@ -142,6 +145,7 @@ describe('OfficeBuilding', () => {
           }}
           onSelectEmployee={vi.fn()}
           onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
           onOpenFiles={vi.fn()}
           onOpenRoster={vi.fn()}
           onOpenLog={vi.fn()}
@@ -191,6 +195,7 @@ describe('OfficeBuilding', () => {
           }}
           onSelectEmployee={vi.fn()}
           onOpenEmployee={vi.fn()}
+          onOpenWorkspace={vi.fn()}
           onOpenFiles={vi.fn()}
           onOpenRoster={vi.fn()}
           onOpenLog={vi.fn()}
@@ -228,6 +233,7 @@ describe('OfficeBuilding', () => {
       removeEventListener: vi.fn(),
     })))
     try {
+      const onOpenWorkspace = vi.fn()
       const onOpenFiles = vi.fn()
       render(
         <OfficeBuilding
@@ -255,6 +261,7 @@ describe('OfficeBuilding', () => {
           }}
           onSelectEmployee={vi.fn()}
           onOpenEmployee={vi.fn()}
+          onOpenWorkspace={onOpenWorkspace}
           onOpenFiles={onOpenFiles}
           onOpenRoster={vi.fn()}
           onOpenLog={vi.fn()}
@@ -262,9 +269,9 @@ describe('OfficeBuilding', () => {
       )
 
       const alice = screen.getByRole('img', { name: 'Alice on the office map' })
-      const sign = screen.getByRole('button', { name: 'Inspect chat files' })
+      const sign = screen.getByRole('button', { name: 'Enter chat workspace' })
       fireEvent.click(sign)
-      expect(onOpenFiles).not.toHaveBeenCalled()
+      expect(onOpenWorkspace).not.toHaveBeenCalled()
       expect(sign.dataset.route).toBe('true')
       expect(screen.getByText('Walking to chat')).toBeTruthy()
       const trail = screen.getByTestId('office-route-trail')
@@ -277,13 +284,13 @@ describe('OfficeBuilding', () => {
         .toBe('/office/furniture/route-target-pointer-v1.png')
       expect(`${alice.style.left}:${alice.style.top}`).not.toBe('480px:336px')
       act(() => vi.advanceTimersByTime(5_000))
-      expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'sign')
+      expect(onOpenWorkspace).toHaveBeenCalledWith('chat-1')
       expect(sign.dataset.route).toBe('false')
       expect(screen.queryByTestId('office-route-trail')).toBeNull()
       expect(screen.queryByTestId('office-route-target-pointer')).toBeNull()
 
-      onOpenFiles.mockClear()
-      const quantSign = screen.getByRole('button', { name: 'Inspect quant files' })
+      onOpenWorkspace.mockClear()
+      const quantSign = screen.getByRole('button', { name: 'Enter quant workspace' })
       fireEvent.click(quantSign)
       expect(screen.getByTestId('office-route-trail')).toBeTruthy()
       const map = screen.getByLabelText(
@@ -293,7 +300,7 @@ describe('OfficeBuilding', () => {
       expect(screen.queryByTestId('office-route-trail')).toBeNull()
       expect(quantSign.dataset.route).toBe('false')
       act(() => vi.advanceTimersByTime(5_000))
-      expect(onOpenFiles).not.toHaveBeenCalled()
+      expect(onOpenWorkspace).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
@@ -318,6 +325,7 @@ describe('OfficeBuilding', () => {
         }}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={vi.fn()}
         onOpenLog={vi.fn()}
@@ -333,6 +341,7 @@ describe('OfficeBuilding', () => {
   })
 
   it('filters sleeping groups and lets Alice move around the continuous map', async () => {
+    const onOpenWorkspace = vi.fn()
     const onOpenFiles = vi.fn()
     const onOpenRoster = vi.fn()
     const onSelectEmployee = vi.fn()
@@ -379,6 +388,7 @@ describe('OfficeBuilding', () => {
         }}
         onSelectEmployee={onSelectEmployee}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={onOpenWorkspace}
         onOpenFiles={onOpenFiles}
         onOpenRoster={onOpenRoster}
         onOpenLog={onOpenLog}
@@ -488,11 +498,11 @@ describe('OfficeBuilding', () => {
     expect(touchAction.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/action-button-v1.png')
     await userEvent.click(touchAction)
-    expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'cabinet')
+    expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
     onOpenFiles.mockClear()
     await userEvent.click(map)
     await userEvent.keyboard('{Enter}')
-    expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'cabinet')
+    expect(onOpenFiles).toHaveBeenCalledWith('chat-1')
     await userEvent.click(screen.getByRole('button', { name: 'Reset map view' }))
     expect(controls?.dataset.learned).toBe('true')
     await userEvent.click(map)
@@ -525,9 +535,9 @@ describe('OfficeBuilding', () => {
       .toContain('/office/furniture/coffee-station-v2.png')
     expect(screen.getByTestId('office-pod-quant-1').querySelector<HTMLImageElement>('.oa-office-pod__harness-prop')?.src)
       .toContain('/office/furniture/server-rack-v2.png')
-    const workspaceSign = screen.getByRole('button', { name: 'Inspect chat files' })
+    const workspaceSign = screen.getByRole('button', { name: 'Enter chat workspace' })
     await userEvent.click(workspaceSign)
-    await waitFor(() => expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'sign'))
+    await waitFor(() => expect(onOpenWorkspace).toHaveBeenCalledWith('chat-1'))
     const menuTrigger = screen.getByRole('button', { name: 'Menu' })
     menuTrigger.focus()
     await userEvent.keyboard('{ArrowDown}')
@@ -559,7 +569,7 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-pod-quant-1')).toBeTruthy()
     expect(screen.getByTestId('office-pod-quant-old')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Filing cabinet · chat' }))
-    await waitFor(() => expect(onOpenFiles).toHaveBeenCalledWith('chat-1', 'cabinet'))
+    await waitFor(() => expect(onOpenFiles).toHaveBeenCalledWith('chat-1'))
     await userEvent.click(operations)
     await waitFor(() => expect(onOpenLog).toHaveBeenCalledWith('operations'))
   })
@@ -595,6 +605,7 @@ describe('OfficeBuilding', () => {
         building={building}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={onOpenRoster}
         onOpenLog={vi.fn()}
@@ -618,6 +629,7 @@ describe('OfficeBuilding', () => {
         interactionSuspended
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={onOpenRoster}
         onOpenLog={vi.fn()}
@@ -631,6 +643,7 @@ describe('OfficeBuilding', () => {
         building={building}
         onSelectEmployee={vi.fn()}
         onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
         onOpenFiles={vi.fn()}
         onOpenRoster={onOpenRoster}
         onOpenLog={vi.fn()}

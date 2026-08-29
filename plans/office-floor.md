@@ -1321,6 +1321,26 @@ HUD status-semantics follow-up (2026-08-29):
 - Browser-confirmed `3/6 AGENTS ACTIVE · 3/3 GROUPS` at desktop and the standalone `3/6 AGENTS ACTIVE` metric at
   390x844. Both stayed inside the HUD, and the narrow page retained zero horizontal overflow.
 
+Workspace-landmark semantics follow-up (2026-08-29):
+
+- Real play exposed that every Workspace sign and its filing cabinet used the same drawer icon, `FILES` prompt, and
+  cabinet window. Two visually distinct landmarks therefore offered one duplicated action, while the map lacked a
+  direct Workspace entrance.
+- Compared making the sign decorative, routing it to the roster, and using it as the Workspace entrance. Chose the
+  entrance model because a sign naturally names the destination, remains useful for empty groups, and lets the
+  cabinet retain exclusive ownership of filed records. The sign now uses the session-portal icon and `ENTER`; the
+  cabinet keeps the drawer icon and `FILES`.
+- The sign route walks Alice to the same physical interaction range before opening the Workspace with Files collapsed.
+  Prediction now supplies the explicit `prediction` source, while Chat and AutoQuant retain their existing shells.
+  The cabinet still opens the in-world record window and restores focus to the physical cabinet on close.
+- Browser-played the Auto Prediction sign from the desktop floor through its route pointer into
+  `/prediction/workspaces/demo-ws-auto-prediction`, then replayed the Prediction cabinet and confirmed it remained
+  on `/office`. At 390x844 the Chat sign entered `/workspaces/demo-chat-ws`; its cabinet window measured 344x246 at
+  x=23..367, stayed inside the 390px viewport, and preserved zero page-level horizontal overflow.
+- Focused Building, OfficePage, and interaction-target specs passed: 3 files / 19 tests.
+- Root/UI TypeScript, the 606-file Vitest run (5,028 passing; one file and nine tests skipped), and the UI production
+  build passed after the landmark responsibility split.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

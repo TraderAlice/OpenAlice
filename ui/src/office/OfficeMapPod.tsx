@@ -16,6 +16,7 @@ export function OfficeMapPod({
   reducedMotion,
   onSelectEmployee,
   onOpenEmployee,
+  onOpenWorkspace,
   onOpenFiles,
   onOpenRoster,
   nearbyTargetId,
@@ -29,7 +30,8 @@ export function OfficeMapPod({
   reducedMotion: boolean
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
-  onOpenFiles: (workspaceId: string, origin: 'sign' | 'cabinet') => void
+  onOpenWorkspace: (workspaceId: string) => void
+  onOpenFiles: (workspaceId: string) => void
   onOpenRoster: (workspaceId: string) => void
   nearbyTargetId?: string | null
   routeTargetId?: string | null
@@ -66,9 +68,9 @@ export function OfficeMapPod({
         className="oa-office-pod__sign"
         style={{ zIndex: officeDepthAt(layout.y + 62) }}
         data-route={routeTargetId === `sign:${group.workspace.id}`}
-        onClick={() => onOpenFiles(group.workspace.id, 'sign')}
-        aria-label={t('office.interactFiles', { name: title })}
-        title={t('office.cabinetHint')}
+        onClick={() => onOpenWorkspace(group.workspace.id)}
+        aria-label={t('office.interactWorkspace', { name: title })}
+        title={t('office.workspaceSignHint')}
       >
         <img
           src={OFFICE_FURNITURE.generated.workspaceSign}
@@ -140,7 +142,7 @@ export function OfficeMapPod({
           style={{ zIndex: officeDepthAt(layout.y + OFFICE_CABINET_CENTER.y + 24) }}
           data-nearby={nearbyTargetId === `cabinet:${group.workspace.id}`}
           data-route={routeTargetId === `cabinet:${group.workspace.id}`}
-          onClick={() => onOpenFiles(group.workspace.id, 'cabinet')}
+          onClick={() => onOpenFiles(group.workspace.id)}
           aria-label={`${t('office.cabinet')} · ${title}`}
           title={t('office.cabinetHint')}
         >

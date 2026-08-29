@@ -18,7 +18,10 @@ vi.mock('./OfficeRuntimeSection', () => ({
 
 vi.mock('../contexts/workspaces-context', () => ({
   useWorkspaces: () => ({
-    workspaces: [{ id: 'chat-1', tag: 'chat' }],
+    workspaces: [
+      { id: 'chat-1', tag: 'chat' },
+      { id: 'prediction-1', tag: 'prediction' },
+    ],
     hasLoaded: true,
   }),
 }))
@@ -116,12 +119,21 @@ describe('OfficePage localization', () => {
     })
   })
 
-  it('inspects a filing cabinet in Office before explicitly entering Workspace files', async () => {
+  it('enters from the Workspace sign while keeping filed records on the cabinet', async () => {
     const { container } = render(<OfficePage />)
 
-    const sign = screen.getByRole('button', { name: '查看 chat 文件' })
+    const sign = screen.getByRole('button', { name: '进入 chat Workspace' })
     await userEvent.click(sign)
+    await vi.waitFor(() => expect(openOrFocusMock).toHaveBeenCalledWith({
+      kind: 'workspace',
+      params: { wsId: 'chat-1', source: 'chat' },
+    }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(false)
 
+    openOrFocusMock.mockClear()
+    const cabinet = screen.getByRole('button', { name: '档案柜 · chat' })
+    await userEvent.click(cabinet)
     await vi.waitFor(() => {
       expect(screen.getByRole('dialog', { name: '档案柜 · chat' })).toBeTruthy()
     }, { timeout: 10_000 })
@@ -132,15 +144,38 @@ describe('OfficePage localization', () => {
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: '档案柜 · chat' })).toBeNull()
     await vi.waitFor(() => {
-      expect(document.activeElement).toBe(sign)
+      expect(document.activeElement).toBe(cabinet)
     })
 
-    await userEvent.click(screen.getByRole('button', { name: '档案柜 · chat' }))
+    await userEvent.click(cabinet)
     await userEvent.click(await screen.findByRole('button', { name: '进入 Workspace 文件' }))
     expect(openOrFocusMock).toHaveBeenCalledWith({
       kind: 'workspace',
       params: { wsId: 'chat-1', source: 'chat' },
     })
+  })
+
+  it('enters Prediction through its own Workspace source', async () => {
+    officeFloorMock.mockReturnValue({
+      ...defaultOfficeFloor(),
+      building: {
+        ...defaultOfficeFloor().building,
+        offices: [{
+          workspace: { id: 'prediction-1', tag: 'prediction', harness: 'prediction' },
+          lastInteractionAt: Date.now(),
+          sleeping: false,
+          employees: [],
+        }],
+      },
+    })
+
+    render(<OfficePage />)
+    await userEvent.click(screen.getByRole('button', { name: '进入 prediction Workspace' }))
+
+    await vi.waitFor(() => expect(openOrFocusMock).toHaveBeenCalledWith({
+      kind: 'workspace',
+      params: { wsId: 'prediction-1', source: 'prediction' },
+    }))
   })
 
   it('returns from an Agent file to the originating roster member', async () => {

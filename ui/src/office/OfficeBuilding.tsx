@@ -57,6 +57,7 @@ export function OfficeBuilding({
   interactionSuspended = false,
   onSelectEmployee,
   onOpenEmployee,
+  onOpenWorkspace,
   onOpenFiles,
   onOpenRoster,
   onOpenLog,
@@ -69,7 +70,8 @@ export function OfficeBuilding({
   interactionSuspended?: boolean
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
-  onOpenFiles: (workspaceId: string, origin: 'sign' | 'cabinet') => void
+  onOpenWorkspace: (workspaceId: string) => void
+  onOpenFiles: (workspaceId: string) => void
   onOpenRoster: (workspaceId: string) => void
   onOpenLog: (origin: 'menu' | 'operations') => void
   onReturnLive?: () => void
@@ -212,7 +214,14 @@ export function OfficeBuilding({
         label: t('office.interactTalk', { name: target }),
       }
     }
-    if (nearbyTarget.kind === 'cabinet' || nearbyTarget.kind === 'sign') {
+    if (nearbyTarget.kind === 'sign') {
+      return {
+        icon: OFFICE_HUD_ASSETS.sessionPortal,
+        action: t('office.interactActionWorkspace'),
+        label: t('office.interactWorkspace', { name: nearbyTarget.roomName }),
+      }
+    }
+    if (nearbyTarget.kind === 'cabinet') {
       return {
         icon: OFFICE_HUD_ASSETS.drawerRecord,
         action: t('office.interactActionFiles'),
@@ -314,9 +323,9 @@ export function OfficeBuilding({
     if (target.kind === 'employee') {
       onSelectEmployee(target.workspaceId, target.employee)
     } else if (target.kind === 'sign') {
-      onOpenFiles(target.workspaceId, 'sign')
+      onOpenWorkspace(target.workspaceId)
     } else if (target.kind === 'cabinet') {
-      onOpenFiles(target.workspaceId, 'cabinet')
+      onOpenFiles(target.workspaceId)
     } else if (target.kind === 'roster') {
       onOpenRoster(target.workspaceId)
     } else {
@@ -808,9 +817,8 @@ export function OfficeBuilding({
                   `employee:${workspaceId}:${employee.resumeId}`,
                   () => onOpenEmployee(workspaceId, employee),
                 )}
-                onOpenFiles={(workspaceId, origin) => requestTargetInteraction(
-                  `${origin}:${workspaceId}`,
-                )}
+                onOpenWorkspace={(workspaceId) => requestTargetInteraction(`sign:${workspaceId}`)}
+                onOpenFiles={(workspaceId) => requestTargetInteraction(`cabinet:${workspaceId}`)}
                 onOpenRoster={(workspaceId) => requestTargetInteraction(`roster:${workspaceId}`)}
                 nearbyTargetId={nearbyTarget?.id}
                 routeTargetId={routeTargetId}
