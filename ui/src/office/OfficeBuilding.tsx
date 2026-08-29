@@ -579,7 +579,7 @@ export function OfficeBuilding({
         </div>
 
         <div className="oa-office-hud__actions">
-          {replaySeq != null && onReturnLive && (
+          {replaySeq != null && onReturnLive && !interactionSuspended && (
             <button
               type="button"
               className="oa-office-replay-exit"

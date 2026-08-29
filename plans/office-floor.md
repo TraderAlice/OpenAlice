@@ -1830,6 +1830,23 @@ Agent-file command hierarchy follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 608-file Vitest run (5,034 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Replay Live-exit ownership follow-up (2026-08-29):
+
+- Played Occupancy log -> Replay -> Seq 5 at 390px and found two controls both labeled Live: one in the active Replay
+  panel and one in the floor HUD behind the modal. Both only cleared `asOfSeq`, but the HUD lived inside the inert
+  background scene, so it looked actionable while being intentionally unreachable.
+- Compared renaming the foreground control, dimming every Office modal background more aggressively, and giving Live
+  ownership to the active layer. Chose active-layer ownership: while any Office window suspends the replay floor, its
+  HUD Live exit is not rendered; the Replay panel owns the only current-time command. Closing the log with View replay
+  floor restores the HUD exit immediately.
+- Browser-played the full phone transition. Seq 5 inside the log exposed exactly one 141.5x36px Live button inside the
+  Replay panel and HUD actions contained only Menu. View replay floor removed the dialog and restored exactly one
+  66.7x32px Live button in the HUD. Both states kept zero page overflow and the historical floor remained visibly
+  stamped and frozen.
+- Focused OfficeBuilding and OfficeReplayBar specs passed: 2 files / 13 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 608-file Vitest run (5,035 passing; one file and nine tests skipped), and the UI
+  production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

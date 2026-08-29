@@ -96,6 +96,35 @@ describe('OfficeBuilding', () => {
     expect(onReturnLive).toHaveBeenCalledTimes(1)
   })
 
+  it('leaves the active Replay menu as the only Live exit while the floor is suspended', () => {
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 6,
+          firstSeq: 1,
+          asOfSeq: 2,
+          offices: [],
+        }}
+        replaySeq={2}
+        interactionSuspended
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onReturnLive={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Replay floor · Seq 2')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Live$/ })).toBeNull()
+  })
+
   it('keeps an empty Office inside the game world with Alice centered', () => {
     render(
       <OfficeBuilding
