@@ -59,6 +59,13 @@ describe('Office responsive style contract', () => {
     expect(css.match(/var\(--office-prompt-tail-shift, 0px\)/g)).toHaveLength(4)
   })
 
+  it('gives narrow auto-route status a second line for cancellation guidance', () => {
+    expect(narrowLiveCss).toContain('.oa-office-route-status')
+    expect(narrowLiveCss).toContain('grid-template-columns: 30px minmax(0, 1fr)')
+    expect(narrowLiveCss).toContain('.oa-office-route-status__cancel')
+    expect(narrowLiveCss).toContain('grid-column: 2')
+  })
+
   it('stacks window location and type as deliberate phone title lines', () => {
     expect(css).toMatch(/\.oa-office-window__title-copy\s*\{[\s\S]*?display: flex/)
     expect(css).toMatch(/\.oa-office-window__title-room\s*\{[\s\S]*?text-overflow: ellipsis/)
@@ -94,7 +101,10 @@ describe('Office responsive style contract', () => {
     expect(coarseTouchCss).toContain("[data-input='keyboard']")
     expect(coarseTouchCss).toContain("[data-input='touch']")
     expect(coarseTouchCss).toContain('.oa-office-map-controls__move')
+    expect(coarseTouchCss).toContain('.oa-office-route-status')
+    expect(coarseTouchCss).toContain('bottom: 122px')
     expect(css.match(/\.oa-office-map-controls\[data-action-ready='true'\]/g)).toHaveLength(2)
+    expect(css.match(/\.oa-office-map-controls\[data-routing='true'\]/g)).toHaveLength(2)
     expect(css).toContain(".oa-office-building[data-controls-suspended='true'] :is(")
   })
 

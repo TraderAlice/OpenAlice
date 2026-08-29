@@ -519,6 +519,11 @@ export function OfficeBuilding({
       const fromFloor = target instanceof Node && Boolean(viewport?.contains(target))
       if (!fromIdlePage && !fromFloor) return
       const key = event.key.toLowerCase()
+      if (key === 'escape' && routeTargetId) {
+        event.preventDefault()
+        cancelAutoWalk()
+        return
+      }
       if ((key === 'enter' || key === ' ') && nearbyTarget && (fromIdlePage || target === viewport)) {
         event.preventDefault()
         activateNearbyTarget()
@@ -990,11 +995,6 @@ export function OfficeBuilding({
                 zIndex={officeDepthAt(Math.max(alice.y, collisionImpact.y)) + 200}
               />
             )}
-            {routeTargetName && (
-              <span className="sr-only" role="status" aria-live="polite">
-                {t('office.walkingTo', { name: routeTargetName })}
-              </span>
-            )}
           {groups.length === 0 && (
             <div
               className="oa-office-quiet"
@@ -1102,10 +1102,36 @@ export function OfficeBuilding({
           </div>
         )}
 
+        {routeTargetName && !controlsSuspended && (
+          <div
+            className="oa-office-route-status"
+            role="status"
+            aria-live="polite"
+            data-testid="office-route-status"
+          >
+            <img
+              src={OFFICE_FURNITURE.generated.routeTargetPointer}
+              alt=""
+              aria-hidden
+              style={officePixelImg}
+            />
+            <span className="oa-office-route-status__copy">
+              <small>{t('office.routeMode')}</small>
+              <strong>{t('office.walkingTo', { name: routeTargetName })}</strong>
+            </span>
+            <span className="oa-office-route-status__cancel">
+              <kbd data-input="keyboard">Esc</kbd>
+              <span data-input="keyboard">{t('office.routeCancelHint')}</span>
+              <span data-input="touch">{t('office.routeCancelTouchHint')}</span>
+            </span>
+          </div>
+        )}
+
         <div
           className="oa-office-map-controls"
           data-learned={controlsLearned}
           data-action-ready={Boolean(nearbyTarget) || undefined}
+          data-routing={Boolean(routeTargetName) || undefined}
           aria-hidden={controlsSuspended || undefined}
           inert={controlsSuspended || undefined}
         >

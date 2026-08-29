@@ -2244,6 +2244,27 @@ Filing-cabinet inventory navigation follow-up (2026-08-29):
   `npx tsc --noEmit`, the 611-file Vitest run (5,057 passing; one file and nine tests skipped), and the UI production
   build all passed.
 
+Auto-route legibility follow-up (2026-08-29):
+
+- Browser-played long routes to the Floor terminal and Auto Prediction at 1280x900 and 390x844. The generated floor
+  chevrons and target pointer communicate motion spatially, but the ordinary `MOVE` tutorial remains visible while
+  Alice auto-walks; the destination name and the fact that manual movement cancels the route exist only indirectly.
+- Compared labeling only the target pointer, attaching a moving speech bubble to Alice, and replacing the ordinary
+  movement tutorial with a transient route-status strip. Chose the transient strip: it preserves the unobstructed map
+  and path, names the current destination, teaches desktop Escape and touch movement cancellation, and disappears with
+  the route instead of adding permanent HUD chrome.
+- Interaction model: Escape cancels a route without moving Alice; WASD, arrows, and touch movement retain their existing
+  cancel-and-take-control behavior. The visible status owns the existing polite announcement rather than duplicating a
+  second screen-reader-only message. Narrow and coarse-pointer layouts place the transient strip above touch controls.
+- Implemented the generated target-pointer status strip, route-aware suppression of the ordinary movement tutorial,
+  Escape cancellation, and localized desktop/touch guidance. At <=520px the destination and cancellation guidance use
+  separate lines; coarse-pointer layouts lift the strip above the D-pad and action-button band.
+- Browser-played long routes, immediate Escape cancellation, and normal Floor-terminal arrival at 1280x900 and 390x844.
+  The strip named Auto Prediction/Floor terminal without covering Alice or the route, disappeared atomically with a
+  canceled route, and cleared before the destination menu received focus. Focused OfficeBuilding and responsive-style
+  specs passed: 2 files / 23 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file Vitest run (5,058 passing;
+  one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

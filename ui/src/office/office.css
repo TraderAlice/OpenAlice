@@ -2937,6 +2937,85 @@
   pointer-events: none;
 }
 
+.oa-office-route-status {
+  position: absolute;
+  right: 42px;
+  bottom: 14px;
+  z-index: 16;
+  display: grid;
+  width: max-content;
+  max-width: min(330px, calc(100% - 58px));
+  min-height: 36px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 3px;
+  border: 2px solid var(--gba-paper);
+  border-radius: 2px;
+  color: var(--gba-cream);
+  background: color-mix(in srgb, var(--gba-ink) 92%, transparent);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--gba-water) 34%, transparent),
+    3px 3px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+  animation: oa-office-route-status-in 140ms steps(3, end);
+}
+
+.oa-office-route-status > img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.oa-office-route-status__copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.oa-office-route-status__copy small {
+  color: var(--gba-water);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-route-status__copy strong {
+  overflow: hidden;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-office-route-status__cancel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: color-mix(in srgb, var(--gba-cream) 78%, var(--gba-water));
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.oa-office-route-status__cancel kbd {
+  min-width: 30px;
+  padding: 2px 4px;
+  border: 2px solid var(--gba-paper);
+  border-radius: 2px;
+  color: var(--gba-cream);
+  background: var(--gba-moss-dark);
+  box-shadow: inset -2px -2px color-mix(in srgb, var(--gba-ink) 32%, transparent);
+  font: inherit;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.oa-office-route-status [data-input='touch'] {
+  display: none;
+}
+
 .oa-office-map-controls__move {
   display: flex;
   max-width: 220px;
@@ -2966,12 +3045,14 @@
 }
 
 .oa-office-map-controls[data-learned='true'],
-.oa-office-map-controls[data-action-ready='true'] {
+.oa-office-map-controls[data-action-ready='true'],
+.oa-office-map-controls[data-routing='true'] {
   gap: 0;
 }
 
 .oa-office-map-controls[data-learned='true'] .oa-office-map-controls__move,
-.oa-office-map-controls[data-action-ready='true'] .oa-office-map-controls__move {
+.oa-office-map-controls[data-action-ready='true'] .oa-office-map-controls__move,
+.oa-office-map-controls[data-routing='true'] .oa-office-map-controls__move {
   max-width: 0;
   padding-inline: 0;
   border-width: 0;
@@ -3279,6 +3360,7 @@
 }
 
 .oa-office-building[data-controls-suspended='true'] :is(
+  .oa-office-route-status,
   .oa-office-map-controls,
   .oa-office-touch-dpad,
   .oa-office-touch-action
@@ -3292,6 +3374,13 @@
   from {
     opacity: 0;
     scale: 0.92;
+  }
+}
+
+@keyframes oa-office-route-status-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
   }
 }
 
@@ -4518,6 +4607,10 @@
     animation: none;
   }
 
+  .oa-office-route-status {
+    animation: none;
+  }
+
   .oa-office-collision-impact > span {
     background-position: -24px 0;
     animation: none;
@@ -4543,6 +4636,8 @@
 .oa-office-pod__count,
 .oa-office-nameplate,
 .oa-office-map-controls__move,
+.oa-office-route-status__copy small,
+.oa-office-route-status__cancel,
 .oa-office-window__header span,
 .oa-office-inspect__kicker {
   font-size: var(--text-xs) !important;
@@ -4585,6 +4680,20 @@
 }
 
 @media (hover: none), (pointer: coarse) {
+  .oa-office-route-status {
+    right: 10px;
+    bottom: 122px;
+    max-width: calc(100% - 20px);
+  }
+
+  .oa-office-route-status [data-input='keyboard'] {
+    display: none;
+  }
+
+  .oa-office-route-status [data-input='touch'] {
+    display: inline;
+  }
+
   .oa-office-touch-dpad {
     display: grid;
   }
@@ -4634,6 +4743,15 @@
 }
 
 @container (max-width: 520px) {
+  .oa-office-route-status {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .oa-office-route-status__cancel {
+    grid-column: 2;
+    justify-self: start;
+  }
+
   .oa-office-window__title-copy {
     display: grid;
     align-items: start;
