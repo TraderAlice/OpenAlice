@@ -1753,6 +1753,27 @@ Occupancy event-stat follow-up (2026-08-29):
 - Focused OfficeRuntimeSection specs passed: 1 file / 3 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
   606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Replay-floor interaction boundary follow-up (2026-08-29):
+
+- Played Seq 5 on the real three-pod replay floor and found every real-time map entry still enabled: Workspace signs,
+  occupied desks, cabinets, Team roster, Floor terminal, and Operations board. A historical reconstruction could
+  therefore leave its own timestamp and open live Workspace or Agent-file state without explaining the time jump.
+- Compared blocking only cross-scene buttons, locking the whole replay map, and treating replay as an explorable
+  museum floor. Chose the museum model: Alice can still walk, Operations board remains the review control, and Live
+  remains the explicit return to current time; every object whose content is not historical is frozen. This preserves
+  the game-world benefit of replay without implying that live records belong to Seq 5.
+- Replay now removes non-operations objects from proximity targeting and guards programmatic route requests as well
+  as disabling their buttons. Workspace signs receive a localized SNAPSHOT stamp; signs, desks, cabinets, roster,
+  and Floor terminal share a localized historical-snapshot explanation. The map itself has a replay-specific
+  accessible label in English, Simplified Chinese, Traditional Chinese, and Japanese.
+- Browser-played replay at 1280x720: all 20 historical object buttons were disabled, Operations board still opened
+  Occupancy log, three Workspace signs showed complete SNAPSHOT stamps, and the page had zero overflow. At 390x844,
+  the same 20 controls stayed frozen with zero overflow. The first responsive pass exposed a clipped Live button, so
+  replay now omits redundant HUD stats below 760px and keeps both Live and Menu fully visible. Returning Live restored
+  the normal map label and Workspace sign interaction and removed every snapshot stamp.
+- Focused OfficeBuilding and OfficeDesk specs passed: 2 files / 13 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`,
+  the 606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

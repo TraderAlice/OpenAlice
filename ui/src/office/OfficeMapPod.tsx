@@ -15,6 +15,7 @@ export function OfficeMapPod({
   harnessTitle,
   selected,
   reducedMotion,
+  interactionDisabled = false,
   onSelectEmployee,
   onOpenEmployee,
   onOpenWorkspace,
@@ -30,6 +31,7 @@ export function OfficeMapPod({
   harnessTitle: string
   selected?: { workspaceId: string; resumeId: string } | null
   reducedMotion: boolean
+  interactionDisabled?: boolean
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenWorkspace: (workspaceId: string) => void
@@ -64,6 +66,7 @@ export function OfficeMapPod({
       data-harness={group.workspace.harness}
       data-active={active}
       data-sleeping={group.sleeping}
+      data-replay-locked={interactionDisabled || undefined}
     >
       <button
         id={`office-sign-${group.workspace.id}`}
@@ -71,9 +74,11 @@ export function OfficeMapPod({
         className="oa-office-pod__sign"
         style={{ zIndex: officeDepthAt(layout.y + 62) }}
         data-route={routeTargetId === `sign:${group.workspace.id}`}
+        data-replay-label={interactionDisabled ? t('office.replaySnapshot') : undefined}
+        disabled={interactionDisabled}
         onClick={() => onOpenWorkspace(group.workspace.id)}
         aria-label={t('office.interactWorkspace', { name: title })}
-        title={t('office.workspaceSignHint')}
+        title={interactionDisabled ? t('office.replayLockedHint') : t('office.workspaceSignHint')}
       >
         <img
           src={OFFICE_FURNITURE.generated.workspaceSign}
@@ -132,6 +137,7 @@ export function OfficeMapPod({
               )}
               depth={officeDepthAt(layout.y + OFFICE_DESK_CENTERS[index].y)}
               reducedMotion={reducedMotion}
+              interactionDisabled={interactionDisabled}
               spriteScale={0.23}
               onSelect={() => employee && onSelectEmployee(group.workspace.id, employee)}
               onOpen={() => employee && onOpenEmployee(group.workspace.id, employee)}
@@ -145,9 +151,10 @@ export function OfficeMapPod({
           style={{ zIndex: officeDepthAt(layout.y + OFFICE_CABINET_CENTER.y + 24) }}
           data-nearby={nearbyTargetId === `cabinet:${group.workspace.id}`}
           data-route={routeTargetId === `cabinet:${group.workspace.id}`}
+          disabled={interactionDisabled}
           onClick={() => onOpenFiles(group.workspace.id)}
           aria-label={`${t('office.cabinet')} · ${title}`}
-          title={t('office.cabinetHint')}
+          title={interactionDisabled ? t('office.replayLockedHint') : t('office.cabinetHint')}
         >
           <img src={OFFICE_FURNITURE.generated.cabinet} alt="" style={officePixelImg} />
         </button>
@@ -164,9 +171,10 @@ export function OfficeMapPod({
             data-side={rosterCenter.side}
             data-nearby={nearbyTargetId === `roster:${group.workspace.id}`}
             data-route={routeTargetId === `roster:${group.workspace.id}`}
+            disabled={interactionDisabled}
             onClick={() => onOpenRoster(group.workspace.id)}
             aria-label={`${t('office.roster')} · ${title}`}
-            title={t('office.rosterHint')}
+            title={interactionDisabled ? t('office.replayLockedHint') : t('office.rosterHint')}
           >
             <img src={OFFICE_FURNITURE.generated.personnelBoard} alt="" style={officePixelImg} />
           </button>

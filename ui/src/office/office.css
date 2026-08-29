@@ -4288,7 +4288,7 @@
   text-transform: none;
 }
 
-.oa-office-pod__sign:focus-visible {
+.oa-office-pod__sign:not(:disabled):focus-visible {
   outline: none;
   filter:
     brightness(1.12)
@@ -4296,13 +4296,13 @@
     drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 22%, transparent));
 }
 
-.oa-office-pod__sign:active {
+.oa-office-pod__sign:not(:disabled):active {
   transform: translateY(1px);
   filter: brightness(0.96) drop-shadow(1px 1px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .oa-office-pod__sign:hover {
+  .oa-office-pod__sign:not(:disabled):hover {
     transform: translateY(-1px);
     filter:
       brightness(1.08)
@@ -4418,12 +4418,12 @@
   filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
-.oa-office-pod__cabinet:hover {
+.oa-office-pod__cabinet:not(:disabled):hover {
   transform: translateY(-3px) scale(1.06);
   filter: brightness(1.08);
 }
 
-.oa-office-pod__cabinet:focus-visible {
+.oa-office-pod__cabinet:not(:disabled):focus-visible {
   outline: 3px solid var(--gba-water);
   outline-offset: 2px;
 }
@@ -4453,12 +4453,12 @@
   filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
-.oa-office-pod__roster:hover {
+.oa-office-pod__roster:not(:disabled):hover {
   transform: translateY(-3px) scale(1.06);
   filter: brightness(1.08);
 }
 
-.oa-office-pod__roster:focus-visible {
+.oa-office-pod__roster:not(:disabled):focus-visible {
   outline: 3px solid var(--gba-water);
   outline-offset: 2px;
 }
@@ -4487,7 +4487,7 @@
   box-shadow: none;
 }
 
-.oa-office-pod .oa-office-desk[data-occupied="true"]:hover {
+.oa-office-pod .oa-office-desk[data-occupied="true"]:not(:disabled):hover {
   z-index: 9;
   transform: translateY(-1px);
 }
@@ -4572,6 +4572,47 @@
 .oa-office-pod .oa-office-desk[data-occupied="false"] {
   opacity: 0.82;
   filter: saturate(0.82) brightness(0.92);
+}
+
+.oa-office-pod[data-replay-locked="true"] :is(
+  .oa-office-pod__sign,
+  .oa-office-pod__cabinet,
+  .oa-office-pod__roster,
+  .oa-office-desk
+) {
+  cursor: default;
+}
+
+.oa-office-pod[data-replay-locked="true"] :is(
+  .oa-office-pod__sign,
+  .oa-office-pod__cabinet,
+  .oa-office-pod__roster
+) {
+  opacity: 0.72;
+  filter: saturate(0.52) brightness(0.94);
+}
+
+.oa-office-pod__sign[data-replay-label]::after {
+  position: absolute;
+  right: 18px;
+  bottom: 6px;
+  padding: 1px 4px;
+  border: 1px solid var(--gba-paper);
+  content: attr(data-replay-label);
+  color: var(--gba-paper);
+  background: var(--gba-water);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-map-landmark--terminal[data-replay-locked="true"] {
+  cursor: default;
+  opacity: 0.58;
+  filter: grayscale(0.35) saturate(0.55);
 }
 
 .oa-office-pod .oa-office-nameplate {
@@ -5264,6 +5305,14 @@
 }
 
 @container (max-width: 760px) {
+  .oa-office-building[data-replay="true"] .oa-office-hud {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .oa-office-building[data-replay="true"] .oa-office-hud__status {
+    display: none;
+  }
+
   .oa-office-touch-dpad {
     display: grid;
   }

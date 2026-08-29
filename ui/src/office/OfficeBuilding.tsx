@@ -180,6 +180,12 @@ export function OfficeBuilding({
     () => officeInteractionTargets(groups, mapLayout, resolveGroupTitle),
     [groups, mapLayout, resolveGroupTitle],
   )
+  const availableInteractionTargets = useMemo(
+    () => replaySeq == null
+      ? interactionTargets
+      : interactionTargets.filter((target) => target.kind === 'operations'),
+    [interactionTargets, replaySeq],
+  )
   const interactionTargetById = useMemo(
     () => new Map(interactionTargets.map((target) => [target.id, target])),
     [interactionTargets],
@@ -209,8 +215,8 @@ export function OfficeBuilding({
   const nearbyTarget = useMemo(
     () => interactionSuspended || departingWorkspace || selected
       ? null
-      : nearestOfficeInteractionTarget(alice, aliceDirection, interactionTargets),
-    [alice, aliceDirection, departingWorkspace, interactionSuspended, interactionTargets, selected],
+      : nearestOfficeInteractionTarget(alice, aliceDirection, availableInteractionTargets),
+    [alice, aliceDirection, availableInteractionTargets, departingWorkspace, interactionSuspended, selected],
   )
   const promptPlacement = useMemo(
     () => nearbyTarget
@@ -414,6 +420,7 @@ export function OfficeBuilding({
     if (selected || departingWorkspace || interactionSuspended) return
     const target = interactionTargetById.get(targetId)
     if (!target) return
+    if (replaySeq != null && target.kind !== 'operations') return
     cancelAutoWalk()
     const generation = routeGenerationRef.current
     const path = officeInteractionPath(aliceRef.current, target, mapLayout, collisionRects)
@@ -687,7 +694,7 @@ export function OfficeBuilding({
         data-panning={panning}
         data-departing={Boolean(departingWorkspace) || undefined}
         aria-busy={Boolean(departingWorkspace)}
-        aria-label={t('office.mapLabel')}
+        aria-label={replaySeq == null ? t('office.mapLabel') : t('office.replayMapLabel')}
         onKeyDown={(event) => {
           if (departingWorkspace) return
           const key = event.key.toLowerCase()
@@ -791,7 +798,9 @@ export function OfficeBuilding({
               type="button"
               className="oa-office-map-landmark oa-office-map-landmark--terminal"
               aria-label={t('office.floorTerminal')}
-              title={t('office.floorTerminalHint')}
+              title={replaySeq == null ? t('office.floorTerminalHint') : t('office.replayLockedHint')}
+              disabled={replaySeq != null}
+              data-replay-locked={replaySeq != null || undefined}
               data-nearby={nearbyTarget?.kind === 'floor-terminal'}
               data-route={routeTargetId === 'floor-terminal'}
               onClick={() => requestTargetInteraction('floor-terminal')}
@@ -942,6 +951,7 @@ export function OfficeBuilding({
                 harnessTitle={t(`office.harness.${group.workspace.harness}`)}
                 selected={selected}
                 reducedMotion={reducedMotion}
+                interactionDisabled={replaySeq != null}
                 onSelectEmployee={(workspaceId, employee) => requestTargetInteraction(
                   `employee:${workspaceId}:${employee.resumeId}`,
                 )}

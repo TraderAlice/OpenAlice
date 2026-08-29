@@ -16,6 +16,7 @@ export function OfficeDesk({
   targeted,
   depth,
   reducedMotion,
+  interactionDisabled = false,
   spriteScale,
   onSelect,
   onOpen,
@@ -27,6 +28,7 @@ export function OfficeDesk({
   targeted?: boolean
   depth: number
   reducedMotion: boolean
+  interactionDisabled?: boolean
   spriteScale?: number
   onSelect: () => void
   onOpen?: () => void
@@ -52,7 +54,8 @@ export function OfficeDesk({
         data-testid={employee ? `office-desk-${employee.resumeId}` : 'office-desk-empty'}
         aria-label={label}
         aria-pressed={employee ? selected : undefined}
-        disabled={!employee}
+        disabled={!employee || interactionDisabled}
+        title={interactionDisabled ? t('office.replayLockedHint') : undefined}
         onClick={onSelect}
         onDoubleClick={() => employee && onOpen?.()}
         className="oa-office-desk"

@@ -21,6 +21,10 @@ beforeEach(async () => {
 describe('OfficeBuilding', () => {
   it('keeps historical floors visibly in replay mode with a direct return to Live', async () => {
     const onReturnLive = vi.fn()
+    const onSelectEmployee = vi.fn()
+    const onOpenWorkspace = vi.fn()
+    const onOpenFiles = vi.fn()
+    const onOpenRoster = vi.fn()
     const { container } = render(
       <OfficeBuilding
         building={{
@@ -31,14 +35,29 @@ describe('OfficeBuilding', () => {
           lastSeq: 6,
           firstSeq: 1,
           asOfSeq: 2,
-          offices: [],
+          offices: [{
+            workspace: { id: 'chat-replay', tag: 'chat', harness: 'chat' },
+            lastInteractionAt: 1,
+            sleeping: false,
+            employees: Array.from({ length: 6 }, (_, index) => ({
+              resumeId: `resume-${index}`,
+              agent: 'codex',
+              name: `x${index + 1}`,
+              title: `Session ${index + 1}`,
+              mood: index < 2 ? 'working' as const : 'idle' as const,
+              bubble: null,
+              lastSeq: 2,
+              lastInteractionAt: 1,
+              drawers: [],
+            })),
+          }],
         }}
         replaySeq={2}
-        onSelectEmployee={vi.fn()}
+        onSelectEmployee={onSelectEmployee}
         onOpenEmployee={vi.fn()}
-        onOpenWorkspace={vi.fn()}
-        onOpenFiles={vi.fn()}
-        onOpenRoster={vi.fn()}
+        onOpenWorkspace={onOpenWorkspace}
+        onOpenFiles={onOpenFiles}
+        onOpenRoster={onOpenRoster}
         onOpenLog={vi.fn()}
         onReturnLive={onReturnLive}
       />,
@@ -48,6 +67,31 @@ describe('OfficeBuilding', () => {
     expect(screen.getByText('Replay floor · Seq 2')).toBeTruthy()
     expect(container.querySelector<HTMLImageElement>('.oa-office-hud__signal img')?.src)
       .toContain('/office/hud/occupancy-log-v2.png')
+    expect(screen.getByLabelText('Replay floor. Move Alice to inspect the snapshot; use Operations board to review it or Live to return.')).toBeTruthy()
+
+    const workspaceSign = screen.getByRole('button', { name: 'Enter chat workspace' }) as HTMLButtonElement
+    const occupiedDesks = screen.getAllByTestId(/^office-desk-/) as HTMLButtonElement[]
+    const cabinet = screen.getByRole('button', { name: 'Filing cabinet · chat' }) as HTMLButtonElement
+    const roster = screen.getByRole('button', { name: 'Team roster · chat' }) as HTMLButtonElement
+    const terminal = screen.getByRole('button', { name: 'Floor terminal' }) as HTMLButtonElement
+    const operations = screen.getByRole('button', { name: 'Operations board' }) as HTMLButtonElement
+
+    expect(workspaceSign.disabled).toBe(true)
+    expect(workspaceSign.dataset.replayLabel).toBe('Snapshot')
+    expect(occupiedDesks.every((desk) => desk.disabled)).toBe(true)
+    expect(cabinet.disabled).toBe(true)
+    expect(roster.disabled).toBe(true)
+    expect(terminal.disabled).toBe(true)
+    expect(operations.disabled).toBe(false)
+    fireEvent.click(workspaceSign)
+    fireEvent.click(occupiedDesks[0])
+    fireEvent.click(cabinet)
+    fireEvent.click(roster)
+    expect(onOpenWorkspace).not.toHaveBeenCalled()
+    expect(onSelectEmployee).not.toHaveBeenCalled()
+    expect(onOpenFiles).not.toHaveBeenCalled()
+    expect(onOpenRoster).not.toHaveBeenCalled()
+
     await userEvent.click(screen.getByRole('button', { name: 'Live' }))
     expect(onReturnLive).toHaveBeenCalledTimes(1)
   })
