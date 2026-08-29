@@ -1,12 +1,12 @@
 # Office generated coworkers
 
 These runtime-specific coworker sprites make Alice the unique player character
-instead of reusing her `alice-maid` atlas for every employee.
+instead of reusing her overworld sheet for every employee.
 
 The four `*-v1.webp` files were generated with the built-in image generator,
 using `docs/assets/office/style-master-v1.png` as the environment palette
-reference and `ui/public/office/packs/alice-maid/spritesheet.webp` only as the
-pixel-density and character-proportion reference.
+reference and Alice's canonical maid art only as the pixel-density and
+character-proportion reference.
 
 Prompt set:
 

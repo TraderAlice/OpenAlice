@@ -3165,8 +3165,8 @@
   --oa-office-bump-y: 2px;
   position: absolute;
   display: grid;
-  width: 34px;
-  height: 42px;
+  width: 48px;
+  height: 56px;
   place-items: center;
   transform: translate(-50%, -50%);
   transition: left 96ms steps(3, end), top 96ms steps(3, end);
@@ -3201,25 +3201,14 @@
   }
 }
 
-/* Alice alone uses the checked-in Codex pet v2 pack through OfficeEmployeeSprite. */
 .oa-office-alice > .oa-office-alice__sprite {
   display: block;
-  width: 38.4px;
-  height: 41.6px;
+  width: 48px;
+  height: 48px;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  transform-origin: center bottom;
-}
-
-.oa-office-alice[data-walking="true"][data-direction="up"] > .oa-office-alice__sprite,
-.oa-office-alice[data-walking="true"][data-direction="down"] > .oa-office-alice__sprite {
-  animation: oa-office-alice-step 160ms steps(2, end) infinite;
-}
-
-@keyframes oa-office-alice-step {
-  50% { transform: translateY(-2px); }
 }
 
 .oa-office-alice small {
@@ -4640,10 +4629,6 @@
     transition: none;
   }
 
-  .oa-office-alice[data-walking="true"][data-direction="up"] > .oa-office-alice__sprite,
-  .oa-office-alice[data-walking="true"][data-direction="down"] > .oa-office-alice__sprite {
-    animation: none;
-  }
 }
 
 .oa-office-runtime__type,

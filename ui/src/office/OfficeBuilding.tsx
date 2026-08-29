@@ -377,6 +377,10 @@ export function OfficeBuilding({
           ? current
           : { width: rect.width, height: rect.height }
       ))
+      setCamera((current) => ({
+        x: Math.min(0, Math.max(rect.width - mapLayout.width, current.x)),
+        y: Math.min(0, Math.max(rect.height - mapLayout.height, current.y)),
+      }))
     }
     updateViewportSize()
     const observer = typeof ResizeObserver === 'undefined'
@@ -388,7 +392,7 @@ export function OfficeBuilding({
       observer?.disconnect()
       window.removeEventListener('resize', updateViewportSize)
     }
-  }, [])
+  }, [mapLayout.height, mapLayout.width])
   useLayoutEffect(() => {
     cancelAutoWalk()
     aliceRef.current = mapLayout.alice
@@ -646,7 +650,7 @@ export function OfficeBuilding({
                   walking={aliceWalking}
                   reducedMotion={reducedMotion}
                   label={t('office.aliceAvatar')}
-                  scale={0.2}
+                  scale={1}
                 />
               </span>
               <small>ALICE</small>

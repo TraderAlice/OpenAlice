@@ -1,8 +1,8 @@
 # Office generated furniture
 
-These `*-v1.png` files are the first generated environment pack for the Office
-overworld. Alice and employee characters continue to use the independent
-`alice-maid` Codex pet v2 pack.
+These `*-v1.png` files are the generated environment pack for the Office
+overworld. Alice uses the purpose-built `alice-overworld-v1.png` four-direction
+sheet, while runtime coworkers use their own portrait and seated families.
 
 Art direction:
 

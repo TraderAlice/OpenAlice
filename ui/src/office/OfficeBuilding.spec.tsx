@@ -299,6 +299,20 @@ describe('OfficeBuilding', () => {
     expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)
       .toBe('translate3d(-100px, -50px, 0)')
     fireEvent.pointerUp(map, { pointerId: 1 })
+    vi.mocked(map.getBoundingClientRect).mockReturnValue({
+      width: 1200,
+      height: 800,
+      top: 0,
+      right: 1200,
+      bottom: 800,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent(window, new Event('resize'))
+    expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)
+      .toBe('translate3d(0px, 0px, 0)')
     await userEvent.keyboard('aasss')
     const interactionPrompt = screen.getByRole('status', { name: 'Inspect chat files' })
     expect(interactionPrompt.classList.contains('oa-office-interact-prompt')).toBe(true)

@@ -30,8 +30,8 @@ Session、Files 或 provenance。
 4. 固定三桌加 `+N` 不能解释真实 Session 密度。
 5. 底部帮助框长驻遮挡地图；详情和日志仍有网页面板层级。
 6. 地图缺少自动构图，空白、遮挡和镜头初始位置依赖手调坐标。
-7. Alice 和所有工位员工共用 `alice-maid` 会抹平主角与 NPC 身份；Alice 保留正式 pet
-   atlas，员工必须使用同画风、按 runtime 可辨识的正式位图角色，不能退回 CSS 占位人。
+7. Alice 和所有工位员工共用一套角色图会抹平主角与 NPC 身份；Alice 使用 Office 专用
+   四方向 overworld atlas，员工使用同画风、按 runtime 可辨识的正式位图角色。
 
 ## Design decision
 
@@ -62,8 +62,10 @@ Session、Files 或 provenance。
 
 ## Interaction model
 
-- 单击员工：选中并在底部打开游戏对话框；再次操作进入 Session。
-- 单击 Workspace 铭牌/档案柜：打开该 Workspace Files。
+- 单击地图对象：Alice 沿真实碰撞网格走到面向锥形范围内，再执行该对象的操作；任意
+  手动移动、拖图、Reset、Menu 或新目标都能取消路线，绝不隔空打开或传送。
+- 单击员工：走近后选中并在底部打开游戏对话框；再次操作进入 Session。
+- 单击 Workspace 铭牌/档案柜：走近后打开该 Workspace 的 Office 档案柜。
 - Alice 靠近员工、档案柜或名册板时，只高亮面向锥形范围内的最佳对象并显示单一游戏
   按键提示；正侧方和背后对象不抢提示。Enter/Space 执行与鼠标点击相同的动作，不用
   键盘用户在地图对象之间 Tab 巡航。
@@ -88,7 +90,7 @@ Session、Files 或 provenance。
 
 ## Asset boundary
 
-`alice-maid` Codex pet v2 是 Alice 唯一使用的正式主角 pack，通过 `OfficeSpritePack`
+`alice-overworld-v1.png` 是 Alice 唯一使用的正式 Office 主角 pack，通过 `OfficeSpritePack`
 保持可替换。Session 员工使用独立的 runtime coworker registry；Codex、Claude、Pi、
 OpenCode 有正式生成角色，其他 runtime 稳定映射到最接近的 archetype，绝不回退成 Alice。
 员工 mood 继续由 runtime log 驱动，并以离散 CSS 动作和状态点表达；未来有可靠的四方向
@@ -97,7 +99,7 @@ atlas 后再替换静态 coworker，不把 mood atlas 行误当成方向行。
 第一版 top-down 家具占位资产遵守统一规范：
 
 - 16×16 tile 基础网格；人物和桌组可占 32×32 / 48×48；
-- 地图主角消费 `alice-maid` v2 adapter；工位、名册和 Agent 档案消费同一 runtime
+- 地图主角消费 Office 专用四方向 adapter；工位、名册和 Agent 档案消费同一 runtime
   coworker asset registry；
 - top-down desk、terminal、cabinet、rug corner、sign、plant；
 - 所有缺失资产在 asset registry 和 CSS 中保留 `TODO(asset)`，替换资产不得修改场景
@@ -858,6 +860,36 @@ Click-to-interact pathfinding follow-up (2026-08-29):
   Also captured an in-progress desk route with its target lock and verified blank-map input cancels the route before
   selection. The narrow route retains its D-pad and zero horizontal overflow.
 - Focused path, target, collision, and building specs passed: 4 files / 20 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 601 files / 5011 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
+Alice-overworld animation follow-up (2026-08-29):
+
+- Played the new automatic routes and found that Alice exposed a split asset model on every turn: left/right
+  used eight-frame side-running rows from the large desktop-pet atlas, north used one generated rear still, and
+  south reused the front idle row with a CSS vertical bob. The main character therefore changed density and
+  animation language as the pathfinder changed direction.
+- Compared generating only north/south strips, keeping the mixed atlas with stronger CSS motion, and replacing
+  all directions with one Office-native overworld sheet. Chose one sheet because mixed proportions would preserve
+  the visible transformation bug; Office does not need compatibility with the desktop-pet atlas.
+- Used the built-in image generator with the canonical Alice maid sheet and prior rear view as identity references.
+  Generated exactly twelve transparent late-GBA sprites: down, left, right, and up rows with left-step, neutral,
+  and right-step columns. Alice retains her gold hair, black bow, blue maid dress, white apron, and black shoes.
+- Packaged the output as `alice-overworld-v1.png`: removed disconnected generation artifacts, normalized every
+  frame to one baseline, nearest-neighbor reduced to native 48x48 cells, binarized alpha, and quantized the whole
+  144x192 atlas to a shared 64-color palette. The old 1536x2288 pet atlas, one-off rear PNG, and pet manifest were
+  removed from Office instead of leaving a second unused runtime path.
+- `OfficeSpritePack` now exposes dedicated idle and three-frame walk poses for all four directions. The player is
+  rendered at its native 48px scale; the previous up/down CSS bob and direction-specific source switching are gone.
+- Night-mode QA exposed a separate camera-state leak: enlarging a previously panned narrow viewport retained an
+  out-of-range negative offset and revealed the campus checkerboard beyond the map edge. Resize observation now
+  reclamps both camera axes against current viewport and map dimensions; a regression spec covers narrow-to-wide.
+- Browser-played an automatic route at 1280x800 and sampled down, left, and up walk poses plus advancing side
+  frames. At 760x900, D-pad taps resolved to four distinct idle poses from the same generated sheet. The new player
+  remains legible beside coworkers, the route completes correctly, and both widths retain zero horizontal overflow.
+  Day and Night remain readable; resizing 760→1280 now leaves the map covering the full campus with a 0px gap.
+- Focused Alice, sprite-pack, and building specs passed: 3 files / 9 tests.
 - `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 601 files / 5011 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed

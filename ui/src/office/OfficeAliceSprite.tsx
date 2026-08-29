@@ -8,9 +8,7 @@ export function officeAlicePose(
   direction: OfficeAliceDirection,
   walking: boolean,
 ): OfficeAlicePose {
-  if (direction === 'up') return 'idle-back'
-  if (!walking || direction === 'down') return 'idle'
-  return direction === 'left' ? 'walk-left' : 'walk-right'
+  return `${walking ? 'walk' : 'idle'}-${direction}` as OfficeAlicePose
 }
 
 export function OfficeAliceSprite({
@@ -18,7 +16,7 @@ export function OfficeAliceSprite({
   walking,
   reducedMotion,
   label,
-  scale = 0.5,
+  scale = 1,
 }: {
   direction: OfficeAliceDirection
   walking: boolean
@@ -63,7 +61,7 @@ export function OfficeAliceSprite({
         backgroundImage: `url(${pose.sheetUrl})`,
         backgroundRepeat: 'no-repeat',
         backgroundSize: `${pose.atlas.columns * displayWidth}px ${pose.atlas.rows * displayHeight}px`,
-        backgroundPosition: `-${frame * displayWidth}px -${pose.row * displayHeight}px`,
+        backgroundPosition: `-${(pose.column + frame) * displayWidth}px -${pose.row * displayHeight}px`,
         imageRendering: 'pixelated',
       }}
     />
