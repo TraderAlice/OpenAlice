@@ -9,7 +9,8 @@ import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
-import { officeCoworkerLabel } from './label'
+import { officeCoworkerCast } from './coworker-sprites'
+import { officeCoworkerCallsign } from './label'
 
 interface CabinetRecord {
   employee: OfficeFloorEmployee
@@ -33,6 +34,7 @@ export function OfficeCabinetWindow({
   const records = useMemo(() => employeesForOffice(group.employees)
     .flatMap((employee) => employee.drawers.map((item) => ({ employee, item })))
     .sort((a, b) => b.item.at - a.item.at), [group.employees])
+  const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
   const recordKey = ({ employee, item }: CabinetRecord) => `${employee.resumeId}:${item.id}`
   const initialFocusKey = records[0] ? recordKey(records[0]) : null
   const [focusedRecordKey, setFocusedRecordKey] = useState(initialFocusKey)
@@ -153,7 +155,9 @@ export function OfficeCabinetWindow({
                         <b>{kind}</b>
                         <time dateTime={new Date(item.at).toISOString()}>{relativeTime}</time>
                       </small>
-                      <small>{t('office.cabinetRecordOwner', { name: officeCoworkerLabel(employee) })}</small>
+                      <small>{t('office.cabinetRecordOwner', {
+                        name: officeCoworkerCallsign(employee, coworkerCast.get(employee.resumeId)),
+                      })}</small>
                     </span>
                     <span className="oa-office-cabinet-window__destination" aria-hidden>
                       <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" style={officePixelImg} />

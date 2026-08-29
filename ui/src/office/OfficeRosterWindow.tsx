@@ -8,7 +8,7 @@ import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
-import { officeCoworkerLabel } from './label'
+import { officeCoworkerAssignment, officeCoworkerCallsign } from './label'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { useReducedMotion } from './use-reduced-motion'
 
@@ -112,7 +112,11 @@ export function OfficeRosterWindow({
             buttons[nextIndex]?.focus()
           }}
         >
-          {employees.map((employee) => (
+          {employees.map((employee) => {
+            const asset = coworkerCast.get(employee.resumeId)
+            const callsign = officeCoworkerCallsign(employee, asset)
+            const assignment = officeCoworkerAssignment(employee)
+            return (
             <li key={employee.resumeId}>
               <button
                 type="button"
@@ -126,15 +130,19 @@ export function OfficeRosterWindow({
                   <OfficeCoworkerSprite
                     agent={employee.agent}
                     identity={employee.resumeId}
-                    asset={coworkerCast.get(employee.resumeId)}
+                    asset={asset}
                     mood={employee.mood}
                     reducedMotion={reducedMotion}
-                    label={officeCoworkerLabel(employee)}
+                    label={callsign}
                     scale={0.22}
                   />
                 </span>
-                <strong className="oa-office-roster__title">{officeCoworkerLabel(employee)}</strong>
-                <small className="oa-office-roster__meta">{employee.agent} · {employee.name}</small>
+                <strong className="oa-office-roster__title">
+                  {callsign}<span> · {employee.name}</span>
+                </strong>
+                <small className="oa-office-roster__meta">
+                  {assignment ?? `${employee.agent} · ${employee.name}`}
+                </small>
                 <span className="oa-office-roster__status" data-mood={employee.mood}>
                   <i aria-hidden />
                   {t(`office.mood.${employee.mood}`)}
@@ -148,7 +156,8 @@ export function OfficeRosterWindow({
                 />
               </button>
             </li>
-          ))}
+            )
+          })}
         </ul>
       </div>
     </section>

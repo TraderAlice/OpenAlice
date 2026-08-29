@@ -849,7 +849,7 @@ describe('OfficeBuilding', () => {
       'chat-1',
       expect.objectContaining({ resumeId: 'resume-alice' }),
     ))
-    const talkPrompt = screen.getByRole('status', { name: 'Talk to Desk mate · Researching…' })
+    const talkPrompt = screen.getByRole('status', { name: /Talk to Codex.*Researching…/ })
     expect(talkPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/talk-bubble-v2.png')
     expect(talkPrompt.textContent).toContain('Talk')

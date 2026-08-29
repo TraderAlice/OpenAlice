@@ -82,6 +82,7 @@ describe('OfficeRuntimeSection', () => {
       resumeId: 'resume-alice',
       agent: 'pi',
       label: 'Market Scout',
+      assignment: 'Watch the semiconductor desk for a clean entry.',
       secondary: 'pi · g1 · Chat Lab',
       asset: OFFICE_COWORKER_SPRITES.pi,
     }]])
@@ -90,6 +91,8 @@ describe('OfficeRuntimeSection', () => {
     expect(container.textContent).not.toContain('resume-alice')
     expect(screen.getAllByText('#0001').length).toBeGreaterThan(0)
     expect(screen.getByText(/webpi/)).toBeTruthy()
+    expect(screen.getByText('Assignment')).toBeTruthy()
+    expect(screen.getByText('Watch the semiconductor desk for a clean entry.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open Runs' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Task started.*Market Scout.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
@@ -349,7 +352,7 @@ describe('OfficeRuntimeSection', () => {
     render(<OfficeRuntimeSection onReplay={onReplay} />)
 
     await userEvent.click(await screen.findByRole('button', { name: /Agent report.*#0007/i }))
-    await userEvent.click(screen.getByRole('button', { name: 'View floor at this event' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Find on floor' }))
 
     expect(onReplay).toHaveBeenCalledWith({
       seq: 7,

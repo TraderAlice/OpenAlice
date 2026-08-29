@@ -77,7 +77,8 @@ describe('OfficeDesk', () => {
     expect(screen.getByTestId('office-emote-working').dataset.reducedMotion).toBe('true')
     expect(container.querySelector('.oa-office-nameplate')?.textContent).toContain('c1')
     expect(container.querySelector('.oa-office-nameplate')?.textContent).not.toContain('Open issue scan')
-    expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Open issue scan')
+    expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Claude')
+    expect(screen.getByRole('button').getAttribute('aria-label')).not.toContain('Open issue scan')
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('awake')
 
     rerender(<OfficeDesk {...props} nearby />)

@@ -2667,6 +2667,30 @@ Activity-beat journal follow-up (2026-08-30):
   11 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,110 passing; one file and nine tests
   skipped), and the production build; existing large-chunk and direct-eval advisories are unchanged.
 
+Coworker identity and Assignment follow-up (2026-08-30):
+
+- Ran a real seven-second Grok headless Session (`run-k5Q9pPX_`) as an Office actor and watched birth, working, report,
+  and completion states on the live floor. Its automatically derived Session title was the full test prompt, so opening
+  Agent File presented a paragraph-long assignment as if it were the coworker's name. The earlier title clamp protected
+  layout but could not make that identity model feel like a game character.
+- Compared retaining the task title as the name, assigning one fixed name per runtime, and separating the coworker from
+  her current Assignment. Chose separation: an explicit user display name still wins, otherwise the already-cast pixel
+  archetype becomes a stable in-world callsign (`Grok Oracle`, `Codex Mechanic`, and so on), disambiguated by the short
+  Session name. The auto-generated title remains useful as the current Assignment and no persistent identity is added.
+- Agent File now leads with callsign and runtime/Session byline, gives Assignment its own clamped and expandable quest
+  block, and keeps status, output dialogue, records, and Open Session at their established levels. Team roster uses the
+  same callsign plus short Session name as its primary row and the Assignment as secondary copy. Activity Log rows,
+  event detail portraits, and replay beacons resolve the same callsign; selected Agent details retain the Assignment.
+- Long Assignments in Activity Log clamp to three lines because the journal owns action history, not full task reading.
+  Shortened `Find on floor` wording plus equal-width compact action buttons keeps both floor replay and destination
+  actions in the first detail screen; Agent File remains the place to expand the complete Assignment.
+- Browser-played the resulting real six-person Grok roster, Grok Oracle Agent File, full-title expansion, and completion
+  event. All five authored Grok archetypes remained visible before the sixth stable repeat; every row stayed distinct by
+  `g1`–`g6`, the Agent File action bar remained fixed, and the log's two actions fit side by side within the 279px detail
+  pane. Focused identity, roster, Agent File, journal, and OfficePage verification passed (9 files / 45 tests), together
+  with root/UI TypeScript, the full 617-file Vitest run (5,111 passing; one file and nine tests skipped), and the
+  production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

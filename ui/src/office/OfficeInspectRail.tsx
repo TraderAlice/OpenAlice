@@ -11,7 +11,7 @@ import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import type { OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
-import { officeCoworkerLabel } from './label'
+import { officeCoworkerAssignment, officeCoworkerCallsign } from './label'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeInspectRail({
@@ -61,11 +61,12 @@ export function OfficeInspectRail({
     profileRef.current.scrollTop = 0
   }, [titleExpanded])
 
-  const employeeLabel = employee ? officeCoworkerLabel(employee) : ''
+  const employeeLabel = employee ? officeCoworkerCallsign(employee, coworkerAsset) : ''
+  const employeeAssignment = employee ? officeCoworkerAssignment(employee) : null
   const employeeByline = employee
-    ? [employee.agent, employee.name !== employeeLabel ? employee.name : null].filter(Boolean).join(' · ')
+    ? [employee.agent, employee.name].filter(Boolean).join(' · ')
     : ''
-  const titleCanExpand = employeeLabel.length > 72
+  const titleCanExpand = (employeeAssignment?.length ?? 0) > 72
 
   return (
     <aside
@@ -106,7 +107,7 @@ export function OfficeInspectRail({
                 asset={coworkerAsset}
                 mood={employee.mood}
                 reducedMotion={reducedMotion}
-                label={officeCoworkerLabel(employee)}
+                label={employeeLabel}
                 scale={0.34}
               />
             </div>
@@ -116,9 +117,15 @@ export function OfficeInspectRail({
                 {t('office.employeeFile')}
               </div>
               <div className="oa-office-inspect__identity">
-                <p id={titleId} data-expanded={titleExpanded || undefined} title={employeeLabel}>
-                  {employeeLabel}
-                </p>
+                <p>{employeeLabel}</p>
+                <span>{employeeByline}</span>
+              </div>
+              {employeeAssignment && (
+                <div className="oa-office-inspect__assignment">
+                  <small>{t('office.assignment')}</small>
+                  <p id={titleId} data-expanded={titleExpanded || undefined} title={employeeAssignment}>
+                    {employeeAssignment}
+                  </p>
                 {titleCanExpand && (
                   <button
                     type="button"
@@ -137,8 +144,8 @@ export function OfficeInspectRail({
                     {titleExpanded ? t('office.collapseTitle') : t('office.showFullTitle')}
                   </button>
                 )}
-                <span>{employeeByline}</span>
-              </div>
+                </div>
+              )}
               <blockquote>
                 {employee.bubble
                   ? officeBubbleText(employee.bubble, t)

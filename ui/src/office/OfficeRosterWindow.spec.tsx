@@ -75,14 +75,14 @@ describe('OfficeRosterWindow', () => {
     expect(screen.getAllByText('working')).toHaveLength(2)
     expect(screen.getAllByText('idle')).toHaveLength(4)
     expect(container.querySelectorAll('.oa-office-roster__status[data-mood="idle"]')).toHaveLength(4)
-    const focusedMember = screen.getByRole('button', { name: /Research session 6.*c1/i })
+    const focusedMember = screen.getByRole('button', { name: /Claude.*c1.*Research session 6/i })
     expect(document.activeElement).toBe(focusedMember)
     await userEvent.keyboard('{Tab}')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
     await userEvent.keyboard('{Tab}')
     expect(document.activeElement).toBe(focusedMember)
     const memberButtons = employees.map((employee) => screen.getByRole('button', {
-      name: new RegExp(employee.title, 'i'),
+      name: new RegExp(`${employee.name}.*${employee.title}`, 'i'),
     }))
     memberButtons.forEach((button, index) => {
       const row = Math.floor(index / 2)

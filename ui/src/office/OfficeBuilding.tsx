@@ -19,6 +19,7 @@ import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeInteractionPath, type OfficeInteractionPathStep } from './interaction-path'
 import { OfficeAliceSprite, type OfficeAliceDirection } from './OfficeAliceSprite'
+import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import {
   OfficeCollisionImpact,
   officeCollisionImpactPosition,
@@ -46,7 +47,7 @@ import {
   OFFICE_PROMPT_SERVICE_MAX_WIDTH,
   officeInteractionPromptPlacement,
 } from './interaction-prompt'
-import { officeCoworkerLabel } from './label'
+import { officeCoworkerCallsign } from './label'
 import {
   isOfficePositionWalkable,
   moveAliceOnOfficeMap,
@@ -252,6 +253,13 @@ export function OfficeBuilding({
     () => new Map(groups.map((group) => [group.workspace.id, group])),
     [groups],
   )
+  const coworkerAssets = useMemo(() => {
+    const assets = new Map<string, OfficeCoworkerSpriteAsset>()
+    for (const group of groups) {
+      for (const [resumeId, asset] of officeCoworkerCast(group.employees)) assets.set(resumeId, asset)
+    }
+    return assets
+  }, [groups])
   const resolveGroupTitle = useMemo(
     () => groupTitle ?? ((_workspaceId: string, tag: string) => tag),
     [groupTitle],
@@ -281,7 +289,7 @@ export function OfficeBuilding({
   const routeTarget = routeTargetId ? interactionTargetById.get(routeTargetId) : null
   const routeTargetName = routeTarget
     ? routeTarget.kind === 'employee'
-      ? officeCoworkerLabel(routeTarget.employee)
+      ? officeCoworkerCallsign(routeTarget.employee, coworkerAssets.get(routeTarget.employee.resumeId))
       : routeTarget.kind === 'operations'
         ? t('office.operationsBoard')
         : routeTarget.kind === 'floor-terminal'
@@ -348,7 +356,10 @@ export function OfficeBuilding({
   } | null = (() => {
     if (!nearbyTarget) return null
     if (nearbyTarget.kind === 'employee') {
-      const target = officeCoworkerLabel(nearbyTarget.employee)
+      const target = officeCoworkerCallsign(
+        nearbyTarget.employee,
+        coworkerAssets.get(nearbyTarget.employee.resumeId),
+      )
       return {
         icon: OFFICE_HUD_ASSETS.talkBubble,
         action: t('office.interactActionTalk'),

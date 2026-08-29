@@ -256,16 +256,18 @@ describe('OfficePage localization', () => {
     expect(screen.getByRole('dialog', { name: '小组名册 · chat' })).toBeTruthy()
     expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
 
-    const member = screen.getByRole('button', { name: /研究同事 2.*claude.*x2/i })
+    const member = screen.getByRole('button', { name: /Claude.*x2.*研究同事 2/i })
     await userEvent.click(member)
-    expect(screen.getByRole('dialog', { name: '研究同事 2' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Claude' })).toBeTruthy()
+    expect(screen.getByText('当前委托')).toBeTruthy()
+    expect(screen.getByText('研究同事 2')).toBeTruthy()
     expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
     const back = screen.getByRole('button', { name: '返回小组名册' })
     expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v2.png')
 
     await userEvent.keyboard('{Escape}')
     expect(screen.getByRole('dialog', { name: '小组名册 · chat' })).toBeTruthy()
-    const restoredMember = screen.getByRole('button', { name: /研究同事 2.*claude.*x2/i })
+    const restoredMember = screen.getByRole('button', { name: /Claude.*x2.*研究同事 2/i })
     expect(document.activeElement).toBe(restoredMember)
 
     await userEvent.keyboard('{Escape}')

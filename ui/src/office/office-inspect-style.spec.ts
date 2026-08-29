@@ -25,9 +25,9 @@ describe('Office Agent-file style contract', () => {
     )
   })
 
-  it('clamps optional long titles and uses a simple DOM-owned close mark', () => {
-    expect(css).toMatch(/\.oa-office-inspect__identity p\s*\{[\s\S]*?-webkit-line-clamp: 3/)
-    expect(css).toMatch(/\.oa-office-inspect__identity p\[data-expanded="true"\]\s*\{[\s\S]*?overflow: visible/)
+  it('keeps callsigns short, clamps optional Assignments, and uses a simple DOM-owned close mark', () => {
+    expect(css).toMatch(/\.oa-office-inspect__assignment > p\s*\{[\s\S]*?-webkit-line-clamp: 2/)
+    expect(css).toMatch(/\.oa-office-inspect__assignment p\[data-expanded="true"\]\s*\{[\s\S]*?overflow: visible/)
     expect(css).toMatch(/\.oa-office-window__close-mark\s*\{[\s\S]*?clip-path: polygon/)
   })
 

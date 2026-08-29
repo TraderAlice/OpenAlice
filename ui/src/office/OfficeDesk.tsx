@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee } from '../api/office'
-import { officeCoworkerLabel } from './label'
+import { officeCoworkerCallsign } from './label'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OFFICE_COWORKER_EMOTES, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
@@ -46,7 +46,7 @@ export function OfficeDesk({
     : null
   const label = employee
     ? t('office.employeeLabel', {
-      name: officeCoworkerLabel(employee),
+      name: officeCoworkerCallsign(employee, coworkerAsset),
       resumeId: employee.resumeId,
       mood: t(`office.mood.${employee.mood}`),
       power: t(employee.awake ? 'office.power.awake' : 'office.power.asleep'),

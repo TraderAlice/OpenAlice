@@ -29,7 +29,8 @@ describe('Office activity actors', () => {
       .get('resume-crisp-slate-terrace-d82wad')
 
     expect(actor).toMatchObject({
-      label: 'Roster scout two ready.',
+      label: expect.stringMatching(/^Grok /),
+      assignment: 'Roster scout two ready.',
       secondary: 'grok · g5 · Prediction Lab',
     })
     expect(actor?.asset.id).toMatch(/^grok-/)

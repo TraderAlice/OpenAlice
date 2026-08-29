@@ -1,11 +1,12 @@
 import type { OfficeRoomSnapshot } from '../api/office'
 import { officeCoworkerCast, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
-import { officeCoworkerLabel } from './label'
+import { officeCoworkerAssignment, officeCoworkerCallsign } from './label'
 
 export interface OfficeActivityActor {
   resumeId: string
   agent: string
   label: string
+  assignment?: string
   secondary: string
   asset: OfficeCoworkerSpriteAsset
 }
@@ -19,17 +20,20 @@ export function officeActivityActors(
     const cast = officeCoworkerCast(office.employees)
     const roomName = groupTitle(office.workspace.id, office.workspace.tag)
     for (const employee of office.employees) {
-      const label = officeCoworkerLabel(employee)
+      const asset = cast.get(employee.resumeId)!
+      const label = officeCoworkerCallsign(employee, asset)
+      const assignment = officeCoworkerAssignment(employee)
       actors.set(employee.resumeId, {
         resumeId: employee.resumeId,
         agent: employee.agent,
         label,
+        ...(assignment ? { assignment } : {}),
         secondary: [
           employee.agent,
-          employee.name !== label ? employee.name : null,
+          employee.name,
           roomName,
         ].filter(Boolean).join(' · '),
-        asset: cast.get(employee.resumeId)!,
+        asset,
       })
     }
   }

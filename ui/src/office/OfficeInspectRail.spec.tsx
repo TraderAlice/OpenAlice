@@ -61,7 +61,8 @@ describe('OfficeInspectRail', () => {
     )
 
     expect(screen.getByText('Polishing the Office floor.')).toBeTruthy()
-    expect(screen.getByText('codex')).toBeTruthy()
+    expect(screen.getByText('Codex Mechanic')).toBeTruthy()
+    expect(screen.getByText('codex · Desk mate')).toBeTruthy()
     expect(container.textContent).not.toContain('demo-resume-chat')
     expect(container.querySelector<HTMLImageElement>('.oa-office-inspect__portrait .oa-office-coworker img')?.src)
       .toContain('/office/coworkers/codex-')
@@ -120,6 +121,8 @@ describe('OfficeInspectRail', () => {
 
     const title = screen.getByText(longTitle)
     const toggle = screen.getByRole('button', { name: 'Show full title' })
+    expect(screen.getByText('Assignment')).toBeTruthy()
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toMatch(/^Codex/)
     expect(title.getAttribute('data-expanded')).toBeNull()
     expect(container.querySelector('.oa-office-inspect')?.lastElementChild)
       .toBe(container.querySelector('.oa-office-inspect__actions'))

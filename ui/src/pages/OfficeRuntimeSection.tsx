@@ -404,6 +404,12 @@ export function OfficeRuntimeSection({
               <strong>{selectedIdentity.primary}</strong>
               <span>{selectedIdentity.secondary}</span>
             </div>
+            {selectedActor?.assignment && (
+              <div className="oa-office-runtime__assignment">
+                <small>{t('office.assignment')}</small>
+                <p title={selectedActor.assignment}>{selectedActor.assignment}</p>
+              </div>
+            )}
             {selectedDetail && (
               <p className="oa-office-runtime__detail">{selectedDetail}</p>
             )}
