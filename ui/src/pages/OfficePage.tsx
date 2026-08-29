@@ -206,6 +206,7 @@ export function OfficePage() {
                   return workspace ? workspaceDisplayName(workspace) : tag
                 }}
                 selected={selected}
+                replaySeq={asOfSeq}
                 interactionSuspended={logOpen
                   || Boolean(selectedSeat)
                   || Boolean(rosterOffice)
@@ -237,6 +238,7 @@ export function OfficePage() {
                   setLogOpen(true)
                   setCabinetWorkspaceId(null)
                 }}
+                onReturnLive={() => setAsOfSeq(null)}
               />
             </div>
             {logOpen && (
@@ -268,6 +270,7 @@ export function OfficePage() {
                         lastSeq={building.lastSeq}
                         asOfSeq={asOfSeq}
                         onAsOfSeq={setAsOfSeq}
+                        onViewFloor={closeLog}
                       />
                     </details>
                     <OfficeRuntimeSection />

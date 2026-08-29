@@ -19,6 +19,38 @@ beforeEach(async () => {
 })
 
 describe('OfficeBuilding', () => {
+  it('keeps historical floors visibly in replay mode with a direct return to Live', async () => {
+    const onReturnLive = vi.fn()
+    const { container } = render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 6,
+          firstSeq: 1,
+          asOfSeq: 2,
+          offices: [],
+        }}
+        replaySeq={2}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onReturnLive={onReturnLive}
+      />,
+    )
+
+    expect(screen.getByTestId('office-building').getAttribute('data-replay')).toBe('true')
+    expect(screen.getByText('Replay floor · Seq 2')).toBeTruthy()
+    expect(container.querySelector<HTMLImageElement>('.oa-office-hud__signal img')?.src)
+      .toContain('/office/hud/occupancy-log-v2.png')
+    await userEvent.click(screen.getByRole('button', { name: 'Live' }))
+    expect(onReturnLive).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps an empty Office inside the game world with Alice centered', () => {
     render(
       <OfficeBuilding

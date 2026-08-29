@@ -52,22 +52,26 @@ export function OfficeBuilding({
   building,
   groupTitle,
   selected,
+  replaySeq = null,
   interactionSuspended = false,
   onSelectEmployee,
   onOpenEmployee,
   onOpenFiles,
   onOpenRoster,
   onOpenLog,
+  onReturnLive,
 }: {
   building: OfficeBuildingSnapshot
   groupTitle?: (workspaceId: string, tag: string) => string
   selected?: { workspaceId: string; resumeId: string } | null
+  replaySeq?: number | null
   interactionSuspended?: boolean
   onSelectEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenEmployee: (workspaceId: string, employee: OfficeFloorEmployee) => void
   onOpenFiles: (workspaceId: string, origin: 'sign' | 'cabinet') => void
   onOpenRoster: (workspaceId: string) => void
   onOpenLog: (origin: 'menu' | 'operations') => void
+  onReturnLive?: () => void
 }) {
   const { t } = useTranslation()
   const officeTime = useEffectivePreferenceSlot()
@@ -438,6 +442,7 @@ export function OfficeBuilding({
       data-testid="office-building"
       className="oa-office-building"
       data-office-time={officeTime}
+      data-replay={replaySeq != null || undefined}
     >
       <header
         data-testid="office-wall"
@@ -445,11 +450,17 @@ export function OfficeBuilding({
       >
         <div className="oa-office-hud__identity">
           <span className="oa-office-hud__signal" aria-hidden>
-            <img src={OFFICE_HUD_ASSETS.signalReceiver} alt="" style={officePixelImg} />
+            <img
+              src={replaySeq == null ? OFFICE_HUD_ASSETS.signalReceiver : OFFICE_HUD_ASSETS.occupancyLog}
+              alt=""
+              style={officePixelImg}
+            />
           </span>
           <div>
             <p className="oa-office-kicker">{t('office.commandCenter')}</p>
-            <p className="oa-office-hud__title">{t('office.liveFloor')}</p>
+            <p className="oa-office-hud__title">
+              {replaySeq == null ? t('office.liveFloor') : t('office.replayFloor', { seq: replaySeq })}
+            </p>
           </div>
         </div>
 
@@ -467,6 +478,16 @@ export function OfficeBuilding({
         </div>
 
         <div className="oa-office-hud__actions">
+          {replaySeq != null && onReturnLive && (
+            <button
+              type="button"
+              className="oa-office-replay-exit"
+              onClick={onReturnLive}
+            >
+              <span className="oa-office-live-dot" aria-hidden />
+              {t('office.replayLive')}
+            </button>
+          )}
           <DropdownMenu
             open={menuOpen}
             onOpenChange={(open) => {

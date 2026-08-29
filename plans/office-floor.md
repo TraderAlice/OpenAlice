@@ -1129,6 +1129,32 @@ Adaptive filing-cabinet follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5020 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Replay-floor mode follow-up (2026-08-29):
+
+- Played Operations board → Occupancy log → Replay as a complete workflow. The floor data already accepted an
+  `asOfSeq`, but replay existed only inside the large journal window. Closing it returned to a map still labelled
+  `Live agent floor`, with the live receiver icon and no direct route back to current state; the visible UI could
+  therefore claim Live while rendering historical data.
+- Compared changing only the title, adding a theatrical full-map rewind transition, and establishing a persistent
+  Replay mode. Chose the mode because it corrects state truth, makes the historical floor explorable, and provides
+  an immediate exit without slowing every scrub with an animation.
+- The replay panel now combines its range with GBA-style previous/next event buttons built from the native back-arrow
+  asset. This gives mouse, keyboard, and touch an exact one-sequence control while retaining rapid range scrubbing.
+  The previously named `scrubs seq` spec now actually asserts the range change callback as well as both step buttons.
+- Historical selection exposes `View replay floor`. The map HUD then uses the generated occupancy-log signal,
+  changes its title to `Replay floor · Seq N`, receives a restrained water-color replay treatment, and adds a compact
+  `Live` action beside Menu. Returning Live restores the receiver icon, title, polling mode, and removes the action.
+- Interaction model: selecting a sequence updates the historical projection while the journal remains open; View
+  replay floor closes only the journal and preserves the sequence; Live clears the sequence from either replay
+  control surface. The floor remains navigable and its normal object interactions continue to use the projected data.
+- Browser-played Live → previous event → View replay floor → Live at 1280x720 and 760x900. Seq 5 appeared in both
+  journal and HUD, the correct generated icons swapped, the dialog closed without clearing history, Live restored
+  all current-state affordances, no image broke, and both widths retained 0px horizontal overflow.
+- Focused ReplayBar, Building, and Office-page specs passed: 3 files / 15 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5021 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
