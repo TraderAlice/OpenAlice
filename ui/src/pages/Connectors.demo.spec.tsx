@@ -180,6 +180,29 @@ describe('Connector demo routes', () => {
     expect(await screen.findByText('connector-probe-demo')).toBeTruthy()
   })
 
+  it('starts and stops a configured connector from its runtime switch', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord = {
+      enabled: false,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorsPage />)
+
+    const runtimeSwitch = await screen.findByRole('switch', {
+      name: 'Start or stop the Discord connector',
+    })
+    expect(runtimeSwitch.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(runtimeSwitch)
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
+    const saved = mocks.save.mock.calls.at(-1)?.[0] as PublicConnectorConfig
+    expect(saved.serviceEnabled).toBe(true)
+    expect(saved.adapters.discord.enabled).toBe(true)
+  })
+
   it('confirms before unlinking a learned owner and keeps the token', async () => {
     const snapshot = createDemoConnectorSnapshot()
     snapshot.config.serviceEnabled = true

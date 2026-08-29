@@ -111,7 +111,7 @@ describe('TelegramDeskPanel', () => {
   it('asks for a linked bot before enabling an unbound desk', () => {
     render(<TelegramDeskPanel linked={false} label="Telegram" />)
     expect(screen.getByText(/Finish linking the bot/)).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Enable phone desk' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('defaults the unbound picker to the Ask Alice Chat workspace', () => {
@@ -127,14 +127,14 @@ describe('TelegramDeskPanel', () => {
 
   it('enables the desk in the Ask Alice workspace without a manual pick', async () => {
     render(<TelegramDeskPanel linked label="Telegram" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Enable phone desk' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }))
     await waitFor(() => expect(mocks.desk.enable).toHaveBeenCalledWith('ws-b'))
   })
 
   it('enables the desk in the selected workspace once linked', async () => {
     render(<TelegramDeskPanel linked label="Telegram" />)
     fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'ws-c' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enable phone desk' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }))
     await waitFor(() => expect(mocks.desk.enable).toHaveBeenCalledWith('ws-c'))
   })
 
@@ -142,15 +142,15 @@ describe('TelegramDeskPanel', () => {
     mocks.desk.desk = boundDesk()
     render(<TelegramDeskPanel linked label="Telegram" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open phone desk' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open chat history' }))
     expect(mocks.openOrFocus).toHaveBeenCalledWith({
       kind: 'issue-detail',
       params: { wsId: 'ws-a', id: 'telegram-phone-desk' },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Disable phone desk' }))
-    expect(screen.getByRole('heading', { name: 'Disable Telegram phone desk?' })).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Disable phone desk' }).at(-1)!)
+    fireEvent.click(screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }))
+    expect(screen.getByRole('heading', { name: 'Turn off Chat on Telegram?' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off chat' }))
     await waitFor(() => expect(mocks.desk.disable).toHaveBeenCalled())
   })
 })

@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { MessageSquare, Phone } from 'lucide-react'
+import { ChevronDown, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { TELEGRAM_DESK_CADENCES } from '../api/connectors'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -11,6 +11,7 @@ import { resolveChatWorkspaceTarget } from '../lib/chat-workspace-target'
 import { useWorkspaces } from '../contexts/workspaces-context'
 import { workspaceDisplayName } from './workspace/display'
 import { useWorkspace } from '../tabs/store'
+import { Toggle } from './Toggle'
 
 export function TelegramDeskPanel({
   connectorId = 'telegram',
@@ -30,6 +31,7 @@ export function TelegramDeskPanel({
   const [wsId, setWsId] = useState('')
   const [working, setWorking] = useState(false)
   const [confirmDisable, setConfirmDisable] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const workspaceSelectId = useId()
   const cadenceSelectId = useId()
 
@@ -60,56 +62,90 @@ export function TelegramDeskPanel({
 
   return (
     <div className="border-t border-border/60 pt-4">
-      <div className="mb-3 flex items-start gap-2.5">
-        <Phone size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
-        <div>
-          <h3 className="text-[13px] font-semibold text-foreground">{t('connectorSettings.desk.title', { name: deskName })}</h3>
-          <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-            {t('connectorSettings.desk.description', { name: deskName })}
-          </p>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <MessageSquare size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
+          <div>
+            <h3 className="text-[13px] font-semibold text-foreground">{t('connectorSettings.desk.title', { name: deskName })}</h3>
+            <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+              {t('connectorSettings.desk.description', { name: deskName })}
+            </p>
+          </div>
+        </div>
+        <div className="flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-secondary/20 px-3">
+          <span className="text-[12px] font-medium text-foreground">
+            {desk ? t('connectorSettings.desk.on') : t('connectorSettings.desk.off')}
+          </span>
+          <Toggle
+            size="sm"
+            checked={Boolean(desk)}
+            disabled={loading || working || (!desk && (!linked || !selectedWsId || !launchPreferencesLoaded))}
+            ariaLabel={t('connectorSettings.desk.toggleAria', { name: deskName })}
+            onChange={(checked) => {
+              if (!checked) {
+                setConfirmDisable(true)
+                return
+              }
+              setWorking(true)
+              void enable(selectedWsId).finally(() => setWorking(false))
+            }}
+          />
         </div>
       </div>
 
       {loading ? (
         <p className="text-[12px] text-muted-foreground">{t('connectorSettings.desk.loading')}</p>
       ) : desk ? (
-        <div className="space-y-4">
-          <p className="text-[12px] text-foreground">
+        <div className="space-y-3">
+          <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
             {t('connectorSettings.desk.boundWorkspace', {
               workspace: boundWorkspace ? workspaceDisplayName(boundWorkspace) : desk.wsId,
             })}
           </p>
-          <Field
-            label={t('connectorSettings.desk.cadence')}
-            controlId={cadenceSelectId}
-            description={t('connectorSettings.desk.cadenceDescription')}
+          <button
+            type="button"
+            className="oa-pressable flex min-h-11 w-full items-center justify-between border-y border-border/60 py-2.5 text-left text-[12px] font-medium text-foreground"
+            aria-expanded={advancedOpen}
+            onClick={() => setAdvancedOpen((open) => !open)}
           >
-            <select
-              id={cadenceSelectId}
-              className={inputClass}
-              value={currentEvery ?? ''}
-              disabled={working}
-              onChange={(event) => {
-                const next = event.target.value
-                if (!next) return
-                void saveCadence(next)
-              }}
-            >
-              {!currentEvery && <option value="">{t('connectorSettings.desk.cadenceCustom')}</option>}
-              {cadenceOptions.map((every) => (
-                <option key={every} value={every}>
-                  {t('connectorSettings.desk.cadenceEvery', { every })}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div>
-            <h4 className="text-[12px] font-medium text-foreground">{t('connectorSettings.desk.what')}</h4>
-            <p className="mb-2 mt-1 text-[11.5px] leading-5 text-muted-foreground">
-              {t('connectorSettings.desk.whatDescription')}
-            </p>
-            <MarkdownWhatEditor value={desk.issue.what} onSave={saveWhat} />
-          </div>
+            {t('connectorSettings.desk.advanced')}
+            <ChevronDown size={14} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+          {advancedOpen && (
+            <div className="oa-disclosure-enter space-y-4">
+              <Field
+                label={t('connectorSettings.desk.cadence')}
+                controlId={cadenceSelectId}
+                description={t('connectorSettings.desk.cadenceDescription')}
+              >
+                <select
+                  id={cadenceSelectId}
+                  className={inputClass}
+                  value={currentEvery ?? ''}
+                  disabled={working}
+                  onChange={(event) => {
+                    const next = event.target.value
+                    if (!next) return
+                    void saveCadence(next)
+                  }}
+                >
+                  {!currentEvery && <option value="">{t('connectorSettings.desk.cadenceCustom')}</option>}
+                  {cadenceOptions.map((every) => (
+                    <option key={every} value={every}>
+                      {t('connectorSettings.desk.cadenceEvery', { every })}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div>
+                <h4 className="text-[12px] font-medium text-foreground">{t('connectorSettings.desk.what')}</h4>
+                <p className="mb-2 mt-1 text-[11.5px] leading-5 text-muted-foreground">
+                  {t('connectorSettings.desk.whatDescription')}
+                </p>
+                <MarkdownWhatEditor value={desk.issue.what} onSave={saveWhat} />
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -122,21 +158,10 @@ export function TelegramDeskPanel({
               <MessageSquare size={14} aria-hidden />
               {t('connectorSettings.desk.open')}
             </button>
-            <button
-              type="button"
-              className="oa-pressable inline-flex min-h-11 items-center rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-destructive"
-              disabled={working}
-              onClick={() => setConfirmDisable(true)}
-            >
-              {t('connectorSettings.desk.disable')}
-            </button>
           </div>
         </div>
       ) : (
         <div className="space-y-3">
-          {!linked && (
-            <p className="text-[12px] leading-5 text-muted-foreground">{t('connectorSettings.desk.needLink')}</p>
-          )}
           {choices.length === 0 ? (
             <p className="text-[12px] text-muted-foreground">{t('connectorSettings.desk.noWorkspaces')}</p>
           ) : (
@@ -160,18 +185,9 @@ export function TelegramDeskPanel({
               </select>
             </Field>
           )}
-          <button
-            type="button"
-            className="oa-pressable inline-flex min-h-11 items-center rounded-lg bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            disabled={!linked || !selectedWsId || working || !launchPreferencesLoaded}
-            onClick={async () => {
-              setWorking(true)
-              await enable(selectedWsId)
-              setWorking(false)
-            }}
-          >
-            {working ? t('connectorSettings.desk.enabling') : t('connectorSettings.desk.enable')}
-          </button>
+          <p className="text-[11.5px] leading-5 text-muted-foreground">
+            {linked ? t('connectorSettings.desk.turnOnHint', { name: deskName }) : t('connectorSettings.desk.needLink')}
+          </p>
         </div>
       )}
 

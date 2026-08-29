@@ -9,6 +9,7 @@ import { SaveIndicator } from '../components/SaveIndicator'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { TelegramDeskPanel } from '../components/TelegramDeskPanel'
+import { Toggle } from '../components/Toggle'
 import {
   getConnectorSetupState,
   type ConnectorRuntime,
@@ -723,6 +724,7 @@ function SetupStatePanel({
   const presentation = setupPresentation(setup.stage, definition.label, command, runtime, t)
   const Icon = presentation.icon
   const running = setup.stage === 'starting' || setup.stage === 'awaiting_link' || setup.stage === 'linked' || setup.stage === 'error'
+  const canRun = setup.stage !== 'needs_credentials'
 
   return (
     <div className={`oa-status-surface border-l-2 px-3 py-2.5 ${presentation.container}`} aria-live="polite">
@@ -747,19 +749,18 @@ function SetupStatePanel({
           </div>
         </div>
         <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
-          {(setup.stage === 'ready_to_link' || setup.stage === 'linked_offline') && (
-            <button
-              type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              disabled={saving}
-              onClick={onStart}
-            >
-              <Power size={14} />
-              {setup.stage === 'ready_to_link'
-                ? t('connectorSettings.startForLinking')
-                : t('connectorSettings.startConnector')}
-            </button>
-          )}
+          <div className="mr-1 flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/60 px-3">
+            <span className="text-[12px] font-medium text-foreground">
+              {t('connectorSettings.runConnector', { name: definition.label })}
+            </span>
+            <Toggle
+              size="sm"
+              checked={running}
+              disabled={saving || !canRun}
+              ariaLabel={t('connectorSettings.runConnectorAria', { name: definition.label })}
+              onChange={(checked) => checked ? onStart() : onStop()}
+            />
+          </div>
           {setup.stage === 'linked' && runtime?.status === 'healthy' && (
             <button
               type="button"
@@ -782,16 +783,6 @@ function SetupStatePanel({
             >
               <Unlink size={14} />
               {t('connectorSettings.unlink')}
-            </button>
-          )}
-          {running && (
-            <button
-              type="button"
-              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50"
-              disabled={saving}
-              onClick={onStop}
-            >
-              {t('connectorSettings.stop')}
             </button>
           )}
         </div>
