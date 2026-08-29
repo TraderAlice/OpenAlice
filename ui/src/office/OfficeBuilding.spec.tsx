@@ -897,6 +897,14 @@ describe('OfficeBuilding', () => {
         onOpenLog={vi.fn()}
       />,
     )
+    const suspendedBuilding = screen.getByTestId('office-building')
+    const suspendedControls = suspendedBuilding.querySelector<HTMLElement>('.oa-office-map-controls')
+    const suspendedDpad = suspendedBuilding.querySelector<HTMLElement>('.oa-office-touch-dpad')
+    expect(suspendedBuilding.dataset.controlsSuspended).toBe('true')
+    expect(suspendedControls?.getAttribute('aria-hidden')).toBe('true')
+    expect(suspendedControls?.hasAttribute('inert')).toBe(true)
+    expect(suspendedDpad?.getAttribute('aria-hidden')).toBe('true')
+    expect(suspendedDpad?.hasAttribute('inert')).toBe(true)
     expect(screen.queryByRole('status')).toBeNull()
     expect(board.dataset.nearby).toBe('false')
 
@@ -911,6 +919,7 @@ describe('OfficeBuilding', () => {
         onOpenLog={vi.fn()}
       />,
     )
+    expect(screen.getByTestId('office-building').dataset.controlsSuspended).toBeUndefined()
     await userEvent.click(board)
     await waitFor(() => expect(onOpenRoster).toHaveBeenCalledWith('chat-full'))
   })

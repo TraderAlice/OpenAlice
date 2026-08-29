@@ -2163,6 +2163,27 @@ Manual-control teaching follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 611-file Vitest run (5,055 passing; one file and nine tests skipped), and the UI production
   build all passed.
 
+Overlay control-ownership follow-up (2026-08-29):
+
+- Audited the remaining Office visual seams in source and in the rendered pause menu, Agent file, filing cabinet, and
+  occupancy surfaces. Their visible icons are already native pixel assets; no SVG, Unicode-arrow, emoji, or generic icon
+  replacement remained to justify another asset-generation pass.
+- Real browser play exposed the stronger discontinuity: opening an Agent file or filing cabinet correctly dimmed and
+  suspended the map, but the bright `MOVE · WASD / ARROWS` strip and camera-reset button remained on top of the paused
+  scene. The same field controls remained visible behind the pause menu, implying actions that the interaction model had
+  already disabled.
+- Compared leaving the controls dimmed, replacing them with a `PAUSED` label, and giving the active game menu/window
+  exclusive ownership. Chose exclusive ownership: when an Office overlay, pause menu, or departure transition suspends
+  the floor, desktop map controls, the coarse-pointer D-pad, and the touch action button become hidden, pointer-inert,
+  and absent from the accessibility tree. The world remains visible as spatial context; closing the overlay restores the
+  correct field-control state at the same Alice position.
+- Browser-played cabinet open/close and the pause menu at 1280x900, 390x844, and 844x390. Controls left the scene without
+  layout movement or empty chrome, the modal/menu remained dominant, and cabinet close restored the nearby `FILES`
+  prompt plus the camera control rather than stale movement teaching.
+- Focused OfficeBuilding and responsive-style specs passed: 2 files / 20 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 611-file Vitest run (5,055 passing; one file and nine tests skipped), and the UI production
+  build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

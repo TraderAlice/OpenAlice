@@ -3997,6 +3997,16 @@
   opacity: 0.42;
 }
 
+.oa-office-building[data-controls-suspended='true'] :is(
+  .oa-office-map-controls,
+  .oa-office-touch-dpad,
+  .oa-office-touch-action
+) {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 @keyframes oa-office-interact-in {
   from {
     opacity: 0;

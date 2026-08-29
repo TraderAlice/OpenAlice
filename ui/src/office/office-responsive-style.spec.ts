@@ -83,6 +83,7 @@ describe('Office responsive style contract', () => {
     expect(coarseTouchCss).toContain("[data-input='touch']")
     expect(coarseTouchCss).toContain('.oa-office-map-controls__move')
     expect(css.match(/\.oa-office-map-controls\[data-action-ready='true'\]/g)).toHaveLength(2)
+    expect(css).toContain(".oa-office-building[data-controls-suspended='true'] :is(")
   })
 
   it('keeps the live-floor identity and Menu on the first phone HUD row', () => {

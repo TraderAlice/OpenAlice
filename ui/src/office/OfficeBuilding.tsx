@@ -128,6 +128,7 @@ export function OfficeBuilding({
     workspaceId: string
     roomName: string
   } | null>(null)
+  const controlsSuspended = floorInteractionSuspended || Boolean(departingWorkspace)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const viewportRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -614,6 +615,7 @@ export function OfficeBuilding({
       className="oa-office-building"
       data-office-time={officeTime}
       data-replay={replaySeq != null || undefined}
+      data-controls-suspended={controlsSuspended || undefined}
     >
       <header
         data-testid="office-wall"
@@ -1099,6 +1101,8 @@ export function OfficeBuilding({
           className="oa-office-map-controls"
           data-learned={controlsLearned}
           data-action-ready={Boolean(nearbyTarget) || undefined}
+          aria-hidden={controlsSuspended || undefined}
+          inert={controlsSuspended || undefined}
         >
           <span
             className="oa-office-map-controls__move"
@@ -1116,7 +1120,13 @@ export function OfficeBuilding({
             />
           </button>
         </div>
-        <div className="oa-office-touch-dpad" role="group" aria-label={t('office.touchControls')}>
+        <div
+          className="oa-office-touch-dpad"
+          role="group"
+          aria-label={t('office.touchControls')}
+          aria-hidden={controlsSuspended || undefined}
+          inert={controlsSuspended || undefined}
+        >
           <img src={OFFICE_HUD_ASSETS.movePad} alt="" aria-hidden style={officePixelImg} />
           {([
             ['up', t('office.moveAliceUp')],
@@ -1148,6 +1158,7 @@ export function OfficeBuilding({
         <button
           type="button"
           className="oa-office-touch-action"
+          aria-hidden={controlsSuspended || undefined}
           data-ready={Boolean(nearbyTarget) && !selected && !departingWorkspace && !floorInteractionSuspended}
           disabled={!nearbyTarget || Boolean(selected) || Boolean(departingWorkspace) || floorInteractionSuspended}
           aria-label={nearbyTarget && promptPresentation
