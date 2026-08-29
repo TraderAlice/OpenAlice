@@ -83,7 +83,9 @@ describe('OfficeBuilding', () => {
     const workspaceSign = screen.getByRole('button', { name: /Enter chat workspace/ }) as HTMLButtonElement
     const occupiedDesks = screen.getAllByTestId(/^office-desk-/) as HTMLButtonElement[]
     const cabinet = screen.getByRole('button', { name: 'Filing cabinet · chat' }) as HTMLButtonElement
-    const roster = screen.getByRole('button', { name: 'Team roster · chat' }) as HTMLButtonElement
+    const roster = screen.getByRole('button', {
+      name: 'Team roster · chat · 2 more teammates',
+    }) as HTMLButtonElement
     const terminal = screen.getByRole('button', { name: 'Floor terminal' }) as HTMLButtonElement
     const operations = screen.getByRole('button', { name: 'Operations board' }) as HTMLButtonElement
 
@@ -983,14 +985,16 @@ describe('OfficeBuilding', () => {
     )
 
     expect(screen.getAllByTestId(/^office-desk-/)).toHaveLength(4)
-    const board = screen.getByRole('button', { name: 'Team roster · chat' })
+    const board = screen.getByRole('button', { name: 'Team roster · chat · 2 more teammates' })
     expect(board.querySelector('img')?.getAttribute('src')).toBe('/office/furniture/personnel-board-v2.png')
+    expect(board.querySelector('.oa-office-pod__roster-count')?.textContent).toBe('+2')
     const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
     map.focus()
     await userEvent.keyboard('aw')
-    const rosterPrompt = screen.getByRole('status', { name: 'View chat roster' })
+    const rosterPrompt = screen.getByRole('status', { name: 'View chat roster · 2 more teammates' })
     expect(rosterPrompt.querySelector('img')?.getAttribute('src'))
       .toBe('/office/hud/roster-badge-v2.png')
+    expect(rosterPrompt.textContent).toContain('2 more teammates')
     expect(board.dataset.nearby).toBe('true')
 
     view.rerender(

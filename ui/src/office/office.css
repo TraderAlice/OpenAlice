@@ -4195,6 +4195,33 @@
   filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent));
 }
 
+.oa-office-pod__roster-count {
+  position: absolute;
+  z-index: 2;
+  top: -7px;
+  right: -10px;
+  display: grid;
+  min-width: 24px;
+  height: 18px;
+  place-items: center;
+  padding: 0 4px;
+  border: 2px solid var(--gba-paper);
+  border-radius: 2px;
+  color: var(--gba-paper);
+  background: var(--gba-water);
+  box-shadow: 2px 2px 0 var(--gba-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.oa-office-pod__roster[data-side="right"] .oa-office-pod__roster-count {
+  right: auto;
+  left: -10px;
+}
+
 .oa-office-pod__roster:not(:disabled):hover {
   transform: translateY(-3px) scale(1.06);
   filter: brightness(1.08);

@@ -2781,6 +2781,25 @@ In-floor service-station follow-up (2026-08-30):
   full 617-file Vitest run (5,116 passing; one file and nine tests skipped), and the production build; the existing
   large-chunk advisory is unchanged.
 
+Roster-overflow landmark follow-up (2026-08-30):
+
+- Replayed the real eight-person Prediction pod, its full roster, and two Agent files. The four-desk cap remained the
+  correct spatial choice documented by the original roster-board increment, but the map itself gave no explanation for
+  the sign's `0/8 awake` count: the unlabelled personnel board could still read as scenery rather than the home of four
+  additional coworkers.
+- Reconsidered expanding the pod, rotating desk occupants, placing a count on the Workspace sign, and labelling the
+  existing board. Chose the board count: it preserves stable desk identity and the readable pod footprint while making
+  the existing GBA-party interaction legible before the player opens it.
+- Large-team personnel boards now carry a compact inward-facing `+N` pixel badge, expose the additional teammate count
+  in their accessible name and tooltip, and pass that count through the spatial target model so the nearby game prompt
+  reads `ROSTER / N more`. The full roster and Agent-file navigation remain unchanged.
+- Browser-played the real eight-person Prediction pod. Its board showed `+4` without covering a coworker or the sign,
+  auto-walk retained the target outline, the nearby prompt read `ROSTER / 4 more`, opening still produced all eight team
+  members, and closing restored focus to `Team roster · office-lab-prediction · 4 more teammates`. Focused Building,
+  Office-page, and interaction-target specs passed (3 files / 30 tests), together with root/UI TypeScript, the full
+  617-file Vitest run (5,117 passing; one file and nine tests skipped), and the production build; the existing
+  large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

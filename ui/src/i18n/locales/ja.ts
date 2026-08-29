@@ -1931,6 +1931,7 @@ export const ja: Resources = {
     newsStationHint: '近づいて新しく取り込まれたニュースを確認します。',
     serviceNeedsAttention: '{{name}} · 新しいアクティビティ',
     roster: 'チーム名簿',
+    rosterAdditional: 'ほか {{count}} 人',
     rosterHint: 'この Workspace グループに所属するすべての Session を表示します。',
     rosterCount_one: '{{count}} 人のメンバー',
     rosterCount_other: '{{count}} 人のメンバー',

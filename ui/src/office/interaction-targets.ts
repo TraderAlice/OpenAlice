@@ -54,6 +54,7 @@ export type OfficeInteractionTarget =
     y: number
     workspaceId: string
     roomName: string
+    additionalCount: number
   }
   | {
     id: 'operations'
@@ -131,6 +132,7 @@ export function officeInteractionTargets(
         y: pod.y + rosterCenter.y,
         workspaceId: group.workspace.id,
         roomName,
+        additionalCount: group.employees.length - visibleEmployeesForOffice(group.employees).length,
       })
     }
   }

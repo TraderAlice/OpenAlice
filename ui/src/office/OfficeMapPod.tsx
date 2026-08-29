@@ -46,6 +46,7 @@ export function OfficeMapPod({
   const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
   const visibleEmployees = visibleEmployeesForOffice(group.employees)
   const slots = deskSlotsForOffice(visibleEmployees, 4)
+  const additionalCount = Math.max(0, group.employees.length - visibleEmployees.length)
   const activeCount = group.employees.filter((employee) => employee.mood !== 'idle').length
   const awakeCount = group.employees.filter((employee) => employee.awake).length
   const statusLabel = interactionDisabled
@@ -166,7 +167,7 @@ export function OfficeMapPod({
         >
           <img src={OFFICE_FURNITURE.generated.cabinet} alt="" style={officePixelImg} />
         </button>
-        {group.employees.length > 4 && (
+        {additionalCount > 0 && (
           <button
             id={`office-roster-${group.workspace.id}`}
             type="button"
@@ -181,10 +182,15 @@ export function OfficeMapPod({
             data-route={routeTargetId === `roster:${group.workspace.id}`}
             disabled={interactionDisabled}
             onClick={() => onOpenRoster(group.workspace.id)}
-            aria-label={`${t('office.roster')} · ${title}`}
-            title={interactionDisabled ? t('office.replayLockedHint') : t('office.rosterHint')}
+            aria-label={`${t('office.roster')} · ${title} · ${t('office.rosterAdditional', {
+              count: additionalCount,
+            })}`}
+            title={interactionDisabled
+              ? t('office.replayLockedHint')
+              : `${t('office.rosterHint')} ${t('office.rosterAdditional', { count: additionalCount })}`}
           >
             <img src={OFFICE_FURNITURE.generated.personnelBoard} alt="" style={officePixelImg} />
+            <span className="oa-office-pod__roster-count" aria-hidden>+{additionalCount}</span>
           </button>
         )}
       </div>

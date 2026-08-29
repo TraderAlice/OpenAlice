@@ -393,7 +393,7 @@ export function OfficeBuilding({
         icon: OFFICE_HUD_ASSETS.rosterBadge,
         action: t('office.interactActionRoster'),
         label: t('office.interactRoster', { name: nearbyTarget.roomName }),
-        detail: null,
+        detail: t('office.rosterAdditional', { count: nearbyTarget.additionalCount }),
       }
     }
     if (nearbyTarget.kind === 'floor-terminal') {

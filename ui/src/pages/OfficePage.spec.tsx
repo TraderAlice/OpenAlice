@@ -320,7 +320,7 @@ describe('OfficePage localization', () => {
 
     const { container } = render(<OfficePage />)
 
-    const rosterBoard = screen.getByRole('button', { name: '小组名册 · chat' })
+    const rosterBoard = screen.getByRole('button', { name: '小组名册 · chat · 还有 2 位同事' })
     await userEvent.click(rosterBoard)
     expect(screen.getByRole('dialog', { name: '小组名册 · chat' })).toBeTruthy()
     expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)

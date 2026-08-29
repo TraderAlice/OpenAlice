@@ -79,6 +79,21 @@ describe('Office interaction targets', () => {
     expect(nearestOfficeInteractionTarget({ x: 0, y: 0 }, 'down', targets)).toBeNull()
   })
 
+  it('records how many teammates are represented by a large group roster', () => {
+    const largeGroup = {
+      ...group,
+      employees: Array.from({ length: 7 }, (_, index) => ({
+        ...group.employees[0]!,
+        resumeId: `resume-${index + 1}`,
+      })),
+    }
+    const layout = layoutOfficeMap([{ id: 'chat-1', harness: 'chat' }])
+
+    expect(officeInteractionTargets([largeGroup], layout, (_id, tag) => tag)
+      .find((target) => target.kind === 'roster'))
+      .toMatchObject({ id: 'roster:chat-1', additionalCount: 3 })
+  })
+
   it('selects only an object in Alice’s facing cone', () => {
     const targets = [
       {
@@ -168,6 +183,7 @@ describe('Office interaction targets', () => {
           y: 0,
           workspaceId: 'test',
           roomName: 'Test',
+          additionalCount: 1,
         },
       },
       {
@@ -247,6 +263,7 @@ describe('Office interaction targets', () => {
         kind: 'roster',
         x: layout.pods[0]!.x + 270,
         y: layout.pods[0]!.y + 83,
+        additionalCount: 1,
       }))
   })
 

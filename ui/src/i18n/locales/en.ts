@@ -1963,6 +1963,7 @@ export const en = {
     newsStationHint: 'Walk over to review newly ingested news.',
     serviceNeedsAttention: '{{name}} · New activity',
     roster: 'Team roster',
+    rosterAdditional: '{{count}} more teammates',
     rosterHint: 'View every Session assigned to this Workspace group.',
     rosterCount_one: '{{count}} team member',
     rosterCount_other: '{{count}} team members',
