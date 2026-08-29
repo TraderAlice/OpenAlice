@@ -2,10 +2,14 @@
 
 Status: Active — design accepted, feasibility work not started
 
-Delivery mode: Serial / interactive. This changes a released install and
-long-running Runtime entry path. Each accepted increment starts from current
-`dev`, lands through one focused PR to `dev`, and updates this plan with the
-verification actually completed.
+Delivery mode: Serial / interactive on the dedicated
+`codex/usability-improvements` integration branch. This changes a released
+install and long-running Runtime entry path. Each increment starts from the
+latest accepted integration tip, lands through one focused PR to that branch,
+and updates this plan with the verification actually completed. Keep only one
+implementation PR active at a time. After end-to-end acceptance, promote the
+coherent usability branch to `dev` through one reviewable PR; do not drip
+partially usable packaging internals directly into `dev`.
 
 Parent product plan: [[plans/shell-first-cli-supervisor.md]]. This plan
 supersedes only that plan's CLI distribution mechanics: managed Pi, the host
@@ -538,6 +542,13 @@ pnpm electron:smoke:pty
 pnpm electron:smoke:packaged --temp-data
 ```
 
+Use the local OrbStack Docker engine as the default clean Linux harness for
+installer, remote, package-manager, repeat-install, upgrade, rollback, and
+uninstall checks. Containers must use isolated temporary homes and no host
+credentials or broker state. OrbStack validates Linux behavior efficiently,
+but it does not replace native macOS acceptance or Windows PowerShell,
+filesystem-locking, PATH, and executable-signing checks.
+
 The Bun-specific acceptance harness must additionally prove:
 
 - the installed command runs with `node`, `npm`, and `bun` absent from PATH;
@@ -625,3 +636,8 @@ This plan is complete only when:
   npm, Bun, Homebrew, and AUR/paru. All channels consume the same accepted
   platform artifacts; the installing channel retains update/uninstall
   ownership, and package-manager variants do not rebuild OpenAlice.
+- 2026-08-29: Established `codex/usability-improvements` as the dedicated
+  serial integration lane. Focused implementation PRs target that branch one
+  at a time, then the accepted initiative is promoted coherently to `dev`.
+  OrbStack Docker is the default clean Linux installation harness, with native
+  macOS and Windows acceptance retained for platform-specific behavior.
