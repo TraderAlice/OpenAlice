@@ -501,29 +501,37 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
-          ASSET_BASE_URL=$(node -e "const{pathToFileURL}=require('url');const{resolve}=require('path');process.stdout.write(pathToFileURL(resolve('dist/release-cli')).href)")
+          CURRENT_ASSET_BASE_URL=$(node -e "const{pathToFileURL}=require('url');const{resolve}=require('path');process.stdout.write(pathToFileURL(resolve('dist/release-cli')).href)")
+          node scripts/prepare-cli-previous-release.mjs \
+            --input-dir dist/release-cli \
+            --output-dir dist/cli-package-homebrew-previous \
+            --version "$VERSION"
+          PREVIOUS_VERSION=$(node -p "require('./dist/cli-package-homebrew-previous/fixture.json').previousVersion")
+          PREVIOUS_ASSET_BASE_URL=$(node -e "const{pathToFileURL}=require('url');const{resolve}=require('path');process.stdout.write(pathToFileURL(resolve('dist/cli-package-homebrew-previous')).href)")
           node scripts/build-cli-package-channels.mjs \
             --input-dir dist/release-cli \
-            --output-dir dist/cli-package-homebrew-smoke \
+            --output-dir dist/cli-package-homebrew-current \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --asset-base-url "$ASSET_BASE_URL" \
+            --asset-base-url "$CURRENT_ASSET_BASE_URL" \
             --require-all
-          trap 'brew uninstall --force openalice >/dev/null 2>&1 || true' EXIT
-          brew install --formula dist/cli-package-homebrew-smoke/homebrew/openalice.rb
-          EXECUTABLE="$(brew --prefix openalice)/bin/openalice"
-          HOME_ROOT="$RUNNER_TEMP/homebrew-home"
-          RUNTIME_HOME="$RUNNER_TEMP/homebrew-runtime"
-          mkdir -p "$HOME_ROOT"
-          VERSION_JSON=$(env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" version --json)
-          VERSION_JSON="$VERSION_JSON" EXPECTED_VERSION="$VERSION" node -e "const v=JSON.parse(process.env.VERSION_JSON);if(v.version!==process.env.EXPECTED_VERSION||v.installSource?.method!=='brew')process.exit(1)"
-          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" up --home "$RUNTIME_HOME" --no-update-check --wait 120 --json
-          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" doctor --home "$RUNTIME_HOME" --json | grep -Fq 'Homebrew owns OpenAlice updates'
-          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" down --home "$RUNTIME_HOME" --json
-          env -i HOME="$HOME_ROOT" PATH=/usr/bin:/bin "$EXECUTABLE" uninstall --yes | grep -Fq 'brew uninstall traderalice/tap/openalice'
-          test -x "$EXECUTABLE"
-          brew uninstall --force openalice
-          test ! -e "$EXECUTABLE"
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/cli-package-homebrew-previous \
+            --output-dir dist/cli-package-homebrew-previous-channels \
+            --version "$PREVIOUS_VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url "$PREVIOUS_ASSET_BASE_URL" \
+            --require-all
+          CURRENT_ID=$(node -e "const f=require('./dist/cli-package-homebrew-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='darwin'&&t.arch==='${{ matrix.arch }}').contentIdentity)")
+          PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-homebrew-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='darwin'&&t.arch==='${{ matrix.arch }}').previousContentIdentity)")
+          node scripts/cli-system-package-manager-smoke.mjs \
+            --manager brew \
+            --previous-version "$PREVIOUS_VERSION" \
+            --current-version "$VERSION" \
+            --previous-content-identity "$PREVIOUS_ID" \
+            --current-content-identity "$CURRENT_ID" \
+            --previous-package dist/cli-package-homebrew-previous-channels/homebrew/openalice.rb \
+            --current-package dist/cli-package-homebrew-current/homebrew/openalice.rb
 
   accept-cli-aur:
     name: Accept Arch/AUR CLI package
@@ -550,34 +558,57 @@ jobs:
       - name: Build, install, and run the generated AUR package
         shell: bash
         run: |
+          set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
+          node scripts/prepare-cli-previous-release.mjs \
+            --input-dir dist/release-cli \
+            --output-dir dist/cli-package-aur-previous \
+            --version "$VERSION"
+          PREVIOUS_VERSION=$(node -p "require('./dist/cli-package-aur-previous/fixture.json').previousVersion")
           node scripts/build-cli-package-channels.mjs \
             --input-dir dist/release-cli \
-            --output-dir dist/cli-package-aur-smoke \
+            --output-dir dist/cli-package-aur-current \
             --version "$VERSION" \
             --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --asset-base-url file:///work/dist/release-cli \
             --require-all
+          node scripts/build-cli-package-channels.mjs \
+            --input-dir dist/cli-package-aur-previous \
+            --output-dir dist/cli-package-aur-previous-channels \
+            --version "$PREVIOUS_VERSION" \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --asset-base-url file:///work/dist/cli-package-aur-previous \
+            --require-all
+          CURRENT_ID=$(node -e "const f=require('./dist/cli-package-aur-current/cli-package-channels.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='x64').contentIdentity)")
+          PREVIOUS_ID=$(node -e "const f=require('./dist/cli-package-aur-previous/fixture.json');process.stdout.write(f.targets.find(t=>t.platform==='linux'&&t.arch==='x64').previousContentIdentity)")
           docker run --rm \
             --platform linux/amd64 \
+            --env CURRENT_ID="$CURRENT_ID" \
+            --env CURRENT_VERSION="$VERSION" \
+            --env PREVIOUS_ID="$PREVIOUS_ID" \
+            --env PREVIOUS_VERSION="$PREVIOUS_VERSION" \
             --volume "$GITHUB_WORKSPACE:/work" \
-            --workdir /work/dist/cli-package-aur-smoke/aur \
+            --workdir /work \
             archlinux:base-devel@sha256:68bfc3b0d277b08a99101dc9b94aaa03e5ae70cf1b4fb965c03b2b87b915760d \
             bash -euxo pipefail -c '
+              pacman -Syu --noconfirm nodejs
               useradd --create-home builder
-              chown -R builder:builder /work/dist/cli-package-aur-smoke
-              su builder -c "makepkg --nodeps --noconfirm"
-              pacman -U --noconfirm ./openalice-bin-*.pkg.tar.zst
-              mkdir -p /tmp/openalice-home /tmp/openalice-runtime
-              VERSION_JSON=$(env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice version --json)
-              printf "%s" "$VERSION_JSON" | grep -Eq "\"method\"[[:space:]]*:[[:space:]]*\"aur\""
-              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice up --home /tmp/openalice-runtime --no-update-check --wait 120 --json
-              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice doctor --home /tmp/openalice-runtime --json | grep -Fq "pacman/AUR owns OpenAlice updates"
-              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice down --home /tmp/openalice-runtime --json
-              env -i HOME=/tmp/openalice-home PATH=/usr/bin:/bin /usr/bin/openalice uninstall --yes | grep -Fq "paru -Rns openalice-bin"
-              test -x /usr/bin/openalice
-              pacman -Rns --noconfirm openalice-bin
-              test ! -e /usr/bin/openalice
+              chown -R builder:builder \
+                /work/dist/cli-package-aur-current \
+                /work/dist/cli-package-aur-previous \
+                /work/dist/cli-package-aur-previous-channels
+              su builder -c "cd /work/dist/cli-package-aur-previous-channels/aur && makepkg --nodeps --noconfirm"
+              mv /work/dist/cli-package-aur-previous-channels/aur/openalice-bin-*.pkg.tar.zst /tmp/openalice-previous.pkg.tar.zst
+              su builder -c "cd /work/dist/cli-package-aur-current/aur && makepkg --nodeps --noconfirm"
+              mv /work/dist/cli-package-aur-current/aur/openalice-bin-*.pkg.tar.zst /tmp/openalice-current.pkg.tar.zst
+              /usr/bin/node /work/scripts/cli-system-package-manager-smoke.mjs \
+                --manager aur \
+                --previous-version "$PREVIOUS_VERSION" \
+                --current-version "$CURRENT_VERSION" \
+                --previous-content-identity "$PREVIOUS_ID" \
+                --current-content-identity "$CURRENT_ID" \
+                --previous-package /tmp/openalice-previous.pkg.tar.zst \
+                --current-package /tmp/openalice-current.pkg.tar.zst
             '
 
   # Broker Packs are release artifacts, not inputs to the desktop package. Build

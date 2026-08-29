@@ -67,7 +67,11 @@ export function packCliNpmPackages({
 function pack(packageRoot, outputRoot, npm) {
   const result = spawnSync(npm, [
     'pack', packageRoot, '--json', '--pack-destination', outputRoot,
-  ], { encoding: 'utf8', stdio: 'pipe' })
+  ], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+    shell: process.platform === 'win32',
+  })
   if (result.error) throw result.error
   if (result.status !== 0) {
     throw new Error(`npm pack failed for ${packageRoot}:\n${result.stdout}\n${result.stderr}`)

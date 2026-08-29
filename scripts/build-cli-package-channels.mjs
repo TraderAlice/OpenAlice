@@ -222,11 +222,13 @@ function homebrewTargetBlock(version, target, assetBaseUrl) {
       sha256 "${target.checksum}"
 
       def install
-        bin.install "bin/openalice"
-        share.install "share/openalice"
-        (share/"openalice").install "release.json"
-        prefix.install "release.json"
-        prefix.install "THIRD_PARTY_NOTICES.md"
+        release = buildpath
+        release_metadata = (release/"release.json").read
+        bin.install release/"bin/openalice"
+        share.install release/"share/openalice"
+        prefix.install release/"release.json"
+        (share/"openalice/release.json").write(release_metadata)
+        prefix.install release/"THIRD_PARTY_NOTICES.md"
         metadata = JSON.parse("${json}")
         metadata["installedAt"] = Time.now.utc.iso8601
         content = JSON.pretty_generate(metadata) + "\\n"
