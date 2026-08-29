@@ -1674,6 +1674,26 @@ Agent-file record exit follow-up (2026-08-29):
 - Focused InspectRail and CabinetWindow specs passed: 2 files / 4 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`,
   the 606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Occupancy-log menu cursor follow-up (2026-08-29):
+
+- Played the Occupancy log at 1280x720 and found every event row ending in the same Unicode `▶`. The glyph was the
+  last non-material control inside the otherwise generated log UI, and showing it on every row made a single-choice
+  detail list read like six navigation links instead of an RPG selection menu.
+- Compared keeping a cursor on every row, revealing it only on hover, and using one persistent current-item cursor
+  with a lighter hover/focus preview. Chose the current-item model because it preserves keyboard discovery while
+  keeping the selected event and right-hand detail causally obvious.
+- Generated a transparent 16-bit mechanical right-pointing cursor with dark ink, cream highlight, and cyan interior,
+  then alpha-cropped and nearest-neighbor packaged it as `journal-cursor-v1.png` on a native 32x32 canvas. The runtime
+  index replaces the text glyph with the bitmap, reserves a stable 22px column, and uses a two-step three-pixel idle
+  nudge only for the selected row. Reduced-motion removes both the nudge and cursor transition.
+- Browser-played selection from Seq 6 to Seq 5 at 1280x720; the generated cursor followed the pressed row and its
+  detail. At 390x844, the cursor remained a complete 22x22 control inside a 301x58 event row, the 328px journal list
+  retained spare horizontal space, and the page stayed exactly 390px wide without overflow.
+- Focused OfficeRuntimeSection and HUD-asset specs passed: 2 files / 4 tests. The asset contract now records the
+  cursor's intentional 32x32 native size alongside 48px command icons, the 72px action button, and 96px move pad.
+  `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest run (5,029 passing; one file and nine tests skipped),
+  and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

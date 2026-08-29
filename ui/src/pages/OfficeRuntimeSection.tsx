@@ -168,7 +168,13 @@ export function OfficeRuntimeSection() {
                     <b>#{String(event.seq).padStart(4, '0')}</b>
                     <time dateTime={new Date(event.ts).toISOString()}>{formatRelativeTime(event.ts)}</time>
                   </span>
-                  <i aria-hidden>▶</i>
+                  <img
+                    className="oa-office-runtime__cursor"
+                    src={OFFICE_HUD_ASSETS.journalCursor}
+                    alt=""
+                    aria-hidden
+                    style={officePixelImg}
+                  />
                 </button>
               </li>
             )

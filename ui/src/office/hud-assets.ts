@@ -13,4 +13,5 @@ export const OFFICE_HUD_ASSETS = {
   drawerRecord: '/office/hud/drawer-record-v2.png',
   talkBubble: '/office/hud/talk-bubble-v2.png',
   windowBack: '/office/hud/window-back-v2.png',
+  journalCursor: '/office/hud/journal-cursor-v1.png',
 } as const

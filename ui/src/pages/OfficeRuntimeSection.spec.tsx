@@ -66,6 +66,10 @@ describe('OfficeRuntimeSection', () => {
       .toBe('true')
     expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
       .toContain('/office/log/lifecycle-v1.png')
+    expect(screen.getByRole('button', { name: /started.*@resume-alice.*#0001/i })
+      .querySelector<HTMLImageElement>('.oa-office-runtime__cursor')?.src)
+      .toContain('/office/hud/journal-cursor-v1.png')
+    expect(container.textContent).not.toContain('▶')
   })
 
   it('renders a headless tool block and completion reply', async () => {
@@ -113,7 +117,7 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.getByText(/1 text · 1 tools/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /stopped.*#0002/i }).getAttribute('aria-pressed'))
       .toBe('true')
-    expect(Array.from(container.querySelectorAll<HTMLImageElement>('.oa-office-runtime__index img'))
+    expect(Array.from(container.querySelectorAll<HTMLImageElement>('.oa-office-runtime__index button > img:first-child'))
       .map((image) => image.src)).toEqual([
       expect.stringContaining('/office/log/lifecycle-v1.png'),
       expect.stringContaining('/office/log/tool-action-v1.png'),
@@ -124,6 +128,9 @@ describe('OfficeRuntimeSection', () => {
     expect(screen.queryByText('Desk is clear.')).toBeNull()
     expect(screen.getByRole('button', { name: /tool.*#0001/i }).getAttribute('aria-pressed'))
       .toBe('true')
+    expect(screen.getByRole('button', { name: /tool.*#0001/i })
+      .querySelector<HTMLImageElement>('.oa-office-runtime__cursor')?.src)
+      .toContain('/office/hud/journal-cursor-v1.png')
     expect(container.querySelector<HTMLImageElement>('.oa-office-runtime__badge img')?.src)
       .toContain('/office/log/tool-action-v1.png')
 

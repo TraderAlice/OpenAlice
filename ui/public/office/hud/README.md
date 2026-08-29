@@ -16,11 +16,13 @@ Live labels, button behavior, focus rings, and accessible names remain DOM-owned
 - `drawer-record-v2.png` — open a provenance record from an Agent desk
 - `talk-bubble-v2.png` — nearby conversation action in the compact world prompt
 - `window-back-v2.png` — return from an Agent file to its originating team roster
+- `journal-cursor-v1.png` — selected-event pointer in the Occupancy log menu
 
 All assets use `docs/assets/office/style-master-v1.png` as their visual reference.
 The command glyphs are separate transparent images so their silhouettes remain
 legible at UI size and their accessible labels stay DOM-owned. The generated
 masters are packaged onto native RGBA canvases with nearest-neighbor sampling and
 hard alpha. Command icons use 48x48 canvases; the primary touch action uses 72x72;
-the movement pad uses its exact 96x96 touch-control canvas. Full-resolution
+the movement pad uses its exact 96x96 touch-control canvas; the journal cursor uses
+a compact 32x32 canvas. Full-resolution
 generated sources are not shipped.

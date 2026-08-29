@@ -23,13 +23,20 @@ describe('OFFICE_HUD_ASSETS', () => {
     expect(OFFICE_HUD_ASSETS.drawerRecord).toBe('/office/hud/drawer-record-v2.png')
     expect(OFFICE_HUD_ASSETS.talkBubble).toBe('/office/hud/talk-bubble-v2.png')
     expect(OFFICE_HUD_ASSETS.windowBack).toBe('/office/hud/window-back-v2.png')
+    expect(OFFICE_HUD_ASSETS.journalCursor).toBe('/office/hud/journal-cursor-v1.png')
 
     for (const [name, url] of Object.entries(OFFICE_HUD_ASSETS)) {
       const bytes = readFileSync(resolve(publicRoot, url.replace(/^\//, '')))
       expect([...bytes.subarray(0, 8)]).toEqual(PNG_MAGIC)
       expect(bytes[25]).toBe(6) // PNG color type 6: RGBA.
       expect(bytes.byteLength).toBeGreaterThan(1000)
-      const expectedSize = name === 'movePad' ? 96 : name === 'actionButton' ? 72 : 48
+      const expectedSize = name === 'movePad'
+        ? 96
+        : name === 'actionButton'
+          ? 72
+          : name === 'journalCursor'
+            ? 32
+            : 48
       expect(bytes.readUInt32BE(16)).toBe(expectedSize)
       expect(bytes.readUInt32BE(20)).toBe(expectedSize)
     }

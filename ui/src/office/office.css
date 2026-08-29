@@ -1319,7 +1319,7 @@
   display: grid;
   width: 100%;
   min-height: 58px;
-  grid-template-columns: 42px minmax(0, 1fr) auto 10px;
+  grid-template-columns: 42px minmax(0, 1fr) auto 22px;
   align-items: center;
   gap: 7px;
   padding: 4px 6px;
@@ -1395,9 +1395,26 @@
   font-weight: 900;
 }
 
-.oa-office-runtime__index i {
-  color: var(--gba-water);
-  font-style: normal;
+.oa-office-runtime__index .oa-office-runtime__cursor {
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+  object-fit: contain;
+  transform: translateX(-2px);
+  transition: opacity 80ms steps(2, end);
+}
+
+.oa-office-runtime__index li button:is(:hover, :focus-visible) .oa-office-runtime__cursor {
+  opacity: 0.58;
+}
+
+.oa-office-runtime__index li button[aria-pressed="true"] .oa-office-runtime__cursor {
+  opacity: 1;
+  animation: oa-office-journal-cursor 700ms steps(2, end) infinite;
+}
+
+@keyframes oa-office-journal-cursor {
+  50% { transform: translateX(1px); }
 }
 
 .oa-office-runtime__event {
@@ -2153,6 +2170,11 @@
   .oa-office-runtime__event,
   .oa-office-runtime__open,
   .oa-office-replay-panel summary::before {
+    transition: none;
+    animation: none;
+  }
+
+  .oa-office-runtime__index .oa-office-runtime__cursor {
     transition: none;
     animation: none;
   }
