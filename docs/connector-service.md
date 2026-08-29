@@ -347,9 +347,13 @@ The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
   unlink, linking instructions, and explicit test sends. While credentials are
-  missing, it keeps a short platform checklist and official console links beside
-  the fields; those links open without dismissing the configuration dialog or
-  losing its drafts. The shared dialog sizes to short content on desktop and
+  missing, the expanded required Connection section is the first task; the
+  actionless `Credentials required` lifecycle panel is omitted because overview
+  and the Settings navigator already establish that state. The section keeps a
+  short platform checklist and official console links beside the fields; those
+  links open without dismissing the configuration dialog or losing its drafts.
+  Every later lifecycle stage retains its panel for runtime, linking, test, or
+  recovery actions. The shared dialog sizes to short content on desktop and
   bounds long forms with internal scrolling; narrow viewports keep a near-full-
   height shell so controls remain usable around virtual keyboards. Once linked,
   the lifecycle panel keeps routine availability

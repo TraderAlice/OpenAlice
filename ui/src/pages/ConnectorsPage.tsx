@@ -457,20 +457,22 @@ function ConnectorSettingsSurface({
                     t={t}
                   >
                     <div className="space-y-4">
-                      <SetupStatePanel
-                        definition={definition}
-                        setup={setup}
-                        runtime={runtime}
-                        saving={status === 'saving'}
-                        testing={testing}
-                        reconnecting={reconnecting}
-                        actionFeedback={actionFeedback?.connectorId === definition.id ? actionFeedback : null}
-                        onStart={() => startAdapter(definition.id)}
-                        onStop={() => updateAdapter(definition.id, { enabled: false })}
-                        onTest={() => void test(definition.id)}
-                        onReconnect={() => void reconnect(definition.id)}
-                        t={t}
-                      />
+                      {setup.stage !== 'needs_credentials' && (
+                        <SetupStatePanel
+                          definition={definition}
+                          setup={setup}
+                          runtime={runtime}
+                          saving={status === 'saving'}
+                          testing={testing}
+                          reconnecting={reconnecting}
+                          actionFeedback={actionFeedback?.connectorId === definition.id ? actionFeedback : null}
+                          onStart={() => startAdapter(definition.id)}
+                          onStop={() => updateAdapter(definition.id, { enabled: false })}
+                          onTest={() => void test(definition.id)}
+                          onReconnect={() => void reconnect(definition.id)}
+                          t={t}
+                        />
+                      )}
 
                       <ConnectorCredentialsEditor
                         definition={definition}

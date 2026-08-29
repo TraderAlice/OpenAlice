@@ -294,6 +294,19 @@ external adapters remain optional projections rather than sources of truth.
     disclosures. Document order, keyboard semantics, status text/icons, error
     coloring, responsive one/two-column grouping, and every action remain
     unchanged; this is a hierarchy correction rather than a new interaction.
+27. **First-time setup starts with the task, not a duplicate status card.**
+    Keeping the lifecycle panel in every stage is structurally consistent, but
+    `Credentials required` has no control or recovery action and immediately
+    repeats the expanded `Connection details · Required` section. Compressing it
+    into a smaller banner would still make users read the same prerequisite
+    twice. The chosen model omits only the `needs_credentials` lifecycle panel:
+    the required Connection section, platform preparation guide, and fields
+    become the first dialog/full-Settings content. The overview card and channel
+    navigator still communicate `Needs setup` before entry. Ready-to-link,
+    starting, awaiting-link, linked, linked-offline, and error stages retain the
+    lifecycle panel because it owns a runtime switch, link instructions, test,
+    reconnect, or actionable progress. This removes no control or state and does
+    not change field disclosure, keyboard order, autosave, or narrow behavior.
 
 ## Ordered Work
 
@@ -352,6 +365,8 @@ external adapters remain optional projections rather than sources of truth.
         keep their save/reconnect feedback local to the affected card.
   - [x] Flatten informational boxes inside overview cards and remove hover cues
         from non-clickable channel surfaces.
+  - [x] Remove the actionless duplicate lifecycle panel from first-time
+        credential setup while retaining status in overview/navigation.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -570,6 +585,23 @@ runtime controls, and the page width exactly matched the viewport. Card-level
 hover classes are absent, while buttons, switches, and disclosure summaries keep
 their own affordances. No control was clicked, no external message was sent, no
 Connector state changed, and the viewport was reset.
+
+The first-task-first increment passed 35 focused overview and Connector demo
+tests, UI and root typechecks, the production build, and all 5,120 repository
+tests. Its dialog test proves that an unconfigured adapter exposes no runtime
+switch and no duplicate `Credentials required` panel while retaining the
+expanded Connection section, official setup
+links in the current catalog fixture, delivery ordering, and capability-gated
+Chat preview. Real Default AliceProject acceptance at 1,052 x 734 moved Slack's
+preparation guide, both credential fields, and Save connection into the first
+desktop task view. At 390 x 844 the same content remained a single scroll owner,
+Save connection fit the available width, and the page width exactly matched the
+viewport. Full Settings rendered zero duplicate credential-status panels while
+its channel navigator still reported Discord Offline, Telegram Unavailable,
+Slack Setup, and Feishu Ready. The live process still predates setup-link
+metadata as already recorded by the platform-preparation increment; it was not
+restarted. No credential, delivery, or Connector control was changed, and the
+viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
