@@ -83,6 +83,7 @@ function makeOptions(over: Partial<PersistentSessionOptions> = {}): PersistentSe
     highWatermarkBytes: 1024, // small so one write trips backpressure
     lowWatermarkBytes: 256,
     onDisposed: () => {},
+    pty: { name: 'node-pty', supportsFlowControl: true, spawn: mockSpawn },
     ...over,
   };
 }

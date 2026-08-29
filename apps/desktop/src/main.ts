@@ -58,6 +58,7 @@ import {
 import { existingOwnerSmokeMode, resolveExistingOwnerStartup } from './existing-owner-startup.js'
 import { inspectPreviousUpdateAttempt, recordUpdateAttempt } from './update-attempt.js'
 import { childIsRunning, stopChild } from './child-shutdown.js'
+import { exitDesktopProcess } from './app-exit.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -1316,7 +1317,11 @@ function shutdown(): void {
   void stopChildren().finally(async () => {
     await releaseGuardianRuntimeLock()
     const exitCode = typeof process.exitCode === 'number' ? process.exitCode : 0
-    app.exit(exitCode)
+    console.log(`[guardian] shutdown complete → exit ${exitCode}`)
+    exitDesktopProcess(exitCode, {
+      appExit: (code) => app.exit(code),
+      processExit: (code) => process.exit(code),
+    })
   })
 }
 

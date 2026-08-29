@@ -21,7 +21,7 @@ raw.githubusercontent.com/TraderAlice/OpenAlice/dev/install plus --branch dev.
 
 Options:
   --installer-url <url>  Installer endpoint to exercise
-  --branch <name>        Matching payload branch (default: dev)
+  --branch dev           Development payload branch (default: dev)
   --keep-image           Preserve the temporary image for investigation
   -h, --help             Show this help
 `)
@@ -50,8 +50,8 @@ if (!/^https:\/\//.test(installerUrl)) {
   console.error('install channel smoke: --installer-url must use https://')
   process.exit(1)
 }
-if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch.startsWith('/') || branch.endsWith('/')) {
-  console.error('install channel smoke: --branch is invalid')
+if (branch !== 'dev') {
+  console.error('install channel smoke: only the dev preview channel is supported')
   process.exit(1)
 }
 

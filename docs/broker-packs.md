@@ -195,6 +195,13 @@ npx tsc --noEmit
 cd ui && npx tsc -b
 ```
 
+The Bun CLI lane additionally runs `pnpm build:bun-runtime:feasibility`. Its
+isolated fixture uses the production active-release layout, imports a private
+SDK from Pack-local `node_modules`, requires a real platform N-API binary, and
+proves the compiled UTA role loads it again after a forced UTA restart. This is
+the external-loading gate; it does not replace building and verifying the real
+release Packs above.
+
 For desktop changes, follow [[docs/managed-workspace-runtime.md]] and require
 `pnpm electron:assert-package` plus the packaged Workspace smoke. For a broker
 implementation change, also follow the paper/demo scenarios in

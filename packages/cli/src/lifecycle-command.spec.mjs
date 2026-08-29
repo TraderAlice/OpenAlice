@@ -124,6 +124,25 @@ describe('OpenAlice top-level lifecycle commands', () => {
     expect(openRuntime).toHaveBeenCalledOnce()
   })
 
+  it('shows a pending activation when up finds an older Runtime already running', async () => {
+    const stdout = output()
+    await expect(runLifecycleCommand('up', parseLifecycleArgs('up', []), {
+      startRuntime: async () => ({
+        ...startedResult(),
+        outcome: 'already-running',
+        status: {
+          ...runningStatus(),
+          pendingActivation: {
+            productVersion: '0.92.0',
+            restartRequired: true,
+          },
+        },
+      }),
+      stdout,
+    })).resolves.toBe(0)
+    expect(stdout.text()).toContain('Pending activation: 0.92.0 (restart required)')
+  })
+
   it('shares named-home and managed-Pi isolation with noninteractive startup', async () => {
     const startRuntime = vi.fn(async () => startedResult())
     await expect(runLifecycleCommand('up', parseLifecycleArgs('up', [

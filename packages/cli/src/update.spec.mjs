@@ -123,6 +123,30 @@ describe('OpenAlice CLI updates', () => {
     )
   })
 
+  it('routes package-managed updates back to the owner without invoking the installer', async () => {
+    const applyUpdate = vi.fn(async () => 0)
+    const fetchImpl = vi.fn(async () => { throw new Error('offline') })
+    const stdout = { write: vi.fn() }
+    await expect(runUpdateCommand([], {
+      applyUpdate,
+      fetchImpl,
+      layout: null,
+      readInstallSourceImpl: async () => ({
+        ...stableSource,
+        schemaVersion: 3,
+        method: 'bun',
+        artifact: { platform: 'darwin', arch: 'arm64', sha256: 'a'.repeat(64) },
+        installedAt: '2026-08-30T00:00:00Z',
+      }),
+      stdout,
+      env: {},
+    })).resolves.toBe(0)
+    expect(applyUpdate).not.toHaveBeenCalled()
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(stdout.write.mock.calls.flat().join('')).toContain('bun add -g --trust openalice@latest')
+    expect(stdout.write.mock.calls.flat().join('')).toContain('did not modify')
+  })
+
   it('verifies the versioned installer and binds it to the manifest version', async () => {
     const bytes = Buffer.from('#!/usr/bin/env bash\nexit 0\n')
     let invocation
@@ -152,7 +176,7 @@ describe('OpenAlice CLI updates', () => {
     expect(invocation).toMatchObject({
       command: 'bash',
       args: expect.arrayContaining([
-        '--install-dir', '/tmp/.openalice', '--no-modify-path', '--yes',
+        '--version', '0.88.0-beta', '--install-dir', '/tmp/.openalice', '--no-modify-path', '--yes',
       ]),
       options: {
         stdio: 'inherit',

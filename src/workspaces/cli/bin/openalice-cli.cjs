@@ -413,4 +413,8 @@ function fail(msg) {
   process.exit(1)
 }
 
-main().catch((e) => fail(e && e.stack ? e.stack : String(e)))
+module.exports.main = main
+
+if (!globalThis.__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  main().catch((e) => fail(e && e.stack ? e.stack : String(e)))
+}
