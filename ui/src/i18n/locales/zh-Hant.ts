@@ -2128,6 +2128,7 @@ export const zhHant: Resources = {
       description: '讓這個私人對話在所選工作區中執行 Agent。',
       loading: '正在載入聊天設定…',
       needLink: '請先完成機器人連結，再開啟聊天。',
+      afterLink: '連結後可用',
       on: '已開啟',
       off: '未開啟',
       toggleAria: '開啟或關閉在 {{name}} 上聊天',
@@ -2177,7 +2178,6 @@ export const zhHant: Resources = {
         title: '可以投遞',
         badge: '就緒',
         description: '{{name}} 機器人已在線，可以投遞收件匣通知。',
-        descriptionWithOwner: '{{name}} 機器人已為擁有者 {{owner}} 上線，可以投遞收件匣通知。',
       },
       linkedOffline: {
         title: '連接器已停止',

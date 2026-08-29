@@ -80,6 +80,18 @@ external adapters remain optional projections rather than sources of truth.
    vertical task flow without horizontal scrolling on narrow screens. Status is
    conveyed by text and icon as well as color; card actions remain real buttons
    with visible focus treatment.
+10. **Configuration follows dependency order.** A tabbed Connection / Delivery /
+    Chat dialog was considered, but it hides prerequisites and makes a short
+    form feel like several destinations. A strict setup wizard was also rejected
+    because it becomes friction after first use. The chosen vertical task flow
+    keeps a lifecycle summary visible, then orders shared sections as Connection,
+    Inbox delivery, and capability-gated Chat. Required credentials open
+    automatically and appear before unrelated delivery preferences; an unavailable
+    runtime switch is omitted instead of displayed disabled. Chat setup stays as
+    a compact preview until the private chat is linked, then reveals Workspace
+    selection and its switch. Saved connection details and heartbeat/prompt
+    controls remain progressively disclosed. Runtime and linked copy never expose
+    raw external owner identifiers.
 
 ## Ordered Work
 
@@ -104,6 +116,8 @@ external adapters remain optional projections rather than sources of truth.
   - [x] Replace the operations-style status table with a compact service summary
         and state-led Connector cards; hide raw owner identifiers and progressively
         disclose diagnostics.
+  - [x] Reorder each Connector dialog into dependency-led Connection, Inbox
+        delivery, and capability-gated Chat sections with first-use disclosure.
   - [ ] Revisit Connector status copy and owner-identifier disclosure as a
         separate accepted increment.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
@@ -133,6 +147,15 @@ collapsed diagnostics; responsive card/action flow; capability-specific dialog
 copy; route retention; dismissal; and focus restoration. The overview no longer
 renders raw owner identifiers. No live connector action or configuration control
 was exercised.
+
+The dependency-led configuration increment passed 24 focused UI tests, UI
+typecheck/build, and real-route acceptance for unconfigured Slack, paused
+Discord, degraded Telegram, and linked Feishu at desktop and 390 px widths. It
+also verified the shared full Settings route. Connection now precedes delivery,
+unavailable controls are omitted, Chat stays compact until linking, errors offer
+in-context reconnect, and neither overview nor configuration copy renders raw
+owner identifiers. No live reconnect, test delivery, credential, or toggle
+action was exercised.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

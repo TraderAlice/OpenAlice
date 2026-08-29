@@ -2153,6 +2153,7 @@ export const en = {
       description: 'Let this private chat run an Agent in the selected Workspace.',
       loading: 'Loading chat settings…',
       needLink: 'Finish linking the bot before turning on chat.',
+      afterLink: 'Available after linking',
       on: 'On',
       off: 'Off',
       toggleAria: 'Turn Chat on {{name}} on or off',
@@ -2202,7 +2203,6 @@ export const en = {
         title: 'Ready for delivery',
         badge: 'Ready',
         description: 'The {{name}} bot is online and can deliver Inbox notifications.',
-        descriptionWithOwner: 'The {{name}} bot is online for owner {{owner}} and can deliver Inbox notifications.',
       },
       linkedOffline: {
         title: 'Connector stopped',

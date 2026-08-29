@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
-import { Bot, CheckCircle2, ChevronDown, CircleAlert, Eye, EyeOff, KeyRound, Link2, Power, Send, ShieldCheck, Unlink } from 'lucide-react'
+import { Bot, CheckCircle2, ChevronDown, CircleAlert, Eye, EyeOff, KeyRound, Link2, Power, RefreshCw, Send, ShieldCheck, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -67,6 +67,7 @@ function ConnectorSettingsSurface({
   const [pendingSecretReplace, setPendingSecretReplace] = useState<PendingSecretReplace | null>(null)
   const [pendingUnlink, setPendingUnlink] = useState<PendingUnlink | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
+  const [reconnecting, setReconnecting] = useState<string | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
   const [lastProbe, setLastProbe] = useState<{ connectorId: string; probeId: string } | null>(null)
   const [credentialEditors, setCredentialEditors] = useState<Record<string, boolean>>({})
@@ -277,6 +278,19 @@ function ConnectorSettingsSurface({
     }
   }, [refreshRuntime])
 
+  const reconnect = useCallback(async (id: string) => {
+    setReconnecting(id)
+    setTestError(null)
+    try {
+      await api.connectors.reconnect(id)
+      await refreshRuntime()
+    } catch (error) {
+      setTestError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setReconnecting(null)
+    }
+  }, [refreshRuntime])
+
   const adapterOnly = connectorId !== undefined
   const visibleDefinitions = adapterOnly
     ? definitions.filter((definition) => definition.id === connectorId)
@@ -354,6 +368,7 @@ function ConnectorSettingsSurface({
                         runtime={runtime}
                         saving={status === 'saving'}
                         testing={testing}
+                        reconnecting={reconnecting}
                         onStart={() => startAdapter(definition.id)}
                         onStop={() => updateAdapter(definition.id, { enabled: false })}
                         onUnlink={() => setPendingUnlink({
@@ -361,13 +376,7 @@ function ConnectorSettingsSurface({
                           connectorLabel: definition.label,
                         })}
                         onTest={() => void test(definition.id)}
-                        t={t}
-                      />
-
-                      <ConnectorPreferences
-                        definition={definition}
-                        adapter={adapter}
-                        onSettingChange={(key, value) => updateSetting(definition.id, key, value)}
+                        onReconnect={() => void reconnect(definition.id)}
                         t={t}
                       />
 
@@ -414,6 +423,13 @@ function ConnectorSettingsSurface({
                           fieldKey,
                           fieldLabel,
                         })}
+                        t={t}
+                      />
+
+                      <ConnectorPreferences
+                        definition={definition}
+                        adapter={adapter}
+                        onSettingChange={(key, value) => updateSetting(definition.id, key, value)}
                         t={t}
                       />
 
@@ -560,28 +576,31 @@ function ConnectorPreferences({
   return (
     <div className="space-y-3">
       {fields.map((field) => {
-        const inputId = `connector-${definition.id}-${field.key}`
         const fieldLabel = t(`connectorSettings.fields.${field.key}`, { defaultValue: field.label })
         const value = adapter.settings[field.key]
         const checked = typeof value === 'boolean' ? value : field.defaultValue !== false
         return (
-          <label key={field.key} className="flex items-start gap-3">
-            <input
-              id={inputId}
-              className="mt-1"
-              type="checkbox"
+          <section key={field.key} className="rounded-xl border border-border/70 bg-secondary/10 px-3.5 py-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <Send size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
+                <div>
+                  <h3 className="text-[12.5px] font-semibold text-foreground">{fieldLabel}</h3>
+                  {field.description && (
+                    <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
+                      {t(`connectorSettings.fieldDescriptions.${field.key}`, { defaultValue: field.description })}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Toggle
+                size="sm"
               checked={field.kind === 'boolean' ? checked : Boolean(value)}
-              onChange={(event) => onSettingChange(field.key, event.target.checked)}
-            />
-            <span>
-              <span className="block text-[13px] font-medium text-foreground">{fieldLabel}</span>
-              {field.description && (
-                <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground/70">
-                  {t(`connectorSettings.fieldDescriptions.${field.key}`, { defaultValue: field.description })}
-                </span>
-              )}
-            </span>
-          </label>
+                ariaLabel={fieldLabel}
+                onChange={(next) => onSettingChange(field.key, next)}
+              />
+            </div>
+          </section>
         )
       })}
     </div>
@@ -620,7 +639,7 @@ function ConnectorCredentialsEditor({
   const credentialsId = `connector-${definition.id}-credentials`
   const [maskedSecrets, setMaskedSecrets] = useState<Record<string, boolean>>({})
   return (
-    <div className="border-y border-border/60">
+    <section className="overflow-hidden rounded-xl border border-border/70 bg-secondary/10">
       <button
         type="button"
         aria-label={t(open
@@ -629,12 +648,12 @@ function ConnectorCredentialsEditor({
         aria-expanded={open}
         aria-controls={credentialsId}
         onClick={onToggle}
-        className="oa-pressable flex min-h-11 w-full items-center justify-between gap-3 py-2.5 text-left"
+        className="oa-pressable flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-3 text-left hover:bg-secondary/35"
       >
         <span className="flex min-w-0 items-center gap-2.5">
           <KeyRound size={15} className="shrink-0 text-muted-foreground" aria-hidden />
           <span className="text-[12px] font-medium text-foreground">{t('connectorSettings.connectionDetails')}</span>
-          <span className={`rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide ${
+          <span className={`rounded-full px-2 py-0.5 text-[9.5px] font-medium ${
             ready ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           }`}>
             {ready ? t('connectorSettings.saved') : t('connectorSettings.required')}
@@ -652,7 +671,7 @@ function ConnectorCredentialsEditor({
         id={credentialsId}
         hidden={!open}
         inert={!open ? true : undefined}
-        className="oa-disclosure-enter pb-4 pt-1"
+        className="oa-disclosure-enter border-t border-border/60 px-3.5 pb-4 pt-3"
       >
         <p className="mb-4 text-[11.5px] leading-5 text-muted-foreground">
           {t('connectorSettings.secretsNote')}
@@ -765,7 +784,7 @@ function ConnectorCredentialsEditor({
           )
         })}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -775,10 +794,12 @@ function SetupStatePanel({
   runtime,
   saving,
   testing,
+  reconnecting,
   onStart,
   onStop,
   onUnlink,
   onTest,
+  onReconnect,
   t,
 }: {
   definition: ConnectorDefinition
@@ -786,10 +807,12 @@ function SetupStatePanel({
   runtime?: ConnectorRuntime
   saving: boolean
   testing: string | null
+  reconnecting: string | null
   onStart: () => void
   onStop: () => void
   onUnlink: () => void
   onTest: () => void
+  onReconnect: () => void
   t: TFunction
 }) {
   const command = `/${setup.linkCommand ?? 'link'}`
@@ -799,7 +822,7 @@ function SetupStatePanel({
   const canRun = setup.stage !== 'needs_credentials'
 
   return (
-    <div className={`oa-status-surface border-l-2 px-3 py-2.5 ${presentation.container}`} aria-live="polite">
+    <section className={`oa-status-surface rounded-xl border border-l-2 px-3.5 py-3 ${presentation.container}`} aria-live="polite">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 gap-2.5">
           <Icon size={17} className={`mt-0.5 shrink-0 ${presentation.iconClass}`} />
@@ -820,20 +843,34 @@ function SetupStatePanel({
             )}
           </div>
         </div>
-        <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
-          <div className="mr-1 flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/60 px-3">
-            <span className="text-[12px] font-medium text-foreground">
-              {t('connectorSettings.runConnector', { name: definition.label })}
-            </span>
-            <Toggle
-              size="sm"
-              checked={running}
-              disabled={saving || !canRun}
-              ariaLabel={t('connectorSettings.runConnectorAria', { name: definition.label })}
-              onChange={(checked) => checked ? onStart() : onStop()}
-            />
-          </div>
-          {setup.stage === 'linked' && runtime?.status === 'healthy' && (
+        {canRun && (
+          <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
+            <div className="mr-1 flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/60 px-3">
+              <span className="text-[12px] font-medium text-foreground">
+                {t('connectorSettings.runConnector', { name: definition.label })}
+              </span>
+              <Toggle
+                size="sm"
+                checked={running}
+                disabled={saving}
+                ariaLabel={t('connectorSettings.runConnectorAria', { name: definition.label })}
+                onChange={(checked) => checked ? onStart() : onStop()}
+              />
+            </div>
+            {setup.stage === 'error' && (
+              <button
+                type="button"
+                className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
+                disabled={reconnecting === definition.id || saving}
+                onClick={onReconnect}
+              >
+                <RefreshCw size={14} className={reconnecting === definition.id ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden />
+                {reconnecting === definition.id
+                  ? t('connectorStatus.reconnecting')
+                  : t('connectorStatus.reconnect')}
+              </button>
+            )}
+            {setup.stage === 'linked' && runtime?.status === 'healthy' && (
             <button
               type="button"
               className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-foreground hover:border-primary/50 disabled:opacity-50"
@@ -845,8 +882,8 @@ function SetupStatePanel({
                 ? t('connectorSettings.sending')
                 : t('connectorSettings.sendTest')}
             </button>
-          )}
-          {setup.linked && (
+            )}
+            {setup.linked && (
             <button
               type="button"
               className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50"
@@ -856,10 +893,11 @@ function SetupStatePanel({
               <Unlink size={14} />
               {t('connectorSettings.unlink')}
             </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -918,9 +956,7 @@ function setupPresentation(
       return {
         title: t('connectorSettings.stage.linked.title'),
         badge: t('connectorSettings.stage.linked.badge'),
-        description: runtime?.owner
-          ? t('connectorSettings.stage.linked.descriptionWithOwner', { name: label, owner: runtime.owner })
-          : t('connectorSettings.stage.linked.description', { name: label }),
+        description: t('connectorSettings.stage.linked.description', { name: label }),
         icon: CheckCircle2,
         iconClass: 'text-success',
         container: 'border-success/35 bg-success/[0.035]',

@@ -101,6 +101,31 @@ describe('Connector demo routes', () => {
     await waitFor(() => expect(mocks.reconnect).toHaveBeenCalledWith('telegram'))
   })
 
+  it('reconnects an unhealthy adapter without leaving its configuration surface', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.telegram = {
+      enabled: true,
+      settings: {},
+      configuredSecrets: ['botToken'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'degraded',
+      service: {
+        status: 'degraded',
+        startedAt: '2026-08-23T00:00:00.000Z',
+        adapters: [{ id: 'telegram', enabled: true, status: 'degraded', lastError: 'offline' }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
+
+    await waitFor(() => expect(mocks.reconnect).toHaveBeenCalledWith('telegram'))
+  })
+
   it('localizes the read-only operations route', async () => {
     await i18n.changeLanguage('zh')
     render(<ConnectorStatusPage />)
@@ -158,7 +183,13 @@ describe('Connector demo routes', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Configure Feishu' })).toBeTruthy()
     expect(within(dialog).getByText('Connection, delivery, and chat settings for Feishu.')).toBeTruthy()
-    expect(within(dialog).getByRole('switch', { name: 'Start or stop the Feishu connector' })).toBeTruthy()
+    expect(within(dialog).queryByRole('switch', { name: 'Start or stop the Feishu connector' })).toBeNull()
+    const connection = within(dialog).getByRole('button', { name: 'Hide Feishu connection details' })
+    const delivery = within(dialog).getByRole('switch', { name: 'Push Inbox notifications' })
+    expect(connection.getAttribute('aria-expanded')).toBe('true')
+    expect(connection.compareDocumentPosition(delivery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(dialog).getByText('Available after linking')).toBeTruthy()
+    expect(within(dialog).queryByRole('switch', { name: 'Turn Chat on Feishu on or off' })).toBeNull()
     expect(within(dialog).queryByText('Discord')).toBeNull()
     expect(window.location.pathname).toBe(before)
 
@@ -221,7 +252,7 @@ describe('Connector demo routes', () => {
     render(<ConnectorsPage />)
 
     expect(await screen.findByRole('heading', { name: '连接器' })).toBeTruthy()
-    expect(screen.getByText('运行外部通知连接器')).toBeTruthy()
+    expect(await screen.findByText('运行外部通知连接器')).toBeTruthy()
     expect(screen.getAllByText('需要凭据')).toHaveLength(3)
     expect(screen.getByRole('textbox', { name: 'Discord 应用 ID' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '管理 Telegram 连接信息' })).toBeTruthy()
@@ -258,6 +289,7 @@ describe('Connector demo routes', () => {
     expect(manage.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('textbox', { name: 'Discord Application ID' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Send test' })).toBeTruthy()
+    expect(screen.queryByText('owner-1')).toBeNull()
 
     fireEvent.click(manage)
     expect(screen.getByRole('button', { name: 'Hide Discord connection details' }).getAttribute('aria-expanded'))

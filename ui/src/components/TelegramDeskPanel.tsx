@@ -61,8 +61,8 @@ export function TelegramDeskPanel({
   }, [currentEvery])
 
   return (
-    <div className="border-t border-border/60 pt-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+    <section className="rounded-xl border border-border/70 bg-secondary/10 p-3.5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <MessageSquare size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
           <div>
@@ -72,31 +72,41 @@ export function TelegramDeskPanel({
             </p>
           </div>
         </div>
-        <div className="flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-secondary/20 px-3">
-          <span className="text-[12px] font-medium text-foreground">
-            {desk ? t('connectorSettings.desk.on') : t('connectorSettings.desk.off')}
+        {linked ? (
+          <div className="flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background/45 px-3">
+            <span className="text-[12px] font-medium text-foreground">
+              {desk ? t('connectorSettings.desk.on') : t('connectorSettings.desk.off')}
+            </span>
+            <Toggle
+              size="sm"
+              checked={Boolean(desk)}
+              disabled={loading || working || (!desk && (!selectedWsId || !launchPreferencesLoaded))}
+              ariaLabel={t('connectorSettings.desk.toggleAria', { name: deskName })}
+              onChange={(checked) => {
+                if (!checked) {
+                  setConfirmDisable(true)
+                  return
+                }
+                setWorking(true)
+                void enable(selectedWsId).finally(() => setWorking(false))
+              }}
+            />
+          </div>
+        ) : (
+          <span className="rounded-full border border-border bg-background/45 px-2.5 py-1 text-[10.5px] font-medium text-muted-foreground">
+            {t('connectorSettings.desk.afterLink')}
           </span>
-          <Toggle
-            size="sm"
-            checked={Boolean(desk)}
-            disabled={loading || working || (!desk && (!linked || !selectedWsId || !launchPreferencesLoaded))}
-            ariaLabel={t('connectorSettings.desk.toggleAria', { name: deskName })}
-            onChange={(checked) => {
-              if (!checked) {
-                setConfirmDisable(true)
-                return
-              }
-              setWorking(true)
-              void enable(selectedWsId).finally(() => setWorking(false))
-            }}
-          />
-        </div>
+        )}
       </div>
 
       {loading ? (
-        <p className="text-[12px] text-muted-foreground">{t('connectorSettings.desk.loading')}</p>
+        <p className="mt-3 text-[12px] text-muted-foreground">{t('connectorSettings.desk.loading')}</p>
+      ) : !linked ? (
+        <p className="mt-3 border-t border-border/60 pt-3 text-[11.5px] leading-5 text-muted-foreground">
+          {t('connectorSettings.desk.needLink')}
+        </p>
       ) : desk ? (
-        <div className="space-y-3">
+        <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
           <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
             {t('connectorSettings.desk.boundWorkspace', {
               workspace: boundWorkspace ? workspaceDisplayName(boundWorkspace) : desk.wsId,
@@ -104,7 +114,7 @@ export function TelegramDeskPanel({
           </p>
           <button
             type="button"
-            className="oa-pressable flex min-h-11 w-full items-center justify-between border-y border-border/60 py-2.5 text-left text-[12px] font-medium text-foreground"
+            className="oa-pressable flex min-h-11 w-full items-center justify-between rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-left text-[12px] font-medium text-foreground hover:bg-secondary/35"
             aria-expanded={advancedOpen}
             onClick={() => setAdvancedOpen((open) => !open)}
           >
@@ -161,7 +171,7 @@ export function TelegramDeskPanel({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
           {choices.length === 0 ? (
             <p className="text-[12px] text-muted-foreground">{t('connectorSettings.desk.noWorkspaces')}</p>
           ) : (
@@ -174,7 +184,7 @@ export function TelegramDeskPanel({
                 id={workspaceSelectId}
                 className={inputClass}
                 value={selectedWsId}
-                disabled={!linked || working || !launchPreferencesLoaded}
+                  disabled={working || !launchPreferencesLoaded}
                 onChange={(event) => setWsId(event.target.value)}
               >
                 {choices.map((workspace) => (
@@ -186,7 +196,7 @@ export function TelegramDeskPanel({
             </Field>
           )}
           <p className="text-[11.5px] leading-5 text-muted-foreground">
-            {linked ? t('connectorSettings.desk.turnOnHint', { name: deskName }) : t('connectorSettings.desk.needLink')}
+            {t('connectorSettings.desk.turnOnHint', { name: deskName })}
           </p>
         </div>
       )}
@@ -212,6 +222,6 @@ export function TelegramDeskPanel({
           onClose={() => setConfirmDisable(false)}
         />
       )}
-    </div>
+    </section>
   )
 }

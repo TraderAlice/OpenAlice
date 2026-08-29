@@ -2120,6 +2120,7 @@ export const zh: Resources = {
       description: '让这个私聊在所选工作区中运行 Agent。',
       loading: '正在加载聊天设置…',
       needLink: '请先完成机器人关联，再开启聊天。',
+      afterLink: '关联后可用',
       on: '已开启',
       off: '未开启',
       toggleAria: '开启或关闭在 {{name}} 上聊天',
@@ -2169,7 +2170,6 @@ export const zh: Resources = {
         title: '可以投递',
         badge: '就绪',
         description: '{{name}} 机器人已在线，可以投递收件箱通知。',
-        descriptionWithOwner: '{{name}} 机器人已为所有者 {{owner}} 上线，可以投递收件箱通知。',
       },
       linkedOffline: {
         title: '连接器已停止',

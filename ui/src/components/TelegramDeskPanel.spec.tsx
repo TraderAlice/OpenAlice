@@ -111,7 +111,9 @@ describe('TelegramDeskPanel', () => {
   it('asks for a linked bot before enabling an unbound desk', () => {
     render(<TelegramDeskPanel linked={false} label="Telegram" />)
     expect(screen.getByText(/Finish linking the bot/)).toBeTruthy()
-    expect((screen.getByRole('switch', { name: 'Turn Chat on Telegram on or off' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('Available after linking')).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: 'Turn Chat on Telegram on or off' })).toBeNull()
+    expect(screen.queryByLabelText('Workspace')).toBeNull()
   })
 
   it('defaults the unbound picker to the Ask Alice Chat workspace', () => {

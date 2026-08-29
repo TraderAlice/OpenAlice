@@ -2121,6 +2121,7 @@ export const ja: Resources = {
       description: 'このプライベートチャットから、選択したワークスペースで Agent を実行します。',
       loading: 'チャット設定を読み込み中…',
       needLink: 'チャットをオンにする前に Bot のリンクを完了してください。',
+      afterLink: 'リンク後に利用可能',
       on: 'オン',
       off: 'オフ',
       toggleAria: 'Chat on {{name}} をオンまたはオフ',
@@ -2170,7 +2171,6 @@ export const ja: Resources = {
         title: '配信準備完了',
         badge: '準備完了',
         description: '{{name}} Bot はオンラインで、受信トレイ通知を配信できます。',
-        descriptionWithOwner: '{{name}} Bot は所有者 {{owner}} 用にオンラインで、受信トレイ通知を配信できます。',
       },
       linkedOffline: {
         title: 'コネクター停止中',
