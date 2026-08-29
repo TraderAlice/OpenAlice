@@ -78,6 +78,10 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, cabinetWorkspaceId, workspaces])
+  const modalOpen = logOpen
+    || Boolean(selectedSeat)
+    || Boolean(rosterOffice)
+    || Boolean(cabinetOffice)
   const closeLog = () => {
     setLogOpen(false)
     requestAnimationFrame(() => {
@@ -197,16 +201,8 @@ export function OfficePage() {
           <div className="oa-office-main">
             <div
               className="oa-office-scene"
-              aria-hidden={logOpen
-                || Boolean(selectedSeat)
-                || Boolean(rosterOffice)
-                || Boolean(cabinetOffice)
-                || undefined}
-              inert={logOpen
-                || Boolean(selectedSeat)
-                || Boolean(rosterOffice)
-                || Boolean(cabinetOffice)
-                || undefined}
+              aria-hidden={modalOpen || undefined}
+              inert={modalOpen || undefined}
             >
               <OfficeBuilding
                 building={building}
@@ -216,10 +212,7 @@ export function OfficePage() {
                 }}
                 selected={selected}
                 replaySeq={asOfSeq}
-                interactionSuspended={logOpen
-                  || Boolean(selectedSeat)
-                  || Boolean(rosterOffice)
-                  || Boolean(cabinetOffice)}
+                interactionSuspended={modalOpen}
                 onSelectEmployee={(workspaceId, employee) => {
                   employeeOriginRef.current = { kind: 'map' }
                   setSelected({ workspaceId, resumeId: employee.resumeId })
@@ -250,42 +243,40 @@ export function OfficePage() {
                 onReturnLive={() => setAsOfSeq(null)}
               />
             </div>
+            {modalOpen && <div className="oa-office-window-scrim" aria-hidden />}
             {logOpen && (
-              <>
-                <div className="oa-office-window-scrim" aria-hidden />
-                <section
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label={t('office.timeline')}
-                  className="oa-office-window oa-office-window--log"
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') closeLog()
-                  }}
-                >
-                  <header className="oa-office-window__header">
-                    <div>
-                      <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden />
-                      <span>{t('office.timeline')}</span>
-                    </div>
-                    <button type="button" autoFocus aria-label={t('common.close')} onClick={closeLog}>
-                      <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
-                    </button>
-                  </header>
-                  <div className="oa-office-window__body">
-                    <details className="oa-office-replay-panel">
-                      <summary>{t('office.replay')}</summary>
-                      <OfficeReplayBar
-                        firstSeq={building.firstSeq}
-                        lastSeq={building.lastSeq}
-                        asOfSeq={asOfSeq}
-                        onAsOfSeq={setAsOfSeq}
-                        onViewFloor={closeLog}
-                      />
-                    </details>
-                    <OfficeRuntimeSection />
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-label={t('office.timeline')}
+                className="oa-office-window oa-office-window--log"
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') closeLog()
+                }}
+              >
+                <header className="oa-office-window__header">
+                  <div>
+                    <img src={OFFICE_HUD_ASSETS.occupancyLog} alt="" aria-hidden />
+                    <span>{t('office.timeline')}</span>
                   </div>
-                </section>
-              </>
+                  <button type="button" autoFocus aria-label={t('common.close')} onClick={closeLog}>
+                    <img src={OFFICE_HUD_ASSETS.windowClose} alt="" aria-hidden style={officePixelImg} />
+                  </button>
+                </header>
+                <div className="oa-office-window__body">
+                  <details className="oa-office-replay-panel">
+                    <summary>{t('office.replay')}</summary>
+                    <OfficeReplayBar
+                      firstSeq={building.firstSeq}
+                      lastSeq={building.lastSeq}
+                      asOfSeq={asOfSeq}
+                      onAsOfSeq={setAsOfSeq}
+                      onViewFloor={closeLog}
+                    />
+                  </details>
+                  <OfficeRuntimeSection />
+                </div>
+              </section>
             )}
             {!logOpen && !cabinetOffice && selectedSeat && (
               <OfficeInspectRail

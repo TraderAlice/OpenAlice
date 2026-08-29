@@ -1467,6 +1467,26 @@ Touch action feedback follow-up (2026-08-29):
 - Focused Building specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
   run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Modal scene hierarchy follow-up (2026-08-29):
+
+- Played Occupancy log, Agent file, Team roster, and Filing cabinet on the real floor. Every window declared itself
+  modal and correctly made the map inert, but only Occupancy log visually paused the scene. Agent file in particular
+  competed with full-brightness coworkers, bubbles, signs, and furniture behind its large cream dialogue panel.
+- Compared preserving the bright map, blurring or desaturating the scene, and sharing the existing 28-percent hard
+  ink curtain. Chose the shared curtain because it already belongs to the Office journal vocabulary, preserves the
+  limited-layer look of a 16-bit game, and avoids modern glass effects. This was an autonomous design choice for the
+  ongoing Office iteration, not a claim of maintainer approval.
+- `OfficePage` now derives one modal-open state for scene accessibility, movement suspension, and presentation. A
+  single non-interactive curtain renders for log, Agent file, roster, or cabinet; switching between roster and Agent
+  file cannot stack curtains. Escape and generated close controls remain the only dismissal paths, preserving the
+  deliberate game-window interaction and existing focus return targets.
+- Browser-played all four window families. The curtain stayed inside the physical floor below its HUD: 842x578 at
+  1280x720 and 368x690 at 390x844. Agent file, roster, and cabinet each reported one curtain and an inert scene with
+  zero page overflow. Closing the cabinet removed the curtain, restored the live floor, and returned focus to
+  `office-cabinet-demo-chat-ws`.
+- Focused OfficePage specs passed: 1 file / 5 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
+  Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -104,8 +104,10 @@ describe('OfficePage localization', () => {
     expect(screen.getByRole('button', { name: '关闭' }).querySelector<HTMLImageElement>('img')?.src)
       .toContain('/office/hud/window-close-v2.png')
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
+    expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByText('Office occupancy')).toBeNull()
+    expect(container.querySelector('.oa-office-window-scrim')).toBeNull()
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(menuTrigger)
     })
@@ -140,9 +142,11 @@ describe('OfficePage localization', () => {
     expect(screen.getByText('这里还没有归档任何工位记录。')).toBeTruthy()
     expect(openOrFocusMock).not.toHaveBeenCalled()
     expect(container.querySelector<HTMLElement>('.oa-office-scene')?.hasAttribute('inert')).toBe(true)
+    expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
 
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: '档案柜 · chat' })).toBeNull()
+    expect(container.querySelector('.oa-office-window-scrim')).toBeNull()
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(cabinet)
     })
@@ -201,15 +205,17 @@ describe('OfficePage localization', () => {
       },
     })
 
-    render(<OfficePage />)
+    const { container } = render(<OfficePage />)
 
     const rosterBoard = screen.getByRole('button', { name: '小组名册 · chat' })
     await userEvent.click(rosterBoard)
     expect(screen.getByRole('dialog', { name: '小组名册 · chat' })).toBeTruthy()
+    expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
 
     const member = screen.getByRole('button', { name: /研究同事 2.*claude.*x2/i })
     await userEvent.click(member)
     expect(screen.getByRole('dialog', { name: '研究同事 2' })).toBeTruthy()
+    expect(container.querySelectorAll('.oa-office-window-scrim')).toHaveLength(1)
     const back = screen.getByRole('button', { name: '返回小组名册' })
     expect(back.querySelector('img')?.getAttribute('src')).toBe('/office/hud/window-back-v2.png')
 
@@ -220,6 +226,7 @@ describe('OfficePage localization', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).toBeNull()
+    expect(container.querySelector('.oa-office-window-scrim')).toBeNull()
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(rosterBoard)
     })

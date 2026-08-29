@@ -1844,7 +1844,7 @@
   }
 }
 
-/* The operations log is an in-world action journal, not a dashboard timeline. */
+/* Modal Office windows pause the playable floor without dimming the global shell or floor HUD. */
 .oa-office-window-scrim {
   position: absolute;
   inset: 52px 0 0;
