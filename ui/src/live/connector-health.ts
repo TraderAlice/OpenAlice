@@ -60,6 +60,23 @@ export async function reconnectConnector(id: string): Promise<'adapter' | 'servi
   return result.scope
 }
 
+export async function setConnectorEnabled(id: string, enabled: boolean): Promise<void> {
+  const latest = await api.connectors.load()
+  const adapter = latest.config.adapters[id]
+  if (!adapter || !latest.definitions.some((definition) => definition.id === id)) {
+    throw new Error(`Unknown Connector: ${id}`)
+  }
+  await api.connectors.save({
+    ...latest.config,
+    serviceEnabled: enabled ? true : latest.config.serviceEnabled,
+    adapters: {
+      ...latest.config.adapters,
+      [id]: { ...adapter, enabled },
+    },
+  })
+  await refreshConnectorHealth()
+}
+
 export function connectorWarningCount(snapshot: ConnectorSettingsSnapshot | null, nowMs = Date.now()): number {
   if (!snapshot?.config.serviceEnabled) return 0
   const configuredEnabled = snapshot.definitions.filter((definition) => {

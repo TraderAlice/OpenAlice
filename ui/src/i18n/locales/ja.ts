@@ -2288,6 +2288,12 @@ export const ja: Resources = {
     configurationDialogDescriptionDelivery: '{{name}} の接続と配信設定です。',
     reconnect: '再接続',
     reconnecting: '再接続中…',
+    reconnectingChannel: '{{name}} に再接続しています…',
+    turningOn: '{{name}} をオンにしています…',
+    turningOff: '{{name}} をオフにしています…',
+    reconnectFailed: '{{name}} に再接続できませんでした: {{error}}',
+    turnOnFailed: '{{name}} をオンにできませんでした: {{error}}',
+    turnOffFailed: '{{name}} をオフにできませんでした: {{error}}',
     service: {
       off: '停止中',
       offDescription: 'すべての外部配信は一時停止中です。OpenAlice の受信箱は引き続き利用できます。',

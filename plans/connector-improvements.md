@@ -265,6 +265,21 @@ external adapters remain optional projections rather than sources of truth.
     update boundary instead of making the entire panel live, preventing action
     feedback from re-announcing every control. Starting another action clears the
     stale result; API behavior and external delivery semantics do not change.
+25. **Owned channel cards expose the reversible runtime switch.** Keeping only
+    Manage preserves a quiet card but makes a paused channel require a dialog
+    round trip; adding a Turn on button only while paused shortens recovery yet
+    leaves the inverse stop action hidden. The chosen model reuses the shared
+    `Use <platform>` Toggle for every credential-ready owned channel, beside the
+    existing setup/manage action. It changes only adapter availability: turning
+    a channel on also allows the shared delivery service, while turning it off
+    preserves credentials, private-chat binding, delivery preference, and Chat
+    configuration. Save/restart progress disables that card's switch, and
+    toggle/reconnect failures stay in the same card rather than appearing after
+    unrelated channel groups. The card retains a single document-order action
+    row that wraps on narrow screens; textual lifecycle status and an accessible
+    switch name keep state independent of color. The Connector health domain
+    owns the read-modify-save-refresh transaction so presentation code does not
+    invent a parallel snapshot lifecycle.
 
 ## Ordered Work
 
@@ -319,6 +334,8 @@ external adapters remain optional projections rather than sources of truth.
         touch target without changing shared dismissal behavior.
   - [x] Keep test-delivery and reconnect feedback inside the triggering channel's
         lifecycle panel with localized accessible progress and errors.
+  - [x] Add per-channel runtime switches to credential-ready overview cards and
+        keep their save/reconnect feedback local to the affected card.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -508,6 +525,22 @@ overflow. The isolated demo's pristine fixtures expose no Send test action, so
 dynamic visual states were accepted through the semantic interaction specs
 rather than hidden state injection or a real Connector API call. No external
 message was sent, no Connector state changed, and the viewport was reset.
+
+The overview-runtime-control increment passed 41 focused overview, health-store,
+and Connector demo tests, plus UI typecheck and production build. The domain
+tests prove that starting one channel also allows the shared delivery service,
+while stopping one channel preserves service state and adapter settings. The
+interaction specs cover credential gating, a globally paused channel whose
+retained preference must still render an off runtime switch, local pending
+status, local toggle failure, and local reconnect failure. Real Default
+AliceProject acceptance at 1,052 x 734 showed runtime switches for Discord,
+Telegram, and Feishu but none for pristine Slack. The first layout placed three
+Telegram actions into an accidental two-line wrap; the accepted card footer now
+uses a stable availability row followed by its task-button row. At 390 x 844,
+all labels, switches, reconnect/review buttons, state evidence, and diagnostics
+remained in document order with a page width exactly matching the viewport. No
+control was clicked, no external message was sent, no Connector state changed,
+and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

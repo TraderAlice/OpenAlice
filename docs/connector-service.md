@@ -394,7 +394,15 @@ The surfaces deliberately have different jobs:
   transient runtime changes never reorder established targets and empty groups
   do not add headings. Cards omit the repeated generic delivery subtitle and do
   not impose a fixed minimum height: the state explanation is the primary body,
-  while evidence and the next action remain in stable document order.
+  while evidence and the next action remain in stable document order. Every
+  credential-ready card also exposes the same `Use <platform>` runtime switch as
+  Settings. Turning it on enables the shared service when needed; turning it off
+  preserves credentials, linkage, delivery preference, and Chat configuration.
+  The switch reflects actual runtime availability when the shared service is
+  paused, not merely the adapter's retained preference. Toggle/reconnect
+  progress and failures stay inside the affected card. The health domain reloads
+  current configuration before this whole-config write, then refreshes the live
+  snapshot so the overview does not own a second polling lifecycle.
 - **Activity Bar → Connectors** shows a warning count for enabled, configured
   adapters that are degraded, stopped, unreachable, or stuck in `starting`
   beyond the grace window. `awaiting_link` remains setup state and does not

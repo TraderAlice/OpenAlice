@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDemoConnectorSnapshot } from '../demo/fixtures/connectors'
 import { i18n } from '../i18n'
@@ -24,12 +24,14 @@ const mocks = vi.hoisted(() => ({
   },
   refresh: vi.fn(),
   reconnect: vi.fn(),
+  toggle: vi.fn(),
 }))
 
 vi.mock('../live/connector-health', () => ({
   useConnectorHealthState: () => mocks.state.current,
   refreshConnectorHealth: mocks.refresh,
   reconnectConnector: mocks.reconnect,
+  setConnectorEnabled: mocks.toggle,
 }))
 
 beforeEach(async () => {
@@ -42,6 +44,8 @@ beforeEach(async () => {
     error: null,
     lastUpdatedAt: null,
   }
+  mocks.reconnect.mockResolvedValue('adapter')
+  mocks.toggle.mockResolvedValue(undefined)
 })
 
 afterEach(() => cleanup())
@@ -120,4 +124,95 @@ describe('Connector overview state hierarchy', () => {
     expect(headings(owned)).toEqual(['Discord', 'Slack', 'Feishu'])
     expect(headings(available)).toEqual(['Telegram'])
   })
+
+  it('offers the runtime switch on a credential-ready channel card', async () => {
+    const snapshot = readyDiscordSnapshot()
+    // Pause all preserves the adapter's preference, but the visible runtime
+    // switch still reflects that the channel is not currently running.
+    snapshot.config.adapters.discord.enabled = true
+    mocks.state.current = loaded(snapshot)
+    render(<ConnectorStatusPage />)
+
+    const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    const toggle = within(discord).getByRole('switch', { name: 'Turn Discord on or off' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    expect(screen.queryByRole('switch', { name: 'Turn Slack on or off' })).toBeNull()
+
+    fireEvent.click(toggle)
+    await waitFor(() => expect(mocks.toggle).toHaveBeenCalledWith('discord', true))
+  })
+
+  it('announces a channel runtime change inside the affected card', async () => {
+    let resolveToggle!: () => void
+    mocks.toggle.mockReturnValueOnce(new Promise<void>((resolve) => { resolveToggle = resolve }))
+    mocks.state.current = loaded(readyDiscordSnapshot())
+    render(<ConnectorStatusPage />)
+
+    const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    const toggle = within(discord).getByRole('switch', { name: 'Turn Discord on or off' })
+    fireEvent.click(toggle)
+
+    expect((await within(discord).findByRole('status')).textContent).toBe('Turning Discord on…')
+    expect(toggle.hasAttribute('disabled')).toBe(true)
+    resolveToggle()
+    await waitFor(() => expect(within(discord).queryByRole('status')).toBeNull())
+  })
+
+  it('keeps a failed runtime change inside the affected card', async () => {
+    mocks.toggle.mockRejectedValueOnce(new Error('service unavailable'))
+    mocks.state.current = loaded(readyDiscordSnapshot())
+    render(<ConnectorStatusPage />)
+
+    const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    fireEvent.click(within(discord).getByRole('switch', { name: 'Turn Discord on or off' }))
+
+    const alert = await within(discord).findByRole('alert')
+    expect(alert.textContent).toBe('Couldn’t turn Discord on: service unavailable')
+    expect(screen.getAllByText(/service unavailable/)).toHaveLength(1)
+  })
+
+  it('keeps a failed reconnect inside the affected card', async () => {
+    mocks.reconnect.mockRejectedValueOnce(new Error('socket closed'))
+    mocks.state.current = loaded(readyDiscordSnapshot({ degraded: true }))
+    render(<ConnectorStatusPage />)
+
+    const discord = screen.getByRole('heading', { name: 'Discord' }).closest('article') as HTMLElement
+    fireEvent.click(within(discord).getByRole('button', { name: 'Reconnect' }))
+
+    const alert = await within(discord).findByRole('alert')
+    expect(alert.textContent).toBe('Couldn’t reconnect Discord: socket closed')
+    expect(screen.getAllByText(/socket closed/)).toHaveLength(1)
+  })
 })
+
+function loaded(snapshot: ReturnType<typeof createDemoConnectorSnapshot>) {
+  return {
+    snapshot,
+    loading: false,
+    refreshing: false,
+    error: null,
+    lastUpdatedAt: '2026-08-30T00:00:00.000Z',
+  }
+}
+
+function readyDiscordSnapshot({ degraded = false }: { degraded?: boolean } = {}) {
+  const snapshot = createDemoConnectorSnapshot()
+  snapshot.config.serviceEnabled = degraded
+  snapshot.config.adapters.discord = {
+    enabled: degraded,
+    settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+    configuredSecrets: ['botToken'],
+  }
+  snapshot.health = degraded
+    ? {
+        enabled: true,
+        status: 'degraded',
+        service: {
+          status: 'degraded',
+          startedAt: '2026-08-30T00:00:00.000Z',
+          adapters: [{ id: 'discord', enabled: true, status: 'degraded', lastError: 'connection lost' }],
+        },
+      }
+    : { enabled: false, status: 'disabled' }
+  return snapshot
+}

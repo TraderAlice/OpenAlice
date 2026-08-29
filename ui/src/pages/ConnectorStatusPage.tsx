@@ -25,11 +25,13 @@ import { ConfigurationDialog } from '../components/ConfigurationDialog'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
+import { Toggle } from '../components/Toggle'
 import type { SaveStatus } from '../hooks/useAutoSave'
 import { ConnectorSettingsPanel } from './ConnectorsPage'
 import {
   reconnectConnector,
   refreshConnectorHealth,
+  setConnectorEnabled,
   useConnectorHealthState,
 } from '../live/connector-health'
 import {
@@ -38,10 +40,15 @@ import {
   type ConnectorSetupState,
 } from './connector-setup-state'
 
+type ConnectorOverviewActionError =
+  | { id: string; action: 'reconnect'; message: string }
+  | { id: string; action: 'toggle'; enabled: boolean; message: string }
+
 export function ConnectorStatusPage() {
   const { snapshot, loading, refreshing, error, lastUpdatedAt } = useConnectorHealthState()
   const [reconnectingId, setReconnectingId] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [toggling, setToggling] = useState<{ id: string; enabled: boolean } | null>(null)
+  const [actionError, setActionError] = useState<ConnectorOverviewActionError | null>(null)
   const [configurationOpen, setConfigurationOpen] = useState(false)
   const [configurationId, setConfigurationId] = useState<string | null>(null)
   const configurationTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -56,9 +63,30 @@ export function ConnectorStatusPage() {
     try {
       await reconnectConnector(id)
     } catch (reconnectError) {
-      setActionError(reconnectError instanceof Error ? reconnectError.message : String(reconnectError))
+      setActionError({
+        id,
+        action: 'reconnect',
+        message: reconnectError instanceof Error ? reconnectError.message : String(reconnectError),
+      })
     } finally {
       setReconnectingId(null)
+    }
+  }, [])
+
+  const toggle = useCallback(async (id: string, enabled: boolean) => {
+    setToggling({ id, enabled })
+    setActionError(null)
+    try {
+      await setConnectorEnabled(id, enabled)
+    } catch (toggleError) {
+      setActionError({
+        id,
+        action: 'toggle',
+        enabled,
+        message: toggleError instanceof Error ? toggleError.message : String(toggleError),
+      })
+    } finally {
+      setToggling(null)
     }
   }, [])
 
@@ -120,7 +148,10 @@ export function ConnectorStatusPage() {
                 snapshot={snapshot}
                 onConfigure={configure}
                 onReconnect={reconnect}
+                onToggle={toggle}
                 reconnectingId={reconnectingId}
+                toggling={toggling}
+                actionError={actionError}
                 t={t}
               />
             </>
@@ -134,12 +165,6 @@ export function ConnectorStatusPage() {
               />
             </div>
           ) : null}
-          {actionError && (
-            <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive" role="alert">
-              <CircleAlert size={17} className="mt-0.5 shrink-0" />
-              <p>{actionError}</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -224,13 +249,19 @@ function ConnectorOverview({
   snapshot,
   onConfigure,
   onReconnect,
+  onToggle,
   reconnectingId,
+  toggling,
+  actionError,
   t,
 }: {
   snapshot: ConnectorSettingsSnapshot
   onConfigure: (id: string, trigger: HTMLButtonElement) => void
   onReconnect: (id: string) => Promise<void>
+  onToggle: (id: string, enabled: boolean) => Promise<void>
   reconnectingId: string | null
+  toggling: { id: string; enabled: boolean } | null
+  actionError: ConnectorOverviewActionError | null
   t: TFunction
 }) {
   const runtimeById = useMemo(
@@ -314,7 +345,10 @@ function ConnectorOverview({
           adapters={ownedAdapters}
           onConfigure={onConfigure}
           onReconnect={onReconnect}
+          onToggle={onToggle}
           reconnectingId={reconnectingId}
+          toggling={toggling}
+          actionError={actionError}
           t={t}
         />
       )}
@@ -326,7 +360,10 @@ function ConnectorOverview({
           adapters={availableAdapters}
           onConfigure={onConfigure}
           onReconnect={onReconnect}
+          onToggle={onToggle}
           reconnectingId={reconnectingId}
+          toggling={toggling}
+          actionError={actionError}
           t={t}
         />
       )}
@@ -359,7 +396,10 @@ function ConnectorGroup({
   adapters,
   onConfigure,
   onReconnect,
+  onToggle,
   reconnectingId,
+  toggling,
+  actionError,
   t,
 }: {
   title: string
@@ -367,7 +407,10 @@ function ConnectorGroup({
   adapters: AdapterOverviewItem[]
   onConfigure: (id: string, trigger: HTMLButtonElement) => void
   onReconnect: (id: string) => Promise<void>
+  onToggle: (id: string, enabled: boolean) => Promise<void>
   reconnectingId: string | null
+  toggling: { id: string; enabled: boolean } | null
+  actionError: ConnectorOverviewActionError | null
   t: TFunction
 }) {
   return (
@@ -383,7 +426,11 @@ function ConnectorGroup({
             adapter={adapter}
             onConfigure={onConfigure}
             onReconnect={onReconnect}
+            onToggle={onToggle}
             reconnecting={reconnectingId === adapter.definition.id}
+            toggling={toggling?.id === adapter.definition.id ? toggling : null}
+            actionsBusy={reconnectingId !== null || toggling !== null}
+            actionError={actionError?.id === adapter.definition.id ? actionError : null}
             t={t}
           />
         ))}
@@ -396,19 +443,31 @@ function ConnectorOverviewCard({
   adapter: { definition, runtime, setup, presentation },
   onConfigure,
   onReconnect,
+  onToggle,
   reconnecting,
+  toggling,
+  actionsBusy,
+  actionError,
   t,
 }: {
   adapter: AdapterOverviewItem
   onConfigure: (id: string, trigger: HTMLButtonElement) => void
   onReconnect: (id: string) => Promise<void>
+  onToggle: (id: string, enabled: boolean) => Promise<void>
   reconnecting: boolean
+  toggling: { id: string; enabled: boolean } | null
+  actionsBusy: boolean
+  actionError: ConnectorOverviewActionError | null
   t: TFunction
 }) {
   const supportsLinking = definition.fields.some((field) => Boolean(field.learnedBy))
   const setupAction = setup.stage === 'needs_credentials'
     || setup.stage === 'ready_to_link'
     || setup.stage === 'awaiting_link'
+  const running = setup.stage === 'starting'
+    || setup.stage === 'awaiting_link'
+    || setup.stage === 'linked'
+    || setup.stage === 'error'
   const ActionIcon = setupAction ? ArrowRight : Settings2
 
   return (
@@ -456,30 +515,62 @@ function ConnectorOverviewCard({
         </DiagnosticDetails>
       )}
 
-      <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border/60 pt-4">
-        {setup.stage === 'error' && (
+      <div className="mt-auto border-t border-border/60 pt-4">
+        {setup.ready && (
+          <div className="flex min-h-10 items-center justify-between gap-3">
+            <span className="text-[12.5px] font-medium text-foreground">
+              {t('connectorSettings.useConnector', { name: definition.label })}
+            </span>
+            <Toggle
+              size="sm"
+              checked={running}
+              disabled={actionsBusy}
+              ariaLabel={t('connectorSettings.useConnectorAria', { name: definition.label })}
+              onChange={(enabled) => void onToggle(definition.id, enabled)}
+            />
+          </div>
+        )}
+        <div className={`flex flex-wrap items-center gap-2 ${setup.ready ? 'mt-3' : ''}`}>
+          {setup.stage === 'error' && (
+            <button
+              type="button"
+              className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              disabled={actionsBusy}
+              onClick={() => void onReconnect(definition.id)}
+            >
+              <RefreshCw size={13} className={reconnecting ? 'animate-spin motion-reduce:animate-none' : ''} />
+              {reconnecting ? t('connectorStatus.reconnecting') : t('connectorStatus.reconnect')}
+            </button>
+          )}
           <button
             type="button"
-            className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
-            disabled={reconnecting}
-            onClick={() => void onReconnect(definition.id)}
+            className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
+              ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+              : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
+            }`}
+            onClick={(event) => onConfigure(definition.id, event.currentTarget)}
           >
-            <RefreshCw size={13} className={reconnecting ? 'animate-spin motion-reduce:animate-none' : ''} />
-            {reconnecting ? t('connectorStatus.reconnecting') : t('connectorStatus.reconnect')}
+            <ActionIcon size={13} aria-hidden />
+            {adapterActionLabel(setup.stage, definition.label, t)}
           </button>
-        )}
-        <button
-          type="button"
-          className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${setupAction
-            ? 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-            : 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
-          }`}
-          onClick={(event) => onConfigure(definition.id, event.currentTarget)}
-        >
-          <ActionIcon size={13} aria-hidden />
-          {adapterActionLabel(setup.stage, definition.label, t)}
-        </button>
+        </div>
       </div>
+      {(toggling || reconnecting) && (
+        <div role="status" aria-live="polite" aria-atomic="true" className="mt-3 flex items-start gap-2 text-[11.5px] text-muted-foreground">
+          <RefreshCw size={13} className="mt-0.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+          <span>{t(toggling
+            ? (toggling.enabled ? 'connectorStatus.turningOn' : 'connectorStatus.turningOff')
+            : 'connectorStatus.reconnectingChannel', { name: definition.label })}</span>
+        </div>
+      )}
+      {!toggling && !reconnecting && actionError && (
+        <div role="alert" className="mt-3 flex items-start gap-2 text-[11.5px] text-destructive">
+          <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden />
+          <span>{t(actionError.action === 'toggle'
+            ? (actionError.enabled ? 'connectorStatus.turnOnFailed' : 'connectorStatus.turnOffFailed')
+            : 'connectorStatus.reconnectFailed', { name: definition.label, error: actionError.message })}</span>
+        </div>
+      )}
     </article>
   )
 }

@@ -2287,6 +2287,12 @@ export const zh: Resources = {
     configurationDialogDescriptionDelivery: '{{name}} 的连接与投递设置。',
     reconnect: '重新连接',
     reconnecting: '正在重新连接…',
+    reconnectingChannel: '正在重新连接 {{name}}…',
+    turningOn: '正在启用 {{name}}…',
+    turningOff: '正在停用 {{name}}…',
+    reconnectFailed: '未能重新连接 {{name}}：{{error}}',
+    turnOnFailed: '未能启用 {{name}}：{{error}}',
+    turnOffFailed: '未能停用 {{name}}：{{error}}',
     service: {
       off: '已关闭',
       offDescription: '所有外部投递均已暂停，OpenAlice 收件箱不受影响。',

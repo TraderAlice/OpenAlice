@@ -2320,6 +2320,12 @@ export const en = {
     configurationDialogDescriptionDelivery: 'Connection and delivery settings for {{name}}.',
     reconnect: 'Reconnect',
     reconnecting: 'Reconnecting…',
+    reconnectingChannel: 'Reconnecting {{name}}…',
+    turningOn: 'Turning {{name}} on…',
+    turningOff: 'Turning {{name}} off…',
+    reconnectFailed: 'Couldn’t reconnect {{name}}: {{error}}',
+    turnOnFailed: 'Couldn’t turn {{name}} on: {{error}}',
+    turnOffFailed: 'Couldn’t turn {{name}} off: {{error}}',
     service: {
       off: 'Off',
       offDescription: 'All external delivery is paused. Your OpenAlice Inbox keeps working.',
