@@ -1,23 +1,23 @@
-export type OfficeRosterDirection = 'left' | 'right' | 'up' | 'down'
+export type OfficeGridDirection = 'left' | 'right' | 'up' | 'down'
 
-export interface OfficeRosterFocusRect {
+export interface OfficeGridFocusRect {
   left: number
   right: number
   top: number
   bottom: number
 }
 
-function rectCenter(rect: OfficeRosterFocusRect) {
+function rectCenter(rect: OfficeGridFocusRect) {
   return {
     x: (rect.left + rect.right) / 2,
     y: (rect.top + rect.bottom) / 2,
   }
 }
 
-export function nextOfficeRosterIndex(
-  rects: readonly OfficeRosterFocusRect[],
+export function nextOfficeGridIndex(
+  rects: readonly OfficeGridFocusRect[],
   currentIndex: number,
-  direction: OfficeRosterDirection,
+  direction: OfficeGridDirection,
 ) {
   const current = rects[currentIndex]
   if (!current) return currentIndex

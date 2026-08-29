@@ -85,6 +85,30 @@ describe('OfficeCabinetWindow', () => {
     expect(container.querySelector('.oa-office-window__title-kind')?.textContent).toBe('Filing cabinet')
     expect(container.querySelector('.oa-office-window__title-separator')?.textContent).toBe('·')
 
+    const recordButtons = screen.getAllByRole('button', { name: /Open .* in Workspace/ })
+    expect(document.activeElement).toBe(recordButtons[0])
+    vi.spyOn(recordButtons[0]!, 'getBoundingClientRect').mockReturnValue({
+      left: 0, right: 100, top: 0, bottom: 60,
+    } as DOMRect)
+    vi.spyOn(recordButtons[1]!, 'getBoundingClientRect').mockReturnValue({
+      left: 120, right: 220, top: 0, bottom: 60,
+    } as DOMRect)
+    await userEvent.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(recordButtons[1])
+    await userEvent.keyboard('{Home}')
+    expect(document.activeElement).toBe(recordButtons[0])
+    await userEvent.keyboard('{End}')
+    expect(document.activeElement).toBe(recordButtons[1])
+
+    const workspaceFiles = screen.getByRole('button', { name: 'Enter Workspace files' })
+    const close = screen.getByRole('button', { name: 'Close' })
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(workspaceFiles)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(close)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(recordButtons[1])
+
     const recordExit = screen.getByRole('button', { name: 'Open Review queue in Workspace' })
     expect(recordExit.querySelector<HTMLImageElement>('.oa-office-cabinet-window__destination img')?.src)
       .toContain('/office/hud/session-portal-v2.png')
@@ -92,14 +116,14 @@ describe('OfficeCabinetWindow', () => {
     expect(onOpenRecord).toHaveBeenCalledWith(group.employees[1], group.employees[1].drawers[0])
     expect(onOpenWorkspaceFiles).not.toHaveBeenCalled()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Enter Workspace files' }))
+    await userEvent.click(workspaceFiles)
     expect(onOpenWorkspaceFiles).toHaveBeenCalledTimes(1)
 
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('uses the generated open drawer for a compact empty cabinet', () => {
+  it('uses the generated open drawer and focuses the empty cabinet exit', async () => {
     const emptyGroup: OfficeRoomSnapshot = {
       ...group,
       employees: group.employees.map((employee) => ({ ...employee, drawers: [] })),
@@ -120,5 +144,12 @@ describe('OfficeCabinetWindow', () => {
     expect(screen.getByText('No desk records have been filed here yet.')).toBeTruthy()
     expect(container.querySelector<HTMLImageElement>('.oa-office-cabinet-window__empty img')?.src)
       .toContain('/office/furniture/empty-cabinet-v1.png')
+    const workspaceFiles = screen.getByRole('button', { name: 'Enter Workspace files' })
+    const close = screen.getByRole('button', { name: 'Close' })
+    expect(document.activeElement).toBe(workspaceFiles)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(close)
+    await userEvent.keyboard('{Tab}')
+    expect(document.activeElement).toBe(workspaceFiles)
   })
 })

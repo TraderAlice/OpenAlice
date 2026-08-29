@@ -7,7 +7,7 @@ import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeCoworkerLabel } from './label'
-import { nextOfficeRosterIndex } from './roster-navigation'
+import { nextOfficeGridIndex } from './grid-navigation'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeRosterWindow({
@@ -93,7 +93,7 @@ export function OfficeRosterWindow({
             if (currentIndex < 0) return
             let nextIndex = currentIndex
             if (direction) {
-              nextIndex = nextOfficeRosterIndex(
+              nextIndex = nextOfficeGridIndex(
                 buttons.map((button) => button.getBoundingClientRect()),
                 currentIndex,
                 direction,

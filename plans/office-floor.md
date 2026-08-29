@@ -2228,6 +2228,22 @@ Superseded scene-graph removal follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 611-file Vitest run (5,057 passing; one file and nine tests skipped), and the UI
   production build passed; the built CSS fell from 372.87 kB to 357.96 kB.
 
+Filing-cabinet inventory navigation follow-up (2026-08-29):
+
+- Browser-played a filed Semis cabinet and the empty Auto Quant cabinet before choosing the interaction. Both windows
+  initially focused Close, so the first game-menu action was unavailable until extra Tab presses; arrow keys did not
+  move between filed records even though the responsive record list can form a physical grid.
+- Compared changing only the initial focus, adding linear arrow navigation, and sharing the roster's geometry-aware
+  roving-focus model. Chose the shared grid model: filed cabinets begin on the newest record, arrows follow the rendered
+  columns, Home/End reach the bounds, and Tab loops record -> Workspace files -> Close -> the retained record. Empty
+  cabinets begin on Workspace files and loop directly through Close.
+- Generalized the roster helper into an Office grid-navigation primitive rather than duplicating cabinet-only key
+  logic. Browser-played the populated focus loop at 1280x900 and the empty cabinet at 390x844; the selected record and
+  primary empty-state exit were visually clear, and the phone dialog fit without internal scrolling.
+- Focused cabinet, roster, and shared-navigation specs passed: 3 files / 5 tests, together with `cd ui && npx tsc -b`.
+  `npx tsc --noEmit`, the 611-file Vitest run (5,057 passing; one file and nine tests skipped), and the UI production
+  build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
