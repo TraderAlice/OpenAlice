@@ -61,7 +61,7 @@ describe('demo Connector handlers', () => {
     expect(refreshed.health.status).toBe('degraded')
   })
 
-  it('binds, updates, and disables the demo Telegram phone desk', async () => {
+  it('binds, updates, and disables demo Chat on Telegram', async () => {
     const missing = await fetch(`${baseUrl}/api/connectors/telegram/desk`)
     expect(await missing.json()).toEqual({ desk: null })
 
@@ -74,6 +74,8 @@ describe('demo Connector handlers', () => {
     expect(created.status).toBe(201)
     expect(createdBody.desk.wsId).toBe('ws-demo')
     expect(createdBody.desk.issue.telegramConnector).toBe(true)
+    expect(createdBody.desk.issue.title).toBe('Chat on Telegram')
+    expect(createdBody.desk.issue.what).not.toMatch(/phone desk/i)
 
     const conflict = await fetch(`${baseUrl}/api/connectors/telegram/desk`, {
       method: 'POST',

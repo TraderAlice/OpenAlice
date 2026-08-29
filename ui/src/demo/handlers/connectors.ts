@@ -41,7 +41,7 @@ export const connectorsHandlers = [
     const body = await request.json().catch(() => null)
     const wsId = isRecord(body) && typeof body.wsId === 'string' ? body.wsId.trim() : ''
     if (!wsId) return HttpResponse.json({ error: 'invalid', message: 'wsId is required' }, { status: 400 })
-    if (desk) return HttpResponse.json({ error: 'conflict', message: 'Telegram phone desk already exists' }, { status: 409 })
+    if (desk) return HttpResponse.json({ error: 'conflict', message: 'Chat on Telegram already exists' }, { status: 409 })
     desk = demoDesk(wsId)
     return HttpResponse.json({ desk }, { status: 201 })
   }),
@@ -148,9 +148,9 @@ function demoDesk(wsId: string): TelegramConnectorDesk {
     wsId,
     issue: {
       id: 'telegram-phone-desk',
-      title: 'Telegram phone desk',
+      title: 'Chat on Telegram',
       what: [
-        'You are the Telegram phone desk for this Workspace.',
+        'You are the chat connected to the owner through Telegram.',
         '',
         "On each scheduled wake, read this Issue's recent comments (the chat with the human).",
         'If the human needs a message, write that message as your reply.',

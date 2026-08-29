@@ -152,7 +152,12 @@ export function TelegramDeskPanel({
                 <p className="mb-2 mt-1 text-[11.5px] leading-5 text-muted-foreground">
                   {t('connectorSettings.desk.whatDescription')}
                 </p>
-                <MarkdownWhatEditor value={desk.issue.what} onSave={saveWhat} />
+                <MarkdownWhatEditor
+                  value={desk.issue.what}
+                  onSave={saveWhat}
+                  ariaLabel={t('connectorSettings.desk.what')}
+                  placeholder={t('connectorSettings.desk.whatPlaceholder')}
+                />
               </div>
             </div>
           )}

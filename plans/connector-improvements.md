@@ -180,6 +180,19 @@ external adapters remain optional projections rather than sources of truth.
     lift the same primitive into the shared dialog's fixed header accessory;
     full Settings pages keep it in PageHeader. Explicit credential saves remain
     field/group actions and never masquerade as autosave.
+18. **Connector chat uses conversation language first and scheduling mechanics
+    second.** Keeping `Agent chat`, `phone desk`, and `Heartbeat` in the primary
+    UI exposes three implementation models for one simple promise; hiding all
+    scheduling would make an autonomous chat's behavior impossible to inspect.
+    The chosen model describes the product as Workspace conversations and keeps
+    each adapter's concrete `Chat on <platform>` name. The optional disclosure is
+    renamed Scheduled check-ins, with a check-in schedule and prompt inside.
+    Underlying Issue, comment, cadence, `[[no-reply]]`, and connector-desk IDs do
+    not change. Existing Issue titles/prompts remain user-owned content and are
+    not silently rewritten; new/demo content and UI-authored defaults use the
+    conversation wording. The shared Markdown editor accepts contextual
+    accessible labels/placeholders so this surface does not announce a generic
+    Issue description.
 
 ## Ordered Work
 
@@ -220,6 +233,8 @@ external adapters remain optional projections rather than sources of truth.
         state-preserving recovery on overview and configuration surfaces.
   - [x] Make shared autosave feedback localized and accessible without changing
         Connector credential-save boundaries.
+  - [x] Replace remaining Connector chat setup jargon with conversation and
+        scheduled-check-in language while preserving Issue semantics.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -320,6 +335,26 @@ scrolled without covering setup copy, the narrow title retained its hierarchy,
 and the temporary demo tab, viewport override, and process were removed. The
 increment also cancels delayed health refreshes when the settings surface
 unmounts or a newer save supersedes them, preventing stale background work.
+
+The conversation-language increment passed 41 focused editor/chat/demo tests,
+UI and root typechecks, the production build, and all 5,111 repository tests.
+Real-route acceptance covered the linked Feishu dialog at desktop and 390 px:
+the hierarchy now reads Chat on Feishu, Scheduled check-ins, Check-in schedule,
+and Check-in prompt without horizontal overflow. The existing user-authored
+prompt remained unchanged and visible, confirming the UI does not rewrite durable
+Issue content. Four locales and the demo-created chat use the same product model.
+
+During isolated-demo setup, one terminal request to Vite port 5174 bypassed the
+browser-only MSW layer and was proxied to a separate Office development instance
+on 47331. The active acceptance instance on 47431 was unchanged. The Office home
+had no Connector config files before that request: the three affected files had
+all been created at the request timestamp while the rest of its config predated
+them. Recovery first disabled the mistakenly started service, then removed only
+those newly created `connectors.json`, `connector-service.json`, and restart-flag
+files. A readback returned the original default state: service disabled, every
+adapter unconfigured, and no saved credentials. No external message was sent;
+the temporary demo credential produced only a platform 404. Subsequent browser
+acceptance used visible read-only UI interaction only.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

@@ -284,8 +284,9 @@ slash-command menu. Subscribe to `im.message.receive_v1`, keep availability
 limited to the owner, and leave IP allowlists empty unless the Connector
 egress IP is listed. Group custom-bot webhooks are send-only and are not this
 connector. `/inbox`, `/settings`, and `/uta` currently reply with placeholders;
-owner-chat desk and Inbox push are implemented. Each Feishu desk is its own
-Issue (`feishu-phone-desk`), not the Telegram phone desk.
+owner chat and Inbox push are implemented. Each platform chat is its own
+connector-chat Issue (for example, `feishu-phone-desk`), independent from the
+Telegram chat Issue.
 
 Saving valid bot credentials does not mean the connector is linked. Settings
 must present the lifecycle explicitly: credentials ready, bot online and
@@ -351,19 +352,20 @@ The surfaces deliberately have different jobs:
   losing its drafts. Once linked, the lifecycle panel keeps routine availability
   and test controls visible; Unlink lives inside Connection details beside token
   replacement/removal and explains that sealed credentials remain available.
-  The Telegram card also
-  binds that connector's phone-desk Issue when the adapter advertises `desk`:
+  A desk-capable adapter also binds that connector's chat Issue when its
+  definition advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator
-  can edit What and heartbeat cadence, then open the ordinary Issue detail
-  for comments. Generic Issue create/update cannot set `connectorDesk`.
-- Each phone-desk Issue is hidden from the Issue board and Tracked list. It
+  can edit the scheduled check-in prompt and cadence, then open the ordinary
+  Issue detail for comments. Generic Issue create/update cannot set
+  `connectorDesk`.
+- Each connector-chat Issue is hidden from the Issue board and Tracked list. It
   still fires on `when`. Extra desks for the same connector in other
   Workspaces do not fire. Owner DMs become comments on that connector's
   Issue; the desk is seeded with `commentPrompt: '{comment}'` so those
   comments are the reply Input Prompt as-is. Scheduled-fire `assistantText`
   is stamped as a comment. Connector projects those comments unless they
   contain the literal tag `[[no-reply]]` or arrived from that connector.
-  Pending comment replies also carry compact turn progress. The phone desk
+  Pending comment replies also carry compact turn progress. The connector chat
   ships sealed mid-turn `text` blocks (the last consecutive text before a
   tool or error) and skips tool/error blocks. A text already sent this way
   is not sent again as the final comment.
