@@ -88,6 +88,34 @@ jobs:
           path: notes.md
           if-no-files-found: error
 
+  preflight-public-cli-authority:
+    name: Preflight public CLI channel authority
+    needs: release
+    if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+
+      - name: Verify every opted-in public channel before release publication
+        if: needs.release.outputs.prerelease == 'false'
+        run: node scripts/preflight-public-cli-authority.mjs
+        env:
+          OPENALICE_PUBLISH_NPM: ${{ vars.OPENALICE_PUBLISH_NPM }}
+          OPENALICE_PUBLISH_HOMEBREW: ${{ vars.OPENALICE_PUBLISH_HOMEBREW }}
+          OPENALICE_PUBLISH_AUR: ${{ vars.OPENALICE_PUBLISH_AUR }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_KNOWN_HOSTS: ${{ secrets.AUR_KNOWN_HOSTS }}
+
   # Per-platform desktop installers are built before any tag or GitHub Release
   # exists. Each runner builds only its own platform/arch, preserves the candidate
   # immediately after fast package acceptance, and leaves the slower N-1 upgrade
@@ -95,7 +123,7 @@ jobs:
   # builds are signed and notarized through Developer ID secrets; Windows remains
   # unsigned until a Windows code-signing certificate exists.
   build-desktop:
-    needs: release
+    needs: [release, preflight-public-cli-authority]
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
     timeout-minutes: 45
     strategy:
@@ -285,7 +313,7 @@ jobs:
 
   cli-installer-acceptance:
     name: Accept CLI installer candidate
-    needs: release
+    needs: [release, preflight-public-cli-authority]
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -307,7 +335,7 @@ jobs:
 
   build-cli-release:
     name: Build native CLI (${{ matrix.platform }}-${{ matrix.arch }})
-    needs: release
+    needs: [release, preflight-public-cli-authority]
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
     strategy:
       fail-fast: false
@@ -705,7 +733,7 @@ jobs:
   # native CLI candidates instead of serializing them in desktop jobs.
   build-broker-packs:
     name: Build Broker Packs (${{ matrix.os }}, ${{ matrix.arch }})
-    needs: release
+    needs: [release, preflight-public-cli-authority]
     if: needs.release.outputs.created == 'true' && !github.event.inputs.mirror_tag
     timeout-minutes: 30
     strategy:
@@ -756,8 +784,8 @@ jobs:
 
   publish-release:
     name: Publish accepted release
-    needs: [release, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
-    if: needs.release.outputs.created == 'true' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-linuxbrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.accept-cli-legacy-cutover.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
+    needs: [release, preflight-public-cli-authority, build-desktop, accept-desktop-upgrade, build-cli-release, build-cli-package-channels, accept-cli-homebrew, accept-cli-linuxbrew, accept-cli-aur, accept-cli-legacy-cutover, build-broker-packs, cli-installer-acceptance]
+    if: needs.release.outputs.created == 'true' && needs.preflight-public-cli-authority.result == 'success' && needs.build-desktop.result == 'success' && needs.accept-desktop-upgrade.result == 'success' && needs.build-cli-release.result == 'success' && needs.build-cli-package-channels.result == 'success' && needs.accept-cli-homebrew.result == 'success' && needs.accept-cli-linuxbrew.result == 'success' && needs.accept-cli-aur.result == 'success' && needs.accept-cli-legacy-cutover.result == 'success' && needs.build-broker-packs.result == 'success' && needs.cli-installer-acceptance.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read

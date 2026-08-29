@@ -107,6 +107,15 @@ External channels are explicit release switches:
 | Homebrew | `OPENALICE_PUBLISH_HOMEBREW=true` | `HOMEBREW_TAP_TOKEN` with write access to `TraderAlice/homebrew-tap` |
 | AUR / paru | `OPENALICE_PUBLISH_AUR=true` | dedicated `AUR_SSH_PRIVATE_KEY` plus manually verified `AUR_KNOWN_HOSTS` |
 
+Before a stable GitHub Release can be created, the release workflow preflights
+every enabled switch. npm must identify the token owner and confirm that all
+five package names already list that identity as a maintainer; the Homebrew
+token must see `TraderAlice/homebrew-tap` with push authority; and the AUR key
+plus pinned known-hosts entry must be able to read the `openalice-bin` Git
+repository. Disabled channels perform no external authority checks. This makes
+missing setup a release-planning failure instead of discovering it after the
+accepted assets are already public.
+
 The Tap and AUR writers are idempotent: if the verified metadata is already
 active, they make no commit. AUR never learns its SSH host key from the same
 untrusted connection used to publish; the maintainer supplies the verified

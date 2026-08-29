@@ -464,6 +464,9 @@ build harness when it improves the next investigation.
 - [x] Record and enforce platform-first/meta-last npm publication after the
   GitHub Release succeeds. Stable publication remains explicitly disabled
   until registry authority and package names are established.
+- [x] Preflight every opted-in public channel before expensive release builds:
+  prove npm package maintainership, Homebrew Tap push access, and pinned-host
+  AUR Git access without logging or weakening the external credentials.
 - [ ] Publish Brew/AUR metadata only after the referenced release assets are
   public and verified. The opt-in automation and public-byte receipt are ready;
   external repository creation, credentials, activation, and first public
