@@ -373,6 +373,13 @@ The surfaces deliberately have different jobs:
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
   configuration surface.
 
+Both product surfaces distinguish absence from staleness. A first load uses a
+layout-matched skeleton; if no snapshot or configuration can be read, the
+surface shows a focused retry state instead of an empty pane or raw transport
+error. When last-known data exists, a refresh failure keeps it visible with an
+explicit stale-state notice. In-dialog runtime retry refreshes health only so it
+cannot replace unsaved credential drafts.
+
 The Connector Service switch is a secondary pause-all control. Starting an
 adapter from the setup flow enables the service automatically, so it is not a
 separate first-use prerequisite; pausing the global service never deletes sealed

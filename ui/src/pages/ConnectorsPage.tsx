@@ -6,6 +6,7 @@ import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnect
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
+import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { TelegramDeskPanel } from '../components/TelegramDeskPanel'
@@ -330,6 +331,30 @@ function ConnectorSettingsSurface({
               </div>
             </div>
           )}
+          {!config && !loadError && (
+            <ConnectorSettingsSkeleton compact={adapterOnly} label={t('connectorSettings.loading')} />
+          )}
+          {!config && loadError && (
+            <div className={`overflow-hidden rounded-2xl border border-border/70 ${adapterOnly
+              ? 'h-[min(34rem,calc(100dvh-9rem))]'
+              : 'h-[28rem]'
+            }`}>
+              <RecoverySurface
+                title={t('connectorSettings.loadErrorTitle')}
+                description={t('connectorSettings.loadErrorDescription')}
+                actionLabel={t('common.retry')}
+                onAction={() => { void load() }}
+              />
+            </div>
+          )}
+          {config && loadError && (
+            <RefreshNotice
+              message={t('connectorSettings.refreshError')}
+              actionLabel={t('common.retry')}
+              onAction={() => { void refreshRuntime() }}
+              className="mb-4"
+            />
+          )}
           {config && (
             <>
               {!adapterOnly && (
@@ -474,7 +499,6 @@ function ConnectorSettingsSurface({
             </>
           )}
           {testError && <p className="mt-4 text-[13px] text-destructive">{testError}</p>}
-          {loadError && <p className="text-[13px] text-destructive">{t('connectorSettings.loadError')}</p>}
         </div>
       </SettingsScrollArea>
 
@@ -551,6 +575,30 @@ function ConnectorSettingsSurface({
           onClose={() => setPendingSecretRemoval(null)}
         />
       )}
+    </div>
+  )
+}
+
+function ConnectorSettingsSkeleton({ compact, label }: { compact: boolean; label: string }) {
+  const rows = compact ? 3 : 5
+  return (
+    <div role="status" aria-label={label} aria-busy="true" className="space-y-4">
+      {Array.from({ length: rows }).map((_, index) => (
+        <section
+          key={index}
+          className={`rounded-xl border border-border/70 bg-secondary/15 ${index === 0 ? 'p-4' : 'px-4 py-3.5'}`}
+        >
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className={`h-3.5 ${index % 2 === 0 ? 'w-36' : 'w-28'}`} />
+              <Skeleton className="h-3 w-full max-w-md" />
+            </div>
+            <Skeleton className="h-6 w-12 rounded-full" />
+          </div>
+          {index === 0 && <Skeleton className="mt-4 h-14 w-full rounded-lg" />}
+        </section>
+      ))}
     </div>
   )
 }

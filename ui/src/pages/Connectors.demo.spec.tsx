@@ -374,6 +374,18 @@ describe('Connector demo routes', () => {
     expect(screen.queryByRole('button', { name: 'Send test' })).toBeNull()
   })
 
+  it('recovers when connection settings fail to load', async () => {
+    mocks.load.mockRejectedValueOnce(new Error('socket closed'))
+    render(<ConnectorsPage />)
+
+    expect(await screen.findByRole('heading', { name: 'Connection settings are unavailable' })).toBeTruthy()
+    expect(screen.queryByText('socket closed')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Allow external delivery')).toBeTruthy()
+    expect(mocks.load).toHaveBeenCalledTimes(2)
+  })
+
   it('localizes Connector setup state and credential controls', async () => {
     await i18n.changeLanguage('zh')
     const snapshot = createDemoConnectorSnapshot()

@@ -155,6 +155,18 @@ external adapters remain optional projections rather than sources of truth.
     `Run connector`; its localized switch name describes turning that platform on
     or off. The maintenance row stacks naturally at narrow widths, and confirmation
     remains the final guard before the learned account identity is cleared.
+16. **Loading and recovery preserve the user's last trustworthy context.** A
+    spinner in a blank page followed by a raw error strip gives no sense of the
+    surface being loaded, while replacing a previously useful snapshot with a
+    full error state turns a transient poll failure into apparent data loss.
+    Silently keeping stale state would avoid disruption but conceal that status
+    may be outdated. The chosen hierarchy uses layout-matched skeletons only for
+    the first load, a focused recovery surface with Retry when no snapshot or
+    configuration can be rendered, and a compact warning notice when last-known
+    data remains usable. Overview retries reload the live snapshot; an in-dialog
+    stale-health retry refreshes runtime only so it cannot overwrite credential
+    drafts. Error meaning is conveyed by text and icon, retry remains a native
+    button, and narrow layouts keep the notice/action in document order.
 
 ## Ordered Work
 
@@ -191,6 +203,8 @@ external adapters remain optional projections rather than sources of truth.
         per-token replacement and removal for configured credentials.
   - [x] Separate routine runtime controls from destructive linked-account
         maintenance and remove remaining runtime-facing Connector jargon.
+  - [x] Replace blank Connector loading/failure states with skeletons and
+        state-preserving recovery on overview and configuration surfaces.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -272,6 +286,15 @@ only `Use Feishu` and Send test, while Unlink appears with preservation copy ins
 Connection details beside credential maintenance. The maintenance row becomes a
 full-width action on narrow screens and the page remains exactly 390 px wide. No
 test, toggle, credential, removal, or unlink action was triggered.
+
+The loading/recovery increment passed 31 focused state/setup/UI tests, UI and
+root typechecks, the production build, and all 5,106 repository tests. Browser
+acceptance used isolated
+Vite instances and an ephemeral fake backend: it covered the overview recovery
+surface, a configuration-dialog recovery surface, and last-known overview data
+with a non-blocking refresh notice at desktop and 390 px. Every narrow state
+matched the 390 px viewport without horizontal overflow. The isolated processes
+and tabs were removed afterward; the real `/connectors` tab remained unchanged.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

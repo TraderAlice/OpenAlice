@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next'
 import type { ConnectorHealth, ConnectorSettingsSnapshot } from '../api'
 import { ConfigurationDialog } from '../components/ConfigurationDialog'
 import { PageHeader } from '../components/PageHeader'
-import { Spinner } from '../components/StateViews'
+import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
 import { ConnectorSettingsPanel } from './ConnectorsPage'
 import {
   reconnectConnector,
@@ -90,26 +90,34 @@ export function ConnectorStatusPage() {
       <div className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-6">
         <div className="mx-auto max-w-[1040px] space-y-6">
           {loading && !snapshot ? (
-            <div className="flex justify-center py-24"><Spinner /></div>
+            <ConnectorOverviewSkeleton label={t('connectorStatus.loading')} />
           ) : snapshot ? (
-            <ConnectorOverview
-              snapshot={snapshot}
-              onConfigure={configure}
-              onReconnect={reconnect}
-              reconnectingId={reconnectingId}
-              t={t}
-            />
-          ) : null}
-
-          {error && (
-            <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive" role="alert">
-              <CircleAlert size={17} className="mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium">{t('connectorStatus.loadError')}</p>
-                <p className="mt-0.5 text-muted-foreground">{error}</p>
-              </div>
+            <>
+              {error && (
+                <RefreshNotice
+                  message={t('connectorStatus.refreshError')}
+                  actionLabel={t('common.retry')}
+                  onAction={() => { void refreshConnectorHealth() }}
+                />
+              )}
+              <ConnectorOverview
+                snapshot={snapshot}
+                onConfigure={configure}
+                onReconnect={reconnect}
+                reconnectingId={reconnectingId}
+                t={t}
+              />
+            </>
+          ) : error ? (
+            <div className="h-[28rem] overflow-hidden rounded-2xl border border-border/70">
+              <RecoverySurface
+                title={t('connectorStatus.loadErrorTitle')}
+                description={t('connectorStatus.loadErrorDescription')}
+                actionLabel={t('common.retry')}
+                onAction={() => { void refreshConnectorHealth() }}
+              />
             </div>
-          )}
+          ) : null}
           {actionError && (
             <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive" role="alert">
               <CircleAlert size={17} className="mt-0.5 shrink-0" />
@@ -140,6 +148,48 @@ export function ConnectorStatusPage() {
           <ConnectorSettingsPanel connectorId={configurationId} flushRef={configurationFlushRef} />
         </ConfigurationDialog>
       )}
+    </div>
+  )
+}
+
+function ConnectorOverviewSkeleton({ label }: { label: string }) {
+  return (
+    <div role="status" aria-label={label} aria-busy="true" className="space-y-6">
+      <section className="rounded-xl border border-border bg-secondary/20 px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="h-3 w-full max-w-lg" />
+          </div>
+        </div>
+      </section>
+      <section>
+        <div className="mb-3.5 space-y-2 px-0.5">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-3 w-72 max-w-full" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <article key={index} className="rounded-2xl border border-border bg-secondary/15 p-5 lg:min-h-[250px]">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className={`h-4 ${index % 2 === 0 ? 'w-24' : 'w-20'}`} />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+              <Skeleton className="mt-4 h-16 w-full rounded-xl" />
+              <div className="mt-4 flex gap-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+              <Skeleton className="mt-12 h-9 w-28 rounded-lg" />
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
