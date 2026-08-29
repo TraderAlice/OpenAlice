@@ -986,6 +986,7 @@ export const zh: Resources = {
     save: '保存',
     saving: '保存中…',
     saved: '已保存',
+    saveFailed: '保存失败',
     cancel: '取消',
     show: '显示',
     hide: '隐藏',

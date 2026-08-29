@@ -167,6 +167,19 @@ external adapters remain optional projections rather than sources of truth.
     stale-health retry refreshes runtime only so it cannot overwrite credential
     drafts. Error meaning is conveyed by text and icon, retry remains a native
     button, and narrow layouts keep the notice/action in document order.
+17. **Autosave feedback is a shared, perceivable status—not Connector-specific
+    chrome.** A Connector-only toast would make ordinary setting changes visible
+    but duplicate the shared settings save lifecycle; leaving the current tiny
+    English color dot preserves ambiguity and fails localization/accessibility.
+    The chosen model upgrades the shared SaveIndicator used by Settings: localized
+    Saving, Saved, Save failed, and Retry labels; a distinct progress/check/error
+    icon in addition to color; and one polite atomic live region so status changes
+    are announced without stealing focus. Retry remains a real `type=button`
+    control. Narrow-browser acceptance rejected the previous zero-height sticky
+    overlay because it covered scrolled setup copy. Connector dialogs therefore
+    lift the same primitive into the shared dialog's fixed header accessory;
+    full Settings pages keep it in PageHeader. Explicit credential saves remain
+    field/group actions and never masquerade as autosave.
 
 ## Ordered Work
 
@@ -205,6 +218,8 @@ external adapters remain optional projections rather than sources of truth.
         maintenance and remove remaining runtime-facing Connector jargon.
   - [x] Replace blank Connector loading/failure states with skeletons and
         state-preserving recovery on overview and configuration surfaces.
+  - [x] Make shared autosave feedback localized and accessible without changing
+        Connector credential-save boundaries.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -295,6 +310,16 @@ surface, a configuration-dialog recovery surface, and last-known overview data
 with a non-blocking refresh notice at desktop and 390 px. Every narrow state
 matched the 390 px viewport without horizontal overflow. The isolated processes
 and tabs were removed afterward; the real `/connectors` tab remained unchanged.
+
+The shared-save-feedback increment passed 31 focused Connector/SaveIndicator
+tests, UI and root typechecks, the production build, and all 5,110 repository
+tests. Demo-browser acceptance changed only a non-secret Discord Application ID
+and verified Saving/Saved feedback in the fixed configuration-dialog header at
+desktop and 390 px widths. The status remained visible while the form was
+scrolled without covering setup copy, the narrow title retained its hierarchy,
+and the temporary demo tab, viewport override, and process were removed. The
+increment also cancels delayed health refreshes when the settings surface
+unmounts or a newer save supersedes them, preventing stale background work.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

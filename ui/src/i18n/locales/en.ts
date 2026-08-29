@@ -998,6 +998,7 @@ export const en = {
     save: 'Save',
     saving: 'Saving…',
     saved: 'Saved',
+    saveFailed: 'Save failed',
     cancel: 'Cancel',
     show: 'Show',
     hide: 'Hide',

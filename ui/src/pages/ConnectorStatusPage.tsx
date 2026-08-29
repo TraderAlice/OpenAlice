@@ -18,7 +18,9 @@ import { useTranslation } from 'react-i18next'
 import type { ConnectorHealth, ConnectorSettingsSnapshot } from '../api'
 import { ConfigurationDialog } from '../components/ConfigurationDialog'
 import { PageHeader } from '../components/PageHeader'
+import { SaveIndicator } from '../components/SaveIndicator'
 import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
+import type { SaveStatus } from '../hooks/useAutoSave'
 import { ConnectorSettingsPanel } from './ConnectorsPage'
 import {
   reconnectConnector,
@@ -38,6 +40,8 @@ export function ConnectorStatusPage() {
   const [configurationId, setConfigurationId] = useState<string | null>(null)
   const configurationTriggerRef = useRef<HTMLButtonElement | null>(null)
   const configurationFlushRef = useRef<(() => void) | null>(null)
+  const configurationRetryRef = useRef<() => void>(() => {})
+  const [configurationSaveStatus, setConfigurationSaveStatus] = useState<SaveStatus>('idle')
   const { t } = useTranslation()
 
   const reconnect = useCallback(async (id: string) => {
@@ -54,8 +58,14 @@ export function ConnectorStatusPage() {
 
   const configure = useCallback((id: string, trigger: HTMLButtonElement) => {
     configurationTriggerRef.current = trigger
+    setConfigurationSaveStatus('idle')
     setConfigurationId(id)
     setConfigurationOpen(true)
+  }, [])
+
+  const handleConfigurationSaveFeedback = useCallback((status: SaveStatus, retrySave: () => void) => {
+    configurationRetryRef.current = retrySave
+    setConfigurationSaveStatus(status)
   }, [])
 
   const configuredDefinition = snapshot?.definitions.find((definition) => definition.id === configurationId)
@@ -143,9 +153,19 @@ export function ConnectorStatusPage() {
             { name: configuredDefinition.label },
           )}
           restoreFocusRef={configurationTriggerRef}
+          headerAccessory={configurationSaveStatus === 'idle' ? undefined : (
+            <SaveIndicator
+              status={configurationSaveStatus}
+              onRetry={() => configurationRetryRef.current()}
+            />
+          )}
           keepMounted
         >
-          <ConnectorSettingsPanel connectorId={configurationId} flushRef={configurationFlushRef} />
+          <ConnectorSettingsPanel
+            connectorId={configurationId}
+            flushRef={configurationFlushRef}
+            onSaveFeedback={handleConfigurationSaveFeedback}
+          />
         </ConfigurationDialog>
       )}
     </div>

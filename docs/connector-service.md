@@ -223,6 +223,14 @@ writes cannot carry a password-manager draft. Changes touch
 `data/control/restart-connector.flag`, and Guardian reconciles the process
 from the same startup path.
 
+Ordinary non-secret auto-save uses the shared localized SaveIndicator. It
+announces Saving, Saved, and Save failed through one polite atomic live region,
+uses icons as well as color, and offers a native Retry button after failure. A
+full Settings page places that status in PageHeader; an in-context Connector
+dialog places the same primitive in its fixed header so scrolling never covers
+setup instructions. Credential creation, replacement, and removal remain
+explicit actions and do not report themselves through this auto-save status.
+
 The retired `web.port`, MCP-Ask state, and legacy Telegram connector shape
 predate the 0.89.2-beta baseline and are not supported upgrade inputs.
 

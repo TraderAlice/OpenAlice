@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MutableRefObject, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
 import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, KeyRound, Link2, ListChecks, Power, RefreshCw, Send, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -8,7 +8,7 @@ import { PageHeader } from '../components/PageHeader'
 import { SaveIndicator } from '../components/SaveIndicator'
 import { RecoverySurface, RefreshNotice, Skeleton } from '../components/StateViews'
 import { ConfigSection, Field, SettingsScrollArea, inputClass } from '../components/form'
-import { useAutoSave } from '../hooks/useAutoSave'
+import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave'
 import { TelegramDeskPanel } from '../components/TelegramDeskPanel'
 import { Toggle } from '../components/Toggle'
 import {
@@ -42,25 +42,37 @@ export function ConnectorsPage() {
 export function ConnectorSettingsPanel({
   connectorId,
   flushRef,
+  onSaveFeedback,
 }: {
   connectorId: string
   flushRef?: MutableRefObject<(() => void) | null>
+  onSaveFeedback?: (status: SaveStatus, retry: () => void) => void
 }) {
-  return <ConnectorSettingsSurface connectorId={connectorId} flushRef={flushRef} />
+  return (
+    <ConnectorSettingsSurface
+      connectorId={connectorId}
+      flushRef={flushRef}
+      onSaveFeedback={onSaveFeedback}
+    />
+  )
 }
 
 function ConnectorSettingsSurface({
   connectorId,
   flushRef,
+  onSaveFeedback,
 }: {
   connectorId?: string
   flushRef?: MutableRefObject<(() => void) | null>
+  onSaveFeedback?: (status: SaveStatus, retry: () => void) => void
 }) {
   const { t } = useTranslation()
   const [definitions, setDefinitions] = useState<ConnectorDefinition[]>([])
   const [config, setConfig] = useState<PublicConnectorConfig | null>(null)
   const [health, setHealth] = useState<ConnectorHealth | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const refreshTimerIdsRef = useRef<number[]>([])
+  const mountedRef = useRef(false)
   const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({})
   const [savingSecret, setSavingSecret] = useState<string | null>(null)
   const [secretErrors, setSecretErrors] = useState<Record<string, string>>({})
@@ -100,12 +112,28 @@ function ConnectorSettingsSurface({
 
   useEffect(() => { void load() }, [load])
 
+  const scheduleRuntimeRefresh = useCallback(() => {
+    refreshTimerIdsRef.current.forEach((timerId) => window.clearTimeout(timerId))
+    refreshTimerIdsRef.current = [
+      window.setTimeout(() => { void refreshRuntime() }, 900),
+      window.setTimeout(() => { void refreshRuntime() }, 2_400),
+    ]
+  }, [refreshRuntime])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      refreshTimerIdsRef.current.forEach((timerId) => window.clearTimeout(timerId))
+    }
+  }, [])
+
   const save = useCallback(async (next: PublicConnectorConfig) => {
     const response = await api.connectors.save(omitSecretSettings(next, definitions))
+    if (!mountedRef.current) return
     setConfig((current) => JSON.stringify(current) === JSON.stringify(response.config) ? current : response.config)
-    window.setTimeout(() => { void refreshRuntime() }, 900)
-    window.setTimeout(() => { void refreshRuntime() }, 2_400)
-  }, [definitions, refreshRuntime])
+    scheduleRuntimeRefresh()
+  }, [definitions, scheduleRuntimeRefresh])
 
   const { status, flush, retry } = useAutoSave({
     data: config!,
@@ -113,6 +141,10 @@ function ConnectorSettingsSurface({
     enabled: config !== null,
     delay: 700,
   })
+
+  useEffect(() => {
+    onSaveFeedback?.(status, retry)
+  }, [onSaveFeedback, retry, status])
 
   useEffect(() => {
     if (!flushRef) return
@@ -248,6 +280,7 @@ function ConnectorSettingsSurface({
     setSecretErrors((current) => omitRecordKeys(current, errorKeys))
     try {
       const response = await api.connectors.save(next)
+      if (!mountedRef.current) return
       setConfig((current) => {
         if (!current) return response.config
         const currentAdapter = current.adapters[id] ?? emptyAdapter()
@@ -264,18 +297,20 @@ function ConnectorSettingsSurface({
         }
       })
       setSecretDrafts((current) => omitRecordKeys(current, drafts.map((draft) => draft.draftKey)))
-      window.setTimeout(() => { void refreshRuntime() }, 900)
-      window.setTimeout(() => { void refreshRuntime() }, 2_400)
+      scheduleRuntimeRefresh()
     } catch (error) {
+      if (!mountedRef.current) return
       const errorKey = grouped ? connectorFieldKey(id, '__connection__') : drafts[0].draftKey
       setSecretErrors((current) => ({
         ...current,
         [errorKey]: error instanceof Error ? error.message : String(error),
       }))
     } finally {
-      setSavingSecret((current) => current === savingKey ? null : current)
+      if (mountedRef.current) {
+        setSavingSecret((current) => current === savingKey ? null : current)
+      }
     }
-  }, [config, refreshRuntime, secretDrafts, t])
+  }, [config, scheduleRuntimeRefresh, secretDrafts, t])
 
   const test = useCallback(async (id: string) => {
     setTesting(id)
@@ -324,13 +359,6 @@ function ConnectorSettingsSurface({
         className={adapterOnly ? 'px-4 py-3 sm:px-6 sm:py-4' : 'px-4 py-5 md:px-8'}
       >
         <div className="max-w-[920px] mx-auto">
-          {adapterOnly && status !== 'idle' && (
-            <div className="sticky top-2 z-10 flex h-0 justify-end pr-1">
-              <div className="rounded-full border border-border/70 bg-popover px-2.5 py-1 shadow-sm">
-                <SaveIndicator status={status} onRetry={retry} />
-              </div>
-            </div>
-          )}
           {!config && !loadError && (
             <ConnectorSettingsSkeleton compact={adapterOnly} label={t('connectorSettings.loading')} />
           )}

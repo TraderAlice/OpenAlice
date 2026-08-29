@@ -987,6 +987,7 @@ export const ja: Resources = {
     save: '保存',
     saving: '保存中…',
     saved: '保存しました',
+    saveFailed: '保存に失敗しました',
     cancel: 'キャンセル',
     show: '表示',
     hide: '非表示',

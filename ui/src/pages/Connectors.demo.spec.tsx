@@ -356,6 +356,29 @@ describe('Connector demo routes', () => {
     expect(saved.adapters.discord.enabled).toBe(true)
   })
 
+  it('keeps auto-save feedback in the configuration dialog header', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.adapters.discord = {
+      enabled: false,
+      settings: { applicationId: 'discord-app', ownerUserId: 'owner-1' },
+      configuredSecrets: ['botToken'],
+    }
+    mocks.load.mockResolvedValue(snapshot)
+    mocks.save.mockReturnValue(new Promise(() => {}))
+    render(<ConnectorStatusPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage Discord' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('switch', {
+      name: 'Turn Discord on or off',
+    }))
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled(), { timeout: 1_200 })
+    const status = await within(dialog).findByRole('status')
+    expect(status.textContent).toBe('Saving…')
+    expect(status.closest('[data-slot="dialog-header"]')).toBeTruthy()
+  })
+
   it('renders the Connector configuration route from the demo snapshot', async () => {
     render(<ConnectorsPage />)
 

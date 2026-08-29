@@ -994,6 +994,7 @@ export const zhHant: Resources = {
     save: '儲存',
     saving: '儲存中…',
     saved: '已儲存',
+    saveFailed: '儲存失敗',
     cancel: '取消',
     show: '顯示',
     hide: '隱藏',
