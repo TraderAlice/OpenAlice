@@ -1886,7 +1886,6 @@ export const zh: Resources = {
     interactOperations: '查看实时行动',
     interactTerminal: '打开楼层终端',
     interactActionTalk: '对话',
-    interactActionWorkspace: '进入',
     interactActionFiles: '文件',
     interactActionRoster: '名册',
     interactActionOperations: '行动',

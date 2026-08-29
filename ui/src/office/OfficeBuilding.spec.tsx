@@ -247,6 +247,55 @@ describe('OfficeBuilding', () => {
     expect(screen.queryByTestId('office-departure')).toBeNull()
   })
 
+  it('names each workspace destination before the keyboard interaction hint', () => {
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 1, 'auto-quant': 1, prediction: 1, other: 0 },
+          },
+          lastSeq: 1,
+          firstSeq: 1,
+          offices: [
+            {
+              workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
+              lastInteractionAt: 1,
+              sleeping: false,
+              employees: [],
+            },
+            {
+              workspace: { id: 'quant-1', tag: 'quant', harness: 'auto-quant' },
+              lastInteractionAt: 1,
+              sleeping: false,
+              employees: [],
+            },
+            {
+              workspace: { id: 'prediction-1', tag: 'prediction', harness: 'prediction' },
+              lastInteractionAt: 1,
+              sleeping: false,
+              employees: [],
+            },
+          ],
+        }}
+        initialPlayerState={{ position: { x: 336, y: 336 }, direction: 'down' }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+      />,
+    )
+
+    const prompt = screen.getByRole('status', { name: 'Enter prediction workspace' })
+    expect(prompt.querySelector('.oa-office-interact-prompt__copy strong')?.textContent)
+      .toBe('Prediction')
+    expect(prompt.style.width).toBe('200px')
+    expect(prompt.querySelector('[data-input="keyboard"]')?.textContent).toBe('Enter')
+    expect(prompt.textContent).not.toContain('EnterEnter')
+  })
+
   it('moves from the touch pad immediately and repeats while held', () => {
     vi.useFakeTimers()
     try {
@@ -544,6 +593,7 @@ describe('OfficeBuilding', () => {
     expect(utilityWall?.style.left).toBe('408px')
     const controls = map.parentElement?.querySelector<HTMLElement>('.oa-office-map-controls')
     expect(controls?.dataset.learned).toBe('false')
+    expect(controls?.dataset.actionReady).toBeUndefined()
     expect(controls?.querySelector<HTMLImageElement>('.oa-office-map-controls__move img')?.src)
       .toContain('/office/hud/move-pad-v3.png')
     const touchPad = screen.getByRole('group', { name: 'Move Alice' })
@@ -638,6 +688,9 @@ describe('OfficeBuilding', () => {
       .toBe('Office map. Use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
     await userEvent.keyboard('aasss')
     const interactionPrompt = screen.getByRole('status', { name: 'Inspect chat files' })
+    expect(controls?.dataset.actionReady).toBe('true')
+    expect(controls?.querySelector('.oa-office-map-controls__move')?.getAttribute('aria-hidden'))
+      .toBe('true')
     expect(interactionPrompt.classList.contains('oa-office-interact-prompt')).toBe(true)
     expect(interactionPrompt.parentElement?.classList.contains('oa-office-map')).toBe(true)
     expect(interactionPrompt.dataset.side).toBeTruthy()

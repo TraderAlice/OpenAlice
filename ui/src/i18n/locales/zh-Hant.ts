@@ -1894,7 +1894,6 @@ export const zhHant: Resources = {
     interactOperations: '查看即時行動',
     interactTerminal: '開啟樓層終端',
     interactActionTalk: '對話',
-    interactActionWorkspace: '進入',
     interactActionFiles: '檔案',
     interactActionRoster: '名冊',
     interactActionOperations: '行動',

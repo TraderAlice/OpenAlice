@@ -2119,6 +2119,30 @@ Camera-edge interaction prompt follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 611-file Vitest run (5,054 passing; one file and nine tests skipped), and the UI production
   build all passed.
 
+Workspace-destination prompt follow-up (2026-08-29):
+
+- Played the complete Auto Prediction sign path rather than treating the third pod as map decoration: click the sign,
+  watch Alice follow the route trail, depart into the real Prediction Workspace, and use browser Back to return to the
+  same `336,336,down` approach point. The route worked, but the returned contextual prompt read `ENTER [ENTER]`.
+- Compared removing the keycap, renaming every sign action to generic `OPEN`, and letting the action line carry the
+  destination harness identity. Chose `CHAT / AUTOQUANT / PREDICTION [ENTER]`: the physical sign and portal icon already
+  communicate entry, while the prompt now identifies which of the three game locations is actionable and still teaches
+  the keyboard control. Sign targets therefore own their harness identity, and the obsolete generic entry-action locale
+  key was deleted instead of retained as compatibility baggage.
+- Browser play caught a second-order truncation at the old 176px generic prompt width. Workspace destinations now use a
+  deliberate 200px prompt width, preserving the complete `PREDICTION` label without shrinking pixel type or introducing
+  abbreviations; the existing camera-edge placement still bounds it on narrow screens.
+- Short-landscape play then caught the contextual prompt colliding with the persistent `MOVE · WASD / ARROWS` tutorial.
+  Nearby actions now temporarily own that teaching layer: the movement strip collapses and becomes assistive-technology
+  hidden while any action is ready, while the camera-reset control remains available. Leaving interaction range clears
+  the contextual state; ordinary movement still uses the existing learned-control behavior.
+- Browser-played the Prediction departure-and-return prompt at 1280x900, 390x844, and 844x390. The full destination name,
+  keycap, prompt tail, and map target remained visible at every size; portrait edge adjustment stayed bounded, and the
+  landscape action no longer competed with movement teaching.
+- Focused target, prompt, OfficeBuilding, and responsive-style specs passed: 4 files / 34 tests. `npx tsc --noEmit`,
+  `cd ui && npx tsc -b`, the 611-file Vitest run (5,055 passing; one file and nine tests skipped), and the UI production
+  build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

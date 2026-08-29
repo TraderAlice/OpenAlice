@@ -1887,7 +1887,6 @@ export const ja: Resources = {
     interactOperations: 'ライブ稼働を確認',
     interactTerminal: 'フロア端末を開く',
     interactActionTalk: '話す',
-    interactActionWorkspace: '入る',
     interactActionFiles: 'ファイル',
     interactActionRoster: '名簿',
     interactActionOperations: '確認',

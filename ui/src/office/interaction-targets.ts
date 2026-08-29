@@ -1,4 +1,4 @@
-import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
+import type { OfficeFloorEmployee, OfficeHarness, OfficeRoomSnapshot } from '../api/office'
 import type { OfficeMapLayout } from './map-layout'
 import { visibleEmployeesForOffice } from './desk-slots'
 import { officeFloorTerminalPosition, officeOperationsBoardPosition } from './map-landmarks'
@@ -24,6 +24,7 @@ export type OfficeInteractionTarget =
     y: number
     workspaceId: string
     roomName: string
+    harness: OfficeHarness
   }
   | {
     id: string
@@ -82,6 +83,7 @@ export function officeInteractionTargets(
       y: pod.y + OFFICE_SIGN_CENTER.y,
       workspaceId: group.workspace.id,
       roomName,
+      harness: group.workspace.harness,
     })
     visibleEmployeesForOffice(group.employees).forEach((employee, index) => {
       const center = OFFICE_DESK_CENTERS[index]

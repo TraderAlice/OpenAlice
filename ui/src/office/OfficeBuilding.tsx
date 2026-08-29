@@ -36,6 +36,7 @@ import {
   type OfficeInteractionTarget,
 } from './interaction-targets'
 import {
+  OFFICE_PROMPT_DESTINATION_MAX_WIDTH,
   OFFICE_PROMPT_DETAIL_MAX_WIDTH,
   OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH,
   officeInteractionPromptPlacement,
@@ -255,11 +256,13 @@ export function OfficeBuilding({
             height: viewportSize.height || mapLayout.height,
           },
           camera,
-          nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
-            ? viewportSize.width > 0 && viewportSize.width <= 520
-              ? OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH
-              : OFFICE_PROMPT_DETAIL_MAX_WIDTH
-            : undefined,
+          nearbyTarget.kind === 'sign'
+            ? OFFICE_PROMPT_DESTINATION_MAX_WIDTH
+            : nearbyTarget.kind === 'employee' && nearbyTarget.employee.bubble
+              ? viewportSize.width > 0 && viewportSize.width <= 520
+                ? OFFICE_PROMPT_NARROW_DETAIL_MAX_WIDTH
+                : OFFICE_PROMPT_DETAIL_MAX_WIDTH
+              : undefined,
         )
       : null,
     [alice, camera, mapLayout.height, mapLayout.width, nearbyTarget, viewportSize],
@@ -280,7 +283,7 @@ export function OfficeBuilding({
     if (nearbyTarget.kind === 'sign') {
       return {
         icon: OFFICE_HUD_ASSETS.sessionPortal,
-        action: t('office.interactActionWorkspace'),
+        action: t(`office.harness.${nearbyTarget.harness}`),
         label: t('office.interactWorkspace', { name: nearbyTarget.roomName }),
         detail: null,
       }
@@ -1093,8 +1096,15 @@ export function OfficeBuilding({
           </div>
         )}
 
-        <div className="oa-office-map-controls" data-learned={controlsLearned}>
-          <span className="oa-office-map-controls__move">
+        <div
+          className="oa-office-map-controls"
+          data-learned={controlsLearned}
+          data-action-ready={Boolean(nearbyTarget) || undefined}
+        >
+          <span
+            className="oa-office-map-controls__move"
+            aria-hidden={Boolean(nearbyTarget) || undefined}
+          >
             <img src={OFFICE_HUD_ASSETS.movePad} alt="" aria-hidden style={officePixelImg} />
             <span>{t('office.mapHint')}</span>
           </span>

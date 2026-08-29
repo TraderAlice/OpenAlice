@@ -40,6 +40,7 @@ describe('Office interaction targets', () => {
 
     expect(sign).toMatchObject({
       id: 'sign:chat-1',
+      harness: 'chat',
       x: layout.pods[0]!.x + 144,
       y: layout.pods[0]!.y + 32,
     })

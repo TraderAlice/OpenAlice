@@ -1919,7 +1919,6 @@ export const en = {
     interactOperations: 'Check live operations',
     interactTerminal: 'Open floor terminal',
     interactActionTalk: 'Talk',
-    interactActionWorkspace: 'Enter',
     interactActionFiles: 'Files',
     interactActionRoster: 'Roster',
     interactActionOperations: 'Review',

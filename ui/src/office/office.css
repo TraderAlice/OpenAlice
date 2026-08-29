@@ -3684,11 +3684,13 @@
   object-fit: contain;
 }
 
-.oa-office-map-controls[data-learned='true'] {
+.oa-office-map-controls[data-learned='true'],
+.oa-office-map-controls[data-action-ready='true'] {
   gap: 0;
 }
 
-.oa-office-map-controls[data-learned='true'] .oa-office-map-controls__move {
+.oa-office-map-controls[data-learned='true'] .oa-office-map-controls__move,
+.oa-office-map-controls[data-action-ready='true'] .oa-office-map-controls__move {
   max-width: 0;
   padding-inline: 0;
   border-width: 0;
