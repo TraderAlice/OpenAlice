@@ -565,7 +565,12 @@ export function OfficeBuilding({
           ? current
           : { width: rect.width, height: rect.height }
       ))
-      setCamera((current) => clampOfficeCamera(current, rect, mapLayout))
+      setCamera((current) => officeCameraFollowingAlice(
+        aliceRef.current,
+        current,
+        rect,
+        mapLayout,
+      ))
     }
     updateViewportSize()
     const observer = typeof ResizeObserver === 'undefined'

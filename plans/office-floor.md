@@ -2199,6 +2199,20 @@ Occupancy-journal composition follow-up (2026-08-29):
 - Focused responsive-style specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 611-file
   Vitest run (5,056 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Responsive camera-safety follow-up (2026-08-29):
+
+- Played the current day/night floor and then resized the live desktop route to 390x844 without reloading. The map
+  bounds remained valid, but the resize observer only clamped the old camera offset; Alice disappeared outside the
+  phone viewport even though a fresh phone entry correctly centered her.
+- Compared resetting the complete composition after every resize, preserving the clamped camera even when Alice is
+  lost, and applying the existing follow-camera safe area as a minimal resize correction. Chose safe-area correction:
+  it retains the player's pan context whenever Alice is already visible and moves only the axis needed to recover her.
+- The ResizeObserver and window-resize path now reconcile the current camera through `officeCameraFollowingAlice`
+  using the live Alice ref. Browser-played 1280x900 -> 390x844 -> 844x390 without navigation or Reset: Alice remained
+  visible after both transitions, the map stayed bounded, and the camera preserved the surrounding pod context.
+- Focused OfficeBuilding and camera-helper specs passed: 2 files / 20 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`,
+  the 611-file Vitest run (5,056 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

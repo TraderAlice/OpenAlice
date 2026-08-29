@@ -676,6 +676,20 @@ describe('OfficeBuilding', () => {
       .toBe('translate3d(-100px, -50px, 0)')
     fireEvent.pointerUp(map, { pointerId: 1 })
     vi.mocked(map.getBoundingClientRect).mockReturnValue({
+      width: 390,
+      height: 844,
+      top: 0,
+      right: 390,
+      bottom: 844,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent(window, new Event('resize'))
+    expect(map.querySelector<HTMLElement>('.oa-office-map')?.style.transform)
+      .toBe('translate3d(-210px, 86px, 0)')
+    vi.mocked(map.getBoundingClientRect).mockReturnValue({
       width: 1200,
       height: 800,
       top: 0,
