@@ -1,6 +1,6 @@
 # Bun-native CLI Distribution
 
-Status: Active — design accepted, feasibility work not started
+Status: Active — macOS/Linux implementation in progress; Windows deferred
 
 Delivery mode: Serial / interactive on the dedicated
 `codex/usability-improvements` integration branch. This changes a released
@@ -55,13 +55,13 @@ shrinking the ownership boundary to OpenAlice itself.
 
 ## Objective
 
-Publish a native OpenAlice command for macOS, Linux, and Windows that:
+Publish a native OpenAlice command for macOS and Linux that:
 
 - runs without a system Node.js or Bun installation;
 - starts the existing Guardian-owned multi-process Runtime from any directory;
 - embeds or ships only OpenAlice-owned code and resources;
 - launches user-owned Agent Runtime executables as independent PTY processes;
-- supports direct Bash/PowerShell installation plus npm, Bun, Homebrew, and
+- supports direct Bash installation plus npm, Bun, Homebrew, and
   Arch/AUR installation from the same accepted release artifacts;
 - keeps installation bytes separate from `OPENALICE_HOME` product data so a
   clean reinstall or bounded cutover never rewrites that data; and
@@ -211,13 +211,15 @@ installations are never removal targets.
 
 ### Initial build matrix
 
-Cutover requires the platforms already served by the CLI plus native Windows:
+The current cutover gate covers macOS and Linux. Native Windows is explicitly
+deferred; its PowerShell, PTY, path, junction, signing, and locked-executable
+work remains a later platform initiative rather than blocking this plan.
 
 | Platform | Architectures | Initial gate |
 |---|---|---|
 | macOS | arm64, x64 | Required |
 | Linux glibc | arm64, x64 | Required |
-| Windows | x64 | Required |
+| Windows | x64 | Deferred |
 
 Linux musl and Windows arm64 are follow-up targets only after there is a
 supported-user or deployment requirement. Do not multiply release variants
@@ -353,14 +355,14 @@ Checkboxes reflect repository truth, not intent.
   no system Node requirement in the output.
 - [x] Compile and boot Alice from an isolated `OPENALICE_HOME` with the real Web
   UI and auth-status route.
-- [ ] Re-execute the compiled binary as Guardian, Alice, UTA, and Connector;
+- [x] Re-execute the compiled binary as Guardian, Alice, UTA, and Connector;
   prove separate PIDs, signal propagation, component failure isolation, and
   clean lock release.
 - [ ] Launch at least two independent fake or real Agent CLI PTYs; stopping one
   must not stop the other, Alice, or Guardian.
 - [ ] Finish the Bun-native PTY gate. Bun 1.4 `Terminal` is accepted on macOS
   arm64, Linux arm64, and Linux x64 behind the existing PTY ownership boundary;
-  native Windows and high-output backpressure remain unproved. Do not add a
+  high-output backpressure remains unproved. Do not add a
   Node sidecar as the default answer.
 - [ ] Prove an installed broker pack can still be dynamically loaded from
   `OPENALICE_HOME` without bundling its SDK into UTA Core.
@@ -368,7 +370,7 @@ Checkboxes reflect repository truth, not intent.
   adapter file.
 - [ ] Record measured executable size, cold start, idle memory per role, and
   clean-build time against the released headless Runtime.
-- [ ] Decide go/no-go from real macOS and Windows evidence. A compile-only
+- [ ] Decide go/no-go from real macOS and Linux evidence. A compile-only
   success is insufficient.
 
 No public installer or durable compatibility layer changes in this increment.
@@ -377,11 +379,11 @@ build harness when it improves the next investigation.
 
 ### 2. Bun runtime entry and build ownership
 
-- [ ] Add one strict TypeScript build entry that dispatches user commands and
+- [x] Add one strict TypeScript build entry that dispatches user commands and
   internal roles before role startup.
-- [ ] Convert Guardian, Alice, UTA, and Connector top-level startup into
+- [x] Convert Guardian, Alice, UTA, and Connector top-level startup into
   explicit boot functions without changing their process boundaries.
-- [ ] Replace Guardian's child JavaScript paths with self-executable role
+- [x] Replace Guardian's child JavaScript paths with self-executable role
   spawns while preserving environment, readiness, restart, and shutdown
   behavior.
 - [ ] Bundle OpenAlice package dependencies and required platform-native
@@ -415,7 +417,7 @@ build harness when it improves the next investigation.
   shims, PATH, provenance, lock, activation, retention, and uninstall.
 - [ ] Remove Node/npm/Pi/build-tool preflight and managed-Pi consent from the
   CLI install plan.
-- [ ] Add the native PowerShell bootstrap for Windows x64 with the same
+- [ ] Deferred Windows lane: add the native PowerShell bootstrap with the same
   checksum, staging, lock, immutable-release, pointer, PATH, and data-preserving
   behavior as Bash.
 - [ ] Preserve explicit install consent and separate start consent; neither
@@ -507,7 +509,7 @@ artifacts.
 - [ ] Build every required target from the accepted tagged tree.
 - [ ] Verify archive checksum and internal release metadata before upload.
 - [ ] Run clean non-admin Bash installs on macOS and Linux.
-- [ ] Run a clean standard-user PowerShell install on Windows.
+- [ ] Deferred Windows lane: run a clean standard-user PowerShell install.
 - [ ] Install and run the accepted release through npm, Bun, Homebrew, and
   `paru`, then verify manager-owned update and uninstall guidance.
 - [ ] Exercise the documented old-to-new cutover once on a currently supported
@@ -546,8 +548,9 @@ Use the local OrbStack Docker engine as the default clean Linux harness for
 installer, remote, package-manager, repeat-install, upgrade, rollback, and
 uninstall checks. Containers must use isolated temporary homes and no host
 credentials or broker state. OrbStack validates Linux behavior efficiently,
-but it does not replace native macOS acceptance or Windows PowerShell,
-filesystem-locking, PATH, and executable-signing checks.
+but it does not replace native macOS acceptance. Windows PowerShell,
+filesystem-locking, PATH, and executable-signing checks belong to the deferred
+Windows lane.
 
 The Bun-specific acceptance harness must additionally prove:
 
@@ -558,8 +561,6 @@ The Bun-specific acceptance harness must additionally prove:
 - terminating one Agent Session does not affect another Session;
 - UI, templates, Workspace helper commands, PTY resize/input, and broker-pack
   loading work outside a checkout;
-- Windows paths, spaces, junction activation, PowerShell execution policy, and
-  locked-running-executable updates are exercised on Windows; and
 - npm, Bun, Homebrew, and AUR installations resolve to the same accepted native
   release content for their platform, report correct provenance, and do not
   self-update across package-manager ownership; and
@@ -574,9 +575,9 @@ live-paper trading is not part of packaging verification.
 
 These may change implementation details but not the fixed product boundaries:
 
-1. What should the Windows CLI PTY backend be if Bun's native `Terminal` remains
-   POSIX-only, and does Bun need an OpenAlice-owned output-pressure buffer to
-   replace `node-pty` pause/resume semantics?
+1. Does Bun need an OpenAlice-owned output-pressure buffer to replace
+   `node-pty` pause/resume semantics? The Windows PTY backend is deferred with
+   the rest of native Windows distribution.
 2. Can the current `@hono/node-server` paths run unchanged under Bun, or should
    the CLI build use a small runtime-neutral server adapter while Electron and
    source development retain Node?
@@ -585,7 +586,7 @@ These may change implementation details but not the fixed product boundaries:
 4. Which current filesystem callers work directly against Bun embedded assets,
    and which externally consumed adapter files require materialization?
 5. What signing, notarization, and malware-scanning gates are required for the
-   standalone macOS and Windows CLI binaries independently of Electron?
+   standalone macOS CLI binary independently of Electron?
 
 ## Explicit Non-goals
 
@@ -603,7 +604,7 @@ These may change implementation details but not the fixed product boundaries:
 
 This plan is complete only when:
 
-1. a clean macOS, Linux, or Windows CLI installation needs no preinstalled
+1. a clean macOS or Linux CLI installation needs no preinstalled
    Node, Bun, npm, source checkout, or Agent Runtime to run OpenAlice itself;
 2. one primary platform executable starts the existing multi-process Guardian,
    Alice, UTA, and Connector tree and every Agent Session remains an independent
@@ -612,8 +613,8 @@ This plan is complete only when:
    the user's machine;
 4. the real UI, Workspace creation, helper commands, PTY Sessions, optional
    components, and fixture broker pack work outside a checkout;
-5. Bash and native PowerShell installers perform verified, atomic,
-   data-preserving install, update, rollback, and uninstall transactions;
+5. the Bash installer performs verified, atomic, data-preserving install,
+   update, rollback, and uninstall transactions;
 6. npm, Bun, Homebrew, and AUR/paru install the same accepted native release,
    and updates/uninstalls remain owned by the selected manager;
 7. the old CLI has a documented, data-preserving cutover; a clean reinstall is
@@ -683,3 +684,12 @@ This plan is complete only when:
   stopped it without stopping Alice, restarted Alice under the same named
   project identity, resumed the native Grok session, and received
   `REATTACH_OK`.
+- 2026-08-29: Feasibility increment 4 added one strict Bun entry that dispatches
+  the CLI and private Guardian/Alice/UTA/Connector roles before importing their
+  explicit boot functions. Guardian now re-enters the same 72,116,978-byte
+  macOS arm64 executable for each service while preserving four distinct PIDs.
+  With an empty PATH and isolated home, the real CLI `run` path reached Alice,
+  UTA, and Connector readiness; forced Connector failure recovered under a new
+  PID, forced UTA failure left Alice ready, the control flag restored UTA under
+  a new PID, and SIGTERM released the Guardian lock. The smoke also fixed an
+  existing UTA restart deadlock by clearing a signalled child reference.

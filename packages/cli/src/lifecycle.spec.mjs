@@ -93,6 +93,52 @@ describe('OpenAlice Runtime lifecycle core', () => {
     })
   })
 
+  it('starts the Bun Guardian role without source preparation', async () => {
+    vi.stubGlobal('__OPENALICE_BUN_STANDALONE__', true)
+    try {
+      const child = new FakeChild()
+      const prepareSource = vi.fn()
+      const resolveRoot = vi.fn()
+      const spawnProcess = vi.fn(() => child)
+      const readStatus = vi.fn()
+        .mockResolvedValueOnce(absentStatus())
+        .mockResolvedValue(runningStatus())
+
+      await startRuntime({
+        ...startOptions(),
+        appDir: null,
+        runtimeProvider: { kind: 'bun', contentIdentity: 'release-content-1' },
+      }, {
+        detached: true,
+        env: { OPENALICE_APP_HOME: '/opt/openalice/releases/v1/share/openalice' },
+        runtimeExecutable: '/opt/openalice/releases/v1/bin/openalice',
+        prepareSource,
+        resolveRoot,
+        spawnProcess,
+        openFile: async () => ({ fd: 9, close: async () => undefined }),
+        mkdirImpl: async () => undefined,
+        readStatus,
+        sleep: async () => undefined,
+      })
+
+      expect(resolveRoot).not.toHaveBeenCalled()
+      expect(prepareSource).not.toHaveBeenCalled()
+      expect(spawnProcess).toHaveBeenCalledWith(
+        '/opt/openalice/releases/v1/bin/openalice',
+        ['--internal-role', 'guardian'],
+        expect.objectContaining({
+          cwd: '/opt/openalice/releases/v1/share/openalice',
+          env: expect.objectContaining({
+            OPENALICE_RUNTIME_PROVIDER: 'bun',
+            OPENALICE_RUNTIME_EXECUTABLE: '/opt/openalice/releases/v1/bin/openalice',
+          }),
+        }),
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('allows its spawned Guardian ownership transition but rejects a racing owner', async () => {
     const child = new FakeChild()
     child.pid = 321

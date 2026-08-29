@@ -38,7 +38,7 @@ import type { UTAEngineContext } from './types.js'
 const UTA_PORT = Number(process.env['OPENALICE_UTA_PORT'] ?? 47333)
 const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000  // 6h
 
-async function main(): Promise<void> {
+export async function startUTAService(): Promise<void> {
   const startedAt = new Date().toISOString()
   console.log(`[uta] bootstrap @ ${startedAt}`)
 
@@ -192,7 +192,9 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => { void shutdown('SIGTERM') })
 }
 
-main().catch((err) => {
-  console.error('[uta] fatal:', err)
-  process.exit(1)
-})
+if (!(globalThis as { __OPENALICE_INTERNAL_ROLE_DISPATCH__?: boolean }).__OPENALICE_INTERNAL_ROLE_DISPATCH__) {
+  startUTAService().catch((err) => {
+    console.error('[uta] fatal:', err)
+    process.exit(1)
+  })
+}

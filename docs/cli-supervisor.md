@@ -61,7 +61,7 @@ openalice project [list|use|copy-ai-creds|transfer] [options]
 | `machine inspect [key]` | Build a typed Machine → AliceProject inventory; each remote Machine uses one bounded aggregate SSH command. |
 | `project copy-ai-creds` | Copy AI credential rows from one complete home into another. Interactive unless `--from`, `--to`, and `--yes` are set. Matching vendor+key rows are skipped; colliding slugs are renamed. Workspace launch preferences, broker accounts, and `sealing.key` are never copied. Secrets are never printed. |
 | `project transfer` | Plan or copy a stopped local AliceProject to a new complete Home on a registered SSH Machine. Portable configuration and Workspace/Git state transfer; Session/runtime/auth state does not. Credentials use the SSH stream and are re-sealed with a new remote key. The source and remote default remain unchanged. |
-| `up` | Prepare the source provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
+| `up` | Prepare the selected provider when needed, start `cli-server` detached, and return only after Guardian control plus Alice HTTP readiness |
 | `run` | Start the same `cli-server` owner in the foreground without opening a browser; normal Ctrl+C/SIGTERM stops that self-owned tree |
 | `down` | Ask a matching Guardian to stop itself, then wait for endpoint and ownership release |
 | `status` | Read normalized status without mutation |
@@ -74,7 +74,10 @@ when no owner exists. Ordinary start never signals another owner. `--takeover`
 delegates replacement to Guardian's established discover, TERM, grace, KILL,
 wait, then acquire ordering.
 
-Stable installs use the verified bundle provider. `up` and `run` remain
+Stable installs currently use the verified bundle provider. The in-progress
+Bun standalone provider skips source preparation and re-enters one executable
+as distinct Guardian/Alice/UTA/Connector processes; its release gate lives in
+[[plans/bun-cli-distribution.md]]. `up` and `run` remain
 browserless lifecycle commands and accept home, port, wait, and takeover
 options; `--app-dir` is an advanced source override with the preparation and
 rebuild options documented in [[docs/local-runtime.md]]. `--open` performs a
