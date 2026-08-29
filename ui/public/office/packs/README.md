@@ -14,6 +14,14 @@ sheet with genuine alpha. Packaging removed disconnected generation artifacts,
 normalized every sprite to a common baseline, nearest-neighbor reduced each
 cell to 48x48, and quantized the final sheet to a shared 64-color palette.
 
+The generated right-facing source separated Alice's body from both shoes, which
+read as a floating torso at native map scale. Alice has no handed prop or
+asymmetric side marking, so the runtime's right-facing row is intentionally a
+per-frame horizontal mirror of the approved connected left-facing row. Frame
+order is preserved, keeping the same stride phase, scale, and shoe baseline in
+both directions. `scripts/repair-office-alice-side-gait.py` owns that
+deterministic repair.
+
 Office no longer ships or loads the full Codex pet atlas. The player, map
 collision, and four-direction animation now have their own purpose-built asset;
 the desktop pet remains a separate product surface.

@@ -2397,6 +2397,24 @@ Coworker map-scale normalization follow-up (2026-08-29):
   run (5,070 passing; one file and nine tests skipped), and the UI production build passed; the existing large-chunk
   advisory remains unchanged.
 
+Alice right-gait repair follow-up (2026-08-30):
+
+- Maintainer screenshots showed Alice's body apparently floating above her shoes while walking right. Native-cell
+  measurement disproved a size mismatch: all three right-facing frames occupied the same 44px height, but each frame's
+  main body stopped at row 41 while two detached shoe components resumed at rows 44–46. Left, down, and up frames each
+  retained one connected silhouette.
+- Compared CSS frame offsets, mirroring the approved left gait, and regenerating the right-facing source. The original
+  1086x1448 generated master confirmed that the gap already existed before packaging, so re-cropping could not repair
+  it. Alice has no handed prop or asymmetric side marking; chose a per-cell mirror of the connected left row because it
+  preserves exact identity, palette, scale, shoe baseline, and frame order without generation drift.
+- Added a deterministic repair script and rebuilt only the right-facing atlas row. All three right cells now exactly
+  match the horizontal mirror of their left counterpart and contain one connected foreground component instead of
+  three.
+- Browser-played a real route to the Floor terminal and captured right-facing frames 0, 1, and 2 in motion. Alice kept
+  one planted shoe baseline and a connected silhouette through the cycle; pathfinding, turning, and the route HUD were
+  unchanged. Focused Alice/sprite-pack specs, root/UI TypeScript, the 612-file Vitest run (5,072 passing; one file and
+  nine tests skipped), and the UI production build passed. The existing large-chunk advisory remains unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
