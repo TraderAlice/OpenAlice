@@ -1,11 +1,15 @@
 import type { CSSProperties } from 'react'
 
 import type { OfficeEmployeeMood } from '../api/office'
-import { officeCoworkerSpriteForAgent } from './coworker-sprites'
+import {
+  officeCoworkerSpriteForAgent,
+  type OfficeCoworkerSpriteAsset,
+} from './coworker-sprites'
 
 export function OfficeCoworkerSprite({
   agent,
   identity,
+  asset: assignedAsset,
   mood,
   reducedMotion,
   label,
@@ -14,13 +18,14 @@ export function OfficeCoworkerSprite({
 }: {
   agent: string
   identity?: string
+  asset?: OfficeCoworkerSpriteAsset
   mood: OfficeEmployeeMood
   reducedMotion: boolean
   label: string
   scale?: number
   pose?: 'portrait' | 'desk'
 }) {
-  const asset = officeCoworkerSpriteForAgent(agent, identity)
+  const asset = assignedAsset ?? officeCoworkerSpriteForAgent(agent, identity)
   const height = 208 * scale
 
   return (

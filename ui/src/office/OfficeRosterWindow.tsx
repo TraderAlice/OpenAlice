@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { employeesForOffice } from './desk-slots'
+import { officeCoworkerCast } from './coworker-sprites'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officePixelImg } from './furniture'
@@ -27,6 +28,7 @@ export function OfficeRosterWindow({
   const { t } = useTranslation()
   const reducedMotion = useReducedMotion()
   const employees = employeesForOffice(group.employees)
+  const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
   const initialFocusResumeId = focusResumeId ?? employees[0]?.resumeId ?? null
   const [focusedResumeId, setFocusedResumeId] = useState(initialFocusResumeId)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -124,6 +126,7 @@ export function OfficeRosterWindow({
                   <OfficeCoworkerSprite
                     agent={employee.agent}
                     identity={employee.resumeId}
+                    asset={coworkerCast.get(employee.resumeId)}
                     mood={employee.mood}
                     reducedMotion={reducedMotion}
                     label={officeCoworkerLabel(employee)}

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { OfficeFloorEmployee } from '../api/office'
 import { officeCoworkerLabel } from './label'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
-import { OFFICE_COWORKER_EMOTES } from './coworker-sprites'
+import { OFFICE_COWORKER_EMOTES, type OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { officeStationComposition } from './station'
 
@@ -17,6 +17,7 @@ export function OfficeDesk({
   reducedMotion,
   interactionDisabled = false,
   spriteScale,
+  coworkerAsset,
   onSelect,
   onOpen,
 }: {
@@ -29,6 +30,7 @@ export function OfficeDesk({
   reducedMotion: boolean
   interactionDisabled?: boolean
   spriteScale?: number
+  coworkerAsset?: OfficeCoworkerSpriteAsset
   onSelect: () => void
   onOpen?: () => void
 }) {
@@ -116,6 +118,7 @@ export function OfficeDesk({
             <OfficeCoworkerSprite
               agent={employee.agent}
               identity={employee.resumeId}
+              asset={coworkerAsset}
               mood={employee.mood}
               reducedMotion={reducedMotion}
               label={label}

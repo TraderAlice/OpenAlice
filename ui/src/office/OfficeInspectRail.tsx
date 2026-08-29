@@ -9,12 +9,14 @@ import { officePixelImg } from './furniture'
 import { nextOfficeGridIndex } from './grid-navigation'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { OfficeCoworkerSprite } from './OfficeCoworkerSprite'
+import type { OfficeCoworkerSpriteAsset } from './coworker-sprites'
 import { OfficeWindowControlGlyph } from './OfficeWindowControlGlyph'
 import { officeCoworkerLabel } from './label'
 import { useReducedMotion } from './use-reduced-motion'
 
 export function OfficeInspectRail({
   employee,
+  coworkerAsset,
   roomName,
   onOpen,
   onOpenDrawer,
@@ -23,6 +25,7 @@ export function OfficeInspectRail({
   children,
 }: {
   employee: OfficeFloorEmployee | null
+  coworkerAsset?: OfficeCoworkerSpriteAsset
   roomName?: string
   onOpen: () => void
   onOpenDrawer: (item: OfficeDrawerItem) => void
@@ -97,6 +100,7 @@ export function OfficeInspectRail({
               <OfficeCoworkerSprite
                 agent={employee.agent}
                 identity={employee.resumeId}
+                asset={coworkerAsset}
                 mood={employee.mood}
                 reducedMotion={reducedMotion}
                 label={officeCoworkerLabel(employee)}

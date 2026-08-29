@@ -57,6 +57,10 @@ describe('OfficeRosterWindow', () => {
     expect(coworkerImages[0]?.getAttribute('src')).toContain('/office/coworkers/codex-')
     expect(coworkerImages[5]?.getAttribute('src')).toContain('/office/coworkers/claude-')
     expect(Array.from(coworkerImages).some((image) => image.src.includes('alice-maid'))).toBe(false)
+    const codexCast = Array.from(
+      screen.getByTestId('office-roster-window').querySelectorAll<HTMLElement>('.oa-office-coworker'),
+    ).slice(0, 5).map((coworker) => coworker.dataset.agent)
+    expect(new Set(codexCast).size).toBe(3)
     expect(screen.getByRole('button', { name: 'Close' }).querySelector('.oa-office-window__close-mark'))
       .toBeTruthy()
     expect(container.querySelector('.oa-office-window__header > div > img')?.getAttribute('src'))

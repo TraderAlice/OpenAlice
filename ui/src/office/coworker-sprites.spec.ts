@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   OFFICE_COWORKER_EMOTES,
   OFFICE_COWORKER_SPRITES,
+  officeCoworkerCast,
   officeCoworkerSpriteForAgent,
 } from './coworker-sprites'
 
@@ -38,6 +39,23 @@ describe('Office coworker sprite registry', () => {
       .toBe(5)
     expect(officeCoworkerSpriteForAgent('codex', 'resume-7'))
       .toBe(officeCoworkerSpriteForAgent('codex', 'resume-7'))
+  })
+
+  it('casts a runtime family without repeats until its authored pool is exhausted', () => {
+    const members = [
+      'resume-crisp-slate-terrace-d82wad',
+      'resume-simple-laurel-porch-7n91jk',
+      'resume-nimble-birch-valley-un7631',
+      'resume-stable-cedar-terrace-vkvnyi',
+      'resume-light-maple-pencil-udz3zv',
+    ].map((resumeId) => ({ resumeId, agent: 'grok' }))
+    const cast = officeCoworkerCast(members)
+    const reversed = officeCoworkerCast([...members].reverse())
+
+    expect(new Set(members.map((member) => cast.get(member.resumeId)?.id)).size).toBe(5)
+    expect(members.map((member) => cast.get(member.resumeId)?.id)).toEqual(
+      members.map((member) => reversed.get(member.resumeId)?.id),
+    )
   })
 
   it('keeps aliases intentional and unknown runtimes stable without returning Alice', () => {

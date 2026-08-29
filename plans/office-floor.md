@@ -2591,6 +2591,26 @@ Unique-artifact cabinet follow-up (2026-08-30):
   TypeScript, the full 613-file Vitest run (5,100 passing; one file and nine tests skipped), and the production build;
   existing large-chunk and direct-eval advisories are unchanged.
 
+Collision-free coworker casting follow-up (2026-08-30):
+
+- Two tiny real Grok sessions (`run-cMA4D_xp` and `run-AqjAvnXI`) expanded Prediction to a five-person test roster.
+  The resulting party exposed three identical red-haired portraits among five members even though the current Grok
+  family already contains five distinct characters. Individual resume-ID hashing was stable, but it did not produce a
+  convincing ensemble.
+- Compared expanding the asset pool again, randomly rerolling collisions, and assigning the existing family as a
+  deterministic group cast. Chose group casting: each runtime family exhausts its available characters before a
+  portrait repeats, assignment remains stable for the same member set, and no persisted identity or migration contract
+  is introduced.
+- The shared casting helper now drives workstation actors, Team roster portraits, and the Agent File portrait. It keeps
+  the established individual hash as each member's first choice, then deterministically open-addresses unused family
+  variants. Responsive layout, controls, and semantic member buttons remain unchanged.
+- Browser-played the live five-person Prediction team. The four simultaneously visible desk actors used four distinct
+  Grok characters and all five roster members used all five available characters. `Roster scout one` remained
+  `grok-oracle` in the Agent File and after Back returned focus to the same roster member. Focused casting, roster,
+  desk, Agent File, and OfficePage specs passed (5 files / 23 tests), together with root/UI TypeScript, the full
+  613-file Vitest run (5,101 passing; one file and nine tests skipped), and the production build; existing large-chunk
+  and direct-eval advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

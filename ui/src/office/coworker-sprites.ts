@@ -22,6 +22,11 @@ export interface OfficeCoworkerSpriteAsset {
   accent: string
 }
 
+export interface OfficeCoworkerCastMember {
+  agent: string
+  resumeId: string
+}
+
 function coworkerAsset(
   id: OfficeCoworkerIdentity,
   accent: string,
@@ -124,4 +129,44 @@ export function officeCoworkerSpriteForAgent(
     : stableCoworkerHash(hashInput)
   const selected = pool[hash % pool.length]
   return OFFICE_COWORKER_SPRITES[selected ?? ARCHETYPE_DEFAULT[archetype]]
+}
+
+/**
+ * Cast one Workspace as a party instead of hashing every member in isolation.
+ * Each runtime family exhausts its authored pool before a silhouette repeats;
+ * input order and live mood changes cannot reshuffle the cast.
+ */
+export function officeCoworkerCast(
+  members: readonly OfficeCoworkerCastMember[],
+): ReadonlyMap<string, OfficeCoworkerSpriteAsset> {
+  const cast = new Map<string, OfficeCoworkerSpriteAsset>()
+  const families = new Map<OfficeCoworkerArchetype, OfficeCoworkerCastMember[]>()
+  for (const member of members) {
+    const archetype = archetypeForAgent(member.agent)
+    const family = families.get(archetype) ?? []
+    family.push(member)
+    families.set(archetype, family)
+  }
+
+  for (const [archetype, family] of families) {
+    const pool = ARCHETYPE_POOL[archetype]
+    const ordered = [...family].sort((a, b) => {
+      const aHash = stableCoworkerHash(`${archetype}:${a.resumeId}`)
+      const bHash = stableCoworkerHash(`${archetype}:${b.resumeId}`)
+      return aHash - bHash || a.resumeId.localeCompare(b.resumeId)
+    })
+    const claimed = new Set<number>()
+    for (const member of ordered) {
+      const preferredAsset = officeCoworkerSpriteForAgent(member.agent, member.resumeId)
+      const preferredIndex = Math.max(0, pool.indexOf(preferredAsset.id))
+      let selectedIndex = preferredIndex
+      if (claimed.size < pool.length) {
+        while (claimed.has(selectedIndex)) selectedIndex = (selectedIndex + 1) % pool.length
+        claimed.add(selectedIndex)
+      }
+      const selected = pool[selectedIndex] ?? ARCHETYPE_DEFAULT[archetype]
+      cast.set(member.resumeId, OFFICE_COWORKER_SPRITES[selected])
+    }
+  }
+  return cast
 }

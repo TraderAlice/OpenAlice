@@ -10,6 +10,7 @@ import { useInboxSelection } from '../live/inbox-selection'
 import { useWorkspaceSidePanels } from '../live/workspace-side-panels'
 import { OfficeBuilding, type OfficeLogOrigin } from '../office/OfficeBuilding'
 import { OfficeCabinetWindow } from '../office/OfficeCabinetWindow'
+import { officeCoworkerCast } from '../office/coworker-sprites'
 import { officePixelImg } from '../office/furniture'
 import { OfficeInspectRail } from '../office/OfficeInspectRail'
 import { OfficeWindowControlGlyph } from '../office/OfficeWindowControlGlyph'
@@ -81,6 +82,9 @@ export function OfficePage() {
       roomName: workspace ? workspaceDisplayName(workspace) : office.workspace.tag,
     }
   }, [building, rosterWorkspaceId, workspaces])
+  const selectedCoworkerAsset = useMemo(() => selectedSeat
+    ? officeCoworkerCast(selectedSeat.office.employees).get(selectedSeat.employee.resumeId)
+    : undefined, [selectedSeat])
   const cabinetOffice = useMemo(() => {
     if (!building || !cabinetWorkspaceId) return null
     const office = building.offices.find((item) => item.workspace.id === cabinetWorkspaceId)
@@ -326,6 +330,7 @@ export function OfficePage() {
             {!logOpen && !cabinetOffice && selectedSeat && (
               <OfficeInspectRail
                 employee={selectedSeat.employee}
+                coworkerAsset={selectedCoworkerAsset}
                 roomName={selectedSeat.roomName}
                 onOpen={() => openEmployee(selectedSeat.office.workspace.id, selectedSeat.employee)}
                 onOpenDrawer={(item) => openDrawer(selectedSeat.office.workspace.id, selectedSeat.employee, item)}

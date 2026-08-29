@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { OfficeDesk } from './OfficeDesk'
+import { officeCoworkerCast } from './coworker-sprites'
 import { deskSlotsForOffice, visibleEmployeesForOffice } from './desk-slots'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, officeRosterCenter } from './pod-geometry'
@@ -41,6 +43,7 @@ export function OfficeMapPod({
   routeTargetId?: string | null
 }) {
   const { t } = useTranslation()
+  const coworkerCast = useMemo(() => officeCoworkerCast(group.employees), [group.employees])
   const visibleEmployees = visibleEmployeesForOffice(group.employees)
   const slots = deskSlotsForOffice(visibleEmployees, 4)
   const activeCount = group.employees.filter((employee) => employee.mood !== 'idle').length
@@ -143,6 +146,7 @@ export function OfficeMapPod({
               reducedMotion={reducedMotion}
               interactionDisabled={interactionDisabled}
               spriteScale={0.23}
+              coworkerAsset={employee ? coworkerCast.get(employee.resumeId) : undefined}
               onSelect={() => employee && onSelectEmployee(group.workspace.id, employee)}
               onOpen={() => employee && onOpenEmployee(group.workspace.id, employee)}
             />
