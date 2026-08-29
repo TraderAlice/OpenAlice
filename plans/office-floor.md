@@ -1105,6 +1105,30 @@ Native HUD-pack follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5019 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Adaptive filing-cabinet follow-up (2026-08-29):
+
+- Replayed click-to-route from the spawn point into both Workspace filing cabinets. The route, destination lock,
+  and arrival all read as game actions, but the result was a fixed 390px administrative panel even for zero or one
+  record. Most of the paper field was empty, hiding the map precisely when the interaction should feel in-world.
+- Compared decorating only the empty state, shrinking every cabinet to one fixed size, and making the cabinet window
+  content-adaptive. Chose the adaptive RPG drawer: zero through four records use measured compact heights, while
+  larger inventories retain the existing capped internal scroll. This preserves dense-data behavior without making
+  common one-item and empty Workspaces pay for it.
+- Used the built-in image generator with the locked Office style master and shipped cabinet identity to create one
+  open cream two-drawer cabinet whose upper drawer is visibly empty. The prompt forbade paper, folders, text, room,
+  UI, characters, logos, and multiple variants. The transparent master was trimmed, hard-matted, and nearest-neighbor
+  packaged as `empty-cabinet-v1.png` on a native 96x88 RGBA canvas.
+- Cabinet windows now expose their record count to presentation. Empty cabinets render at 286px with the generated
+  open drawer; one or two desktop records render at 246px; three or four render at 320px; larger inventories keep
+  the 390px cap. Narrow layouts increase only the multi-row cases because records become single-column.
+- Browser-played AutoQuant empty and Semis one-record cabinets at 1280x720 and 760x900. The empty illustration loads
+  at exact natural/display 96x88, one-row lists have equal client/scroll height with no fake scrollbar, map context
+  remains visible above and below, no image is broken, and both viewports retain 0px horizontal overflow.
+- Focused Cabinet, native-furniture, and Building specs passed: 3 files / 10 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5020 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

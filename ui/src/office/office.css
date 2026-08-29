@@ -2602,6 +2602,20 @@
   color: var(--gba-ink);
 }
 
+.oa-office-cabinet-window[data-record-count="0"] {
+  height: min(286px, calc(100% - 102px));
+}
+
+.oa-office-cabinet-window[data-record-count="1"],
+.oa-office-cabinet-window[data-record-count="2"] {
+  height: min(246px, calc(100% - 102px));
+}
+
+.oa-office-cabinet-window[data-record-count="3"],
+.oa-office-cabinet-window[data-record-count="4"] {
+  height: min(320px, calc(100% - 102px));
+}
+
 .oa-office-cabinet-window__body {
   display: grid;
   height: calc(100% - 38px);
@@ -2710,10 +2724,9 @@
 }
 
 .oa-office-cabinet-window__empty img {
-  width: 58px;
-  height: 58px;
+  width: 96px;
+  height: 88px;
   object-fit: contain;
-  opacity: 0.72;
 }
 
 .oa-office-cabinet-window__empty p {
@@ -4706,6 +4719,15 @@
 
   .oa-office-cabinet-window__records {
     grid-template-columns: 1fr;
+  }
+
+  .oa-office-cabinet-window[data-record-count="2"] {
+    height: min(320px, calc(100% - 102px));
+  }
+
+  .oa-office-cabinet-window[data-record-count="3"],
+  .oa-office-cabinet-window[data-record-count="4"] {
+    height: min(390px, calc(100% - 102px));
   }
 
   .oa-office-roster__summary small,

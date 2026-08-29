@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { OfficeDrawerItem, OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { employeesForOffice } from './desk-slots'
-import { officePixelImg } from './furniture'
+import { OFFICE_FURNITURE, officePixelImg } from './furniture'
 import { OFFICE_HUD_ASSETS } from './hud-assets'
 import { officeCoworkerLabel } from './label'
 
@@ -36,6 +36,8 @@ export function OfficeCabinetWindow({
       aria-modal="true"
       aria-label={`${t('office.cabinet')} · ${roomName}`}
       data-testid="office-cabinet-window"
+      data-empty={records.length === 0 || undefined}
+      data-record-count={records.length}
       className="oa-office-window oa-office-cabinet-window"
       onKeyDown={(event) => {
         if (event.key === 'Escape') onClose()
@@ -74,7 +76,7 @@ export function OfficeCabinetWindow({
           </ul>
         ) : (
           <div className="oa-office-cabinet-window__empty">
-            <img src={OFFICE_HUD_ASSETS.drawerRecord} alt="" aria-hidden style={officePixelImg} />
+            <img src={OFFICE_FURNITURE.generated.emptyCabinet} alt="" aria-hidden style={officePixelImg} />
             <p>{t('office.cabinetEmpty')}</p>
           </div>
         )}

@@ -71,7 +71,9 @@ describe('OfficeCabinetWindow', () => {
       />,
     )
 
-    expect(screen.getByRole('dialog', { name: 'Filing cabinet · Semis' })).toBeTruthy()
+    const dialog = screen.getByRole('dialog', { name: 'Filing cabinet · Semis' })
+    expect(dialog.getAttribute('data-record-count')).toBe('2')
+    expect(dialog.hasAttribute('data-empty')).toBe(false)
     expect(screen.getByText('2 filed records')).toBeTruthy()
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Review queueFiled by c1▶',
@@ -89,5 +91,28 @@ describe('OfficeCabinetWindow', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the generated open drawer for a compact empty cabinet', () => {
+    const emptyGroup: OfficeRoomSnapshot = {
+      ...group,
+      employees: group.employees.map((employee) => ({ ...employee, drawers: [] })),
+    }
+    const { container } = render(
+      <OfficeCabinetWindow
+        group={emptyGroup}
+        roomName="Auto Quant"
+        onOpenWorkspaceFiles={vi.fn()}
+        onOpenRecord={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: 'Filing cabinet · Auto Quant' })
+    expect(dialog.getAttribute('data-empty')).toBe('true')
+    expect(dialog.getAttribute('data-record-count')).toBe('0')
+    expect(screen.getByText('No desk records have been filed here yet.')).toBeTruthy()
+    expect(container.querySelector<HTMLImageElement>('.oa-office-cabinet-window__empty img')?.src)
+      .toContain('/office/furniture/empty-cabinet-v1.png')
   })
 })

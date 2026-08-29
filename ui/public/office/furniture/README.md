@@ -30,6 +30,7 @@ Current runtime assets:
 - `workstation-v2.png`
 - `vacant-workstation-v2.png` — powered-down empty-chair variant for unoccupied Session slots
 - `filing-cabinet-v2.png`
+- `empty-cabinet-v1.png` — open, visibly empty drawer vignette for a Workspace with no filed records
 - `terminal-kiosk-v2.png`
 - `plant-v2.png`
 - `wall-window-v2.png`
@@ -82,3 +83,8 @@ lifetime instead of animating the sheet; the effect is decorative and does not c
 from a chroma-key sheet, baseline-aligned, nearest-neighbor reduced to 120x104, and quantized against one 64-color
 palette. They appear only when the map has one Workspace row, turning its otherwise empty lower margin into two
 recognizable service landmarks without crowding denser floors.
+
+`empty-cabinet-v1.png` was generated from the locked style master and the shipped cabinet identity as a single
+cream two-drawer cabinet with its upper drawer pulled open and visibly empty. The transparent master was trimmed,
+hard-matted, and nearest-neighbor packaged on a native 96x88 canvas for the compact cabinet empty state; it contains
+no paper, folders, labels, characters, or UI frame.

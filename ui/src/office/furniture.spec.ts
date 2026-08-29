@@ -14,6 +14,7 @@ describe('OFFICE_FURNITURE', () => {
       workstation: [112, 84],
       vacantWorkstation: [112, 84],
       cabinet: [48, 96],
+      emptyCabinet: [96, 88],
       terminal: [48, 72],
       plant: [64, 64],
       wallWindow: [204, 102],
