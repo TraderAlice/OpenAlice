@@ -1,7 +1,6 @@
 import { createServer } from 'node:net'
-import { cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
-import { createRequire } from 'node:module'
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -16,17 +15,13 @@ const outputRoot = resolve(
 )
 const executableName = process.platform === 'win32' ? 'alice.exe' : 'alice'
 const executablePath = join(outputRoot, executableName)
+const ptySmokeName = process.platform === 'win32' ? 'pty-smoke.exe' : 'pty-smoke'
+const ptySmokePath = join(outputRoot, ptySmokeName)
 const smokeHome = join(outputRoot, 'smoke-home')
 
 await rm(outputRoot, { recursive: true, force: true })
 await mkdir(outputRoot, { recursive: true })
 process.chdir(outputRoot)
-
-const nodePtyPackage = dirname(
-  createRequire(import.meta.url).resolve('node-pty/package.json'),
-)
-const nodePtySidecar = join(outputRoot, 'native', 'node-pty')
-await cp(nodePtyPackage, nodePtySidecar, { recursive: true, dereference: true })
 
 const buildStartedAt = performance.now()
 const result = await Bun.build({
@@ -36,15 +31,55 @@ const result = await Bun.build({
     autoloadBunfig: false,
     autoloadDotenv: false,
   },
-  define: {
-    'globalThis.__OPENALICE_BUN_STANDALONE__': 'true',
-  },
   minify: true,
 })
 const buildDurationMs = performance.now() - buildStartedAt
 if (!result.success) {
   for (const log of result.logs) console.error(log)
   throw new Error('Bun Alice feasibility build failed')
+}
+
+const ptyBuild = await Bun.build({
+  entrypoints: [join(repositoryRoot, 'scripts/bun-native-pty-smoke.ts')],
+  compile: {
+    outfile: ptySmokePath,
+    autoloadBunfig: false,
+    autoloadDotenv: false,
+  },
+  minify: true,
+})
+if (!ptyBuild.success) {
+  for (const log of ptyBuild.logs) console.error(log)
+  throw new Error('Bun PTY feasibility build failed')
+}
+
+const ptyProbe = Bun.spawn([ptySmokePath], {
+  cwd: outputRoot,
+  env: {
+    HOME: smokeHome,
+    PATH: '',
+    TMPDIR: process.env['TMPDIR'] ?? '/tmp',
+    ...(process.env['SystemRoot'] ? { SystemRoot: process.env['SystemRoot'] } : {}),
+  },
+  stdout: 'pipe',
+  stderr: 'pipe',
+})
+const [ptyExitCode, ptyStdout, ptyStderr] = await Promise.all([
+  ptyProbe.exited,
+  new Response(ptyProbe.stdout).text(),
+  new Response(ptyProbe.stderr).text(),
+])
+if (ptyExitCode !== 0) {
+  throw new Error(`compiled Bun PTY smoke exited with ${ptyExitCode}: ${ptyStderr || ptyStdout}`)
+}
+const ptyReport = JSON.parse(ptyStdout.trim()) as {
+  status: string
+  backend: string
+  supportsFlowControl: boolean
+  pids: number[]
+}
+if (ptyReport.status !== 'pass' || ptyReport.backend !== 'bun-native') {
+  throw new Error(`compiled Bun PTY smoke returned an invalid report: ${ptyStdout}`)
 }
 
 const [webPort, mcpPort, utaPort, connectorPort] = await allocatePorts(4)
@@ -115,7 +150,7 @@ const report = {
   readyDurationMs,
   authStatus,
   rootStatus,
-  ptySidecar: 'native/node-pty',
+  pty: ptyReport,
   smokePath: '',
 }
 await writeFile(join(outputRoot, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)

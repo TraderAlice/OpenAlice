@@ -358,10 +358,10 @@ Checkboxes reflect repository truth, not intent.
   clean lock release.
 - [ ] Launch at least two independent fake or real Agent CLI PTYs; stopping one
   must not stop the other, Alice, or Guardian.
-- [ ] Prove the current `node-pty` path under Bun on macOS and Windows. If it
-  fails, compare an embedded N-API load with a Bun-native PTY implementation
-  behind the existing PTY ownership boundary. Do not add a Node sidecar as the
-  default answer.
+- [ ] Finish the Bun-native PTY gate. Bun 1.4 `Terminal` is accepted on macOS
+  arm64, Linux arm64, and Linux x64 behind the existing PTY ownership boundary;
+  native Windows and high-output backpressure remain unproved. Do not add a
+  Node sidecar as the default answer.
 - [ ] Prove an installed broker pack can still be dynamically loaded from
   `OPENALICE_HOME` without bundling its SDK into UTA Core.
 - [ ] Prove embedded UI/default/template reads and one materialized external
@@ -574,9 +574,9 @@ live-paper trading is not part of packaging verification.
 
 These may change implementation details but not the fixed product boundaries:
 
-1. Does the current `node-pty` N-API package bundle and run reliably in Bun
-   standalone executables on every required target, or should CLI builds use a
-   Bun-native PTY backend behind the same Session process abstraction?
+1. What should the Windows CLI PTY backend be if Bun's native `Terminal` remains
+   POSIX-only, and does Bun need an OpenAlice-owned output-pressure buffer to
+   replace `node-pty` pause/resume semantics?
 2. Can the current `@hono/node-server` paths run unchanged under Bun, or should
    the CLI build use a small runtime-neutral server adapter while Electron and
    source development retain Node?
@@ -658,3 +658,15 @@ This plan is complete only when:
   98,150,544 bytes and 735 ms; emulated Linux x64 measured 98,093,184 bytes and
   4,047 ms. This does not yet prove PTY loading from the sidecar or embedded
   resources outside a checkout.
+- 2026-08-29: Feasibility increment 3 adopted OpenCode's build-condition
+  boundary without inheriting its third-party native addon: Node/Electron keeps
+  lazy `node-pty`, while Bun 1.4 selects Bun's native `Terminal` API behind one
+  OpenAlice-owned PTY contract. Before the pivot, pinned `bun-pty` passed on
+  macOS arm64 and Linux x64 but produced no output on Linux arm64, including in
+  a direct source-mode probe. The Bun-native compiled probe then passed on
+  macOS arm64, Linux x64, and Linux arm64: it started two PTYs with distinct
+  PIDs, exercised input/output and resize, stopped one, and proved the other
+  remained usable. Alice also booted with an empty `PATH` and no native
+  sidecar. Bun's current Terminal API has no output pause/resume equivalent,
+  and its 1.4 type contract still describes PTY support as POSIX-only, so
+  high-output backpressure and native Windows x64 remain explicit gates.

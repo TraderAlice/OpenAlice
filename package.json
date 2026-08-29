@@ -3,6 +3,12 @@
   "version": "0.90.1",
   "description": "File-based trading agent engine",
   "type": "module",
+  "imports": {
+    "#openalice/pty-backend": {
+      "bun": "./src/workspaces/pty-bun.ts",
+      "default": "./src/workspaces/pty-node.ts"
+    }
+  },
   "main": "dist/electron/main.js",
   "scripts": {
     "cli": "node packages/cli/bin/openalice.ts",
