@@ -1448,6 +1448,25 @@ Alice ground-contact follow-up (2026-08-29):
 - Focused Building and Alice-sprite specs passed: 2 files / 11 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the
   606-file Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Touch action feedback follow-up (2026-08-29):
+
+- Replayed the phone controls after the D-pad pass and keyboard-focused the generated A button. Its circular pixel
+  art was surrounded by a 72x72 cream browser-style square, and the shared hover/focus/active rule also depressed the
+  control when it merely had keyboard focus. Both details made the controller feel like an image inside a web button.
+- Compared a smooth circular outline, separate generated focus/pressed assets, and a hard alpha-contour around the
+  existing sprite. Chose the alpha-contour because it follows the authored silhouette without anti-aliased geometry,
+  duplicated image states, or a theme-specific baked highlight.
+- Keyboard focus now draws a two-pixel cream contour with four zero-blur drop shadows while leaving the button at its
+  resting height. Actual press alone moves it down two pixels and scales it to 96 percent; fine-pointer hover only
+  brightens the asset, so touch input cannot leave a sticky hover state. Disabled styling, the 72x72 hit target, and
+  the existing accessible labels remain unchanged. Reduced-motion mode removes the transform transition.
+- Browser-played the 390x844 controller from the disabled spawn state through three upward moves. The button changed
+  from `No nearby action` at 42-percent opacity to `Check live operations`; activating it opened Occupancy log. The
+  focused state used the sprite-shaped contour with no DOM outline, page overflow and broken images remained zero,
+  and the control returned to `display: none` at 1280x720.
+- Focused Building specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file Vitest
+  run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

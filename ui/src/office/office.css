@@ -3736,16 +3736,30 @@
   object-fit: contain;
 }
 
-.oa-office-touch-action:not(:disabled):is(:hover, :focus-visible, :active) {
+.oa-office-touch-action:not(:disabled):focus-visible {
+  outline: none;
   filter:
+    drop-shadow(-2px 0 0 var(--gba-cream))
+    drop-shadow(2px 0 0 var(--gba-cream))
+    drop-shadow(0 -2px 0 var(--gba-cream))
+    drop-shadow(0 2px 0 var(--gba-cream))
     drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent))
     brightness(1.12);
-  transform: translateY(2px);
 }
 
-.oa-office-touch-action:focus-visible {
-  outline: 3px solid var(--gba-cream);
-  outline-offset: 2px;
+.oa-office-touch-action:not(:disabled):active {
+  filter:
+    drop-shadow(2px 2px 0 color-mix(in srgb, var(--gba-ink) 24%, transparent))
+    brightness(0.98);
+  transform: translateY(2px) scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oa-office-touch-action:not(:disabled):hover:not(:active) {
+    filter:
+      drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 28%, transparent))
+      brightness(1.12);
+  }
 }
 
 .oa-office-touch-action:disabled {
@@ -5021,6 +5035,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .oa-office-window,
+  .oa-office-touch-action,
   .oa-office-pod .oa-office-desk,
   .oa-office-pod .oa-office-desk[data-selected="true"]::after,
   .oa-office-pod__cabinet,
