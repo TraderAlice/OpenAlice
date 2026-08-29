@@ -538,7 +538,7 @@ artifacts.
   required Linux x64 `dev` and stable-release acceptance gate.
 - [x] Prove `up`, detach, `status`, `open`, multiple independent Agent PTYs,
   component restart, `down`, update activation, rollback, and uninstall.
-- [ ] Run the root TypeScript/tests, UI typecheck, Guardian recovery, CLI PTY,
+- [x] Run the root TypeScript/tests, UI typecheck, Guardian recovery, CLI PTY,
   installer, managed remote, and relevant Electron regression lanes.
 - [x] Publish `dev` preview artifacts and exercise their network path before a
   human-directed `dev` to `master` promotion.
@@ -562,14 +562,18 @@ pnpm test:install:docker
 pnpm test:install:dev-channel
 pnpm test:remote:docker
 pnpm electron:smoke:pty
-pnpm electron:smoke:packaged --temp-data
+pnpm electron:smoke:workspace
 ```
 
 Use the local OrbStack Docker engine as the default clean Linux harness for
 installer, remote, package-manager, repeat-install, upgrade, rollback, and
 uninstall checks. Containers must use isolated temporary homes and no host
 credentials or broker state. OrbStack validates Linux behavior efficiently,
-but it does not replace native macOS acceptance. Windows PowerShell,
+including native Bun release and multiprocess Runtime acceptance on Linux
+arm64 and x64, but it does not replace native macOS acceptance. Prefer this
+local native-macOS plus OrbStack matrix during serial development instead of
+waiting on hosted runners; hosted jobs remain publication and release gates.
+Windows PowerShell,
 filesystem-locking, PATH, and executable-signing checks belong to the deferred
 Windows lane.
 
