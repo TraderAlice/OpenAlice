@@ -76,6 +76,11 @@ export type ViewSpec =
         returnTrackedName?: string
       }
     }
+  | { kind: 'quant-lab'; params: Record<string, never> }
+  | { kind: 'quant-lab-strategy'; params: { id: string } }
+  | { kind: 'quant-lab-results'; params: { id: string } }
+  | { kind: 'quant-lab-integrity'; params: { experimentId: string } }
+  | { kind: 'quant-lab-journal'; params: Record<string, never> }
 
 export type ViewKind = ViewSpec['kind']
 
@@ -99,6 +104,7 @@ export type ActivitySection =
   | 'issue'
   | 'automation'
   | 'office'
+  | 'quant-lab'
 
 export interface Tab {
   id: string

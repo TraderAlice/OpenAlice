@@ -22,6 +22,7 @@ import { useLocale } from './i18n/useLocale'
  */
 export type Page =
   | 'chat' | 'auto-quant' | 'prediction' | 'inbox' | 'tracked' | 'workspaces' | 'portfolio' | 'office' | 'automation' | 'market'
+  | 'quant-lab'
   | 'issue'
   | 'connectors'
   | 'settings' | 'dev'

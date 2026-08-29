@@ -38,6 +38,11 @@ import { InboxPageShell } from '../pages/InboxPageShell'
 import { TrackedPage } from '../pages/TrackedPage'
 import { AutoPredictionLandingPage, AutoQuantLandingPage, ChatLandingPage } from '../pages/ChatLandingPage'
 import { WorkspaceManagerPage } from '../pages/WorkspaceManagerPage'
+import { QuantLabPage } from '../pages/QuantLabPage'
+import { StrategyDetailPage } from '../pages/StrategyDetailPage'
+import { BacktestResultsPage } from '../pages/BacktestResultsPage'
+import { ResearchIntegrityPage } from '../pages/ResearchIntegrityPage'
+import { TradeJournalPage } from '../pages/TradeJournalPage'
 import { PageSidebarShell } from '../pages/PageSidebarShell'
 import { WorkspaceListPage } from '../pages/WorkspaceListPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
@@ -634,6 +639,41 @@ const fileViewerModule: ViewModule<'file-viewer'> = {
     ),
 }
 
+const quantLabModule: ViewModule<'quant-lab'> = {
+  kind: 'quant-lab',
+  title: () => 'Quant Lab',
+  toUrl: () => '/quant-lab',
+  Component: ({ spec }) => <QuantLabPage spec={spec} />,
+}
+
+const quantLabStrategyModule: ViewModule<'quant-lab-strategy'> = {
+  kind: 'quant-lab-strategy',
+  title: (spec) => `Strategy: ${spec.params.id}`,
+  toUrl: (spec) => `/quant-lab/strategy/${encodeURIComponent(spec.params.id)}`,
+  Component: ({ spec }) => <StrategyDetailPage spec={spec} />,
+}
+
+const quantLabResultsModule: ViewModule<'quant-lab-results'> = {
+  kind: 'quant-lab-results',
+  title: (spec) => `Backtest: ${spec.params.id}`,
+  toUrl: (spec) => `/quant-lab/results/${encodeURIComponent(spec.params.id)}`,
+  Component: ({ spec }) => <BacktestResultsPage spec={spec} />,
+}
+
+const quantLabIntegrityModule: ViewModule<'quant-lab-integrity'> = {
+  kind: 'quant-lab-integrity',
+  title: (spec) => `Integrity: ${spec.params.experimentId}`,
+  toUrl: (spec) => `/quant-lab/integrity/${encodeURIComponent(spec.params.experimentId)}`,
+  Component: ({ spec }) => <ResearchIntegrityPage spec={spec} />,
+}
+
+const quantLabJournalModule: ViewModule<'quant-lab-journal'> = {
+  kind: 'quant-lab-journal',
+  title: () => 'Trade Journal',
+  toUrl: () => '/quant-lab/journal',
+  Component: ({ spec }) => <TradeJournalPage spec={spec} />,
+}
+
 // ==================== Aggregate ====================
 
 const VIEWS = {
@@ -667,6 +707,11 @@ const VIEWS = {
   'template-catalog': templateCatalogModule,
   'template-detail': templateDetailModule,
   'file-viewer': fileViewerModule,
+  'quant-lab': quantLabModule,
+  'quant-lab-strategy': quantLabStrategyModule,
+  'quant-lab-results': quantLabResultsModule,
+  'quant-lab-integrity': quantLabIntegrityModule,
+  'quant-lab-journal': quantLabJournalModule,
 } as const satisfies { [K in ViewKind]: ViewModule<K> }
 
 /** Untyped lookup — narrow at the call site by inspecting `spec.kind`. */
