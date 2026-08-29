@@ -21,6 +21,7 @@ import {
   rememberOfficePlayerState,
 } from '../office/office-excursion'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
+import type { OfficeReplayFocus } from '../office/replay-focus'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
 import { useOfficeProductActivity } from '../office/useOfficeProductActivity'
 import '../office/office.css'
@@ -45,6 +46,7 @@ export function OfficePage() {
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
   const initialPlayerStateRef = useRef(readOfficePlayerState())
   const [asOfSeq, setAsOfSeq] = useState<number | null>(null)
+  const [replayFocus, setReplayFocus] = useState<OfficeReplayFocus | null>(null)
   const [selected, setSelected] = useState<{ workspaceId: string; resumeId: string } | null>(null)
   const [logOpen, setLogOpen] = useState(false)
   const logOriginRef = useRef<OfficeLogOrigin>('menu')
@@ -245,6 +247,7 @@ export function OfficePage() {
                 }}
                 selected={selected}
                 replaySeq={asOfSeq}
+                replayFocus={replayFocus}
                 interactionSuspended={modalOpen}
                 initialPlayerState={initialPlayerStateRef.current}
                 onPlayerStateChange={rememberOfficePlayerState}
@@ -288,7 +291,10 @@ export function OfficePage() {
                   markExcursion()
                   openOrFocus({ kind: 'news', params: {} })
                 }}
-                onReturnLive={() => setAsOfSeq(null)}
+                onReturnLive={() => {
+                  setAsOfSeq(null)
+                  setReplayFocus(null)
+                }}
               />
             </div>
             {modalOpen && <div className="oa-office-window-scrim" aria-hidden />}
@@ -321,14 +327,18 @@ export function OfficePage() {
                       firstSeq={building.firstSeq}
                       lastSeq={building.lastSeq}
                       asOfSeq={asOfSeq}
-                      onAsOfSeq={setAsOfSeq}
+                      onAsOfSeq={(seq) => {
+                        setReplayFocus(null)
+                        setAsOfSeq(seq)
+                      }}
                       onViewFloor={closeLog}
                     />
                   </details>
                   <OfficeRuntimeSection
                     actors={activityActors}
-                    onReplay={(seq) => {
-                      setAsOfSeq(seq)
+                    onReplay={(focus) => {
+                      setReplayFocus(focus)
+                      setAsOfSeq(focus.seq)
                       closeLog()
                     }}
                   />

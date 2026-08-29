@@ -3738,6 +3738,61 @@
   animation: none;
 }
 
+.oa-office-replay-beacon {
+  position: absolute;
+  display: grid;
+  width: max-content;
+  max-width: 190px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px 3px 3px;
+  border: 2px solid var(--gba-ink);
+  border-radius: 2px;
+  color: var(--gba-ink);
+  background: var(--gba-paper);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--gba-ink) 34%, transparent);
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  animation: oa-office-replay-beacon 560ms steps(2, end) 3;
+}
+
+.oa-office-replay-beacon > img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.oa-office-replay-beacon > span {
+  display: grid;
+  min-width: 0;
+}
+
+.oa-office-replay-beacon small {
+  color: var(--gba-ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.oa-office-replay-beacon strong {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oa-office-replay-beacon[data-reduced-motion="true"] {
+  animation: none;
+}
+
+@keyframes oa-office-replay-beacon {
+  50% { transform: translate(-50%, calc(-100% - 3px)); }
+}
+
 .oa-office-collision-impact {
   position: absolute;
   width: 24px;

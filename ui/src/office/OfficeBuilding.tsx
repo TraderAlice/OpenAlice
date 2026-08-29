@@ -27,6 +27,8 @@ import {
 import { OfficeMapPod } from './OfficeMapPod'
 import { OfficeRouteTrail } from './OfficeRouteTrail'
 import { OfficeRouteTargetPointer } from './OfficeRouteTargetPointer'
+import { OfficeReplayBeacon } from './OfficeReplayBeacon'
+import type { OfficeReplayFocus } from './replay-focus'
 import {
   clampOfficeCamera,
   nearestOfficeInteractionTarget,
@@ -92,6 +94,7 @@ export function OfficeBuilding({
   groupTitle,
   selected,
   replaySeq = null,
+  replayFocus = null,
   interactionSuspended = false,
   initialPlayerState = null,
   onPlayerStateChange,
@@ -116,6 +119,7 @@ export function OfficeBuilding({
   groupTitle?: (workspaceId: string, tag: string) => string
   selected?: { workspaceId: string; resumeId: string } | null
   replaySeq?: number | null
+  replayFocus?: OfficeReplayFocus | null
   interactionSuspended?: boolean
   initialPlayerState?: OfficePlayerState | null
   onPlayerStateChange?: (state: OfficePlayerState) => void
@@ -181,6 +185,7 @@ export function OfficeBuilding({
   const routeTimerRef = useRef<number | null>(null)
   const departureTimerRef = useRef<number | null>(null)
   const routeGenerationRef = useRef(0)
+  const replayFocusKeyRef = useRef<string | null>(null)
   const menuOriginRef = useRef<'hud' | 'floor-terminal'>('hud')
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const awakeGroups = useMemo(
@@ -204,6 +209,17 @@ export function OfficeBuilding({
   const hiddenGroupCount = building.offices.length - defaultGroups.length
   const showingAll = showAll && hiddenGroupCount > 0
   const groups = showingAll ? building.offices : defaultGroups
+  useEffect(() => {
+    if (
+      replaySeq == null
+      || !replayFocus?.workspaceId
+      || hiddenGroupCount === 0
+      || groups.some((group) => group.workspace.id === replayFocus.workspaceId)
+    ) return
+    if (building.offices.some((office) => office.workspace.id === replayFocus.workspaceId)) {
+      setShowAll(true)
+    }
+  }, [building.offices, groups, hiddenGroupCount, replayFocus?.workspaceId, replaySeq])
   const stats = useMemo(() => {
     const employees = groups.flatMap((office) => office.employees)
     return {
@@ -254,6 +270,14 @@ export function OfficeBuilding({
     () => new Map(interactionTargets.map((target) => [target.id, target])),
     [interactionTargets],
   )
+  const replayFocusTarget = useMemo(() => {
+    if (replaySeq == null || replayFocus?.seq !== replaySeq) return null
+    for (const targetId of replayFocus.targetIds) {
+      const target = interactionTargetById.get(targetId)
+      if (target) return target
+    }
+    return null
+  }, [interactionTargetById, replayFocus, replaySeq])
   const routeTarget = routeTargetId ? interactionTargetById.get(routeTargetId) : null
   const routeTargetName = routeTarget
     ? routeTarget.kind === 'employee'
@@ -764,6 +788,20 @@ export function OfficeBuilding({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapLayout.width, mapLayout.height])
 
+  useLayoutEffect(() => {
+    if (replaySeq == null || !replayFocus || !replayFocusTarget) {
+      replayFocusKeyRef.current = null
+      return
+    }
+    const focusKey = `${replayFocus.seq}:${building.asOfSeq ?? 'loading'}:${replayFocusTarget.id}`
+    if (replayFocusKeyRef.current === focusKey) return
+    const viewport = viewportRef.current?.getBoundingClientRect()
+    if (!viewport || viewport.width <= 0 || viewport.height <= 0) return
+    replayFocusKeyRef.current = focusKey
+    setCamera(officeCameraCenteredOn(replayFocusTarget, viewport, mapLayout))
+    viewportRef.current?.focus({ preventScroll: true })
+  }, [building.asOfSeq, mapLayout, replayFocus, replayFocusTarget, replaySeq])
+
   useEffect(() => {
     if (!initialLayoutKeyRef.current) return
     onPlayerStateChange?.({ position: alice, direction: aliceDirection })
@@ -1179,6 +1217,15 @@ export function OfficeBuilding({
                 target={routeTarget}
                 reducedMotion={reducedMotion}
                 zIndex={officeDepthAt(routeTarget.y) + 1200}
+              />
+            )}
+            {replayFocus && replayFocusTarget && replayFocus.seq === replaySeq && (
+              <OfficeReplayBeacon
+                target={replayFocusTarget}
+                label={replayFocus.label}
+                sequenceLabel={t('office.replayAt', { seq: replayFocus.seq })}
+                reducedMotion={reducedMotion}
+                zIndex={officeDepthAt(replayFocusTarget.y) + 1250}
               />
             )}
             <div

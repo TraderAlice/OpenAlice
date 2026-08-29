@@ -54,6 +54,16 @@ describe('OfficeBuilding', () => {
           }],
         }}
         replaySeq={2}
+        replayFocus={{
+          seq: 2,
+          workspaceId: 'chat-replay',
+          targetIds: [
+            'employee:chat-replay:resume-5',
+            'roster:chat-replay',
+            'sign:chat-replay',
+          ],
+          label: 'Session 6',
+        }}
         onSelectEmployee={onSelectEmployee}
         onOpenEmployee={vi.fn()}
         onOpenWorkspace={onOpenWorkspace}
@@ -85,6 +95,10 @@ describe('OfficeBuilding', () => {
     expect(roster.disabled).toBe(true)
     expect(terminal.disabled).toBe(true)
     expect(operations.disabled).toBe(false)
+    const replayBeacon = screen.getByRole('status', { name: 'Seq 2 · Session 6' })
+    expect(replayBeacon.dataset.kind).toBe('roster')
+    expect(replayBeacon.querySelector('img')?.getAttribute('src'))
+      .toBe('/office/furniture/route-destination-v1.png')
     fireEvent.click(workspaceSign)
     fireEvent.click(occupiedDesks[0])
     fireEvent.click(cabinet)

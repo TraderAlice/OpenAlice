@@ -14,6 +14,7 @@ import { OfficeCoworkerSprite } from '../office/OfficeCoworkerSprite'
 import { officePixelImg } from '../office/furniture'
 import { OFFICE_HUD_ASSETS } from '../office/hud-assets'
 import { OFFICE_LOG_ASSETS, officeLogAssetKind } from '../office/log-assets'
+import { officeReplayFocusForEvent, type OfficeReplayFocus } from '../office/replay-focus'
 import { useWorkspace } from '../tabs/store'
 
 type OfficeLogChannel = 'all' | 'agent' | 'inbox' | 'news'
@@ -137,7 +138,7 @@ export function OfficeRuntimeSection({
   onReplay,
 }: {
   actors?: ReadonlyMap<string, OfficeActivityActor>
-  onReplay?: (seq: number) => void
+  onReplay?: (focus: OfficeReplayFocus) => void
 } = {}) {
   const { t } = useTranslation()
   const openOrFocus = useWorkspace((state) => state.openOrFocus)
@@ -402,7 +403,7 @@ export function OfficeRuntimeSection({
               <button
                 type="button"
                 className="oa-office-runtime__open oa-office-runtime__open--replay"
-                onClick={() => onReplay(selectedEvent.seq)}
+                onClick={() => onReplay(officeReplayFocusForEvent(selectedEvent, selectedIdentity.primary))}
               >
                 <img src={OFFICE_HUD_ASSETS.replayLatch} alt="" aria-hidden style={officePixelImg} />
                 {t('office.replayEvent')}

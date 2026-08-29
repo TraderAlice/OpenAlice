@@ -2631,6 +2631,25 @@ Player-facing coworker identity follow-up (2026-08-30):
   first full run, then passed both in isolation and in the complete rerun; existing large-chunk and direct-eval
   advisories are unchanged.
 
+Historical-event floor beacon follow-up (2026-08-30):
+
+- Playing `View floor at this event` for Grok completion #1327 showed that the action only changed the HUD to Replay;
+  camera, focus, selection, and prompts stayed where they were, so the player could not tell where the event happened.
+- Compared centering only the Workspace, immediately reopening Agent File, and marking the exact historical world
+  target. Chose a map beacon: it keeps the snapshot visible and explorable, does not move Alice or trigger a live
+  interaction, and matches the map-target language already taught by Office auto-move.
+- Agent events resolve to the exact desk, then the Team roster for off-desk members, then the Workspace sign. Inbox and
+  News resolve to their physical service terminals; events without a spatial identity resolve to Operations. A hidden
+  target Workspace automatically enters All groups. Direct Replay slider changes deliberately clear the event beacon.
+- Loading the snapshot centers the camera and focuses the floor. A compact generated-arrow parchment marker names the
+  sequence and actor/source, animates for only three stepped beats, remains static under reduced motion, and persists
+  while the player pans for context. Returning Live removes it.
+- Browser-played Grok #1327 (`employee`, `grok-analyst`), Inbox #1296 (`inbox-service`), and News #1311
+  (`news-service`, `nikkei-asia`). Each changed the camera, focused `office-floor`, and marked the correct physical
+  target without moving Alice. Focused replay mapping, beacon, journal, OfficeBuilding, and OfficePage specs passed (5
+  files / 30 tests), together with root/UI TypeScript, the full 616-file Vitest run (5,106 passing; one file and nine
+  tests skipped), and the production build; existing large-chunk and direct-eval advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

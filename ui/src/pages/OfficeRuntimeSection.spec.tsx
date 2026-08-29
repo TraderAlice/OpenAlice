@@ -300,7 +300,11 @@ describe('OfficeRuntimeSection', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Agent report.*#0007/i }))
     await userEvent.click(screen.getByRole('button', { name: 'View floor at this event' }))
 
-    expect(onReplay).toHaveBeenCalledWith(7)
+    expect(onReplay).toHaveBeenCalledWith({
+      seq: 7,
+      targetIds: ['operations'],
+      label: 'A',
+    })
   })
 
   it('keeps channel navigation available when the selected channel is empty', async () => {
