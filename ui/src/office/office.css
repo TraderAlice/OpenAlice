@@ -4163,6 +4163,10 @@
   animation: oa-office-emote-failed 700ms steps(2, end) infinite;
 }
 
+.oa-office-mood-emote[data-mood="review"] {
+  animation: oa-office-emote-review 1.8s steps(2, end) 3;
+}
+
 .oa-office-mood-emote[data-reduced-motion="true"] {
   animation: none;
 }
@@ -4178,6 +4182,10 @@
 @keyframes oa-office-emote-failed {
   25% { transform: translate(-52%, -2px); }
   75% { transform: translate(-48%, -2px); }
+}
+
+@keyframes oa-office-emote-review {
+  50% { transform: translate(-50%, -2px); }
 }
 
 .oa-office-main {

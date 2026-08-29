@@ -66,7 +66,17 @@ describe('Office coworker sprite registry', () => {
       working: '/office/hud/talk-bubble-v2.png',
       waiting: '/office/coworkers/waiting-emote-v1.png',
       failed: '/office/coworkers/failed-emote-v1.png',
+      review: '/office/coworkers/review-emote-v1.png',
     })
+
+    const review = readFileSync(resolve(
+      publicRoot,
+      OFFICE_COWORKER_EMOTES.review.replace(/^\//, ''),
+    ))
+    expect(review.subarray(1, 4).toString()).toBe('PNG')
+    expect(review.readUInt32BE(16)).toBe(160)
+    expect(review.readUInt32BE(20)).toBe(160)
+    expect(review[25]).toBe(6)
   })
 
   it('ships each generated typing frame on the exact canvas of its identity frame', () => {

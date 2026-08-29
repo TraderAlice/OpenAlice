@@ -2520,6 +2520,22 @@ Completed-result legibility follow-up (2026-08-30):
   specs, root/UI TypeScript, the full 613-file Vitest run (5,096 passing; one file and nine tests skipped), and the full
   production build passed; the existing large-chunk and direct-eval advisories remain unchanged.
 
+Spatial completion-cue follow-up (2026-08-30):
+
+- A fresh one-line Grok run exposed the successful `review` state on the real floor: its desk powered down and the
+  Operations Board gained attention, but the specific coworker who had finished showed no map-level feedback. Success
+  was therefore less legible than working, waiting, or failure.
+- Compared a gold workstation glow, a completed count on the room sign, and a coworker-anchored result emote. Chose the
+  emote because it identifies the exact actor, follows the existing RPG status language, and disappears with the
+  existing 30-second review hold instead of adding another persistent dashboard counter.
+- Added a generated transparent 16-bit parchment bubble with a muted moss check. It uses the existing decorative emote
+  slot, bobs only three restrained cycles, stays static under reduced motion, and leaves the desk's translated review
+  state as the accessible description.
+- Browser-ran and then resumed the same tiny Grok Session. The cue appeared above the exact finished coworker without
+  overpowering the room sign or service-terminal attention, the Agent File remained directly reachable, and the cue
+  disappeared with the review hold. Root/UI TypeScript, the full 613-file Vitest run (5,097 passing; one file and nine
+  tests skipped), and the production build passed; existing large-chunk and direct-eval advisories are unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

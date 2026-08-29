@@ -59,6 +59,7 @@ export const OFFICE_COWORKER_EMOTES = {
   working: '/office/hud/talk-bubble-v2.png',
   waiting: '/office/coworkers/waiting-emote-v1.png',
   failed: '/office/coworkers/failed-emote-v1.png',
+  review: '/office/coworkers/review-emote-v1.png',
 } as const
 
 const AGENT_ARCHETYPE: Record<string, OfficeCoworkerArchetype> = {

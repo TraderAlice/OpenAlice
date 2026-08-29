@@ -38,6 +38,7 @@ export function OfficeDesk({
     employee.mood === 'working'
     || employee.mood === 'waiting'
     || employee.mood === 'failed'
+    || employee.mood === 'review'
   )
     ? { mood: employee.mood, src: OFFICE_COWORKER_EMOTES[employee.mood] }
     : null

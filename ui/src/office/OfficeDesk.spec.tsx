@@ -108,6 +108,7 @@ describe('OfficeDesk', () => {
   it.each([
     ['waiting', '/office/coworkers/waiting-emote-v1.png'],
     ['failed', '/office/coworkers/failed-emote-v1.png'],
+    ['review', '/office/coworkers/review-emote-v1.png'],
   ] as const)('keeps the generated %s emote while interaction copy moves to the prompt', (mood, src) => {
     const stateEmployee = { ...employee, mood, bubble: { kind: 'tool' as const, name: 'research' } }
     const props = {
