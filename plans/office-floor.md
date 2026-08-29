@@ -1201,6 +1201,31 @@ First-minute diegesis follow-up (2026-08-29):
 - `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Portrait-viewport follow-up (2026-08-29):
+
+- Rechecked the selected Agent file after the first-minute cleanup. At 760px, the window exposed 212px of a 288px
+  profile: `Open session` was clipped by 13px and the drawer was fully hidden. At 390px, the root cause became clear:
+  Office was still forced into a 4:3 card only about 252px tall while hundreds of pixels above and below went unused.
+- Compared adding a permanent page-down control, hiding profile facts to fit the old card, and making the game
+  viewport responsive to portrait screens. Chose the responsive viewport because it fixes the world and every
+  temporary Office window instead of adding one more control or discarding real Session data.
+- Wide and tablet layouts keep the 4:3 frame. At the existing 760px container breakpoint, Agent files may grow to
+  320px or the available map height, whichever is smaller. At phone width (`<=580px`), the Office frame drops its
+  forced aspect ratio and consumes the available vertical work area with the same 8px physical-frame margin.
+- Responsive behavior remains spatial: the world keeps its fixed 960x672 coordinate system, camera bounds and D-pad
+  operate against the taller viewport, and modal windows remain inside the Office frame. No font, target, or sprite
+  is reduced; the layout spends previously blank page space instead.
+- Browser-measured the one-drawer Agent file before and after at 760x900: 212/288 scroll client/content became
+  288/288, with both `Open session` and the drawer fully visible and 220px of map context retained. Desktop 1280x720
+  remained a compact 215px window with 207/207 content.
+- Browser-played 390x844 after the portrait-frame change. The Office frame grew to 374x748, Agent file content fit
+  at 354/354 without scrolling, close/session/drawer actions were visible, and after closing the window the generated
+  96px D-pad moved Alice down one tile. Broken images and horizontal overflow remained zero at every width.
+- Focused Agent-file and Building specs passed: 2 files / 10 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 604 files / 5023 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

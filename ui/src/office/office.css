@@ -3043,6 +3043,10 @@
     display: none;
   }
 
+  .oa-office-inspect {
+    max-height: min(320px, calc(100% - 84px));
+  }
+
   .oa-office-inspect__profile {
     grid-template-columns: 64px minmax(0, 1fr);
   }
@@ -3068,6 +3072,7 @@
 
   .oa-office-inspect {
     top: auto;
+    max-height: calc(100% - 16px);
   }
 }
 
@@ -4908,5 +4913,18 @@
     right: 8px;
     bottom: 8px;
     width: calc(100% - 16px);
+  }
+}
+
+@media (max-width: 580px) {
+  .oa-office-layout {
+    align-items: stretch;
+    padding: 8px;
+  }
+
+  .oa-office-main {
+    width: 100cqw;
+    height: 100cqh;
+    aspect-ratio: auto;
   }
 }
