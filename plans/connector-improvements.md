@@ -67,6 +67,19 @@ external adapters remain optional projections rather than sources of truth.
    becomes near-full-screen on narrow viewports. The shared dialog primitive
    owns focus trap, Escape/backdrop dismissal, labelled header, scroll containment,
    and focus restoration; adapter content continues to own fields and actions.
+9. **The overview is a connection center, not a status table.** A large global
+   service card, a dense four-row definition list, and raw owner identifiers
+   all compete with the action a user actually needs. Three approaches were
+   considered: retain the table and restyle it (low risk, same cognitive load),
+   turn the page into a setup wizard (clear for first use, poor for daily
+   operations), or use state-led cards with progressive diagnostics. The chosen
+   model keeps a compact service summary and gives each adapter one plain-language
+   state, one next action, linked/last-delivery context, and technical details
+   only when something is wrong. Setup stays prominent only until credentials
+   exist. Cards remain two columns when space permits and become a single
+   vertical task flow without horizontal scrolling on narrow screens. Status is
+   conveyed by text and icon as well as color; card actions remain real buttons
+   with visible focus treatment.
 
 ## Ordered Work
 
@@ -88,6 +101,9 @@ external adapters remain optional projections rather than sources of truth.
         `Chat on <Label> already exists`; do not rewrite existing Issues.
   - [x] Add a reusable configuration dialog and open one adapter's shared
         settings content from its overview card without changing routes.
+  - [x] Replace the operations-style status table with a compact service summary
+        and state-led Connector cards; hide raw owner identifiers and progressively
+        disclose diagnostics.
   - [ ] Revisit Connector status copy and owner-identifier disclosure as a
         separate accepted increment.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
@@ -109,6 +125,14 @@ typecheck/build, and real-route browser acceptance at desktop and 390 px widths.
 The browser check confirmed route retention, one-adapter content, narrow-screen
 action wrapping without horizontal overflow, close-button dismissal, and focus
 restoration. No live connector action or configuration control was exercised.
+
+The connection-center overview increment passed 23 focused UI tests, UI
+typecheck/build, and real-route browser acceptance at desktop and 390 px widths.
+The browser check covered healthy, paused, setup-required, and degraded cards;
+collapsed diagnostics; responsive card/action flow; capability-specific dialog
+copy; route retention; dismissal; and focus restoration. The overview no longer
+renders raw owner identifiers. No live connector action or configuration control
+was exercised.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

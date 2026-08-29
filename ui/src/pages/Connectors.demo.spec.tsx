@@ -66,10 +66,10 @@ describe('Connector demo routes', () => {
   it('renders the read-only operations route from the demo snapshot', async () => {
     render(<ConnectorStatusPage />)
 
-    expect(await screen.findByText('Connector Service')).toBeTruthy()
+    expect(await screen.findByText('Delivery service')).toBeTruthy()
     expect(screen.getByText('Discord')).toBeTruthy()
     expect(screen.getByText('Telegram')).toBeTruthy()
-    expect(screen.getByText(/External delivery is disabled/)).toBeTruthy()
+    expect(screen.getByText(/All external delivery is paused/)).toBeTruthy()
   })
 
   it('reconnects an unhealthy configured adapter from the operations route', async () => {
@@ -92,6 +92,10 @@ describe('Connector demo routes', () => {
     mocks.load.mockResolvedValue(snapshot)
 
     render(<ConnectorStatusPage />)
+    const diagnostics = (await screen.findByText('Technical details')).closest('details') as HTMLDetailsElement
+    expect(diagnostics.open).toBe(false)
+    fireEvent.click(within(diagnostics).getByText('Technical details'))
+    expect(diagnostics.open).toBe(true)
     fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }))
 
     await waitFor(() => expect(mocks.reconnect).toHaveBeenCalledWith('telegram'))
@@ -105,11 +109,43 @@ describe('Connector demo routes', () => {
     expect(screen.getByRole('button', { name: '刷新' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '配置' })).toBeNull()
     expect(screen.getByRole('button', { name: '设置 Feishu' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '连接器服务' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '投递连接器' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '投递服务' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '你的聊天渠道' })).toBeTruthy()
     expect(screen.getByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeTruthy()
     expect(screen.getAllByText('需要设置')).toHaveLength(4)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
+  })
+
+  it('summarizes a linked connector without exposing its raw owner identifier', async () => {
+    const snapshot = createDemoConnectorSnapshot()
+    snapshot.config.serviceEnabled = true
+    snapshot.config.adapters.feishu = {
+      enabled: true,
+      settings: { appId: 'feishu-app' },
+      configuredSecrets: ['appSecret'],
+    }
+    snapshot.health = {
+      enabled: true,
+      status: 'healthy',
+      service: {
+        status: 'healthy',
+        startedAt: '2026-08-23T00:00:00.000Z',
+        adapters: [{
+          id: 'feishu',
+          enabled: true,
+          status: 'healthy',
+          owner: 'ou_private_identifier',
+          lastSuccessAt: new Date().toISOString(),
+        }],
+      },
+    }
+    mocks.load.mockResolvedValue(snapshot)
+
+    render(<ConnectorStatusPage />)
+
+    expect(await screen.findByText('Private chat linked')).toBeTruthy()
+    expect(screen.getByText('Delivered just now')).toBeTruthy()
+    expect(screen.queryByText('ou_private_identifier')).toBeNull()
   })
 
   it('opens one connector configuration in place and restores focus on close', async () => {
@@ -129,6 +165,15 @@ describe('Connector demo routes', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     await waitFor(() => expect(document.activeElement).toBe(trigger))
+  })
+
+  it('describes configuration according to the connector capabilities', async () => {
+    render(<ConnectorStatusPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up Slack' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Connection and delivery settings for Slack.')).toBeTruthy()
+    expect(within(dialog).queryByText('Connection, delivery, and chat settings for Slack.')).toBeNull()
   })
 
   it('finishes a pending auto-save after the configuration dialog closes', async () => {

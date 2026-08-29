@@ -1,6 +1,18 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
-import { CircleAlert, Plug, RefreshCw, Settings2 } from 'lucide-react'
+import {
+  CircleAlert,
+  Clock3,
+  Hash,
+  Link2,
+  MessageCircle,
+  MessagesSquare,
+  Plug,
+  RefreshCw,
+  Send,
+  Settings2,
+  type LucideIcon,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ConnectorHealth, ConnectorSettingsSnapshot } from '../api'
 import { ConfigurationDialog } from '../components/ConfigurationDialog'
@@ -70,8 +82,8 @@ export function ConnectorStatusPage() {
         )}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
-        <div className="mx-auto max-w-[960px] space-y-5">
+      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-6">
+        <div className="mx-auto max-w-[1040px] space-y-6">
           {loading && !snapshot ? (
             <div className="flex justify-center py-24"><Spinner /></div>
           ) : snapshot ? (
@@ -111,7 +123,12 @@ export function ConnectorStatusPage() {
             if (!open) void refreshConnectorHealth()
           }}
           title={t('connectorStatus.configurationDialogTitle', { name: configuredDefinition.label })}
-          description={t('connectorStatus.configurationDialogDescription', { name: configuredDefinition.label })}
+          description={t(
+            configuredDefinition.capabilities?.includes('desk')
+              ? 'connectorStatus.configurationDialogDescription'
+              : 'connectorStatus.configurationDialogDescriptionDelivery',
+            { name: configuredDefinition.label },
+          )}
           restoreFocusRef={configurationTriggerRef}
           keepMounted
         >
@@ -140,123 +157,143 @@ function ConnectorOverview({
     [snapshot.health.service?.adapters],
   )
   const service = servicePresentation(snapshot.health, t)
+  const adapters = snapshot.definitions.map((definition) => {
+    const config = snapshot.config.adapters[definition.id] ?? {
+      enabled: false,
+      settings: {},
+      configuredSecrets: [],
+    }
+    const runtime = runtimeById.get(definition.id)
+    const configured = definition.fields
+      .filter((field) => field.required)
+      .every((field) => field.kind === 'secret'
+        ? config.configuredSecrets.includes(field.key)
+        : hasValue(config.settings[field.key]))
+    return {
+      definition,
+      config,
+      runtime,
+      configured,
+      presentation: adapterPresentation({
+        serviceEnabled: snapshot.config.serviceEnabled,
+        adapterEnabled: config.enabled,
+        configured,
+        runtimeStatus: runtime?.status,
+      }, t, definition.label),
+    }
+  })
+  const activeCount = adapters.filter(({ config }) => snapshot.config.serviceEnabled && config.enabled).length
+  const attentionCount = adapters.filter(({ presentation }) => presentation.tone === 'danger').length
+  const configuredCount = adapters.filter(({ configured }) => configured).length
 
   return (
     <>
-      <section className="oa-status-surface rounded-2xl border border-border bg-secondary/35 p-5 md:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground">
-              <Plug size={19} />
+      <section className={`oa-status-surface rounded-xl border px-4 py-3.5 ${service.tone === 'danger'
+        ? 'border-destructive/25 bg-destructive/[0.035]'
+        : 'border-border bg-secondary/25'
+      }`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${service.tone === 'danger'
+              ? 'border-destructive/20 bg-destructive/10 text-destructive'
+              : service.tone === 'healthy'
+                ? 'border-success/20 bg-success/10 text-success'
+                : 'border-border bg-background text-muted-foreground'
+            }`}>
+              <Plug size={17} aria-hidden />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[15px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
+                <h3 className="text-[13px] font-semibold text-foreground">{t('connectorStatus.serviceTitle')}</h3>
                 <StatusBadge tone={service.tone}>{service.label}</StatusBadge>
               </div>
-              <p className="mt-1 max-w-[660px] text-[13px] leading-5 text-muted-foreground">
+              <p className="mt-0.5 max-w-[660px] text-[12px] leading-5 text-muted-foreground">
                 {service.description}
               </p>
             </div>
           </div>
-          <div className="text-right text-[11px] text-muted-foreground/70">
-            {snapshot.health.checkedAt && (
-              <p>{t('connectorStatus.checked', { time: formatDate(snapshot.health.checkedAt) })}</p>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <SummaryPill>{t('connectorStatus.configuredCount', { count: configuredCount })}</SummaryPill>
+            <SummaryPill>{t('connectorStatus.activeCount', { count: activeCount })}</SummaryPill>
+            {attentionCount > 0 && (
+              <SummaryPill tone="danger">{t('connectorStatus.attentionCount', { count: attentionCount })}</SummaryPill>
             )}
-            {snapshot.health.latencyMs !== undefined && <p className="mt-0.5">{snapshot.health.latencyMs} ms</p>}
           </div>
         </div>
         {snapshot.health.lastError && (
-          <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+          <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
             {snapshot.health.lastError}
-          </div>
+          </DiagnosticDetails>
         )}
       </section>
 
       <section>
-        <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="mb-3.5 flex items-end justify-between gap-3 px-0.5">
           <div>
-            <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground">
+            <h3 className="text-[14px] font-semibold text-foreground">
               {t('connectorStatus.deliveryTitle')}
             </h3>
-            <p className="mt-1 text-[12px] text-muted-foreground">{t('connectorStatus.deliveryDescription')}</p>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">{t('connectorStatus.deliveryDescription')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {snapshot.definitions.map((definition) => {
-            const config = snapshot.config.adapters[definition.id] ?? {
-              enabled: false,
-              settings: {},
-              configuredSecrets: [],
-            }
-            const runtime = runtimeById.get(definition.id)
-            const configured = definition.fields
-              .filter((field) => field.required)
-              .every((field) => field.kind === 'secret'
-                ? config.configuredSecrets.includes(field.key)
-                : hasValue(config.settings[field.key]))
-            const presentation = adapterPresentation({
-              serviceEnabled: snapshot.config.serviceEnabled,
-              adapterEnabled: config.enabled,
-              configured,
-              runtimeStatus: runtime?.status,
-            }, t)
-
+          {adapters.map(({ definition, config, runtime, configured, presentation }) => {
+            const linked = Boolean(runtime?.owner)
             return (
-              <article key={definition.id} className="oa-status-surface rounded-2xl border border-border bg-secondary/25 p-5">
+              <article key={definition.id} className="oa-status-surface group flex flex-col rounded-2xl border border-border bg-secondary/20 p-5 transition-colors hover:border-border/90 hover:bg-secondary/30 lg:min-h-[250px]">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ConnectorGlyph id={definition.id} />
+                    <div className="min-w-0">
                       <h4 className="text-[15px] font-semibold text-foreground">{definition.label}</h4>
-                      <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
+                      <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                        {t('connectorStatus.adapterDescription', { name: definition.label })}
+                      </p>
                     </div>
-                    <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-                      {t('connectorStatus.adapterDescription', { name: definition.label })}
-                    </p>
                   </div>
-                  <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${presentation.dot}`} aria-hidden />
+                  <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
                 </div>
 
-                <dl className="mt-5 grid grid-cols-[112px_1fr] gap-x-3 gap-y-2 border-t border-border/70 pt-4 text-[12px]">
-                  <dt className="text-muted-foreground">{t('connectorStatus.configuration')}</dt>
-                  <dd className="text-foreground">
-                    {configured ? t('connectorStatus.ready') : t('connectorStatus.needsSetup')}
-                  </dd>
-                  <dt className="text-muted-foreground">{t('connectorStatus.delivery')}</dt>
-                  <dd className="text-foreground">
-                    {config.enabled ? t('connectorStatus.enabled') : t('connectorStatus.disabled')}
-                  </dd>
-                  <dt className="text-muted-foreground">{t('connectorStatus.owner')}</dt>
-                  <dd className="truncate text-foreground" title={runtime?.owner}>
-                    {runtime?.owner ?? t('connectorStatus.notLinked')}
-                  </dd>
-                  <dt className="text-muted-foreground">{t('connectorStatus.lastSuccess')}</dt>
-                  <dd className="text-foreground">
-                    {runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : t('connectorStatus.noDeliveryYet')}
-                  </dd>
-                  {runtime?.nextAttemptAt && (
-                    <>
-                      <dt className="text-muted-foreground">{t('connectorStatus.nextRetry')}</dt>
-                      <dd className="text-foreground">
+                <div className={`mt-4 rounded-xl border px-3.5 py-3 ${statusSurfaceClass(presentation.tone)}`}>
+                  <p className="text-[12.5px] font-medium leading-5 text-foreground">{presentation.description}</p>
+                </div>
+
+                {configured && (
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11.5px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Link2 size={13} aria-hidden />
+                      {linked ? t('connectorStatus.privateChatLinked') : t('connectorStatus.privateChatNotLinked')}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5" title={runtime?.lastSuccessAt ? formatDate(runtime.lastSuccessAt) : undefined}>
+                      <Clock3 size={13} aria-hidden />
+                      {runtime?.lastSuccessAt
+                        ? t('connectorStatus.lastDelivered', { time: formatTimeAgo(runtime.lastSuccessAt, t) })
+                        : t('connectorStatus.noDeliveryYet')}
+                    </span>
+                  </div>
+                )}
+
+                {(runtime?.detail || runtime?.lastError) && (
+                  <DiagnosticDetails summary={t('connectorStatus.technicalDetails')}>
+                    <span>{runtime.lastError ?? runtime.detail}</span>
+                    {runtime.nextAttemptAt && (
+                      <span className="mt-1 block text-muted-foreground">
                         {t('connectorStatus.nextRetryAt', {
                           time: formatDate(runtime.nextAttemptAt),
                           count: runtime.consecutiveFailures ?? 1,
                         })}
-                      </dd>
-                    </>
-                  )}
-                </dl>
-
-                {(runtime?.detail || runtime?.lastError) && (
-                  <p className={`mt-4 rounded-lg px-3 py-2 text-[12px] ${runtime.lastError ? 'bg-destructive/5 text-destructive' : 'bg-muted/55 text-muted-foreground'}`}>
-                    {runtime.lastError ?? runtime.detail}
-                  </p>
+                      </span>
+                    )}
+                  </DiagnosticDetails>
                 )}
 
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+                <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border/60 pt-4">
                   <button
                     type="button"
-                    className="oa-pressable inline-flex items-center gap-2 rounded-lg border border-primary/35 bg-primary/[0.04] px-3 py-2 text-[12px] font-medium text-primary hover:border-primary/60 hover:bg-primary/[0.07]"
+                    className={`oa-pressable inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${configured
+                      ? 'border border-border bg-background/50 text-foreground hover:border-primary/45 hover:text-primary'
+                      : 'border border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                    }`}
                     onClick={(event) => onConfigure(definition.id, event.currentTarget)}
                   >
                     <Settings2 size={13} aria-hidden />
@@ -322,23 +359,47 @@ function adapterPresentation(input: {
   adapterEnabled: boolean
   configured: boolean
   runtimeStatus?: AdapterStatus
-}, t: TFunction): { label: string; tone: StatusTone; dot: string } {
-  if (!input.serviceEnabled || !input.adapterEnabled) {
-    return { label: t('connectorStatus.adapter.off'), tone: 'neutral', dot: 'bg-muted-foreground/30' }
-  }
+}, t: TFunction, name: string): { label: string; tone: StatusTone; description: string } {
   if (!input.configured) {
-    return { label: t('connectorStatus.adapter.needsSetup'), tone: 'warning', dot: 'bg-warning' }
+    return {
+      label: t('connectorStatus.adapter.needsSetup'),
+      tone: 'warning',
+      description: t('connectorStatus.adapter.needsSetupDescription', { name }),
+    }
+  }
+  if (!input.serviceEnabled || !input.adapterEnabled) {
+    return {
+      label: t('connectorStatus.adapter.off'),
+      tone: 'neutral',
+      description: t('connectorStatus.adapter.offDescription'),
+    }
   }
   if (input.runtimeStatus === 'healthy') {
-    return { label: t('connectorStatus.adapter.connected'), tone: 'healthy', dot: 'bg-success' }
+    return {
+      label: t('connectorStatus.adapter.connected'),
+      tone: 'healthy',
+      description: t('connectorStatus.adapter.connectedDescription'),
+    }
   }
   if (input.runtimeStatus === 'awaiting_link') {
-    return { label: t('connectorStatus.adapter.awaitingLink'), tone: 'warning', dot: 'bg-warning' }
+    return {
+      label: t('connectorStatus.adapter.awaitingLink'),
+      tone: 'warning',
+      description: t('connectorStatus.adapter.awaitingLinkDescription', { name }),
+    }
   }
   if (input.runtimeStatus === 'degraded' || input.runtimeStatus === 'stopped') {
-    return { label: t('connectorStatus.adapter.needsAttention'), tone: 'danger', dot: 'bg-destructive' }
+    return {
+      label: t('connectorStatus.adapter.needsAttention'),
+      tone: 'danger',
+      description: t('connectorStatus.adapter.needsAttentionDescription'),
+    }
   }
-  return { label: t('connectorStatus.adapter.starting'), tone: 'warning', dot: 'bg-warning' }
+  return {
+    label: t('connectorStatus.adapter.starting'),
+    tone: 'warning',
+    description: t('connectorStatus.adapter.startingDescription', { name }),
+  }
 }
 
 function StatusBadge({ tone, children }: { tone: StatusTone; children: string }) {
@@ -349,9 +410,56 @@ function StatusBadge({ tone, children }: { tone: StatusTone; children: string })
     neutral: 'border-border bg-muted text-muted-foreground',
   }
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${styles[tone]}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10.5px] font-medium ${styles[tone]}`}>
       {children}
     </span>
+  )
+}
+
+function SummaryPill({ tone = 'neutral', children }: { tone?: 'neutral' | 'danger'; children: string }) {
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 ${tone === 'danger'
+      ? 'border-destructive/20 bg-destructive/10 text-destructive'
+      : 'border-border/80 bg-background/55'
+    }`}>
+      {children}
+    </span>
+  )
+}
+
+function ConnectorGlyph({ id }: { id: string }) {
+  const glyphs: Record<string, LucideIcon> = {
+    discord: MessageCircle,
+    telegram: Send,
+    slack: Hash,
+    feishu: MessagesSquare,
+  }
+  const Icon = glyphs[id] ?? Plug
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary" aria-hidden>
+      <Icon size={18} />
+    </span>
+  )
+}
+
+function statusSurfaceClass(tone: StatusTone): string {
+  if (tone === 'healthy') return 'border-success/15 bg-success/[0.035]'
+  if (tone === 'warning') return 'border-warning/15 bg-warning/[0.035]'
+  if (tone === 'danger') return 'border-destructive/15 bg-destructive/[0.035]'
+  return 'border-border/60 bg-background/35'
+}
+
+function DiagnosticDetails({ summary, children }: { summary: string; children: ReactNode }) {
+  return (
+    <details className="group/details mt-3 rounded-lg border border-border/60 bg-background/30 px-3 py-2 text-[11.5px]">
+      <summary className="oa-pressable flex cursor-pointer list-none items-center gap-2 font-medium text-muted-foreground hover:text-foreground">
+        <CircleAlert size={13} aria-hidden />
+        {summary}
+      </summary>
+      <div className="mt-2 break-words border-t border-border/50 pt-2 leading-5 text-destructive">
+        {children}
+      </div>
+    </details>
   )
 }
 
@@ -362,4 +470,17 @@ function hasValue(value: string | number | boolean | undefined): boolean {
 function formatDate(value: string): string {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function formatTimeAgo(value: string, t: TFunction): string {
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return value
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000))
+  if (elapsedMinutes < 1) return t('connectorStatus.time.justNow')
+  if (elapsedMinutes < 60) return t('connectorStatus.time.minutesAgo', { count: elapsedMinutes })
+  const elapsedHours = Math.floor(elapsedMinutes / 60)
+  if (elapsedHours < 24) return t('connectorStatus.time.hoursAgo', { count: elapsedHours })
+  const elapsedDays = Math.floor(elapsedHours / 24)
+  if (elapsedDays < 7) return t('connectorStatus.time.daysAgo', { count: elapsedDays })
+  return formatDate(value)
 }
