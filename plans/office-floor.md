@@ -1487,6 +1487,24 @@ Modal scene hierarchy follow-up (2026-08-29):
 - Focused OfficePage specs passed: 1 file / 5 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
   Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Coworker map-label follow-up (2026-08-29):
+
+- Clicked an occupied workstation and inspected the route state before Alice arrived. The map nameplate had 86px of
+  usable width but contained the 290px Session title `What's moving in semiconductors today?`, so the only visible
+  route feedback was the meaningless fragment `Wha… mov…`. The same label appeared on hover and proximity.
+- Compared widening the plate across adjacent desks, scrolling the title like a marquee, and using the stable Session
+  short name as the map identity. Chose the short name because an RPG-world nameplate should answer “which character”
+  immediately; the long assignment already belongs to the accessible object label, activity bubble, and Agent file.
+- Occupied desks now render their required `name` as the visible world label while preserving the descriptive
+  `officeCoworkerLabel` for the button, sprite, and detailed window. The pod-local plate uppercases the short name in
+  CSS, so `p1`, `x1`, `c1`, and `o1` read as compact `P1`, `X1`, `C1`, and `O1` without mutating semantic text.
+- Browser-played the first desk from route selection through Agent file at 1280x720 and 390x844. Its plate changed
+  from 290px scroll content clipped inside 86px to a fully fitting 29px `p1` label; the full task title remained in
+  the accessible desk label and Agent file. All four occupied demo desks exposed distinct short names, broken layout
+  did not appear, and page-level overflow stayed zero at both widths.
+- Focused OfficeDesk specs passed: 1 file / 4 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
+  Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

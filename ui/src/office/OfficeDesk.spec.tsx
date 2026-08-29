@@ -69,6 +69,9 @@ describe('OfficeDesk', () => {
       .toContain('/office/coworkers/claude-desk-v1.png')
     expect(container.querySelector<HTMLImageElement>('.oa-office-coworker__frame--work')?.src)
       .toContain('/office/coworkers/claude-desk-work-v1.png')
+    expect(container.querySelector('.oa-office-nameplate')?.textContent).toContain('c1')
+    expect(container.querySelector('.oa-office-nameplate')?.textContent).not.toContain('Open issue scan')
+    expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Open issue scan')
 
     rerender(<OfficeDesk {...props} nearby />)
     expect(screen.getByText('Researching…').getAttribute('title')).toBe('research')

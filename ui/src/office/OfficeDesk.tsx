@@ -102,7 +102,7 @@ export function OfficeDesk({
             }}
           >
             <span className="oa-office-nameplate__dot" aria-hidden />
-            {officeCoworkerLabel(employee)}
+            {employee.name}
           </span>
         )}
         {employee && (
