@@ -3332,13 +3332,7 @@
   color: inherit;
   background: transparent;
   font: inherit;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.oa-office-interact-prompt__action:focus-visible {
-  outline: 3px solid var(--gba-water);
-  outline-offset: 3px;
+  pointer-events: none;
 }
 
 .oa-office-interact-prompt__action > img {

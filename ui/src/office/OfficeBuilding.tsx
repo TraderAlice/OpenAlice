@@ -762,18 +762,16 @@ export function OfficeBuilding({
                 zIndex: officeDepthAt(nearbyTarget.y) + 1000,
               }}
             >
-              <button
-                type="button"
+              <span
                 className="oa-office-interact-prompt__action"
-                aria-label={t('office.interactNow', { action: promptPresentation.label })}
-                onClick={activateNearbyTarget}
+                aria-hidden
               >
                 <img src={promptPresentation.icon} alt="" aria-hidden style={officePixelImg} />
                 <span className="oa-office-interact-prompt__copy" aria-hidden>
                   <strong>{promptPresentation.action}</strong>
                 </span>
                 <kbd aria-hidden>{t('office.interactKey')}</kbd>
-              </button>
+              </span>
             </div>
           )}
           </div>

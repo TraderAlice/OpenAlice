@@ -956,6 +956,28 @@ Collision-impact follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5016 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+World-object identity follow-up (2026-08-29):
+
+- Replayed employee and cabinet interactions in sequence and found a completion-breaking hit-target bug: after
+  closing an Agent file, clicking the visible cabinet could reopen `Open issue scan` instead of the cabinet.
+- Runtime inspection showed that target IDs and activation closures were correct. The nearby-interaction prompt sat
+  above the cabinet at world depth and re-enabled pointer events on its inner button; its `<kbd>` occupied the
+  cabinet's center, so the visible world object and the object receiving the click could disagree.
+- Compared collision-aware prompt placement, lowering the prompt behind world objects, and making the prompt a
+  non-interactive game hint. Chose the hint model: keyboard Enter/Space already owns nearby interaction, while every
+  world object is directly clickable and touch has a dedicated D-pad. A second overlapping click target adds no
+  capability and violates object identity.
+- The prompt remains a named live status with the same action art and key legend, but its presentation is now fully
+  pointer-inert and removed from the tab order. Mouse and touch clicks therefore pass through to the visible desk,
+  cabinet, sign, roster board, or Operations object underneath.
+- Browser-played employee → Close → cabinet at 1280x800 and 760x900. Element hit-testing now resolves the cabinet
+  image itself at the previously broken center point; the cabinet dialog opens, the Agent file stays closed, and
+  the narrow page retains 0px horizontal overflow.
+- Focused building and page specs passed: 2 files / 11 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5016 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
