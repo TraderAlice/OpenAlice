@@ -78,9 +78,31 @@ describe('OfficeDesk', () => {
     expect(container.querySelector('.oa-office-nameplate')?.textContent).toContain('c1')
     expect(container.querySelector('.oa-office-nameplate')?.textContent).not.toContain('Open issue scan')
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Open issue scan')
+    expect(screen.getByRole('button').getAttribute('aria-label')).toContain('awake')
 
     rerender(<OfficeDesk {...props} nearby />)
     expect(screen.queryByText('Researching…')).toBeNull()
+  })
+
+  it('powers down a sleeping Session desk without removing its coworker', () => {
+    const sleepingEmployee = { ...employee, awake: false, mood: 'idle' as const, bubble: null }
+    const { container } = render(
+      <OfficeDesk
+        employee={sleepingEmployee}
+        roomName="Chat"
+        selected={false}
+        depth={107}
+        reducedMotion={false}
+        onSelect={() => undefined}
+      />,
+    )
+
+    const desk = screen.getByRole('button')
+    expect(desk.dataset.awake).toBe('false')
+    expect(desk.getAttribute('aria-label')).toContain('asleep')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-topdown-station__asset')?.src)
+      .toContain('/office/furniture/vacant-workstation-v2.png')
+    expect(container.querySelector('.oa-office-coworker')).toBeTruthy()
   })
 
   it.each([

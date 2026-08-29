@@ -46,6 +46,7 @@ export function OfficeDesk({
       name: officeCoworkerLabel(employee),
       resumeId: employee.resumeId,
       mood: t(`office.mood.${employee.mood}`),
+      power: t(employee.awake ? 'office.power.awake' : 'office.power.asleep'),
     })
     : t('office.emptyDesk', { name: roomName })
 
@@ -65,12 +66,13 @@ export function OfficeDesk({
         data-nearby={nearby}
         data-route={targeted}
         data-occupied={Boolean(employee)}
+        data-awake={employee?.awake}
         data-mood={employee?.mood}
         style={{ width: station.widthPx, height: station.heightPx, zIndex: depth }}
       >
         <span className="oa-office-topdown-station" aria-hidden>
           <img
-            src={employee
+            src={employee?.awake
               ? OFFICE_FURNITURE.generated.workstation
               : OFFICE_FURNITURE.generated.vacantWorkstation}
             alt=""

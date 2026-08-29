@@ -1981,7 +1981,11 @@ export const zhHant: Resources = {
     bubbleToolRun: '執行任務…',
     bubbleTool: '使用 {{name}}…',
     bubbleRejected: '沒派成',
-    employeeLabel: '{{name}} @{{resumeId}}，{{mood}}',
+    employeeLabel: '{{name}} @{{resumeId}}，{{mood}}，{{power}}',
+    power: {
+      awake: '已喚醒',
+      asleep: '休眠',
+    },
     mood: {
       idle: '空閒',
       working: '工作中',

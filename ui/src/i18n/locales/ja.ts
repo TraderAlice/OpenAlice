@@ -1974,7 +1974,11 @@ export const ja: Resources = {
     bubbleToolRun: 'タスクを実行中…',
     bubbleTool: '{{name}} を使用中…',
     bubbleRejected: '派遣できませんでした',
-    employeeLabel: '{{name}} @{{resumeId}}、{{mood}}',
+    employeeLabel: '{{name}} @{{resumeId}}、{{mood}}、{{power}}',
+    power: {
+      awake: '稼働中',
+      asleep: '休止中',
+    },
     mood: {
       idle: '待機',
       working: '作業中',

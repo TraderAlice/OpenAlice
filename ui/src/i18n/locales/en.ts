@@ -2006,7 +2006,11 @@ export const en = {
     bubbleToolRun: 'Running a task…',
     bubbleTool: 'Using {{name}}…',
     bubbleRejected: 'Could not dispatch',
-    employeeLabel: '{{name}} @{{resumeId}}, {{mood}}',
+    employeeLabel: '{{name}} @{{resumeId}}, {{mood}}, {{power}}',
+    power: {
+      awake: 'awake',
+      asleep: 'asleep',
+    },
     mood: {
       idle: 'idle',
       working: 'working',
