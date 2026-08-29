@@ -112,7 +112,10 @@ function bytesToUtf8(value: unknown): string | null {
 }
 
 function textFromContent(value: unknown): string | null {
-  if (typeof value === 'string' && value.trim()) return value;
+  // Streaming text can legitimately arrive as a standalone space or newline.
+  // Reject only empty strings so concatenating deltas preserves the model's
+  // exact Markdown layout.
+  if (typeof value === 'string' && value.length > 0) return value;
   if (Array.isArray(value)) {
     const parts = value.flatMap((item) => {
       if (!isRecord(item)) return [];
@@ -126,8 +129,8 @@ function textFromContent(value: unknown): string | null {
     return parts.length > 0 ? parts.join('') : null;
   }
   if (!isRecord(value)) return null;
-  if (typeof value['text'] === 'string' && value['text'].trim()) return value['text'];
-  if (typeof value['data'] === 'string' && value['data'].trim()) return value['data'];
+  if (typeof value['text'] === 'string' && value['text'].length > 0) return value['text'];
+  if (typeof value['data'] === 'string' && value['data'].length > 0) return value['data'];
   return null;
 }
 

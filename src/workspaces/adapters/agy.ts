@@ -262,7 +262,7 @@ export const agyAdapter: CliAdapter = {
     if (evt['event'] === 'step_update' && isRecord(evt['step_update'])) {
       const step = evt['step_update'];
       if (step['step_type'] === 'agent_response' && typeof step['text_delta'] === 'string' && step['text_delta']) {
-        return [{ type: 'text', text: step['text_delta'] }];
+        return [{ type: 'text', text: step['text_delta'], delta: true }];
       }
       if (step['step_type'] === 'tool') return agyToolEvents(step);
       return [];
