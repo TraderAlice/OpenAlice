@@ -9,8 +9,8 @@ export const OFFICE_OPERATIONS_BOARD_Y = 204
 export const OFFICE_FLOOR_TERMINAL_Y = 164
 
 export interface OfficeServiceLandmark {
-  id: 'mail-service' | 'archive-service'
-  kind: 'mail' | 'archive'
+  id: 'inbox-service' | 'news-service'
+  kind: 'inbox' | 'news'
   x: number
   y: number
   width: number
@@ -18,28 +18,28 @@ export interface OfficeServiceLandmark {
   collision: { x: number; y: number; width: number; height: number }
 }
 
-const SERVICE_WIDTH = 120
-const SERVICE_HEIGHT = 104
+const SERVICE_WIDTH = 136
+const SERVICE_HEIGHT = 116
 
-function serviceLandmarksAt(mailX: number, archiveX: number, y: number): OfficeServiceLandmark[] {
+function serviceLandmarksAt(inboxX: number, newsX: number, y: number): OfficeServiceLandmark[] {
   return [
     {
-      id: 'mail-service',
-      kind: 'mail',
-      x: mailX,
+      id: 'inbox-service',
+      kind: 'inbox',
+      x: inboxX,
       y,
       width: SERVICE_WIDTH,
       height: SERVICE_HEIGHT,
-      collision: { x: 10, y: 54, width: 100, height: 46 },
+      collision: { x: 12, y: 62, width: 112, height: 48 },
     },
     {
-      id: 'archive-service',
-      kind: 'archive',
-      x: archiveX,
+      id: 'news-service',
+      kind: 'news',
+      x: newsX,
       y,
       width: SERVICE_WIDTH,
       height: SERVICE_HEIGHT,
-      collision: { x: 8, y: 56, width: 104, height: 44 },
+      collision: { x: 12, y: 62, width: 112, height: 48 },
     },
   ]
 }
@@ -76,7 +76,7 @@ export function officeServiceLandmarks(layout: OfficeMapLayout): OfficeServiceLa
   if (!firstPod || !finalPod || occupiedFinalRow === 0) return []
 
   const emptyCellX = firstPod.x + occupiedFinalRow * (OFFICE_POD_WIDTH + OFFICE_POD_GAP)
-  const serviceGap = 20
+  const serviceGap = 12
   const insetX = Math.round((OFFICE_POD_WIDTH - SERVICE_WIDTH * 2 - serviceGap) / 2)
   const y = finalPod.y + Math.round((OFFICE_POD_HEIGHT - SERVICE_HEIGHT) * 0.64)
   return serviceLandmarksAt(

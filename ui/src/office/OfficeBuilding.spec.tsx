@@ -655,10 +655,10 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-wall')).toBeTruthy()
     const map = screen.getByLabelText('Office map. Drag to pan; use arrows or WASD to move Alice; press Enter or Space to interact nearby.')
     expect(map).toBeTruthy()
-    expect(map.querySelector<HTMLImageElement>('.oa-office-map-service[data-kind="mail"] img')?.src)
-      .toContain('/office/furniture/mail-service-v1.png')
-    expect(map.querySelector<HTMLImageElement>('.oa-office-map-service[data-kind="archive"] img')?.src)
-      .toContain('/office/furniture/archive-service-v1.png')
+    expect(map.querySelector<HTMLImageElement>('.oa-office-map-service[data-kind="inbox"] img')?.src)
+      .toContain('/office/furniture/inbox-terminal-v1.png')
+    expect(map.querySelector<HTMLImageElement>('.oa-office-map-service[data-kind="news"] img')?.src)
+      .toContain('/office/furniture/news-terminal-v1.png')
     const mapWall = map.querySelector<HTMLElement>('.oa-office-map-wall')
     expect(mapWall?.style.getPropertyValue('--office-wall-day'))
       .toContain('/office/furniture/wall-window-v2.png')
@@ -1010,5 +1010,64 @@ describe('OfficeBuilding', () => {
     expect(screen.getByTestId('office-building').dataset.controlsSuspended).toBeUndefined()
     await userEvent.click(board)
     await waitFor(() => expect(onOpenRoster).toHaveBeenCalledWith('chat-full'))
+  })
+
+  it('turns Inbox and News activity into navigable floor landmarks', async () => {
+    const onOpenInbox = vi.fn()
+    const onOpenNews = vi.fn()
+    const { container } = render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 0, other: 0 },
+          },
+          lastSeq: 12,
+          firstSeq: 1,
+          offices: [{
+            workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
+            lastInteractionAt: 1,
+            sleeping: false,
+            employees: [],
+          }],
+        }}
+        productActivity={{
+          inbox: {
+            seq: 11,
+            occurredAt: 1_100,
+            detail: 'Agent report delivered',
+            source: 'codex',
+            inboxEntryId: 'inbox-11',
+          },
+          news: {
+            seq: 12,
+            occurredAt: 1_200,
+            detail: 'Markets move overnight',
+            source: 'Wire',
+          },
+          freshKind: 'news',
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenWorkspace={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+        onOpenInbox={onOpenInbox}
+        onOpenNews={onOpenNews}
+      />,
+    )
+
+    const inbox = screen.getByRole('button', { name: 'Inbox station' })
+    const news = screen.getByRole('button', { name: 'News terminal' })
+    expect(inbox.dataset.hasActivity).toBe('true')
+    expect(news.dataset.fresh).toBe('true')
+    expect(news.querySelector('.oa-office-map-service__signal')?.textContent).toBe('!')
+
+    await userEvent.click(inbox)
+    await waitFor(() => expect(onOpenInbox).toHaveBeenCalledWith('inbox-11'))
+    await userEvent.click(news)
+    await waitFor(() => expect(onOpenNews).toHaveBeenCalledTimes(1))
+    expect(container.querySelector('[data-kind="news-service"]')).toBeTruthy()
   })
 })

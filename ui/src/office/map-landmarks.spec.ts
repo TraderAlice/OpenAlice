@@ -16,7 +16,7 @@ describe('Office service landmarks', () => {
     const services = officeServiceLandmarks(floor)
 
     expect(floor).toMatchObject({ columns: 2, rows: 1 })
-    expect(services.map((service) => service.id)).toEqual(['mail-service', 'archive-service'])
+    expect(services.map((service) => service.id)).toEqual(['inbox-service', 'news-service'])
     expect(services.every((service) => service.y + service.height < floor.height)).toBe(true)
   })
 
@@ -28,9 +28,9 @@ describe('Office service landmarks', () => {
 
     expect(floor).toMatchObject({ columns: 2, rows: 2 })
     expect(services).toHaveLength(2)
-    expect(services[0]).toMatchObject({ x: emptyCellX + 14, y: finalRowY + 72 })
-    expect(services[1]).toMatchObject({ x: emptyCellX + 154, y: finalRowY + 72 })
-    expect(services[1]!.x + services[1]!.width).toBe(emptyCellX + OFFICE_POD_WIDTH - 14)
+    expect(services[0]).toMatchObject({ x: emptyCellX + 2, y: finalRowY + 64 })
+    expect(services[1]).toMatchObject({ x: emptyCellX + 150, y: finalRowY + 64 })
+    expect(services[1]!.x + services[1]!.width).toBe(emptyCellX + OFFICE_POD_WIDTH - 2)
     expect(services.every((service) => service.y + service.height < finalRowY + OFFICE_POD_HEIGHT)).toBe(true)
   })
 

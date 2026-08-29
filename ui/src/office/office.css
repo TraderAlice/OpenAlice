@@ -4574,7 +4574,13 @@
 
 .oa-office-map-service {
   position: absolute;
-  pointer-events: none;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: filter 120ms steps(2, end), transform 120ms steps(2, end);
 }
 
 .oa-office-map-service img {
@@ -4583,6 +4589,58 @@
   height: 100%;
   object-fit: contain;
   filter: drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
+}
+
+.oa-office-map-service:is(:hover, :focus-visible),
+.oa-office-map-service[data-nearby="true"],
+.oa-office-map-service[data-route="true"] {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+}
+
+.oa-office-map-service:is(:hover, :focus-visible) img,
+.oa-office-map-service[data-nearby="true"] img,
+.oa-office-map-service[data-route="true"] img {
+  filter:
+    drop-shadow(-2px 0 0 color-mix(in srgb, var(--gba-water) 68%, transparent))
+    drop-shadow(2px 0 0 color-mix(in srgb, var(--gba-water) 68%, transparent))
+    drop-shadow(3px 4px 0 color-mix(in srgb, var(--gba-ink) 20%, transparent));
+}
+
+.oa-office-map-service__signal {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 3px solid var(--gba-ink);
+  border-radius: 50%;
+  color: var(--gba-ink);
+  background: var(--gba-paper);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px;
+  line-height: 1;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--gba-ink) 34%, transparent);
+  animation: oa-office-service-signal 920ms steps(2, end) infinite;
+}
+
+.oa-office-map-service[data-kind="news"] .oa-office-map-service__signal {
+  background: var(--gba-water);
+}
+
+.oa-office-map-service:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.55) brightness(0.82);
+}
+
+@keyframes oa-office-service-signal {
+  50% { transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-office-map-service__signal { animation: none; }
 }
 
 .oa-office-operations-board {

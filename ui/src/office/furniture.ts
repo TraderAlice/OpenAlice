@@ -27,8 +27,8 @@ export const OFFICE_FURNITURE = {
     routeFootsteps: '/office/furniture/route-footsteps-v1.png',
     routeDestination: '/office/furniture/route-destination-v1.png',
     collisionImpact: '/office/furniture/collision-impact-v1.png',
-    mailService: '/office/furniture/mail-service-v1.png',
-    archiveService: '/office/furniture/archive-service-v1.png',
+    inboxTerminal: '/office/furniture/inbox-terminal-v1.png',
+    newsTerminal: '/office/furniture/news-terminal-v1.png',
   },
 } as const
 

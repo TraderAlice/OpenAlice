@@ -36,8 +36,8 @@ describe('Office map collision', () => {
     expect(ids).toContain('harness-prop:chat-1')
     expect(ids).toContain('landmark:plant')
     expect(ids).toContain('landmark:terminal')
-    expect(ids).toContain('landmark:mail-service')
-    expect(ids).toContain('landmark:archive-service')
+    expect(ids).toContain('landmark:inbox-service')
+    expect(ids).toContain('landmark:news-service')
     expect(ids).toContain('operations')
   })
 
@@ -144,8 +144,8 @@ describe('Office map collision', () => {
     })))
     expect(partialLayout).toMatchObject({ columns: 2, rows: 2 })
     const ids = officeCollisionRects(partialLayout).map((rect) => rect.id)
-    expect(ids).toContain('landmark:mail-service')
-    expect(ids).toContain('landmark:archive-service')
+    expect(ids).toContain('landmark:inbox-service')
+    expect(ids).toContain('landmark:news-service')
   })
 
   it('keeps service landmarks out of complete multi-row floors', () => {
@@ -155,7 +155,7 @@ describe('Office map collision', () => {
     })))
     expect(completeLayout).toMatchObject({ columns: 2, rows: 2 })
     const ids = officeCollisionRects(completeLayout).map((rect) => rect.id)
-    expect(ids).not.toContain('landmark:mail-service')
-    expect(ids).not.toContain('landmark:archive-service')
+    expect(ids).not.toContain('landmark:inbox-service')
+    expect(ids).not.toContain('landmark:news-service')
   })
 })

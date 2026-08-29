@@ -37,6 +37,8 @@ describe('Office interaction targets', () => {
     const cabinet = targets.find((target) => target.kind === 'cabinet')
     const operations = targets.find((target) => target.kind === 'operations')
     const floorTerminal = targets.find((target) => target.kind === 'floor-terminal')
+    const inboxService = targets.find((target) => target.kind === 'inbox-service')
+    const newsService = targets.find((target) => target.kind === 'news-service')
 
     expect(sign).toMatchObject({
       id: 'sign:chat-1',
@@ -66,6 +68,8 @@ describe('Office interaction targets', () => {
       x: layout.width - 80,
       y: 164,
     })
+    expect(inboxService).toMatchObject({ id: 'inbox-service', kind: 'inbox-service' })
+    expect(newsService).toMatchObject({ id: 'news-service', kind: 'news-service' })
     expect(nearestOfficeInteractionTarget(
       { x: employee!.x + 24, y: employee!.y },
       'left',

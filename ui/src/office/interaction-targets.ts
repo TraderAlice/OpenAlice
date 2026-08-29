@@ -1,7 +1,11 @@
 import type { OfficeFloorEmployee, OfficeHarness, OfficeRoomSnapshot } from '../api/office'
 import type { OfficeMapLayout } from './map-layout'
 import { visibleEmployeesForOffice } from './desk-slots'
-import { officeFloorTerminalPosition, officeOperationsBoardPosition } from './map-landmarks'
+import {
+  officeFloorTerminalPosition,
+  officeOperationsBoardPosition,
+  officeServiceLandmarks,
+} from './map-landmarks'
 import {
   OFFICE_CABINET_CENTER,
   OFFICE_DESK_CENTERS,
@@ -60,6 +64,18 @@ export type OfficeInteractionTarget =
   | {
     id: 'floor-terminal'
     kind: 'floor-terminal'
+    x: number
+    y: number
+  }
+  | {
+    id: 'inbox-service'
+    kind: 'inbox-service'
+    x: number
+    y: number
+  }
+  | {
+    id: 'news-service'
+    kind: 'news-service'
     x: number
     y: number
   }
@@ -129,6 +145,15 @@ export function officeInteractionTargets(
     kind: 'floor-terminal',
     ...officeFloorTerminalPosition(layout.width),
   })
+  for (const landmark of officeServiceLandmarks(layout)) {
+    const position = {
+      x: landmark.x + Math.round(landmark.width / 2),
+      y: landmark.y + landmark.collision.y + Math.round(landmark.collision.height / 2),
+    }
+    targets.push(landmark.kind === 'inbox'
+      ? { id: 'inbox-service', kind: 'inbox-service', ...position }
+      : { id: 'news-service', kind: 'news-service', ...position })
+  }
 
   return targets
 }

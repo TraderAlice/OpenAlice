@@ -2415,6 +2415,23 @@ Alice right-gait repair follow-up (2026-08-30):
   unchanged. Focused Alice/sprite-pack specs, root/UI TypeScript, the 612-file Vitest run (5,072 passing; one file and
   nine tests skipped), and the UI production build passed. The existing large-chunk advisory remains unchanged.
 
+Product-activity landmarks follow-up (2026-08-30):
+
+- With Inbox and News now writing the shared Product Activity Journal, compared a permanent map ticker, HUD-only
+  counters, and physical service landmarks. Chose physical landmarks because they make background work discoverable
+  inside the game world without adding another dashboard layer. The fixtures remain calm by default; approaching one
+  reveals its latest summary, while only a newly appended event earns a short-lived signal lamp.
+- Replaced the semantically unrelated water-cooler/archive decoration with generated 16-bit Inbox sorting and News
+  communications terminals. Both are native transparent 136x116 map props with restrained cream, walnut, brass, and
+  cyan palettes; they use the same collision, depth, focus, route pointer, and reduced-motion rules as other furniture.
+- Added an Office-local journal projection that keeps the latest Inbox and News fact independently. Initial history
+  hydrates the fixtures without pretending to be new; later events light the matching station for twelve seconds.
+  Inbox navigation selects the exact journal entry when available, while News opens the first-class News surface.
+- Browser-played both service routes on the real Project: Inbox auto-walked and opened `/inbox`; News auto-walked and
+  opened `/market/news`. The current News fact produced one visible pixel signal without adding a persistent overlay.
+  Focused Office specs passed (6 files / 37 tests), as did root/UI TypeScript and the full 613-file Vitest run (5,080
+  passing; one file and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

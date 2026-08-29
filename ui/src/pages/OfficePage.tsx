@@ -20,6 +20,7 @@ import {
 } from '../office/office-excursion'
 import { OfficeReplayBar } from '../office/OfficeReplayBar'
 import { OfficeRosterWindow } from '../office/OfficeRosterWindow'
+import { useOfficeProductActivity } from '../office/useOfficeProductActivity'
 import '../office/office.css'
 import { useWorkspace } from '../tabs/store'
 import type { WorkspaceSource } from '../tabs/types'
@@ -53,6 +54,7 @@ export function OfficePage() {
   >({ kind: 'map' })
   const [cabinetWorkspaceId, setCabinetWorkspaceId] = useState<string | null>(null)
   const { building, loading, error } = useOfficeFloor(asOfSeq)
+  const productActivity = useOfficeProductActivity()
   const markExcursion = () => {
     navigate('/office/return', { state: { officeExcursion: true } })
   }
@@ -261,6 +263,16 @@ export function OfficePage() {
                   logOriginRef.current = origin
                   setLogOpen(true)
                   setCabinetWorkspaceId(null)
+                }}
+                productActivity={productActivity}
+                onOpenInbox={(entryId) => {
+                  if (entryId) useInboxSelection.getState().select(entryId)
+                  markExcursion()
+                  openOrFocus({ kind: 'inbox', params: {} })
+                }}
+                onOpenNews={() => {
+                  markExcursion()
+                  openOrFocus({ kind: 'news', params: {} })
                 }}
                 onReturnLive={() => setAsOfSeq(null)}
               />

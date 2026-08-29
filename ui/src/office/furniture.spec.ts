@@ -34,8 +34,8 @@ describe('OFFICE_FURNITURE', () => {
       routeFootsteps: [12, 12],
       routeDestination: [20, 20],
       collisionImpact: [96, 24],
-      mailService: [120, 104],
-      archiveService: [120, 104],
+      inboxTerminal: [136, 116],
+      newsTerminal: [136, 116],
     } satisfies Record<keyof typeof OFFICE_FURNITURE.generated, [number, number]>
 
     for (const [key, url] of Object.entries(OFFICE_FURNITURE.generated)) {

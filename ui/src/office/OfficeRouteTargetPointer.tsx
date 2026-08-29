@@ -8,6 +8,8 @@ const ROUTE_TARGET_POINTER_LIFT = {
   roster: 44,
   operations: 72,
   'floor-terminal': 62,
+  'inbox-service': 58,
+  'news-service': 58,
 } as const satisfies Record<OfficeInteractionTarget['kind'], number>
 
 const ROUTE_TARGET_POINTER_NUDGE_X = {
@@ -17,6 +19,8 @@ const ROUTE_TARGET_POINTER_NUDGE_X = {
   roster: -8,
   operations: 0,
   'floor-terminal': 0,
+  'inbox-service': 0,
+  'news-service': 0,
 } as const satisfies Record<OfficeInteractionTarget['kind'], number>
 
 export function officeRouteTargetPointerPosition(

@@ -55,6 +55,7 @@ import {
 import { layoutOfficeMap } from './map-layout'
 import { officeDepthAt } from './scene-depth'
 import { useReducedMotion } from './use-reduced-motion'
+import type { OfficeProductActivity } from './useOfficeProductActivity'
 
 const OFFICE_MOVEMENTS = {
   left: { x: -24, y: 0, direction: 'left' as const },
@@ -97,6 +98,9 @@ export function OfficeBuilding({
   onOpenFiles,
   onOpenRoster,
   onOpenLog,
+  productActivity = { inbox: null, news: null, freshKind: null },
+  onOpenInbox,
+  onOpenNews,
   onReturnLive,
 }: {
   building: OfficeBuildingSnapshot
@@ -112,6 +116,9 @@ export function OfficeBuilding({
   onOpenFiles: (workspaceId: string) => void
   onOpenRoster: (workspaceId: string) => void
   onOpenLog: (origin: OfficeLogOrigin) => void
+  productActivity?: OfficeProductActivity
+  onOpenInbox?: (entryId?: string) => void
+  onOpenNews?: () => void
   onReturnLive?: () => void
 }) {
   const { t } = useTranslation()
@@ -243,6 +250,10 @@ export function OfficeBuilding({
         ? t('office.operationsBoard')
         : routeTarget.kind === 'floor-terminal'
           ? t('office.floorTerminal')
+          : routeTarget.kind === 'inbox-service'
+            ? t('office.inboxStation')
+            : routeTarget.kind === 'news-service'
+              ? t('office.newsStation')
           : routeTarget.roomName
     : null
   const operationsBoard = useMemo(
@@ -327,6 +338,22 @@ export function OfficeBuilding({
         action: t('office.interactActionTerminal'),
         label: t('office.interactTerminal'),
         detail: null,
+      }
+    }
+    if (nearbyTarget.kind === 'inbox-service') {
+      return {
+        icon: OFFICE_FURNITURE.generated.inboxTerminal,
+        action: t('office.interactActionInbox'),
+        label: t('office.interactInbox'),
+        detail: productActivity.inbox?.detail ?? productActivity.inbox?.source ?? null,
+      }
+    }
+    if (nearbyTarget.kind === 'news-service') {
+      return {
+        icon: OFFICE_FURNITURE.generated.newsTerminal,
+        action: t('office.interactActionNews'),
+        label: t('office.interactNews'),
+        detail: productActivity.news?.detail ?? productActivity.news?.source ?? null,
       }
     }
     return {
@@ -415,6 +442,10 @@ export function OfficeBuilding({
           '.oa-office-pause-menu :is([role="menuitemradio"], [role="menuitem"])',
         )?.focus()
       }, 0)
+    } else if (target.kind === 'inbox-service') {
+      onOpenInbox?.(productActivity.inbox?.inboxEntryId)
+    } else if (target.kind === 'news-service') {
+      onOpenNews?.()
     } else {
       onOpenLog('operations')
     }
@@ -972,12 +1003,36 @@ export function OfficeBuilding({
                 style={officePixelImg}
               />
             </button>
-            {serviceLandmarks.map((landmark) => (
-              <div
+            {serviceLandmarks.map((landmark) => {
+              const activity = landmark.kind === 'inbox'
+                ? productActivity.inbox
+                : productActivity.news
+              const interactionKind = landmark.kind === 'inbox'
+                ? 'inbox-service'
+                : 'news-service'
+              const fresh = productActivity.freshKind === landmark.kind
+              return (
+              <button
                 key={landmark.id}
+                id={`office-${landmark.id}`}
+                type="button"
                 className="oa-office-map-service"
                 data-kind={landmark.kind}
-                aria-hidden
+                data-fresh={fresh || undefined}
+                data-has-activity={Boolean(activity) || undefined}
+                data-nearby={nearbyTarget?.kind === interactionKind || undefined}
+                data-route={routeTargetId === landmark.id || undefined}
+                data-replay-locked={replaySeq != null || undefined}
+                aria-label={landmark.kind === 'inbox'
+                  ? t('office.inboxStation')
+                  : t('office.newsStation')}
+                title={replaySeq == null
+                  ? landmark.kind === 'inbox'
+                    ? t('office.inboxStationHint')
+                    : t('office.newsStationHint')
+                  : t('office.replayLockedHint')}
+                disabled={replaySeq != null}
+                onClick={() => requestTargetInteraction(landmark.id)}
                 style={{
                   left: landmark.x,
                   top: landmark.y,
@@ -987,14 +1042,17 @@ export function OfficeBuilding({
                 }}
               >
                 <img
-                  src={landmark.kind === 'mail'
-                    ? OFFICE_FURNITURE.generated.mailService
-                    : OFFICE_FURNITURE.generated.archiveService}
+                  src={landmark.kind === 'inbox'
+                    ? OFFICE_FURNITURE.generated.inboxTerminal
+                    : OFFICE_FURNITURE.generated.newsTerminal}
                   alt=""
+                  aria-hidden
                   style={officePixelImg}
                 />
-              </div>
-            ))}
+                {fresh && <span className="oa-office-map-service__signal" aria-hidden>!</span>}
+              </button>
+              )
+            })}
             <button
               id="office-operations-board"
               type="button"
