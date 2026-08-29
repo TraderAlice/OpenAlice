@@ -85,6 +85,17 @@ published last as the completed-set receipt. Stable releases publish the same
 four versioned archives and sidecars as GitHub Release assets and mirror them
 unchanged to the download CDN.
 
+Each native build also emits `report.json`. `buildDurationMs` is the clean Bun
+standalone compile, `artifactBuildDurationMs` is assembly plus archive creation
+with already-built server inputs, and `totalDurationMs` includes the real
+acceptance smoke. `smoke.coldStartReadyMs` runs from process spawn until
+Guardian reports Alice ready. `smoke.idleMemoryBytes` samples Guardian and
+Alice RSS three times after a one-second settling period and records the
+median. The separate multiprocess feasibility report applies the same method
+to Guardian, Alice, UTA, and Connector. These are target-run acceptance
+measurements, not cross-host performance promises; compare builds on the same
+runner and preserve the report beside its archive.
+
 ## Ownership boundary
 
 The direct installer owns only:
@@ -313,6 +324,9 @@ Before promotion also:
    `--branch dev` network path;
 6. verify release assets and sidecar checksums before making any stable alias
    visible.
+
+Treat missing or non-positive build, readiness, or per-role memory metrics as
+an invalid native acceptance report. A compile-only result is not sufficient.
 
 Routine acceptance is non-trading and uses isolated homes without real
 credentials or broker accounts.

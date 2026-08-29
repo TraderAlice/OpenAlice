@@ -45,6 +45,7 @@ const resourceRoot = join(releaseRoot, 'share', 'openalice')
 const gitRoot = join(resourceRoot, 'runtime', 'git')
 const archivePath = join(outputRoot, `${releaseName}.tar.gz`)
 const smokeHome = join(outputRoot, 'smoke-home')
+const releaseStartedAt = performance.now()
 
 await rm(releaseRoot, { recursive: true, force: true })
 await rm(smokeHome, { recursive: true, force: true })
@@ -123,7 +124,9 @@ const releaseMetadata = {
   files,
 }
 await writeFile(join(releaseRoot, 'release.json'), `${JSON.stringify(releaseMetadata, null, 2)}\n`)
+const assemblyDurationMs = Math.round(performance.now() - releaseStartedAt)
 
+const smokeStartedAt = performance.now()
 const smoke = await smokeRelease({
   executablePath,
   resourceRoot,
@@ -131,7 +134,9 @@ const smoke = await smokeRelease({
   smokeHome,
   contentIdentity,
 })
+const smokeDurationMs = Math.round(performance.now() - smokeStartedAt)
 
+const archiveStartedAt = performance.now()
 const archive = Bun.spawnSync([
   'tar', '-czf', archivePath, '-C', outputRoot, releaseName,
 ], {
@@ -144,6 +149,7 @@ if (archive.exitCode !== 0) {
 }
 const archiveHash = await sha256File(archivePath)
 await writeFile(`${archivePath}.sha256`, `${archiveHash}  ${basename(archivePath)}\n`)
+const archiveDurationMs = Math.round(performance.now() - archiveStartedAt)
 
 const report = {
   schemaVersion: 1,
@@ -154,6 +160,11 @@ const report = {
   arch: process.arch,
   contentIdentity,
   buildDurationMs,
+  artifactBuildDurationMs: assemblyDurationMs + archiveDurationMs,
+  assemblyDurationMs,
+  archiveDurationMs,
+  smokeDurationMs,
+  totalDurationMs: Math.round(performance.now() - releaseStartedAt),
   executableBytes: (await stat(executablePath)).size,
   releaseBytes: await directoryBytes(releaseRoot),
   archiveBytes: (await stat(archivePath)).size,
@@ -429,6 +440,7 @@ done
     OPENALICE_TEMPLATE_SOURCE_VERSION: 'HEAD',
     OPENALICE_TEMPLATE_SOURCE_COMMIT: sourceCommit,
   }
+  const runtimeStartedAt = performance.now()
   const runtime = Bun.spawn([
     options.executablePath,
     'run',
@@ -446,18 +458,45 @@ done
   const stderrPromise = new Response(runtime.stderr).text()
   let runtimeError: unknown = null
   let realOpenCodeReport: { path: string; version: string; ptyBytes: number } | null = null
+  let coldStartReadyMs = 0
+  let idleMemoryBytes: {
+    sampleCount: number
+    sampleIntervalMs: number
+    guardian: number
+    alice: number
+    total: number
+  } | null = null
   try {
     const root = await waitForHttp(`http://127.0.0.1:${webPort}/`, 90_000)
     if (!root.includes('<div id="root">')) throw new Error('installed release did not serve the real Web UI')
-    const status = JSON.parse(run([
+    const status = await waitForReleaseRuntimeStatus(
       options.executablePath,
-      'status', '--home', runtimeHome, '--wait', '3', '--json',
-    ], runtimeEnv)) as { result?: { status?: { provider?: { kind?: string; contentIdentity?: string } } } }
+      runtimeHome,
+      runtimeEnv,
+    )
     if (
-      status.result?.status?.provider?.kind !== 'bun'
+      status.result?.status?.class !== 'running'
+      || status.result.status.componentDetail?.alice?.state !== 'ready'
+      || status.result.status.provider?.kind !== 'bun'
       || status.result.status.provider.contentIdentity !== options.contentIdentity
     ) {
       throw new Error(`installed release status lost Bun provenance: ${JSON.stringify(status)}`)
+    }
+    coldStartReadyMs = Math.round(performance.now() - runtimeStartedAt)
+    const guardianPid = status.result.status.owner?.pid
+    const alicePid = status.result.status.componentDetail?.alice?.pid
+    if (!guardianPid || !alicePid || guardianPid === alicePid) {
+      throw new Error(`installed release status omitted distinct Guardian/Alice PIDs: ${JSON.stringify(status)}`)
+    }
+    await Bun.sleep(1_000)
+    const guardian = await medianResidentSetBytes(guardianPid)
+    const alice = await medianResidentSetBytes(alicePid)
+    idleMemoryBytes = {
+      sampleCount: 3,
+      sampleIntervalMs: 500,
+      guardian,
+      alice,
+      total: guardian + alice,
     }
     const baseUrl = `http://127.0.0.1:${webPort}`
     const inventory = await fetchJson(`${baseUrl}/api/workspaces/agents`) as {
@@ -577,7 +616,62 @@ done
     materializedPiAdapter: true,
     uiStatus: 200,
     contentIdentity: options.contentIdentity,
+    coldStartReadyMs,
+    idleMemoryBytes,
   }
+}
+
+async function medianResidentSetBytes(pid: number): Promise<number> {
+  const samples: number[] = []
+  for (let index = 0; index < 3; index += 1) {
+    const probe = Bun.spawnSync(['/bin/ps', '-o', 'rss=', '-p', String(pid)], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const residentKiB = Number.parseInt(probe.stdout.toString().trim(), 10)
+    if (probe.exitCode !== 0 || !Number.isFinite(residentKiB) || residentKiB <= 0) {
+      throw new Error(`failed to measure resident memory for PID ${pid}: ${probe.stderr.toString()}`)
+    }
+    samples.push(residentKiB * 1024)
+    if (index < 2) await Bun.sleep(500)
+  }
+  samples.sort((left, right) => left - right)
+  return samples[1]
+}
+
+interface ReleaseRuntimeStatusEnvelope {
+  result?: {
+    status?: {
+      class?: string
+      provider?: { kind?: string; contentIdentity?: string }
+      owner?: { pid?: number }
+      componentDetail?: Record<string, { state?: string; pid?: number }>
+    }
+  }
+}
+
+async function waitForReleaseRuntimeStatus(
+  executable: string,
+  runtimeHome: string,
+  env: Record<string, string>,
+  timeoutMs = 15_000,
+): Promise<ReleaseRuntimeStatusEnvelope> {
+  const deadline = Date.now() + timeoutMs
+  let last: ReleaseRuntimeStatusEnvelope | null = null
+  while (Date.now() < deadline) {
+    last = JSON.parse(run([
+      executable,
+      'status', '--home', runtimeHome, '--wait', '1', '--json',
+    ], env)) as ReleaseRuntimeStatusEnvelope
+    if (
+      last.result?.status?.class === 'running'
+      && last.result.status.componentDetail?.alice?.state === 'ready'
+    ) {
+      return last
+    }
+    await Bun.sleep(100)
+  }
+  throw new Error(`installed release did not become ready: ${JSON.stringify(last)}`)
 }
 
 async function fetchJson(

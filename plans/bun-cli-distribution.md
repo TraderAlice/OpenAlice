@@ -377,9 +377,9 @@ Checkboxes reflect repository truth, not intent.
   `OPENALICE_HOME` without bundling its SDK into UTA Core.
 - [x] Prove embedded UI/default/template reads and one materialized external
   adapter file.
-- [ ] Record measured executable size, cold start, idle memory per role, and
+- [x] Record measured executable size, cold start, idle memory per role, and
   clean-build time against the released headless Runtime.
-- [ ] Decide go/no-go from real macOS and Linux evidence. A compile-only
+- [x] Decide go/no-go from real macOS and Linux evidence. A compile-only
   success is insufficient.
 
 No public installer or durable compatibility layer changes in this increment.
@@ -399,7 +399,7 @@ build harness when it improves the next investigation.
   assets; keep broker packs external.
 - [x] Generate platform archives, `release.json`, SHA-256 metadata, version,
   control compatibility, and content identity from accepted build outputs.
-- [ ] Keep source development on `pnpm dev`; it need not imitate the installed
+- [x] Keep source development on `pnpm dev`; it need not imitate the installed
   executable layout.
 
 ### 3. Resources and Workspace helper boundary
@@ -803,3 +803,17 @@ This plan is complete only when:
   cannot collect the pending target. Package-manager upgrades remain
   manager-owned: CLI/TUI status compares content identities and reports restart
   activation without modifying npm, Bun, Homebrew, or AUR files.
+- 2026-08-30: Recorded a go decision from same-host v0.90.1 expanded Runtime
+  and Bun-native measurements. On macOS arm64, archive size fell from 112.5 to
+  53.8 MiB, expanded size from 528.5 to 113.8 MiB, four-role readiness improved
+  from 1,548 to 1,326 ms, and median idle RSS fell from 539.0 to 440.4 MiB. On
+  native OrbStack Linux arm64, archive size fell from 76.9 to 64.4 MiB,
+  expanded size from 419.2 to 128.4 MiB, readiness was effectively flat at 935
+  versus 959 ms, and idle RSS fell from 525.5 to 391.8 MiB. Rebuilding the
+  v0.90.1 headless artifact from its tag with prebuilt server inputs took 66.52
+  seconds on that Linux host; the Bun artifact assembly plus archive took 4.83
+  seconds, with a 0.93-second standalone compile. Both paths used isolated
+  homes, all four real process roles, three RSS samples at 500 ms intervals,
+  and no configured accounts. Release and feasibility reports now preserve
+  compile, artifact, total, cold-start, and per-role memory evidence. Source
+  development remains the unchanged `pnpm dev` path.
