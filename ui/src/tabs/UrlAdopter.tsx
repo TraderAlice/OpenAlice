@@ -512,8 +512,13 @@ function specToSection(spec: ViewSpec): ActivitySection {
     case 'uta-detail':         return 'portfolio'
     case 'issue':
     case 'issue-detail':       return 'issue'
-    case 'automation':         return 'automation'
-    case 'office':             return 'office'
+    case 'automation':           return 'automation'
+    case 'office':               return 'office'
+    case 'quant-lab':
+    case 'quant-lab-strategy':
+    case 'quant-lab-results':
+    case 'quant-lab-integrity':
+    case 'quant-lab-journal':    return 'quant-lab'
     case 'news':
     case 'market-list':
     case 'market-rotation':
