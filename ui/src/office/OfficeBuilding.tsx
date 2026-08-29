@@ -362,7 +362,7 @@ export function OfficeBuilding({
       setMenuOpen(true)
       window.setTimeout(() => {
         document.querySelector<HTMLElement>(
-          '.oa-office-pause-menu [role="menuitemradio"]',
+          '.oa-office-pause-menu :is([role="menuitemradio"], [role="menuitem"])',
         )?.focus()
       }, 0)
     } else {
@@ -608,19 +608,28 @@ export function OfficeBuilding({
                 <img src={OFFICE_HUD_ASSETS.menuTerminal} alt="" style={officePixelImg} />
                 <span>{t('office.floorView')}</span>
               </div>
-              <DropdownMenuRadioGroup
-                value={showingAll ? 'all' : 'live'}
-                onValueChange={(value) => {
-                  setShowAll(value === 'all')
-                  setCamera({ x: 0, y: 0 })
-                  closeFloorMenu()
-                }}
-              >
-                <DropdownMenuRadioItem value="live">
-                  <img src={OFFICE_HUD_ASSETS.resetCompass} alt="" aria-hidden style={officePixelImg} />
-                  <span>{t('office.liveMap')}</span>
-                </DropdownMenuRadioItem>
-                {hiddenGroupCount > 0 && (
+              {hiddenGroupCount > 0 ? (
+                <DropdownMenuRadioGroup
+                  value={showingAll ? 'all' : 'live'}
+                  onValueChange={(value) => {
+                    setShowAll(value === 'all')
+                    setCamera({ x: 0, y: 0 })
+                    closeFloorMenu()
+                  }}
+                >
+                  <DropdownMenuRadioItem value="live">
+                    <img src={OFFICE_HUD_ASSETS.resetCompass} alt="" aria-hidden style={officePixelImg} />
+                    <span>{t('office.liveMap')}</span>
+                    {!showingAll && (
+                      <img
+                        className="oa-office-pause-menu__selection"
+                        src={OFFICE_HUD_ASSETS.journalCursor}
+                        alt=""
+                        aria-hidden
+                        style={officePixelImg}
+                      />
+                    )}
+                  </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem
                     value="all"
                     aria-label={t('office.allGroups')}
@@ -633,9 +642,27 @@ export function OfficeBuilding({
                         {t('office.sleepingGroups', { count: hiddenGroupCount })}
                       </small>
                     </span>
+                    {showingAll && (
+                      <img
+                        className="oa-office-pause-menu__selection"
+                        src={OFFICE_HUD_ASSETS.journalCursor}
+                        alt=""
+                        aria-hidden
+                        style={officePixelImg}
+                      />
+                    )}
                   </DropdownMenuRadioItem>
-                )}
-              </DropdownMenuRadioGroup>
+                </DropdownMenuRadioGroup>
+              ) : (
+                <div
+                  className="oa-office-pause-menu__current"
+                  aria-label={t('office.currentFloorView', { view: t('office.liveMap') })}
+                >
+                  <img src={OFFICE_HUD_ASSETS.resetCompass} alt="" aria-hidden style={officePixelImg} />
+                  <span>{t('office.liveMap')}</span>
+                  <small>{t('office.currentView')}</small>
+                </div>
+              )}
               <DropdownMenuItem
                 onClick={() => {
                   closeFloorMenu(false)

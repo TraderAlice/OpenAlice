@@ -1827,6 +1827,8 @@ export const zh: Resources = {
     awakeGroups: '清醒小组',
     awakeGroupCount: '{{total}} 个小组中有 {{awake}} 个清醒',
     liveMap: '当前地图',
+    currentView: '当前',
+    currentFloorView: '当前楼层视图：{{view}}',
     visibleGroupCount: '显示 {{visible}} · 清醒 {{awake}} · 共 {{total}}',
     allRooms: '所有房间',
     allGroups: '所有小组',

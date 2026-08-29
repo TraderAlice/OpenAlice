@@ -1828,6 +1828,8 @@ export const ja: Resources = {
     awakeGroups: '起きているグループ',
     awakeGroupCount: '{{total}} グループ中 {{awake}} グループが起動中',
     liveMap: '現在のマップ',
+    currentView: '現在',
+    currentFloorView: '現在のフロア表示：{{view}}',
     visibleGroupCount: '{{visible}} 表示 · {{awake}} 起動中 · 全 {{total}}',
     allRooms: 'すべての部屋',
     allGroups: 'すべてのグループ',

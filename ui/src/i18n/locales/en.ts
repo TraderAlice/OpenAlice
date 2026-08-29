@@ -1860,6 +1860,8 @@ export const en = {
     awakeGroups: 'Awake groups',
     awakeGroupCount: '{{awake}} of {{total}} groups awake',
     liveMap: 'Live map',
+    currentView: 'Current',
+    currentFloorView: 'Current floor view: {{view}}',
     visibleGroupCount: '{{visible}} shown · {{awake}} awake · {{total}} total',
     allRooms: 'All rooms',
     allGroups: 'All groups',

@@ -1835,6 +1835,8 @@ export const zhHant: Resources = {
     awakeGroups: '清醒小組',
     awakeGroupCount: '{{total}} 個小組中有 {{awake}} 個清醒',
     liveMap: '目前地圖',
+    currentView: '目前',
+    currentFloorView: '目前樓層檢視：{{view}}',
     visibleGroupCount: '顯示 {{visible}} · 清醒 {{awake}} · 共 {{total}}',
     allRooms: '所有房間',
     allGroups: '所有小組',

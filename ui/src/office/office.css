@@ -4806,6 +4806,39 @@
   object-fit: contain;
 }
 
+.oa-office-pause-menu__current {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px 3px 5px;
+  border: 2px solid var(--gba-ink-soft);
+  color: var(--gba-ink);
+  background: color-mix(in srgb, var(--gba-floor-alt) 76%, var(--gba-paper));
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.oa-office-pause-menu__current > img {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  object-fit: contain;
+}
+
+.oa-office-pause-menu__current small {
+  margin-left: auto;
+  padding: 2px 4px;
+  border: 1px solid var(--gba-ink-soft);
+  color: var(--gba-ink-soft);
+  background: var(--gba-paper);
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .oa-office-pause-menu__option {
   display: grid;
   min-width: 0;
@@ -4837,10 +4870,11 @@
   background: var(--gba-moss-dark);
 }
 
-.oa-office-pause-menu [role="menuitemradio"][aria-checked="true"]::after {
+.oa-office-pause-menu .oa-office-pause-menu__selection {
+  width: 20px;
+  height: 20px;
   margin-left: auto;
-  content: "◆";
-  color: var(--office-gba-live);
+  object-fit: contain;
 }
 
 .oa-office-pause-menu [data-slot="dropdown-menu-radio-item-indicator"] {

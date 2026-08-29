@@ -1714,6 +1714,26 @@ Roster-card hierarchy follow-up (2026-08-29):
 - Focused RosterWindow specs passed: 1 file / 1 test. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
   Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
 
+Single-view pause-menu follow-up (2026-08-29):
+
+- Played Floor terminal on the real three-pod demo. After the earlier effective-view cleanup, Floor view contained
+  one checked `Live map ◆` radio and no alternative. The row remained focusable and clickable even though activating
+  it could not change camera, groups, or floor state: a status was still masquerading as a game command.
+- Compared hiding Floor view entirely, keeping a disabled radio, and converting the lone mode into a current-state
+  plate. Chose the plate because the pause menu should still orient the player, while only observable transitions
+  belong in its command sequence. When a sleeping group creates a real delta, the existing Live map / All groups
+  radio group still appears.
+- The no-delta menu now renders a non-focusable generated-compass plate with Live map and a localized CURRENT badge.
+  Floor terminal focuses the first actual menu item, Occupancy log, instead of querying a radio that may not exist.
+  True radio selections replace the CSS Unicode diamond with the generated journal cursor, so both branches retain
+  one material selection language.
+- Browser-played Floor terminal -> Occupancy log -> Close at 1280x720. The single-view menu exposed zero radios,
+  focused Occupancy log immediately, contained no `◆`, and restored focus to `office-floor-terminal` after closing
+  the log. At 390x844, the current plate measured 208x44 inside the 224x148 menu, its right edge stayed at 379px,
+  and the page remained exactly 390px wide. Component coverage verifies the complementary two-radio path.
+- Focused OfficeBuilding specs passed: 1 file / 9 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 606-file
+  Vitest run (5,029 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
