@@ -104,20 +104,6 @@ export function OfficeDesk({
             {officeCoworkerLabel(employee)}
           </span>
         )}
-        {!employee && (
-          <img
-            src={OFFICE_FURNITURE.chair}
-            alt=""
-            data-slot="office-chair-prop"
-            className="oa-office-chair"
-            style={{
-              ...officePixelImg,
-              bottom: station.sprite.bottomPx - 16,
-              zIndex: station.sprite.zIndex,
-              width: 52,
-            }}
-          />
-        )}
         {employee && (
           <span
             data-slot="office-sprite"
@@ -137,18 +123,6 @@ export function OfficeDesk({
             />
           </span>
         )}
-        <img
-          src={OFFICE_FURNITURE.desk}
-          alt=""
-          data-slot="office-desk-prop"
-          className="oa-office-desk-prop"
-          style={{
-            ...officePixelImg,
-            bottom: station.desk.bottomPx,
-            zIndex: station.desk.zIndex,
-            width: station.desk.widthPx,
-          }}
-        />
       </button>
     </li>
   )

@@ -1,6 +1,6 @@
 # Office generated furniture
 
-These `*-v1.png` files are the generated environment pack for the Office
+These versioned PNG files are the generated environment pack for the Office
 overworld. Alice uses the purpose-built `alice-overworld-v1.png` four-direction
 sheet, while runtime coworkers use their own portrait and seated families.
 
@@ -27,41 +27,45 @@ must not recreate card or room boundaries.
 
 Current runtime assets:
 
-- `workstation-v1.png`
-- `vacant-workstation-v1.png` — powered-down empty-chair variant for unoccupied Session slots
-- `filing-cabinet-v1.png`
-- `terminal-kiosk-v1.png`
-- `plant-v1.png`
-- `wall-window-v1.png`
-- `wall-window-night-v1.png` — geometry-matched after-hours window variant
-- `floor-tile-v1.png`
-- `workspace-rug-v1.png`
-- `coffee-station-v1.png` — Chat neighborhood social prop
+- `workstation-v2.png`
+- `vacant-workstation-v2.png` — powered-down empty-chair variant for unoccupied Session slots
+- `filing-cabinet-v2.png`
+- `terminal-kiosk-v2.png`
+- `plant-v2.png`
+- `wall-window-v2.png`
+- `wall-window-night-v2.png` — geometry-matched after-hours window variant
+- `floor-tile-v2.png`
+- `workspace-rug-v2.png`
+- `coffee-station-v2.png` — Chat neighborhood social prop
 
-`wall-window-night-v1.png` was produced as a geometry-locked lighting edit of
+`wall-window-night-v2.png` was produced as a geometry-locked lighting edit of
 the daytime window module, followed by a background-extraction pass to restore
 real alpha. `OfficeBuilding` selects the day or night module from the effective
 theme preference, including system-resolved Auto mode.
-- `server-rack-v1.png` — AutoQuant neighborhood operations prop
-- `personnel-board-v1.png` — interactive roster prop for groups with more than four Sessions
-- `operations-board-v1.png` — floor landmark that opens the live occupancy log and replay
-- `workspace-sign-v1.png` — blank physical placard behind live Workspace, Harness, and agent text
-- `spawn-compass-v1.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
+- `server-rack-v2.png` — AutoQuant neighborhood operations prop
+- `personnel-board-v2.png` — interactive roster prop for groups with more than four Sessions
+- `operations-board-v2.png` — floor landmark that opens the live occupancy log and replay
+- `workspace-sign-v2.png` — blank physical placard behind live Workspace, Harness, and agent text
+- `spawn-compass-v2.png` — flush four-direction Operations medallion beneath Alice's neutral reset point
 - `route-chevron-v1.png` — generated 24px floor inlay for the remaining click-to-interact path
 - `collision-impact-v1.png` — generated four-frame blocked-movement sparkle at native 24px cells
 - `mail-service-v1.png` — water cooler and mail-sorting landmark for the open service edge
 - `archive-service-v1.png` — copier and archive-trolley landmark for the open service edge
 
-`operations-board-v1.png` was generated from the locked style master as a freestanding, width-dominant
+The v2 environment pack converts the original generated masters into their actual runtime canvases with
+nearest-neighbor sampling, hard alpha, and compact 48- or 64-color palettes. Fifteen formerly 1K-scale sources
+totaling 12.49 MiB become a 106.5 KiB native pack while preserving their existing contain/fill composition.
+
+`operations-board-v2.png` was generated from the locked style master as a freestanding, width-dominant
 mission console with an abstract teal status display and no baked words. The built-in image generator
 rendered it on a flat magenta key; the repository copy uses locally extracted transparent alpha.
 
-`workspace-sign-v1.png` was generated from the same style master as a wide walnut-and-teal physical
+`workspace-sign-v2.png` was generated from the same style master as a wide walnut-and-teal physical
 placard with no baked text. Runtime HTML supplies the localized Harness label, Workspace title, and
 agent count over its quiet center panel, preserving dynamic data and accessible text without reverting
 to a dashboard card.
 
-`vacant-workstation-v1.png` preserves the workstation footprint while removing the cyan screen and tower
+`vacant-workstation-v2.png` preserves the workstation footprint while removing the cyan screen and tower
 glow. It was generated on a flat magenta key, processed with the ImageGen chroma-key helper, and packaged
 with real alpha. Empty slots remain disabled scenery, but no longer disappear into the rug as if their
 assets failed to load.

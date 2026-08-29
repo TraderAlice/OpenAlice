@@ -806,9 +806,7 @@
   background: var(--office-danger);
 }
 
-.oa-office-chair,
-.oa-office-sprite,
-.oa-office-desk-prop {
+.oa-office-sprite {
   position: absolute;
   left: 50%;
   pointer-events: none;
@@ -4041,11 +4039,6 @@
   border-top-color: var(--gba-alert);
   background: transparent;
   animation: oa-office-gba-select 600ms steps(2, end) infinite;
-}
-
-.oa-office-pod .oa-office-chair,
-.oa-office-pod .oa-office-desk-prop {
-  display: none;
 }
 
 .oa-office-pod .oa-office-sprite {

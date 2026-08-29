@@ -42,7 +42,7 @@ describe('OfficeDesk', () => {
     expect(desk.hasAttribute('disabled')).toBe(true)
     expect(desk.dataset.occupied).toBe('false')
     expect(container.querySelector<HTMLImageElement>('.oa-office-topdown-station__asset')?.src)
-      .toContain('/office/furniture/vacant-workstation-v1.png')
+      .toContain('/office/furniture/vacant-workstation-v2.png')
     expect(container.querySelector('.oa-office-coworker')).toBeNull()
   })
 
@@ -63,6 +63,8 @@ describe('OfficeDesk', () => {
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-agent')).toBe('claude')
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-pose')).toBe('desk')
     expect(container.querySelector('.oa-office-coworker')?.getAttribute('data-reduced-motion')).toBe('true')
+    expect(container.querySelector<HTMLImageElement>('.oa-office-topdown-station__asset')?.src)
+      .toContain('/office/furniture/workstation-v2.png')
     expect(container.querySelector<HTMLImageElement>('.oa-office-coworker img')?.src)
       .toContain('/office/coworkers/claude-desk-v1.png')
     expect(container.querySelector<HTMLImageElement>('.oa-office-coworker__frame--work')?.src)

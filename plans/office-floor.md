@@ -1033,6 +1033,33 @@ Coworker work-animation follow-up (2026-08-29):
 - `pnpm test` passed: 603 files / 5018 tests, 1 file / 9 tests skipped
 - `pnpm --filter open-alice-ui build` passed
 
+Native environment-pack follow-up (2026-08-29):
+
+- Audited the rendered Office and its asset graph after the coworker animation. No Lucide, inline SVG, or generic
+  vector icons remain in the Office runtime. The actual residual asset problem was pixel density and payload: fifteen
+  generated furniture masters between 1K and 1.7K pixels were still shipped directly and displayed at 40-288px,
+  totaling 12.49 MiB before coworker and HUD assets.
+- Compared optimizing only the repeated workstation, leaving browser scaling in place, and packaging the entire
+  environment at its authored runtime canvases. Chose a complete v2 pack because a partial conversion would preserve
+  mismatched texture density between the floor, walls, rugs, pods, and landmarks; Office has no compatibility need
+  for the oversized runtime sources.
+- Locked native canvases from current CSS composition rather than arbitrary thumbnails: 96x96 floor tile, 204x102
+  wall module, 264x64 Workspace sign, 264x138 rug, 112x84 workstation, 176x132 Operations board, and 48-80px prop
+  canvases. `fill` assets retain current geometry; `contain` assets retain source aspect and transparent margins.
+- Nearest-neighbor sampling, hard alpha, and compact 48/64-color palettes produced fifteen sibling v2 PNGs totaling
+  106.5 KiB, a 99.2% reduction. A contact-sheet audit confirmed complete silhouettes, matching day/night wall
+  geometry, uncut shadows, and readable teal-screen, walnut, parchment, and olive details at native scale.
+- Runtime references now use the v2 pack. The fifteen matching high-resolution v1 files and five already-hidden
+  early desk/chair/cabinet/coffee/plant PNGs were removed; `OfficeDesk` no longer renders the dead legacy layers and
+  their CSS selectors are gone. Native v1 route, impact, and service assets remain because they were already packed.
+- Browser A/B verified the default two-Workspace floor in Day, Night, and 760x900. All v2 images reported their
+  expected natural dimensions, night selected `wall-window-night-v2`, repeated floor/wall textures had no visible
+  seams, cabinet interaction still opened the correct dialog, no image failed, and horizontal overflow stayed 0px.
+- Focused furniture, desk, and building specs passed: 3 files / 12 tests.
+- `npx tsc --noEmit` and `cd ui && npx tsc -b` passed
+- `pnpm test` passed: 603 files / 5018 tests, 1 file / 9 tests skipped
+- `pnpm --filter open-alice-ui build` passed
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

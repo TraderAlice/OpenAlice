@@ -9,29 +9,30 @@ const PNG_MAGIC = [137, 80, 78, 71, 13, 10, 26, 10]
 const publicRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../public')
 
 describe('OFFICE_FURNITURE', () => {
-  it('ships pixel PNG props and does not reference photoreal JPEGs', () => {
-    expect(OFFICE_FURNITURE.desk).toBe('/office/furniture/desk.png')
-    expect(OFFICE_FURNITURE.chair).toBe('/office/furniture/chair.png')
-    expect(OFFICE_FURNITURE.cabinet).toBe('/office/furniture/cabinet.png')
-    expect(OFFICE_FURNITURE.generated.workstation).toBe('/office/furniture/workstation-v1.png')
-    expect(OFFICE_FURNITURE.generated.vacantWorkstation).toBe('/office/furniture/vacant-workstation-v1.png')
-    expect(OFFICE_FURNITURE.generated.cabinet).toBe('/office/furniture/filing-cabinet-v1.png')
-    expect(OFFICE_FURNITURE.generated.operationsBoard).toBe('/office/furniture/operations-board-v1.png')
-    expect(OFFICE_FURNITURE.generated.workspaceSign).toBe('/office/furniture/workspace-sign-v1.png')
-    expect(OFFICE_FURNITURE.generated.spawnCompass).toBe('/office/furniture/spawn-compass-v1.png')
-    expect(OFFICE_FURNITURE.generated.routeChevron).toBe('/office/furniture/route-chevron-v1.png')
-    expect(OFFICE_FURNITURE.generated.collisionImpact).toBe('/office/furniture/collision-impact-v1.png')
-    expect(OFFICE_FURNITURE.generated.mailService).toBe('/office/furniture/mail-service-v1.png')
-    expect(OFFICE_FURNITURE.generated.archiveService).toBe('/office/furniture/archive-service-v1.png')
-    expect(OFFICE_FURNITURE.generated.wallWindowNight).toBe('/office/furniture/wall-window-night-v1.png')
-    for (const url of [
-      OFFICE_FURNITURE.desk,
-      OFFICE_FURNITURE.chair,
-      OFFICE_FURNITURE.cabinet,
-      OFFICE_FURNITURE.coffee,
-      OFFICE_FURNITURE.plant,
-      ...Object.values(OFFICE_FURNITURE.generated),
-    ]) {
+  it('ships every runtime prop as a native-size pixel PNG', () => {
+    const dimensions = {
+      workstation: [112, 84],
+      vacantWorkstation: [112, 84],
+      cabinet: [48, 96],
+      terminal: [48, 72],
+      plant: [64, 64],
+      wallWindow: [204, 102],
+      wallWindowNight: [204, 102],
+      floorTile: [96, 96],
+      workspaceRug: [264, 138],
+      coffeeStation: [72, 72],
+      serverRack: [48, 72],
+      personnelBoard: [48, 48],
+      operationsBoard: [176, 132],
+      workspaceSign: [264, 64],
+      spawnCompass: [80, 80],
+      routeChevron: [24, 24],
+      collisionImpact: [96, 24],
+      mailService: [120, 104],
+      archiveService: [120, 104],
+    } satisfies Record<keyof typeof OFFICE_FURNITURE.generated, [number, number]>
+
+    for (const [key, url] of Object.entries(OFFICE_FURNITURE.generated)) {
       expect(url.endsWith('.png')).toBe(true)
       expect(url.includes('.jpg')).toBe(false)
       expect(url.includes('treadmill')).toBe(false)
@@ -39,66 +40,9 @@ describe('OFFICE_FURNITURE', () => {
       const bytes = readFileSync(file)
       expect([...bytes.subarray(0, 8)]).toEqual(PNG_MAGIC)
       expect(bytes.byteLength).toBeGreaterThan(1000)
-    }
-
-    const operations = readFileSync(resolve(
-      publicRoot,
-      OFFICE_FURNITURE.generated.operationsBoard.replace(/^\//, ''),
-    ))
-    expect(operations[25]).toBe(6) // PNG color type 6: RGBA.
-
-    const vacantWorkstation = readFileSync(resolve(
-      publicRoot,
-      OFFICE_FURNITURE.generated.vacantWorkstation.replace(/^\//, ''),
-    ))
-    expect(vacantWorkstation[25]).toBe(6)
-    expect(vacantWorkstation.readUInt32BE(16)).toBe(256)
-    expect(vacantWorkstation.readUInt32BE(20)).toBe(256)
-
-    const workspaceSign = readFileSync(resolve(
-      publicRoot,
-      OFFICE_FURNITURE.generated.workspaceSign.replace(/^\//, ''),
-    ))
-    expect(workspaceSign[25]).toBe(6)
-
-    const nightWindow = readFileSync(resolve(
-      publicRoot,
-      OFFICE_FURNITURE.generated.wallWindowNight.replace(/^\//, ''),
-    ))
-    expect(nightWindow[25]).toBe(6)
-
-    const spawnCompass = readFileSync(resolve(
-      publicRoot,
-      OFFICE_FURNITURE.generated.spawnCompass.replace(/^\//, ''),
-    ))
-    expect(spawnCompass[25]).toBe(6)
-    expect(spawnCompass.readUInt32BE(16)).toBe(144)
-    expect(spawnCompass.readUInt32BE(20)).toBe(144)
-
-    const routeChevron = readFileSync(resolve(
-      publicRoot,
-      OFFICE_FURNITURE.generated.routeChevron.replace(/^\//, ''),
-    ))
-    expect(routeChevron[25]).toBe(6)
-    expect(routeChevron.readUInt32BE(16)).toBe(24)
-    expect(routeChevron.readUInt32BE(20)).toBe(24)
-
-    const collisionImpact = readFileSync(resolve(
-      publicRoot,
-      OFFICE_FURNITURE.generated.collisionImpact.replace(/^\//, ''),
-    ))
-    expect(collisionImpact[25]).toBe(6)
-    expect(collisionImpact.readUInt32BE(16)).toBe(96)
-    expect(collisionImpact.readUInt32BE(20)).toBe(24)
-
-    for (const serviceUrl of [
-      OFFICE_FURNITURE.generated.mailService,
-      OFFICE_FURNITURE.generated.archiveService,
-    ]) {
-      const service = readFileSync(resolve(publicRoot, serviceUrl.replace(/^\//, '')))
-      expect(service[25]).toBe(6)
-      expect(service.readUInt32BE(16)).toBe(120)
-      expect(service.readUInt32BE(20)).toBe(104)
+      expect(bytes.readUInt32BE(16)).toBe(dimensions[key as keyof typeof dimensions][0])
+      expect(bytes.readUInt32BE(20)).toBe(dimensions[key as keyof typeof dimensions][1])
+      expect(bytes[25]).toBe(key === 'floorTile' ? 2 : 6)
     }
   })
 })
