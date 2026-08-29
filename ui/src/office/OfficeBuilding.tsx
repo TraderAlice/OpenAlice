@@ -832,6 +832,7 @@ export function OfficeBuilding({
                 key={layout.id}
                 group={group}
                 layout={layout}
+                mapWidth={mapLayout.width}
                 title={resolveGroupTitle(
                   group.workspace.id,
                   group.workspace.tag,

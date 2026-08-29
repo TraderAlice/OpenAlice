@@ -5,8 +5,8 @@ import { officeOperationsBoardPosition } from './map-landmarks'
 import {
   OFFICE_CABINET_CENTER,
   OFFICE_DESK_CENTERS,
-  OFFICE_ROSTER_CENTER,
   OFFICE_SIGN_CENTER,
+  officeRosterCenter,
 } from './pod-geometry'
 
 export const OFFICE_INTERACTION_RADIUS = 72
@@ -99,11 +99,12 @@ export function officeInteractionTargets(
       roomName,
     })
     if (group.employees.length > 4) {
+      const rosterCenter = officeRosterCenter(pod, layout.width)
       targets.push({
         id: `roster:${group.workspace.id}`,
         kind: 'roster',
-        x: pod.x + OFFICE_ROSTER_CENTER.x,
-        y: pod.y + OFFICE_ROSTER_CENTER.y,
+        x: pod.x + rosterCenter.x,
+        y: pod.y + rosterCenter.y,
         workspaceId: group.workspace.id,
         roomName,
       })

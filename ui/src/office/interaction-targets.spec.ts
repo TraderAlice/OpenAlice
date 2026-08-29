@@ -8,6 +8,7 @@ import {
   officeInteractionTargets,
 } from './interaction-targets'
 import { layoutOfficeMap } from './map-layout'
+import { officeRosterCenter } from './pod-geometry'
 
 const group: OfficeRoomSnapshot = {
   workspace: { id: 'chat-1', tag: 'chat', harness: 'chat' },
@@ -200,5 +201,19 @@ describe('Office interaction targets', () => {
         x: layout.pods[0]!.x + 270,
         y: layout.pods[0]!.y + 83,
       }))
+  })
+
+  it('places roster boards in the outer aisle instead of under Operations', () => {
+    const layout = layoutOfficeMap([
+      { id: 'chat-left', harness: 'chat' },
+      { id: 'chat-right', harness: 'chat' },
+    ])
+    const left = officeRosterCenter(layout.pods[0]!, layout.width)
+    const right = officeRosterCenter(layout.pods[1]!, layout.width)
+
+    expect(left).toEqual({ x: 18, y: 83, side: 'left' })
+    expect(right).toEqual({ x: 270, y: 83, side: 'right' })
+    expect(layout.pods[0]!.x + left.x).toBeLessThan(layout.width / 2 - 88)
+    expect(layout.pods[1]!.x + right.x).toBeGreaterThan(layout.width / 2 + 88)
   })
 })

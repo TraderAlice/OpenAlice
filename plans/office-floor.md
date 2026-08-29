@@ -1365,6 +1365,31 @@ Workspace-entry transition follow-up (2026-08-29):
   5,028 tests (one file and nine tests skipped); its first pass also caught and removed a literal shadow color so the
   curtain continues to obey the shared semantic-color contract.
 
+World-object hit ownership follow-up (2026-08-29):
+
+- Replayed Menu, Operations, Agent file, roster, and their return-to-floor paths at desktop and phone widths. A direct
+  click on the visible Semis personnel board consistently opened Occupancy log instead of Team roster. Live hit
+  inspection found that the 176x132 Operations console button physically covered the roster's 42x58 rectangle, so
+  the higher-depth console owned the pointer even though the player aimed at the board.
+- Compared lowering the console's depth, shrinking its rectangular hitbox, and moving personnel boards into a clear
+  aisle. Chose the aisle because depth changes would corrupt scene ordering and a smaller hitbox would make an
+  important object harder to use. The chosen placement also makes the standing board read as deliberate furniture
+  instead of a prop tucked under the central console.
+- Personnel boards now use the outer edge of their Workspace pod: left-half pods place the board on the left and
+  right-half or centered pods place it on the right. One shared `officeRosterCenter` owns the rendered position,
+  route target, collision rectangle, and side metadata, eliminating the previous 49px mismatch between the visible
+  asset and its interaction geometry.
+- Browser-played the Semis board at 1280x720. Its center changed from an Operations-owned hit to a roster-owned hit;
+  clicking it set only the roster route state and opened `Team roster · Semis and supply chain`. The Operations
+  console center remained self-owned and still opened Occupancy log.
+- At 390x844, eleven real D-pad moves brought Alice and the camera into the left aisle. The board remained fully
+  visible at x=68..110, a coordinate-level click opened Team roster rather than the log, closing restored focus to
+  `office-roster-demo-chat-ws`, and page-level horizontal overflow remained zero.
+- Focused interaction-target, collision, and Building specs passed: 3 files / 22 tests. The new geometry assertion
+  requires two-column boards to sit beyond the Operations console's horizontal footprint.
+- `npx tsc --noEmit`, `cd ui && npx tsc -b`, and the UI production build passed. The 606-file Vitest run passed with
+  5,029 tests (one file and nine tests skipped).
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

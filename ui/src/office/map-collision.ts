@@ -3,8 +3,8 @@ import { officeOperationsBoardPosition, officeServiceLandmarks } from './map-lan
 import {
   OFFICE_CABINET_CENTER,
   OFFICE_DESK_CENTERS,
-  OFFICE_ROSTER_CENTER,
   OFFICE_SIGN_CENTER,
+  officeRosterCenter,
 } from './pod-geometry'
 
 export const OFFICE_WALL_FLOOR_EDGE = 112
@@ -78,10 +78,11 @@ export function officeCollisionRects(
       height: 48,
     })
     if (rosterWorkspaceIds.has(pod.id)) {
+      const rosterCenter = officeRosterCenter(pod, layout.width)
       rects.push({
         id: `roster:${pod.id}`,
-        x: pod.x + OFFICE_ROSTER_CENTER.x - 18,
-        y: pod.y + OFFICE_ROSTER_CENTER.y - 25,
+        x: pod.x + rosterCenter.x - 18,
+        y: pod.y + rosterCenter.y - 25,
         width: 36,
         height: 50,
       })

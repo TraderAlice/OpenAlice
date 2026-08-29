@@ -4,12 +4,13 @@ import type { OfficeFloorEmployee, OfficeRoomSnapshot } from '../api/office'
 import { OfficeDesk } from './OfficeDesk'
 import { deskSlotsForOffice, visibleEmployeesForOffice } from './desk-slots'
 import { OFFICE_FURNITURE, officePixelImg } from './furniture'
-import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, OFFICE_ROSTER_CENTER } from './pod-geometry'
+import { OFFICE_CABINET_CENTER, OFFICE_DESK_CENTERS, officeRosterCenter } from './pod-geometry'
 import { officeDepthAt } from './scene-depth'
 
 export function OfficeMapPod({
   group,
   layout,
+  mapWidth,
   title,
   harnessTitle,
   selected,
@@ -24,6 +25,7 @@ export function OfficeMapPod({
 }: {
   group: OfficeRoomSnapshot
   layout: { x: number; y: number; width: number; height: number }
+  mapWidth: number
   title: string
   harnessTitle: string
   selected?: { workspaceId: string; resumeId: string } | null
@@ -40,6 +42,7 @@ export function OfficeMapPod({
   const visibleEmployees = visibleEmployeesForOffice(group.employees)
   const slots = deskSlotsForOffice(visibleEmployees, 4)
   const active = group.employees.some((employee) => employee.mood !== 'idle')
+  const rosterCenter = officeRosterCenter(layout, mapWidth)
   const harnessProp = group.workspace.harness === 'chat'
     ? OFFICE_FURNITURE.generated.coffeeStation
     : group.workspace.harness === 'auto-quant'
@@ -153,7 +156,12 @@ export function OfficeMapPod({
             id={`office-roster-${group.workspace.id}`}
             type="button"
             className="oa-office-pod__roster"
-            style={{ zIndex: officeDepthAt(layout.y + OFFICE_ROSTER_CENTER.y + 25) }}
+            style={{
+              left: rosterCenter.x - 21,
+              top: rosterCenter.y - 29,
+              zIndex: officeDepthAt(layout.y + rosterCenter.y + 25),
+            }}
+            data-side={rosterCenter.side}
             data-nearby={nearbyTargetId === `roster:${group.workspace.id}`}
             data-route={routeTargetId === `roster:${group.workspace.id}`}
             onClick={() => onOpenRoster(group.workspace.id)}
