@@ -19,7 +19,7 @@ describe('GET /api/agent-runtime', () => {
       cause: { kind: 'http' },
     })
     const app = new Hono().route('/', createAgentRuntimeLogRoutes({
-      agentRuntimeLog: log,
+      activityJournal: log,
     } as never))
     const res = await app.request('/?page=1&pageSize=1')
     expect(res.status).toBe(200)
@@ -38,7 +38,7 @@ describe('GET /api/agent-runtime', () => {
       ]),
     }
     const app = new Hono().route('/', createAgentRuntimeLogRoutes({
-      agentRuntimeLog: log,
+      activityJournal: log,
     } as never))
     const res = await app.request('/?afterSeq=1&limit=10')
     expect(res.status).toBe(200)
@@ -50,7 +50,7 @@ describe('GET /api/agent-runtime', () => {
   it('records a Sonner probe through the same runtime journal', async () => {
     const record = vi.fn(async (type, payload) => ({ seq: 7, ts: 1, type, payload }))
     const app = new Hono().route('/', createAgentRuntimeLogRoutes({
-      agentRuntimeLog: { record },
+      activityJournal: { record },
     } as never))
 
     const res = await app.request('/sonner-test', {
@@ -63,6 +63,31 @@ describe('GET /api/agent-runtime', () => {
     expect(record).toHaveBeenCalledWith('dev.sonner_test', expect.objectContaining({
       agent: 'Dev Panel',
       testState: 'success',
+    }))
+  })
+
+  it('records registered Inbox and News product probes', async () => {
+    const record = vi.fn(async (type, payload) => ({ seq: 7, ts: 1, type, payload }))
+    const registerFamily = vi.fn(() => ({ record }))
+    const app = new Hono().route('/', createAgentRuntimeLogRoutes({
+      activityJournal: { registerFamily },
+    } as never))
+
+    for (const family of ['inbox', 'news'] as const) {
+      const res = await app.request('/product-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ family }),
+      })
+      expect(res.status).toBe(201)
+    }
+    expect(registerFamily).toHaveBeenCalledWith(expect.objectContaining({ family: 'inbox' }))
+    expect(registerFamily).toHaveBeenCalledWith(expect.objectContaining({ family: 'news' }))
+    expect(record).toHaveBeenCalledWith('inbox.received', expect.objectContaining({
+      inboxEntryId: expect.stringContaining('inbox-test-'),
+    }))
+    expect(record).toHaveBeenCalledWith('news.ingested', expect.objectContaining({
+      title: 'Product activity journal News test',
     }))
   })
 })

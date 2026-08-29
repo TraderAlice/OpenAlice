@@ -75,15 +75,16 @@ async function projectRoom(
 
 export function createOfficeRoutes(svc: WorkspaceService): Hono {
   const app = new Hono()
+  const activityJournal = svc.activityJournal ?? svc.agentRuntimeLog
 
   app.get('/floor', async (c) => {
-    const lastSeq = svc.agentRuntimeLog.lastSeq()
+    const lastSeq = activityJournal.lastSeq()
     const asOfSeq = parseAsOfSeq(c.req.query('asOfSeq'), lastSeq)
     // Live Office is a bounded current-state projection. Only explicit replay
     // pays the cost of reading immutable history from disk.
     const events = asOfSeq === undefined
-      ? svc.agentRuntimeLog.projectionEvents()
-      : await svc.agentRuntimeLog.read({})
+      ? activityJournal.projectionEvents()
+      : await activityJournal.read({})
     const sliced = asOfSeq === undefined ? events : eventsThroughSeq(events, asOfSeq)
     const now = officeProjectionNow(sliced, asOfSeq, lastSeq)
     const requested = c.req.query('workspaceId')?.trim()
@@ -112,7 +113,7 @@ export function createOfficeRoutes(svc: WorkspaceService): Hono {
       config: OFFICE_CONFIG,
       offices,
       lastSeq,
-      firstSeq: svc.agentRuntimeLog.firstSeq(),
+      firstSeq: activityJournal.firstSeq(),
       ...(asOfSeq !== undefined ? { asOfSeq } : {}),
     })
   })

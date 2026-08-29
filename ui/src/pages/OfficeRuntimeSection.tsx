@@ -14,6 +14,8 @@ function eventLabel(type: AgentRuntimeEventType): string {
   if (type === 'runtime.turn.tool') return 'tool'
   if (type === 'runtime.turn.error') return 'error'
   if (type === 'dev.sonner_test') return 'Sonner test'
+  if (type === 'inbox.received') return 'Inbox received'
+  if (type === 'news.ingested') return 'News ingested'
   return type.replace('runtime.', '').replace('session.', '')
 }
 
@@ -25,8 +27,38 @@ function eventDetail(event: AgentRuntimeEvent): string | null {
   }
   if (event.type === 'runtime.turn.error') return payload.message ?? payload.error ?? null
   if (event.type === 'dev.sonner_test') return payload.message ?? null
+  if (event.type === 'inbox.received') return payload.summary ?? null
+  if (event.type === 'news.ingested') return payload.title ?? null
   if (event.type === 'runtime.stopped' && payload.assistantText) return payload.assistantText
   return null
+}
+
+function eventActor(event: AgentRuntimeEvent): string {
+  if (event.type === 'inbox.received') {
+    return event.payload.workspaceLabel ?? event.payload.workspaceId ?? 'Inbox'
+  }
+  if (event.type === 'news.ingested') return event.payload.source ?? 'News collector'
+  return `@${event.payload.resumeId || '—'}`
+}
+
+function eventIdentity(event: AgentRuntimeEvent): { primary: string; secondary: string } {
+  if (event.type === 'inbox.received') {
+    return {
+      primary: 'Inbox',
+      secondary: [event.payload.agent, event.payload.workspaceLabel ?? event.payload.workspaceId]
+        .filter(Boolean).join(' · ') || 'OpenAlice',
+    }
+  }
+  if (event.type === 'news.ingested') {
+    return {
+      primary: event.payload.source ?? 'News collector',
+      secondary: 'Market · News',
+    }
+  }
+  return {
+    primary: `@${event.payload.resumeId || '—'}`,
+    secondary: `${event.payload.agent || '—'} · ${event.payload.workspaceId || '—'}`,
+  }
 }
 
 function causeLabel(event: AgentRuntimeEvent): string | null {
@@ -54,7 +86,8 @@ export function OfficeRuntimeSection() {
 
   const load = useCallback(async () => {
     try {
-      const page = await api.agentRuntime.query({ page: 1, pageSize: 50 })
+      const activityApi = api.productActivity ?? api.agentRuntime
+      const page = await activityApi.query({ page: 1, pageSize: 50 })
       setEntries(page.entries)
       setError(null)
     } catch (err) {
@@ -123,6 +156,16 @@ export function OfficeRuntimeSection() {
   }
   addMeta(t('office.eventReason'), selectedPayload.reason)
   addMeta(t('office.eventErrorCode'), selectedPayload.launchErrorCode)
+  if (selectedEvent.type === 'inbox.received' && selectedPayload.documentCount) {
+    addMeta('Documents', String(selectedPayload.documentCount))
+  }
+  if (selectedEvent.type === 'news.ingested') {
+    addMeta('Source', selectedPayload.source)
+    addMeta('Published', selectedPayload.publishedAt
+      ? new Date(selectedPayload.publishedAt).toLocaleString()
+      : undefined)
+  }
+  const selectedIdentity = eventIdentity(selectedEvent)
   const moveJournalSelection = (keyboardEvent: KeyboardEvent<HTMLButtonElement>) => {
     const buttons = Array.from(
       keyboardEvent.currentTarget.closest('ol')
@@ -171,7 +214,7 @@ export function OfficeRuntimeSection() {
                   <img src={OFFICE_LOG_ASSETS[kind]} alt="" aria-hidden style={officePixelImg} />
                   <span className="oa-office-runtime__index-copy">
                     <strong>{eventLabel(event.type)}</strong>
-                    <small>@{payload.resumeId || '—'}</small>
+                    <small>{eventActor(event)}</small>
                   </span>
                   <span className="oa-office-runtime__index-meta">
                     <b>#{String(event.seq).padStart(4, '0')}</b>
@@ -201,8 +244,8 @@ export function OfficeRuntimeSection() {
               <time dateTime={new Date(selectedEvent.ts).toISOString()}>{formatRelativeTime(selectedEvent.ts)}</time>
             </header>
             <div className="oa-office-runtime__identity">
-              <strong>@{selectedPayload.resumeId || '—'}</strong>
-              <span>{selectedPayload.agent || '—'} · {selectedPayload.workspaceId || '—'}</span>
+              <strong>{selectedIdentity.primary}</strong>
+              <span>{selectedIdentity.secondary}</span>
             </div>
             {selectedDetail && (
               <p className="oa-office-runtime__detail">{selectedDetail}</p>
@@ -216,7 +259,9 @@ export function OfficeRuntimeSection() {
               ))}
             </ul>
           </div>
-          {selectedPayload.taskId && (
+          {selectedPayload.taskId
+            && selectedEvent.type !== 'inbox.received'
+            && selectedEvent.type !== 'news.ingested' && (
             <button
               type="button"
               className="oa-office-runtime__open"
@@ -224,6 +269,26 @@ export function OfficeRuntimeSection() {
             >
               <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
               {t('office.openRun')}
+            </button>
+          )}
+          {selectedEvent.type === 'inbox.received' && (
+            <button
+              type="button"
+              className="oa-office-runtime__open"
+              onClick={() => openOrFocus({ kind: 'inbox', params: {} })}
+            >
+              <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+              Open Inbox
+            </button>
+          )}
+          {selectedEvent.type === 'news.ingested' && (
+            <button
+              type="button"
+              className="oa-office-runtime__open"
+              onClick={() => openOrFocus({ kind: 'news', params: {} })}
+            >
+              <img src={OFFICE_HUD_ASSETS.sessionPortal} alt="" aria-hidden style={officePixelImg} />
+              Open News
             </button>
           )}
         </article>

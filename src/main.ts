@@ -318,16 +318,6 @@ async function main() {
   // ==================== News Collector ====================
 
   let newsCollector: NewsCollector | null = null
-  if (config.news.enabled && config.news.feeds.length > 0) {
-    newsCollector = new NewsCollector({
-      store: newsStore,
-      feeds: config.news.feeds,
-      intervalMs: config.news.intervalMinutes * 60 * 1000,
-    })
-    newsCollector.start()
-    const activeCount = config.news.feeds.filter((f) => f.enabled !== false).length
-    console.log(`news-collector: started (${activeCount}/${config.news.feeds.length} feeds active, every ${config.news.intervalMinutes}m)`)
-  }
 
   // ==================== Plugins ====================
 
@@ -414,6 +404,37 @@ async function main() {
   for (const plugin of [...corePlugins, ...optionalPlugins.values()]) {
     await plugin.start(ctx)
     console.log(`plugin started: ${plugin.name}`)
+  }
+
+  // Optional products actively install their own journal producer after the
+  // shared Workspace service is ready. NanoAlice can omit News entirely; the
+  // journal core never imports or starts the collector.
+  if (config.news.enabled && config.news.feeds.length > 0) {
+    const newsActivity = workspaceServiceRef.current?.activityJournal.registerFamily({
+      family: 'news',
+      types: ['news.ingested'] as const,
+    })
+    newsCollector = new NewsCollector({
+      store: newsStore,
+      feeds: config.news.feeds,
+      intervalMs: config.news.intervalMinutes * 60 * 1000,
+      ...(newsActivity ? {
+        onIngested: async (record) => {
+          await newsActivity.record('news.ingested', {
+            newsItemId: record.seq,
+            dedupKey: record.dedupKey,
+            title: record.title,
+            ...(record.metadata.source ? { source: record.metadata.source } : {}),
+            ...(record.metadata.link ? { link: record.metadata.link } : {}),
+            publishedAt: record.pubTs,
+            ingestSource: record.metadata.ingestSource ?? 'rss',
+          })
+        },
+      } : {}),
+    })
+    newsCollector.start()
+    const activeCount = config.news.feeds.filter((f) => f.enabled !== false).length
+    console.log(`news-collector: started (${activeCount}/${config.news.feeds.length} feeds active, every ${config.news.intervalMinutes}m)`)
   }
 
   console.log('engine: started')

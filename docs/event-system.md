@@ -29,3 +29,31 @@ implementation if archaeology is required.
 
 Do not recreate task dispatch on top of the journal. Extend Workspace issues,
 headless runs, or Inbox reporting when automation needs a new capability.
+
+## Product Activity Journal
+
+OpenAlice also maintains one append-only product activity journal for facts that
+the UI is expected to consume. It answers “what did OpenAlice do for the user?”;
+ordinary diagnostic output continues to use structured launcher logs and must
+not be copied into this stream.
+
+The journal is deliberately not an event bus:
+
+- a producer records only after its own durable domain write succeeds;
+- a journal failure never rolls back or starts domain work;
+- Office, Sonner, occupancy, and future unread counters are independent read
+  projections over the same ordered facts;
+- only Agent lifecycle events participate in Office occupancy.
+
+Product modules install themselves through a registered activity family and a
+scoped recorder. The journal core does not import or start News, Inbox, trading,
+or another optional product. TraderAlice currently installs Agent, Inbox, and
+per-item News facts. NanoAlice can omit product-specific families, and future
+Workspace products can register new families without rebuilding the journal or
+creating another notification polling path.
+
+For compatibility with the first shipped Agent-only projection, the physical
+file remains `state/agent-runtime.jsonl` and the read API remains
+`/api/agent-runtime` in this increment. Those names are compatibility details;
+their contract is the broader product activity journal. A future physical
+rename requires the normal idempotent persisted-state migration.

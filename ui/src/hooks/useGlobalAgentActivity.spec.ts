@@ -4,10 +4,10 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AgentRuntimeEvent } from '../api/agentRuntimeLog'
-import type { InboxEntry } from '../api/inbox'
 import {
   conversationActivityFilter,
   inboxActivityFilter,
+  newsActivityFilter,
   projectGlobalActivity,
   sonnerTestActivityFilter,
   summarizeAgentActivity,
@@ -16,12 +16,10 @@ import {
 } from './useGlobalAgentActivity'
 
 const queryRuntime = vi.fn()
-const queryInbox = vi.fn()
 
 vi.mock('../api', () => ({
   api: {
-    agentRuntime: { query: (...args: unknown[]) => queryRuntime(...args) },
-    inbox: { history: (...args: unknown[]) => queryInbox(...args) },
+    productActivity: { query: (...args: unknown[]) => queryRuntime(...args) },
   },
 }))
 
@@ -58,25 +56,8 @@ function conversationCause() {
   }
 }
 
-function inboxEntry(overrides: Partial<InboxEntry> = {}): InboxEntry {
-  return {
-    id: 'inbox-1',
-    ts: 10_000,
-    workspaceId: 'chat-1',
-    comments: 'Done',
-    origin: {
-      kind: 'headless',
-      agent: 'pi',
-      runId: 'task-1',
-      resumeId: 'resume-1',
-    },
-    ...overrides,
-  }
-}
-
 beforeEach(() => {
   queryRuntime.mockReset()
-  queryInbox.mockReset()
 })
 
 describe('global activity filters', () => {
@@ -100,7 +81,6 @@ describe('global activity filters', () => {
           toolStatus: 'running',
         }),
       ],
-      inboxEntries: [],
     }
 
     expect(conversationActivityFilter.project(sources, 5_000)).toEqual([
@@ -117,12 +97,10 @@ describe('global activity filters', () => {
     const started = event(1, 'runtime.started', { cause: conversationCause() })
     expect(conversationActivityFilter.project({
       runtimeEvents: [started, event(2, 'runtime.stopped', { status: 'paused' })],
-      inboxEntries: [],
     }, 2_000)).toEqual([])
 
     expect(conversationActivityFilter.project({
       runtimeEvents: [started, event(2, 'runtime.stopped', { status: 'failed', error: 'no auth' })],
-      inboxEntries: [],
     }, 2_000)).toEqual([
       expect.objectContaining({
         id: 'conversation-failed:task:task-1',
@@ -134,18 +112,42 @@ describe('global activity filters', () => {
 
   it('surfaces only recent Agent-originated Inbox deliveries', () => {
     expect(inboxActivityFilter.project({
-      runtimeEvents: [],
-      inboxEntries: [
-        inboxEntry(),
-        inboxEntry({ id: 'manual', origin: { kind: 'manual', agent: 'human' } }),
-        inboxEntry({ id: 'old', ts: 1_000 }),
-        inboxEntry({ id: 'anonymous', origin: undefined }),
+      runtimeEvents: [
+        event(10, 'inbox.received', {
+          workspaceId: 'chat-1', inboxEntryId: 'inbox-1', agent: 'pi',
+          originKind: 'headless', resumeId: 'resume-1', taskId: 'task-1',
+        }, 10_000),
+        event(11, 'inbox.received', {
+          inboxEntryId: 'manual', agent: 'human', originKind: 'manual',
+        }, 10_000),
+        event(12, 'inbox.received', { inboxEntryId: 'old', agent: 'pi' }, 1_000),
+        event(13, 'inbox.received', { inboxEntryId: 'anonymous', agent: undefined }, 10_000),
       ],
     }, 15_000)).toEqual([
       expect.objectContaining({
         id: 'inbox:inbox-1',
         kind: 'inbox',
         inboxEntryId: 'inbox-1',
+      }),
+    ])
+  })
+
+  it('projects each recently ingested News item as its own activity fact', () => {
+    expect(newsActivityFilter.project({
+      runtimeEvents: [event(20, 'news.ingested', {
+        workspaceId: undefined,
+        resumeId: undefined,
+        agent: undefined,
+        newsItemId: 42,
+        title: 'Markets reopen after holiday',
+        source: 'Reuters',
+      }, 10_000)],
+    }, 11_000)).toEqual([
+      expect.objectContaining({
+        id: 'news:42',
+        kind: 'news',
+        detail: 'Markets reopen after holiday',
+        source: 'Reuters',
       }),
     ])
   })
@@ -162,7 +164,7 @@ describe('global activity filters', () => {
       }],
     }
     const signals = projectGlobalActivity(
-      { runtimeEvents: [], inboxEntries: [] },
+      { runtimeEvents: [] },
       10_000,
       [customFilter],
     )
@@ -187,7 +189,6 @@ describe('global activity filters', () => {
           message: 'Sonner success test',
         }, 10_000),
       ],
-      inboxEntries: [],
     }
 
     expect(sonnerTestActivityFilter.project(sources, 11_000)).toEqual([
@@ -201,33 +202,32 @@ describe('global activity filters', () => {
 })
 
 describe('useGlobalAgentActivity', () => {
-  it('combines incremental runtime events with Inbox deliveries and preserves data on partial failure', async () => {
+  it('combines incremental product activity events and preserves data on failure', async () => {
     const now = Date.now()
     queryRuntime
       .mockResolvedValueOnce({
-        entries: [event(2, 'runtime.started', { cause: conversationCause() }, now)],
-        lastSeq: 2,
+        entries: [
+          event(2, 'runtime.started', { cause: conversationCause() }, now),
+          event(4, 'inbox.received', {
+            inboxEntryId: 'inbox-1', agent: 'pi', originKind: 'headless',
+          }, now),
+        ],
+        lastSeq: 4,
       })
       .mockResolvedValueOnce({
         entries: [event(3, 'runtime.turn.tool', { toolName: 'bash', toolStatus: 'running' }, now + 1_000)],
         lastSeq: 3,
       })
       .mockRejectedValueOnce(new Error('runtime offline'))
-    queryInbox
-      .mockResolvedValueOnce({ entries: [inboxEntry({ ts: now })], hasMore: false })
-      .mockResolvedValueOnce({ entries: [inboxEntry({ ts: now })], hasMore: false })
-      .mockResolvedValueOnce({ entries: [inboxEntry({ ts: now })], hasMore: false })
-
     const { result, unmount } = renderHook(() => useGlobalAgentActivity())
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(queryRuntime).toHaveBeenCalledWith({ page: 1, pageSize: 100 })
-    expect(queryInbox).toHaveBeenCalledWith({ limit: 25 })
     expect(result.current.signals.map((signal) => signal.kind).sort()).toEqual(['conversation', 'inbox'])
 
     await act(async () => {
       await result.current.refresh()
     })
-    expect(queryRuntime).toHaveBeenLastCalledWith({ afterSeq: 2, limit: 100 })
+    expect(queryRuntime).toHaveBeenLastCalledWith({ afterSeq: 4, limit: 100 })
     expect(result.current.signals.find((signal) => signal.kind === 'conversation')?.revision).toBe(2)
 
     await act(async () => {

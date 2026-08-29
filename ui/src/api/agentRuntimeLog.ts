@@ -10,6 +10,8 @@ export type AgentRuntimeEventType =
   | 'runtime.turn.tool'
   | 'runtime.turn.error'
   | 'dev.sonner_test'
+  | 'inbox.received'
+  | 'news.ingested'
 
 export type AgentRuntimeSurface = 'terminal' | 'webpi' | 'headless'
 
@@ -29,9 +31,9 @@ export type AgentRuntimeCause =
   | { kind: 'http' }
 
 export interface AgentRuntimePayload {
-  workspaceId: string
-  resumeId: string
-  agent: string
+  workspaceId?: string
+  resumeId?: string
+  agent?: string
   sessionRecordId?: string
   taskId?: string
   surface?: AgentRuntimeSurface
@@ -54,6 +56,18 @@ export interface AgentRuntimePayload {
   }
   truncated?: boolean
   testState?: 'running' | 'success' | 'error'
+  inboxEntryId?: string
+  workspaceLabel?: string
+  originKind?: 'headless' | 'interactive' | 'manual'
+  summary?: string
+  documentCount?: number
+  newsItemId?: number
+  dedupKey?: string
+  title?: string
+  source?: string
+  link?: string
+  publishedAt?: number
+  ingestSource?: string
 }
 
 export interface AgentRuntimeEvent {
@@ -97,4 +111,14 @@ export const agentRuntimeLogApi = {
       body: JSON.stringify({ state }),
     })
   },
+  async triggerProductActivityTest(family: 'inbox' | 'news'): Promise<void> {
+    await fetchJson('/api/agent-runtime/product-test', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ family }),
+    })
+  },
 }
+
+/** Product name; the older export remains for compatibility. */
+export const productActivityJournalApi = agentRuntimeLogApi

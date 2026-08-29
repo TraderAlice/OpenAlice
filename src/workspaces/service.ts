@@ -153,7 +153,7 @@ import {
   type AgentConversationDispatch,
 } from './agent-conversation-log.js';
 import {
-  AgentRuntimeLog,
+  ProductActivityJournal,
   conversationCause,
   issueCause,
   type AgentRuntimeCause,
@@ -621,8 +621,10 @@ export interface WorkspaceService {
   provenanceStore: ArtifactProvenanceStore;
   /** Append-only analysis/audit projection of cross-Agent messages. */
   agentConversationLog: AgentConversationLog;
-  /** Append-only desk/employee occupancy journal. Never a dispatch authority. */
-  agentRuntimeLog: AgentRuntimeLog;
+  /** Standard append-only product activity journal. Never a dispatch authority. */
+  activityJournal: ProductActivityJournal;
+  /** Compatibility alias for older Agent-runtime routes and callers. */
+  agentRuntimeLog: ProductActivityJournal;
   recordAgentRuntime(
     type: AgentRuntimeEventType,
     payload: AgentRuntimePayload,
@@ -729,10 +731,29 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     join(config.launcherRoot, 'state', 'agent-conversations.jsonl'),
     launcherLogger.child({ scope: 'agent-conversation-log' }),
   );
-  const agentRuntimeLog = await AgentRuntimeLog.open(
+  const agentRuntimeLog = await ProductActivityJournal.open(
     join(config.launcherRoot, 'state', 'agent-runtime.jsonl'),
     launcherLogger.child({ scope: 'agent-runtime-log' }),
   );
+  const inboxActivity = agentRuntimeLog.registerFamily({
+    family: 'inbox',
+    types: ['inbox.received'] as const,
+  });
+  const stopInboxActivity = inboxStore?.onAppended((entry) => {
+    const summary = entry.comments?.replace(/\s+/g, ' ').trim().slice(0, 240);
+    void inboxActivity.record('inbox.received', {
+      workspaceId: entry.workspaceId,
+      inboxEntryId: entry.id,
+      ...(entry.workspaceLabel ? { workspaceLabel: entry.workspaceLabel } : {}),
+      ...(entry.origin?.agent ? { agent: entry.origin.agent } : {}),
+      ...(entry.origin?.resumeId ? { resumeId: entry.origin.resumeId } : {}),
+      ...(entry.origin?.sessionId ? { sessionRecordId: entry.origin.sessionId } : {}),
+      ...(entry.origin?.runId ? { taskId: entry.origin.runId } : {}),
+      ...(entry.origin?.kind ? { originKind: entry.origin.kind } : {}),
+      ...(summary ? { summary } : {}),
+      documentCount: entry.docs?.length ?? 0,
+    });
+  });
   const recordAgentRuntime = async (
     type: AgentRuntimeEventType,
     payload: AgentRuntimePayload,
@@ -3031,6 +3052,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     shuttingDown = true;
     launcherLogger.info('workspaces.dispose', { reason, activeSessions: pool.size() });
     scheduleScanner.stop();
+    stopInboxActivity?.();
     await harnessSurfaces.dispose();
     pool.disposeAll('plugin shutdown');
     await webPi.stopAll('plugin shutdown');
@@ -3174,6 +3196,7 @@ export async function createWorkspaceService(opts: CreateWorkspaceServiceOptions
     resumeRegistry,
     provenanceStore,
     agentConversationLog,
+    activityJournal: agentRuntimeLog,
     agentRuntimeLog,
     recordAgentRuntime,
     isResumeActive: (resumeId) => activeResumeIds.has(resumeId),

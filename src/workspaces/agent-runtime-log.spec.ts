@@ -133,4 +133,45 @@ describe('AgentRuntimeLog', () => {
     ]))
   })
 
+  it('installs optional product families without adding them to occupancy', async () => {
+    const { log } = await openLog()
+    const inbox = log.registerFamily({ family: 'inbox', types: ['inbox.received'] as const })
+    const news = log.registerFamily({ family: 'news', types: ['news.ingested'] as const })
+
+    await inbox.record('inbox.received', {
+      workspaceId: 'desk-a',
+      inboxEntryId: 'inbox-1',
+      agent: 'pi',
+      documentCount: 1,
+    })
+    await news.record('news.ingested', {
+      newsItemId: 42,
+      dedupKey: 'guid:42',
+      title: 'Markets reopen after holiday',
+      source: 'Reuters',
+      publishedAt: 1_000,
+      ingestSource: 'rss',
+    })
+
+    expect((await log.read()).map((entry) => entry.type)).toEqual([
+      'inbox.received',
+      'news.ingested',
+    ])
+    expect(log.projectionEvents()).toEqual([])
+    expect(log.familyOf('news.ingested')).toBe('news')
+  })
+
+  it('rejects writes from event families that were not installed', async () => {
+    const { log } = await openLog()
+    const entry = await log.record('news.ingested', {
+      newsItemId: 1,
+      dedupKey: 'guid:1',
+      title: 'Hidden module',
+      publishedAt: 1,
+      ingestSource: 'rss',
+    })
+    expect(entry).toBeNull()
+    expect(await log.read()).toEqual([])
+  })
+
 })

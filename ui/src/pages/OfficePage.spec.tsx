@@ -125,9 +125,9 @@ describe('OfficePage localization', () => {
     const menuTrigger = screen.getByRole('button', { name: '菜单' })
     menuTrigger.focus()
     await userEvent.keyboard('{ArrowDown}')
-    await userEvent.click(screen.getByRole('menuitem', { name: '占用日志' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: '活动日志' }))
     expect(screen.getByText('Office occupancy')).toBeTruthy()
-    expect(screen.getByRole('dialog', { name: '占用日志' }).querySelector<HTMLImageElement>('header img')?.src)
+    expect(screen.getByRole('dialog', { name: '活动日志' }).querySelector<HTMLImageElement>('header img')?.src)
       .toContain('/office/hud/occupancy-log-v2.png')
     expect(screen.getByRole('button', { name: '关闭' }).querySelector('.oa-office-window__close-mark'))
       .toBeTruthy()
@@ -152,7 +152,7 @@ describe('OfficePage localization', () => {
 
     const floorTerminal = screen.getByRole('button', { name: '楼层终端' })
     await userEvent.click(floorTerminal)
-    await userEvent.click(await screen.findByRole('menuitem', { name: '占用日志' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: '活动日志' }))
     expect(screen.getByText('Office occupancy')).toBeTruthy()
     await userEvent.keyboard('{Escape}')
     await vi.waitFor(() => {

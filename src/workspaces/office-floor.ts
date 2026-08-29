@@ -5,7 +5,6 @@
 import type { ProvenanceRecord } from '../core/provenance-store.js'
 import type {
   AgentRuntimeEvent,
-  AgentRuntimePayload,
   AgentRuntimeSurface,
 } from './agent-runtime-log.js'
 
@@ -92,7 +91,9 @@ interface MutableEmployee {
   lastTs: number
 }
 
-type FloorPayload = AgentRuntimePayload & {
+type FloorPayload = {
+  readonly workspaceId?: string
+  readonly resumeId?: string
   readonly surface?: AgentRuntimeSurface
   readonly toolStatus?: 'running' | 'completed' | 'failed'
   readonly toolName?: string

@@ -23,6 +23,8 @@ export const AGENT_RUNTIME_EVENT_TYPES = [
   'runtime.turn.tool',
   'runtime.turn.error',
   'dev.sonner_test',
+  'inbox.received',
+  'news.ingested',
 ] as const
 
 export type AgentRuntimeEventType = (typeof AGENT_RUNTIME_EVENT_TYPES)[number]
@@ -30,6 +32,22 @@ export type AgentRuntimeSurface = 'terminal' | 'webpi' | 'headless'
 export type AgentRuntimeStopStatus = 'done' | 'failed' | 'interrupted' | 'paused'
 export type AgentRuntimeToolStatus = 'running' | 'completed' | 'failed'
 export type SonnerTestState = 'running' | 'success' | 'error'
+
+export type ProductActivityFamily = 'agent' | 'inbox' | 'news' | 'dev' | (string & {})
+
+export interface ProductActivityFamilyDefinition<TType extends string, TPayload> {
+  readonly family: ProductActivityFamily
+  readonly types: readonly TType[]
+  readonly accepts?: (type: TType, payload: unknown) => payload is TPayload
+}
+
+export interface ProductActivityRecorder<TType extends string, TPayload> {
+  record(
+    type: TType,
+    payload: TPayload,
+    opts?: { readonly causedBy?: number },
+  ): Promise<AgentRuntimeEvent | null>
+}
 
 export interface AgentRuntimeTurnMetrics {
   readonly textBlocks: number
@@ -60,6 +78,29 @@ export interface AgentRuntimeSubject {
   readonly taskId?: string
   readonly surface?: AgentRuntimeSurface
   readonly cause?: AgentRuntimeCause
+}
+
+export interface InboxActivityPayload {
+  readonly workspaceId: string
+  readonly inboxEntryId: string
+  readonly workspaceLabel?: string
+  readonly agent?: string
+  readonly resumeId?: string
+  readonly sessionRecordId?: string
+  readonly taskId?: string
+  readonly originKind?: 'headless' | 'interactive' | 'manual'
+  readonly summary?: string
+  readonly documentCount: number
+}
+
+export interface NewsActivityPayload {
+  readonly newsItemId: number
+  readonly dedupKey: string
+  readonly title: string
+  readonly source?: string
+  readonly link?: string
+  readonly publishedAt: number
+  readonly ingestSource: string
 }
 
 export type AgentRuntimePayload =
@@ -94,6 +135,8 @@ export type AgentRuntimePayload =
       readonly testState: SonnerTestState
       readonly message: string
     })
+  | InboxActivityPayload
+  | NewsActivityPayload
 
 export type AgentRuntimeEvent = EventLogEntry<AgentRuntimePayload> & {
   readonly type: AgentRuntimeEventType
@@ -103,8 +146,9 @@ interface LoggerLike {
   warn(message: string, meta?: Record<string, unknown>): void
 }
 
-export class AgentRuntimeLog {
+export class ProductActivityJournal {
   private readonly latestBySession = new Map<string, AgentRuntimeEvent>()
+  private readonly registeredFamilies = new Map<string, ProductActivityFamily>()
   private total = 0
   private first = 0
 
@@ -113,14 +157,46 @@ export class AgentRuntimeLog {
     private readonly logger: LoggerLike,
   ) {}
 
-  static async open(path: string, logger: LoggerLike): Promise<AgentRuntimeLog> {
+  static async open(path: string, logger: LoggerLike): Promise<ProductActivityJournal> {
     const events = await createEventLog({ logPath: path, bufferSize: 2_000 })
-    const log = new AgentRuntimeLog(events, logger)
+    const log = new ProductActivityJournal(events, logger)
     // EventLog restores only its bounded recent ring. Recover the compact live
     // projection once here so Office polling never has to rescan the journal.
     // The projection keeps one enriched event per Session, not the full log.
     log.recoverProjection(await events.read())
+    log.registerTypes('agent', AGENT_RUNTIME_EVENT_TYPES.filter((type) =>
+      type === 'session.born' || type.startsWith('runtime.'),
+    ))
+    log.registerTypes('dev', ['dev.sonner_test'])
     return log
+  }
+
+  /**
+   * Install one product activity family and receive a scoped recorder.
+   * Optional products call this at startup; the journal itself does not import
+   * or start those products and never dispatches work from recorded facts.
+   */
+  registerFamily<TType extends string, TPayload>(
+    definition: ProductActivityFamilyDefinition<TType, TPayload>,
+  ): ProductActivityRecorder<TType, TPayload> {
+    this.registerTypes(definition.family, definition.types)
+    return {
+      record: async (type, payload, opts) => {
+        if (definition.accepts && !definition.accepts(type, payload)) {
+          this.logger.warn('product_activity_log.payload_rejected', {
+            family: definition.family,
+            type,
+          })
+          return null
+        }
+        return this.record(type as AgentRuntimeEventType, payload as AgentRuntimePayload, opts)
+      },
+    }
+  }
+
+  familyOf(type: string): ProductActivityFamily {
+    return this.registeredFamilies.get(type)
+      ?? (type === 'session.born' || type.startsWith('runtime.') ? 'agent' : type.split('.')[0] || 'unknown')
   }
 
   lastSeq(): number {
@@ -144,6 +220,10 @@ export class AgentRuntimeLog {
     payload: AgentRuntimePayload,
     opts?: { readonly causedBy?: number },
   ): Promise<AgentRuntimeEvent | null> {
+    if (!this.registeredFamilies.has(type)) {
+      this.logger.warn('product_activity_log.type_not_registered', { type })
+      return null
+    }
     try {
       const entry = await this.events.append(type, payload, opts)
       const event = { ...entry, type }
@@ -232,11 +312,28 @@ export class AgentRuntimeLog {
 
   private asAgentRuntimeEvents(entries: readonly EventLogEntry[]): AgentRuntimeEvent[] {
     return entries.flatMap((entry) => {
-      if (!isAgentRuntimeEventType(entry.type)) return []
-      return [{ ...entry, type: entry.type, payload: entry.payload as AgentRuntimePayload }]
+      if (!isAgentRuntimeEventType(entry.type) && !this.registeredFamilies.has(entry.type)) return []
+      return [{
+        ...entry,
+        type: entry.type as AgentRuntimeEventType,
+        payload: entry.payload as AgentRuntimePayload,
+      }]
     })
   }
+
+  private registerTypes(family: ProductActivityFamily, types: readonly string[]): void {
+    for (const type of types) {
+      const existing = this.registeredFamilies.get(type)
+      if (existing && existing !== family) {
+        throw new Error(`Product activity type ${type} is already registered by ${existing}`)
+      }
+      this.registeredFamilies.set(type, family)
+    }
+  }
 }
+
+/** Compatibility name for the first shipped Agent-only journal surface. */
+export { ProductActivityJournal as AgentRuntimeLog }
 
 export function isAgentRuntimeEventType(value: string): value is AgentRuntimeEventType {
   return (AGENT_RUNTIME_EVENT_TYPES as readonly string[]).includes(value)
