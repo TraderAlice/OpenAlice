@@ -95,6 +95,36 @@ describe('OfficeBuilding', () => {
     expect(building.querySelector('svg')).toBeNull()
   })
 
+  it('gives the Prediction Workspace its own forecasting console', () => {
+    render(
+      <OfficeBuilding
+        building={{
+          config: {
+            workspaceSleepAfterMs: 1,
+            harnessMinimumVisibleGroups: { chat: 0, 'auto-quant': 0, prediction: 1, other: 0 },
+          },
+          lastSeq: 1,
+          firstSeq: 1,
+          offices: [{
+            workspace: { id: 'prediction-1', tag: 'prediction', harness: 'prediction' },
+            lastInteractionAt: Date.now(),
+            sleeping: false,
+            employees: [],
+          }],
+        }}
+        onSelectEmployee={vi.fn()}
+        onOpenEmployee={vi.fn()}
+        onOpenFiles={vi.fn()}
+        onOpenRoster={vi.fn()}
+        onOpenLog={vi.fn()}
+      />,
+    )
+
+    const prop = screen.getByTestId('office-pod-prediction-1')
+      .querySelector<HTMLImageElement>('.oa-office-pod__harness-prop')
+    expect(prop?.src).toContain('/office/furniture/prediction-console-v1.png')
+  })
+
   it('moves from the touch pad immediately and repeats while held', () => {
     vi.useFakeTimers()
     try {

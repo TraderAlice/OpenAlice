@@ -18,6 +18,7 @@ export const OFFICE_FURNITURE = {
     workspaceRug: '/office/furniture/workspace-rug-v2.png',
     coffeeStation: '/office/furniture/coffee-station-v2.png',
     serverRack: '/office/furniture/server-rack-v2.png',
+    predictionConsole: '/office/furniture/prediction-console-v1.png',
     personnelBoard: '/office/furniture/personnel-board-v2.png',
     operationsBoard: '/office/furniture/operations-board-v2.png',
     workspaceSign: '/office/furniture/workspace-sign-v2.png',

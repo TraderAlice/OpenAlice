@@ -25,6 +25,7 @@ describe('OFFICE_FURNITURE', () => {
       workspaceRug: [264, 138],
       coffeeStation: [72, 72],
       serverRack: [48, 72],
+      predictionConsole: [72, 88],
       personnelBoard: [48, 48],
       operationsBoard: [176, 132],
       workspaceSign: [264, 64],

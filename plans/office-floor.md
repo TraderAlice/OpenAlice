@@ -54,7 +54,7 @@ Session、Files 或 provenance。
    鼠标/触控拖动平移，WASD/方向键移动 Alice，Reset 恢复自动取景。
 5. **显示优先级为 minimum > awake > sleeping。** 每个 Harness 先保留最近交互的
    `harnessMinimumVisibleGroups` 个 Workspace，再加入其他 awake Workspace；其余只在
-   All groups 中出现。默认 `chat=1`、`auto-quant=1`、`other=0`。
+   All groups 中出现。默认 `chat=1`、`auto-quant=1`、`prediction=1`、`other=0`。
 6. **休眠是对象状态，不是区域滤镜。** 地板和家具保持同一环境色；只降低员工、
    terminal 指示和铭牌状态。
 7. **状态通过角色和物件表达。** working/talking/waiting/review/failed 继续来自
@@ -237,13 +237,20 @@ Harness-neighborhood increment (2026-08-29):
   backgrounds, and generated set dressing on the shared floor. Chose generated set dressing because
   it adds readable world semantics without restoring card boundaries or fragmenting the continuous map.
 - Generated and alpha-checked a Chat coffee station and AutoQuant server rack from the locked Office
-  style master; Prediction retains the generated terminal kiosk and generic groups retain the plant.
+  style master; generic groups retain the plant.
+- Added the existing Auto Prediction demo Workspace to the Office floor as a third first-class pod, then
+  generated and alpha-checked a dedicated probability-and-evidence console so Prediction no longer reuses
+  the generic terminal kiosk.
 - Rebuilt employee inspection as a compact RPG dialogue: the real animated employee sprite is the
   portrait, live activity becomes dialogue, state/location stay readable, and drawers act as inventory.
 - Repaired the demo drawer provenance path to open an actual shared demo Workspace artifact instead of
   ending at a file-not-found state.
-- Browser-confirmed the real `/office` route, both Harness props, employee selection, responsive field
+- Browser-confirmed the real `/office` route, all three first-class Harness props, employee selection, responsive field
   wrapping, Open session to the recorded WebPi session, and drawer-to-file navigation.
+- Rechecked the three-pod desktop composition, 390x844 pannable map with no page-level horizontal overflow,
+  and the Prediction sign-to-cabinet interaction after adding the third demo pod.
+- Root/UI TypeScript, the 606-file Vitest run (5,027 passing; one file and nine tests skipped), and the UI
+  production build passed after the Prediction increment.
 - `npx tsc --noEmit` passed
 - `cd ui && npx tsc -b` passed
 - `pnpm test` passed: 589 files / 4967 tests, 1 file / 9 tests skipped

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  DEMO_AUTO_PREDICTION_WORKSPACE_ID,
   DEMO_AUTO_QUANT_WORKSPACE_ID,
   DEMO_CHAT_WORKSPACE_ID,
   demoChatWorkspace,
@@ -50,6 +51,16 @@ export const officeHandlers = [
         },
         {
           workspace: { id: DEMO_AUTO_QUANT_WORKSPACE_ID, tag: 'auto-quant', harness: 'auto-quant' },
+          lastInteractionAt: now,
+          sleeping: false,
+          employees: [],
+        },
+        {
+          workspace: {
+            id: DEMO_AUTO_PREDICTION_WORKSPACE_ID,
+            tag: 'prediction',
+            harness: 'prediction',
+          },
           lastInteractionAt: now,
           sleeping: false,
           employees: [],

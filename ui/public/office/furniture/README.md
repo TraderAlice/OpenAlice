@@ -51,6 +51,7 @@ network console. It preserves the 204x102 wall-module canvas, so the fixture enr
 floor collision or a new card-shaped region. Its Night sibling keeps the same silhouette and uses restrained cyan
 machine light instead of dimming the whole Office scene.
 - `server-rack-v2.png` — AutoQuant neighborhood operations prop
+- `prediction-console-v1.png` — Auto Prediction probability-and-evidence console
 - `personnel-board-v2.png` — interactive roster prop for groups with more than four Sessions
 - `operations-board-v2.png` — floor landmark that opens the live occupancy log and replay
 - `workspace-sign-v2.png` — blank physical placard behind live Workspace, Harness, and agent text
@@ -100,3 +101,8 @@ recognizable service landmarks without crowding denser floors.
 cream two-drawer cabinet with its upper drawer pulled open and visibly empty. The transparent master was trimmed,
 hard-matted, and nearest-neighbor packaged on a native 96x88 canvas for the compact cabinet empty state; it contains
 no paper, folders, labels, characters, or UI frame.
+
+`prediction-console-v1.png` gives the Prediction neighborhood its own physical identity instead of reusing the
+generic terminal kiosk. Its abstract probability bars, branching outcome display, paired result lights, and paper
+evidence tray contain no baked text. The built-in image generator followed the locked style master; the repository
+copy removes the generated checkerboard, hard-mats the alpha, and packages the prop on a native 72x88 canvas.

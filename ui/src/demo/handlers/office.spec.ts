@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { setupServer } from 'msw/node'
 
 import {
+  DEMO_AUTO_PREDICTION_WORKSPACE_ID,
   DEMO_AUTO_QUANT_WORKSPACE_ID,
   DEMO_CHAT_RESUME_ID,
   DEMO_CHAT_SESSION_ID,
@@ -38,6 +39,7 @@ describe('demo Office handlers', () => {
     expect(body.offices.map((office) => office.workspace.id)).toEqual([
       DEMO_CHAT_WORKSPACE_ID,
       DEMO_AUTO_QUANT_WORKSPACE_ID,
+      DEMO_AUTO_PREDICTION_WORKSPACE_ID,
     ])
     expect(body.offices[0]?.employees[0]?.sessionRecordId).toBe(DEMO_CHAT_SESSION_ID)
     expect(body.offices[0]?.employees[0]?.resumeId).toBe(DEMO_CHAT_RESUME_ID)

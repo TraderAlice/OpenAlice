@@ -43,7 +43,7 @@ export function OfficeMapPod({
     : group.workspace.harness === 'auto-quant'
       ? OFFICE_FURNITURE.generated.serverRack
       : group.workspace.harness === 'prediction'
-        ? OFFICE_FURNITURE.generated.terminal
+        ? OFFICE_FURNITURE.generated.predictionConsole
         : OFFICE_FURNITURE.generated.plant
 
   return (
