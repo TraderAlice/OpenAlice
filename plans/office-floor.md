@@ -2728,6 +2728,21 @@ Balanced activity-journal follow-up (2026-08-30):
   Vitest run (5,112 passing; one file and nine tests skipped), and the production build; the existing large-chunk
   advisory is unchanged.
 
+Player-facing runtime-dialogue follow-up (2026-08-30):
+
+- Selected Grok completion #1635 in the repaired unified journal and found the result still exposed author syntax:
+  bold markers, backticks, Markdown links, and six list items rendered as a dense raw-text wall inside the game window.
+- Compared leaving raw output, rendering full Markdown, and projecting it into structured plain dialogue. Chose plain
+  dialogue: the Office journal is a game summary rather than a document reader, so preserving headings, paragraphs,
+  numbered steps, and bullets matters while rich prose components and raw author syntax do not.
+- Agent reports and completion replies now remove fenced-code wrappers, link destinations, headings, quotes, emphasis,
+  strike markers, and inline-code delimiters; list items become visible `•` beats and existing line breaks remain under
+  the journal's pre-wrapped text contract. Inbox summaries and News titles remain literal product data.
+- Browser replay of the same #1635 result retained its three layout headings, six bullets, formula text, and verdict
+  while removing every `**`, backtick, and Markdown link seam. The focused journal spec passed (1 file / 10 tests),
+  together with root/UI TypeScript, the full 617-file Vitest run (5,113 passing; one file and nine tests skipped), and
+  the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

@@ -179,6 +179,43 @@ describe('OfficeRuntimeSection', () => {
       .toBe('true')
   })
 
+  it('presents agent Markdown as structured game dialogue', async () => {
+    query.mockResolvedValue({
+      lastSeq: 1,
+      total: 1,
+      page: 1,
+      pageSize: 50,
+      totalPages: 1,
+      entries: [{
+        seq: 1,
+        ts: Date.now(),
+        type: 'runtime.stopped',
+        payload: {
+          resumeId: 'resume-dialogue',
+          status: 'done',
+          assistantText: [
+            '# **Verdict**',
+            '',
+            '- Use `Layout B` for the loop.',
+            '- Keep [history visible](https://example.com/history).',
+            '> ~~Discard~~ retire Layout C.',
+          ].join('\n'),
+        },
+      }],
+    })
+    const { container } = render(<OfficeRuntimeSection />)
+
+    await screen.findByRole('button', { name: /Task complete.*#0001/i })
+    const detail = container.querySelector('.oa-office-runtime__detail')
+    expect(detail?.textContent).toBe([
+      'Verdict',
+      '• Use Layout B for the loop.',
+      '• Keep history visible.',
+      'Discard retire Layout C.',
+    ].join('\n'))
+    expect(detail?.textContent).not.toMatch(/\*\*|`|\]\(|~~|^#/)
+  })
+
   it('keeps story events while switching between product activity channels', async () => {
     const now = Date.now()
     mockJournal([

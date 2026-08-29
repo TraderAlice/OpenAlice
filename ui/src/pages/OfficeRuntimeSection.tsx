@@ -59,9 +59,30 @@ function eventStatusLabel(status: AgentRuntimeEvent['payload']['status'], t: TFu
   return null
 }
 
+function officeRuntimeDialogue(value: string): string {
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/```[^\n]*\n([\s\S]*?)```/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/^\s*(\d+)[.)]\s+/gm, '$1. ')
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/__([^_\n]+)__/g, '$1')
+    .replace(/~~([^~\n]+)~~/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function eventDetail(event: AgentRuntimeEvent): string | null {
   const payload = event.payload
-  if (event.type === 'runtime.turn.text') return payload.text ?? null
+  if (event.type === 'runtime.turn.text') {
+    return payload.text ? officeRuntimeDialogue(payload.text) : null
+  }
   if (event.type === 'runtime.turn.tool') {
     return [payload.toolName, payload.toolStatus].filter(Boolean).join(' · ') || null
   }
@@ -69,7 +90,9 @@ function eventDetail(event: AgentRuntimeEvent): string | null {
   if (event.type === 'dev.sonner_test') return payload.message ?? null
   if (event.type === 'inbox.received') return payload.summary ?? null
   if (event.type === 'news.ingested') return payload.title ?? null
-  if (event.type === 'runtime.stopped' && payload.assistantText) return payload.assistantText
+  if (event.type === 'runtime.stopped' && payload.assistantText) {
+    return officeRuntimeDialogue(payload.assistantText)
+  }
   return null
 }
 
