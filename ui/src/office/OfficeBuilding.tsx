@@ -484,6 +484,43 @@ export function OfficeBuilding({
       touchMoveRepeatRef.current = window.setInterval(() => moveAlice(movement), 96)
     }, 220)
   }
+  useEffect(() => {
+    const handleAmbientKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented
+        || event.isComposing
+        || event.altKey
+        || event.ctrlKey
+        || event.metaKey
+        || floorInteractionSuspended
+        || departingWorkspace
+        || selected
+      ) return
+      if (event.target !== document.body && event.target !== viewportRef.current) return
+      const key = event.key.toLowerCase()
+      if ((key === 'enter' || key === ' ') && nearbyTarget) {
+        event.preventDefault()
+        activateNearbyTarget()
+        return
+      }
+      const movement = {
+        arrowleft: OFFICE_MOVEMENTS.left,
+        a: OFFICE_MOVEMENTS.left,
+        arrowright: OFFICE_MOVEMENTS.right,
+        d: OFFICE_MOVEMENTS.right,
+        arrowup: OFFICE_MOVEMENTS.up,
+        w: OFFICE_MOVEMENTS.up,
+        arrowdown: OFFICE_MOVEMENTS.down,
+        s: OFFICE_MOVEMENTS.down,
+      }[key]
+      if (!movement) return
+      event.preventDefault()
+      cancelAutoWalk()
+      moveAlice(movement)
+    }
+    document.addEventListener('keydown', handleAmbientKeyDown)
+    return () => document.removeEventListener('keydown', handleAmbientKeyDown)
+  })
   useEffect(() => () => {
     if (bumpFrameRef.current != null) window.cancelAnimationFrame(bumpFrameRef.current)
     if (bumpTimerRef.current != null) window.clearTimeout(bumpTimerRef.current)
@@ -713,29 +750,6 @@ export function OfficeBuilding({
         aria-label={replaySeq == null
           ? t(cameraPannable ? 'office.mapLabel' : 'office.mapLabelFixed')
           : t('office.replayMapLabel')}
-        onKeyDown={(event) => {
-          if (floorInteractionSuspended || departingWorkspace) return
-          const key = event.key.toLowerCase()
-          if ((key === 'enter' || key === ' ') && nearbyTarget && !selected) {
-            event.preventDefault()
-            activateNearbyTarget()
-            return
-          }
-          const movement = {
-            arrowleft: OFFICE_MOVEMENTS.left,
-            a: OFFICE_MOVEMENTS.left,
-            arrowright: OFFICE_MOVEMENTS.right,
-            d: OFFICE_MOVEMENTS.right,
-            arrowup: OFFICE_MOVEMENTS.up,
-            w: OFFICE_MOVEMENTS.up,
-            arrowdown: OFFICE_MOVEMENTS.down,
-            s: OFFICE_MOVEMENTS.down,
-          }[key]
-          if (!movement) return
-          event.preventDefault()
-          cancelAutoWalk()
-          moveAlice(movement)
-        }}
         onPointerDown={(event) => {
           if (floorInteractionSuspended || departingWorkspace) return
           if ((event.target as HTMLElement).closest('button')) return

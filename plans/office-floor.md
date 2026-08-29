@@ -1983,6 +1983,22 @@ Input-capability HUD follow-up (2026-08-29):
   `cd ui && npx tsc -b`, the 609-file Vitest run (5,042 passing; one file and nine tests skipped), and the UI
   production build all passed.
 
+Play-ready keyboard focus follow-up (2026-08-29):
+
+- Reloaded the real Office route and found its first input contradicted the HUD: focus correctly remained on BODY,
+  but W left Alice at `480,336` because movement was owned only by the focusable campus. The player had to discover
+  an undocumented click-to-arm step before the advertised WASD controls became real.
+- Compared auto-focusing the map, capturing every page key, and accepting ambient game keys only from an otherwise
+  idle page. Chose the scoped ambient model: BODY and the campus itself may issue movement or nearby interaction,
+  while buttons, menus, inputs, selected Agent files, departures, and paused floors retain ordinary UI ownership.
+  Ctrl, Meta, Alt, default-prevented, and IME-composition events are ignored so application and browser shortcuts do
+  not move Alice. One document listener replaces the old campus-only handler and is removed with the floor.
+- Browser-played fresh 1280x900, 844x390, and 390x844 routes. In every viewport, the first W moved Alice directly
+  from `480,336` to `480,312` with zero page overflow. W then S returned her to spawn on desktop; after Menu focus was
+  restored to its button, pressing D left Alice unchanged, proving that ambient play does not leak into controls.
+- The focused OfficeBuilding suite passed: 1 file / 10 tests. `npx tsc --noEmit`, `cd ui && npx tsc -b`, the 609-file
+  Vitest run (5,042 passing; one file and nine tests skipped), and the UI production build all passed.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log
