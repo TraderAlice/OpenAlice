@@ -7,7 +7,7 @@
  * PTY byte streams.
  *
  * Design notes:
- * - We use node-pty (not plain child_process) because both `claude` and
+ * - We use the selected PTY backend (not plain child_process) because both `claude` and
  *   `codex` change behavior dramatically in TUI vs. non-TTY mode (trust
  *   dialog, ANSI output, even argument parsing on some flags). The probe
  *   should exercise the same path a real user takes.
@@ -25,7 +25,8 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Logger } from './logger.js';
-import { loadNodePty } from './pty-runtime.js';
+import { loadPtyBackend } from './pty-runtime.js';
+import type { PtyBackend } from './pty-types.js';
 import { resolveLaunchCommand } from './win-command.js';
 
 export interface HeadlessProbeArgs {
@@ -40,7 +41,7 @@ export interface HeadlessProbeArgs {
   /** Closes directory-operation start races once the PTY actually exists. */
   readonly onSpawned?: () => void;
   /** Test seam; production loads the platform module only when probing. */
-  readonly pty?: Pick<typeof import('node-pty'), 'spawn'>;
+  readonly pty?: PtyBackend;
 }
 
 export interface JsonlFileDelta {
@@ -88,13 +89,13 @@ export async function runHeadlessProbe(args: HeadlessProbeArgs): Promise<Headles
   let signal: number | null = null;
   let killed = false;
 
-  const child = (args.pty ?? loadNodePty()).spawn(argv0, argv1, {
+  const child = (args.pty ?? loadPtyBackend()).spawn(argv0, argv1, {
+    name: 'xterm-256color',
     cwd,
     env: env as { [key: string]: string },
     cols: 80,
     rows: 24,
-    encoding: null,
-  } as never);
+  });
   args.onSpawned?.();
 
   child.onData((data) => {
