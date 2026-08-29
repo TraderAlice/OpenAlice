@@ -4403,8 +4403,8 @@
 
 .oa-office-mood-emote {
   position: absolute;
-  top: -30px;
-  left: 50%;
+  top: -4px;
+  left: 64%;
   z-index: 13;
   display: block;
   width: 48px;
@@ -4422,13 +4422,13 @@
 }
 
 .oa-office-mood-emote[data-kind="working"] {
+  width: 32px;
+  height: 32px;
   opacity: 0.9;
   animation: oa-office-emote-working 1.1s steps(2, end) infinite;
 }
 
 .oa-office-mood-emote[data-kind="sleeping"] {
-  top: -4px;
-  left: 64%;
   width: 40px;
   height: 40px;
   opacity: 0.82;

@@ -2853,6 +2853,23 @@ Sleeping-coworker state follow-up (2026-08-30):
   together with root/UI TypeScript, the full 617-file Vitest run (5,121 passing; one file and nine tests skipped), and
   the production build; the existing large-chunk advisory is unchanged.
 
+Coworker-emote slot follow-up (2026-08-30):
+
+- The real sleep-state run also exposed an older live-state defect: the shared 48×48 speech asset fills almost its
+  entire canvas, while generated waiting, failure, review, and sleep assets contain substantial transparent padding.
+  During Grok work, the visually oversized speech bubble floated above the desk and covered the Chat Workspace sign.
+- Compared repackaging the shared prompt asset, adding only a work-bubble exception, and defining one normalized status
+  slot beside every coworker's head. Chose the shared slot: the prompt also consumes the speech asset, and a one-state
+  patch would leave status location unpredictable as runtime mood changes.
+- All coworker emotes now anchor at the same head-side coordinate. The near-full speech asset renders in a 32×32 box;
+  sleep uses 40×40; padded generated states retain 48×48. Their resulting visible marks converge around 26–32px while
+  existing stepped motion and reduced-motion behavior remain intact.
+- Browser-played real AutoQuant Grok run `run-JJZl6J07`. At `1 working · 1 awake`, the work bubble remained beside the
+  Grok Engineer and left both `office-lab-quant` and the central control desk unobstructed; after the 29-second run, the
+  same slot returned to the sleep cue at `0 working · 0 awake`. Focused desk, asset, and responsive-style specs passed
+  (3 files / 30 tests), together with root/UI TypeScript, the full 617-file Vitest run (5,122 passing; one file and nine
+  tests skipped), and the production build; the existing large-chunk advisory is unchanged.
+
 ## Completion
 
 计划只在 maintainer 接受真实浏览器中的 Live、All groups、employee dialog 和 pause/log

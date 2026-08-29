@@ -84,6 +84,18 @@ describe('Office responsive style contract', () => {
     expect(css).not.toContain('@keyframes oa-office-route-target-pointer')
   })
 
+  it('anchors normalized coworker emotes beside the character instead of over room signs', () => {
+    expect(css).toMatch(
+      /\.oa-office-mood-emote\s*\{[^}]*top:\s*-4px;[^}]*left:\s*64%;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-mood-emote\[data-kind="working"\]\s*\{[^}]*width:\s*32px;[^}]*height:\s*32px;/s,
+    )
+    expect(css).toMatch(
+      /\.oa-office-mood-emote\[data-kind="sleeping"\]\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;/s,
+    )
+  })
+
   it('stacks window location and type as deliberate phone title lines', () => {
     expect(css).toMatch(/\.oa-office-window__title-copy\s*\{[\s\S]*?display: flex/)
     expect(css).toMatch(/\.oa-office-window__title-room\s*\{[\s\S]*?text-overflow: ellipsis/)
