@@ -65,7 +65,7 @@ describe('CLI installer dev publication workflow', () => {
 
   it('validates candidates before uploading immutable assets and fixed aliases', () => {
     const publish = workflow.jobs['publish-dev-cli']
-    expect(publish.needs).toEqual(['build-dev-cli', 'accept-dev-linuxbrew'])
+    expect(publish.needs).toEqual(['build-dev-cli', 'accept-dev-linuxbrew', 'accept-dev-aur'])
     expect(step(publish, 'Validate candidates and prepare channel aliases').run)
       .toContain('prepare-cli-dev-assets.mjs')
     const upload = step(publish, 'Publish immutable candidates and activate dev aliases').run ?? ''
@@ -83,6 +83,17 @@ describe('CLI installer dev publication workflow', () => {
     ])
     expect(step(linuxbrew, 'Accept the dev archives through Linuxbrew').run)
       .toContain('cli-linuxbrew-smoke.mjs')
+  })
+
+  it('accepts Arch/AUR packages on both native Linux architectures before publication', () => {
+    const aur = workflow.jobs['accept-dev-aur']
+    expect(aur.needs).toBe('build-dev-cli')
+    expect(aur.strategy?.matrix?.include).toEqual([
+      { os: 'ubuntu-24.04', arch: 'x64' },
+      { os: 'ubuntu-24.04-arm', arch: 'arm64' },
+    ])
+    expect(step(aur, 'Accept the dev archives through Arch/AUR').run)
+      .toContain('cli-aur-container-smoke.mjs')
   })
 
   it('runs the live network install only after a successful push publication', () => {
