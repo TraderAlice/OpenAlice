@@ -52,6 +52,36 @@ Then establish ownership of the checkout:
 
 Delivery mode controls merge authority, not implementation quality.
 
+### Feature-branch iteration hold
+
+Feature-branch iteration is an explicit natural-language instruction, not a
+third delivery mode or a configuration schema. A maintainer may say, for
+example, “keep this on a feature branch and iterate until I am satisfied.” The
+hold applies independently to serial or parallel work and overrides their
+normal PR timing without changing their implementation or review standards.
+
+While the hold is active:
+
+1. keep the coherent initiative on one named branch based on `dev`;
+2. keep one integrator responsible for that branch; parallel workers use
+   temporary branches or worktrees and hand off commits;
+3. commit and push verified increments to the feature branch, but do not open
+   or merge a PR to `dev` yet;
+4. keep substantial multi-session scope and acceptance progress current in its
+   canonical `plans/<topic>.md` file using ordinary prose;
+5. continue to inspect known CI or integration failures before adding scope,
+   and periodically incorporate current `dev` without rewriting shared branch
+   history; and
+6. remain in the hold until the maintainer explicitly says the result is ready
+   for a PR, or explicitly abandons the branch.
+
+When the maintainer accepts the branch, first reconcile it with current `dev`,
+run the complete proportional verification for the accumulated diff, and then
+open the normal PR to `dev`. “Keep working,” an interactive follow-up, or a
+successful local increment does not implicitly end the hold. A held branch is
+also not a preview or release lane: `dev` and `master` retain their existing
+integration and promotion ownership.
+
 ### Serial / interactive
 
 This is the default when the user is actively requesting, reviewing, and
@@ -64,7 +94,8 @@ steering concrete work.
    and its post-merge `dev` run. Repair a completed failure before stacking more
    work; record a still-pending run without waiting on it.
 5. Open a PR to `dev`, confirm the intended base and head, and merge immediately
-   unless the user requests a review pause or earlier CI has a known failure.
+   unless the user requests a review pause, declares a feature-branch iteration
+   hold, or earlier CI has a known failure.
 6. Delete the merged feature branch and return to updated `dev`.
 
 The PR durably integrates the completed increment into `dev` and records its
@@ -84,7 +115,8 @@ into a coherent topic that a reviewer can understand as one product outcome:
 1. define the topic in one sentence and record its acceptance boundary and
    non-goals;
 2. start from latest `dev` on one topic branch and open a Draft PR after the
-   first verified increment;
+   first verified increment, unless a feature-branch iteration hold delays the
+   PR until maintainer acceptance;
 3. keep one integrator responsible for that branch; parallel workers use
    temporary branches or worktrees and hand off commits rather than racing to
    push the topic branch;

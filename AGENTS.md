@@ -105,10 +105,19 @@ for current ownership and entry points.
 
 Choose delivery authority before implementation:
 
+Feature-branch iteration is an explicit integration hold, not a third delivery
+mode. When the maintainer says to keep iterating on a feature branch until they
+are satisfied, keep all related increments on one owned branch and do not open
+or merge its PR to `dev` until the maintainer says it is ready. This instruction
+applies independently to serial or parallel work. It does not relax
+verification, known-failure handling, scope coherence, or the single-integrator
+rule; parallel workers still hand commits to the branch owner instead of racing
+to push it.
+
 | Mode | Trigger | Delivery to `dev` |
 |---|---|---|
-| Serial / interactive | Default: the user is actively requesting and steering concrete work | After proportional local verification, open and merge the PR without waiting for pending remote CI; delete the feature branch and return to updated `dev` unless the user says to pause |
-| Autonomous / topic contribution | Explicit `/goal` or direct request to autonomously find and contribute improvements | Keep one community-facing Draft PR for the active topic, add related work as atomic commits, and leave the topic unmerged for later acceptance |
+| Serial / interactive | Default: the user is actively requesting and steering concrete work | After proportional local verification, open and merge the PR without waiting for pending remote CI; delete the feature branch and return to updated `dev` unless the user says to pause or declares feature-branch iteration |
+| Autonomous / topic contribution | Explicit `/goal` or direct request to autonomously find and contribute improvements | Keep one community-facing Draft PR for the active topic, add related work as atomic commits, and leave the topic unmerged for later acceptance; an explicit feature-branch iteration hold delays opening that PR until the maintainer says the branch is ready |
 
 Internal agent decomposition must not become one GitHub PR per finding. Define a
 coherent topic and acceptance boundary, keep a single integrator responsible for
