@@ -103,6 +103,17 @@ external adapters remain optional projections rather than sources of truth.
     kill-switch, and external-owner terminology from user-facing setup copy. The
     row wraps into a vertical layout on narrow screens; its switch has a localized
     accessible name and state is not conveyed by color alone.
+12. **Credential setup starts with an in-context platform checklist.** A bare
+    help link would still make the user reconstruct the sequence after leaving
+    OpenAlice, while a full wizard would duplicate volatile third-party consoles
+    and become a maintenance trap. The chosen connection editor shows a compact,
+    localized preparation checklist only while required credentials are missing,
+    followed by official platform links that open in a new tab without dismissing
+    the dialog or losing drafts. Connector definitions own an optional list of
+    official setup links, so downstream adapters still render generically without
+    UI branching; built-in translations add concise platform-specific steps.
+    Links have explicit accessible names and an external-link cue, and the card
+    remains a single vertical reading order at narrow widths.
 
 ## Ordered Work
 
@@ -131,6 +142,8 @@ external adapters remain optional projections rather than sources of truth.
         delivery, and capability-gated Chat sections with first-use disclosure.
   - [x] Present the global Delivery service as a secondary pause-all control and
         remove implementation-oriented owner/Guardian/kill-switch setup copy.
+  - [x] Add a data-driven, localized platform preparation guide to first-time
+        credential setup without replacing the existing lifecycle.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -175,6 +188,17 @@ The card explains automatic service startup, retains pause-all and health state
 as secondary controls, uses a localized accessible switch, removes setup-facing
 owner/Guardian/kill-switch language, and introduces no horizontal overflow.
 No live service or adapter control was exercised.
+
+The platform-preparation increment passed 26 focused API/UI tests, the 15-test
+Connector protocol package suite, protocol and UI typechecks, the production UI
+build, and the full repository suite. Real-route acceptance opened the
+unconfigured Slack dialog at desktop and 390 px widths, where the localized
+checklist remained readable, preserved a single scroll column, and introduced no
+horizontal overflow. A separate `dev:demo` walkthrough verified the decoded
+definition contract, official-link target, new-tab behavior, and the same desktop
+and narrow layouts. The already-running real Connector process predates the new
+link metadata and was deliberately not restarted, so no active adapter or external
+account was disturbed.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.

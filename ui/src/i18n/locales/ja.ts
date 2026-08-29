@@ -2071,6 +2071,45 @@ export const ja: Resources = {
     hideConnectionDetailsAria: '{{name}} の接続情報を閉じる',
     manageConnectionDetailsAria: '{{name}} の接続情報を管理',
     secretsNote: '保存済みトークンはローカルで暗号化され、送り返しません。貼り付け内容を確認するときだけ下書きを表示してください。',
+    setupGuide: {
+      title: '先に {{name}} を準備',
+      description: '{{name}} アプリを作成または開き、接続情報を用意してここに戻ります。',
+      openSetup: '{{name}} の設定を開く',
+      openSetupAria: '{{label}} を新しいタブで開く',
+      links: {
+        discordPortal: 'Discord Developer Portal',
+        telegramBotFather: '@BotFather を開く',
+        slackPortal: 'Slack アプリ設定',
+        feishuPortal: 'Feishu 開発者コンソール',
+        larkPortal: 'Lark 開発者コンソール',
+      },
+    },
+    setupGuides: {
+      discord: {
+        description: 'ユーザーインストール型の Discord アプリを使います。Bot の起動時に OpenAlice がスラッシュコマンドを公開します。',
+        step1: 'アプリケーションを作成し、Application ID をコピーします。',
+        step2: 'Bot ページで Bot トークンをリセットまたはコピーし、安全に保管します。',
+        step3: 'Installation で User Install と applications.commands を有効にし、アプリを自分のアカウントへインストールします。',
+      },
+      telegram: {
+        description: 'BotFather で、OpenAlice が実行するプライベート Bot を作成します。',
+        step1: 'Telegram で @BotFather を開き、/newbot を送信します。',
+        step2: '名前と「bot」で終わるユーザー名を決め、生成されたトークンをコピーします。',
+        step3: '下にトークンを貼り付けます。Bot の起動後、OpenAlice が /link の送信を案内します。',
+      },
+      slack: {
+        description: 'ワークスペースにインストールする Socket Mode アプリを使います。公開 Request URL は不要です。',
+        step1: '利用する Slack ワークスペースでアプリを新規作成します。',
+        step2: 'chat:write、im:write、files:write の Bot スコープを追加してインストールし、xoxb トークンをコピーします。',
+        step3: 'Socket Mode を有効にし、connections:write 付き xapp トークンと /link、/status、/test、/inbox、/settings、/uta コマンドを作成します。',
+      },
+      feishu: {
+        description: 'Bot と長時間接続を持つ企業内製アプリを使います。カスタム Webhook では /link を受信できません。',
+        step1: 'Feishu または Lark のコンソールで企業内製アプリを作成し、Bot 機能を有効にします。',
+        step2: 'メッセージ権限を付与し、長時間接続で im.message.receive_v1 を購読してからアプリを公開します。',
+        step3: 'App ID と App Secret をコピーし、下で同じ Feishu または Lark プラットフォームを選びます。',
+      },
+    },
     showDraft: '下書きを表示',
     hideDraft: '下書きを隠す',
     fields: {

@@ -204,8 +204,11 @@ remain untouched rather than being silently misrouted. Proxy URLs and
 credentials must never be logged.
 
 The Settings API never returns a bot token. It returns field definitions,
-non-secret values, and `configuredSecrets` presence markers. The Settings
-draft field is masked by default to keep tokens out of screenshots and
+optional official `setupLinks`, non-secret values, and `configuredSecrets`
+presence markers. Setup links are definition-owned metadata rather than
+hard-coded adapter branches in the renderer; built-in localized checklists may
+enrich them, while an external adapter still receives the generic guide. The
+Settings draft field is masked by default to keep tokens out of screenshots and
 screenshares; an explicit reveal control lets the operator verify a paste.
 Saving an empty secret keeps the stored value; explicitly removing its presence clears it.
 A non-empty secret body is accepted only when it is a plausible token (at
@@ -329,7 +332,10 @@ saved but no bot process exists to receive `/link`.
 The surfaces deliberately have different jobs:
 
 - **Settings → Connectors** owns credentials, the setup sequence, enable/stop,
-  unlink, linking instructions, and explicit test sends. The Telegram card also
+  unlink, linking instructions, and explicit test sends. While credentials are
+  missing, it keeps a short platform checklist and official console links beside
+  the fields; those links open without dismissing the configuration dialog or
+  losing its drafts. The Telegram card also
   binds that connector's phone-desk Issue when the adapter advertises `desk`:
   the Workspace picker defaults to the Ask Alice Chat workspace. The operator
   can edit What and heartbeat cadence, then open the ordinary Issue detail
@@ -357,9 +363,10 @@ The surfaces deliberately have different jobs:
 - **Dev Panel** may expose logs and replay tooling, but it is not a product
   configuration surface.
 
-The Connector Service switch is a global kill switch. Starting an adapter from
-the setup flow may enable the service and adapter together; stopping the global
-service never deletes sealed credentials or the learned owner. Health polling
+The Connector Service switch is a secondary pause-all control. Starting an
+adapter from the setup flow enables the service automatically, so it is not a
+separate first-use prerequisite; pausing the global service never deletes sealed
+credentials or the learned account link. Health polling
 during linking updates runtime health only. It must not replace the current
 Settings draft, reveal secrets, or create an auto-save/restart loop.
 

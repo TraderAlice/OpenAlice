@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { TFunction } from 'i18next'
-import { Bot, CheckCircle2, ChevronDown, CircleAlert, Eye, EyeOff, KeyRound, Link2, Power, RefreshCw, Send, ShieldCheck, Unlink } from 'lucide-react'
+import { Bot, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Eye, EyeOff, KeyRound, Link2, ListChecks, Power, RefreshCw, Send, ShieldCheck, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api, type ConnectorDefinition, type ConnectorHealth, type PublicConnectorConfig } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -679,6 +679,7 @@ function ConnectorCredentialsEditor({
         inert={!open ? true : undefined}
         className="oa-disclosure-enter border-t border-border/60 px-3.5 pb-4 pt-3"
       >
+        {!ready && <ConnectorSetupGuide definition={definition} t={t} />}
         <p className="mb-4 text-[11.5px] leading-5 text-muted-foreground">
           {t('connectorSettings.secretsNote')}
         </p>
@@ -791,6 +792,66 @@ function ConnectorCredentialsEditor({
         })}
       </div>
     </section>
+  )
+}
+
+function ConnectorSetupGuide({ definition, t }: { definition: ConnectorDefinition; t: TFunction }) {
+  const steps = [1, 2, 3]
+    .map((step) => t(`connectorSettings.setupGuides.${definition.id}.step${step}`, { defaultValue: '' }))
+    .filter((step) => typeof step === 'string' && step.trim().length > 0)
+
+  return (
+    <aside className="mb-4 rounded-xl border border-primary/15 bg-primary/[0.045] p-3.5">
+      <div className="flex items-start gap-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <ListChecks size={16} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-[12.5px] font-semibold text-foreground">
+            {t('connectorSettings.setupGuide.title', { name: definition.label })}
+          </h4>
+          <p className="mt-0.5 text-[11.5px] leading-5 text-muted-foreground">
+            {t(`connectorSettings.setupGuides.${definition.id}.description`, {
+              defaultValue: t('connectorSettings.setupGuide.description', { name: definition.label }),
+            })}
+          </p>
+        </div>
+      </div>
+      {steps.length > 0 && (
+        <ol className="mt-3 space-y-2 pl-11 text-[11.5px] leading-5 text-foreground/90">
+          {steps.map((step, index) => (
+            <li key={step} className="flex gap-2">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-background/70 text-[10px] font-semibold text-primary">
+                {index + 1}
+              </span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {definition.setupLinks && definition.setupLinks.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2 pl-11">
+          {definition.setupLinks.map((link) => {
+            const label = t(`connectorSettings.setupGuide.links.${link.key}`, {
+              defaultValue: t('connectorSettings.setupGuide.openSetup', { name: definition.label }),
+            })
+            return (
+              <a
+                key={link.key}
+                href={link.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={t('connectorSettings.setupGuide.openSetupAria', { label })}
+                className="oa-pressable inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-background/65 px-2.5 py-1.5 text-[11px] font-medium text-primary hover:border-primary/40 hover:bg-primary/5"
+              >
+                {label}
+                <ExternalLink size={12} aria-hidden />
+              </a>
+            )
+          })}
+        </div>
+      )}
+    </aside>
   )
 }
 

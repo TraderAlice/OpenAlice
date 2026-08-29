@@ -49,6 +49,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta'],
+      setupLinks: [
+        { key: 'discordPortal', url: 'https://discord.com/developers/applications' },
+      ],
     },
     {
       id: 'telegram',
@@ -99,6 +102,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta', 'desk'],
+      setupLinks: [
+        { key: 'telegramBotFather', url: 'https://t.me/BotFather' },
+      ],
     },
     {
       id: 'slack',
@@ -147,6 +153,9 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta'],
+      setupLinks: [
+        { key: 'slackPortal', url: 'https://api.slack.com/apps' },
+      ],
     },
     {
       id: 'feishu',
@@ -213,6 +222,10 @@ export const demoConnectorSnapshot: ConnectorSettingsSnapshot = {
         { name: 'uta', description: 'Review and approve pending trades.' },
       ],
       capabilities: ['inbox', 'settings', 'uta', 'desk'],
+      setupLinks: [
+        { key: 'feishuPortal', url: 'https://open.feishu.cn/app' },
+        { key: 'larkPortal', url: 'https://open.larksuite.com/app' },
+      ],
     },
   ],
   config: {

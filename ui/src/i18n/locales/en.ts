@@ -2103,6 +2103,45 @@ export const en = {
     hideConnectionDetailsAria: 'Hide {{name}} connection details',
     manageConnectionDetailsAria: 'Manage {{name}} connection details',
     secretsNote: 'OpenAlice seals the stored token and never sends it back. Reveal the draft only when you need to check the paste.',
+    setupGuide: {
+      title: 'Prepare {{name}} first',
+      description: 'Create or open your {{name}} app, then return here with its connection details.',
+      openSetup: 'Open {{name}} setup',
+      openSetupAria: 'Open {{label}} in a new tab',
+      links: {
+        discordPortal: 'Discord Developer Portal',
+        telegramBotFather: 'Open @BotFather',
+        slackPortal: 'Slack app settings',
+        feishuPortal: 'Feishu developer console',
+        larkPortal: 'Lark developer console',
+      },
+    },
+    setupGuides: {
+      discord: {
+        description: 'Use a user-installed Discord app. OpenAlice publishes its slash commands when the bot starts.',
+        step1: 'Create an application and copy its Application ID.',
+        step2: 'Open Bot, reset or copy the bot token, and keep it private.',
+        step3: 'Under Installation, enable User Install with applications.commands, then install the app to your account.',
+      },
+      telegram: {
+        description: 'BotFather creates the private bot that OpenAlice runs for you.',
+        step1: 'Open @BotFather in Telegram and send /newbot.',
+        step2: 'Choose a name and a username ending in “bot”, then copy the generated token.',
+        step3: 'Paste the token below. OpenAlice will start the bot before asking you to send /link.',
+      },
+      slack: {
+        description: 'Use a workspace-installed app with Socket Mode; OpenAlice does not need a public Request URL.',
+        step1: 'Create an app from scratch in the Slack workspace you want to use.',
+        step2: 'Add chat:write, im:write, and files:write bot scopes, install the app, and copy its xoxb token.',
+        step3: 'Enable Socket Mode, create an xapp token with connections:write, and add /link, /status, /test, /inbox, /settings, and /uta commands.',
+      },
+      feishu: {
+        description: 'Use an enterprise self-built app with a bot and long connection; custom webhooks cannot receive /link.',
+        step1: 'Create a self-built app in the Feishu or Lark console and enable its bot capability.',
+        step2: 'Grant message permissions, subscribe to im.message.receive_v1 with long connection, then publish the app.',
+        step3: 'Copy the App ID and App secret, and choose the same Feishu or Lark platform below.',
+      },
+    },
     showDraft: 'Show draft',
     hideDraft: 'Hide draft',
     fields: {

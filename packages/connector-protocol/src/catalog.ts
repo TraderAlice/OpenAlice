@@ -52,6 +52,9 @@ export const DISCORD_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'uta', description: 'Review and approve pending trades.' },
     ],
     capabilities: ['inbox', 'settings', 'uta'],
+    setupLinks: [
+      { key: 'discordPortal', url: 'https://discord.com/developers/applications' },
+    ],
   }
 
 export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
@@ -103,6 +106,9 @@ export const TELEGRAM_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'uta', description: 'Review and approve pending trades.' },
     ],
     capabilities: ['inbox', 'settings', 'uta', 'desk'],
+    setupLinks: [
+      { key: 'telegramBotFather', url: 'https://t.me/BotFather' },
+    ],
   }
 
 export const SLACK_CONNECTOR_DEFINITION: ConnectorDefinition = {
@@ -152,6 +158,9 @@ export const SLACK_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'uta', description: 'Review and approve pending trades.' },
     ],
     capabilities: ['inbox', 'settings', 'uta'],
+    setupLinks: [
+      { key: 'slackPortal', url: 'https://api.slack.com/apps' },
+    ],
   }
 
 export const FEISHU_CONNECTOR_DEFINITION: ConnectorDefinition = {
@@ -219,6 +228,10 @@ export const FEISHU_CONNECTOR_DEFINITION: ConnectorDefinition = {
       { name: 'uta', description: 'Review and approve pending trades.' },
     ],
     capabilities: ['inbox', 'settings', 'uta', 'desk'],
+    setupLinks: [
+      { key: 'feishuPortal', url: 'https://open.feishu.cn/app' },
+      { key: 'larkPortal', url: 'https://open.larksuite.com/app' },
+    ],
   }
 
 export const BUILTIN_CONNECTOR_DEFINITIONS: ConnectorDefinition[] = [

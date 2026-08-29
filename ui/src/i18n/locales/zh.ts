@@ -2070,6 +2070,45 @@ export const zh: Resources = {
     hideConnectionDetailsAria: '收起 {{name}} 连接信息',
     manageConnectionDetailsAria: '管理 {{name}} 连接信息',
     secretsNote: '已保存的令牌会在本地加密，也不会回传。仅在需要核对粘贴内容时显示草稿。',
+    setupGuide: {
+      title: '先准备好 {{name}}',
+      description: '创建或打开你的 {{name}} 应用，再带着连接信息回到这里。',
+      openSetup: '打开 {{name}} 设置',
+      openSetupAria: '在新标签页打开{{label}}',
+      links: {
+        discordPortal: 'Discord 开发者后台',
+        telegramBotFather: '打开 @BotFather',
+        slackPortal: 'Slack 应用设置',
+        feishuPortal: '飞书开发者后台',
+        larkPortal: 'Lark 开发者后台',
+      },
+    },
+    setupGuides: {
+      discord: {
+        description: '使用可由用户安装的 Discord 应用；机器人启动时，OpenAlice 会自动发布斜杠命令。',
+        step1: '创建应用并复制 Application ID。',
+        step2: '进入 Bot 页面，重置或复制机器人令牌，并妥善保管。',
+        step3: '在 Installation 中开启 User Install 与 applications.commands，再把应用安装到你的账号。',
+      },
+      telegram: {
+        description: 'BotFather 会创建由 OpenAlice 为你运行的私有机器人。',
+        step1: '在 Telegram 中打开 @BotFather，并发送 /newbot。',
+        step2: '设置名称和以“bot”结尾的用户名，然后复制生成的令牌。',
+        step3: '在下方粘贴令牌；OpenAlice 启动机器人后会引导你发送 /link。',
+      },
+      slack: {
+        description: '使用安装到工作区的 Socket Mode 应用；OpenAlice 不需要公网 Request URL。',
+        step1: '在你准备使用的 Slack 工作区中从头创建一个应用。',
+        step2: '添加 chat:write、im:write、files:write Bot 权限，安装应用并复制 xoxb 令牌。',
+        step3: '开启 Socket Mode，创建带 connections:write 的 xapp 令牌，并添加 /link、/status、/test、/inbox、/settings、/uta 命令。',
+      },
+      feishu: {
+        description: '使用带机器人和长连接的企业自建应用；群机器人 Webhook 无法接收 /link。',
+        step1: '在飞书或 Lark 开发者后台创建企业自建应用，并开启机器人能力。',
+        step2: '授予消息权限，通过长连接订阅 im.message.receive_v1，然后发布应用。',
+        step3: '复制 App ID 与 App Secret，并在下方选择与后台一致的飞书或 Lark 平台。',
+      },
+    },
     showDraft: '显示草稿',
     hideDraft: '隐藏草稿',
     fields: {

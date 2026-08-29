@@ -21,6 +21,7 @@ export interface ConnectorDefinition {
   }>
   commands: Array<{ name: string; description: string }>
   capabilities?: Array<'inbox' | 'settings' | 'uta' | 'desk'>
+  setupLinks?: Array<{ key: string; url: string }>
 }
 
 export interface PublicConnectorConfig {
@@ -171,6 +172,11 @@ function isConnectorDefinition(value: unknown): boolean {
         && value.capabilities.every((capability) => (
           capability === 'inbox' || capability === 'settings' || capability === 'uta' || capability === 'desk'
         ))))
+    && (value.setupLinks === undefined
+      || (Array.isArray(value.setupLinks)
+        && value.setupLinks.every((link) => isRecord(link)
+          && typeof link.key === 'string'
+          && typeof link.url === 'string')))
 }
 
 function isPublicConnectorConfig(value: unknown): boolean {

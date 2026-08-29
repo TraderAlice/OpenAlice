@@ -25,6 +25,12 @@ export type ConnectorFieldDefinition = z.infer<typeof connectorFieldDefinitionSc
 export const connectorCapabilitySchema = z.enum(['inbox', 'settings', 'uta', 'desk'])
 export type ConnectorCapability = z.infer<typeof connectorCapabilitySchema>
 
+export const connectorSetupLinkSchema = z.object({
+  key: z.string().min(1),
+  url: z.string().url(),
+})
+export type ConnectorSetupLink = z.infer<typeof connectorSetupLinkSchema>
+
 export const connectorDefinitionSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -35,6 +41,8 @@ export const connectorDefinitionSchema = z.object({
     description: z.string().min(1),
   })).default([]),
   capabilities: z.array(connectorCapabilitySchema).optional(),
+  /** Official third-party entry points used by the generic credential guide. */
+  setupLinks: z.array(connectorSetupLinkSchema).max(3).optional(),
 })
 export type ConnectorDefinition = z.infer<typeof connectorDefinitionSchema>
 

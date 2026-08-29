@@ -2078,6 +2078,45 @@ export const zhHant: Resources = {
     hideConnectionDetailsAria: '收合 {{name}} 連線資訊',
     manageConnectionDetailsAria: '管理 {{name}} 連線資訊',
     secretsNote: '已儲存的權杖會在本機加密，也不會回傳。只在需要核對貼上內容時顯示草稿。',
+    setupGuide: {
+      title: '先準備好 {{name}}',
+      description: '建立或開啟你的 {{name}} 應用程式，再帶著連線資訊回到這裡。',
+      openSetup: '開啟 {{name}} 設定',
+      openSetupAria: '在新分頁開啟{{label}}',
+      links: {
+        discordPortal: 'Discord 開發者後台',
+        telegramBotFather: '開啟 @BotFather',
+        slackPortal: 'Slack 應用程式設定',
+        feishuPortal: '飛書開發者後台',
+        larkPortal: 'Lark 開發者後台',
+      },
+    },
+    setupGuides: {
+      discord: {
+        description: '使用可由使用者安裝的 Discord 應用程式；機器人啟動時，OpenAlice 會自動發布斜線指令。',
+        step1: '建立應用程式並複製 Application ID。',
+        step2: '進入 Bot 頁面，重設或複製機器人權杖，並妥善保管。',
+        step3: '在 Installation 中啟用 User Install 與 applications.commands，再把應用程式安裝到你的帳號。',
+      },
+      telegram: {
+        description: 'BotFather 會建立由 OpenAlice 為你執行的私人機器人。',
+        step1: '在 Telegram 中開啟 @BotFather，並傳送 /newbot。',
+        step2: '設定名稱和以「bot」結尾的使用者名稱，然後複製產生的權杖。',
+        step3: '在下方貼上權杖；OpenAlice 啟動機器人後會引導你傳送 /link。',
+      },
+      slack: {
+        description: '使用安裝到工作區的 Socket Mode 應用程式；OpenAlice 不需要公開 Request URL。',
+        step1: '在你準備使用的 Slack 工作區中從頭建立一個應用程式。',
+        step2: '加入 chat:write、im:write、files:write Bot 權限，安裝應用程式並複製 xoxb 權杖。',
+        step3: '啟用 Socket Mode，建立含 connections:write 的 xapp 權杖，並加入 /link、/status、/test、/inbox、/settings、/uta 指令。',
+      },
+      feishu: {
+        description: '使用含機器人與長連線的企業自建應用程式；群機器人 Webhook 無法接收 /link。',
+        step1: '在飛書或 Lark 開發者後台建立企業自建應用程式，並啟用機器人能力。',
+        step2: '授予訊息權限，透過長連線訂閱 im.message.receive_v1，然後發布應用程式。',
+        step3: '複製 App ID 與 App Secret，並在下方選擇與後台一致的飛書或 Lark 平台。',
+      },
+    },
     showDraft: '顯示草稿',
     hideDraft: '隱藏草稿',
     fields: {
