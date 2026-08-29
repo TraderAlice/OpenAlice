@@ -412,16 +412,11 @@ function ConnectorOverviewCard({
   const ActionIcon = setupAction ? ArrowRight : Settings2
 
   return (
-    <article className="oa-status-surface group flex flex-col rounded-2xl border border-border bg-secondary/20 p-5 transition-colors hover:border-border/90 hover:bg-secondary/30 lg:min-h-[250px]">
+    <article className="oa-status-surface group flex flex-col rounded-2xl border border-border bg-secondary/20 p-5 transition-colors hover:border-border/90 hover:bg-secondary/30">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <ConnectorGlyph id={definition.id} />
-          <div className="min-w-0">
-            <h4 className="text-[15px] font-semibold text-foreground">{definition.label}</h4>
-            <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-              {t('connectorStatus.adapterDescription', { name: definition.label })}
-            </p>
-          </div>
+          <h4 className="min-w-0 text-[15px] font-semibold text-foreground">{definition.label}</h4>
         </div>
         <StatusBadge tone={presentation.tone}>{presentation.label}</StatusBadge>
       </div>

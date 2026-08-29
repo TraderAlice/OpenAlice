@@ -2260,7 +2260,6 @@ export const zhHant: Resources = {
     deliveryDescription: '管理已連接或正在設定的聊天管道。',
     availableTitle: '可用管道',
     availableDescription: '需要時再設定一個新的私人聊天管道。',
-    adapterDescription: '將收件匣通知投遞到你的私人 {{name}} 對話。',
     configuredCount: '已設定 {{count}} 個',
     activeCount: '執行中 {{count}} 個',
     attentionCount: '需處理 {{count}} 個',

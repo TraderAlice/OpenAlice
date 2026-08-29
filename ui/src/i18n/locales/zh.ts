@@ -2252,7 +2252,6 @@ export const zh: Resources = {
     deliveryDescription: '管理已连接或正在设置的聊天渠道。',
     availableTitle: '可用渠道',
     availableDescription: '需要时再设置一个新的私聊渠道。',
-    adapterDescription: '将收件箱通知投递到你的私有 {{name}} 会话。',
     configuredCount: '已配置 {{count}} 个',
     activeCount: '运行中 {{count}} 个',
     attentionCount: '需处理 {{count}} 个',

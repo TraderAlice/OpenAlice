@@ -136,7 +136,7 @@ describe('Connector demo routes', () => {
     expect(screen.getByRole('button', { name: '设置 Feishu' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '投递服务' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '可用渠道' })).toBeTruthy()
-    expect(screen.getByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeTruthy()
+    expect(screen.queryByText('将收件箱通知投递到你的私有 Discord 会话。')).toBeNull()
     expect(screen.getAllByText('需要设置')).toHaveLength(4)
     expect(screen.queryByText('Delivery connectors')).toBeNull()
   })
@@ -318,7 +318,7 @@ describe('Connector demo routes', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Set up Slack' }))
     const dialog = await screen.findByRole('dialog')
-    const saveConnection = within(dialog).getByRole('button', { name: 'Save connection' }) as HTMLButtonElement
+    const saveConnection = await within(dialog).findByRole('button', { name: 'Save connection' }) as HTMLButtonElement
     const botToken = within(dialog).getByLabelText('Slack Bot token') as HTMLInputElement
     const appToken = within(dialog).getByLabelText('Slack App-level token') as HTMLInputElement
 

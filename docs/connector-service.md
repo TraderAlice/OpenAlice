@@ -382,7 +382,9 @@ The surfaces deliberately have different jobs:
   enabled, and partially configured adapters in stable definition order under
   Your channels. Only pristine adapters appear under Available channels, so
   transient runtime changes never reorder established targets and empty groups
-  do not add headings.
+  do not add headings. Cards omit the repeated generic delivery subtitle and do
+  not impose a fixed minimum height: the state explanation is the primary body,
+  while evidence and the next action remain in stable document order.
 - **Activity Bar → Connectors** shows a warning count for enabled, configured
   adapters that are degraded, stopped, unreachable, or stuck in `starting`
   beyond the grace window. `awaiting_link` remains setup state and does not

@@ -2285,7 +2285,6 @@ export const en = {
     deliveryDescription: 'Manage connected channels and setup already in progress.',
     availableTitle: 'Available channels',
     availableDescription: 'Set up another private channel when you need it.',
-    adapterDescription: 'Send Inbox notifications to your private {{name}} chat.',
     configuredCount: '{{count}} configured',
     activeCount: '{{count}} active',
     attentionCount: '{{count}} flagged',

@@ -2253,7 +2253,6 @@ export const ja: Resources = {
     deliveryDescription: '接続済み、または設定途中のチャットチャネルを管理します。',
     availableTitle: '利用可能なチャネル',
     availableDescription: '必要になったときに、新しいプライベートチャネルを設定できます。',
-    adapterDescription: '受信箱の通知を非公開の {{name}} チャットに配信します。',
     configuredCount: '{{count}} 件設定済み',
     activeCount: '{{count}} 件稼働中',
     attentionCount: '{{count}} 件要確認',

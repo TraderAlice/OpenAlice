@@ -218,6 +218,18 @@ external adapters remain optional projections rather than sources of truth.
     fixed header, focus trap, Escape/backdrop dismissal, draft preservation, and
     document position do not change. The shared ConfigurationDialog owns the
     sizing rule rather than each Connector form branching on its content.
+21. **Channel cards spend space on state, not a repeated capability tagline.**
+    Allowing the generic “Send Inbox notifications…” subtitle to wrap would
+    remove its visible truncation but make every card taller without adding
+    distinguishing information. Replacing it with capability chips would help a
+    marketplace comparison, but the current four adapters share delivery and
+    capability-specific setup already appears inside configuration. The chosen
+    card header contains only the platform identity and lifecycle badge. Its
+    plain-language state remains the primary body, followed by durable evidence,
+    diagnostics when present, and the next action. Removing the desktop 250 px
+    minimum lets single-card rows fit their actual content; CSS Grid still keeps
+    cards equal within a row, so action alignment and scan order remain stable.
+    No accessible name, focus behavior, state copy, or action semantics change.
 
 ## Ordered Work
 
@@ -264,6 +276,8 @@ external adapters remain optional projections rather than sources of truth.
         the Connector overview without state-driven card reordering.
   - [x] Make short desktop Connector dialogs content-sized while preserving
         bounded scrolling for long forms and near-full-height narrow layouts.
+  - [x] Remove repeated truncated card subtitles and fixed minimum heights so
+        the overview prioritizes state, evidence, and the next action.
 - [ ] Reconcile the accumulated branch with current `dev`, run full acceptance,
       and open a PR only after Ame says the branch is ready.
 
@@ -405,6 +419,18 @@ Slack and an expanded Discord connection both retained the 828 px near-full-
 height shell, internal scrolling, and a document width exactly matching the
 390 px viewport. Focus/dismissal behavior remained on the shared dialog
 primitive, no Connector action was triggered, and the viewport was reset.
+
+The compact-card increment passed 29 focused overview/demo tests, UI and root
+typechecks, the production build, and all 5,112 repository tests. Real desktop
+measurements kept the diagnostic-heavy Discord/Telegram row equal at 294 px,
+while Feishu reduced from 250 px to 226 px and pristine Slack from 250 px to
+197 px. No card rendered the repeated generic delivery subtitle. At 390 px,
+all four lifecycle states retained platform, textual state, evidence,
+diagnostics, and actions in document order; the page width remained exactly
+390 px. The first full-suite run exposed an existing async test race where the
+Slack assertion treated the open loading skeleton as loaded settings. The test
+now waits for Save connection, its targeted rerun passed, and the full suite
+then passed. No Connector action was triggered and the viewport was reset.
 
 Live Telegram, Discord, Slack, or Feishu delivery is reported as skipped unless
 Ame explicitly authorizes the external-account action.
